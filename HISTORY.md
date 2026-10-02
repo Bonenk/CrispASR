@@ -6,6 +6,24 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — PR #480 scheduler replay review
+
+The useful cached-compute rewire change already ships in v0.8.40's shared ggml
+pin, introduced by shared commit `890278a8342c620197c90e702e1188bcab94f510`.
+Keep that implementation: it additionally guards disposal when callers have
+rebuilt graph metadata at the same address. PR #480 unconditionally restores
+old source pointers and can overwrite the rebuilt graph; its older vendored
+ggml base and compile-only Windows workflow should not be merged wholesale.
+
+Hosted Vulkan/lavapipe proof [36999971712](https://github.com/CrispStrobe/CrispASR/actions/runs/36999971712)
+passes ten cached computes with changed CPU inputs, independent exact arithmetic,
+source restoration, recycled metadata and alloc-without-compute reset checks.
+Removing cached reapplication reproduces second-compute SIGBUS (status 135);
+removing disposal's state guard reproduces overwritten metadata (status 1).
+Permanent focused regression reruns on ggml pin changes. No physical-GPU
+performance or complete T3 synthesis claim. Receipt:
+`docs/scheduler-pr480-review-2026-10-02.json`.
+
 ## DONE 2026-10-02 — Dia full speech and Nemotron realtime (#487)
 
 Dia's truncated/noisy output had three independent causes: missing RoPE on

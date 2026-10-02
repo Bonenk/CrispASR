@@ -22,21 +22,11 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — PR #480 scheduler review, #483 CUDA 12.6, next release
+## CLAIMED 2026-10-02 — #483 CUDA 12.6 and next release
 
-Worktrees `/mnt/volume1/wt-480` (`fix/480-scheduler`) and
-`/mnt/volume1/wt-483` (`fix/483-cuda126`). Whole PR #480 and issue #483 read,
+Worktree `/mnt/volume1/wt-483` (`fix/483-cuda126`).
+PR #480 review and permanent regression completed; see HISTORY and proof receipt. Whole PR #480 and issue #483 read,
 including all comments/reviews (none). No Index-Echo runtime edits here.
-
-PR #480 scheduler replay fix already shipped in v0.8.40's pinned shared ggml
-`2f5a80d258c46e6ac8eee95f1328c0f58376d7ee`, introduced by `890278a8342c620197c90e702e1188bcab94f510`.
-Current version also state-guards disposal when caller recycles graph metadata;
-PR's unconditional disposal lacks that guard. Focused actual Vulkan/lavapipe
-run `36999421733` PASS: ten changed-input computes match independent arithmetic,
-original source pointers restored, recycled/uncomputed graph reset checks pass;
-removing reapplication reproduces a second-compute SIGBUS (negative status 135).
-Extended run `36999971712` adds the PR-disposal negative control. No wholesale
-PR merge: obsolete vendored-ggml base and build-only workflow are unsuitable.
 
 #483: CUDA 12.8 does support Pascal/Volta (NVIDIA documentation); PyTorch wheel
 policy is separate. Candidate `a40850fbf` preserves CUDA 12.8/Blackwell and
