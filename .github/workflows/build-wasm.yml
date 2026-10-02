@@ -79,8 +79,12 @@ jobs:
           ls -lh build-wasm/bin/libwhisper.js build-wasm/bin/libwhisper.wasm
           echo "JS size:   $(wc -c < build-wasm/bin/libwhisper.js) bytes"
           echo "WASM size: $(wc -c < build-wasm/bin/libwhisper.wasm) bytes"
-          # Sanity: WASM binary should be < 10 MB (all backends), JS < 200 KB
-          [ "$(wc -c < build-wasm/bin/libwhisper.wasm)" -lt 10485760 ] || (echo "WASM too large" && exit 1)
+          # All-backend budget includes Index-Echo's hybrid decoder (#485).
+          # Pinned emsdk 6.0.2: 10,045,300–10,127,779 bytes before Index-Echo,
+          # 11,211,244–11,296,245 after it (runs 36879830550/36959052416).
+          # Keep a bounded 12 MiB WASM budget and the existing 200 KiB JS intent.
+          [ "$(wc -c < build-wasm/bin/libwhisper.wasm)" -lt 12582912 ] || (echo "WASM exceeds 12 MiB budget" && exit 1)
+          [ "$(wc -c < build-wasm/bin/libwhisper.js)" -lt 204800 ] || (echo "JS exceeds 200 KiB budget" && exit 1)
           # The proxy build must export the async, deadlock-free synth entry.
           if [ "${{ matrix.name }}" = "proxy-to-pthread" ]; then
             grep -q "ttsSynthesizeAsync" build-wasm/bin/libwhisper.wasm || \
