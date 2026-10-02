@@ -68,19 +68,31 @@ Corrected private GPU kernel crispasr-index-echo-9b-corrected-parity v1
 successfully launched after the slot freed. Prior cap rejection preserved;
 no account switching or session-cap bypass. Full 9B results still pending.
 
-TTS -> Index-Echo 9B CPU Q8 round-trip job `36975184748` RUNNING at feature
-`884caa16a`: real pinned Piper synthesis, three distinct sentences, non-silent
-16 kHz WAVs, target-English WER <=0.10 and exact CLI/C ABI text agreement.
-Retains WAV/synthesis/recognition logs and immutable pins. Does not substitute
-for stage/cache source parity or claim untested F16/CUDA round-trips.
-Corrected Kaggle v1 confirms two Tesla T4 (SM75), preinstalled Torch; original
-source JFK generation capture running. No acceptance results yet.
+TTS -> Index-Echo 9B CPU Q8 round-trip job `36975184748` PASS: three real
+pinned Piper sentences, all English WER 0.0, valid segments, exact CLI/C ABI
+text agreement. Full WAV/synthesis/recognition receipts cold under roundtrip-36975184748/.
+Canonical synthetic fixture pin `d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3`,
+path index-echo-9b/roundtrip-piper; originals immutable. Portable helper at
+`0026d9b13` releases ABI weights before subsequent CLI loads (GPU VRAM safety).
+F16/CUDA round-trips still pending; dedicated genuine CUDA stage/roundtrip
+kernel prepared, clones `0026d9b13`, uses already synthesized GH WAVs.
+
+Corrected Kaggle v1 (two actual Tesla T4, SM75, Torch 2.10.0+cu128) uploaded
+VALID original F32 JFK generation capture: own raw greedy trace alignment True,
+actual transcript/translation sensible, preload metadata proven. Immutable
+JFK pin `fac990e86eb1163280e62f66a989da3b6432b4bd`, namespace
+index-echo-9b-f32-generation/jfk_11s/ref.gguf. Cold corrected-reference/ includes
+effective dtype/placement receipt. Chinese, tail and full file/VAD/context
+source capture still running. Native CPU Q8 full JFK diff+actual C ABI job
+`36976243448` RUNNING at `0026d9b13` against this valid source pin; no result yet.
+Recovered 2,517,383,440 root bytes (inactive old binaries) and 997,168,009 volume1
+bytes (cold trace artifacts), checksum-verified destinations and old-path
+symlinks retained. Cold cleanup receipts; no active model/DB/build moved.
 Source oracle and native model parity still PENDING, no public model/registry
 publication or performance claim. No VPS inference / large downloads. Cold
 source headers, receipts, rejected-ref archive, live Kaggle stream and model
 card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs work via
 get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
-
 
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
