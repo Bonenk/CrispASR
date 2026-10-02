@@ -153,6 +153,22 @@ Full F16 strict three-clip control 36985780992 dispatched at 3ba6074da using
 original immutable F16 pair and corrected reference fixture. CUDA bundle
 36984982041 compiling; source full-file oracle still pending.
 
+UPDATE 09:15 UTC: F16 strict CPU three-clip 36985780992 PASS: 76/76 stages
+each (228 total), 16/16 cached greedy IDs each, anonymous C ABI metadata
+detection and exact complete source texts/timestamps for JFK, Chinese, tail.
+F16 preserves JFK country.。; remaining selective-Q8 punctuation is quantization.
+Cached F16 logits cosine minimum .999998 across all three; connector minimum
+1.0. Original default-BF16 control and F32 golden unchanged. Lint 36984930114
+PASS 10/10 at 28e922bd1 (same C++ mixed-precision diff fix).
+FFN-only candidate conversion 36987909959 running at c24dbceb5: genuine F16
+base, Q8 only 96 gate/up/down matrices; attention/recurrent/vocabulary/audio
+remain F16. Separate filenames, no presumed acceptance.
+GPU-less CI bundle 36984982041 compiled successfully but FAILED executable
+link on absent NVIDIA driver. Fixed toolkit-stub soname/rpath-link at c07ec1d8d,
+exclude all driver stubs from runtime archive; replacement 36988187315 queued
+with previous compiler cache retained. Existing real CUDA proofs unchanged.
+Full five-case source file/VAD/context oracle still running; no publication.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
