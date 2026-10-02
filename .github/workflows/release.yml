@@ -35,7 +35,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.only || 'all' }}
   cancel-in-progress: true
 
 permissions:
