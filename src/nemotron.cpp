@@ -3107,7 +3107,7 @@ struct nemotron_stream {
     nemotron_context* ctx = nullptr;
     std::vector<float> audio;
     size_t audio_offset = 0;
-    bool full_recompute = false; // CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE, read when a turn starts
+    bool full_recompute = false; // backend default and control gates, read when a turn starts
     size_t frontend_checked_samples = 0;
     int processed_pre_frames = 0;
     int encoder_frames_computed = 0;
@@ -3172,10 +3172,21 @@ static bool nemotron_stream_decode(nemotron_stream* stream, const float* enc, in
     return true;
 }
 
+static bool nemotron_stream_full_frontend(const nemotron_context* ctx) {
+    if (crispasr_env::truthy("CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE"))
+        return true;
+    if (crispasr_env::truthy("CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND"))
+        return false;
+    // The aligned window is exact on validated CPU paths. Real T4 testing
+    // exposed shape-dependent token-confidence changes on CUDA; preserve the
+    // original full frontend on GPU until that numerical difference is fixed.
+    return !core_cpu_backend::is_cpu(ctx->backend);
+}
+
 static void nemotron_stream_clear(nemotron_stream* stream) {
     stream->audio.clear();
     stream->audio_offset = 0;
-    stream->full_recompute = crispasr_env::truthy("CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE");
+    stream->full_recompute = nemotron_stream_full_frontend(stream->ctx);
     stream->processed_pre_frames = 0;
     stream->encoder_frames_computed = 0;
     stream->frontend_checked_samples = 0;
@@ -3416,7 +3427,7 @@ extern "C" struct nemotron_stream* nemotron_stream_create(struct nemotron_contex
         return nullptr;
     auto* stream = new nemotron_stream;
     stream->ctx = ctx;
-    stream->full_recompute = crispasr_env::truthy("CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE");
+    stream->full_recompute = nemotron_stream_full_frontend(stream->ctx);
     return stream;
 }
 

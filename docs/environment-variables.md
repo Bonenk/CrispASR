@@ -1108,9 +1108,13 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   Other backends keep their 30-second limit. Invalid values use the default.
 - `CRISPASR_NEMOTRON_STREAM_DEBUG`
 - `CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE` — `1` makes the realtime session
-  redo mel and pre-encode for the whole turn on every update, instead of only
-  for the newest audio. Same output, slower on long turns. Read when a turn
-  starts; useful to check the default against.
+  redo mel and pre-encode for the whole turn on every update. CPU defaults to
+  the validated aligned window; GPU keeps the original full frontend after
+  real T4 tests exposed token-confidence differences with the window. Read
+  when a turn starts; retain this control for exact CPU A/B verification.
+- `CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND` — experimental `1` forces
+  the window on GPU too. Off by default there; numerical parity failed on T4.
+  `STREAM_FULL_RECOMPUTE=1` takes precedence.
 
 ### OmniASR
 
