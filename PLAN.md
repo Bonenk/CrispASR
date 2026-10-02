@@ -106,66 +106,57 @@ get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
 Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
-User authorized fixing and proving the remaining failures via GH CI/Kaggle.
-Pin official Dia source, compare feedback/stop stages, then gate complete speech.
-NOW: pinned `nari-labs/dia@4a9e29b1` exposes a nucleus-filter bug: native
-drops the threshold-crossing token, allowing all-zero weights. Candidate
-`153ef839c` keeps it; complete-speech Q8/1/4/8 CPU job `36972564262` running
-with the existing explicit 1024-step override. Default cap unchanged pending
-quality. Actual native sampler vs pinned PyTorch source `36972710180` PASS
-(12 probability fixtures). Complete speech `36972564262` FAILED: first Q8
-Hello/seed42 clip hit 1024 steps, mostly near-silence, ASR empty (WER1).
-Sampler fix alone is insufficient; preserved audio/logs in cold
-`/mnt/volume1/tmp-overflow/dia-full-speech-v1`. Official F32 vs native F16
-128-step teacher-forced audit `36973899601` launched, pinned source4a9e29b1
-and original HFcheckpoint257bc72f. Production default changes only on branch,
-no full-speech acceptance or landing yet.
-NOW: source audit36973899601 FAILED numerical gate (127 steps, conditional
-min cosine .979275, max norm error .097132; unconditional near1). Code audit
-found missing cross-attention RoPE on both cached encoder keys and decoder
-queries. Candidate121b11965 restores both; source audit36975523662 and full
-Q8 speech36975526523 rerun. Also corrected final delayed BOS masking one-step
-off-by-one: source input step15/channel8=890, old native holds BOS1026.
-Sampler36974440119 PASS13 fixtures; compiled old sampler dominant token2
-fixture emits token0 all1000 times, candidate agrees with official distribution.
+User authorized fixes and proof via GH CI/Kaggle. Runtime09804bb5d corrects
+nucleus crossing-token retention, the delayed BOS countdown, and missing
+cross-attention RoPE on BOTH cached encoder K and decoder Q. Candidate also
+removes the hidden200-step cap and honors explicit C ABI/CLI limits bounded
+by model capacity; not landed before complete acceptance.
 
-The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
-its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
-unfixed runtime: `36965187732` (novel CPU-thread phrase/seed 123, WER .852) and
-`36966653943` (documented Hello/weather phrase/seed 42, WER .72). The default-cap
-removal was rejected, not shipped. Requires a pinned source/native reference,
-teacher-forced logits and feedback/stop/quantization audit before changing the
-production generation default. This is separate from the verified #486 setter.
+Pinned official source4a9e29b1 / HFcheckpoint257bc72f / nativeGGUF3233fbcb.
+Sampler36974440119 PASS13 probability fixtures plus compiled old negative
+control (dominant token2 incorrectly emits token0 all1000 times).
+Official F32 vs native F16 audit36973899601 FAILED before RoPE: mincos.979275,
+max norm error9.7132%. Fixed audit36976267766 PASS all127 steps: mincos
+.999999116, max norm error.06639%; all126 real delay-feedback inputs exact.
+Actual old BOS negative control fails only step15/channel8:1026 vs source890.
+Q8 audit36977167440 FAILS the same strict F16 numerical guard: mincos.998409,
+max norm error2.8123%; preserve this quantization result, do not loosen guard.
+
+Complete Q8 speech36975526523 PASS both Hello/42 and fox/123 at4 threads,
+explicit1024override: WER0 each,5.5844s/6.6293s. Before controls36965187732
+(WER.852) and36966653943(WER.72), plus sampler-only36972564262(WER1),
+remain rejected. Final helper637c47f93 launches36979017189: default model
+limit, BOTH prompts x1/4/8 threads, C ABI32/reset0 and CLI32/default limits.
+Runtime CI36977049609 PASS13; lint36977052309 pending. Cold evidence under
+`/mnt/volume1/tmp-overflow/dia-*`; no release-quality claim until final gates.
 
 ## CLAIMED 2026-10-02 — PR #487 Nemotron realtime/server
 
 Worktree `/mnt/volume1/wt-487`, branch `fix/487-realtime`.
-User authorized completing this follow-up. Hosted CPU/GPU parity and live server
-checks must pass before landing; Index models remain another agent’s task.
-NOW: author commits preserved in candidate `20d99ac98`; hosted CPU exact
-full-recompute/window token+confidence matrix (Q8/Q4/F16 x threads 1/4/8,
-presets 0/2/3, 33s) and VAD/ordinary server checks `36972773144` running.
-Current full CPU/server parity `36973268384` and CI `36973274195` / lint
-`36973276596` running/queued; scripts now derive Q8 from pinned F16 because
-that HF revision has no Q8 file. CUDA Kaggle `crispasr-nemotron-realtime-487`
-v1 RUNNING on two actual Tesla T4/SM75 (clonedfc3088dd3; actual backend
-assertion); author source plus finite configurable
-1..300s Nemotron turn limit, default30, on branch20dd2bcaf. Earlier queued
-dispatches superseded before doing heavy work. First parity dispatch cancelled
-because its harness selected the wrong Catch test name; not acceptance evidence.
+User authorized completion and hosted proof; Index models remain another
+agent's task. Whole PR/comments/reviews/diff and linked#383 follow-ups read.
+Author commits preserved. Candidate implements case-insensitive WebSocket
+key lookup, ping payload echo, configurable update cadence, incremental CPU
+mel/pre-encode window, and finite1..300s native Nemotron turn cap(default30).
 
-Read description, all comments/reviews (none) and complete diff. Contains
-WebSocket ping/header fixes plus configurable update cadence and an incremental
-mel/pre-encode window. Contributor's CPU-only four-thread evidence is useful;
-validate complete streamed text/token confidence at 1/4/8 threads, non-four-frame
-presets, long turns and real GPU backends before defaulting the window. Retain
-its full-recompute control for A/B verification. All Q8 CPU1/4/8 exact window/control tokens+confidence passed in36973268384;
-server9/9, VAD11/11, configured33s turn10/10 passed. Run then FAILED its
-auxiliary Q4/thread1 one-shot punctuation equality: full recompute and window
-both have the SAME comma difference from one-shot. No window/control mismatch.
-Preserved raw failure and all logs; exact controlled gate unchanged. Auxiliary
-one-shot now checks spoken words while recording raw punctuation differences.
-Remaining Q4/F16 x1/4/8 job36975834552 running from8887eac15.
+Q8 CPU1/4/8 exact window/full-control text+token confidences PASS36973268384,
+all3presets0/2/3 on33s. Ordinary server9/9, VAD11/11, configured33s turn10/10
+PASS. That run fails ONLY auxiliary Q4 one-shot comma equality: full-control
+and window share the SAME comma difference. Exact window/control checks kept;
+spoken-word auxiliary comparison now checks all words. Remaining Q4/F16 CPU
+1/4/8 matrix36975834552 running. ARM Q8/server matrix36978217155 pending.
+
+Real CUDA v1 on twoTeslaT4/SM75 FAILS exact token-confidence parity despite
+matching complete text in the preserved tail. Candidate876d4deb7 therefore
+retains ORIGINAL full frontend by default on GPU; CPU window stays default.
+GPU window only via explicit CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND.
+Do not describe CPU proof as GPU window proof. New GPU proof harnessb465bb1cd
+compares production default against frozen pre-PR b33138b057, complete33s
+speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
+server checks. Separate proof slug preserves rejected v1 evidence.
+Final runtime CI36979186151 / lint36979189406 running; earlier20dd2bcaf
+CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
+
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
