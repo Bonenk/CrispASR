@@ -288,7 +288,8 @@ TEST_CASE("nemotron: realtime stream gives the same output as a full recompute",
         pcm.insert(pcm.end(), jfk.begin(), jfk.end());
 
     nemotron_context_params cp = nemotron_context_default_params();
-    cp.n_threads = 4;
+    cp.n_threads = std::max(1, std::atoi(get_env("CRISPASR_TEST_N_THREADS", "4").c_str()));
+    cp.use_gpu = get_env("CRISPASR_TEST_CPU_ONLY") != "1";
     cp.verbosity = 0;
     nemotron_context* ctx = nemotron_init_from_file(model.c_str(), cp);
     REQUIRE(ctx != nullptr);
