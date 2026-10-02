@@ -55,186 +55,33 @@ pass pinned cppcheck 2.7 (`36992014618`); see
 ## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
 
 Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
-Source pinned to `IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba`.
-Read the full released inference class and source tensor headers: audio tower
-647,927,168 parameters; decoder 8,953,803,264 parameters, 32 actual layers,
-no MTP weights; connector is one 2048→4096 projection (8,388,608 parameters).
-Native projection and dimension validation `fb61d7167` preserve the 2B residual
-path; the diff harness now audits every decoder layer. No public API change.
+All large artifacts and terminal receipts under `/mnt/storage/crispasr/issue485-9b/`.
 
-NOW: conversion/quantization GH `36963243412` PASS, private F16/Q8 pairs at
-`cstr/index-echo-9b-GGUF@d1cc752e82bb97842052f2a5cd335512da984f96`.
-F16 pair 19,234,545,728 bytes (17.913 GiB), Q8 pair 10,230,452,352 bytes
-(9.528 GiB); SHA256s in cold `conversion/conversion-receipt.json`. 32 blocks
-checked, no MTP tensors. Build `36963598957` PASS (seven unit suites, connector
-21 assertions, real shared-library wiring), lint `36964988743` PASS 10/10.
+NOW: full ARM CPU acceptance `37002813123` PASS (three complete stage/cache/direct
+clips, five independent F32 whole-file/VAD/context cases, actual Piper 3/3 WER 0).
+CUDA v3 COMPLETE/PASS on two actual T4 with the same complete gates; no numerical
+or timestamp tolerance relaxed. Receipt `docs/index-echo-9b-acceptance-2026-10-02.json`.
+Protected 2B Q8 actual nightly `37006905046` PASS; new public 9B F16 actual nightly
+`37008624536` PASS, including pinned public downloads and real regression driver.
+CI `37003844831` PASS 13/13, lint `37003842265` PASS 10/10; full-tree cppcheck
+`36995998244` PASS after nonvirtual destructor cleanup. Feature `35320540e`.
 
-2B protected regression `36964545104` has all F16/Q8 stage/cache/direct C ABI
-gates PASS. Its strict single-precision full-file diagnostic fails known
-source precision/timing differences; offline comparison to the pinned complete
-F32 source cases proves all 10 whole-case exact texts and existing F16 5.1 ms /
-Q8 20.1 ms policy pass. Receipt `2b-regression-acceptance.json` preserves raw
-strict failures; no new 9B tolerance inferred.
+Canonical PUBLIC `cstr/index-echo-9b-GGUF`, accepted F16-only pair 17.914 GiB,
+weight revision `dffbadf0f173446fee0364a0807803d2b2fb6f49`, updated card/acceptance
+`f05dd56b51f22590767472224924cbdb078aee79`. Original experimental history remains
+PRIVATE `cstr/index-echo-9b-staging-GGUF`; rejected Q8 recipes never published.
+Publication `37005611122` PASS with local/remote hashes and clean-history audit.
 
-Kaggle `crispasr-index-echo-9b-parity` v1 runs old pinned loader `2b5a2d13d`,
-actual TWO Tesla T4 (SM75, 15 GiB each), preinstalled Torch 2.10.0+cu128.
-Independent JFK dump F32 parameters proven (all three modules), but REJECTED
-as acceptance oracle: malformed multilingual output, and saved cache replay
-agrees with its own generation only at the first token. This diagnostic is
-preserved at `index-echo-9b-f32/jfk_11s/ref.gguf` in canonical fixtures MODEL
-repo revision `e4384ee4d3847ed4f171e60ce7973a75d48806e3`; it must NOT become a
-9B manifest golden or be overwritten. First attempted full Q8 validation
-`36966337073` cancelled before misleading acceptance. Numerical-only Q8
-investigation `36969153128` against preserved rejected dump is separate from
-behavioral acceptance (always records validated=false).
+Resident AB/BA GPU profile PASS: JFK warm native ~12.2 s versus original BF16
+~16.2 s (1.33x); Chinese ~13.9 versus ~18.9 s (1.36x). Precision and default
+placement differ and are recorded; no offloaded F32 or cold-load speed claim.
+Receipt `docs/index-echo-9b-profile-2026-10-02.json`; generation ~86% of inference.
 
-Feature `b1e4443dd` fixes the independently reproduced reference placement bug:
-Qwen3.5 cached GDN reads conv1d.weight directly, bypassing Accelerate's child
-forward hook. Parent preload_module_classes=['Qwen3_5GatedDeltaNet'] plus a meta
-weight guard preserve actual source math. Tiny actual-HF CPU/disk A/B
-`36970777049` PASS: unpreloaded prefill matches but cached weight is meta;
-preloaded prefill and all three cached steps exactly match resident execution.
-Receipt cold `offload-check-36970777049/`. Faulty CPU source controls
-`36968076996` / `36968365575` cancelled; neither is a valid source oracle.
-
-Initial Q8 diff `36969153128`: 75 PASS / 3 FAIL / 0 SKIP against rejected
-reference. All encoder/connector/32 decoder prefill stages and initial logits
-pass; cache gates fail. Acceptance remains false. Corrected GPU kernel
-`9dcbff7c5`, cloning guarded source `b1e4443dd`, checks independent original
-translate_window captures, F16/Q8 diff/cache/direct CLI/anonymous C ABI and
-complete five-case file pipelines. Uses separate fixture namespace
-index-echo-9b-f32-generation; never overwrites rejected original reference.
-Old v1 reached ERROR and terminal logs were harvested under kaggle-v1-terminal/.
-Corrected private GPU kernel crispasr-index-echo-9b-corrected-parity v1
-successfully launched after the slot freed. Prior cap rejection preserved;
-no account switching or session-cap bypass. Full 9B results still pending.
-
-TTS -> Index-Echo 9B CPU Q8 round-trip job `36975184748` PASS: three real
-pinned Piper sentences, all English WER 0.0, valid segments, exact CLI/C ABI
-text agreement. Full WAV/synthesis/recognition receipts cold under roundtrip-36975184748/.
-Canonical synthetic fixture pin `d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3`,
-path index-echo-9b/roundtrip-piper; originals immutable. Portable helper at
-`0026d9b13` releases ABI weights before subsequent CLI loads (GPU VRAM safety).
-F16/CUDA round-trips still pending; dedicated genuine CUDA stage/roundtrip
-kernel `882a34e2a` successfully launched v1, clones `0026d9b13`, uses already
-synthesized GH WAVs. Private crispasr-index-echo-9b-roundtrip, F16 then Q8,
-actual CUDA JFK diff and three CLI/C ABI round-trips each; not a full-file proof.
-
-Corrected Kaggle v1 (two actual Tesla T4, SM75, Torch 2.10.0+cu128) uploaded
-VALID original F32 JFK generation capture: own raw greedy trace alignment True,
-actual transcript/translation sensible, preload metadata proven. Immutable
-JFK pin `fac990e86eb1163280e62f66a989da3b6432b4bd`, namespace
-index-echo-9b-f32-generation/jfk_11s/ref.gguf. Cold corrected-reference/ includes
-effective dtype/placement receipt. Chinese, tail and full file/VAD/context
-source capture still running. Native CPU Q8 full JFK diff+actual C ABI job
-`36976243448` completed: Q8 JFK 76/76 stage/magnitude checks PASS, cached
-argmax 16/16 PASS (cache cos_min .998495, mean .999620). Strict full decoded
-text gate FAILED only source transcript punctuation: F32 country.。 vs native
-country。; English target text and every timestamp match. Preserve red run,
-no altered goldens/tolerance. Released-default BF16 CPU/disk original source
-control dispatched to distinguish precision from port behavior. Chinese F32
-capture also valid, greedy alignment True, fixture pin
-1674bf03877588789b63b9ee1865bb78d7643a3b. All three corrected F32 direct captures now uploaded at
-bca2f2a07c286a4ad2f2d1d566a3227d29c285a9; full-file source pending.
-Default BF16 original-source audit `36977491923` RUNNING: JFK valid, raw greedy
-alignment true, all actual parameters BF16; its complete JFK output equals
-F32 including country.。, so Q8 mismatch is not explained by this source control.
-Chinese default-source case still pending.
-
-Q8 Chinese/tail run `36978856585` FAILED broader gates: Chinese 75 PASS/2 FAIL,
-proj1 cosine minimum .987558 and cached argmax 15/16 (near-tie rank 2, gap .0222);
-actual Chinese merged first two subtitle cues and changed English wording.
-Tail 68 PASS/17 FAIL including late audio layers/norm/projections, although
-actual tail text and timestamps exactly match source. Keep raw red receipts.
-F16 short-tail numerical diagnostic `36981378646` dispatched to separate
-quantization from graph math, always records validated=false.
-Candidate isolated q8_0_selective at feature latest producer keeps original F16
-entire audio/connector plus decoder token_embd/output matrices; remaining
-decoder matrices Q8. Separate private filenames, no baseline rewrite, and no
-publication/tolerance relaxation until real source and decoded tests pass.
-Recovered 2,517,383,440 root bytes (inactive old binaries) and 997,168,009 volume1
-bytes (cold trace artifacts), checksum-verified destinations and old-path
-symlinks retained. Cold cleanup receipts; no active model/DB/build moved.
-Source oracle and native model parity still PENDING, no public model/registry
-publication or performance claim. No VPS inference / large downloads. Cold
-source headers, receipts, rejected-ref archive, live Kaggle stream and model
-card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs work via
-get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
-
-UPDATE 08:20 UTC: Default BF16 source audit 36977491923 PASS; both complete
-JFK and Chinese outputs exactly equal corrected F32, so plain-Q8 errors are
-not explained by this precision control. F16 tail 36981378646 PASS all 76
-stage/magnitude checks and cached argmax 16/16; encoder errors isolate Q8.
-Kaggle roundtrip v1 COMPLETE: actual two Tesla T4, F16 and Q8 JFK CUDA diffs
-pass; all six real Piper roundtrips English WER 0, exact CLI/C ABI agreement.
-Full-file acceptance still pending. Terminal logs harvested before any reuse.
-Selective conversion 36981864400 PASS, separate immutable model pin
-a5353921fde9283ebd18f155cefee3c425707477, pair 12,748,447,808 bytes.
-CPU three-clip strict selective validation 36983710234 dispatched at f4263f5e2
-against corrected source fixture bca2f2a07c286a4ad2f2d1d566a3227d29c285a9.
-
-UPDATE 08:40 UTC: mixed precision diff metadata fixed at 9d6223f82: inspect
-actual companion tensor types separately, keep F16 audio gates strict, apply
-existing Q8 gates to quantized decoder stages, exact token/text checks unchanged.
-Portable CUDA CLI/lib/diff compilation dispatched on GitHub 36984982041 at
-3ba6074da (CUDA 12.4.1, SM75); GPU execution remains Kaggle. Lint 36984930114
-queued. Pending independent five-case source pipeline still running; prepared
-separate CUDA full acceptance harness for F16 and selective Q8, pinned CI bundle,
-three direct stage/cache/CLI/anonymous C ABI checks, five source file cases and
-three real Piper roundtrips. No quality claim until terminal receipts pass.
-
-UPDATE 08:50 UTC: selective CPU 36983710234 FAILED on old stricter diff plus
-JFK exact punctuation. All three clips cached argmax 16/16. Selective Chinese
-complete five cues/text/times now exact; tail encoder/connector cosine minima
-1.0 and full decoded tail exact. Decoder relative L2 maxima .03042447 JFK,
-.02736433 Chinese, .03202217 tail: within existing Q8 5% gates but old audio-only
-precision inference used F16 2%. Corrected harness preserves strict F16 audio
-gates; no text gate waiver. JFK still country。 vs source country.。; rejected.
-Full F16 strict three-clip control 36985780992 dispatched at 3ba6074da using
-original immutable F16 pair and corrected reference fixture. CUDA bundle
-36984982041 compiling; source full-file oracle still pending.
-
-UPDATE 09:15 UTC: F16 strict CPU three-clip 36985780992 PASS: 76/76 stages
-each (228 total), 16/16 cached greedy IDs each, anonymous C ABI metadata
-detection and exact complete source texts/timestamps for JFK, Chinese, tail.
-F16 preserves JFK country.。; remaining selective-Q8 punctuation is quantization.
-Cached F16 logits cosine minimum .999998 across all three; connector minimum
-1.0. Original default-BF16 control and F32 golden unchanged. Lint 36984930114
-PASS 10/10 at 28e922bd1 (same C++ mixed-precision diff fix).
-FFN-only candidate conversion 36987909959 running at c24dbceb5: genuine F16
-base, Q8 only 96 gate/up/down matrices; attention/recurrent/vocabulary/audio
-remain F16. Separate filenames, no presumed acceptance.
-GPU-less CI bundle 36984982041 compiled successfully but FAILED executable
-link on absent NVIDIA driver. Fixed toolkit-stub soname/rpath-link at c07ec1d8d,
-exclude all driver stubs from runtime archive; replacement 36988187315 queued
-with previous compiler cache retained. Existing real CUDA proofs unchanged.
-Full five-case source file/VAD/context oracle still running; no publication.
-
-UPDATE 10:17 UTC: F16 CPU direct three-clip acceptance 36985780992 PASS 228 stages / 48 cached IDs, exact complete text/timing. FFN-only conversion 36989091712 PASS at bcc398eb1 (first recipe 36987909959 failed; corrected unsupported global-f16); private model dca128e0da2c86819347b79f63da610c0b8bd472, pair 14,704,697,408 bytes. FFN CPU 36990739513 FAIL only JFK ASCII punctuation; 228/228 numerical and 48/48 cached gates pass, Chinese/tail exact. No Q8 candidate accepted.
-Portable CUDA bundle 36988187315 PASS at c07ec1d8d, immutable private dataset c51cb08c50d6997e2bbb3efc75fc73d0c5d1cda4, SHA e47a46bb7ff780f286686a7239f1c1806cb1b5c7451a07fb9706a630a15bf0da. Actual GPU stage+real roundtrip v1 COMPLETE, all six Piper English WER 0, exact CLI/C ABI.
-Corrected F32 source v1 ERROR at repeated-English context generation (CUDA OOM); its three direct reference captures remain valid. Fully resident original default-BF16 repeated-English control ERROR on source's 127 cues, parser errors/out-of-range times; retained as rejected stress, not golden. Separate natural Chinese-pause context preserves original math/prompt and is now COMPLETE: five valid source cases, parse warnings 0, actual BF16 modules, second speech window with prior context. Immutable fixture 86ec7245cf53b78d8d2442f6f919b9215104609b, namespace index-echo-9b-bf16-default-zh-context. Old rejected namespace and all 2B fixtures preserved.
-CUDA full acceptance v1 at 44996324a ERROR: all three F16 CUDA diffs, exact anonymous C ABI and independent CLI text/timing PASS, then Silero autoload abort due CUDA weights in forced CPU scheduler. Terminal logs harvested before reuse. Fix weight placement to scheduler CPU policy; replacement CI bundle pending. CPU full-file acceptance 36994533773 running at 0004c1a44 against independent pinned five-case default-source oracle and F32 stages. No public model/registry claim yet.
-
-UPDATE 10:44 UTC: VAD weight-placement fix 9503bec6f proven on actual GPU v2: all five file cases execute without abort; requested-GPU VAD probabilities equal CPU exactly. F16 full texts match released-default BF16 in all five; JFK/Japanese/natural-context times exact, Chinese-English/Spanish final cue differs 20ms start /40ms end and remains a strict failure. Independent complete F32 natural-context source capture now running, separate namespace index-echo-9b-f32-zh-context; original class/math, parent preload guard, expandable CUDA allocator and 5GiB GPU0 generation slack. No acceptance tolerance changed.
-Fixed bundle 36994683144 PASS, source 9503bec6f, dataset pin cdd447a34651ecd757f2c38df2dee486ab2502d9, SHA beb116b33ae08836e6dafa8c6414073622bfb72befaaefb71c93445dad67cd4e. CUDA acceptance v2 kernel launched at 49617e7b3, SDK helper 324c10b9f; all stage/direct checks pass, full-file strict diagnostic still pending terminal. Source/BF16 controls, rejected F32/OOM and repeated-English stress logs preserved under /mnt/storage.
-Rebased onto main 2a00c4a0d; immutable proof commits preserved remotely on archive/index-echo-9b-proof-20261002. Fixed the open cppcheck destructor finding by nonvirtual cleanup; rebased lint 36995994536 PASS, full-tree cppcheck 36995998244 running. Registry wiring prepared for explicit 9B F16 filename with matching decoder, 2B Q8 remains default. Publication helper prepared: mandatory CPU/CUDA/file/roundtrip acceptance flags, verify tested hashes, create clean private F16-only history and flip public only after complete upload/card/hash verification. Experimental quants will remain private; nothing published yet.
-Additional cold storage cleanup: three inactive Ollama blobs, source paths resolving under /mnt/volume1/opt/ollama-models, 2,717,147,872 bytes recovered on volume1 (not root). Streaming copy, both hashes verified, symlinks preserve old /usr/share/ollama paths. Root now ~1.2GiB free, volume1 ~3GiB; no VPS model inference/build/downloads.
-
-Final independent all-F32 natural full-file source COMPLETE, canonical fixture cb678dfd4806778aa55c39fe7b7a710a54cdc153. All five complete cases match both native CPU and CUDA at unchanged 5.1 ms F16 bounds, including prior-window context; no parser warnings. Source actual parameter dtype audit and terminal logs retained cold. Retained-evidence audit now PASS: 225 numeric rows plus three prompt checks (228 reported), 48 cached predictions per device, direct anonymous C ABI/CLI decoding, independent VAD probabilities and real Piper F16 roundtrips 3/3 WER 0. Earlier raw BF16 pipeline runs remain red for two 20/40 ms precision-dependent boundaries; evidence audit preserves those failures, compares complete independent F32 cases without mixed cues or tolerance changes.
-
-Final CUDA F16-only v3 launched with latest CI bundle 36997586995, build f91a31da8d586157043639d0e6039c778d2571dc / ggml 2f5a80d258c46e6ac8eee95f1328c0f58376d7ee; bundle pin 9ffaeaab43fece5ec5c0baeb4884e2db87625f6f, SHA 166e8741738827fd0b997551bf27bfa93b5dcf04c898056fdedade87ba5c9f3e. Native runtime includes VAD CPU placement fix and destructor static-analysis fix. Feature at 223321847, full 13-job CI 36997368788 PASS; full-tree cppcheck 36995998244 still running. Private quant history must stay private; clean F16-only publication helper and weekly large CPU regression (including real Piper fixtures) prepared. Publication/profile/final integration pending final green CUDA and clean public model pin.
-
-Final CUDA v3 COMPLETE/PASS: script 2026-10-02.3, build f91a31da8d586157043639d0e6039c778d2571dc, all three F16 stages/cache, anonymous C ABI/independent CLI, all five whole F32 file cases and three real Piper roundtrips; failed=[]/validated=true, actual 2xT4. Terminal outputs retained kaggle-validation-v3-terminal; docs/index-echo-9b-acceptance-2026-10-02.json now audited against this green final build. Full-tree cppcheck 36995998244 PASS (3ff25b88 destructor fix), 13-job CI 36997368788 PASS. 8 model-free acceptance guards and 56 regression smoke tests PASS; both acceptance suites wired in Regression CI.
-
-ARM CPU final F32 file + real Piper rerun 37002813123 running at c1a9ca8fc. x64 queued dispatch cancelled before execution (37002157845). GPU resident profiler v1 failed before timing due wrong loader name, all terminal logs saved; corrected load_blueprint return signature, v2 active, no performance result accepted. Clean publication prepared via index_echo_publish.py --keep-private to avoid interrupting active reads of the experimental staging name; F16-only copy will be verified on hosted scratch, then staging renamed and clean canonical publication exposed only after validation. Weight pin dca128e0da2c86819347b79f63da610c0b8bd472, final acceptance pin 5c416c3d83e0047b73c6181a9589bf54203f8351. Feature79a44f945; original proof ancestors remain protected by archived branch. Main integration/public model pin/9B manifest/protected2B nightly/final lint pending.
-
-Resident GPU profile v2 COMPLETE/PASS with both AB/BA execution orders, isolated arms, first call + three warm calls per clip, every timed output exact to independent source. Original fully resident BF16 default placement 12/20 GPU decoder layers versus native F16 default split; all native logs confirm actual CUDA placement. JFK source warm16.210/16.241s versus native12.197/12.243s (1.329x/1.327x); Chinese18.964/18.864 versus13.960/13.871 (1.358x/1.360x). Different activation precision and placement explicitly recorded; no offloaded-F32 speedup claim. Generation ~86% of native Chinese inference. Receipt docs/index-echo-9b-profile-2026-10-02.json; per-stage timing logs cold kaggle-profile-v2-terminal.
-
-Clean model copy first encountered removed upload_large_folder API in HF2.1.1 (37003386515); upload_folder rerun37004146527 verified both19GBpair hashes but commit rejected private storage quota. No weights entered the clean target; only .gitattributes. Publication helper now supports explicit --public-upload only after all acceptance gates/local hash checks/history whitelist, keeping experimental original repo private. New hosted ARM publication launched at fc251b309 using portable complete-cue acceptance; no local large weights. Model source staging rename/new canonical public pin waits active CPU proof reads; clean accepted files can upload publicly without duplicating private quota. CPU ARM37002813123 still running; protected2B actual nightly+Q8/live followup37004765314 pending behind same validate-script concurrency. Full CI37003844831/lint37003842265 queued at b8dc322e3, same tested C++ as f91. Featurefc251b309, final manifest/README card/main ff pending model publication and remaining green checks.
-
-Clean F16-only public copy VERIFIED by hosted ARM publication37005611122 PASS at fc251b309. Current temporary clean repo cstr/index-echo-9b-publication-GGUF@dffbadf0f173446fee0364a0807803d2b2fb6f49, exactly pair+LICENSE+README+acceptance+.gitattributes; no experimental files/history. Original cstr/index-echo-9b-GGUF remains private until active ARM validation finishes; then rename original to cstr/index-echo-9b-staging-GGUF and clean copy to canonical cstr/index-echo-9b-GGUF. Immutable hashes/bytes identical to tested dca staging pair; model pins and complete portable cue acceptance verified. Public upload fallback only exposed independently accepted files after local hashes/history audit; private quota failure preserved. Final acceptance source pin0ff015bcc7705e3c46223533d5a47bb06cb7acfe.
-
-Featurefc251b309 includes profile/portable receipt and producer9Bdestination now private staging for future experiments. Full CI37003844831 has compiled Linux/x64/backend-DL/macOS/iOS and unit jobs green; remaining jobs continue. Lint37003842265 has nine jobs PASS, clang-tidy remains. Model registry URL check PASS. Actual ARM full-corpus+Piper37002813123 still running, protected2B Q8 actualnightly37004765314 pending behind it. Final canonical swap/manifest/dedicated9Bnightly/main ff waiting remaining green quality checks, not merely jobs dispatched.
+NEXT: CUDA validation v4 successfully pushed against canonical public weight pin
+(script 2026-10-02.4; same proven CI CUDA runtime f91a31da8), terminal v3 logs saved
+before repush. Rebase latest browser/WASM main changes, final-head integration
+CI/lint/regression, then ff main and remove claim/feature. Original proof commits
+are protected by archive/index-echo-9b-proof-20261002; final archive to follow.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
