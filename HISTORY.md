@@ -6,6 +6,29 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — asynchronous browser pthread ASR/TTS
+
+Browser bindings expose callback-based model-open and transcription on the
+existing proxy compute thread, alongside asynchronous synthesis. Native work
+and results cross the proxy queue; JS values stay on the servicer. Readiness
+is atomic, and non-proxy/unready calls reject instead of synchronously running
+compute on the servicer. Existing synchronous/native APIs remain available.
+
+WASM CI [37004439151](https://github.com/CrispStrobe/CrispASR/actions/runs/37004439151)
+passed all five build variants at 70e15c9a0. CrisperWeaver's real dedicated-worker
+checks pass two/four-thread transcription, worker cancellation and downloads-
+disabled reload in Chromium, Firefox and WebKit. All three also pass four-thread
+Kokoro synthesis followed by locally decoded Moonshine transcription.
+
+Optional initial-memory and pool-size CMake knobs preserve upstream defaults;
+CI supplies 128 MiB single/proxy SIMD variants with a four-worker pool.
+CrisperWeaver's three-warm-run A/B decoded output matches its old single-thread
+baseline for Moonshine, FastConformer and Phonon Q4. Threading helps Phonon but
+hurts Moonshine; Phonon's process RSS hardly changes. This does not promote
+threads or a lower heap as universal defaults, and contains no physical GPU
+performance claim. Reports live in CrisperWeaver's
+`docs/browser-hardening-2026-10-02/`.
+
 ## DONE 2026-10-02 — PR #480 scheduler replay review
 
 The useful cached-compute rewire change already ships in v0.8.40's shared ggml
