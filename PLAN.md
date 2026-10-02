@@ -93,7 +93,24 @@ country。; English target text and every timestamp match. Preserve red run,
 no altered goldens/tolerance. Released-default BF16 CPU/disk original source
 control dispatched to distinguish precision from port behavior. Chinese F32
 capture also valid, greedy alignment True, fixture pin
-1674bf03877588789b63b9ee1865bb78d7643a3b. Tail and full-file source pending.
+1674bf03877588789b63b9ee1865bb78d7643a3b. All three corrected F32 direct captures now uploaded at
+bca2f2a07c286a4ad2f2d1d566a3227d29c285a9; full-file source pending.
+Default BF16 original-source audit `36977491923` RUNNING: JFK valid, raw greedy
+alignment true, all actual parameters BF16; its complete JFK output equals
+F32 including country.。, so Q8 mismatch is not explained by this source control.
+Chinese default-source case still pending.
+
+Q8 Chinese/tail run `36978856585` FAILED broader gates: Chinese 75 PASS/2 FAIL,
+proj1 cosine minimum .987558 and cached argmax 15/16 (near-tie rank 2, gap .0222);
+actual Chinese merged first two subtitle cues and changed English wording.
+Tail 68 PASS/17 FAIL including late audio layers/norm/projections, although
+actual tail text and timestamps exactly match source. Keep raw red receipts.
+F16 short-tail numerical diagnostic `36981378646` dispatched to separate
+quantization from graph math, always records validated=false.
+Candidate isolated q8_0_selective at feature latest producer keeps original F16
+entire audio/connector plus decoder token_embd/output matrices; remaining
+decoder matrices Q8. Separate private filenames, no baseline rewrite, and no
+publication/tolerance relaxation until real source and decoded tests pass.
 Recovered 2,517,383,440 root bytes (inactive old binaries) and 997,168,009 volume1
 bytes (cold trace artifacts), checksum-verified destinations and old-path
 symlinks retained. Cold cleanup receipts; no active model/DB/build moved.
