@@ -6,7 +6,12 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-02 — browser ASR pthread integration
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+to main before you start**. Several agents run here at once; a claim that lands
+with the work is a claim that did nothing. Delete it when the work lands, or if
+it goes stale for more than a day.
+
+## CLAIMED 2026-10-02 — browser ASR pthread integration
 
 Worktree `/mnt/volume1/cw-asr-threads`, branch `feat/cw-browser-threads`.
 Add callback-based ASR/model-open entry points on the existing proxied compute
@@ -17,10 +22,10 @@ without changing upstream defaults before output and timing evidence.
 Hosted CI builds avoid the shared VPS memory/disk pressure. Physical WebGPU
 proof remains external; the local display adapter is virtual.
 
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
-to main before you start**. Several agents run here at once; a claim that lands
-with the work is a claim that did nothing. Delete it when the work lands, or if
-it goes stale for more than a day.
+Checkpoint: all five WASM CI variants passed run 36999311622 at ed2fdda49.
+Low-heap artifacts are pinned in CrisperWeaver; runtime ASR/TTS and parity
+checks are running on isolated CI after shared-host browser crashes.
+
 
 ## CLAIMED 2026-10-02 — #483 CUDA 12.6 and next release
 
