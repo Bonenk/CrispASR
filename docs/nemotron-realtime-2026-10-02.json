@@ -68,7 +68,20 @@
   "arm": {
     "run": 36978217155,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36978217155",
-    "status": "running"
+    "status": "completed",
+    "passed": true,
+    "source": "876d4deb72473e9459125213ee01b3c84d9575c9",
+    "cases": [
+      "window-q8_0-1",
+      "window-q8_0-4",
+      "window-q8_0-8"
+    ],
+    "assertions_per_case": 5969,
+    "server_checks": {
+      "ordinary": 9,
+      "vad": 11,
+      "configured_long_turn": 10
+    }
   },
   "rejected_gpu_window": {
     "kernel_slug": "crispasr-nemotron-realtime-487",
@@ -86,9 +99,10 @@
     "kernel_slug": "crispasr-nemotron-realtime-487-proof",
     "version": 1,
     "uploaded_script_version": 2,
-    "source": "7cddcdeee",
+    "source": "7cddcdeee14757bcff0f4293aec67a78182b0294",
     "status": "launched",
-    "scope": "Original full frontend is default on GPU. Frozen-source versus candidate complete speech/token-confidence capture Q8/Q4/F16 plus real server/VAD/long turn."
+    "scope": "Original full frontend is default on GPU. Frozen-source versus candidate complete speech/token-confidence capture Q8/Q4/F16 plus real server/VAD/long turn.",
+    "hardware": "two actual TeslaT4, SM75"
   },
   "standard_ci": {
     "run": 36979186151,
@@ -99,7 +113,9 @@
   "lint": {
     "run": 36979189406,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36979189406",
-    "status": "running"
+    "status": "completed",
+    "passed": true,
+    "jobs": 10
   },
   "default_backend_policy": {
     "cpu": "validated aligned window",
