@@ -1,0 +1,164 @@
+{
+  "status": "pending final complete-speech gates; not landed",
+  "date": "2026-10-02",
+  "runtime_source": "09804bb5d",
+  "scope": "Dia sampler, cross-attention RoPE, BOS delay, complete model generation and explicit C ABI/CLI limits",
+  "official_reference": {
+    "source_pin": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "model_pin": "257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd",
+    "text": "[S1] Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+    "steps": 127,
+    "shape": [
+      127,
+      2,
+      9,
+      1028
+    ],
+    "precision": "F32"
+  },
+  "native_models": {
+    "repo": "cstr/dia-1.6b-GGUF",
+    "revision": "3233fbcb32be47761d2e736857b6d1a075b9ba7e",
+    "default": "dia-1.6b-f16.gguf",
+    "codec": "dac-44khz.gguf"
+  },
+  "recognizer": {
+    "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+    "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+    "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf"
+  },
+  "numerical_gate": {
+    "minimum_cosine": 0.9995,
+    "maximum_norm_error": 0.02,
+    "quant": "f16",
+    "both_cfg_batches": true,
+    "steps": 127,
+    "heads_per_batch": 9
+  },
+  "before": {
+    "run": 36973899601,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36973899601",
+    "passed": false,
+    "minimum_cosine": 0.979274812,
+    "max_norm_error": 0.097132434
+  },
+  "after": {
+    "run": 36976267766,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36976267766",
+    "passed": true,
+    "minimum_cosine": 0.9999991159784164,
+    "max_norm_error": 0.0006638800502446474,
+    "feedback": {
+      "steps": 126,
+      "exact_source_inputs": true,
+      "old_mismatch": [
+        [
+          15,
+          8
+        ]
+      ],
+      "old": 1026,
+      "reference": 890
+    }
+  },
+  "reference_hashes": {
+    "reference-logits.f32": "f8e4bf1e2f6243a7d6d6862437dc9539e1b9c904b171d762f0329ca54ca1d1fe",
+    "inputs.i32": "fc407b85240f43db3d260b8a17e9f0068190b7cad3691868a2578dfeb443a72f",
+    "outputs.i32": "5ebd09eeea05eb281748443a112bf5e8d653e62e86fa773214a2a66ebd912ba5",
+    "old-bos-inputs.i32": "a4d013e20cde307571bd7e4c7a5ea03b90052c7a55605e165b8cc8311b694793",
+    "feedback-inputs.i32": "a63e9b36fc111b1a9061e7be6bff4e1dd9522bb7e486a3ce2bce51e0221cbc12"
+  },
+  "sampler": {
+    "run": 36974440119,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36974440119",
+    "passed": true,
+    "fixtures": 13,
+    "negative_control": "Old compiled sampler selected token0 in all1000 trials with dominant token2; source/candidate retain token2."
+  },
+  "q8_diagnostic": {
+    "run": 36977167440,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36977167440",
+    "passed": false,
+    "minimum_cosine": 0.9984085265401985,
+    "max_norm_error": 0.028122569855661528,
+    "scope": "Q8 does not satisfy the unchanged F16 full-precision guard; this is not claimed as numerical parity."
+  },
+  "complete_speech_explicit_1024": {
+    "run": 36975526523,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36975526523",
+    "passed": true,
+    "cases": [
+      {
+        "phrase": "Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+        "seed": 42,
+        "threads": 4,
+        "steps_override": 1024,
+        "audio_seconds": 5.584399092970521,
+        "generation_seconds": 105.67918907599994,
+        "transcript": "Hello there, how are you doing today? <en-US>  I really hope you are having a wonderful and pleasant time. <en-US> The weather outside is lovely and bright. <en-US>",
+        "wer": 0.0
+      },
+      {
+        "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+        "seed": 123,
+        "threads": 4,
+        "steps_override": 1024,
+        "audio_seconds": 6.629297052154195,
+        "generation_seconds": 139.68604007399995,
+        "transcript": "The quick brown Fox jumps over the lazy dog. <en-US> Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+        "wer": 0.0
+      }
+    ]
+  },
+  "final_gates": {
+    "q8_default_threads_cli": {
+      "run": 36979527236,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36979527236",
+      "status": "running"
+    },
+    "f16_default_cpu": {
+      "run": 36980002984,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36980002984",
+      "status": "pending"
+    },
+    "f16_metal": {
+      "run": 36980351443,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36980351443",
+      "status": "running"
+    }
+  },
+  "standard_ci": {
+    "run": 36977049609,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36977049609",
+    "passed": true,
+    "jobs": 13
+  },
+  "lint": {
+    "run": 36977052309,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36977052309",
+    "passed": true,
+    "jobs": 10
+  },
+  "limitations": [
+    "Full-speech acceptance uses two prompts longer than100characters and fixed seeds. Short prompts remain model-sensitive.",
+    "Q8 is an explicit model choice; the automatic download remains F16.",
+    "CUDA/Vulkan Dia acceleration remains opt-in; no new validation claim for those backends."
+  ],
+  "rejected_full_speech": [
+    {
+      "run": 36965187732,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36965187732",
+      "wer": 0.852
+    },
+    {
+      "run": 36966653943,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36966653943",
+      "wer": 0.72
+    },
+    {
+      "run": 36972564262,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36972564262",
+      "wer": 1.0
+    }
+  ]
+}
