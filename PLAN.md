@@ -11,6 +11,15 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — GitHub issue and PR replies
+
+Worktree `/mnt/volume1/wt-index-echo-9b`, branch
+`docs/github-issue-pr-replies`. User explicitly requests replies. Read complete
+open threads and PR reviews, audit recent closed follow-ups, and post evidence
+and scoped release/status answers. Preserve issue/PR states; no competing release
+publication or model/build work. Full reads, drafts and posted URL receipts
+stay under `/mnt/storage/crispasr/issue485-9b/github-replies-20261002/`.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
