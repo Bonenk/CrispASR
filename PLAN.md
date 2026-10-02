@@ -61,7 +61,11 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## OPEN 2026-10-02 — Dia full-speech source parity
+## CLAIMED 2026-10-02 — Dia full-speech source parity
+
+Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
+User authorized fixing and proving the remaining failures via GH CI/Kaggle.
+Pin official Dia source, compare feedback/stop stages, then gate complete speech.
 
 The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
 its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
@@ -71,7 +75,11 @@ removal was rejected, not shipped. Requires a pinned source/native reference,
 teacher-forced logits and feedback/stop/quantization audit before changing the
 production generation default. This is separate from the verified #486 setter.
 
-## OPEN 2026-10-02 — PR #487 Nemotron realtime/server
+## CLAIMED 2026-10-02 — PR #487 Nemotron realtime/server
+
+Worktree `/mnt/volume1/wt-487`, branch `fix/487-realtime`.
+User authorized completing this follow-up. Hosted CPU/GPU parity and live server
+checks must pass before landing; Index models remain another agent’s task.
 
 Read description, all comments/reviews (none) and complete diff. Contains
 WebSocket ping/header fixes plus configurable update cadence and an incremental
