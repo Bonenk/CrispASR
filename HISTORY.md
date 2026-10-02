@@ -6,6 +6,45 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — Dia full speech and Nemotron realtime (#487)
+
+Dia's truncated/noisy output had three independent causes: missing RoPE on
+cross-attention Q/K, a nucleus filter that could remove every candidate, and
+one-step-late delayed-BOS handling. Correcting all three enables removal of
+the hidden 200-step CPU cap. Generation now uses model capacity with bounded
+explicit overrides; the existing C ABI setter and CLI limit reach the decoder.
+The shared CLI/server planner preserves a complete Dia dialogue instead of
+splitting it into short sentences and restarting speaker context.
+
+Independent pinned official F32 source versus native F16 passes all 127 steps:
+minimum cosine .9999991159784164, maximum norm error .0006638800502446474.
+All 126 real-feedback inputs match; reverting only BOS timing fails at [15,8].
+Default F16 and Q8 CPU speech roundtrips both pass WER 0. Six Q8 runs (two
+prompts at 1/4/8 threads) produce identical per-prompt audio. Actual CLI run
+`36983650376` passes a single 32-step request (.185759637 s) and complete
+default fox speech (6.629297052 s, WER 0). Strict F16 numerical thresholds
+still reject Q8; that diagnostic is preserved alongside its passing speech
+proof. Metal compiled, but one hosted VM stalled on a paravirtual device and
+another had no MTLDevice: physical Metal runtime acceptance remains unproven.
+Exact pins, failed controls and receipts: `docs/dia-full-generation-2026-10-02.json`.
+
+PR #487 retains its author's WebSocket header/pong and Nemotron cadence work.
+CPU uses aligned incremental frontend windows; exact text, token IDs and
+confidence comparisons pass Q8/F16/Q4 at 1/4/8 threads (5,969 assertions per
+case), plus ARM Q8. A real T4 rejects incremental-window confidence parity,
+so GPU keeps the original full frontend; experimental opt-in remains explicit.
+The corrected Kaggle kernel completes on real Tesla T4/CUDA, with all three
+quants byte-identical to frozen `b33138b05` token/confidence captures and all
+three full JFK repetitions retained (2,993 assertions per capture).
+Live WebSocket ordinary/VAD/45-second-turn tests pass 9/9, 11/11 and 10/10.
+Native Nemotron turns default to 30 seconds with validated 1..300-second
+configuration and retained fallback audio. No unmeasured speedup claim.
+Exact CPU/ARM/GPU runs and capture hashes: `docs/nemotron-realtime-2026-10-02.json`.
+
+Landed from separate worktrees: Nemotron `d7f5beb78`, Dia `9a184adeb`.
+Feature CI passes 13/13 and lint 10/10 for both; combined main integration
+CI `36986270531` and lint `36986270376` are being checked separately.
+
 ## DONE 2026-10-02 — Model CPU thread counts (#486)
 
 Nemotron, Paraformer and Dia now apply requested thread counts to their actual

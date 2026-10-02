@@ -153,97 +153,6 @@ Full F16 strict three-clip control 36985780992 dispatched at 3ba6074da using
 original immutable F16 pair and corrected reference fixture. CUDA bundle
 36984982041 compiling; source full-file oracle still pending.
 
-## CLAIMED 2026-10-02 — Dia full-speech source parity
-
-Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
-User authorized fixes and proof via GH CI/Kaggle. Runtime09804bb5d corrects
-nucleus crossing-token retention, the delayed BOS countdown, and missing
-cross-attention RoPE on BOTH cached encoder K and decoder Q. Candidate also
-removes the hidden200-step cap and honors explicit C ABI/CLI limits bounded
-by model capacity; not landed before complete acceptance.
-
-Pinned official source4a9e29b1 / HFcheckpoint257bc72f / nativeGGUF3233fbcb.
-Sampler36974440119 PASS13 probability fixtures plus compiled old negative
-control (dominant token2 incorrectly emits token0 all1000 times).
-Official F32 vs native F16 audit36973899601 FAILED before RoPE: mincos.979275,
-max norm error9.7132%. Fixed audit36976267766 PASS all127 steps: mincos
-.999999116, max norm error.06639%; all126 real delay-feedback inputs exact.
-Actual old BOS negative control fails only step15/channel8:1026 vs source890.
-Q8 audit36977167440 FAILS the same strict F16 numerical guard: mincos.998409,
-max norm error2.8123%; preserve this quantization result, do not loosen guard.
-
-Complete Q8 speech36975526523 PASS both Hello/42 and fox/123 at4 threads,
-explicit1024override: WER0 each,5.5844s/6.6293s. Before controls36965187732
-(WER.852) and36966653943(WER.72), plus sampler-only36972564262(WER1),
-remain rejected. Final helper9c0ee8a46 launches36979527236: default model limit, BOTH
-prompts x1/4/8 threads, C ABI32/reset0 and CLI32/default limits. Superseded
-36979017189 cancelled; CLI now uses fox (>512 steps) to expose inherited
-generic512-token defaults. Registry ships F16: two complete default-limit
-F16 prompts36980002984 pending. Hosted macOS14 Metal acceptance36980351443
-launches helper0723cce72, actual MTL backend required plus CLI/C ABI caps.
-Initial Metal harness36980272412 cancelled before acceptance after correcting
-an unsupported CLI flag. No neural/runtime changes since09804bb5d.
-Default Q8 run36979527236 completes all6speech cases at1/4/8 threads:
-WER0 every case; PCM arrays are bit-identical across thread counts per prompt.
-C ABI32 cap yields .18576s, reset0 restores complete speech. Shipped F16 CPU
-36980002984 PASS both prompts, WER0 each(6.9892s/5.8746s). Aggregate FAIL
-only at CLI launch because the harness used bin/crispasr-cli, while CMake
-outputs bin/crispasr. Corrected helper3819e4db5; CPU CLI-only36982203366
-and hosted Metal CLI-only36982206126 launched. Retain failed run and all
-six successful speech receipts; do not repeat the model matrix unnecessarily.
-CLI retry36982203366 exposed real sentence-splitting:32limit applied twice,
-short first prompt<100bytes, .2s inserted silence, total .571519s. Candidate
-388a7ad86 keeps complete Dia dialogue in shared CLI/server planner; actual
-old-source narrow check FAILS(2chunks), candidatePASS(1wholetext). Permanent
-unit regression added. Corrected CPU CLI36983650376 PASS: one32step clip,
-whole default-model fox generation and ASR. Updated CI36983655538 / lint
-36983658133 running. Hosted Mac runtime36980351443 still running; pending
-new whole-dialogue CLI36983652977, standalone GPU execution probe36984356005
-must establish actual Metal availability before any Metal acceptance claim.
-Runtime CI36977049609 PASS13; lint36977052309 PASS10. Cold evidence under
-`/mnt/volume1/tmp-overflow/dia-*`; no release-quality claim until final gates.
-
-## CLAIMED 2026-10-02 — PR #487 Nemotron realtime/server
-
-Worktree `/mnt/volume1/wt-487`, branch `fix/487-realtime`.
-User authorized completion and hosted proof; Index models remain another
-agent's task. Whole PR/comments/reviews/diff and linked#383 follow-ups read.
-Author commits preserved. Candidate implements case-insensitive WebSocket
-key lookup, ping payload echo, configurable update cadence, incremental CPU
-mel/pre-encode window, and finite1..300s native Nemotron turn cap(default30).
-
-Q8 CPU1/4/8 exact window/full-control text+token confidences PASS36973268384,
-all3presets0/2/3 on33s. Ordinary server9/9, VAD11/11, configured33s turn10/10
-PASS. That run fails ONLY auxiliary Q4 one-shot comma equality: full-control
-and window share the SAME comma difference. Exact window/control checks kept;
-spoken-word auxiliary comparison now checks all words. Remaining Q4/F16 CPU
-1/4/8 matrix36975834552 PASS all6cases,5969assertions each, all3presets
-complete33s text/token-confidence exact. ARM Q8/server36978217155 PASS all3threadcases(5969asserts each),
-ordinary9/9, VAD11/11, configured33s turn10/10.
-
-Real CUDA v1 on twoTeslaT4/SM75 FAILS exact token-confidence parity despite
-matching complete text in the preserved tail. Candidate876d4deb7 therefore
-retains ORIGINAL full frontend by default on GPU; CPU window stays default.
-GPU window only via explicit CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND.
-Do not describe CPU proof as GPU window proof. New GPU proof harnessb465bb1cd
-compares production default against frozen pre-PR b33138b057, complete33s
-speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
-server checks. Separate proof slug preserves rejected v1 evidence. GPU proof v1 successfully launched after the other agent roundtrip job
-completed and a slot freed: crispasr-nemotron-realtime-487-proof, uploaded
-scriptversion2 from7cddcdeee. Actual twoTeslaT4/SM75 verified again,
-source7cddcdeee14757bcff0f4293aec67a78182b0294. Kernel COMPLETE;
-all6baseline/candidate GPU cases PASS(2993assertions each), candidate token
-captures byte-exact to frozen b33138b057 for Q8/F16/Q4; actual full33s words
-checked at all3presets. Server9/9 and VAD11/11 passed, final long-turn
-receipt harvesting underway. Hosted Metal is NOT acceptance: old macos14 VM
-exposes Apple Paravirtual device without SIMD matrix acceleration and times
-out; separate probe36984356005 exit77 reports noMTLDevice on its VM. Stop
-redundant Mac model job36983652977; physical-Mac proof unavailable here. Retains separate rejected-window slug/logs.
-No account switching, interruption of other jobs, or session-cap bypass.
-Final runtime CI36979186151 PASS13 / lint36979189406 PASS10; earlier20dd2bcaf
-CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
-
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
@@ -2524,16 +2433,16 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 ## §138 SpeechT5 + Dia + Parler + FastPitch TTS stubs → working backends
 
-**Status:** SpeechT5 + Dia both run e2e and produce audio but have decoder-precision issues (ASR says music/noise); Parler + FastPitch not started.
+**Status:** Dia CPU full speech is verified (2026-10-02); SpeechT5 still has a decoder content mismatch; Parler + FastPitch not started.
 
 ### SpeechT5 TTS (microsoft/speecht5_tts)
 - Encoder verified (cos > 0.999 all 12 layers). Runtime `src/speecht5_tts.cpp` = encoder + decoder w/ KV cache + postnet + HiFi-GAN. GGUF `/mnt/storage/speecht5/speecht5-tts-f16.gguf` (300 MB). Converter `models/convert-speecht5-to-gguf.py`.
 - **TO DO:** decoder content mismatch — validate decoder per-layer against the Python reference.
 
 ### Dia 1.6B TTS (nari-labs/Dia-1.6B)
-- Encoder cos=1.0 all layers; decoder layer-0 cos 0.999, step-0 argmax matches Python. Runtime `src/dia_tts.cpp` = encoder + cross-attn + AR decoder (18L GQA CFG) + DAC decode. GGUF `/mnt/storage/dia/dia-1.6b-f16.gguf` (3.2 GB F16); DAC `/mnt/storage/dia/dac-44khz.gguf` (104 MB). Converters `models/convert-dia-to-gguf.py`, `models/convert-dac-to-gguf.py`.
-- Audio produced (2.15 s) but ASR says music/noise.
-- **TO DO:** validate decoder layers 1-17; test with F32 GGUF; investigate DAC decode fidelity. Key sensitivity: Dia's `scale=1.0` attention (no 1/sqrt(d)) makes softmax precision-critical — every computation must match Python exactly or codes diverge.
+- **DONE 2026-10-02:** fixed cross-attention Q/K RoPE, nucleus threshold inclusion and delayed-BOS timing. Independent pinned F32 source versus native F16 passes all 127 steps (cosine and magnitude); all 126 real-feedback inputs match, with the old BOS timing rejected by a negative control.
+- F16 default and Q8 CPU full-speech roundtrips both pass WER 0. Q8 at 1/4/8 threads produces identical audio for each of two prompts. Model capacity replaces the 200-step cap; C ABI and CLI explicit limits/reset are verified. Shared CLI/server planning preserves the whole Dia dialogue.
+- Proof: [full-generation receipt](docs/dia-full-generation-2026-10-02.json), and HISTORY. Q8 does not pass the strict F16 numerical threshold; its separate speech gate does pass. Metal compiles, but hosted Mac VMs supplied no usable physical GPU runtime proof.
 
 ### Parler TTS / FastPitch — NOT STARTED
 - FastPitch: ~1000 LOC stub, converter exists, needs NeMo model.
