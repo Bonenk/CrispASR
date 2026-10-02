@@ -22,8 +22,8 @@ node = next(n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef) 
 namespace = {'torch': torch}
 exec(compile(ast.Module(body=[node], type_ignores=[]), 'official-dia-sampler', 'exec'), namespace)
 reference = namespace['_sample_next_token']
-production = (ROOT / 'src/dia_tts.cpp').read_text()
-function = production[production.index('static uint32_t dia_sample_token('):production.index('// Weight loading')]
+production = (ROOT / 'src/dia_sampling.h').read_text()
+function = production[production.index('static uint32_t dia_sample_token('):]
 # Compile the actual production function; no copied filter implementation.
 cpp = '#include <algorithm>\n#include <cmath>\n#include <cstdint>\n#include <iostream>\n#include <random>\n#include <vector>\n' + function + '''
 int main() {
