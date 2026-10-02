@@ -150,6 +150,13 @@ F16 prompts36980002984 pending. Hosted macOS14 Metal acceptance36980351443
 launches helper0723cce72, actual MTL backend required plus CLI/C ABI caps.
 Initial Metal harness36980272412 cancelled before acceptance after correcting
 an unsupported CLI flag. No neural/runtime changes since09804bb5d.
+Default Q8 run36979527236 completes all6speech cases at1/4/8 threads:
+WER0 every case; PCM arrays are bit-identical across thread counts per prompt.
+C ABI32 cap yields .18576s, reset0 restores complete speech. Aggregate FAIL
+only at CLI launch because the harness used bin/crispasr-cli, while CMake
+outputs bin/crispasr. Corrected helper3819e4db5; CPU CLI-only36982203366
+and hosted Metal CLI-only36982206126 launched. Retain failed run and all
+six successful speech receipts; do not repeat the model matrix unnecessarily.
 Runtime CI36977049609 PASS13; lint36977052309 PASS10. Cold evidence under
 `/mnt/volume1/tmp-overflow/dia-*`; no release-quality claim until final gates.
 
@@ -179,7 +186,8 @@ compares production default against frozen pre-PR b33138b057, complete33s
 speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
 server checks. Separate proof slug preserves rejected v1 evidence. GPU proof v1 successfully launched after the other agent roundtrip job
 completed and a slot freed: crispasr-nemotron-realtime-487-proof, uploaded
-scriptversion2 from7cddcdeee. Retains separate rejected-window slug/logs.
+scriptversion2 from7cddcdeee. Actual twoTeslaT4/SM75 verified again,
+source7cddcdeee14757bcff0f4293aec67a78182b0294; cold CUDA build underway. Retains separate rejected-window slug/logs.
 No account switching, interruption of other jobs, or session-cap bypass.
 Final runtime CI36979186151 PASS13 / lint36979189406 PASS10; earlier20dd2bcaf
 CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
