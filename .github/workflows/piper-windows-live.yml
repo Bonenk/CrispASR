@@ -58,6 +58,8 @@ jobs:
       - name: Build portable CPU CLI (bounded)
         shell: pwsh
         run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object FreePhysicalMemory,TotalVisibleMemorySize
+          Get-CimInstance Win32_Processor | Select-Object LoadPercentage
           cmake -S . -B build -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON
@@ -94,7 +96,7 @@ jobs:
           if ($preview -match 'lessac') { throw 'Cori was substituted with the Lessac registry default' }
 
           $ttsLog = (& build/bin/crispasr.exe --backend piper `
-            -m piper-en_GB-cori-medium-f16.gguf -l en -t 2 --no-gpu `
+            -m piper-en_GB-cori-medium-f16.gguf -l en -t 2 --no-gpu --seed 42 `
             --tts 'The quick brown fox jumps over the lazy dog.' `
             --tts-output proof/cori-cli.wav `
             --no-spoken-disclaimer --no-c2pa --accept-marking-responsibility 2>&1) -join "`n"
@@ -107,6 +109,27 @@ jobs:
               (Get-Item proof-models/espeak_en_us.tsv).Length -lt 1000000) {
             throw 'Piper IPA dictionary was not downloaded into the clean cache'
           }
+          # Seed 0 resamples VITS noise every run. Keep seed 42 explicit and
+          # prove reproducibility without relaxing the existing speech gate.
+          $repeat = (& build/bin/crispasr.exe --backend piper `
+            -m piper-en_GB-cori-medium-f16.gguf -l en -t 2 --no-gpu --seed 42 `
+            --tts 'The quick brown fox jumps over the lazy dog.' `
+            --tts-output proof/cori-cli-repeat.wav `
+            --no-spoken-disclaimer --no-c2pa --accept-marking-responsibility 2>&1) -join "`n"
+          Write-Host $repeat
+          if ($LASTEXITCODE -ne 0) { throw "Repeated Piper CLI exited $LASTEXITCODE" }
+          $firstHash = (Get-FileHash proof/cori-cli.wav -Algorithm SHA256).Hash
+          $repeatHash = (Get-FileHash proof/cori-cli-repeat.wav -Algorithm SHA256).Hash
+          if ($firstHash -ne $repeatHash) { throw 'Seeded Piper WAVs differ' }
+          @{
+            source = $env:GITHUB_SHA; seed = 42
+            wav_sha256 = $firstHash.ToLower(); repeated_wav_sha256 = $repeatHash.ToLower()
+            inputs = @(Get-FileHash proof-models/piper-en_GB-cori-medium-f16.gguf,
+              proof-models/ggml-base.en.bin, proof-models/espeak_en_us.tsv -Algorithm SHA256 |
+              Select-Object Path,Hash)
+          } | ConvertTo-Json -Depth 4 | Set-Content proof/seeded-cli-proof.json
+          Write-Host "PIPER_SEEDED_REPEAT_OK seed=42 sha256=$firstHash"
+
           $wav = [IO.File]::ReadAllBytes('proof/cori-cli.wav')
           if ($wav.Length -lt 10000 -or [Text.Encoding]::ASCII.GetString($wav, 0, 4) -ne 'RIFF') {
             throw 'CLI output is not a non-empty WAV'
@@ -125,7 +148,7 @@ jobs:
           $env:CRISPASR_MODELS_DIR = (Resolve-Path proof-models).Path
           $server = Start-Process -FilePath (Resolve-Path build/bin/crispasr.exe) `
             -ArgumentList @('--server', '-m', 'piper-en_GB-cori-medium-f16.gguf',
-              '--port', '18089', '-l', 'en', '-t', '2', '--no-gpu',
+              '--port', '18089', '-l', 'en', '-t', '2', '--no-gpu', '--seed', '42',
               '--no-spoken-disclaimer', '--no-c2pa', '--accept-marking-responsibility') `
             -RedirectStandardOutput proof/server.stdout.log `
             -RedirectStandardError proof/server.stderr.log -PassThru
