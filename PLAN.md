@@ -132,6 +132,16 @@ a5353921fde9283ebd18f155cefee3c425707477, pair 12,748,447,808 bytes.
 CPU three-clip strict selective validation 36983710234 dispatched at f4263f5e2
 against corrected source fixture bca2f2a07c286a4ad2f2d1d566a3227d29c285a9.
 
+UPDATE 08:40 UTC: mixed precision diff metadata fixed at 9d6223f82: inspect
+actual companion tensor types separately, keep F16 audio gates strict, apply
+existing Q8 gates to quantized decoder stages, exact token/text checks unchanged.
+Portable CUDA CLI/lib/diff compilation dispatched on GitHub 36984982041 at
+3ba6074da (CUDA 12.4.1, SM75); GPU execution remains Kaggle. Lint 36984930114
+queued. Pending independent five-case source pipeline still running; prepared
+separate CUDA full acceptance harness for F16 and selective Q8, pinned CI bundle,
+three direct stage/cache/CLI/anonymous C ABI checks, five source file cases and
+three real Piper roundtrips. No quality claim until terminal receipts pass.
+
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
 Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
