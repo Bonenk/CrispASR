@@ -1849,18 +1849,28 @@ jobs:
     if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64-cuda' }}
     # Pin to windows-2022 — CUDA 12.8 doesn't support VS 2026 (MSVC 14.51).
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolkit: '12.8.0'
+            flavor: cuda
+            arch: '60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual'
+          - toolkit: '12.6.3'
+            flavor: cuda126
+            arch: '60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;90-virtual'
     env:
-      CUDA_VERSION: "12.8.0"
+      CUDA_VERSION: ${{ matrix.toolkit }}
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Install CUDA Toolkit 12.8.0
+      - name: Install CUDA Toolkit ${{ matrix.toolkit }}
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.8.0'
+          cuda: ${{ matrix.toolkit }}
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "nvrtc", "nvrtc_dev", "nvtx", "cuda_profiler_api", "visual_studio_integration"]'
 
@@ -1876,14 +1886,14 @@ jobs:
             -DCRISPASR_BUILD_EXAMPLES=OFF ^
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="${{ matrix.arch }}" ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j %NUMBER_OF_PROCESSORS% --target crispasr-lib
 
       - name: Package
         shell: pwsh
         run: |
-          $OUT = "release\libcrispasr-windows-x86_64-cuda"
+          $OUT = "release\libcrispasr-windows-x86_64-${{ matrix.flavor }}"
           New-Item -ItemType Directory -Force "$OUT\bin","$OUT\src\Release","$OUT\ggml\src\Release","$OUT\ggml\bin","$OUT\include","$OUT\ggml\include" | Out-Null
           # Ninja flat layout: dlls in build-libs\bin, libs in build-libs\src
           $BIN_DIRS = @("build-libs\bin\Release","build-libs\bin")
@@ -1919,17 +1929,17 @@ jobs:
           # This is the largest asset in the release, so it is the one where a
           # slow connection hurts most. The CUDA runtime changes far less often
           # than we cut releases, so re-downloading it every time is waste.
-          $SPLIT = "release\libcrispasr-windows-x86_64-cuda-non-cuda"
+          $SPLIT = "release\libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda"
           Copy-Item $OUT $SPLIT -Recurse
           @'
           This archive intentionally excludes the CUDA runtime DLLs.
-          For a self-contained install, use libcrispasr-windows-x86_64-cuda.tar.gz.
-          For an incremental install, copy the three separate *64_*.dll release assets
+          For a self-contained install, use libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz.
+          For an incremental install, extract the matching ${{ matrix.flavor }}-runtime.zip
           into bin\: cudart64_*.dll, cublas64_*.dll, and cublasLt64_*.dll.
 
           They are published once per release alongside
-          crispasr-windows-x86_64-cuda-runtime-sha256.txt, and are the same files
-          the CLI package uses - both are built against CUDA 12.8.0, so one copy
+          crispasr-windows-x86_64-${{ matrix.flavor }}-runtime-sha256.txt, and are the same files
+          the CLI package uses - both are built against CUDA ${{ matrix.toolkit }}, so one copy
           serves both. Verify with that manifest before reusing an older download.
           '@ | Set-Content "$SPLIT\README-CUDA.txt"
 
@@ -1950,28 +1960,28 @@ jobs:
           }
 
           cd release
-          tar -czf libcrispasr-windows-x86_64-cuda.tar.gz libcrispasr-windows-x86_64-cuda
-          tar -czf libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz libcrispasr-windows-x86_64-cuda-non-cuda
-          Get-Item libcrispasr-windows-x86_64-cuda.tar.gz,libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz | Format-List Name,Length
+          tar -czf libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz libcrispasr-windows-x86_64-${{ matrix.flavor }}
+          tar -czf libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.tar.gz libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda
+          Get-Item libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz,libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.tar.gz | Format-List Name,Length
 
       - uses: actions/upload-artifact@v4
         with:
-          name: libcrispasr-windows-x86_64-cuda
-          path: release/libcrispasr-windows-x86_64-cuda.tar.gz
+          name: libcrispasr-windows-x86_64-${{ matrix.flavor }}
+          path: release/libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz
 
       - uses: actions/upload-artifact@v4
         with:
-          name: libcrispasr-windows-x86_64-cuda-split
-          path: release/libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz
+          name: libcrispasr-windows-x86_64-${{ matrix.flavor }}-split
+          path: release/libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.tar.gz
 
-      - name: Attach libcrispasr-windows-x86_64-cuda.tar.gz to release
+      - name: Attach libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz to release
         if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
-            release/libcrispasr-windows-x86_64-cuda.tar.gz
-            release/libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz
+            release/libcrispasr-windows-x86_64-${{ matrix.flavor }}.tar.gz
+            release/libcrispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.tar.gz
           fail_on_unmatched_files: true
 
   # ── Windows x86_64 shared libs + headers (generic CPU legacy) ────────────────
@@ -2144,31 +2154,31 @@ jobs:
     if: ${{ !inputs.only || inputs.only == 'build-windows-cuda' }}
     # Pin to windows-2022 — CUDA 12.8 doesn't support VS 2026 (MSVC 14.51).
     runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolkit: '12.8.0'
+            flavor: cuda
+            arch: '60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual'
+          - toolkit: '12.6.3'
+            flavor: cuda126
+            arch: '60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;90-virtual'
     env:
-      CUDA_VERSION: "12.8.0"
+      CUDA_VERSION: ${{ matrix.toolkit }}
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
-      # CUDA 12.8 is the minimum that ships sm_120 SASS for Blackwell
-      # consumer GPUs (RTX 50xx). Earlier toolkits (12.4 etc.) only know
-      # up to sm_90, so RTX 5060/5070/5080/5090 fail at runtime with
-      # 'no kernel image is available'.
-      # Ships Pascal (sm_61) + Volta (sm_70) + P100 (sm_60) alongside sm_75..sm_120,
-      # same as Linux CUDA-12 (#302/#307). The v0.8.23 crispasr-windows-x86_64-cuda
-      # miss was NOT the arch: a bare MSVC `/bigobj` was leaking into the nvcc
-      # command (nvcc counted it as a 2nd input -> `nvcc fatal: A single input file
-      # is required for a non-link phase`); guarding /bigobj to C/CXX only (root
-      # CMakeLists) removed it, and the Windows CUDA Smoke workflow confirmed the
-      # full arch compiles. Kept in lockstep with build-libs-windows-x86_64-cuda.
-      - name: Install CUDA Toolkit 12.8.0
-        # v0.2.19 only knows up to CUDA 12.4; v0.2.35 added 12.8 + 12.9
-        # support. Required for sm_120 (RTX 50xx, Blackwell consumer) builds.
+      # #483: keep CUDA 12.8/Blackwell and add a coherent CUDA 12.6.3
+      # legacy package. CLI, shared libraries and bundled runtime use the same
+      # toolkit matrix. Never replace a 12.8 runtime with 12.6 DLLs by hand.
+      - name: Install CUDA Toolkit ${{ matrix.toolkit }}
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.8.0'
+          cuda: ${{ matrix.toolkit }}
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "nvrtc", "nvrtc_dev", "nvtx", "cuda_profiler_api", "visual_studio_integration"]'
 
@@ -2181,15 +2191,15 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_CUDA=ON ^
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="${{ (inputs.tag == '' && inputs.cuda12_probe_arch) || '60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual' }}" ^
+            -DCMAKE_CUDA_ARCHITECTURES="${{ (inputs.tag == '' && inputs.cuda12_probe_arch) || matrix.arch }}" ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j %NUMBER_OF_PROCESSORS%
 
       - name: Package (complete and split CUDA assets)
         shell: pwsh
         run: |
-          $full = "release\crispasr-windows-x86_64-cuda"
-          $split = "release\crispasr-windows-x86_64-cuda-non-cuda"
+          $full = "release\crispasr-windows-x86_64-${{ matrix.flavor }}"
+          $split = "release\crispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda"
           $runtime = "release\cuda-runtime"
           New-Item -ItemType Directory -Force $full, $split, $runtime | Out-Null
 
@@ -2210,9 +2220,27 @@ jobs:
           $cudaDlls | Copy-Item -Destination $full
           $cudaDlls | Copy-Item -Destination $runtime
 
+          # cudaRuntimeGetVersion does not require a GPU. Verify the actual
+          # packaged DLL rather than only the compile-time diagnostics.
+          $runtimeDll = ($cudaDlls | Where-Object Name -like 'cudart64_*').FullName
+          $signature = '[DllImport("' + $runtimeDll.Replace('\', '\\') + '")] public static extern int cudaRuntimeGetVersion(out int version);'
+          Add-Type -MemberDefinition $signature -Name CudaRuntimeProbe -Namespace CrispASR
+          $runtimeVersion = 0
+          $status = [CrispASR.CudaRuntimeProbe]::cudaRuntimeGetVersion([ref]$runtimeVersion)
+          $parts = $env:CUDA_VERSION.Split('.')
+          $expectedVersion = [int]$parts[0] * 1000 + [int]$parts[1] * 10
+          if ($status -ne 0 -or $runtimeVersion -ne $expectedVersion) {
+            throw "Packaged runtime mismatch: status=$status version=$runtimeVersion expected=$expectedVersion"
+          }
+          Write-Host "WIN_CUDA_RUNTIME_MATCH_OK toolkit=$env:CUDA_VERSION runtime=$runtimeVersion"
+          # CUDA 12.6 and 12.8 DLL basenames overlap. Publish the legacy runtime
+          # as a distinctly named archive so release uploads cannot overwrite
+          # the existing CUDA 12.8 standalone DLL assets.
+          Compress-Archive -Path "$runtime\*.dll" -DestinationPath release\${{ matrix.flavor }}-runtime.zip
+
           Copy-Item LICENSE $full\
           Copy-Item THIRD_PARTY_NOTICES.txt $full\
-          Compress-Archive -Path $full -DestinationPath release\crispasr-windows-x86_64-cuda.zip -CompressionLevel Optimal
+          Compress-Archive -Path $full -DestinationPath release\crispasr-windows-x86_64-${{ matrix.flavor }}.zip -CompressionLevel Optimal
 
           # The split archive contains the executable and CrispASR DLLs, but
           # deliberately omits the three CUDA runtime DLLs below. Users can
@@ -2224,19 +2252,19 @@ jobs:
           } | Copy-Item -Destination $split\
           @'
           This archive intentionally excludes the CUDA runtime DLLs.
-          For a self-contained install, use crispasr-windows-x86_64-cuda.zip.
-          For an incremental install, copy the three separate *64_*.dll release assets
+          For a self-contained install, use crispasr-windows-x86_64-${{ matrix.flavor }}.zip.
+          For an incremental install, extract the matching ${{ matrix.flavor }}-runtime.zip
           into this directory: cudart64_*.dll, cublas64_*.dll, and cublasLt64_*.dll.
           '@ | Set-Content $split\README-CUDA.txt
           Copy-Item LICENSE $split\
           Copy-Item THIRD_PARTY_NOTICES.txt $split\
-          Compress-Archive -Path $split -DestinationPath release\crispasr-windows-x86_64-cuda-non-cuda.zip -CompressionLevel Optimal
+          Compress-Archive -Path $split -DestinationPath release\crispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.zip -CompressionLevel Optimal
 
           $hashLines = $cudaDlls | ForEach-Object {
             $hash = (Get-FileHash (Join-Path $runtime $_.Name) -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
           }
-          $hashLines | Set-Content release\crispasr-windows-x86_64-cuda-runtime-sha256.txt
+          $hashLines | Set-Content release\crispasr-windows-x86_64-${{ matrix.flavor }}-runtime-sha256.txt
 
           # The hosted runner has no NVIDIA driver. This simultaneously proves
           # that nvcuda.dll is delay-loaded (the process reaches main) and that
@@ -2265,27 +2293,29 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: crispasr-windows-x86_64-cuda
-          path: release/crispasr-windows-x86_64-cuda.zip
+          name: crispasr-windows-x86_64-${{ matrix.flavor }}
+          path: release/crispasr-windows-x86_64-${{ matrix.flavor }}.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: crispasr-windows-x86_64-cuda-split
+          name: crispasr-windows-x86_64-${{ matrix.flavor }}-split
           path: |
-            release/crispasr-windows-x86_64-cuda-non-cuda.zip
+            release/crispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.zip
+            release/${{ matrix.flavor }}-runtime.zip
             release/cuda-runtime/*.dll
-            release/crispasr-windows-x86_64-cuda-runtime-sha256.txt
+            release/crispasr-windows-x86_64-${{ matrix.flavor }}-runtime-sha256.txt
 
-      - name: Attach crispasr-windows-x86_64-cuda.zip to release
+      - name: Attach crispasr-windows-x86_64-${{ matrix.flavor }}.zip to release
         if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
-            release/crispasr-windows-x86_64-cuda.zip
-            release/crispasr-windows-x86_64-cuda-non-cuda.zip
-            release/cuda-runtime/*.dll
-            release/crispasr-windows-x86_64-cuda-runtime-sha256.txt
+            release/crispasr-windows-x86_64-${{ matrix.flavor }}.zip
+            release/crispasr-windows-x86_64-${{ matrix.flavor }}-non-cuda.zip
+            release/${{ matrix.flavor }}-runtime.zip
+            ${{ matrix.flavor == 'cuda' && 'release/cuda-runtime/*.dll' || '' }}
+            release/crispasr-windows-x86_64-${{ matrix.flavor }}-runtime-sha256.txt
           fail_on_unmatched_files: true
 
   # ── Windows CUDA 13 (dynamic, driverless CPU fallback) ───────────────────────

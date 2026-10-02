@@ -77,7 +77,7 @@ and unzip it:
 | Platform | Download | Notes |
 |---|---|---|
 | **Windows** | `crispasr-windows-x86_64-cpu.zip` | Needs AVX2 (2013+ Intel / 2015+ AMD). Older CPU → `…-cpu-legacy.zip` |
-| **Windows + NVIDIA** | `crispasr-windows-x86_64-cuda.zip` | Self-contained; a CUDA Toolkit install is **not** required. CUDA-13-native build: `…-cuda13.zip` (Turing+) |
+| **Windows + NVIDIA** | `crispasr-windows-x86_64-cuda.zip` | Self-contained; a CUDA Toolkit install is **not** required. CUDA 12.6 legacy build: `…-cuda126.zip` (Pascal/Volta and newer, through Hopper); CUDA-13-native build: `…-cuda13.zip` (Turing+) |
 | **macOS, Apple Silicon** | `crispasr-macos-arm64.tar.gz` | Metal GPU + Accelerate; `crispasr-macos.tar.gz` is the arm64 compatibility alias |
 | **macOS, Intel** | `crispasr-macos-x86_64.tar.gz` | CPU + Accelerate; requires AVX2/FMA/F16C (Haswell or newer). Older Intel Mac → `crispasr-macos-x86_64-cpu-legacy.tar.gz` |
 | **Linux** | `crispasr-linux-x86_64.tar.gz` | `…-cuda.tar.gz` / `…-vulkan.tar.gz` for GPU |
@@ -94,6 +94,14 @@ crispasr --version          # Windows: .\crispasr.exe --version
 
 CUDA builds also print `cuda toolkit` and `cuda runtime ABI`, so this command
 distinguishes the CUDA 12 and CUDA 13 packages without inspecting DLLs.
+
+Windows CUDA packages bundle the runtime they were built against. The CUDA 12.6
+legacy CLI and library assets use the `-cuda126` suffix; their split packages
+require `cuda126-runtime.zip` from the same release. Use the included SHA-256
+manifest when reusing runtime DLLs. Do not mix CUDA 12.8 binaries with CUDA 12.6
+DLLs. The standard `-cuda` build retains CUDA 12.8 and native Blackwell support.
+CUDA 12.8 also supports Pascal and Volta in CrispASR; PyTorch's wheel architecture
+selection is a separate policy ([NVIDIA architecture support](https://developer.nvidia.com/blog/navigating-gpu-architecture-support-a-guide-for-nvidia-cuda-developers/)).
 
 ### 2. Make it speak
 
