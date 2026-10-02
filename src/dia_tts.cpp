@@ -2006,6 +2006,10 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                 // Write sampled (post-override) into the delayed buffer at step+1, with the
                 // start-of-sequence BOS mask (only fill positions still unwritten), mirroring
                 // Python update_one(pred, step+1, apply_mask=bos_countdown>0). Then emit gen[step+1].
+                // Official generate() decrements before update_one(): at the
+                // last delayed BOS position, the sampled token must replace it.
+                if (bos_countdown > 0)
+                    bos_countdown--;
                 const bool apply_mask = (bos_countdown > 0);
                 if (step + 1 < (uint32_t)gen_len) {
                     for (uint32_t c = 0; c < m.n_output_heads; c++)
@@ -2014,8 +2018,6 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                     for (uint32_t c = 0; c < m.n_output_heads; c++)
                         ctx->output_tokens.push_back((uint32_t)gen[step + 1][c]);
                 }
-                if (bos_countdown > 0)
-                    bos_countdown--;
             }
 
             if (stop) {
