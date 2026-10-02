@@ -42,8 +42,13 @@ configuration and retained fallback audio. No unmeasured speedup claim.
 Exact CPU/ARM/GPU runs and capture hashes: `docs/nemotron-realtime-2026-10-02.json`.
 
 Landed from separate worktrees: Nemotron `d7f5beb78`, Dia `9a184adeb`.
-Feature CI passes 13/13 and lint 10/10 for both; combined main integration
-CI `36986270531` and lint `36986270376` are being checked separately.
+Feature CI passes 13/13 and lint 10/10 for both. Combined main integration
+CI `36986270531` passes 13/13 (including 1,982 unit tests), lint `36986270376`
+passes 10/10, and selected regression `36986270337` passes 5/5 with byte-equal
+Nemotron transcript and encoder cosine .999982. WASM (all three modes), Docker
+and Rust/C#/Dart/Ruby bindings also pass. The separate slow cppcheck run is
+still queued; its recorded status is not a completed verdict. Tested feature
+commits are preserved in a verified cold git bundle before branch deletion.
 
 ## DONE 2026-10-02 — Model CPU thread counts (#486)
 
