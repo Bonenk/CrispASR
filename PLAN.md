@@ -64,7 +64,7 @@ or timestamp tolerance relaxed. Receipt `docs/index-echo-9b-acceptance-2026-10-0
 Protected 2B Q8 actual nightly `37006905046` PASS; new public 9B F16 actual nightly
 `37008624536` PASS, including pinned public downloads and real regression driver.
 CI `37003844831` PASS 13/13, lint `37003842265` PASS 10/10; full-tree cppcheck
-`36995998244` PASS after nonvirtual destructor cleanup. Feature `35320540e`.
+`36995998244` PASS after nonvirtual destructor cleanup. Feature `90f74c854` rebased onto main `b4f3c1c0d`; native runtime unchanged from proven f91 build.
 
 Canonical PUBLIC `cstr/index-echo-9b-GGUF`, accepted F16-only pair 17.914 GiB,
 weight revision `dffbadf0f173446fee0364a0807803d2b2fb6f49`, updated card/acceptance
@@ -79,9 +79,10 @@ Receipt `docs/index-echo-9b-profile-2026-10-02.json`; generation ~86% of inferen
 
 NEXT: CUDA validation v4 successfully pushed against canonical public weight pin
 (script 2026-10-02.4; same proven CI CUDA runtime f91a31da8), terminal v3 logs saved
-before repush. Rebase latest browser/WASM main changes, final-head integration
-CI/lint/regression, then ff main and remove claim/feature. Original proof commits
-are protected by archive/index-echo-9b-proof-20261002; final archive to follow.
+before repush. Final-head CI `37012228763`, lint `37012234246`, regression `37012244055` and
+all five WASM modes `37012251223` launched on rebased `90f74c854`. Then ff main
+and remove claim/feature. Original proof commits
+are protected by archive/index-echo-9b-proof-20261002; final archive/index-echo-9b-final-proof-20261002 protects original final proof SHAs.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
