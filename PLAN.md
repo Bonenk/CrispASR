@@ -125,9 +125,15 @@ max norm error2.8123%; preserve this quantization result, do not loosen guard.
 Complete Q8 speech36975526523 PASS both Hello/42 and fox/123 at4 threads,
 explicit1024override: WER0 each,5.5844s/6.6293s. Before controls36965187732
 (WER.852) and36966653943(WER.72), plus sampler-only36972564262(WER1),
-remain rejected. Final helper637c47f93 launches36979017189: default model
-limit, BOTH prompts x1/4/8 threads, C ABI32/reset0 and CLI32/default limits.
-Runtime CI36977049609 PASS13; lint36977052309 pending. Cold evidence under
+remain rejected. Final helper9c0ee8a46 launches36979527236: default model limit, BOTH
+prompts x1/4/8 threads, C ABI32/reset0 and CLI32/default limits. Superseded
+36979017189 cancelled; CLI now uses fox (>512 steps) to expose inherited
+generic512-token defaults. Registry ships F16: two complete default-limit
+F16 prompts36980002984 pending. Hosted macOS14 Metal acceptance36980351443
+launches helper0723cce72, actual MTL backend required plus CLI/C ABI caps.
+Initial Metal harness36980272412 cancelled before acceptance after correcting
+an unsupported CLI flag. No neural/runtime changes since09804bb5d.
+Runtime CI36977049609 PASS13; lint36977052309 PASS10. Cold evidence under
 `/mnt/volume1/tmp-overflow/dia-*`; no release-quality claim until final gates.
 
 ## CLAIMED 2026-10-02 — PR #487 Nemotron realtime/server
@@ -144,7 +150,8 @@ all3presets0/2/3 on33s. Ordinary server9/9, VAD11/11, configured33s turn10/10
 PASS. That run fails ONLY auxiliary Q4 one-shot comma equality: full-control
 and window share the SAME comma difference. Exact window/control checks kept;
 spoken-word auxiliary comparison now checks all words. Remaining Q4/F16 CPU
-1/4/8 matrix36975834552 running. ARM Q8/server matrix36978217155 pending.
+1/4/8 matrix36975834552 PASS all6cases,5969assertions each, all3presets
+complete33s text/token-confidence exact. ARM Q8/server36978217155 running.
 
 Real CUDA v1 on twoTeslaT4/SM75 FAILS exact token-confidence parity despite
 matching complete text in the preserved tail. Candidate876d4deb7 therefore
@@ -153,7 +160,9 @@ GPU window only via explicit CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND.
 Do not describe CPU proof as GPU window proof. New GPU proof harnessb465bb1cd
 compares production default against frozen pre-PR b33138b057, complete33s
 speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
-server checks. Separate proof slug preserves rejected v1 evidence.
+server checks. Separate proof slug preserves rejected v1 evidence. Proof not launched yet:
+Kaggle maximum2GPU sessions reached; both are other agent Index-Echo jobs.
+Wait for their completion, never interrupt or bypass quota. Ready7cddcdeee.
 Final runtime CI36979186151 / lint36979189406 running; earlier20dd2bcaf
 CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
 
