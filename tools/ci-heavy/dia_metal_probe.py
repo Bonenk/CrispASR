@@ -21,6 +21,9 @@ int main(void) {
         id<MTLDevice> d = MTLCreateSystemDefaultDevice();
         if (!d) { puts("METAL_UNAVAILABLE: no MTLDevice"); return 77; }
         printf("METAL_DEVICE: %s\n", [[d name] UTF8String]);
+        if ([[d name] rangeOfString:@"paravirtual" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            puts("METAL_VIRTUAL_DEVICE_UNSUITABLE: require physical model-execution hardware"); return 78;
+        }
         NSError *error = nil;
         id<MTLLibrary> lib = [d newLibraryWithSource:@"#include <metal_stdlib>\nusing namespace metal; kernel void mark(device float *o [[buffer(0)]], uint i [[thread_position_in_grid]]) { o[i] = 1.0f; }" options:nil error:&error];
         if (!lib) { puts("METAL_SHADER_FAILED"); return 2; }

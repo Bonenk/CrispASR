@@ -97,6 +97,8 @@ def run(cmd, tag):
 
 subprocess.run(['uptime'], check=True)
 subprocess.run(['vm_stat'] if sys.platform == 'darwin' else ['free', '-h'], check=True)
+if a.metal:
+    run([sys.executable, ROOT / 'tools/ci-heavy/dia_metal_probe.py'], 'metal-hardware-probe')
 build = SCRATCH / 'dia-build'
 run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
      '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
