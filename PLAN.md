@@ -19,8 +19,11 @@ cppcheck queue has not completed. Previous main run `36969566590` fails only
 `examples/cli/crispasr_backend_index_echo.cpp:12/63` (`virtualCallInConstructor`:
 virtual `shutdown()` called from the destructor); that source still has the
 same pattern and belongs to the separate Index-Echo agent. Do not suppress it.
-NOW: pinned cppcheck 2.7 GH `36990965775` runs on helper source `8aca2ff3f`
-(ubuntu:22.04 container, seven CI-covered runtime files, existing CI options).
+NOW: pinned cppcheck 2.7 GH `36992014618` runs on helper source `3a87d6007`
+(ubuntu:22.04 container, seven CI-covered runtime files, existing CI options
+plus explicit C++ language for standalone headers). First run `36990965775`
+failed only because the harness classified `.h` files as C; corrected without
+runtime edits or additional suppressions. Failed receipt is preserved on CIFS.
 No Index-Echo files or new suppressions; server files keep the existing
 full-tree CI exclusion and already pass the live-server tests. Next: record
 the actual scoped verdict and retain the unrelated full-tree finding for its owner. VPS load 20.46/18.13/13.58, available RAM 1.1 GiB and swap free 6.7 MiB;
