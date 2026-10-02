@@ -155,15 +155,33 @@ class TestReleaseWorkflow(unittest.TestCase):
             self.skipTest("pyyaml not installed")
         job = self.data.get("jobs", {}).get("build-windows-cuda", {})
         self.assertTrue(job, "build-windows-cuda job must exist")
-        steps_text = str(job.get("steps", []))
-        for asset in (
-            "crispasr-windows-x86_64-cuda.zip",
-            "crispasr-windows-x86_64-cuda-non-cuda.zip",
-            "cudart64_*.dll",
-            "cublas64_*.dll",
-            "cublasLt64_*.dll",
-            "crispasr-windows-x86_64-cuda-runtime-sha256.txt",
-        ):
+        rows = job.get("strategy", {}).get("matrix", {}).get("include", [])
+        self.assertEqual({row["flavor"] for row in rows}, {"cuda", "cuda126"})
+        library = self.data["jobs"]["build-libs-windows-x86_64-cuda"]
+        self.assertEqual(rows, library["strategy"]["matrix"]["include"])
+        steps = job.get("steps", [])
+        attachments = [
+            step["with"]["files"]
+            for step in steps
+            if step.get("uses", "").startswith("softprops/action-gh-release@")
+        ]
+        self.assertEqual(len(attachments), 1)
+        published = set()
+        for row in rows:
+            flavor = row["flavor"]
+            files = attachments[0].replace("${{ matrix.flavor }}", flavor).splitlines()
+            expected = {
+                f"release/crispasr-windows-x86_64-{flavor}.zip",
+                f"release/crispasr-windows-x86_64-{flavor}-non-cuda.zip",
+                f"release/{flavor}-runtime.zip",
+                f"release/crispasr-windows-x86_64-{flavor}-runtime-sha256.txt",
+            }
+            with self.subTest(flavor=flavor):
+                self.assertTrue(expected.issubset(files), expected - set(files))
+                self.assertFalse(expected & published, "flavors must not overwrite assets")
+            published.update(expected)
+        steps_text = str(steps)
+        for asset in ("cudart64_*.dll", "cublas64_*.dll", "cublasLt64_*.dll"):
             with self.subTest(asset=asset):
                 self.assertIn(asset, steps_text)
         self.assertIn(
