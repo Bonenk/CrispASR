@@ -70,6 +70,21 @@
     "ruby_bindings": {
       "status": "PASS",
       "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/37022213108"
+    },
+    "released_cuda_package_pair": {
+      "status": "PASS",
+      "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/37042433754",
+      "source": "340d7085eaa53c40a46dcb73a6d3d0448a480006",
+      "mixed_runtime_negative_exit": 1
+    },
+    "released_python_wheels": {
+      "status": "PASS",
+      "jobs": 11,
+      "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/37044712965",
+      "gpu_wheels": 3,
+      "cpu_wheels": 4,
+      "index_publish": "PASS",
+      "pypi_publish": "PASS"
     }
   },
   "retained_control": {
@@ -87,5 +102,6 @@
     "docs/index-echo-9b-acceptance-2026-10-02.json",
     "docs/dia-full-generation-2026-10-02.json",
     "docs/nemotron-realtime-2026-10-02.json"
-  ]
+  ],
+  "distribution_receipt": "docs/release-v0.8.41-distribution.json"
 }

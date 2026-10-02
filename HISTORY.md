@@ -11,8 +11,13 @@ technical deep-dives are in `LEARNINGS.md`.
 Published annotated tag `340d7085eaa53c40a46dcb73a6d3d0448a480006` through
 scripts/bump-version.sh after all integrated source/model gates passed.
 Release body includes the complete audited v0.8.40-to-main change range.
-Platform asset build/attachment is tracked by workflow `37026428050`; final
-asset verification remains live in PLAN until distribution completes.
+Release workflow `37026428050` PASS 36/36. All 53 expected native and GPU-wheel
+assets are uploaded, nonzero and carry SHA-256 digests; the release body matches
+the tagged notes. Actual full CUDA 12.6/12.8 CLI/runtime/library archive pairing
+`37042433754` PASS, including a rejected mixed-runtime negative control.
+Wheel pipeline `37044712965` PASS 11/11, including index and PyPI publishing.
+Distribution receipt: `docs/release-v0.8.41-distribution.json`. Physical
+MX150/GTX1660 performance remains a reporter check; no forced-MMQ binary ships.
 
 ## DONE 2026-10-02 — authorized GitHub issue and PR replies
 

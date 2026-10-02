@@ -47,29 +47,6 @@ Q4 v1 terminal logs/outputs preserved cold. F16 control PASS all checks; no quan
 
 All13 CI jobs37037038753 and10 lint jobs37037042008 PASS on proven native MioTTS/Echo source. Reread kaggle_usage.md in full at user direction: CPU quantize/upload remains GH37044026371; GPU-only validator9ebb3a7e9 removes prior CPU CLI invocation and requires actual CUDA layer assignments in CLI/full-file/roundtrip logs. Kaggle v1 control PASS but auth/preparation abort retained, no candidate ran. New GPU kernelv2 is not pushed until prepared artifact pins and permission preflight are ready.
 
-## CLAIMED 2026-10-02 — next release
-
-Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
-implementation/proofs are complete and landed; see HISTORY and structured
-receipts. Full CUDA 13 package verification `37003929359` PASS. All large
-builds ran hosted after checking local load/free memory; no Index runtime
-edits here. Original tested source bundle and logs archived cold.
-
-Core release gates PASS, receipt docs/release-v0.8.41-validation.json:
-CI37022213223 13/13, lint37022213402 10/10, cppcheck37016733737,
-Regression37016733584 11 jobs, dedicated9B CPU37016734351, WASM37016733853
-5/5 and deterministic Windows Piper37022213369. Seed-0 failed audio preserved;
-seed42 repeat hashes and unchanged speech thresholds pass. Native Piper sources
-unchanged. Index CPU/CUDA canonical-public acceptance is integrated.
-
-Published v0.8.41 at annotated tag340d7085e using scripts/bump-version.sh;
-all seven versioned files agree. Comprehensive notes and twelve-point Index
-wiring audit are complete; Ruby37022213108 PASS. Release workflow37026428050
-is building/attaching platform packages, with no failures and eleven assets
-uploaded at the latest check. Target inventory53 assets includes both CUDA12
-flavors; verify the full legacy CLI/library/runtime uploads before completion.
-All large builds are hosted after load/free checks; root checkout untouched.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
