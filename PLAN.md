@@ -22,6 +22,15 @@ Verify actual graph worker counts and decoded output, plus CPU/dynamic-backend
 builds. VPS load 9.36/6.27/5.03, available memory 2.2GiB: heavy builds/models run
 on hosted CI; logs/artifacts remain on CIFS. Index models are another agent's work.
 
+## CLAIMED 2026-10-02 — #485 WASM integration size budget
+
+Worktree `/mnt/volume1/wt-index-echo-wasm-budget`, branch
+`fix/index-echo-wasm-budget`. The 2B port is on main and native/model/nightly
+proofs pass. Merged WASM run `36959052416` compiles all three variants but
+exceeds the old 10 MiB sanity budget: 11,211,244–11,296,245 bytes versus
+10,045,300–10,127,779 in baseline `36879830550`. Parent main has identical
+WASM compilation sources to that baseline. Audit the expected native decoder
+code growth, document it and verify all three export gates with GH CI.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
