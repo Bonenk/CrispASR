@@ -13,18 +13,20 @@ it goes stale for more than a day.
 
 ## CLAIMED 2026-10-02 — next release
 
-Worktree `/mnt/volume1/wt-483` (`fix/483-cuda126`). PR #480 review and #483
+Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
 implementation/proofs are complete and landed; see HISTORY and structured
 receipts. Full CUDA 13 package verification `37003929359` PASS. All large
 builds ran hosted after checking local load/free memory; no Index runtime
 edits here. Original tested source bundle and logs archived cold.
 
-User authorizes the next release after the separate Index-Echo agent lands
-its accepted public 9B F16 support and integrated-main CI passes. Protected
-2B Q8 nightly `37006905046` and public 9B F16 nightly `37008624536` PASS;
-Index final integration/CUDA canonical-public check remains the other agent’s
-work. Release notes drafted; latest v0.8.40. Use scripts/bump-version.sh once
-all gates pass.
+Index-Echo accepted public 9B F16 support is now integrated at a67c78eb2.
+Protected 2B Q8 nightly37006905046 and public 9B F16 nightly37008624536 PASS;
+canonical public CUDA v4 passes on two T4. Final feature CI37013451267 PASS
+13/13 and lint37012234246 PASS10/10. Our existing release-workflow assertion
+was updated for both matrix flavors; ten local tests and two failing controls
+PASS. Combined main CI37016734092 is running. Release notes committed;
+latest v0.8.40. User authorizes the next release once integrated-main checks
+pass; use scripts/bump-version.sh. No remaining Index work owned here.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
