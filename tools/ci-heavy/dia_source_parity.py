@@ -23,6 +23,7 @@ p.add_argument('--model')
 p.add_argument('--lib')
 p.add_argument('--reference-run')
 p.add_argument('--feedback', action='store_true')
+p.add_argument('--quant', choices=('f16', 'q8_0'), default='f16')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -76,7 +77,7 @@ if a.child == 'reference':
     np.stack(logits).astype('<f4').tofile(OUT / 'reference-logits.f32')
     np.save(OUT / 'reference-codes.npy', codes)
     (OUT / 'reference.json').write_text(json.dumps({'source_pin': PIN, 'model_pin': MODEL_PIN,
-        'text': TEXT, 'steps': len(inputs), 'shape': np.stack(logits).shape, 'precision': 'F32'}, indent=2))
+        'text': TEXT, 'steps': len(inputs), 'shape': np.stack(logits).shape, 'precision': 'F32', 'torch_version': torch.__version__}, indent=2))
     print('DIA_REFERENCE_CAPTURED', len(inputs), flush=True)
     sys.exit(0)
 
@@ -120,7 +121,7 @@ run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SH
 run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j4'], 'build')
 lib = next(build.rglob('libcrispasr.so'))
 revision = '3233fbcb32be47761d2e736857b6d1a075b9ba7e'
-model = hf_hub_download('cstr/dia-1.6b-GGUF', 'dia-1.6b-f16.gguf', revision=revision)
+model = hf_hub_download('cstr/dia-1.6b-GGUF', f'dia-1.6b-{a.quant}.gguf', revision=revision)
 hf_hub_download('cstr/dia-1.6b-GGUF', 'dac-44khz.gguf', revision=revision)
 run([sys.executable, __file__, '--child', 'native', '--model', model, '--lib', lib], 'native')
 shape = json.loads((OUT / 'reference.json').read_text())['shape']
@@ -128,7 +129,7 @@ ref = np.fromfile(OUT / 'reference-logits.f32', dtype='<f4').reshape(shape).asty
 actual = np.fromfile(OUT / 'native-logits.f32', dtype='<f4').reshape(shape).astype(np.float64)
 cos = np.sum(ref * actual, axis=-1) / np.sqrt(np.sum(ref**2, axis=-1) * np.sum(actual**2, axis=-1))
 ratio = np.sqrt(np.sum(actual**2, axis=-1) / np.sum(ref**2, axis=-1))
-receipt = {'cosine': cos.tolist(), 'norm_ratio': ratio.tolist(),
+receipt = {'quant': a.quant, 'cosine': cos.tolist(), 'norm_ratio': ratio.tolist(),
            'minimum_cosine': float(cos.min()), 'max_norm_error': float(abs(ratio-1).max())}
 (OUT / 'parity.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print('DIA_SOURCE_PARITY', receipt['minimum_cosine'], receipt['max_norm_error'], flush=True)
