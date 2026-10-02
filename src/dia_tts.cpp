@@ -1278,6 +1278,23 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                 dia_forced.size() / m.n_output_heads);
     }
     const bool dia_force = !dia_forced.empty();
+    // Force sampled outputs while preserving the real delay/BOS feedback loop.
+    // Unlike FORCE_TOKENS, this also audits generation bookkeeping itself.
+    std::vector<int32_t> dia_forced_outputs;
+    if (const char* fp = crispasr_env::get("CRISPASR_DIA_FORCE_OUTPUT_TOKENS")) {
+        if (FILE* f = fopen(fp, "rb")) {
+            int32_t v;
+            while (fread(&v, sizeof(v), 1, f) == 1)
+                dia_forced_outputs.push_back(v);
+            fclose(f);
+        }
+    }
+    const bool dia_force_outputs = !dia_forced_outputs.empty();
+    if (dia_force_outputs)
+        max_gen = (uint32_t)std::min((size_t)m.max_generation_size, dia_forced_outputs.size() / m.n_output_heads);
+    const char* dia_input_path = crispasr_env::get("CRISPASR_DIA_DUMP_INPUT_TOKENS");
+    if (dia_input_path)
+        remove(dia_input_path);
     const char* dia_steplogits_path = crispasr_env::get("CRISPASR_DIA_DUMP_STEPLOGITS");
     if (dia_force)
         max_gen = (uint32_t)std::min((size_t)m.max_generation_size, dia_forced.size() / m.n_output_heads);
@@ -1557,6 +1574,13 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                 for (uint32_t h = 0; h < m.n_output_heads; h++) {
                     int32_t g = gen[step][h];
                     ctx->current_audio_tokens[h] = (g >= 0) ? (uint32_t)g : m.bos_token_id;
+                }
+            }
+
+            if (dia_input_path) {
+                if (FILE* f = fopen(dia_input_path, "ab")) {
+                    fwrite(ctx->current_audio_tokens.data(), sizeof(uint32_t), m.n_output_heads, f);
+                    fclose(f);
                 }
             }
 
@@ -2006,8 +2030,13 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
 
             ggml_free(ctx0);
 
-            // EOS/delay override on the sampled tokens (end-of-sequence delay) + stop check.
-            bool stop = !dia_force && dia_check_stopping(*ctx, max_gen);
+            if (dia_force_outputs) {
+                for (uint32_t h = 0; h < m.n_output_heads; ++h)
+                    ctx->current_audio_tokens[h] = (uint32_t)dia_forced_outputs[(size_t)step * m.n_output_heads + h];
+            }
+            // Forced outputs already include the reference's EOS/PAD overrides.
+            // Free generation performs the checkpoint's delayed stopping rule.
+            bool stop = !dia_force && !dia_force_outputs && dia_check_stopping(*ctx, max_gen);
 
             if (dia_force) {
                 // teacher-forcing: emit sampled directly (output unused for diffing)

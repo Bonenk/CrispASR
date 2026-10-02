@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import types
@@ -20,6 +21,8 @@ p = argparse.ArgumentParser()
 p.add_argument('--child', choices=('reference', 'native'))
 p.add_argument('--model')
 p.add_argument('--lib')
+p.add_argument('--reference-run')
+p.add_argument('--feedback', action='store_true')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -78,7 +81,11 @@ if a.child == 'reference':
     sys.exit(0)
 
 if a.child == 'native':
-    os.environ['CRISPASR_DIA_FORCE_TOKENS'] = str(OUT / 'inputs.i32')
+    if a.feedback:
+        os.environ['CRISPASR_DIA_FORCE_OUTPUT_TOKENS'] = str(OUT / 'outputs.i32')
+        os.environ['CRISPASR_DIA_DUMP_INPUT_TOKENS'] = str(OUT / 'feedback-inputs.i32')
+    else:
+        os.environ['CRISPASR_DIA_FORCE_TOKENS'] = str(OUT / 'inputs.i32')
     os.environ['CRISPASR_DIA_DUMP_STEPLOGITS'] = str(OUT / 'native-logits.f32')
     sys.path.insert(0, str(ROOT / 'python'))
     from crispasr import Session
@@ -96,7 +103,16 @@ def run(cmd, label):
 
 subprocess.run(['uptime'], check=True)
 subprocess.run(['free', '-h'], check=True)
-run([sys.executable, __file__, '--child', 'reference'], 'reference')
+if a.reference_run:
+    archive = SCRATCH / 'reference-artifact'
+    run(['gh', 'run', 'download', a.reference_run, '-R', 'CrispStrobe/CrispASR', '-D', archive], 'reference-download')
+    folder = next(archive.glob('heavy-*'))
+    for name in ('reference.json', 'inputs.i32', 'reference-logits.f32', 'reference-codes.npy', 'reference.log'):
+        shutil.copyfile(folder / name, OUT / name)
+    provenance = json.loads((OUT / 'reference.json').read_text())
+    assert provenance['source_pin'] == PIN and provenance['model_pin'] == MODEL_PIN
+else:
+    run([sys.executable, __file__, '--child', 'reference'], 'reference')
 build = SCRATCH / 'dia-build'
 run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
     '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
@@ -117,3 +133,41 @@ receipt = {'cosine': cos.tolist(), 'norm_ratio': ratio.tolist(),
 (OUT / 'parity.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print('DIA_SOURCE_PARITY', receipt['minimum_cosine'], receipt['max_norm_error'], flush=True)
 assert cos.min() >= .9995 and abs(ratio-1).max() < .02, receipt
+
+# Test real delay feedback with official next-input tokens as forced outputs.
+inputs = np.fromfile(OUT / 'inputs.i32', dtype='<i4').reshape(-1, 9)
+inputs[1:].tofile(OUT / 'outputs.i32')
+native_command = [sys.executable, __file__, '--child', 'native', '--model', model, '--lib', lib, '--feedback']
+source_path = ROOT / 'src/dia_tts.cpp'
+candidate = source_path.read_text()
+before = """                if (bos_countdown > 0)
+                    bos_countdown--;
+                const bool apply_mask = (bos_countdown > 0);"""
+after = """                const bool apply_mask = (bos_countdown > 0);"""
+assert before in candidate
+wrong = candidate.replace(before, after, 1)
+marker = """            if (stop) {"""
+assert marker in wrong
+wrong = wrong.replace(marker, """            if (!dia_force && bos_countdown > 0)
+                bos_countdown--;
+
+""" + marker, 1)
+try:
+    source_path.write_text(wrong)
+    run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j4'], 'old-bos-build')
+    run(native_command, 'old-bos-feedback')
+    observed = np.fromfile(OUT / 'feedback-inputs.i32', dtype='<i4').reshape(-1, 9)
+    mismatch = np.argwhere(observed != inputs[:-1])
+    assert mismatch.tolist() == [[15, 8]], mismatch
+    assert observed[15, 8] == 1026 and inputs[15, 8] == 890
+    shutil.copyfile(OUT / 'feedback-inputs.i32', OUT / 'old-bos-inputs.i32')
+finally:
+    source_path.write_text(candidate)
+run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j4'], 'fixed-bos-build')
+run(native_command, 'fixed-bos-feedback')
+observed = np.fromfile(OUT / 'feedback-inputs.i32', dtype='<i4').reshape(-1, 9)
+assert np.array_equal(observed, inputs[:-1]), np.argwhere(observed != inputs[:-1])
+receipt['feedback'] = {'steps': len(observed), 'exact_source_inputs': True,
+                       'old_mismatch': [[15, 8]], 'old': 1026, 'reference': 890}
+(OUT / 'parity.json').write_text(json.dumps(receipt, indent=2) + '\n')
+print('DIA_SOURCE_LOGITS_AND_FEEDBACK_PASS', flush=True)
