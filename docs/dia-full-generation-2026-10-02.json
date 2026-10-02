@@ -238,7 +238,9 @@
     "f16_metal": {
       "run": 36980351443,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36980351443",
-      "status": "running"
+      "status": "timed out; not acceptance",
+      "passed": false,
+      "reason": "Hosted runner exposed Apple Paravirtual device without SIMD matrix acceleration. No completed model generation in2400seconds."
     },
     "q8_cli_retry": {
       "run": 36982203366,
@@ -258,19 +260,36 @@
     "q8_cli_whole_dialogue": {
       "run": 36983650376,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983650376",
-      "status": "running"
+      "status": "completed",
+      "passed": true,
+      "explicit_limit": {
+        "max_new_tokens": 32,
+        "audio_seconds": 0.18575963718820862
+      },
+      "default_speech": {
+        "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+        "audio_seconds": 6.629297052154195,
+        "cli": true,
+        "transcript": "The quick brown Fox jumps over the lazy dog. <en-US> Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+        "wer": 0.0
+      },
+      "generation_capacity": 3072,
+      "decoder_loops_per_request": 1
     },
     "f16_metal_whole_dialogue": {
       "run": 36983652977,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983652977",
-      "status": "pending"
+      "status": "cancelled",
+      "reason": "Hosted GPU probe proves Metal unavailable; physical-Mac runtime acceptance cannot be claimed."
     }
   },
   "standard_ci": {
     "run": 36983655538,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983655538",
-    "status": "running",
-    "scope": "includes shared CLI/server whole-dialogue fix and permanent chunking regression"
+    "status": "completed",
+    "scope": "includes shared CLI/server whole-dialogue fix and permanent chunking regression",
+    "passed": true,
+    "jobs": 13
   },
   "lint": {
     "run": 36983658133,
@@ -280,7 +299,8 @@
   "limitations": [
     "Full-speech acceptance uses two prompts longer than100characters and fixed seeds. Short prompts remain model-sensitive.",
     "Q8 is an explicit model choice; the automatic download remains F16.",
-    "CUDA/Vulkan Dia acceleration remains opt-in; no new validation claim for those backends."
+    "CUDA/Vulkan Dia acceleration remains opt-in; no new validation claim for those backends.",
+    "Metal compiles in standard CI, but physical-Mac runtime proof is unavailable on these hosted VMs. No Metal runtime acceptance claim; hardware preflight now rejects nil/paravirtual devices before model work."
   ],
   "rejected_full_speech": [
     {
@@ -301,12 +321,20 @@
   ],
   "chunk_policy_negative_control": {
     "baseline": "b33138b057",
-    "text": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+    "text": "[S1] The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
     "before_chunks": 2,
     "before_single_context_gate_passed": false,
     "after_chunks": 1,
     "after_single_context_gate_passed": true,
     "source": "388a7ad86",
     "cold_receipt": "/mnt/volume1/tmp-overflow/dia-chunk-policy/receipt.json"
+  },
+  "metal_hardware_probe": {
+    "run": 36984356005,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36984356005",
+    "passed": false,
+    "exit_code": 77,
+    "output": "METAL_UNAVAILABLE: no MTLDevice",
+    "scope": "Another standard macos14 ARM VM has no Metal device; compiled Metal support is not hardware-execution proof."
   }
 }
