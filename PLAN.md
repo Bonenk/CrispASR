@@ -70,7 +70,14 @@ NOW: pinned `nari-labs/dia@4a9e29b1` exposes a nucleus-filter bug: native
 drops the threshold-crossing token, allowing all-zero weights. Candidate
 `153ef839c` keeps it; complete-speech Q8/1/4/8 CPU job `36972564262` running
 with the existing explicit 1024-step override. Default cap unchanged pending
-quality. Actual native sampler vs pinned PyTorch source `36972710180` running.
+quality. Actual native sampler vs pinned PyTorch source `36972710180` PASS
+(12 probability fixtures). Complete speech `36972564262` FAILED: first Q8
+Hello/seed42 clip hit 1024 steps, mostly near-silence, ASR empty (WER1).
+Sampler fix alone is insufficient; preserved audio/logs in cold
+`/mnt/volume1/tmp-overflow/dia-full-speech-v1`. Official F32 vs native F16
+128-step teacher-forced audit `36973899601` launched, pinned source4a9e29b1
+and original HFcheckpoint257bc72f. Production default changes only on branch,
+no full-speech acceptance or landing yet.
 
 The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
 its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
@@ -88,7 +95,12 @@ checks must pass before landing; Index models remain another agent’s task.
 NOW: author commits preserved in candidate `20d99ac98`; hosted CPU exact
 full-recompute/window token+confidence matrix (Q8/Q4/F16 x threads 1/4/8,
 presets 0/2/3, 33s) and VAD/ordinary server checks `36972773144` running.
-CI `36972712647`, lint `36972715035` running. First parity dispatch cancelled
+Current full CPU/server parity `36973268384` and CI `36973274195` / lint
+`36973276596` running/queued; scripts now derive Q8 from pinned F16 because
+that HF revision has no Q8 file. CUDA Kaggle `crispasr-nemotron-realtime-487`
+v1 RUNNING (actual backend assertion); author source plus finite configurable
+1..300s Nemotron turn limit, default30, on branch20dd2bcaf. Earlier queued
+dispatches superseded before doing heavy work. First parity dispatch cancelled
 because its harness selected the wrong Catch test name; not acceptance evidence.
 
 Read description, all comments/reviews (none) and complete diff. Contains
