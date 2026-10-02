@@ -272,5 +272,24 @@
       }
     ],
     "note": "Full-length Dia quality failed in the unfixed runtime too. Production generation defaults are unchanged; live Dia acceptance is strict decoded-output/duration parity, not a full-prompt quality pass."
+  },
+  "landed_commit": "b33138b057268f573757ded8258e4afef2461ea8",
+  "main_validation": {
+    "ci": {
+      "run": 36969566591,
+      "passed_jobs": 13
+    },
+    "lint": {
+      "run": 36969566638,
+      "passed_checks": 10
+    },
+    "selected_nightly": {
+      "run": 36969566635,
+      "passed_jobs": 6,
+      "models": [
+        "nemotron-3.5-asr-streaming-0.6b",
+        "paraformer-zh"
+      ]
+    }
   }
 }
