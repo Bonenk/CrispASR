@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - ggml
       - tests/test-ggml-scheduler-replay.cpp
       - tools/ci-heavy/scheduler-replay/**
       - .github/workflows/scheduler-replay-vulkan.yml
@@ -43,6 +44,7 @@ jobs:
           grep -q SCHEDULER_REPLAY_VULKAN_PASS scheduler-positive.log
       - name: Negative control removes cached source reapplication
         run: |
+          cp ggml/src/ggml-backend.cpp "$RUNNER_TEMP/scheduler-original.cpp"
           python3 - <<'PY'
           from pathlib import Path
           p = Path('ggml/src/ggml-backend.cpp')
@@ -61,6 +63,28 @@ jobs:
           grep -q 'compute reverse=0 iteration=1' scheduler-negative.log
           if grep -q SCHEDULER_REPLAY_VULKAN_PASS scheduler-negative.log; then exit 1; fi
           echo "SCHEDULER_NEGATIVE_CONTROL_REJECTED status=$status"
+      - name: Negative control reproduces PR 480 unconditional disposal
+        run: |
+          cp "$RUNNER_TEMP/scheduler-original.cpp" ggml/src/ggml-backend.cpp
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('ggml/src/ggml-backend.cpp')
+          s = p.read_text()
+          needle = ('    if (sched->src_mutations_applied) {\n'
+                    '        ggml_backend_sched_restore_src_mutations(sched);\n'
+                    '    }\n')
+          assert s.count(needle) == 1
+          p.write_text(s.replace(needle, '    ggml_backend_sched_restore_src_mutations(sched);\n'))
+          PY
+          cmake --build build-replay --target scheduler-replay -j2
+          set +e
+          build-replay/scheduler-replay > scheduler-disposal-negative.log 2>&1
+          status=$?
+          set -e
+          cat scheduler-disposal-negative.log
+          test "$status" -ne 0
+          grep -q 'FAIL: reset must not overwrite recycled metadata' scheduler-disposal-negative.log
+          echo "SCHEDULER_PR480_DISPOSAL_REJECTED status=$status"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
