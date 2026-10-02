@@ -1242,7 +1242,7 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
     // Match the checkpoint's generation capacity; explicit limits can shorten
     // it but cannot overrun the model's KV allocation. There is no CPU-only cap.
     uint32_t max_gen = m.max_generation_size;
-    if (p.max_tokens > (int)m.max_delay)
+    if (p.max_tokens > 0)
         max_gen = std::min(max_gen, (uint32_t)p.max_tokens);
     if (const char* ms = crispasr_env::get("CRISPASR_DIA_MAX_STEPS")) {
         char* end = nullptr;
