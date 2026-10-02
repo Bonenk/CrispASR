@@ -11,6 +11,15 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — Index-Echo contributing checklist and release-note audit
+
+Worktree `/mnt/volume1/wt-index-echo-9b`, branch
+`docs/index-echo-wiring-release-audit`. Audit all twelve integration points
+against code and the accepted shared-library/CPU/CUDA receipts; add a durable
+checklist and explicit 2B/9B selection and scope to the prepared release notes.
+Release bump/tag ownership remains with `/mnt/volume1/wt-483`; its deterministic
+Windows Piper proof and remaining tip lint must pass before tagging.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
