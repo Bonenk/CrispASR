@@ -25,6 +25,8 @@ MioTTS rate getter and voice-preset wiring committed at `5dfc7d3f8`; hosted x86 
 
 Echo opt-in pipeline-disable experiment committed at `722f54ba4`; portable CUDA runtime build [37030248844](https://github.com/CrispStrobe/CrispASR/actions/runs/37030248844) dispatched (queued). Kaggle prior validation/profile sessions are COMPLETE; latest 30 sessions audited with no active jobs. Preparing canonical acceptance followed by same-runtime control/candidate AB/BA timing, three warm calls per clip, and actual graph-reuse counters. No speed claim or default flip yet.
 
+Additional audit: MioTTS lacked tokenizer companion download and resident-server per-request preset dispatch; fixes and accurate preset-only docs are in progress. Local format-18, regenerated Go flags and LEARNINGS index checks PASS; secret scan 3 PASS / 1 expected skip, metadata-copy patch offsets verified. Feature CI [37031425578](https://github.com/CrispStrobe/CrispASR/actions/runs/37031425578) and lint [37031429892](https://github.com/CrispStrobe/CrispASR/actions/runs/37031429892) dispatched, still queued with the hosted proof jobs.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
