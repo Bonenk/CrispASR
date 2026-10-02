@@ -43,6 +43,8 @@ Q4_K checkpoint: CUDA bundle37040196454 SUCCESS at 012188eed, including crispasr
 
 Q4 experiment launch: private runtime revision51158bc93be3e4f2f65a3bde6296bd9a59712968, SHA2560a4f882975c802a4ff3a1932fcb3ecf838cac39c3ccecc181240e331d0432303; SDK1d01260a6/build012188eed and kernel e06a3460a version2026-10-02.1. Sole-account dateRun audit found0 active among30 recent kernels. Pushed q4-guards v1 once, hardware/F16 control/candidate verdicts pending. No default or public weight changes.
 
+Q4 v1 terminal logs/outputs preserved cold. F16 control PASS all checks; no quantizer/candidate ran because Kaggle token cannot create model repositories (403). Move CPU quantization/private uploads to GH37044026371 at6bc941a00 using existing INDEX_ECHO_HF_TOKEN and private staging repo. New runner proves staging write permission before build or model pull. GPU v2 will consume pinned prepared candidates only; no threshold/default/public-artifact changes. Local storage cleanup copied and hashed1.074GiB of >5h-unused artifacts, preserving15 old paths as symlinks; receipt cold.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
