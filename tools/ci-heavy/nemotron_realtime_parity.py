@@ -43,7 +43,7 @@ for quant in ('q8_0', 'q4_k', 'f16'):
     env = dict(os.environ, CRISPASR_MODEL_NEMOTRON=model, CRISPASR_TEST_CPU_ONLY='1')
     for threads in (1, 4, 8):
         label = f'window-{quant}-{threads}'
-        run([build / 'bin/test-nemotron', 'nemotron: newest-audio frontend matches full recompute'],
+        run([build / 'bin/test-nemotron', 'nemotron: realtime stream gives the same output as a full recompute'],
             label, dict(env, CRISPASR_TEST_N_THREADS=str(threads)))
         receipt['cases'].append(label)
         (OUT / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
