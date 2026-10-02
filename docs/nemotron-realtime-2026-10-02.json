@@ -1,5 +1,5 @@
 {
-  "status": "pending ARM and actual GPU production-path proof; not landed",
+  "status": "accepted CPU window, preserved GPU production frontend, and live server changes; pending main integration CI",
   "date": "2026-10-02",
   "scope": "PR487 CPU incremental frontend, WebSocket ping/header compatibility, cadence override and finite native Nemotron long-turn setting",
   "author_head": "87f23e34dbb6936816a045bb12e898eebed7c8bd",
@@ -100,9 +100,78 @@
     "version": 1,
     "uploaded_script_version": 2,
     "source": "7cddcdeee14757bcff0f4293aec67a78182b0294",
-    "status": "launched",
+    "status": "COMPLETE",
     "scope": "Original full frontend is default on GPU. Frozen-source versus candidate complete speech/token-confidence capture Q8/Q4/F16 plus real server/VAD/long turn.",
-    "hardware": "two actual TeslaT4, SM75"
+    "hardware": "two actual TeslaT4, SM75",
+    "passed": true,
+    "receipt": {
+      "source": "7cddcdeee14757bcff0f4293aec67a78182b0294",
+      "baseline": "b33138b057268f573757ded8258e4afef2461ea8",
+      "model_revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+      "script_version": 2,
+      "scope": "GPU full frontend retained; incremental GPU window is not accepted",
+      "cases": [
+        {
+          "arm": "baseline",
+          "quant": "q8_0",
+          "complete_speech": true,
+          "exact_baseline_tokens": false
+        },
+        {
+          "arm": "baseline",
+          "quant": "f16",
+          "complete_speech": true,
+          "exact_baseline_tokens": false
+        },
+        {
+          "arm": "baseline",
+          "quant": "q4_k",
+          "complete_speech": true,
+          "exact_baseline_tokens": false
+        },
+        {
+          "arm": "candidate",
+          "quant": "q8_0",
+          "complete_speech": true,
+          "exact_baseline_tokens": true
+        },
+        {
+          "arm": "candidate",
+          "quant": "f16",
+          "complete_speech": true,
+          "exact_baseline_tokens": true
+        },
+        {
+          "arm": "candidate",
+          "quant": "q4_k",
+          "complete_speech": true,
+          "exact_baseline_tokens": true
+        },
+        {
+          "protocol": "server",
+          "passed": true
+        },
+        {
+          "protocol": "server-vad",
+          "passed": true
+        },
+        {
+          "protocol": "server-long-turn",
+          "passed": true
+        }
+      ]
+    },
+    "assertions_per_native_case": 2993,
+    "exact_token_capture_hashes": {
+      "q8_0": "dad5e64999b2fcc64cbf9f1a653e7459b5d8fbd1f3dfd83dfe7de3f6ddae952e",
+      "q4_k": "4dd4811117836878a2030a481c201481a7f0ee41bc4040c97a5c7c2820bb2bef",
+      "f16": "5f7f93bc50a4014667c1d5c7d6d73453453a632ba0247c9e6e7aae7f3bcada7c"
+    },
+    "server_checks": {
+      "ordinary": 9,
+      "vad": 11,
+      "configured_long_turn": 10
+    }
   },
   "standard_ci": {
     "run": 36979186151,
@@ -138,5 +207,9 @@
     "No universal CPU speedup percentage claimed from contended runners.",
     "GPU window is experimental and failed exact confidence parity; no default enablement.",
     "Kaggle hardware must be recorded from actual nvidia-smi and backend logs."
-  ]
+  ],
+  "ggml_pin": "2f5a80d258c46e6ac8eee95f1328c0f58376d7ee",
+  "integration_main": {
+    "status": "pending"
+  }
 }
