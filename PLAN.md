@@ -11,13 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — comprehensive v0.8.41 release notes
-
-Worktree `/mnt/volume1/wt-index-echo-9b`, branch
-`docs/comprehensive-v0.8.41-notes`. Audit the complete v0.8.40-to-main change
-range and expand release notes for all shipped features, fixes, usage and
-validated limitations. Bump/tag ownership remains with wt-483.
-
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
