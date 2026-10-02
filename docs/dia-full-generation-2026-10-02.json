@@ -1,5 +1,5 @@
 {
-  "status": "pending final complete-speech gates; not landed",
+  "status": "accepted official F16 numerical/feedback parity, complete F16/Q8 CPU speech, and CLI/server context policy; pending main integration CI",
   "date": "2026-10-02",
   "runtime_source": "09804bb5d",
   "scope": "Dia sampler, cross-attention RoPE, BOS delay, complete model generation and explicit C ABI/CLI limits",
@@ -294,7 +294,9 @@
   "lint": {
     "run": 36983658133,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983658133",
-    "status": "running"
+    "status": "completed",
+    "passed": true,
+    "jobs": 10
   },
   "limitations": [
     "Full-speech acceptance uses two prompts longer than100characters and fixed seeds. Short prompts remain model-sensitive.",
@@ -336,5 +338,13 @@
     "exit_code": 77,
     "output": "METAL_UNAVAILABLE: no MTLDevice",
     "scope": "Another standard macos14 ARM VM has no Metal device; compiled Metal support is not hardware-execution proof."
+  },
+  "runtime_sources": {
+    "dia_core": "09804bb5d",
+    "cli_server_policy": "388a7ad86"
+  },
+  "ggml_pin": "2f5a80d258c46e6ac8eee95f1328c0f58376d7ee",
+  "integration_main": {
+    "status": "pending"
   }
 }
