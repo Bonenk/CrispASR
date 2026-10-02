@@ -56,7 +56,9 @@ Protected 2B Q8 actual nightly `37006905046` and the new public 9B F16 actual
 nightly `37008624536` pass. Anonymous pinned-artifact preflight passes both.
 Weekly large ARM regression includes all three stage clips, five whole-file
 cases, Piper and the real manifest driver. CI `37003844831` passes 13/13, lint
-`37003842265` 10/10, full-tree cppcheck `36995998244` passes. Rebased WASM `37012251223` passes all five modes, including both 128 MB heap
+`37003842265` 10/10, full-tree cppcheck `36995998244` passes. Rebased native
+CI `37013451267` passes 13/13 and lint `37012234246` passes 10/10; final
+C++/header/CMake files are identical to that CI source tree. Rebased WASM build `37012251223` passes all five modes, including both 128 MB heap
 variants and PROXY_TO_PTHREAD. Original tested
 commits remain reachable on archived proof branches through final rebasing.
 

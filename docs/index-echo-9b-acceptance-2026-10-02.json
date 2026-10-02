@@ -4018,6 +4018,32 @@
       "f16": [],
       "nightly_regression": []
     },
-    "nightly-public_receipt_sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577"
+    "nightly-public_receipt_sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577",
+    "rebased_ci": {
+      "run": 37013451267,
+      "passed": true,
+      "jobs": 13,
+      "source_commit": "1f369bfde6c95abde6cab115db1c800de7593a2b",
+      "archive": "archive/index-echo-9b-integration-proof-20261002",
+      "cpp_header_cmake_identical_to_final": true
+    },
+    "rebased_lint": {
+      "run": 37012234246,
+      "passed": true,
+      "jobs": 10
+    },
+    "rebased_wasm_build": {
+      "run": 37012251223,
+      "passed": true,
+      "modes": 5
+    },
+    "manifest_checks": {
+      "run": 37012244055,
+      "smoke": "success",
+      "unit-tests": "success",
+      "preflight": "success",
+      "select": "success",
+      "full_unrelated_matrix": "cancelled after targeted live model nightlies already passed"
+    }
   }
 }
