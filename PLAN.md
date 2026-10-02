@@ -27,6 +27,8 @@ Echo opt-in pipeline-disable experiment committed at `722f54ba4`; portable CUDA 
 
 Additional audit: MioTTS lacked tokenizer companion download and resident-server per-request preset dispatch; fixes and accurate preset-only docs are in progress. Local format-18, regenerated Go flags and LEARNINGS index checks PASS; secret scan 3 PASS / 1 expected skip, metadata-copy patch offsets verified. Feature CI [37031425578](https://github.com/CrispStrobe/CrispASR/actions/runs/37031425578) and lint [37031429892](https://github.com/CrispStrobe/CrispASR/actions/runs/37031429892) dispatched, still queued with the hosted proof jobs.
 
+MioTTS x86 proof `37029976684` is RUNNING; final resident-preset implementation/test `58cdf3679` queued for ARM speech proof [37031911762](https://github.com/CrispStrobe/CrispASR/actions/runs/37031911762). Portable Echo CUDA bundle `37030248844` is RUNNING. Runtime transfer and Kaggle launch wait for a successful, hashed bundle; no hardware or speed verdict yet.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
