@@ -21,6 +21,8 @@ optimization against accepted source/cache/full-output controls, using hosted
 builds and real Kaggle GPUs where available. Preserve current defaults until
 both speed and output pass. Large artifacts live on `/mnt/storage`.
 
+MioTTS rate getter and voice-preset wiring committed at `5dfc7d3f8`; hosted x86 speech/metadata proof [37029976684](https://github.com/CrispStrobe/CrispASR/actions/runs/37029976684) dispatched (queued). Tests require both CLI WAV and session ASR readback; 24 kHz/missing-key metadata copies test dispatch only. Echo pipeline/graph-reuse experiment remains pending.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
