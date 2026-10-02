@@ -23,13 +23,17 @@ builds. VPS load 9.36/6.27/5.03, available memory 2.2GiB: heavy builds/models ru
 on hosted CI; logs/artifacts remain on CIFS. Index models are another agent's work.
 
 NOW: runtime fix `4d947cfafeaa55b338db04c54321b60be69506e4` restores shared-shim
-thread application; Dia also normalizes invalid counts and updates its CPU
-handle in the runtime setter. Existing CLI/C ABI forwarding is correct.
-Worker regression baseline `36959899260` runs unfixed source `f25f5cc5c`;
-fixed linked/module proof `36960149101` follows. CI `36960151399`, lint
-`36960153662`, and real CLI/C ABI/Dia roundtrip `36960469518` are queued.
-The live script at `e36ad64f8` adds no runtime changes. All checks must pass
-before landing; no performance speedup is claimed on an oversubscribed runner.
+thread application; Dia normalizes invalid counts and updates its CPU handle
+in the runtime setter. Existing CLI/C ABI forwarding is correct.
+First baseline `36959899260` compiled and reproduced Nemotron's ignored count
+(actual four workers for requested 1/3/8), then hit Paraformer's unsupported
+null-path case. Probe now uses a missing filename, and `36960870923` replays
+exact unfixed runtime `f25f5cc5c13c9e2249083b677726f6cae6dd9f0f` with that probe.
+Fixed linked/module proof `36960873053`, CI `36960875146`, and lint `36960877225`
+use candidate `08907bde4a77477a875d91bfbcae43662337a498`. Live CLI/C ABI/Dia
+roundtrip `36960617960` uses the same runtime files at `bd1628183`; queued live
+run `36960469518` was canceled to correct its CLI punctuation option before use.
+All checks must pass before landing; no runner speedup claim.
 
 ## CLAIMED 2026-10-02 — #485 WASM integration size budget
 
