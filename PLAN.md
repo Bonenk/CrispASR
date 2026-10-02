@@ -73,7 +73,16 @@ failing that prompt's WER gate. No relaxed acceptance: run `36963803169` at
 helper `599968914` compares the unfixed and candidate four-thread long-prompt
 behavior, then runs the committed Dia regression phrase at 1/4/8 threads with
 the original .2 WER gate. Only helpers changed after the checked runtime/tests.
-No runner speedup claim; finish live quality proof before landing.
+Run `36963803169` proved unfixed and candidate four-thread long-prompt output
+identical (WER .667, 2.1478458s), but the short canonical phrase still truncated
+at exactly 2.1478458s (WER .222). Root cause found in code: a TEMP CPU-testing
+limit silently clamps all Dia generation to 200 steps, independent of model or
+caller limits. This predates #486. Extend the fix to remove the default test cap,
+retain an explicit debug override, and bound native requested limits by allocated
+model KV capacity. Recheck full long-prompt intelligibility at 1/4/8 threads and
+an unfixed-runtime control using its existing explicit step-cap override. Renew
+runtime CI/lint and worker checks for this additional change. No WER relaxation
+or runner speedup claim.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
