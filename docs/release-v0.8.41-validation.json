@@ -66,6 +66,10 @@
       },
       "http_unique_word_overlap": 0.7777777777777778,
       "unchanged_minimum_http_overlap": 0.7
+    },
+    "ruby_bindings": {
+      "status": "PASS",
+      "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/37022213108"
     }
   },
   "retained_control": {
