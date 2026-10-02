@@ -15,6 +15,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -312,6 +313,10 @@ TEST_CASE("nemotron: realtime stream gives the same output as a full recompute",
     REQUIRE(ctx != nullptr);
     scoped_env step_env("CRISPASR_NEMOTRON_STREAM_CHUNKS_PER_STEP", "1");
 
+    // Exercise the window explicitly on every backend, including GPU, where
+    // it remains experimental after failing exact confidence parity.
+    scoped_env window_env("CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND", "1");
+
     // Same words and the same confidence for every token as a full recompute.
     // Presets 2 and 3 have 7 and 14 frame chunks, so they exercise the
     // multiple-of-4 start; preset 0's 4 frame chunks always land on one.
@@ -343,6 +348,53 @@ TEST_CASE("nemotron: realtime stream gives the same output as a full recompute",
             CHECK(jfk_words(newest_only.text) == jfk_words(expected));
         }
     }
+    nemotron_free(ctx);
+}
+
+// Capture the production GPU default independently of the experimental window.
+// The hosted harness runs this against both the frozen pre-PR source and the
+// candidate, then compares all text and token confidence bytes.
+TEST_CASE("nemotron: GPU production stream captures complete speech", "[nemotron][.live][streaming]") {
+    const std::string model = get_env("CRISPASR_MODEL_NEMOTRON");
+    if (model.empty())
+        SKIP("CRISPASR_MODEL_NEMOTRON not set");
+    auto jfk = load_wav_16k_mono("samples/jfk.wav");
+    REQUIRE(!jfk.empty());
+    std::vector<float> pcm;
+    for (int i = 0; i < 3; i++)
+        pcm.insert(pcm.end(), jfk.begin(), jfk.end());
+    nemotron_context_params cp = nemotron_context_default_params();
+    cp.n_threads = 4;
+    cp.use_gpu = true;
+    cp.verbosity = 1;
+    auto* ctx = nemotron_init_from_file(model.c_str(), cp);
+    REQUIRE(ctx != nullptr);
+    scoped_env window_env("CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND", "0");
+    scoped_env full_env("CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE", "0");
+    scoped_env step_env("CRISPASR_NEMOTRON_STREAM_CHUNKS_PER_STEP", "1");
+    const std::string output = get_env("CRISPASR_TEST_STREAM_CAPTURE");
+    REQUIRE(!output.empty());
+    std::ofstream capture(output, std::ios::binary);
+    REQUIRE(capture.good());
+    for (const auto& [preset, chunk] :
+         {std::pair<int, int>{0, 4}, std::pair<int, int>{2, 7}, std::pair<int, int>{3, 14}}) {
+        INFO("preset " << preset);
+        nemotron_set_context_preset(ctx, preset);
+        const auto actual = stream_like_live_client(ctx, pcm, chunk);
+        INFO(actual.text);
+        const std::string words = jfk_words(actual.text);
+        for (const std::string phrase : {"my fellow americans", "ask not what your country can do for you",
+                                         "ask what you can do for your country"}) {
+            size_t count = 0, pos = 0;
+            while ((pos = words.find(phrase, pos)) != std::string::npos) {
+                count++;
+                pos += phrase.size();
+            }
+            CHECK(count == 3);
+        }
+        capture << preset << '\n' << actual.text << '\n' << actual.tokens << '\n';
+    }
+    REQUIRE(capture.good());
     nemotron_free(ctx);
 }
 
