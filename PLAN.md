@@ -22,6 +22,15 @@ Verify actual graph worker counts and decoded output, plus CPU/dynamic-backend
 builds. VPS load 9.36/6.27/5.03, available memory 2.2GiB: heavy builds/models run
 on hosted CI; logs/artifacts remain on CIFS. Index models are another agent's work.
 
+NOW: runtime fix `4d947cfafeaa55b338db04c54321b60be69506e4` restores shared-shim
+thread application; Dia also normalizes invalid counts and updates its CPU
+handle in the runtime setter. Existing CLI/C ABI forwarding is correct.
+Worker regression baseline `36959899260` runs unfixed source `f25f5cc5c`;
+fixed linked/module proof `36960149101` follows. CI `36960151399`, lint
+`36960153662`, and real CLI/C ABI/Dia roundtrip `36960469518` are queued.
+The live script at `e36ad64f8` adds no runtime changes. All checks must pass
+before landing; no performance speedup is claimed on an oversubscribed runner.
+
 ## CLAIMED 2026-10-02 — #485 WASM integration size budget
 
 Worktree `/mnt/volume1/wt-index-echo-wasm-budget`, branch
