@@ -6,7 +6,19 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
+
+Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
+Source pinned to `IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba`.
+Read the 9B inference class in full: it uses a plain 2048→4096 projection
+connector and a 32-layer Qwen3.5 decoder, unlike the 2B residual connector and
+24-layer decoder. Preserve 2B behavior; follow convert→quantize→independent
+reference→cosine/magnitude/cache/decoded-output parity before publishing.
+Heavy jobs use GH CI/Kaggle; all large local assets and receipts go under
+`/mnt/storage/crispasr/issue485-9b/`. Audit source tensor headers and memory
+first to choose runners; no 9B inference or large weights on the VPS.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
