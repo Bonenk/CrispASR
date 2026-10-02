@@ -29,15 +29,19 @@ run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release',
      '-DCRISPASR_BUILD_TESTS=ON', '-DCRISPASR_BUILD_SERVER=ON',
      '-DCRISPASR_OPUS=OFF', '-DCRISPASR_AMR=OFF'], 'configure')
 run(['cmake', '--build', build, '--target', 'crispasr-cli', 'test-nemotron',
-     'test-realtime-turn-buffer', '-j4'], 'build')
+     'test-realtime-turn-buffer', 'crispasr-quantize', '-j4'], 'build')
 # Protocol test discovers this conventional path; no local build is overwritten.
 assert not (ROOT / 'build').exists()
 (ROOT / 'build').symlink_to(build, target_is_directory=True)
 receipt = {'sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
            'revision': 'bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2', 'cases': []}
 run([build / 'bin/test-realtime-turn-buffer'], 'turn-buffer')
+f16 = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
+    'nemotron-3.5-asr-streaming-0.6b-f16.gguf', revision=receipt['revision'])
+q8 = SCRATCH / 'nemotron-q8_0.gguf'
+run([build / 'bin/crispasr-quantize', f16, q8, 'q8_0'], 'quantize-q8')
 for quant in ('q8_0', 'q4_k', 'f16'):
-    model = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
+    model = str(q8) if quant == 'q8_0' else hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
                            f'nemotron-3.5-asr-streaming-0.6b-{quant}.gguf',
                            revision=receipt['revision'])
     env = dict(os.environ, CRISPASR_MODEL_NEMOTRON=model, CRISPASR_TEST_CPU_ONLY='1')
