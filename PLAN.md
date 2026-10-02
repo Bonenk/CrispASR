@@ -102,6 +102,16 @@ unchanged, including the uncapped baseline control. Preliminary read-only review
 also found open PR #487 (Nemotron streaming window + WebSocket ping/header fixes);
 its runtime performance changes need separate streaming/backend parity proof.
 
+The documented Hello/weather phrase also failed in the *unfixed* uncapped
+control (`36966653943`: seed 42, WER .72, 11.714s). Reject the cap removal:
+restored all three runtime and regression-test files byte-for-byte to fully
+checked candidate `51faf7b27`. Dia's default cap/long-form quality remain a
+separate source-parity investigation, not a claimed quality pass. Final live
+proof now requires exact decoded-output/duration parity with the unfixed Dia
+at 1/4/8 threads, alongside strict full-JFK CLI/C ABI checks. The unfixed runtime
+also matches permanent main ancestor `d5582e8f` exactly (avoid relying on an
+orphaned feature commit for future reproduction).
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
