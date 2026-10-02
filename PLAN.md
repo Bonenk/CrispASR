@@ -22,18 +22,23 @@ Verify actual graph worker counts and decoded output, plus CPU/dynamic-backend
 builds. VPS load 9.36/6.27/5.03, available memory 2.2GiB: heavy builds/models run
 on hosted CI; logs/artifacts remain on CIFS. Index models are another agent's work.
 
-NOW: runtime fix `4d947cfafeaa55b338db04c54321b60be69506e4` restores shared-shim
-thread application; Dia normalizes invalid counts and updates its CPU handle
-in the runtime setter. Existing CLI/C ABI forwarding is correct.
-First baseline `36959899260` compiled and reproduced Nemotron's ignored count
-(actual four workers for requested 1/3/8), then hit Paraformer's unsupported
-null-path case. Probe now uses a missing filename, and `36960870923` replays
-exact unfixed runtime `f25f5cc5c13c9e2249083b677726f6cae6dd9f0f` with that probe.
-Fixed linked/module proof `36960873053`, CI `36960875146`, and lint `36960877225`
-use candidate `08907bde4a77477a875d91bfbcae43662337a498`. Live CLI/C ABI/Dia
-roundtrip `36960617960` uses the same runtime files at `bd1628183`; queued live
-run `36960469518` was canceled to correct its CLI punctuation option before use.
-All checks must pass before landing; no runner speedup claim.
+NOW: candidate `51faf7b27034427ab5f70e7be69f83a16818da19` applies requested
+CPU threads in all three initializers and Dia's runtime setter. It also rejects
+null/empty Paraformer paths and frees backend handles after failed weight loads.
+CLI/C ABI forwarding is already correct. Worker tests now use tiny loadable
+Paraformer/Dia contexts; baseline rejection requires exactly eleven observed
+four-worker mismatches, not merely four failing test cases. Earlier missing-file
+Paraformer probes had no observation because its failed-load path leaked the
+CPU handle; they are not accepted as proof. DL validation uses shared ggml libs.
+
+Final baseline `36961987735` replays exact unfixed runtime
+`f25f5cc5c13c9e2249083b677726f6cae6dd9f0f`; fixed linked/module proof
+`36961990177`, CI `36961993401` and lint `36961996140` use candidate `51faf7b27`.
+Live `36960617960` passed repeated Nemotron C ABI output at 1/4/8 threads,
+then rejected the CLI's unbracketed existing en-US markers. Strict spoken-word
+normalization is corrected; full live rerun `36962236146` uses `2e8ec52fa`
+(same production/tests as candidate, only the live helper changed).
+All final checks must pass before landing; no runner speedup claim.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
