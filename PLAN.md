@@ -25,20 +25,34 @@ it goes stale for more than a day.
 ## CLAIMED 2026-10-02 — PR #480 scheduler review, #483 CUDA 12.6, next release
 
 Worktrees `/mnt/volume1/wt-480` (`fix/480-scheduler`) and
-`/mnt/volume1/wt-483` (`fix/483-cuda126`). Full PR #480 description/comments/
-reviews and issue #483 description/comments read (both have no follow-up
-comments). Actual PR change is `3fcc67f9b` in the formerly vendored ggml
-scheduler; the PR snapshot predates submoduling and many Chatterbox fixes.
-Review/port only the relevant scheduler delta against pinned shared ggml,
-prove cached cross-backend graph rewiring with failed baseline controls and
-real Vulkan execution; preserve current T3 attention/voice/backend policies.
-Audit CUDA 12.6/12.8/13 compiler/device support against NVIDIA documentation,
-then implement and verify coherent legacy packages plus runtime pairing.
-VPS initial load 4.91/4.94/5.07, available RAM 3.1 GiB, swap free 1.4 GiB;
-large builds/model runs stay on GH/Kaggle with fresh resource checks.
-Release authorized after these tasks and the other agent's Index-Echo 9B
-full acceptance/publication gates pass. Latest release v0.8.40; no bump/tag
-until Index-Echo 9B is fully accepted and integrated and main CI is green.
+`/mnt/volume1/wt-483` (`fix/483-cuda126`). Whole PR #480 and issue #483 read,
+including all comments/reviews (none). No Index-Echo runtime edits here.
+
+PR #480 scheduler replay fix already shipped in v0.8.40's pinned shared ggml
+`2f5a80d258c46e6ac8eee95f1328c0f58376d7ee`, introduced by `890278a8342c620197c90e702e1188bcab94f510`.
+Current version also state-guards disposal when caller recycles graph metadata;
+PR's unconditional disposal lacks that guard. Focused actual Vulkan/lavapipe
+run `36999421733` PASS: ten changed-input computes match independent arithmetic,
+original source pointers restored, recycled/uncomputed graph reset checks pass;
+removing reapplication reproduces a second-compute SIGBUS (negative status 135).
+Extended run `36999971712` adds the PR-disposal negative control. No wholesale
+PR merge: obsolete vendored-ggml base and build-only workflow are unsuitable.
+
+#483: CUDA 12.8 does support Pascal/Volta (NVIDIA documentation); PyTorch wheel
+policy is separate. Candidate `a40850fbf` preserves CUDA 12.8/Blackwell and
+adds coherent CUDA 12.6.3 Windows CLI and shared-library matrix assets with
+`-cuda126` suffix, separately named runtime ZIPs, SHA manifests and actual
+cudaRuntimeGetVersion + compile-toolkit-minor checks. Release dry-run CLI
+`36999848276`, library `36999459313` pending; both probe SM61/SM75 kernels.
+Full release architecture sets remain unchanged for 12.8; legacy adds SM60,
+61,70,75,80,86,89,90 + SM90 PTX. GTX16xx-specific MMQ performance not claimed.
+
+Resource checks performed before hosted builds; VPS load elevated and available
+RAM 2.1–3.1 GiB, so no large local build/model task. All code in separate worktrees.
+User authorizes next release only after these gates AND the other agent's
+Index-Echo 9B full acceptance/publication/integration. 9B strict full-file timing
+still pending; latest release v0.8.40. No bump/tag until Index accepted and
+integrated-main CI green.
 
 ## OPEN 2026-10-02 — full-tree cppcheck: Index-Echo destructor
 
