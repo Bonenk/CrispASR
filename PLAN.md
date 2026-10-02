@@ -164,11 +164,21 @@ Initial Metal harness36980272412 cancelled before acceptance after correcting
 an unsupported CLI flag. No neural/runtime changes since09804bb5d.
 Default Q8 run36979527236 completes all6speech cases at1/4/8 threads:
 WER0 every case; PCM arrays are bit-identical across thread counts per prompt.
-C ABI32 cap yields .18576s, reset0 restores complete speech. Aggregate FAIL
+C ABI32 cap yields .18576s, reset0 restores complete speech. Shipped F16 CPU
+36980002984 PASS both prompts, WER0 each(6.9892s/5.8746s). Aggregate FAIL
 only at CLI launch because the harness used bin/crispasr-cli, while CMake
 outputs bin/crispasr. Corrected helper3819e4db5; CPU CLI-only36982203366
 and hosted Metal CLI-only36982206126 launched. Retain failed run and all
 six successful speech receipts; do not repeat the model matrix unnecessarily.
+CLI retry36982203366 exposed real sentence-splitting:32limit applied twice,
+short first prompt<100bytes, .2s inserted silence, total .571519s. Candidate
+388a7ad86 keeps complete Dia dialogue in shared CLI/server planner; actual
+old-source narrow check FAILS(2chunks), candidatePASS(1wholetext). Permanent
+unit regression added. Corrected CPU CLI36983650376 PASS: one32step clip,
+whole default-model fox generation and ASR. Updated CI36983655538 / lint
+36983658133 running. Hosted Mac runtime36980351443 still running; pending
+new whole-dialogue CLI36983652977, standalone GPU execution probe36984356005
+must establish actual Metal availability before any Metal acceptance claim.
 Runtime CI36977049609 PASS13; lint36977052309 PASS10. Cold evidence under
 `/mnt/volume1/tmp-overflow/dia-*`; no release-quality claim until final gates.
 
@@ -187,7 +197,8 @@ PASS. That run fails ONLY auxiliary Q4 one-shot comma equality: full-control
 and window share the SAME comma difference. Exact window/control checks kept;
 spoken-word auxiliary comparison now checks all words. Remaining Q4/F16 CPU
 1/4/8 matrix36975834552 PASS all6cases,5969assertions each, all3presets
-complete33s text/token-confidence exact. ARM Q8/server36978217155 running.
+complete33s text/token-confidence exact. ARM Q8/server36978217155 PASS all3threadcases(5969asserts each),
+ordinary9/9, VAD11/11, configured33s turn10/10.
 
 Real CUDA v1 on twoTeslaT4/SM75 FAILS exact token-confidence parity despite
 matching complete text in the preserved tail. Candidate876d4deb7 therefore
