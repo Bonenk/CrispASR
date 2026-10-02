@@ -90,6 +90,18 @@ run `36965187732`, renewed CI `36965225232`, lint `36965224988`, and both-mode
 worker proof `36965225243` are launched. VPS load 10.26/16.09/20.03, available
 1.4GiB: all builds/models remain hosted; cold logs stay on CIFS.
 
+Worker `36965225243` passed all 136 assertions in six cases in each build mode.
+Lint `36965224988` passed 10/10; CI `36965225232` is 12/13 green with no failure.
+Live `36965187732` passed ASR again but the *unfixed* uncapped Dia control
+repeated the novel CPU-thread test sentence (seed 123, WER .852), so the run
+correctly stopped before accepting a candidate. No claimed quality pass. New
+live `36966653943`, helper `beb28fed8` (runtime/tests unchanged from `3d3a536f6`),
+uses the >100-byte Hello/weather phrase documented by the original Dia parity
+validation and the reference harness's standard seed 42. The .2 WER gate remains
+unchanged, including the uncapped baseline control. Preliminary read-only review
+also found open PR #487 (Nemotron streaming window + WebSocket ping/header fixes);
+its runtime performance changes need separate streaming/backend parity proof.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
