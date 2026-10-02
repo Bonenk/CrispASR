@@ -25,15 +25,17 @@ WASM37016733853 is 5/5, selected regression37016733584 is 11/11 and full
 9B ARM acceptance37016734351 passes. All twelve Index-Echo wiring points
 are audited in docs/index-echo-wiring-audit-2026-10-02.md. Release notes and
 Flutter changelog are ready; latest workflow-change lint37022213402 and
-deterministic Windows Piper37022213369 remain active at the audit.
+deterministic Windows Piper37022213369 both subsequently PASS. Tip CI37022213223
+also PASS; Ruby binding37022213108 is still running at the final wiring check.
 
-CLAIMED release blocker: Windows Piper Cori live37016733840 failed its existing
+Resolved release blocker: Windows Piper Cori live37016733840 failed its existing
 CLI readback gate ("quick-brim Fox" versus "quick brown fox"), while the same
 commit's earlier manual37016731265 passed. Native Piper sources are unchanged;
 its existing seed=0 deliberately uses random_device. Audit the preserved WAV,
 then pin an explicit seed in the existing Windows proof and verify repeated
-output plus the original readback criteria. Do not weaken speech gates or rerun
-until a lucky random sample passes. Work remains in this separate worktree.
+output plus the original readback criteria. That deterministic proof37022213369
+is now PASS; its gates were not weakened. Final packaging receipt/publication
+work remains owned by this separate worktree.
 Latest release v0.8.40; no bump/tag until release gates pass.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
