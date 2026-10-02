@@ -6,6 +6,38 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — authorized GitHub issue and PR replies
+
+Read all nine open issues, both open PRs including review/inline comments,
+and screened 25 recent closed issues plus 12 closed PRs. Posted sixteen
+individual evidence-based replies; read back and verified each exact published
+body and author. Corrected stale statuses, answered the two PR #487 questions,
+explained retained scheduler implementation for #480, linked completed source
+and runtime proofs, and separated released fixes from measured/pending hardware
+results. At posting, v0.8.41 was tagged but binary builds were still pending.
+Issue and PR states were preserved. Existing answered/confirmation-only closed
+threads received no duplicate update. Full reads, drafts and verified URL/hash
+receipts are cold under `/mnt/storage/crispasr/issue485-9b/github-replies-20261002/`.
+
+| Thread | Published reply |
+|---|---|
+| #486 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/486#issuecomment-5955712864) |
+| #485 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/485#issuecomment-5955713511) |
+| #484 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/484#issuecomment-5955714111) |
+| #483 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/483#issuecomment-5955714805) |
+| #482 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/482#issuecomment-5955715298) |
+| #481 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/481#issuecomment-5955715819) |
+| #478 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/478#issuecomment-5955716286) |
+| #461 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/461#issuecomment-5955716864) |
+| #456 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/456#issuecomment-5955717559) |
+| #487 | [Reply](https://github.com/CrispStrobe/CrispASR/pull/487#issuecomment-5955718108) |
+| #480 | [Reply](https://github.com/CrispStrobe/CrispASR/pull/480#issuecomment-5955718829) |
+| #441 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/441#issuecomment-5955719465) |
+| #439 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/439#issuecomment-5955719896) |
+| #446 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/446#issuecomment-5955720482) |
+| #437 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/437#issuecomment-5955721017) |
+| #458 | [Reply](https://github.com/CrispStrobe/CrispASR/issues/458#issuecomment-5955721534) |
+
 ## DONE 2026-10-02 — integrated v0.8.41 release gates
 
 Main CI `37022213223` PASS 13/13; integrated unit tier `37016734092` passes
