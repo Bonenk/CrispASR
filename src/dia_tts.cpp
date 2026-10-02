@@ -1440,11 +1440,20 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
         ggml_set_name(enc_in, "enc_in");
         ggml_set_input(enc_in);
 
+        // The official checkpoint rotates cached cross-attention keys at
+        // encoder positions, and decoder queries at the current audio step.
+        ggml_tensor* cross_positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T_enc);
+        ggml_set_name(cross_positions, "cross_positions");
+        ggml_set_input(cross_positions);
+
         // Project cross K/V for each layer
         std::vector<ggml_tensor*> outputs;
         for (int l = 0; l < (int)m.n_decoder_layers; l++) {
             auto& layer = m.decoder.layers[l];
             ggml_tensor* ck = ggml_mul_mat(ctx0, layer.cross_k_proj, enc_in);
+            ck = ggml_rope(ctx0, ggml_cont(ctx0, ggml_reshape_4d(ctx0, ck, head_dim, n_heads, T_enc, B)),
+                           cross_positions, head_dim, DIA_ROPE_MODE);
+            ck = ggml_reshape_3d(ctx0, ggml_cont(ctx0, ck), cross_kv_dim, T_enc, B);
             ggml_tensor* cv = ggml_mul_mat(ctx0, layer.cross_v_proj, enc_in);
             std::string kname = "cross_k_" + std::to_string(l);
             std::string vname = "cross_v_" + std::to_string(l);
@@ -1469,6 +1478,8 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
 
         ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_in"), encoder_output.data(), 0,
                                 encoder_output.size() * sizeof(float));
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "cross_positions"), positions.data(), 0,
+                                positions.size() * sizeof(int32_t));
 
         ggml_status st = ggml_backend_sched_graph_compute(ctx->sched, gf);
         if (st != GGML_STATUS_SUCCESS) {
@@ -1718,7 +1729,7 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                     // Q from decoder hidden state
                     ggml_tensor* Q = ggml_mul_mat(ctx0, layer.cross_q_proj, cur); // (dec_hidden, 1, B)
                     Q = ggml_reshape_4d(ctx0, Q, head_dim, n_heads, T_cur, B);
-                    // No RoPE on cross-attention Q (cross-attn uses absolute position from encoder)
+                    Q = ggml_rope(ctx0, ggml_cont(ctx0, Q), dec_pos, head_dim, DIA_ROPE_MODE);
 
                     // K/V from precomputed cross-attention cache
                     // cross_k: (cross_kv_dim=2048, T_enc, B) -> (hd, n_heads, T_enc, B)
