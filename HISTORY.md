@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — Windows Vulkan SDK transport retries
+
+The first v0.8.40 Windows Vulkan library build lost its SDK download connection.
+Both Windows Vulkan release jobs now use `scripts/fetch-vulkan-sdk.ps1`: bounded
+retries cover metadata and installer transport/HTTP failures, installer writes
+stay in a partial file until complete, and exhausted retries still fail the job.
+
+Windows CI exercises the actual PowerShell downloader against a local HTTP
+server. Recovery required two metadata requests and three installer requests
+(after HTTP 503 and a truncated response); metadata and installer exhaustion
+both failed after three attempts without leaving an installer or partial file.
+Full CI `36915036668` passed 13/13 jobs and lint `36915040448` passed 10/10 at
+`86037682fc95797da9778901e77ef1a2f1c3109a`. Rebase onto main changed only
+`PLAN.md`; the four implementation/workflow files remained byte-identical.
+
+Release dry run `36915044490` installed the real SDK, built Vulkan and packaged
+`libcrispasr-windows-x86_64-vulkan` (artifact `11189199045`, 89,278,669 bytes;
+SHA256 `121917f19d3fa463fff8dfb5191d349adf42179e9db000557c681095541fbe06`).
+No release publication was requested by that dry run; v0.8.40 assets are unchanged.
+
 ## RELEASE 2026-10-01 — v0.8.40
 
 Published [v0.8.40](https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40)
