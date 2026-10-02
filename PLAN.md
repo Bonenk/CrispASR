@@ -19,14 +19,18 @@ receipts. Full CUDA 13 package verification `37003929359` PASS. All large
 builds ran hosted after checking local load/free memory; no Index runtime
 edits here. Original tested source bundle and logs archived cold.
 
-Index-Echo accepted public 9B F16 support is now integrated at a67c78eb2.
-Protected 2B Q8 nightly37006905046 and public 9B F16 nightly37008624536 PASS;
-canonical public CUDA v4 passes on two T4. Final feature CI37013451267 PASS
-13/13 and lint37012234246 PASS10/10. Our existing release-workflow assertion
-was updated for both matrix flavors; ten local tests and two failing controls
-PASS. Combined main CI37016734092 is running. Release notes committed;
-latest v0.8.40. User authorizes the next release once integrated-main checks
-pass; use scripts/bump-version.sh. No remaining Index work owned here.
+Index-Echo 9B is integrated and accepted on ARM CPU and two T4, including
+canonical public downloads. Combined main CI37016734092 has 12/13 green;
+lint/deep/regressions remain active. Release notes and Flutter changelog ready.
+
+CLAIMED release blocker: Windows Piper Cori live37016733840 failed its existing
+CLI readback gate ("quick-brim Fox" versus "quick brown fox"), while the same
+commit's earlier manual37016731265 passed. Native Piper sources are unchanged;
+its existing seed=0 deliberately uses random_device. Audit the preserved WAV,
+then pin an explicit seed in the existing Windows proof and verify repeated
+output plus the original readback criteria. Do not weaken speech gates or rerun
+until a lucky random sample passes. Work remains in this separate worktree.
+Latest release v0.8.40; no bump/tag until release gates pass.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
