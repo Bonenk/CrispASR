@@ -26,6 +26,7 @@ p.add_argument('--threads', type=int, default=4)
 p.add_argument('--steps', type=int, default=0)
 p.add_argument('--quant', choices=('f16', 'q8_0'), default='q8_0')
 p.add_argument('--matrix', default='4,1,8')
+p.add_argument('--cli-only', action='store_true', help='verify CLI without repeating the C ABI speech matrix')
 p.add_argument('--metal', action='store_true', help='require real Metal CLI backend on macOS')
 p.add_argument('--audio-tag', help='separate output basename for CLI recognition')
 p.add_argument('--limits', action='store_true', help='also verify C ABI setter and CLI explicit/default limits')
@@ -101,12 +102,14 @@ run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SH
      '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
      '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF', '-DCRISPASR_OPUS=OFF', '-DCRISPASR_AMR=OFF'], 'configure')
 run(['cmake', '--build', build, '--target', 'crispasr-lib', 'crispasr-cli', '-j4'], 'build')
+if a.limits:
+    assert (build / 'bin/crispasr').is_file(), 'CMake CLI output is bin/crispasr'
 lib = next(build.rglob('libcrispasr.dylib' if sys.platform == 'darwin' else 'libcrispasr.so'))
 repo, revision = 'cstr/dia-1.6b-GGUF', '3233fbcb32be47761d2e736857b6d1a075b9ba7e'
 model = hf_hub_download(repo, f'dia-1.6b-{a.quant}.gguf', revision=revision)
 hf_hub_download(repo, 'dac-44khz.gguf', revision=revision)
 asr = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF', 'nemotron-3.5-asr-streaming-0.6b-q4_k.gguf', revision='bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2')
-for key, _, _ in PHRASES:
+for key, _, _ in ([] if a.cli_only else PHRASES):
     if a.phrase and key != a.phrase:
         continue
     for threads in map(int, a.matrix.split(',')):
@@ -118,7 +121,7 @@ if a.limits:
     import numpy as np
     for limit in (32, 0):
         wav = OUT / f'cli-limit-{limit}.wav'
-        command = [build / 'bin/crispasr-cli', '--backend', 'dia', '-m', model,
+        command = [build / 'bin/crispasr', '--backend', 'dia', '-m', model,
                    '-t', '4', '--seed', '123', '--temperature', '1.2',
                    '--tts', '[S1] ' + PHRASES[1][2], '--tts-output', wav,
                    '--no-spoken-disclaimer', '--accept-marking-responsibility']
