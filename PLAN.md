@@ -11,6 +11,19 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — Dia/Nemotron cppcheck acceptance follow-up
+
+Worktree `/mnt/volume1/wt-482`. Runtime fixes are landed and main CI 13/13,
+lint 10/10, selected regression 5/5, WASM and binding checks pass. The slow
+cppcheck queue has not completed. Previous main run `36969566590` fails only
+`examples/cli/crispasr_backend_index_echo.cpp:12/63` (`virtualCallInConstructor`:
+virtual `shutdown()` called from the destructor); that source still has the
+same pattern and belongs to the separate Index-Echo agent. Do not suppress it.
+Next: run pinned cppcheck 2.7 on the affected Dia/Nemotron runtime files on GH,
+record scope and verdict, and retain the unrelated full-tree finding for its
+owner. VPS load 20.46/18.13/13.58, available RAM 1.1 GiB and swap free 6.7 MiB;
+no large local analysis/build.
+
 ## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
 
 Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
