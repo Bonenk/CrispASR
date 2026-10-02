@@ -39,6 +39,8 @@ MioTTS final ARM proof [37034738840](https://github.com/CrispStrobe/CrispASR/act
 
 Checkpoint: native ARM37034738840 and x8637036548868 MioTTS proof PASS; Echo scheduler Kaggle v1 PASS all stage/cache/magnitude, five-file and three Piper checks, 48 timed outputs, 2.5–3.6% speed gain in both orders. User now requests a usable Q4_K Echo recipe: audit existing crispasr-quantize sensitive-tensor rules, isolate losses against immutable F32 references, preserve critical tensors as required, and validate candidates on hosted hardware. Current F16/default artifacts stay unchanged until a quantized candidate passes. Same worktree/branch; large artifacts cold or hosted.
 
+Q4_K checkpoint: CUDA bundle37040196454 SUCCESS at 012188eed, including crispasr-quantize. Four predeclared mixed-Q4 candidates are on feature9efb8e6bd: plain decoder baseline; F16 token/GDN + Q8 attention/down; FFN gate/up Q4 + down Q8; and layers4–27 gate/up Q4 only. Acoustic tower/connector stay original F16. Strict canonical acceptance extended to local candidates without threshold/output/reference changes. Bundle transfer and sole-account session audit underway; no Q4 acceptance claim yet.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
