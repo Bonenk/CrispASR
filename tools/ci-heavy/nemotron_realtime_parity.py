@@ -52,10 +52,12 @@ for quant in ('q8_0', 'q4_k', 'f16'):
         receipt['cases'].append(label)
         (OUT / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     if quant == 'q8_0':
-        for vad in (False, True):
+        for mode in ('server', 'server-vad', 'server-long-turn'):
             command = [sys.executable, ROOT / 'tests/test-server-realtime-api.py',
                        '--backend', 'nemotron', '--model', model, '--language', 'en']
-            if vad:
+            if mode == 'server-vad':
                 command.append('--server-vad')
-            run(command, 'server-vad' if vad else 'server', env)
+            elif mode == 'server-long-turn':
+                command.append('--long-turn')
+            run(command, mode, env)
 print('NEMOTRON_REALTIME_PARITY_PASS', json.dumps(receipt), flush=True)
