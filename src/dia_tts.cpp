@@ -632,12 +632,11 @@ static ggml_tensor* build_dia_decoder_embedding(ggml_context* ctx, dia_model& m,
 // Delay pattern logic
 // -----------------------------------------------------------------------
 
-static bool dia_check_stopping(dia_tts_context& ctx) {
+static bool dia_check_stopping(dia_tts_context& ctx, uint32_t max_steps) {
     auto& m = ctx.model;
     auto& tokens = ctx.current_audio_tokens;
 
-    if (ctx.delay_steps == -1 &&
-        (tokens[0] == m.eos_token_id || ctx.current_position >= m.max_generation_size - m.max_delay)) {
+    if (ctx.delay_steps == -1 && (tokens[0] == m.eos_token_id || ctx.current_position >= max_steps - m.max_delay - 1)) {
         ctx.delay_steps = (int)m.max_delay;
     }
 
@@ -1240,14 +1239,21 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
         ctx->current_audio_tokens[i] = m.bos_token_id;
     }
 
-    uint32_t max_gen = (p.max_tokens > (int)m.max_delay) ? (uint32_t)p.max_tokens : m.max_generation_size;
-    // TEMP: limit for CPU testing (full 3072 steps impractical on this CPU).
-    // Override with DIA_MAX_STEPS for longer prompts on faster backends.
-    uint32_t step_cap = 200;
-    if (const char* ms = crispasr_env::get("CRISPASR_DIA_MAX_STEPS"))
-        step_cap = (uint32_t)atoi(ms);
-    if (max_gen > step_cap)
-        max_gen = step_cap;
+    // Match the checkpoint's generation capacity; explicit limits can shorten
+    // it but cannot overrun the model's KV allocation. There is no CPU-only cap.
+    uint32_t max_gen = m.max_generation_size;
+    if (p.max_tokens > (int)m.max_delay)
+        max_gen = std::min(max_gen, (uint32_t)p.max_tokens);
+    if (const char* ms = crispasr_env::get("CRISPASR_DIA_MAX_STEPS")) {
+        char* end = nullptr;
+        const long requested = std::strtol(ms, &end, 10);
+        if (end != ms && *end == '\0' && requested > (long)m.max_delay)
+            max_gen = (uint32_t)std::min((long)max_gen, requested);
+    }
+    if (max_gen <= m.max_delay) {
+        fprintf(stderr, "dia_tts: generation capacity must exceed audio delay\n");
+        return nullptr;
+    }
 
     // --- diff/debug hooks (env-gated; output paths come from the env value, never hardcoded) ---
     // DIA_GREEDY=1         : temperature=0 (argmax) for deterministic diffing
@@ -1274,7 +1280,7 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
     const bool dia_force = !dia_forced.empty();
     const char* dia_steplogits_path = crispasr_env::get("CRISPASR_DIA_DUMP_STEPLOGITS");
     if (dia_force)
-        max_gen = (uint32_t)(dia_forced.size() / m.n_output_heads);
+        max_gen = (uint32_t)std::min((size_t)m.max_generation_size, dia_forced.size() / m.n_output_heads);
     if (dia_steplogits_path)
         remove(dia_steplogits_path); // truncate; we append per step
 
@@ -1990,7 +1996,7 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
             ggml_free(ctx0);
 
             // EOS/delay override on the sampled tokens (end-of-sequence delay) + stop check.
-            bool stop = dia_check_stopping(*ctx);
+            bool stop = !dia_force && dia_check_stopping(*ctx, max_gen);
 
             if (dia_force) {
                 // teacher-forcing: emit sampled directly (output unused for diffing)
@@ -2149,4 +2155,9 @@ void dia_tts_set_seed(struct dia_tts_context* ctx, uint64_t seed) {
             ctx->rng.seed(rd());
         }
     }
+}
+
+void dia_tts_set_max_tokens(struct dia_tts_context* ctx, int max_tokens) {
+    if (ctx)
+        ctx->params.max_tokens = max_tokens > 0 ? max_tokens : 0;
 }

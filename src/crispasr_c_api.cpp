@@ -13020,6 +13020,10 @@ CA_EXPORT int crispasr_session_set_max_new_tokens(crispasr_session* s, int n) {
     if (s->vibevoice_ctx)
         vibevoice_set_max_new_tokens(s->vibevoice_ctx, s->max_new_tokens);
 #endif
+#ifdef CA_HAVE_DIA
+    if (s->dia_tts_ctx)
+        dia_tts_set_max_tokens(s->dia_tts_ctx, s->max_new_tokens);
+#endif
     return 0;
 }
 

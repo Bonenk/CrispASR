@@ -77,3 +77,8 @@ TEST_CASE("dia_sampling: top-k precedes nucleus and greedy bypasses both", "[uni
     REQUIRE(crossing > 0);
     REQUIRE(dia_sample_token(logits, 4, 0.0f, 0.1f, 1, rng) == 0);
 }
+
+TEST_CASE("dia_params: null generation-limit setter is safe", "[unit][dia]") {
+    dia_tts_set_max_tokens(nullptr, 1024);
+    SUCCEED();
+}

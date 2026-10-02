@@ -7,7 +7,7 @@
 //
 // Architecture:
 //   Text encoder: 12-layer Llama-style transformer (byte-level, 1024-d)
-//   AR decoder: 18-layer transformer with cross-attention (2048-d, GQA 16q/4kv)
+//   AR decoder: 24-layer transformer with cross-attention (2048-d, GQA 16q/4kv)
 //   DAC codec: 9 codebooks -> 44.1 kHz PCM (shared with Zonos #130)
 //
 // Delay pattern for multi-codebook generation:
@@ -17,7 +17,7 @@
 //
 // Classifier-Free Guidance (CFG):
 //   Batch size is always 2 (conditional + unconditional).
-//   logits = uncond + cfg_scale * (cond - uncond)
+//   logits = cond + cfg_scale * (cond - uncond)
 //
 // The DAC codec weights can be in the same GGUF or a separate file
 // (--codec-model). When separate, the DAC GGUF from the Zonos port
@@ -70,6 +70,9 @@ void dia_tts_set_n_threads(struct dia_tts_context* ctx, int n_threads);
 void dia_tts_set_temperature(struct dia_tts_context* ctx, float temperature);
 void dia_tts_set_cfg_scale(struct dia_tts_context* ctx, float cfg_scale);
 void dia_tts_set_seed(struct dia_tts_context* ctx, uint64_t seed);
+// Zero/non-positive restores the model default; positive limits are bounded
+// by model capacity. Limits must exceed the 15-step audio delay.
+void dia_tts_set_max_tokens(struct dia_tts_context* ctx, int max_tokens);
 
 #ifdef __cplusplus
 }

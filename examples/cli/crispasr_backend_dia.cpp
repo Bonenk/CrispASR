@@ -73,6 +73,7 @@ public:
         cp.verbosity = p.no_prints ? 0 : 1;
         cp.use_gpu = crispasr_backend_should_use_gpu(p);
         cp.seed = p.seed;
+        cp.max_tokens = p.max_new_tokens_explicit ? p.max_new_tokens : 0;
 
         // Temperature: Dia default is 1.2 (unlike whisper's 0.0).
         // Only override if the user explicitly sets a non-zero value.

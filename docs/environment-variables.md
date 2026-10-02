@@ -581,7 +581,10 @@ suffixes.
 - `CRISPASR_DIA_DUMP_TOKENS`
 - `CRISPASR_DIA_FORCE_TOKENS`
 - `CRISPASR_DIA_GREEDY`
-- `CRISPASR_DIA_MAX_STEPS`
+- `CRISPASR_DIA_MAX_STEPS` — explicit generation-step cap (greater than the
+  audio delay of 15), bounded by the model capacity. Unset uses the model
+  default (3072); no hidden 200-step CPU cap. CLI `--max-new-tokens` and
+  C ABI `set_max_new_tokens` also set a bounded limit.
 - `CRISPASR_DIA_TTS_GPU`
 
 ### dots.tts
