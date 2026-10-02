@@ -26,17 +26,6 @@ Index final integration/CUDA canonical-public check remains the other agent’s
 work. Release notes drafted; latest v0.8.40. Use scripts/bump-version.sh once
 all gates pass.
 
-## OPEN 2026-10-02 — full-tree cppcheck: Index-Echo destructor
-
-Separate Index-Echo agent owns this finding. Main baseline cppcheck
-`36969566590` fails only `virtualCallInConstructor` at
-`examples/cli/crispasr_backend_index_echo.cpp:12/63`: the destructor calls
-virtual `shutdown()`. The same pattern remains in main; no suppression or
-Index-Echo runtime edit was made here. Current full-tree run `36986270785`
-is queued behind `36984635206`. Dia/Nemotron's seven changed CI-covered files
-pass pinned cppcheck 2.7 (`36992014618`); see
-`docs/dia-nemotron-cppcheck-2026-10-02.json`. Other completed gates are in HISTORY.
-
 ## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
 
 Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
