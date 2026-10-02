@@ -37,6 +37,8 @@ ARM proof `37033129143` preserved: baseline rate guard rejected v0.8.41, all 18 
 
 MioTTS final ARM proof [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) PASS at `8196ac2c2`: both CLI and session readbacks 0% WER, exactly 132300 samples / 3.000 s at 44100 Hz, 18 native assertions including resident preset switching/restoration, 24 kHz/missing-key metadata dispatch, and published v0.8.41 baseline guard rejected 24000 Hz. Generated capability/feature tables captured from actual CLI and ABI rebuilt. Echo CUDA bundle `722f54ba4` + SDK `2d890f161`, hash f1717702dfd35deb977974b49f3cad7696291a1dd072bfd9f8cad26a9d9282ab transferred to private HF revision 7242ecaa666572b6220184701f325f3d0bcd81dc. Kaggle scheduler A/B v1 pushed once, RUNNING after 0-active-session audit; output and speed verdict pending.
 
+Checkpoint: native ARM37034738840 and x8637036548868 MioTTS proof PASS; Echo scheduler Kaggle v1 PASS all stage/cache/magnitude, five-file and three Piper checks, 48 timed outputs, 2.5–3.6% speed gain in both orders. User now requests a usable Q4_K Echo recipe: audit existing crispasr-quantize sensitive-tensor rules, isolate losses against immutable F32 references, preserve critical tensors as required, and validate candidates on hosted hardware. Current F16/default artifacts stay unchanged until a quantized candidate passes. Same worktree/branch; large artifacts cold or hosted.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
