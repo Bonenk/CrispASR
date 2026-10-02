@@ -35,6 +35,8 @@ Corrected ARM speech/metadata/baseline/resident-adapter proof [37033129143](http
 
 ARM proof `37033129143` preserved: baseline rate guard rejected v0.8.41, all 18 native assertions including resident preset restoration PASS, metadata/WAV rates correct, but sampled session readback was 2/9 word errors and FAILED the unchanged 20% gate. Found and wired previously ignored session temperature/seed controls (native defaults preserved); CLI/server request controls and truthful capability declarations now supported. Corrected ARM rerun [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) queued; generated capability/feature tables will come from its actual CLI. Echo CUDA bundle [37030248844](https://github.com/CrispStrobe/CrispASR/actions/runs/37030248844) SUCCESS; downloading and hashing runtime to cold storage for private HF transfer, then GPU acceptance/A-B.
 
+MioTTS final ARM proof [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) PASS at `8196ac2c2`: both CLI and session readbacks 0% WER, exactly 132300 samples / 3.000 s at 44100 Hz, 18 native assertions including resident preset switching/restoration, 24 kHz/missing-key metadata dispatch, and published v0.8.41 baseline guard rejected 24000 Hz. Generated capability/feature tables captured from actual CLI and ABI rebuilt. Echo CUDA bundle `722f54ba4` + SDK `2d890f161`, hash f1717702dfd35deb977974b49f3cad7696291a1dd072bfd9f8cad26a9d9282ab transferred to private HF revision 7242ecaa666572b6220184701f325f3d0bcd81dc. Kaggle scheduler A/B v1 pushed once, RUNNING after 0-active-session audit; output and speed verdict pending.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
