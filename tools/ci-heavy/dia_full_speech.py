@@ -119,9 +119,11 @@ if a.limits:
     for limit in (32, 0):
         wav = OUT / f'cli-limit-{limit}.wav'
         command = [build / 'bin/crispasr-cli', '--backend', 'dia', '-m', model,
-                   '-t', '4', '--gpu' if a.metal else '--no-gpu', '--seed', '123', '--temperature', '1.2',
+                   '-t', '4', '--seed', '123', '--temperature', '1.2',
                    '--tts', '[S1] ' + PHRASES[1][2], '--tts-output', wav,
                    '--no-spoken-disclaimer', '--accept-marking-responsibility']
+        if not a.metal:
+            command += ['--no-gpu']
         if limit:
             command += ['--max-new-tokens', str(limit)]
         run(command, f'cli-limit-{limit}')
