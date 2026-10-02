@@ -79,6 +79,8 @@ Main integration `a67c78eb2` passes CI `37016734092` 13/13, lint `37016733637`
 nightly driver against public weight revision dffbadf0. Canonical acceptance
 now audits that main CPU proof together with public-download CUDA v4 against
 the same public model pin; original staging proof and failed controls remain.
+Selected regression `37016733584` passes all 11 jobs (seven live backends),
+including protected 2B Q8 and the Kokoro speech roundtrip.
 
 ## DONE 2026-10-02 — asynchronous browser pthread ASR/TTS
 

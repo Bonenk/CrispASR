@@ -4072,6 +4072,20 @@
           "nightly_regression": []
         },
         "receipt_sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577"
+      },
+      "selected_regression": {
+        "run": 37016733584,
+        "passed": true,
+        "jobs": 11,
+        "backends": [
+          "regression (canary-1b-v2)",
+          "regression (parakeet-tdt-0.6b-en)",
+          "regression (moonshine-tiny)",
+          "regression (index-echo-2b)",
+          "regression (wav2vec2-xlsr-en)",
+          "regression (kokoro-82m-en)",
+          "regression (qwen3-asr-0.6b)"
+        ]
       }
     }
   },
