@@ -114,7 +114,87 @@
     "q8_default_threads_cli": {
       "run": 36979527236,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36979527236",
-      "status": "running"
+      "status": "completed",
+      "aggregate_passed": false,
+      "reason": "All six speech cases and C ABI limit/reset passed; CLI harness incorrectly named output binary bin/crispasr-cli.",
+      "speech_matrix_passed": true,
+      "cases": [
+        {
+          "phrase": "Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+          "seed": 42,
+          "threads": 1,
+          "steps_override": 0,
+          "audio_seconds": 5.584399092970521,
+          "generation_seconds": 162.59895885000003,
+          "cabi_limit_32_seconds": null,
+          "transcript": "Hello there, how are you doing today? <en-US>  I really hope you are having a wonderful and pleasant time. <en-US> The weather outside is lovely and bright. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+          "seed": 42,
+          "threads": 4,
+          "steps_override": 0,
+          "audio_seconds": 5.584399092970521,
+          "generation_seconds": 85.87770987399995,
+          "cabi_limit_32_seconds": 0.18575963718820862,
+          "transcript": "Hello there, how are you doing today? <en-US>  I really hope you are having a wonderful and pleasant time. <en-US> The weather outside is lovely and bright. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+          "seed": 42,
+          "threads": 8,
+          "steps_override": 0,
+          "audio_seconds": 5.584399092970521,
+          "generation_seconds": 98.28466918099991,
+          "cabi_limit_32_seconds": null,
+          "transcript": "Hello there, how are you doing today? <en-US>  I really hope you are having a wonderful and pleasant time. <en-US> The weather outside is lovely and bright. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+          "seed": 123,
+          "threads": 1,
+          "steps_override": 0,
+          "audio_seconds": 6.629297052154195,
+          "generation_seconds": 207.49335564800003,
+          "cabi_limit_32_seconds": null,
+          "transcript": "The quick brown Fox jumps over the lazy dog. <en-US> Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+          "seed": 123,
+          "threads": 4,
+          "steps_override": 0,
+          "audio_seconds": 6.629297052154195,
+          "generation_seconds": 108.91433164199998,
+          "cabi_limit_32_seconds": null,
+          "transcript": "The quick brown Fox jumps over the lazy dog. <en-US> Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+          "seed": 123,
+          "threads": 8,
+          "steps_override": 0,
+          "audio_seconds": 6.629297052154195,
+          "generation_seconds": 118.18582906699999,
+          "cabi_limit_32_seconds": null,
+          "transcript": "The quick brown Fox jumps over the lazy dog. <en-US> Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+          "wer": 0.0
+        }
+      ],
+      "npy_hashes": {
+        "hello-1": "7f1f8020661d330a659092fc0339847b2eed4235dcc180f691be6e59ab12a5df",
+        "hello-4": "7f1f8020661d330a659092fc0339847b2eed4235dcc180f691be6e59ab12a5df",
+        "hello-8": "7f1f8020661d330a659092fc0339847b2eed4235dcc180f691be6e59ab12a5df",
+        "fox-1": "f7a1a51f777beb28b3006579daba59e81d223244a149ec0598a355b163da7f23",
+        "fox-4": "f7a1a51f777beb28b3006579daba59e81d223244a149ec0598a355b163da7f23",
+        "fox-8": "f7a1a51f777beb28b3006579daba59e81d223244a149ec0598a355b163da7f23"
+      },
+      "audio_bit_identical_across_thread_counts": true
     },
     "f16_default_cpu": {
       "run": 36980002984,
@@ -125,6 +205,18 @@
       "run": 36980351443,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36980351443",
       "status": "running"
+    },
+    "q8_cli_retry": {
+      "run": 36982203366,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36982203366",
+      "status": "launched",
+      "scope": "Correct bin/crispasr name; short explicit32 limit and complete default fox speech."
+    },
+    "f16_metal_cli_retry": {
+      "run": 36982206126,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36982206126",
+      "status": "launched",
+      "scope": "Correct bin/crispasr name; actual MTL backend required, short32 and complete default fox speech."
     }
   },
   "standard_ci": {
