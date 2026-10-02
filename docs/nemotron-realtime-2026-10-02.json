@@ -1,0 +1,126 @@
+{
+  "status": "pending ARM and actual GPU production-path proof; not landed",
+  "date": "2026-10-02",
+  "scope": "PR487 CPU incremental frontend, WebSocket ping/header compatibility, cadence override and finite native Nemotron long-turn setting",
+  "author_head": "87f23e34dbb6936816a045bb12e898eebed7c8bd",
+  "frozen_baseline": "b33138b057268f573757ded8258e4afef2461ea8",
+  "runtime_with_gpu_gate": "876d4deb7",
+  "models": {
+    "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+    "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+    "f16": "nemotron-3.5-asr-streaming-0.6b-f16.gguf",
+    "q4_k": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+    "q8_0": "derived from pinned F16 with crispasr-quantize q8_0; no Q8 file exists at this pin"
+  },
+  "test_inputs": {
+    "wav": "samples/jfk.wav",
+    "repetitions": 3,
+    "approximately_seconds": 33,
+    "append_milliseconds": 100,
+    "context_presets": [
+      0,
+      2,
+      3
+    ],
+    "chunks": [
+      4,
+      7,
+      14
+    ],
+    "cpu_threads": [
+      1,
+      4,
+      8
+    ]
+  },
+  "exact_gate": "Window and full-control text, token IDs and every confidence encoded as hexadecimal float must match byte-for-byte.",
+  "cpu_q8": {
+    "run": 36973268384,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36973268384",
+    "scope": "Q8 matrix and live server passed; aggregate rejected by auxiliary Q4 one-shot comma check",
+    "passed_cases": [
+      "window-q8_0-1",
+      "window-q8_0-4",
+      "window-q8_0-8"
+    ],
+    "assertions_per_case": 5968,
+    "server_checks": {
+      "ordinary": 9,
+      "vad": 11,
+      "configured_long_turn": 10
+    }
+  },
+  "cpu_q4_f16": {
+    "run": 36975834552,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36975834552",
+    "passed": true,
+    "cases": [
+      "window-q4_k-1",
+      "window-q4_k-4",
+      "window-q4_k-8",
+      "window-f16-1",
+      "window-f16-4",
+      "window-f16-8"
+    ],
+    "assertions_per_case": 5969
+  },
+  "auxiliary_one_shot_check": "Q4 full-control and window have the SAME comma difference from whole-clip one-shot; auxiliary check compares all spoken words. Exact window/control text/token/confidence gate unchanged.",
+  "arm": {
+    "run": 36978217155,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36978217155",
+    "status": "running"
+  },
+  "rejected_gpu_window": {
+    "kernel_slug": "crispasr-nemotron-realtime-487",
+    "version": 1,
+    "uploaded_script_version": 1,
+    "source": "fc3088dd37bc56b841f5852b648e9632738387c2",
+    "hardware": "two actual TeslaT4, SM75",
+    "quant": "q8_0",
+    "passed": false,
+    "assertions_passed": 5964,
+    "assertions_total": 5968,
+    "scope": "Tail shows complete identical preset3 speech, but exact token-confidence comparison fails. No GPU window parity claim."
+  },
+  "gpu_production": {
+    "kernel_slug": "crispasr-nemotron-realtime-487-proof",
+    "version": 1,
+    "uploaded_script_version": 2,
+    "source": "7cddcdeee",
+    "status": "launched",
+    "scope": "Original full frontend is default on GPU. Frozen-source versus candidate complete speech/token-confidence capture Q8/Q4/F16 plus real server/VAD/long turn."
+  },
+  "standard_ci": {
+    "run": 36979186151,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36979186151",
+    "passed": true,
+    "jobs": 13
+  },
+  "lint": {
+    "run": 36979189406,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36979189406",
+    "status": "running"
+  },
+  "default_backend_policy": {
+    "cpu": "validated aligned window",
+    "gpu": "original full frontend",
+    "experimental_gpu_window": "CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND=1",
+    "full_control": "CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE=1 takes precedence"
+  },
+  "turn_limit": {
+    "environment": "CRISPASR_NEMOTRON_MAX_TURN_SECONDS",
+    "default_seconds": 30,
+    "range_seconds": [
+      1,
+      300
+    ],
+    "configured_test_seconds": 45,
+    "applies_to": "/v1/realtime native Nemotron only",
+    "retains_audio_for_commit_fallback": true
+  },
+  "limitations": [
+    "No universal CPU speedup percentage claimed from contended runners.",
+    "GPU window is experimental and failed exact confidence parity; no default enablement.",
+    "Kaggle hardware must be recorded from actual nvidia-smi and backend logs."
+  ]
+}
