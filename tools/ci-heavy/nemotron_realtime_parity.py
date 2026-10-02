@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """PR #487: exact full-window/token-confidence parity and real WebSocket tests."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,11 @@ import sys
 
 from huggingface_hub import hf_hub_download
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--quants', default='q8_0,q4_k,f16')
+args = parser.parse_args()
+quants = args.quants.split(',')
+assert all(q in ('q8_0', 'q4_k', 'f16') for q in quants)
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ['HEAVY_OUT'])
 SCRATCH = Path(os.environ['HEAVY_SCRATCH'])
@@ -40,7 +46,7 @@ f16 = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
     'nemotron-3.5-asr-streaming-0.6b-f16.gguf', revision=receipt['revision'])
 q8 = SCRATCH / 'nemotron-q8_0.gguf'
 run([build / 'bin/crispasr-quantize', f16, q8, 'q8_0'], 'quantize-q8')
-for quant in ('q8_0', 'q4_k', 'f16'):
+for quant in quants:
     model = str(q8) if quant == 'q8_0' else hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
                            f'nemotron-3.5-asr-streaming-0.6b-{quant}.gguf',
                            revision=receipt['revision'])
