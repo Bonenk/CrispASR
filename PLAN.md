@@ -33,6 +33,8 @@ First MioTTS x86 run `37029976684` built successfully and passed native tests (1
 
 Corrected ARM speech/metadata/baseline/resident-adapter proof [37033129143](https://github.com/CrispStrobe/CrispASR/actions/runs/37033129143) is RUNNING at `4a4c2773b`. Small range reads of immutable public Q8_0/Q4_K/F16 GGUF headers confirm all store 44100 Hz, n_fft=392 and hop=98; no full model downloaded locally. Release ARM baseline archive digest verified and its library layout confirmed. Echo CUDA bundle build is still RUNNING; Kaggle launch awaits completion.
 
+ARM proof `37033129143` preserved: baseline rate guard rejected v0.8.41, all 18 native assertions including resident preset restoration PASS, metadata/WAV rates correct, but sampled session readback was 2/9 word errors and FAILED the unchanged 20% gate. Found and wired previously ignored session temperature/seed controls (native defaults preserved); CLI/server request controls and truthful capability declarations now supported. Corrected ARM rerun [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) queued; generated capability/feature tables will come from its actual CLI. Echo CUDA bundle [37030248844](https://github.com/CrispStrobe/CrispASR/actions/runs/37030248844) SUCCESS; downloading and hashing runtime to cold storage for private HF transfer, then GPU acceptance/A-B.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
