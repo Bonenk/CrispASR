@@ -29,6 +29,8 @@ Additional audit: MioTTS lacked tokenizer companion download and resident-server
 
 MioTTS x86 proof `37029976684` is RUNNING; final resident-preset implementation/test `58cdf3679` queued for ARM speech proof [37031911762](https://github.com/CrispStrobe/CrispASR/actions/runs/37031911762). Portable Echo CUDA bundle `37030248844` is RUNNING. Runtime transfer and Kaggle launch wait for a successful, hashed bundle; no hardware or speed verdict yet.
 
+First MioTTS x86 run `37029976684` built successfully and passed native tests (10 assertions), 44.1/24 kHz/missing-key dispatch and CLI 44.1 kHz WAV. It failed speech scoring because `<en-US>` was counted as words; actual session readback is 8/9 correct words (11.1% WER after established control-tag normalization). Kept the 20% threshold, fixed scorer in `4a4c2773b`, preserved full failed logs/audio and an explicitly incomplete correction receipt on cold storage. Cancelled queued superseded ARM `37032747524` and dispatched corrected ARM proof; CLI speech acceptance still pending.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
