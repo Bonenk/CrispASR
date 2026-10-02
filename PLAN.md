@@ -66,6 +66,11 @@ it goes stale for more than a day.
 Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
 User authorized fixing and proving the remaining failures via GH CI/Kaggle.
 Pin official Dia source, compare feedback/stop stages, then gate complete speech.
+NOW: pinned `nari-labs/dia@4a9e29b1` exposes a nucleus-filter bug: native
+drops the threshold-crossing token, allowing all-zero weights. Candidate
+`153ef839c` keeps it; complete-speech Q8/1/4/8 CPU job `36972564262` running
+with the existing explicit 1024-step override. Default cap unchanged pending
+quality. Actual native sampler vs pinned PyTorch source `36972710180` running.
 
 The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
 its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
@@ -80,6 +85,11 @@ production generation default. This is separate from the verified #486 setter.
 Worktree `/mnt/volume1/wt-487`, branch `fix/487-realtime`.
 User authorized completing this follow-up. Hosted CPU/GPU parity and live server
 checks must pass before landing; Index models remain another agent’s task.
+NOW: author commits preserved in candidate `20d99ac98`; hosted CPU exact
+full-recompute/window token+confidence matrix (Q8/Q4/F16 x threads 1/4/8,
+presets 0/2/3, 33s) and VAD/ordinary server checks `36972773144` running.
+CI `36972712647`, lint `36972715035` running. First parity dispatch cancelled
+because its harness selected the wrong Catch test name; not acceptance evidence.
 
 Read description, all comments/reviews (none) and complete diff. Contains
 WebSocket ping/header fixes plus configurable update cadence and an incremental
