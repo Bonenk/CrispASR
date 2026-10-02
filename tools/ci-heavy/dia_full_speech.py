@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+import wave
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ['HEAVY_OUT'])
@@ -25,6 +26,7 @@ p.add_argument('--threads', type=int, default=4)
 p.add_argument('--steps', type=int, default=0)
 p.add_argument('--quant', choices=('f16', 'q8_0'), default='q8_0')
 p.add_argument('--matrix', default='4,1,8')
+p.add_argument('--limits', action='store_true', help='also verify C ABI setter and CLI explicit/default limits')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -41,6 +43,14 @@ if a.child:
             os.environ['CRISPASR_DIA_MAX_STEPS'] = str(a.steps)
         with Session(a.model, lib_path=a.lib, backend='dia', n_threads=a.threads) as session:
             session.set_temperature(1.2, seed=seed)
+            capped_seconds = None
+            if a.limits and a.phrase == 'hello' and a.threads == 4:
+                session.set_max_new_tokens(32)
+                capped = session.synthesize('[S1] ' + text)
+                capped_seconds = len(capped) / 44100
+                assert 0 < capped_seconds < .3, capped_seconds
+                session.set_max_new_tokens(0)
+                session.set_temperature(1.2, seed=seed)
             start = time.perf_counter()
             pcm = session.synthesize('[S1] ' + text)
             elapsed = time.perf_counter() - start
@@ -48,7 +58,7 @@ if a.child:
         assert np.isfinite(pcm).all() and np.sqrt(np.mean(pcm.astype(np.float64) ** 2)) > 1e-4
         np.save(path, pcm)
         result = {'phrase': text, 'seed': seed, 'threads': a.threads, 'steps_override': a.steps,
-                  'audio_seconds': len(pcm) / 44100, 'generation_seconds': elapsed}
+                  'audio_seconds': len(pcm) / 44100, 'generation_seconds': elapsed, 'cabi_limit_32_seconds': capped_seconds}
         assert result['audio_seconds'] > 3, result
         (OUT / (tag + '.json')).write_text(json.dumps(result, indent=2))
     else:
@@ -84,7 +94,7 @@ build = SCRATCH / 'dia-build'
 run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
      '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
      '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF', '-DCRISPASR_OPUS=OFF', '-DCRISPASR_AMR=OFF'], 'configure')
-run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j4'], 'build')
+run(['cmake', '--build', build, '--target', 'crispasr-lib', 'crispasr-cli', '-j4'], 'build')
 lib = next(build.rglob('libcrispasr.so'))
 repo, revision = 'cstr/dia-1.6b-GGUF', '3233fbcb32be47761d2e736857b6d1a075b9ba7e'
 model = hf_hub_download(repo, f'dia-1.6b-{a.quant}.gguf', revision=revision)
@@ -96,5 +106,36 @@ for key, _, _ in PHRASES:
     for threads in map(int, a.matrix.split(',')):
         for child, weights in (('generate', model), ('recognize', asr)):
             run([sys.executable, __file__, '--child', child, '--model', weights, '--lib', lib,
-                 '--phrase', key, '--threads', threads, '--steps', a.steps], f'{key}-{threads}-{child}')
+                 '--phrase', key, '--threads', threads, '--steps', a.steps] + (['--limits'] if a.limits else []), f'{key}-{threads}-{child}')
+if a.limits:
+    # CLI must preserve the model default, and honor an explicit short limit.
+    import numpy as np
+    for limit in (32, 0):
+        wav = OUT / f'cli-limit-{limit}.wav'
+        command = [build / 'bin/crispasr-cli', '--backend', 'dia', '-m', model,
+                   '-t', '4', '--no-gpu', '--seed', '42', '--temperature', '1.2',
+                   '--tts', '[S1] ' + PHRASES[0][2], '--tts-output', wav,
+                   '--no-spoken-disclaimer', '--accept-marking-responsibility']
+        if limit:
+            command += ['--max-new-tokens', str(limit)]
+        run(command, f'cli-limit-{limit}')
+        with wave.open(str(wav)) as audio:
+            assert audio.getframerate() == 44100 and audio.getnchannels() == 1
+            assert audio.getsampwidth() == 2
+            pcm = np.frombuffer(audio.readframes(audio.getnframes()), dtype='<i2').astype(np.float32) / 32768
+        seconds = len(pcm) / 44100
+        if limit:
+            assert 0 < seconds < .3, seconds
+        else:
+            assert seconds > 3, seconds
+            # Reuse the independent ASR acceptance for CLI output as well.
+            np.save(OUT / 'hello-4.npy', pcm)
+            receipt_path = OUT / 'hello-4.json'
+            prior = receipt_path.read_text()
+            receipt_path.write_text(json.dumps({'phrase': PHRASES[0][2], 'audio_seconds': seconds, 'cli': True}))
+            run([sys.executable, __file__, '--child', 'recognize', '--model', asr,
+                 '--lib', lib, '--phrase', 'hello', '--threads', '4'], 'cli-default-recognize')
+            (OUT / 'cli-default.json').write_text(receipt_path.read_text())
+            receipt_path.write_text(prior)
+        (OUT / f'cli-limit-{limit}.json').write_text(json.dumps({'max_new_tokens': limit, 'audio_seconds': seconds}))
 print('DIA_FULL_SPEECH_PASS', flush=True)
