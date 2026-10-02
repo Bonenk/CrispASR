@@ -180,6 +180,11 @@ exclude all driver stubs from runtime archive; replacement 36988187315 queued
 with previous compiler cache retained. Existing real CUDA proofs unchanged.
 Full five-case source file/VAD/context oracle still running; no publication.
 
+UPDATE 10:17 UTC: F16 CPU direct three-clip acceptance 36985780992 PASS 228 stages / 48 cached IDs, exact complete text/timing. FFN-only conversion 36989091712 PASS at bcc398eb1 (first recipe 36987909959 failed; corrected unsupported global-f16); private model dca128e0da2c86819347b79f63da610c0b8bd472, pair 14,704,697,408 bytes. FFN CPU 36990739513 FAIL only JFK ASCII punctuation; 228/228 numerical and 48/48 cached gates pass, Chinese/tail exact. No Q8 candidate accepted.
+Portable CUDA bundle 36988187315 PASS at c07ec1d8d, immutable private dataset c51cb08c50d6997e2bbb3efc75fc73d0c5d1cda4, SHA e47a46bb7ff780f286686a7239f1c1806cb1b5c7451a07fb9706a630a15bf0da. Actual GPU stage+real roundtrip v1 COMPLETE, all six Piper English WER 0, exact CLI/C ABI.
+Corrected F32 source v1 ERROR at repeated-English context generation (CUDA OOM); its three direct reference captures remain valid. Fully resident original default-BF16 repeated-English control ERROR on source's 127 cues, parser errors/out-of-range times; retained as rejected stress, not golden. Separate natural Chinese-pause context preserves original math/prompt and is now COMPLETE: five valid source cases, parse warnings 0, actual BF16 modules, second speech window with prior context. Immutable fixture 86ec7245cf53b78d8d2442f6f919b9215104609b, namespace index-echo-9b-bf16-default-zh-context. Old rejected namespace and all 2B fixtures preserved.
+CUDA full acceptance v1 at 44996324a ERROR: all three F16 CUDA diffs, exact anonymous C ABI and independent CLI text/timing PASS, then Silero autoload abort due CUDA weights in forced CPU scheduler. Terminal logs harvested before reuse. Fix weight placement to scheduler CPU policy; replacement CI bundle pending. CPU full-file acceptance 36994533773 running at 0004c1a44 against independent pinned five-case default-source oracle and F32 stages. No public model/registry claim yet.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
