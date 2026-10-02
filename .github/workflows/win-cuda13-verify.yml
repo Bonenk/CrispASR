@@ -87,7 +87,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_CUDA=ON ^
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120a-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="75-real;80-real;86-real;89-real;90-real;90-virtual;120a-real;120-virtual" ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j %NUMBER_OF_PROCESSORS%
 

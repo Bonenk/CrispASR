@@ -12,7 +12,7 @@ on:
       arch:
         description: CMAKE_CUDA_ARCHITECTURES
         required: true
-        default: "60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual"
+        default: "60-real;61-real;70-real;75-real;80-real;86-real;89-real;90-real;90-virtual;120-real;120-virtual"
       toolkit:
         description: CUDA Toolkit version (use an architecture list it supports)
         type: choice
