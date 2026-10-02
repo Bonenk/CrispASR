@@ -38,9 +38,14 @@ with kh.build_heartbeat('build'):
 from huggingface_hub import hf_hub_download, HfApi
 cache = kh.export_ccache_tar()
 if cache:
-    HfApi(token=os.environ['HF_TOKEN']).upload_file(path_or_fileobj=cache, path_in_repo='ccache.tar',
-        repo_id='cstr/crispasr-ccache', repo_type='dataset', commit_message='Refresh from real Nemotron CUDA build')
-    Path(cache).unlink()
+    try:
+        HfApi(token=os.environ['HF_TOKEN']).upload_file(path_or_fileobj=cache, path_in_repo='ccache.tar',
+            repo_id='cstr/crispasr-ccache', repo_type='dataset', commit_message='Refresh from real Nemotron CUDA build')
+        Path(cache).unlink()
+        kh.step('ccache.upload.pass')
+    except Exception as exc:
+        # Keep the exported cache artifact; cache publishing is not a correctness gate.
+        kh.step('ccache.upload.failed', error_type=type(exc).__name__)
 
 revision = 'bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2'
 f16 = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF',
