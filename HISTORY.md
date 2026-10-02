@@ -6,6 +6,14 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## RELEASED 2026-10-02 — v0.8.41
+
+Published annotated tag `340d7085eaa53c40a46dcb73a6d3d0448a480006` through
+scripts/bump-version.sh after all integrated source/model gates passed.
+Release body includes the complete audited v0.8.40-to-main change range.
+Platform asset build/attachment is tracked by workflow `37026428050`; final
+asset verification remains live in PLAN until distribution completes.
+
 ## DONE 2026-10-02 — authorized GitHub issue and PR replies
 
 Read all nine open issues, both open PRs including review/inline comments,

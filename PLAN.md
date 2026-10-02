@@ -38,14 +38,13 @@ Regression37016733584 11 jobs, dedicated9B CPU37016734351, WASM37016733853
 seed42 repeat hashes and unchanged speech thresholds pass. Native Piper sources
 unchanged. Index CPU/CUDA canonical-public acceptance is integrated.
 
-Release notes and Flutter changelog ready. User authorizes v0.8.41; next use
-scripts/bump-version.sh, publish the annotated tag/release and verify assets.
-All large builds are hosted after load/free checks; no local model/build task.
-
-Index-Echo's twelve wiring points are audited in
-`docs/index-echo-wiring-audit-2026-10-02.md`; model notes include paired/VAD
-files and measured/scoped performance. Ruby binding37022213108 also PASS. The comprehensive release-note
-audit is complete at 2f8f24197; proceed with the authorized bump/tag.
+Published v0.8.41 at annotated tag340d7085e using scripts/bump-version.sh;
+all seven versioned files agree. Comprehensive notes and twelve-point Index
+wiring audit are complete; Ruby37022213108 PASS. Release workflow37026428050
+is building/attaching platform packages, with no failures and eleven assets
+uploaded at the latest check. Target inventory53 assets includes both CUDA12
+flavors; verify the full legacy CLI/library/runtime uploads before completion.
+All large builds are hosted after load/free checks; root checkout untouched.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
