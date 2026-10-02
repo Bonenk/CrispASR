@@ -13,6 +13,11 @@ on:
         description: CMAKE_CUDA_ARCHITECTURES
         required: true
         default: "60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual"
+      toolkit:
+        description: CUDA Toolkit version (use an architecture list it supports)
+        type: choice
+        options: ['12.8.0', '12.6.3']
+        default: '12.8.0'
 
 jobs:
   win-cuda-smoke:
@@ -21,10 +26,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Install CUDA Toolkit 12.8.0
+      - name: Check runner resources
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory
+          Get-CimInstance Win32_Processor | Select-Object Name,LoadPercentage
+      - name: Install CUDA Toolkit ${{ inputs.toolkit }}
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.8.0'
+          cuda: ${{ inputs.toolkit }}
           method: 'network'
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev", "nvrtc", "nvrtc_dev", "nvtx", "cuda_profiler_api", "visual_studio_integration"]'
       - name: Configure + compile 2 ggml-cuda kernels (verbose)
