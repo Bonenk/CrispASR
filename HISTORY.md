@@ -6,6 +6,18 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-10-02 — Index-Echo contributing checklist and release-note audit
+
+All twelve maintainer integration points pass for the shared 2B/9B backend;
+see `docs/index-echo-wiring-audit-2026-10-02.md`. Main ARM full acceptance
+37016734351 actually regenerated the feature matrix and audited the built
+shared library with `--require-lib`: every canonical runtime is present and
+Index-Echo has no advisory coverage gap. Go linkage drift check also passes
+locally. The v0.8.41 notes now include both checkpoint choices, paired/VAD
+downloads, sizes, binding/API behavior, measured resident performance and
+platform/quantization scope. Release bump/tag remains owned by wt-483 and
+waits for its deterministic Windows Piper proof and remaining tip lint.
+
 ## DONE 2026-10-02 — Windows CUDA 12.6 package pairing (#483)
 
 CUDA 12.8 remains available for native Blackwell support; new Windows CLI and

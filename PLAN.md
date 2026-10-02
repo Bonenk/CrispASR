@@ -11,15 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — Index-Echo contributing checklist and release-note audit
-
-Worktree `/mnt/volume1/wt-index-echo-9b`, branch
-`docs/index-echo-wiring-release-audit`. Audit all twelve integration points
-against code and the accepted shared-library/CPU/CUDA receipts; add a durable
-checklist and explicit 2B/9B selection and scope to the prepared release notes.
-Release bump/tag ownership remains with `/mnt/volume1/wt-483`; its deterministic
-Windows Piper proof and remaining tip lint must pass before tagging.
-
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
@@ -29,8 +20,12 @@ builds ran hosted after checking local load/free memory; no Index runtime
 edits here. Original tested source bundle and logs archived cold.
 
 Index-Echo 9B is integrated and accepted on ARM CPU and two T4, including
-canonical public downloads. Combined main CI37016734092 has 12/13 green;
-lint/deep/regressions remain active. Release notes and Flutter changelog ready.
+canonical public downloads. Combined main CI37016734092 is 13/13 green, lint37016733637 is 10/10,
+WASM37016733853 is 5/5, selected regression37016733584 is 11/11 and full
+9B ARM acceptance37016734351 passes. All twelve Index-Echo wiring points
+are audited in docs/index-echo-wiring-audit-2026-10-02.md. Release notes and
+Flutter changelog are ready; latest workflow-change lint37022213402 and
+deterministic Windows Piper37022213369 remain active at the audit.
 
 CLAIMED release blocker: Windows Piper Cori live37016733840 failed its existing
 CLI readback gate ("quick-brim Fox" versus "quick brown fox"), while the same
