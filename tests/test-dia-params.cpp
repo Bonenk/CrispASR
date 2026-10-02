@@ -48,10 +48,10 @@ TEST_CASE("dia_free: NULL context is a no-op", "[unit][dia]") {
 // These inputs expose the previous all-zero nucleus weights and missing
 // threshold-crossing token. Expectations follow the pinned official sampler.
 TEST_CASE("dia_sampling: a dominant token survives nucleus filtering", "[unit][dia]") {
-    const float logits[] = {20.0f, 0.0f, -1.0f};
+    const float logits[] = {0.0f, -1.0f, 20.0f};
     std::mt19937 rng(42);
     for (int i = 0; i < 512; ++i)
-        REQUIRE(dia_sample_token(logits, 3, 1.2f, 0.95f, 0, rng) == 0);
+        REQUIRE(dia_sample_token(logits, 3, 1.2f, 0.95f, 0, rng) == 2);
 }
 
 TEST_CASE("dia_sampling: nucleus includes its crossing token", "[unit][dia]") {

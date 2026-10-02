@@ -37,7 +37,7 @@ int main() {
 '''
 (SCRATCH / 'sampling.cpp').write_text(cpp)
 subprocess.run(['g++', '-std=c++17', '-O2', SCRATCH / 'sampling.cpp', '-o', SCRATCH / 'sampling'], check=True)
-fixtures = [([20, 0, -1], 1.2, .95, 0), ([2, 1, 0, -1], 1., .5, 0),
+fixtures = [([20, 0, -1], 1.2, .95, 0), ([0, -1, 20], 1.2, .95, 0), ([2, 1, 0, -1], 1., .5, 0),
             ([2, 1, 0, -1], 1., .95, 2), ([2, 1, 0, -1], 0., .95, 2)]
 for seed in range(8):
     x = np.random.default_rng(seed).normal(0, 3, 32).astype(np.float32).tolist()
@@ -70,4 +70,16 @@ for x, temp, top_p, k in fixtures:
     (OUT / 'sampling-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     assert np.all(abs(observed - expected) <= tolerance), case
     assert np.all(observed[expected == 0] == 0), case
+# The permanent pre-fix main source must fail the same dominant-token case.
+BASELINE = 'b33138b057268f573757ded8258e4afef2461ea8'
+subprocess.run(['git', 'fetch', '--depth', '1', 'origin', BASELINE], check=True)
+old = subprocess.check_output(['git', 'show', BASELINE + ':src/dia_tts.cpp'], text=True)
+old_function = old[old.index('static uint32_t dia_sample_token('):old.index('// Weight loading')]
+(SCRATCH / 'baseline.cpp').write_text(cpp.replace(function, old_function))
+subprocess.run(['g++', '-std=c++17', '-O2', SCRATCH / 'baseline.cpp', '-o', SCRATCH / 'baseline'], check=True)
+raw = subprocess.check_output([SCRATCH / 'baseline'], input='3 0 1000 1.2 0.95 0 -1 20', text=True)
+counts = [int(n) for n in raw.split()]
+receipt['baseline'] = {'sha': BASELINE, 'dominant_token_2_counts': counts}
+assert counts[2] < 990, 'baseline unexpectedly satisfies the regression fixture'
+(OUT / 'sampling-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print('DIA_OFFICIAL_SAMPLER_PARITY_PASS', len(fixtures), flush=True)
