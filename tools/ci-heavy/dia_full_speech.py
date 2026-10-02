@@ -22,7 +22,9 @@ p.add_argument('--model')
 p.add_argument('--lib')
 p.add_argument('--phrase', choices=('hello', 'fox'))
 p.add_argument('--threads', type=int, default=4)
-p.add_argument('--steps', type=int, default=1024)
+p.add_argument('--steps', type=int, default=0)
+p.add_argument('--quant', choices=('f16', 'q8_0'), default='q8_0')
+p.add_argument('--matrix', default='4,1,8')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -51,7 +53,7 @@ if a.child:
         (OUT / (tag + '.json')).write_text(json.dumps(result, indent=2))
     else:
         with Session(a.model, lib_path=a.lib, backend='nemotron', n_threads=4) as session:
-            transcript = ' '.join(s.text for s in session.transcribe(np.load(path), sample_rate=44100))
+            transcript = ' '.join(s.text for s in session.transcribe(np.load(path), sample_rate=44100, language='en'))
         def words(t):
             return re.findall('[a-z]+', re.sub(r'<[^>]*>', '', t).lower())
         ref, actual = words(text), words(transcript)
@@ -85,11 +87,13 @@ run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SH
 run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j4'], 'build')
 lib = next(build.rglob('libcrispasr.so'))
 repo, revision = 'cstr/dia-1.6b-GGUF', '3233fbcb32be47761d2e736857b6d1a075b9ba7e'
-model = hf_hub_download(repo, 'dia-1.6b-q8_0.gguf', revision=revision)
+model = hf_hub_download(repo, f'dia-1.6b-{a.quant}.gguf', revision=revision)
 hf_hub_download(repo, 'dac-44khz.gguf', revision=revision)
 asr = hf_hub_download('cstr/nemotron-3.5-asr-streaming-GGUF', 'nemotron-3.5-asr-streaming-0.6b-q4_k.gguf', revision='bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2')
 for key, _, _ in PHRASES:
-    for threads in (4, 1, 8):
+    if a.phrase and key != a.phrase:
+        continue
+    for threads in map(int, a.matrix.split(',')):
         for child, weights in (('generate', model), ('recognize', asr)):
             run([sys.executable, __file__, '--child', child, '--model', weights, '--lib', lib,
                  '--phrase', key, '--threads', threads, '--steps', a.steps], f'{key}-{threads}-{child}')
