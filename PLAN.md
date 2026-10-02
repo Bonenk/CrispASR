@@ -84,6 +84,12 @@ an unfixed-runtime control using its existing explicit step-cap override. Renew
 runtime CI/lint and worker checks for this additional change. No WER relaxation
 or runner speedup claim.
 
+Candidate `3d3a536f6197ad366ec344d7235ff54b2c4c1345` removes that hidden cap
+and clamps native/debug limits to model KV capacity. Live full-prompt/control
+run `36965187732`, renewed CI `36965225232`, lint `36965224988`, and both-mode
+worker proof `36965225243` are launched. VPS load 10.26/16.09/20.03, available
+1.4GiB: all builds/models remain hosted; cold logs stay on CIFS.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
