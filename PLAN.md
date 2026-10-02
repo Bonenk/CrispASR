@@ -10,13 +10,21 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 
 Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
 Source pinned to `IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba`.
-Read the 9B inference class in full: it uses a plain 2048→4096 projection
-connector and a 32-layer Qwen3.5 decoder, unlike the 2B residual connector and
-24-layer decoder. Preserve 2B behavior; follow convert→quantize→independent
-reference→cosine/magnitude/cache/decoded-output parity before publishing.
-Heavy jobs use GH CI/Kaggle; all large local assets and receipts go under
-`/mnt/storage/crispasr/issue485-9b/`. Audit source tensor headers and memory
-first to choose runners; no 9B inference or large weights on the VPS.
+Read the full released inference class and source tensor headers: audio tower
+647,927,168 parameters; decoder 8,953,803,264 parameters, 32 actual layers,
+no MTP weights; connector is one 2048→4096 projection (8,388,608 parameters).
+Native projection and dimension validation `fb61d7167` preserve the 2B residual
+path; the diff harness now audits every decoder layer. No public API change.
+
+NOW: private F16/Q8 conversion `36963243412` on GH x64 uses `4552d5c98`;
+native shared-library/connector/unit/wiring build `36963598957` uses `fb61d7167`.
+Both are queued. Independent F32 reference will need placement across GPU/CPU
+or disk: a full F32 decoder exceeds standard runner RAM. Preparing the genuine
+released inference class with documented placement-only offload, then native
+GPU parity; no GGUF-derived oracle. No model or registry publication before
+stage/magnitude/cache and complete decoded-output gates. All large local assets
+and receipts stay under `/mnt/storage/crispasr/issue485-9b/`; VPS does no 9B
+inference or large weight downloads. Source header audit is `source/header-audit.json`.
 
 ## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
