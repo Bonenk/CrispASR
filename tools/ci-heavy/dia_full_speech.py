@@ -26,11 +26,16 @@ p.add_argument('--threads', type=int, default=4)
 p.add_argument('--steps', type=int, default=0)
 p.add_argument('--quant', choices=('f16', 'q8_0'), default='q8_0')
 p.add_argument('--matrix', default='4,1,8')
+p.add_argument('--metal', action='store_true', help='require real Metal CLI backend on macOS')
 p.add_argument('--audio-tag', help='separate output basename for CLI recognition')
 p.add_argument('--limits', action='store_true', help='also verify C ABI setter and CLI explicit/default limits')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
 SCRATCH.mkdir(parents=True, exist_ok=True)
+
+if a.metal:
+    assert sys.platform == 'darwin', 'Metal acceptance requires a macOS runner'
+    os.environ['CRISPASR_DIA_TTS_GPU'] = '1'
 
 if a.child:
     import numpy as np
@@ -90,13 +95,13 @@ def run(cmd, tag):
     assert proc.returncode == 0, tag
 
 subprocess.run(['uptime'], check=True)
-subprocess.run(['free', '-h'], check=True)
+subprocess.run(['vm_stat'] if sys.platform == 'darwin' else ['free', '-h'], check=True)
 build = SCRATCH / 'dia-build'
 run(['cmake', '-S', ROOT, '-B', build, '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
      '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
      '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF', '-DCRISPASR_OPUS=OFF', '-DCRISPASR_AMR=OFF'], 'configure')
 run(['cmake', '--build', build, '--target', 'crispasr-lib', 'crispasr-cli', '-j4'], 'build')
-lib = next(build.rglob('libcrispasr.so'))
+lib = next(build.rglob('libcrispasr.dylib' if sys.platform == 'darwin' else 'libcrispasr.so'))
 repo, revision = 'cstr/dia-1.6b-GGUF', '3233fbcb32be47761d2e736857b6d1a075b9ba7e'
 model = hf_hub_download(repo, f'dia-1.6b-{a.quant}.gguf', revision=revision)
 hf_hub_download(repo, 'dac-44khz.gguf', revision=revision)
@@ -107,19 +112,21 @@ for key, _, _ in PHRASES:
     for threads in map(int, a.matrix.split(',')):
         for child, weights in (('generate', model), ('recognize', asr)):
             run([sys.executable, __file__, '--child', child, '--model', weights, '--lib', lib,
-                 '--phrase', key, '--threads', threads, '--steps', a.steps] + (['--limits'] if a.limits else []), f'{key}-{threads}-{child}')
+                 '--phrase', key, '--threads', threads, '--steps', a.steps] + (['--limits'] if a.limits else []) + (['--metal'] if a.metal else []), f'{key}-{threads}-{child}')
 if a.limits:
     # CLI must preserve the model default, and honor an explicit short limit.
     import numpy as np
     for limit in (32, 0):
         wav = OUT / f'cli-limit-{limit}.wav'
         command = [build / 'bin/crispasr-cli', '--backend', 'dia', '-m', model,
-                   '-t', '4', '--no-gpu', '--seed', '123', '--temperature', '1.2',
+                   '-t', '4', '--gpu' if a.metal else '--no-gpu', '--seed', '123', '--temperature', '1.2',
                    '--tts', '[S1] ' + PHRASES[1][2], '--tts-output', wav,
                    '--no-spoken-disclaimer', '--accept-marking-responsibility']
         if limit:
             command += ['--max-new-tokens', str(limit)]
         run(command, f'cli-limit-{limit}')
+        if a.metal:
+            assert 'dia_tts: GPU backend enabled (MTL' in (OUT / f'cli-limit-{limit}.log').read_text(), 'Metal fallback rejected'
         with wave.open(str(wav)) as audio:
             assert audio.getframerate() == 44100 and audio.getnchannels() == 1
             assert audio.getsampwidth() == 2
