@@ -34,6 +34,8 @@ investigation and PR #487 streaming/server follow-up remain in `PLAN.md`.
 Pinned models, transcripts, source hashes and exact gate scope are retained in
 `docs/cpu-threads-2026-10-02.json`. No runner speedup claim. All heavy builds and
 models ran on hosted runners after VPS load/memory checks; cold proof is on CIFS.
+Landed at `b33138b05`; main CI `36969566591` and lint `36969566638` are
+running. Source/tests/helpers match their accepted feature-run bytes.
 
 ## DONE 2026-10-02 — Windows Vulkan SDK transport retries
 
