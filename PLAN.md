@@ -11,6 +11,24 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — PR #480 scheduler review, #483 CUDA 12.6, next release
+
+Worktrees `/mnt/volume1/wt-480` (`fix/480-scheduler`) and
+`/mnt/volume1/wt-483` (`fix/483-cuda126`). Full PR #480 description/comments/
+reviews and issue #483 description/comments read (both have no follow-up
+comments). Actual PR change is `3fcc67f9b` in the formerly vendored ggml
+scheduler; the PR snapshot predates submoduling and many Chatterbox fixes.
+Review/port only the relevant scheduler delta against pinned shared ggml,
+prove cached cross-backend graph rewiring with failed baseline controls and
+real Vulkan execution; preserve current T3 attention/voice/backend policies.
+Audit CUDA 12.6/12.8/13 compiler/device support against NVIDIA documentation,
+then implement and verify coherent legacy packages plus runtime pairing.
+VPS initial load 4.91/4.94/5.07, available RAM 3.1 GiB, swap free 1.4 GiB;
+large builds/model runs stay on GH/Kaggle with fresh resource checks.
+Release authorized after these tasks and the other agent's Index-Echo 9B
+full acceptance/publication gates pass. Latest release v0.8.40; no bump/tag
+until Index-Echo 9B is fully accepted and integrated and main CI is green.
+
 ## OPEN 2026-10-02 — full-tree cppcheck: Index-Echo destructor
 
 Separate Index-Echo agent owns this finding. Main baseline cppcheck
