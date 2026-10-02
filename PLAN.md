@@ -142,6 +142,17 @@ separate CUDA full acceptance harness for F16 and selective Q8, pinned CI bundle
 three direct stage/cache/CLI/anonymous C ABI checks, five source file cases and
 three real Piper roundtrips. No quality claim until terminal receipts pass.
 
+UPDATE 08:50 UTC: selective CPU 36983710234 FAILED on old stricter diff plus
+JFK exact punctuation. All three clips cached argmax 16/16. Selective Chinese
+complete five cues/text/times now exact; tail encoder/connector cosine minima
+1.0 and full decoded tail exact. Decoder relative L2 maxima .03042447 JFK,
+.02736433 Chinese, .03202217 tail: within existing Q8 5% gates but old audio-only
+precision inference used F16 2%. Corrected harness preserves strict F16 audio
+gates; no text gate waiver. JFK still country。 vs source country.。; rejected.
+Full F16 strict three-clip control 36985780992 dispatched at 3ba6074da using
+original immutable F16 pair and corrected reference fixture. CUDA bundle
+36984982041 compiling; source full-file oracle still pending.
+
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
 Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
