@@ -6,6 +6,22 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — integrated v0.8.41 release gates
+
+Main CI `37022213223` PASS 13/13; integrated unit tier `37016734092` passes
+1,984 tests. Lint `37022213402` PASS 10/10, full-tree cppcheck `37016733737`
+PASS, selected-model Regression `37016733584` PASS 11 jobs, dedicated 9B CPU
+`37016734351` PASS and WASM `37016733853` PASS all five variants.
+
+Windows Cori proof `37016733840` retained a valid seed-0 WAV whose ASR readback
+fails the existing gate. Piper sources and ggml match v0.8.40; another run at
+that same commit passed. The existing stochastic VITS default needs an explicit
+seed in a controlled CI fixture. Seed-42 proof `37022213369` PASS: repeated WAV
+SHA256s identical, original CLI speech criterion passes, HTTP unique-word
+recovery 7/9 exceeds the unchanged .70 gate, and streaming PCM passes. No native
+synthesis default or speech threshold changed. Failed audio/input hashes and
+exact source/run pins remain in `docs/release-v0.8.41-validation.json`.
+
 ## 2026-10-02 — Index-Echo contributing checklist and release-note audit
 
 All twelve maintainer integration points pass for the shared 2B/9B backend;

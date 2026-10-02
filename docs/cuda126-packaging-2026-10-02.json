@@ -56,7 +56,8 @@
       "status": "PASS",
       "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/36999848276",
       "actual_checkout": "a40850fbfad94e3778ae3d19bff5eb7d49f278f1",
-      "scope": "Complete kernel set for SM61/SM75; both toolkits; staged CLI versions/diagnostics and actual cudaRuntimeGetVersion."
+      "scope": "Complete kernel set for SM61/SM75; both toolkits; staged CLI versions/diagnostics and actual cudaRuntimeGetVersion.",
+      "runtime_api_probe_path": "Installed toolkit cudart DLL used as the packaging input; staging copies it into the CLI/runtime ZIP, and archive SHA checks validate CLI/library pairing."
     },
     "windows_library": {
       "status": "PASS",

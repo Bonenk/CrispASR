@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (319 lessons)
+## Index by topic (320 lessons)
 
 **Security & untrusted input** (2)
 
@@ -34,7 +34,7 @@ cross-reference when you already know which model you are touching.
 - L17070 — consent record — BIND to the audio, don't chain the log
 - L18365 — watermark detector — swap the STATISTIC, not the threshold
 
-**Build, CI, release & packaging** (23)
+**Build, CI, release & packaging** (24)
 
 - L719 — A packaging step that destroys the state a later step reads — and scripts that only run in a release job
 - L1023 — A guard job that runs ONE compiler family guards one compiler family
@@ -59,6 +59,7 @@ cross-reference when you already know which model you are touching.
 - L15808 — #313 Rust crates on crates.io via git dep
 - L18979 — An upstream-sync PR must target the branch consumers pin, and cache export belongs after the build
 - L19104 — A convert-and-upload pipeline has no readout at its last step, and the dependency that broke the run was not a path in the source
+- L19460 — 2026-10-02 — Pin Piper noise before trusting Windows live readback gates
 
 **Multi-surface wiring — CLI / C ABI / bindings / server** (31)
 
