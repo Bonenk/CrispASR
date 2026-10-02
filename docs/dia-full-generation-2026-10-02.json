@@ -14,7 +14,16 @@
       9,
       1028
     ],
-    "precision": "F32"
+    "precision": "F32",
+    "torch_version": "2.14.1+cpu",
+    "reference_parameters": {
+      "seed": 42,
+      "temperature": 1.2,
+      "cfg_scale": 3.0,
+      "top_p": 0.95,
+      "top_k": 45,
+      "max_tokens": 128
+    }
   },
   "native_models": {
     "repo": "cstr/dia-1.6b-GGUF",
@@ -199,7 +208,32 @@
     "f16_default_cpu": {
       "run": 36980002984,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36980002984",
-      "status": "pending"
+      "status": "completed",
+      "passed": true,
+      "cases": [
+        {
+          "phrase": "Hello there, how are you doing today? I really hope you are having a wonderful and pleasant time. The weather outside is lovely and bright.",
+          "seed": 42,
+          "threads": 4,
+          "steps_override": 0,
+          "audio_seconds": 6.989206349206349,
+          "generation_seconds": 152.73842804499998,
+          "cabi_limit_32_seconds": null,
+          "transcript": "Hello there, how are you doing today? <en-US>  I really hope you are having a wonderful and pleasant time. <en-US> The weather outside is lovely and bright. <en-US>",
+          "wer": 0.0
+        },
+        {
+          "phrase": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+          "seed": 123,
+          "threads": 4,
+          "steps_override": 0,
+          "audio_seconds": 5.874648526077097,
+          "generation_seconds": 123.66436700700001,
+          "cabi_limit_32_seconds": null,
+          "transcript": "The Quick Brown Fox jumps over the lazy dog. <en-US> Please listen carefully because this is a test of speech synthesis with a chosen number of CPU threads. <en-US>",
+          "wer": 0.0
+        }
+      ]
     },
     "f16_metal": {
       "run": 36980351443,
@@ -209,27 +243,39 @@
     "q8_cli_retry": {
       "run": 36982203366,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36982203366",
-      "status": "launched",
-      "scope": "Correct bin/crispasr name; short explicit32 limit and complete default fox speech."
+      "status": "completed",
+      "scope": "Correct bin/crispasr name; short explicit32 limit and complete default fox speech.",
+      "passed": false,
+      "reason": "Actual production planner split the paragraph into two short prompts, applying cap32 twice and inserting .2s of silence; output .571519s. Candidate388a7ad86 preserves complete Dia dialogue."
     },
     "f16_metal_cli_retry": {
       "run": 36982206126,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36982206126",
-      "status": "launched",
-      "scope": "Correct bin/crispasr name; actual MTL backend required, short32 and complete default fox speech."
+      "status": "cancelled before execution",
+      "scope": "Correct bin/crispasr name; actual MTL backend required, short32 and complete default fox speech.",
+      "reason": "Superseded by the whole-dialogue production fix."
+    },
+    "q8_cli_whole_dialogue": {
+      "run": 36983650376,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983650376",
+      "status": "running"
+    },
+    "f16_metal_whole_dialogue": {
+      "run": 36983652977,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983652977",
+      "status": "pending"
     }
   },
   "standard_ci": {
-    "run": 36977049609,
-    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36977049609",
-    "passed": true,
-    "jobs": 13
+    "run": 36983655538,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983655538",
+    "status": "running",
+    "scope": "includes shared CLI/server whole-dialogue fix and permanent chunking regression"
   },
   "lint": {
-    "run": 36977052309,
-    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36977052309",
-    "passed": true,
-    "jobs": 10
+    "run": 36983658133,
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36983658133",
+    "status": "running"
   },
   "limitations": [
     "Full-speech acceptance uses two prompts longer than100characters and fixed seeds. Short prompts remain model-sensitive.",
@@ -252,5 +298,15 @@
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36972564262",
       "wer": 1.0
     }
-  ]
+  ],
+  "chunk_policy_negative_control": {
+    "baseline": "b33138b057",
+    "text": "The quick brown fox jumps over the lazy dog. Please listen carefully, because this is a test of speech synthesis with a chosen number of CPU threads.",
+    "before_chunks": 2,
+    "before_single_context_gate_passed": false,
+    "after_chunks": 1,
+    "after_single_context_gate_passed": true,
+    "source": "388a7ad86",
+    "cold_receipt": "/mnt/volume1/tmp-overflow/dia-chunk-policy/receipt.json"
+  }
 }
