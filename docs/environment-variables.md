@@ -1101,6 +1101,11 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   realtime session gathers before it processes them and sends new text. Default
   4 on CPU and 1 on GPU. `1` updates the text after every chunk (320 ms at
   context preset 0, 1.12 s at preset 3) and costs more CPU.
+- `CRISPASR_NEMOTRON_MAX_TURN_SECONDS` — `/v1/realtime` Nemotron turn limit
+  in seconds, integer 1..300, default 30. Set e.g. `180` for longer dictation.
+  Read when the WebSocket session starts; advertised in `session.created`.
+  The server retains audio for commit fallback, so the limit remains finite.
+  Other backends keep their 30-second limit. Invalid values use the default.
 - `CRISPASR_NEMOTRON_STREAM_DEBUG`
 - `CRISPASR_NEMOTRON_STREAM_FULL_RECOMPUTE` — `1` makes the realtime session
   redo mel and pre-encode for the whole turn on every update, instead of only

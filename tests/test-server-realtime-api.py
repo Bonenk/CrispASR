@@ -156,6 +156,10 @@ def main():
     explicit_model = ""
     language = "en"
     server_vad = "--server-vad" in sys.argv[1:]
+    long_turn = "--long-turn" in sys.argv[1:]
+    if long_turn:
+        assert not server_vad
+        os.environ["CRISPASR_NEMOTRON_MAX_TURN_SECONDS"] = "45"
     args = sys.argv[1:]
     for i, a in enumerate(args):
         if a == "--port" and i + 1 < len(args):
@@ -281,6 +285,9 @@ def main():
             print("  ✗ session did not declare its turn/VAD contract: %r" % session_contract)
             failed += 1
 
+        if long_turn:
+            assert session_contract.get("max_turn_seconds") == 45, session_contract
+
         # A Ping must get a Pong with the same payload.
         s.sendall(ws_frame(b"abcd", opcode=0x9))
         opcode, payload = read_one_frame(s, timeout=5.0)
@@ -303,6 +310,8 @@ def main():
 
         # 2. Stream PCM, collect text frames.
         pcm, sr = load_pcm_16_bytes(sample)
+        if long_turn:
+            pcm *= 3
         chunk = 16000 * 2  # ~1s of PCM16
         msgs = []
         for i in range(0, len(pcm), chunk):
@@ -339,6 +348,10 @@ def main():
         else:
             print("  ✗ pre-commit behavior disagrees with session contract: %r" % premature[:2])
             failed += 1
+
+        if long_turn:
+            assert not any(json.loads(m).get("type") ==
+                           "conversation.item.input_audio_transcription.completed" for m in msgs), msgs
 
         commit_msg = json.dumps({"type": "input_audio_buffer.commit"})
         auto_completed = False
@@ -396,6 +409,14 @@ def main():
         else:
             print("  ✗ completion timing metadata missing: %r" % completed)
             failed += 1
+
+        if long_turn:
+            assert completed and abs(completed["audio_duration_ms"] - len(pcm) / 32) < 1, completed
+            completions = [m for m in msgs if json.loads(m).get("type") ==
+                           "conversation.item.input_audio_transcription.completed"]
+            assert len(completions) == 1, completions
+            print("  ✓ 33 s dictation remains one complete turn under configured 45 s cap")
+            passed += 1
 
         # 3. Reuse the same WebSocket for another turn. Its duration must be
         # just this append, proving commit cleared the prior audio prefix.

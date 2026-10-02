@@ -1,5 +1,6 @@
 #include "realtime_server.h"
 #include "core/realtime_turn_buffer.h"
+#include "core/crispasr_env.h"
 #include "crispasr_vad.h"
 #include <algorithm>
 #include <atomic>
@@ -284,6 +285,7 @@ struct rt_session {
     CrispasrBackend* backend;
     std::mutex* model_mutex;
     whisper_params rp;
+    int max_turn_seconds = 30;
     core_realtime::TurnBuffer turn{16000 * 30};
     std::unique_ptr<CrispasrRealtimeSession> realtime;
     std::string text_sent;
@@ -299,6 +301,18 @@ struct rt_session {
     rt_session(socket_t fd, CrispasrBackend* b, std::mutex* m, whisper_params p)
         : client_fd(fd), backend(b), model_mutex(m), rp(std::move(p)), realtime(backend->create_realtime_session(rp)) {
         server_vad = rp.vad && !rp.vad_model.empty();
+        if (realtime && std::strcmp(backend->name(), "nemotron") == 0) {
+            if (const char* value = crispasr_env::get("CRISPASR_NEMOTRON_MAX_TURN_SECONDS")) {
+                char* end = nullptr;
+                const long seconds = std::strtol(value, &end, 10);
+                if (end != value && *end == '\0' && seconds >= 1 && seconds <= 300) {
+                    max_turn_seconds = (int)seconds;
+                    turn = core_realtime::TurnBuffer((size_t)16000 * max_turn_seconds);
+                } else {
+                    fprintf(stderr, "realtime: CRISPASR_NEMOTRON_MAX_TURN_SECONDS must be 1..300; using 30\n");
+                }
+            }
+        }
     }
 
     void send_simple_event(const char* type) {
@@ -522,7 +536,7 @@ static void rt_handle_connection(rt_session* sess) {
     created["turn_detection"] = sess->server_vad ? "server_vad" : "client_commit";
     created["server_vad"] = sess->server_vad;
     created["partial_transcription"] = sess->realtime != nullptr;
-    created["max_turn_seconds"] = 30;
+    created["max_turn_seconds"] = sess->max_turn_seconds;
     ws_send_text(sess->client_fd, created.dump());
 
     std::vector<uint8_t> payload;
@@ -536,7 +550,8 @@ static void rt_handle_connection(rt_session* sess) {
         if (opcode == 0x09) {
             if (payload.size() > 125)
                 break; // a Ping carries at most 125 bytes
-            ws_send_pong(sess->client_fd, payload);
+            if (!ws_send_pong(sess->client_fd, payload))
+                break;
             continue;
         }
 
