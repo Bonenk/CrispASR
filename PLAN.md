@@ -16,24 +16,45 @@ no MTP weights; connector is one 2048→4096 projection (8,388,608 parameters).
 Native projection and dimension validation `fb61d7167` preserve the 2B residual
 path; the diff harness now audits every decoder layer. No public API change.
 
-NOW: GH conversion/quantization `36963243412` produced private F16/Q8 pairs
-at `cstr/index-echo-9b-GGUF@d1cc752e82bb97842052f2a5cd335512da984f96`.
-Measured F16 pair 19,234,545,728 bytes (17.91 GiB), Q8 pair 10,230,452,352
-bytes (9.53 GiB); receipt with SHA256s under cold `conversion/` and model repo.
-32 blocks checked; no MTP tensors. Native build `36963598957` passed all seven
-unit suites (connector 21 assertions) and generated shared-library wiring.
-Feature now `931a67846`: documented placement-only HF loader, genuine released
-F32 GPU/offload reference capture, parameter/dtype/device audit, direct CUDA
-F16/Q8 stage/cache/decoded gates, parameterized 9B exact C ABI/file-pipeline
-validator. Kaggle `crispasr-index-echo-9b-parity` v1 submitted; actual hardware
-must support installed PyTorch and >=24 GiB aggregate VRAM, otherwise mark
-inconclusive without weight pulls or fishing for hardware. Full 2B F16/Q8
-stage/cache/C ABI/file-pipeline regression `36964545104` queued to protect the
-shared residual path. Independent references and native model parity pending.
-No model or registry publication before stage/magnitude/cache and complete
-decoded-output gates. All large local assets and receipts stay under
-`/mnt/storage/crispasr/issue485-9b/`; VPS does no 9B inference or large weight
-downloads. Source header audit is `source/header-audit.json`.
+NOW: conversion/quantization GH `36963243412` PASS, private F16/Q8 pairs at
+`cstr/index-echo-9b-GGUF@d1cc752e82bb97842052f2a5cd335512da984f96`.
+F16 pair 19,234,545,728 bytes (17.913 GiB), Q8 pair 10,230,452,352 bytes
+(9.528 GiB); SHA256s in cold `conversion/conversion-receipt.json`. 32 blocks
+checked, no MTP tensors. Build `36963598957` PASS (seven unit suites, connector
+21 assertions, real shared-library wiring), lint `36964988743` PASS 10/10.
+
+2B protected regression `36964545104` has all F16/Q8 stage/cache/direct C ABI
+gates PASS. Its strict single-precision full-file diagnostic fails known
+source precision/timing differences; offline comparison to the pinned complete
+F32 source cases proves all 10 whole-case exact texts and existing F16 5.1 ms /
+Q8 20.1 ms policy pass. Receipt `2b-regression-acceptance.json` preserves raw
+strict failures; no new 9B tolerance inferred.
+
+Kaggle `crispasr-index-echo-9b-parity` v1 runs old pinned loader `2b5a2d13d`,
+actual TWO Tesla T4 (SM75, 15 GiB each), preinstalled Torch 2.10.0+cu128.
+Independent JFK dump F32 parameters proven (all three modules), but REJECTED
+as acceptance oracle: malformed multilingual output, and saved cache replay
+agrees with its own generation only at the first token. This diagnostic is
+preserved at `index-echo-9b-f32/jfk_11s/ref.gguf` in canonical fixtures MODEL
+repo revision `e4384ee4d3847ed4f171e60ce7973a75d48806e3`; it must NOT become a
+9B manifest golden or be overwritten. First attempted full Q8 validation
+`36966337073` cancelled before misleading acceptance. Numerical-only Q8
+investigation `36969153128` against preserved rejected dump is separate from
+behavioral acceptance (always records validated=false).
+
+Feature `4a1420406` now supports original translate_window generation hooks,
+without an extra decoder prefill or retained/replayed pre-generation cache;
+historical 2B dump recipe unchanged. Fresh source controls on official released
+Torch 2.11.0/Transformers 5.6.0: BF16 CPU/disk `36968076996` and F32 CPU/disk
+`36968365575`, Chinese clip, original 2000-token limit, no diagnostic prefill.
+These distinguish capture/placement/precision from actual source behavior.
+Source oracle and native model parity still PENDING, no public model/registry
+publication or performance claim. No VPS inference / large downloads. Cold
+source headers, receipts, rejected-ref archive, live Kaggle stream and model
+card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs actually
+work via get_kernel_session_logs_stream(user_name/kernel_slug, no version_label);
+parent stream reveals hardware, child redirected reference logs available only
+at terminal. Do not replace/resubmit v1 before harvesting its terminal logs.
 
 ## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
