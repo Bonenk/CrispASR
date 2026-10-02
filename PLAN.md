@@ -160,10 +160,11 @@ GPU window only via explicit CRISPASR_NEMOTRON_STREAM_INCREMENTAL_FRONTEND.
 Do not describe CPU proof as GPU window proof. New GPU proof harnessb465bb1cd
 compares production default against frozen pre-PR b33138b057, complete33s
 speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
-server checks. Separate proof slug preserves rejected v1 evidence. Proof not launched yet:
-Kaggle maximum2GPU sessions reached; both are other agent Index-Echo jobs.
-Wait for their completion, never interrupt or bypass quota. Ready7cddcdeee.
-Final runtime CI36979186151 / lint36979189406 running; earlier20dd2bcaf
+server checks. Separate proof slug preserves rejected v1 evidence. GPU proof v1 successfully launched after the other agent roundtrip job
+completed and a slot freed: crispasr-nemotron-realtime-487-proof, uploaded
+scriptversion2 from7cddcdeee. Retains separate rejected-window slug/logs.
+No account switching, interruption of other jobs, or session-cap bypass.
+Final runtime CI36979186151 PASS13 / lint36979189406 PASS10; earlier20dd2bcaf
 CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
 
 
