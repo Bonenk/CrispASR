@@ -138,6 +138,8 @@ if a.limits:
             pcm = np.frombuffer(audio.readframes(audio.getnframes()), dtype='<i2').astype(np.float32) / 32768
         seconds = len(pcm) / 44100
         if limit:
+            log = (OUT / f'cli-limit-{limit}.log').read_text()
+            assert log.count('starting decoder loop (max_gen=32,') == 1, 'explicit cap repeated per sentence'
             assert 0 < seconds < .3, seconds
         else:
             assert seconds > 3, seconds
@@ -146,8 +148,10 @@ if a.limits:
             (OUT / 'cli-default.json').write_text(json.dumps({'phrase': PHRASES[1][2], 'audio_seconds': seconds, 'cli': True}))
             run([sys.executable, __file__, '--child', 'recognize', '--model', asr,
                  '--lib', lib, '--phrase', 'fox', '--threads', '4', '--audio-tag', 'cli-default'], 'cli-default-recognize')
-            # The fox phrase requires >512 decoder steps, exposing any accidental
-            # inheritance of the frontend's generic 512-token default.
-            assert seconds > 6, seconds
+            # Inspect the actual decoder capacity, independent of quantization
+            # or sampled speaking rate. Speech must still pass the ASR gate.
+            log = (OUT / 'cli-limit-0.log').read_text()
+            assert 'starting decoder loop (max_gen=3072,' in log, 'CLI inherited a generic token cap'
+            assert log.count('starting decoder loop (max_gen=3072,') == 1, 'Dia was sentence-split'
         (OUT / f'cli-limit-{limit}.json').write_text(json.dumps({'max_new_tokens': limit, 'audio_seconds': seconds}))
 print('DIA_FULL_SPEECH_PASS', flush=True)

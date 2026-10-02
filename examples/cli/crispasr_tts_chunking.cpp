@@ -156,6 +156,13 @@ std::vector<std::string> crispasr_tts_plan_chunks_for_backend(const std::string&
     if (backend_name.rfind("vibevoice", 0) == 0 || backend_name.rfind("qwen3-tts", 0) == 0 ||
         backend_name.rfind("tada", 0) == 0 || backend_name.rfind("dots-tts", 0) == 0)
         return {text};
+    // Dia generates a dialogue as one delayed-code sequence. Splitting a
+    // paragraph creates short prompts (often <100 bytes), loses speaker-turn
+    // context, and applies an explicit generation limit afresh to each sentence.
+    // Match the official generate(text) flow in both CLI and server requests.
+    if (backend_name == "dia" || backend_name.rfind("dia-", 0) == 0 || backend_name.rfind("dia_", 0) == 0)
+        return {text};
+
     // omnivoice defaults to single-shot too, but keep an escape hatch: on a
     // GPU without CUDA-graph reuse (Metal/CPU) single-shot's ~2.7× attention
     // (O(T²)) can cost more than the per-chunk warmup it saves. CRISPASR_OMNIVOICE_CHUNK=1

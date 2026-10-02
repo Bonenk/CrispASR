@@ -191,6 +191,18 @@ TEST_CASE("server TTS policy keeps dots-tts single-shot", "[unit][chunking]") {
     REQUIRE(out[0] == text);
 }
 
+TEST_CASE("server TTS policy preserves Dia dialogue context and one generation limit", "[unit][chunking]") {
+    const std::string text = "[S1] Hello there, how are you doing today? I hope you are having a wonderful time. "
+                             "[S2] Thank you! The weather outside is lovely and bright.";
+    for (const char* name : {"dia", "dia-tts", "dia-1.6b", "dia_tts"}) {
+        CAPTURE(name);
+        // A small generic chunk bound must not fragment the model's dialogue.
+        const auto chunks = crispasr_tts_plan_chunks_for_backend(text, name, 16);
+        REQUIRE(chunks.size() == 1);
+        REQUIRE(chunks.front() == text);
+    }
+}
+
 TEST_CASE("server TTS policy chunks sentence-safe backends", "[unit][chunking]") {
     auto out = crispasr_tts_plan_chunks_for_backend("First sentence. Second sentence.", "kokoro");
     REQUIRE(out.size() == 2);
