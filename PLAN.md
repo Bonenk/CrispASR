@@ -40,6 +40,10 @@ exceeds the old 10 MiB sanity budget: 11,211,244–11,296,245 bytes versus
 10,045,300–10,127,779 in baseline `36879830550`. Parent main has identical
 WASM compilation sources to that baseline. Audit the expected native decoder
 code growth, document it and verify all three export gates with GH CI.
+Follow-up branch commit `691ef6108` sets a measured 12 MiB WASM / 200 KiB JS
+budget; required ASR/proxy-TTS export gates remain. Workflow shell lint passes
+392 steps. Three-variant WASM proof `36960265387` is queued; source size audit
+is `/mnt/storage/crispasr/issue485/wasm-size-audit.json`.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
