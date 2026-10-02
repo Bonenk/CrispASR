@@ -6,7 +6,18 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-02 — browser ASR pthread integration
+
+Worktree `/mnt/volume1/cw-asr-threads`, branch `feat/cw-browser-threads`.
+Add callback-based ASR/model-open entry points on the existing proxied compute
+thread, preserving synchronous bindings. Validate thread readiness, startup,
+ASR decoded output and TTS roundtrip from CrisperWeaver's dedicated worker.
+Expose initial-memory/thread-pool build knobs and benchmark bounded heaps
+without changing upstream defaults before output and timing evidence.
+Hosted CI builds avoid the shared VPS memory/disk pressure. Physical WebGPU
+proof remains external; the local display adapter is virtual.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
