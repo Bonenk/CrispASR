@@ -4,6 +4,8 @@
 
 Worktree `/mnt/volume1/wt-488-489-glint`, branch `fix/qwen3-mimo-glint`. Read full issue, linked #218, PR description/diff/comments (none). Confirmed Qwen3 hotwords suppress language prefill. PR workflows require approval (zero jobs). Glint fails checkout using optional PAT. Next: prompt contract regressions, hosted native/ABI speech checks, generated capabilities, credential fallback, then main integration. Echo Q4 preparation run 37046153440 failed private HF storage quota after first quantization; no GPU acceptance.
 
+Checkpoint: branch `fix/qwen3-mimo-glint@217f260a1` includes author-preserving PR #489, Qwen3 shared prompt builder (ABI/CLI/streaming), MiMo native language/instruction defaults, and Glint built-in-token checkout plus explicit CI dispatch. Hosted speech/capability/unit proof run `37120210334`; Glint dry-run authentication/provenance proof `37120211560`. Both launched; results pending. No Windows/Vulkan speech proof claimed.
+
 ## Start here
 
 Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
