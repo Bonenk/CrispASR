@@ -11,9 +11,9 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — MioTTS integration and Index-Echo Q4 validation
+## CLAIMED 2026-10-03 — integrate MioTTS/Echo and Q4 tooling
 
-Worktree `/mnt/volume1/wt-index-echo-9b`, branch `fix/miotts-rate-echo-profile`,
+Integration worktree `/mnt/storage/crispasr/issue488-pr489-glint-20261003/worktree`, branch `integrate/miotts-echo-20261003`. Original feature worktree `/mnt/volume1/wt-index-echo-9b`, branch `fix/miotts-rate-echo-profile`,
 latest source `d10134a4f14740fc6f1a1cdf3ff5a7cba549c0a0`. Large artifacts and
 terminal logs live under `/mnt/storage/crispasr/miotts-echo-20261002/`.
 **These changes are tested on the feature branch but have not landed on main.**
