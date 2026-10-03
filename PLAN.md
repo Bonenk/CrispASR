@@ -1,17 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-10-03 — reconcile completed fixes and pending validation
-
-Worktree `/mnt/storage/crispasr/issue488-pr489-glint-20261003/worktree`, branch `docs/status-20261003`. Audit landed source and hosted results; update PLAN/HISTORY and a readable validation report to distinguish completed Qwen3/MiMo/Glint work from unlanded MioTTS/Echo and unvalidated Q4 candidates. Documentation only.
-
-## DONE 2026-10-03 — Qwen3 hotwords #488, MiMo PR #489, Glint sync authentication
-
-Worktree `/mnt/volume1/wt-488-489-glint`, branch `fix/qwen3-mimo-glint`. Read full issue, linked #218, PR description/diff/comments (none). Confirmed Qwen3 hotwords suppress language prefill. PR workflows require approval (zero jobs). Glint fails checkout using optional PAT. Next: prompt contract regressions, hosted native/ABI speech checks, generated capabilities, credential fallback, then main integration. Echo Q4 preparation run 37046153440 failed private HF storage quota after first quantization; no GPU acceptance.
-
-Checkpoint: branch `fix/qwen3-mimo-glint@217f260a1` includes author-preserving PR #489, Qwen3 shared prompt builder (ABI/CLI/streaming), MiMo native language/instruction defaults, and Glint built-in-token checkout plus explicit CI dispatch. Hosted speech/capability/unit proof run `37120210334`; Glint dry-run authentication/provenance proof `37120211560`. Both launched; results pending. No Windows/Vulkan speech proof claimed.
-
-Result: PR #489 merged as `1647d5f9c`, complete fixes and generated capability docs landed as `f9eb35f4d`. Actual hosted CPU run `37120330648` PASS: Qwen3 Q8_0 three Piper short clips off/on/clear plus CLI all exact; MiMo Q4_K English/Chinese/auto CLI/ABI byte-identical, no external Whisper LID; prompt units 17 assertions/3 cases, native MiMo units 12 assertions/6 cases. Glint dry-run `37120211560` PASS: default-token checkout, unchanged upstream `77738f3ed9b15f627196cc5bbd7f6406814ba2fb`, 48 MP3/AAC assertions/13 cases. Receipt `docs/asr-prompt-validation-2026-10-03.json`. Reporter Windows/Vulkan clips were unavailable; no physical GPU claim. Worktree and its private Git metadata moved to `/mnt/storage/crispasr/issue488-pr489-glint-20261003/`; old worktree path remains a symlink after `/mnt/volume1` filled. Follow-up PASS: normal main Glint run `37122115577` authenticated and confirmed upstream current; feature CI `37120332492` 13/13 and lint `37120333893` 10/10 passed at native source `6f27e8d36`. Final main documentation reruns can settle independently. Proof archive `archive/asr-prompt-glint-proof-20261003` preserves the immutable source/test pins.
-
 ## Start here
 
 Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
@@ -23,41 +11,61 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — MioTTS sample rate, then Index-Echo decoder optimization
+## CLAIMED 2026-10-02 — MioTTS integration and Index-Echo Q4 validation
 
-Worktree `/mnt/volume1/wt-index-echo-9b`, branch
-`fix/miotts-rate-echo-profile`. Fix model-derived MioTTS output rate across
-native runtime, CLI/server adapter and session ABI; prove metadata, WAV duration
-and speech readback through hosted CI. Then profile a gated Index-Echo decoder
-optimization against accepted source/cache/full-output controls, using hosted
-builds and real Kaggle GPUs where available. Preserve current defaults until
-both speed and output pass. Large artifacts live on `/mnt/storage`.
+Worktree `/mnt/volume1/wt-index-echo-9b`, branch `fix/miotts-rate-echo-profile`,
+latest source `d10134a4f14740fc6f1a1cdf3ff5a7cba549c0a0`. Large artifacts and
+terminal logs live under `/mnt/storage/crispasr/miotts-echo-20261002/`.
+**These changes are tested on the feature branch but have not landed on main.**
+Main still lacks the MioTTS sample-rate accessor and the Echo scheduler gate.
 
-MioTTS rate getter and voice-preset wiring committed at `5dfc7d3f8`; hosted x86 speech/metadata proof [37029976684](https://github.com/CrispStrobe/CrispASR/actions/runs/37029976684) dispatched (queued). Tests require both CLI WAV and session ASR readback; 24 kHz/missing-key metadata copies test dispatch only. Echo pipeline/graph-reuse experiment remains pending.
+Completed feature validation:
 
-Echo opt-in pipeline-disable experiment committed at `722f54ba4`; portable CUDA runtime build [37030248844](https://github.com/CrispStrobe/CrispASR/actions/runs/37030248844) dispatched (queued). Kaggle prior validation/profile sessions are COMPLETE; latest 30 sessions audited with no active jobs. Preparing canonical acceptance followed by same-runtime control/candidate AB/BA timing, three warm calls per clip, and actual graph-reuse counters. No speed claim or default flip yet.
+- MioTTS model-derived output rate, tokenizer companion download, resident voice
+  preset restoration, and session temperature/seed wiring pass hosted ARM
+  [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840)
+  and x86 [37036548868](https://github.com/CrispStrobe/CrispASR/actions/runs/37036548868).
+  CLI and session speech readbacks both have 0% WER; WAV output is 132300 samples,
+  3.000 seconds at 44100 Hz. Native tests pass 18 assertions/4 cases. The released
+  24000 Hz baseline is rejected; 24 kHz/missing-key fixtures test dispatch only.
+- Echo opt-in `CRISPASR_LLAMA_PIPELINE_DISABLE=1` passes F32-reference stage,
+  magnitude, cache, exact decoded-output, five-file CLI/ABI and three Piper
+  roundtrip checks on two physical T4 GPUs. Forty-eight timed AB/BA calls show
+  2.5–3.6% speed gain, with 1536 reused graphs per candidate process versus zero
+  for controls. This does not prove CUDA graph capture or performance on other
+  GPUs. Defaults remain unchanged. Feature receipts:
+  `docs/miotts-rate-validation-2026-10-02.json` and
+  `docs/index-echo-scheduler-ab-2026-10-02.json`.
+- Feature CI [37037038753](https://github.com/CrispStrobe/CrispASR/actions/runs/37037038753)
+  passes all 13 jobs; lint [37037042008](https://github.com/CrispStrobe/CrispASR/actions/runs/37037042008)
+  passes all 10 jobs. These are feature-source results, not main integration proof.
 
-Additional audit: MioTTS lacked tokenizer companion download and resident-server per-request preset dispatch; fixes and accurate preset-only docs are in progress. Local format-18, regenerated Go flags and LEARNINGS index checks PASS; secret scan 3 PASS / 1 expected skip, metadata-copy patch offsets verified. Feature CI [37031425578](https://github.com/CrispStrobe/CrispASR/actions/runs/37031425578) and lint [37031429892](https://github.com/CrispStrobe/CrispASR/actions/runs/37031429892) dispatched, still queued with the hosted proof jobs.
+Q4 is still unvalidated:
 
-MioTTS x86 proof `37029976684` is RUNNING; final resident-preset implementation/test `58cdf3679` queued for ARM speech proof [37031911762](https://github.com/CrispStrobe/CrispASR/actions/runs/37031911762). Portable Echo CUDA bundle `37030248844` is RUNNING. Runtime transfer and Kaggle launch wait for a successful, hashed bundle; no hardware or speed verdict yet.
+- Four decoder recipes are defined: plain Q4 baseline; F16 sensitive tensors with
+  Q8 attention/down and Q4 gate/up; all gate/up Q4 with down Q8; and only layers
+  4–27 gate/up Q4. All 177 original F32 tensors, including 24 recurrent
+  convolution matrices, must retain F32; acoustic tower/connector stay original.
+  Source pair: `cstr/index-echo-9b-GGUF@dffbadf0f173446fee0364a0807803d2b2fb6f49`.
+- Kaggle q4-guards v1 passed the F16 control on two T4s, then failed repository
+  creation with HTTP 403 before any candidate ran. Terminal logs and all 31
+  outputs are preserved. CPU preparation has been removed from the GPU wrapper.
+- Hosted CPU preparation [37044026371](https://github.com/CrispStrobe/CrispASR/actions/runs/37044026371)
+  was cancelled to correct F32 preservation guards. Corrected run
+  [37046153440](https://github.com/CrispStrobe/CrispASR/actions/runs/37046153440)
+  produced a 5.05 GB plain Q4 decoder but failed its HF commit with HTTP 400:
+  private repository storage quota reached. No prepared candidate has a successful
+  upload/pin or GPU acceptance. Private staging was a transfer choice, not a
+  runtime requirement; retrying the same quota-limited route will not fix it.
+- GPU-only q4-guards v2 is not pushed. Prepared candidate revisions/hashes remain
+  pending; its old preparation-run reference must also be updated before launch.
 
-First MioTTS x86 run `37029976684` built successfully and passed native tests (10 assertions), 44.1/24 kHz/missing-key dispatch and CLI 44.1 kHz WAV. It failed speech scoring because `<en-US>` was counted as words; actual session readback is 8/9 correct words (11.1% WER after established control-tag normalization). Kept the 20% threshold, fixed scorer in `4a4c2773b`, preserved full failed logs/audio and an explicitly incomplete correction receipt on cold storage. Cancelled queued superseded ARM `37032747524` and dispatched corrected ARM proof; CLI speech acceptance still pending.
-
-Corrected ARM speech/metadata/baseline/resident-adapter proof [37033129143](https://github.com/CrispStrobe/CrispASR/actions/runs/37033129143) is RUNNING at `4a4c2773b`. Small range reads of immutable public Q8_0/Q4_K/F16 GGUF headers confirm all store 44100 Hz, n_fft=392 and hop=98; no full model downloaded locally. Release ARM baseline archive digest verified and its library layout confirmed. Echo CUDA bundle build is still RUNNING; Kaggle launch awaits completion.
-
-ARM proof `37033129143` preserved: baseline rate guard rejected v0.8.41, all 18 native assertions including resident preset restoration PASS, metadata/WAV rates correct, but sampled session readback was 2/9 word errors and FAILED the unchanged 20% gate. Found and wired previously ignored session temperature/seed controls (native defaults preserved); CLI/server request controls and truthful capability declarations now supported. Corrected ARM rerun [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) queued; generated capability/feature tables will come from its actual CLI. Echo CUDA bundle [37030248844](https://github.com/CrispStrobe/CrispASR/actions/runs/37030248844) SUCCESS; downloading and hashing runtime to cold storage for private HF transfer, then GPU acceptance/A-B.
-
-MioTTS final ARM proof [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840) PASS at `8196ac2c2`: both CLI and session readbacks 0% WER, exactly 132300 samples / 3.000 s at 44100 Hz, 18 native assertions including resident preset switching/restoration, 24 kHz/missing-key metadata dispatch, and published v0.8.41 baseline guard rejected 24000 Hz. Generated capability/feature tables captured from actual CLI and ABI rebuilt. Echo CUDA bundle `722f54ba4` + SDK `2d890f161`, hash f1717702dfd35deb977974b49f3cad7696291a1dd072bfd9f8cad26a9d9282ab transferred to private HF revision 7242ecaa666572b6220184701f325f3d0bcd81dc. Kaggle scheduler A/B v1 pushed once, RUNNING after 0-active-session audit; output and speed verdict pending.
-
-Checkpoint: native ARM37034738840 and x8637036548868 MioTTS proof PASS; Echo scheduler Kaggle v1 PASS all stage/cache/magnitude, five-file and three Piper checks, 48 timed outputs, 2.5–3.6% speed gain in both orders. User now requests a usable Q4_K Echo recipe: audit existing crispasr-quantize sensitive-tensor rules, isolate losses against immutable F32 references, preserve critical tensors as required, and validate candidates on hosted hardware. Current F16/default artifacts stay unchanged until a quantized candidate passes. Same worktree/branch; large artifacts cold or hosted.
-
-Q4_K checkpoint: CUDA bundle37040196454 SUCCESS at 012188eed, including crispasr-quantize. Four predeclared mixed-Q4 candidates are on feature9efb8e6bd: plain decoder baseline; F16 token/GDN + Q8 attention/down; FFN gate/up Q4 + down Q8; and layers4–27 gate/up Q4 only. Acoustic tower/connector stay original F16. Strict canonical acceptance extended to local candidates without threshold/output/reference changes. Bundle transfer and sole-account session audit underway; no Q4 acceptance claim yet.
-
-Q4 experiment launch: private runtime revision51158bc93be3e4f2f65a3bde6296bd9a59712968, SHA2560a4f882975c802a4ff3a1932fcb3ecf838cac39c3ccecc181240e331d0432303; SDK1d01260a6/build012188eed and kernel e06a3460a version2026-10-02.1. Sole-account dateRun audit found0 active among30 recent kernels. Pushed q4-guards v1 once, hardware/F16 control/candidate verdicts pending. No default or public weight changes.
-
-Q4 v1 terminal logs/outputs preserved cold. F16 control PASS all checks; no quantizer/candidate ran because Kaggle token cannot create model repositories (403). Move CPU quantization/private uploads to GH37044026371 at6bc941a00 using existing INDEX_ECHO_HF_TOKEN and private staging repo. New runner proves staging write permission before build or model pull. GPU v2 will consume pinned prepared candidates only; no threshold/default/public-artifact changes. Local storage cleanup copied and hashed1.074GiB of >5h-unused artifacts, preserving15 old paths as symlinks; receipt cold.
-
-All13 CI jobs37037038753 and10 lint jobs37037042008 PASS on proven native MioTTS/Echo source. Reread kaggle_usage.md in full at user direction: CPU quantize/upload remains GH37044026371; GPU-only validator9ebb3a7e9 removes prior CPU CLI invocation and requires actual CUDA layer assignments in CLI/full-file/roundtrip logs. Kaggle v1 control PASS but auth/preparation abort retained, no candidate ran. New GPU kernelv2 is not pushed until prepared artifact pins and permission preflight are ready.
+Next: establish a feasible artifact transfer route; prepare and pin all candidates
+on hosted CPU; run GPU-only canonical stage/magnitude/cache and exact-output plus
+TTS→ASR acceptance without relaxing gates. Separately rebase the proven MioTTS/Echo
+feature onto current main, preserve the newly landed Qwen3/MiMo ABI changes,
+regenerate capabilities from the actual CLI, and pass integration checks before
+landing. No Q4 weight/default change or new release is justified by current proof.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
@@ -201,32 +209,14 @@ second is small and unbreaks the platform immediately.
 Found while reproducing #369, and NOT that issue's cause: the reporter is on
 Windows CPU/Vulkan and sees wrong-language output, not silence.
 
-## OPEN 2026-08-05 — miotts writes a 24 kHz WAV header for 44.1 kHz audio
+## OPEN 2026-08-05 — MioTTS sample-rate fix awaits main integration
 
-Reported from another session as "docs say 44.1 kHz, adapter says 24 kHz".
-**Verified, and it is not a docs typo — it is a shipping defect:**
-
-- `models/convert-miotts-to-gguf.py:269` writes `miotts.codec.sample_rate =
-  44100` (default, or parsed from the upstream config).
-- `src/miotts.cpp:262` reads it correctly: `get_u32("miotts.codec.sample_rate",
-  24000)` — so the runtime synthesises at whatever the GGUF says, i.e. 44.1 kHz.
-- `examples/cli/crispasr_backend_miotts.cpp:35` **hardcodes**
-  `tts_sample_rate() { return 24000; }`, and that is what stamps the WAV header.
-
-So 44.1 kHz samples get a 24 kHz header: the file plays ~1.84× too slow and
-about an octave low. README.md:161, README.md:296 and docs/tts.md:13 all say
-44.1 kHz, so the docs are right and the adapter is wrong.
-
-**The fix is not "change 24000 to 44100"** — the rate is per-model GGUF metadata,
-so hardcoding the other constant just moves the bug. Add a
-`miotts_get_sample_rate(ctx)` accessor (there is none: `grep sample_rate
-src/miotts.h` is empty), have the adapter return it, and keep 24000 only as the
-pre-init fallback. Then check the session C-ABI arm too — per the multi-surface
-rule it reimplements the backend inline and will have its own copy.
-
-⚠ NOT fixed here because it needs the model to verify end-to-end (502 MB, not on
-this box) and an audible before/after is the only acceptance test that matters
-for a rate bug. Everything above is from the source, not from listening.
+Main still stamps a 24000 Hz WAV header for the public 44100 Hz codec. The
+model-derived getter and CLI/server/session fixes have passed hosted ARM and
+x86 decoded speech checks on `fix/miotts-rate-echo-profile`; they are not yet
+shipped. See the active MioTTS/Index-Echo claim above for immutable source,
+proof runs, and the integration gate. The remaining task is integration, not
+another hardcoded rate or an unperformed model test.
 
 ## OPEN 2026-08-05 — carried out of the #316 round-2 work
 
