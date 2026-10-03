@@ -98,11 +98,25 @@
     "upstream_sha": "77738f3ed9b15f627196cc5bbd7f6406814ba2fb",
     "provenance_assertions": 48,
     "provenance_cases": 13,
-    "log_sha256": "20de65a6b33abd6b3a50beaee3c71bedaa6b908ab405499e3108a40399439088"
+    "log_sha256": "20de65a6b33abd6b3a50beaee3c71bedaa6b908ab405499e3108a40399439088",
+    "main_run_url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37122115577",
+    "main_run_passed": true,
+    "main_checkout_sha": "9fe672f127ef0ae50d6e520c8f48c88720ebf7de",
+    "main_log_sha256": "aaac05f2f1e17ae6775b4b64f35ed255b8e3fc88c5afc58ff863bbdfe4399fa4"
   },
   "limitations": [
     "Reporter six Windows/Vulkan recordings were unavailable; CPU synthetic short clips cover the ABI regression.",
     "MiMo numeric layers unchanged; this receipt covers prompt and decoded-output parity, not new stage cosine measurements.",
     "Glint dry run proves authentication, sync and provenance; no changed upstream files required a push or CI dispatch."
-  ]
+  ],
+  "ci": {
+    "run_url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37120332492",
+    "source_commit": "6f27e8d36b73401b1b46fa6c16eed4e0b08dcd6e",
+    "passed_jobs": 13
+  },
+  "lint": {
+    "run_url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37120333893",
+    "source_commit": "6f27e8d36b73401b1b46fa6c16eed4e0b08dcd6e",
+    "passed_jobs": 10
+  }
 }
