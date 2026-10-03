@@ -48,6 +48,27 @@ driver; no thresholds or expected outputs were changed. Its cancelled log is
 retained with the successful proof artifacts under
 `/mnt/storage/crispasr/miotts-echo-integration-20261003/`.
 
+## Validation on merged main
+
+The merged source `17dc2a81e70839b79ac8d905acaa375459e07435` also passes
+[main CI 37140082182](https://github.com/CrispStrobe/CrispASR/actions/runs/37140082182)
+(13 jobs), [main lint 37140082038](https://github.com/CrispStrobe/CrispASR/actions/runs/37140082038)
+(10 jobs), [selected regression 37140082052](https://github.com/CrispStrobe/CrispASR/actions/runs/37140082052)
+(11 jobs), all five WASM variants, all triggered language bindings, Docker smoke
+and Windows Piper live checks. The structured receipt records each workflow.
+
+Fresh [9B ARM CPU validation 37140082238](https://github.com/CrispStrobe/CrispASR/actions/runs/37140082238)
+passes 76 checks on each of three F32-reference clips, exact decoded output,
+five full-file cases, three Piper roundtrips and the pinned nightly driver.
+Minimum stage-row cosine is **0.999997**; maximum relative L2 is **0.1883%**.
+This validates the public F16 pair, not an experimental Q4 candidate.
+
+[Cppcheck 37140082070](https://github.com/CrispStrobe/CrispASR/actions/runs/37140082070)
+continues in the separate non-cancelling deep-analysis workflow; its snapshot
+is still running, so no completed cppcheck verdict is claimed. The cold Git
+repository now has its own 197 MiB object pack and passes connectivity checks,
+with no dependency on the original checkout's object database.
+
 ## Still pending
 
 Corrected Q4 CPU preparation [37046153440](https://github.com/CrispStrobe/CrispASR/actions/runs/37046153440)

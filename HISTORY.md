@@ -19,6 +19,15 @@ CI `37137392582` passes 13/13 including 1988 unit tests; lint `37137535938`
 passes 10/10. Go/Dart/Rust bindings and Windows Piper live checks also pass.
 Generated capabilities match between actual ARM and x86 CLIs.
 
+Merged-source follow-up: main CI `37140082182` 13/13, lint `37140082038`
+10/10, selected regression `37140082052` 11/11 and WASM 5/5 PASS. All triggered
+bindings, Docker and Windows Piper live checks pass. Fresh ARM 9B validation
+`37140082238` passes 76 checks per clip, exact full outputs and three Piper
+roundtrips; minimum cosine .999997 and maximum relative L2 .1883%. Cppcheck
+`37140082070` is still running in its non-cancelling workflow. Corrected the
+MioTTS architecture example to include the validated preset/CPU controls and
+matching tokenizer. Cold Git objects are self-contained and connectivity-checked.
+
 The opt-in scheduler retains its prior two-T4 2.5–3.6% A/B evidence and unchanged
 default. Q4 recipes/preparation/GPU-only tooling are integrated, but HF storage
 quota still prevents successful candidate upload/pins; no Q4 candidate is

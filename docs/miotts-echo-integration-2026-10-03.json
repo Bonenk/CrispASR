@@ -7402,5 +7402,536 @@
       "sha256": "5cb129a7875e901d2a60f6409ff963daa88927aefcb21823d89154c3d2e2946a",
       "bytes": 333
     }
+  },
+  "post_merge": {
+    "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+    "workflows": {
+      "37140082182": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082182",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "linux-x86_64",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-amr-fetch (clang++)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-asan-audio",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "windows",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "android",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-unit",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-backend-dl",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-amr-fetch (g++)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-opus-fetch",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-fuzz-smoke",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "macos",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-vulkan",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "ios",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082038": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082038",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "model-registry URLs resolve",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "CUDA runtime ships split from every package",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "core_cpu_backend header reachable everywhere",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "doc anchors resolve",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "kaggle_harness bundled-copy sync",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "chat ABI bound by every binding",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "README language metadata",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "clang-tidy (lint / types / security)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "version files agree with VERSION",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "clang-format (style)",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082070": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082070",
+        "status": "in_progress",
+        "conclusion": "",
+        "jobs": [
+          {
+            "name": "cppcheck (static analysis)",
+            "status": "in_progress",
+            "conclusion": ""
+          }
+        ]
+      },
+      "37140082052": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082052",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "select",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "smoke",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "unit-tests",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "preflight",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (moonshine-tiny)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (wav2vec2-xlsr-en)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (index-echo-2b)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (canary-1b-v2)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (qwen3-asr-0.6b)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (parakeet-tdt-0.6b-en)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "regression (kokoro-82m-en)",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082238": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082238",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "validate / run",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082041": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082041",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "build-wasm (default)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "build-wasm (proxy-to-pthread)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "build-wasm (proxy-to-pthread-lowheap)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "build-wasm (single-thread)",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "build-wasm (single-thread-lowheap)",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082077": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082077",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "ubuntu-22",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "cgo-ldflags-drift",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082024": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082024",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "ubuntu-22",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082045": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082045",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "ubuntu-22",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082120": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082120",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "ubuntu",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "windows",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082109": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082109",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "ubuntu-22",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082026": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082026",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "scope",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "cori-cli-and-server",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082042": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082042",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "smoke",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "hf-space-build",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140082018": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140082018",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "scan",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      },
+      "37140080795": {
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/37140080795",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "name": "build",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "report-build-status",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "name": "deploy",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    },
+    "echo_9b": {
+      "passed": true,
+      "provenance": {
+        "model_repo": "cstr/index-echo-9b-GGUF",
+        "model_revision": "dffbadf0f173446fee0364a0807803d2b2fb6f49",
+        "fixture_repo": "cstr/crispasr-regression-fixtures",
+        "fixture_revision": "cb678dfd4806778aa55c39fe7b7a710a54cdc153",
+        "stage_fixture_prefix": "index-echo-9b-f32-generation",
+        "pipeline_fixture_prefix": "index-echo-9b-f32-zh-context",
+        "pipeline_audio_path": "index-echo-9b/pipeline-zh-context/audio.wav",
+        "source_commit": "17dc2a81e70839b79ac8d905acaa375459e07435",
+        "ggml_commit": "2f5a80d258c46e6ac8eee95f1328c0f58376d7ee",
+        "threads": 4,
+        "cpu": "aarch64"
+      },
+      "results": {
+        "f16": [],
+        "nightly_regression": []
+      },
+      "stages": {
+        "f16-jfk-diff": {
+          "pass": 76,
+          "fail": 0,
+          "skip": 0,
+          "minimum_stage_row_cosine": 0.999997,
+          "maximum_relative_l2": 0.00188275,
+          "sha256": "7ff629e9d61f7c789dbaaa294aa9a62f7b5549848183fe2542c909c78ae3748e"
+        },
+        "f16-zh-diff": {
+          "pass": 76,
+          "fail": 0,
+          "skip": 0,
+          "minimum_stage_row_cosine": 0.999997,
+          "maximum_relative_l2": 0.00176224,
+          "sha256": "f0d7443bbf2e2f58ee9f18fb809272d7f021eb43393ab3f1546bbd89f13fa45d"
+        },
+        "f16-jfk-tail-diff": {
+          "pass": 76,
+          "fail": 0,
+          "skip": 0,
+          "minimum_stage_row_cosine": 0.999997,
+          "maximum_relative_l2": 0.00109103,
+          "sha256": "0759800a111e1f12f1e31c2d585f4d0f18da46e281faee8da0dadfeff275bff9"
+        }
+      },
+      "pipeline_failed": [],
+      "pipeline_case_count": 5,
+      "roundtrips": {
+        "model": "index-echo-9b-f16.gguf",
+        "gpu": false,
+        "cases": {
+          "fox": {
+            "expected": "The quick brown fox jumps over the lazy dog.",
+            "english": "The quick brown fox jumps over the lazy dog.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.52,
+                "text": "The quick brown fox jumps over the lazy dog.。\nThe quick brown fox jumps over the lazy dog."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
+            "seconds": 2.67025,
+            "elapsed_seconds": 57.97648190400014,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "cli_cuda_used": false,
+            "passed": true
+          },
+          "window": {
+            "expected": "Please close the window before you leave the room.",
+            "english": "Please close the window before you leave the room.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.4,
+                "text": "Please close the window before you leave the room.。\nPlease close the window before you leave the room."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
+            "seconds": 2.6006875,
+            "elapsed_seconds": 45.58692798400034,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "cli_cuda_used": false,
+            "passed": true
+          },
+          "station": {
+            "expected": "We will meet at the train station tomorrow morning.",
+            "english": "We will meet at the train station tomorrow morning.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.34,
+                "text": "We will meet at the train station tomorrow morning.\nWe will meet at the train station tomorrow morning."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a",
+            "seconds": 2.4729375,
+            "elapsed_seconds": 61.884112236999954,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "cli_cuda_used": false,
+            "passed": true
+          }
+        },
+        "failed": [],
+        "source_stage_parity_checked": false,
+        "roundtrip_passed": true
+      }
+    },
+    "deep_static_analysis": "Cppcheck 37140082070 is still running; no completed verdict claimed."
+  },
+  "cold_repository": {
+    "self_contained": true,
+    "objects_size_mib": 197,
+    "connectivity_check": "git fsck --no-reflogs --connectivity-only --no-dangling PASS; no alternates dependency"
   }
 }

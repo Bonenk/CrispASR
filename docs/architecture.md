@@ -1120,7 +1120,8 @@ iSTFT → model-derived rate: 44.1 kHz for v2, 24 kHz for legacy codecs). Single
 - Preset voices via 128-d global embedding (`--voice preset.emb.gguf`)
 - 0.6B/1.7B variants (Apache-2.0 license on Qwen3-based models)
 - Q8_0: 793 MB, Q4_K: 502 MB; tokenizer.json is a registry companion
-- `--backend miotts -m miotts-0.6b-q8_0.gguf --tts "Hello world"`
+- `--backend miotts -m miotts-0.6b-q4_k.gguf --no-gpu -t 4 --voice en_female.emb.gguf --temperature 0 --tts "The quick brown fox jumps over the lazy dog." --tts-output speech.wav`
+- Keep the matching `tokenizer.json` beside the model; preset embeddings are available in the same [model repository](https://huggingface.co/cstr/miotts-0.6b-GGUF). This is preset-conditioned synthesis; save session PCM using its reported output rate.
 
 ### moss-tts
 
