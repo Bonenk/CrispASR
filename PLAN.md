@@ -1,5 +1,9 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-10-03 — reconcile completed fixes and pending validation
+
+Worktree `/mnt/storage/crispasr/issue488-pr489-glint-20261003/worktree`, branch `docs/status-20261003`. Audit landed source and hosted results; update PLAN/HISTORY and a readable validation report to distinguish completed Qwen3/MiMo/Glint work from unlanded MioTTS/Echo and unvalidated Q4 candidates. Documentation only.
+
 ## DONE 2026-10-03 — Qwen3 hotwords #488, MiMo PR #489, Glint sync authentication
 
 Worktree `/mnt/volume1/wt-488-489-glint`, branch `fix/qwen3-mimo-glint`. Read full issue, linked #218, PR description/diff/comments (none). Confirmed Qwen3 hotwords suppress language prefill. PR workflows require approval (zero jobs). Glint fails checkout using optional PAT. Next: prompt contract regressions, hosted native/ABI speech checks, generated capabilities, credential fallback, then main integration. Echo Q4 preparation run 37046153440 failed private HF storage quota after first quantization; no GPU acceptance.
