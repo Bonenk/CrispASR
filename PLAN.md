@@ -20,8 +20,10 @@ Integration checkpoint: rebased source `1973ab6fb574047aacb62659198bb598110ef718
 is on `integrate/miotts-echo-source-20261003`, retaining current main's Qwen3,
 MiMo, and Glint fixes. Hosted CI `37137392582`, ARM MioTTS speech/rate
 `37137394514`, x86 prompt/capability speech `37137396334`, and Echo 2B
-stage/decoded/file/nightly regression `37137398069` are dispatched. Generated
-feature HTML will be refreshed from the integrated hosted CLI before landing.
+stage/decoded/file/nightly regression `37137398069` are dispatched. ARM MioTTS `37137394514` PASS: 18 assertions/4 cases, 44100 Hz/132300 samples,
+CLI/session readback 0% WER, released 24000 Hz baseline rejected. Generated
+feature HTML is refreshed from that actual integrated CLI. Lint `37137535938`
+and Go/Dart binding runs are in flight; remaining speech/Echo/CI gates pending.
 Original source is preserved as `archive/miotts-echo-q4-source-20261003`.
 
 **These changes are tested on the feature branch but have not landed on main.**
