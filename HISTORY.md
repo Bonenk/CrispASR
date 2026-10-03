@@ -6,13 +6,36 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-03 — MioTTS/Echo source integration and Q4 tooling
+
+Rebased the proven feature onto current main without changing native code,
+retaining Qwen3/MiMo/Glint fixes. Hosted ARM MioTTS `37137394514` passes 18
+assertions/4 cases and both 44.1 kHz/3.000-second speech readbacks at 0% WER.
+Combined prompt speech `37137396334` preserves all 12 Qwen3 recognitions and
+MiMo forced/auto English/Chinese CLI/ABI equality. Echo F32 validation
+`37138488949` passes all 68 checks on each of three clips, cached IDs 16/16,
+exact direct text/timestamps, five full-file cases and the pinned nightly driver.
+CI `37137392582` passes 13/13 including 1988 unit tests; lint `37137535938`
+passes 10/10. Go/Dart/Rust bindings and Windows Piper live checks also pass.
+Generated capabilities match between actual ARM and x86 CLIs.
+
+The opt-in scheduler retains its prior two-T4 2.5–3.6% A/B evidence and unchanged
+default. Q4 recipes/preparation/GPU-only tooling are integrated, but HF storage
+quota still prevents successful candidate upload/pins; no Q4 candidate is
+accepted or published. The cancelled wrong-oracle integration attempt remains
+cold; the corrected run changes reference selection, not thresholds. Original
+and integrated source pins remain on proof archive branches. Full results,
+source equivalence, logs/artifact hashes and remaining gates:
+[report](docs/miotts-echo-integration-2026-10-03.md) and
+[receipt](docs/miotts-echo-integration-2026-10-03.json). No release tag is cut.
+
 ## DONE 2026-10-03 — Qwen3 hotwords, MiMo language prompts, Glint authentication
 
 Qwen3 session hotwords now use the same system-turn context as CLI and streaming, preserving the forced-language assistant prefill and explicit questions (#488). MiMo PR #489 merged with author credit; native language-selected default instructions, independent `--ask`, automatic detection without external LID, and generated CLI/library capability tables complete the integration. Glint sync uses the built-in token instead of an optional stale PAT, explicitly dispatches CI after real sync pushes, and offers a tested dry run.
 
 Hosted proof: [speech/unit/capability run 37120330648](https://github.com/CrispStrobe/CrispASR/actions/runs/37120330648), [Glint provenance dry run 37120211560](https://github.com/CrispStrobe/CrispASR/actions/runs/37120211560). All three Qwen3 synthetic clips match the expected words off/on/cleared and CLI. MiMo Q4_K English and Chinese in forced and auto mode match CLI/ABI exactly. Prompt units 17 assertions/3 cases, MiMo units 12 assertions/6 cases, MP3/AAC provenance 48 assertions/13 cases pass. Immutable model/audio/source pins and transcripts: `docs/asr-prompt-validation-2026-10-03.json`. This is CPU prompt and decoded-output proof, not a new GPU/numeric-stage benchmark or reproduction of the reporter's unavailable recordings.
 
-Closure: normal main [Glint run 37122115577](https://github.com/CrispStrobe/CrispASR/actions/runs/37122115577) passes with built-in-token authentication and confirms upstream is current. The unchanged-source run does not exercise the conditional sync push/CI dispatch. Main [CI 37123144540](https://github.com/CrispStrobe/CrispASR/actions/runs/37123144540) passes at `6e451b51f2716dde27e59525605a7752a267b9b8`; [lint 37122745123](https://github.com/CrispStrobe/CrispASR/actions/runs/37122745123) passes at the preceding README-only follow-up `9fe672f127ef0ae50d6e520c8f48c88720ebf7de`. PR #489 is merged; issue #488 stays open for the reporter's Windows/Vulkan retest. The feature branch is deleted and source archive `archive/asr-prompt-glint-proof-20261003` retains the original proof pins. See [the readable validation report](docs/asr-prompt-validation-2026-10-03.md). Earlier MioTTS/Echo work remains on its separate feature branch; Echo Q4 has no accepted candidate.
+Closure: normal main [Glint run 37122115577](https://github.com/CrispStrobe/CrispASR/actions/runs/37122115577) passes with built-in-token authentication and confirms upstream is current. The unchanged-source run does not exercise the conditional sync push/CI dispatch. Main [CI 37123144540](https://github.com/CrispStrobe/CrispASR/actions/runs/37123144540) passes at `6e451b51f2716dde27e59525605a7752a267b9b8`; [lint 37122745123](https://github.com/CrispStrobe/CrispASR/actions/runs/37122745123) passes at the preceding README-only follow-up `9fe672f127ef0ae50d6e520c8f48c88720ebf7de`. PR #489 is merged; issue #488 stays open for the reporter's Windows/Vulkan retest. The feature branch is deleted and source archive `archive/asr-prompt-glint-proof-20261003` retains the original proof pins. See [the readable validation report](docs/asr-prompt-validation-2026-10-03.md). MioTTS/Echo integration is recorded separately below; Echo Q4 has no accepted candidate.
 
 ## RELEASED 2026-10-02 — v0.8.41
 

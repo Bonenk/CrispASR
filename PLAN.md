@@ -11,77 +11,40 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-03 — integrate MioTTS/Echo and Q4 tooling
+## OPEN 2026-10-03 — Index-Echo Q4 candidate preparation and GPU acceptance
 
-Integration worktree `/mnt/storage/crispasr/issue488-pr489-glint-20261003/worktree`, branch `integrate/miotts-echo-20261003`. Original feature worktree `/mnt/volume1/wt-index-echo-9b`, branch `fix/miotts-rate-echo-profile`,
-latest source `d10134a4f14740fc6f1a1cdf3ff5a7cba549c0a0`. Large artifacts and
-terminal logs live under `/mnt/storage/crispasr/miotts-echo-20261002/`.
-Integration checkpoint: rebased source `1973ab6fb574047aacb62659198bb598110ef718`
-is on `integrate/miotts-echo-source-20261003`, retaining current main's Qwen3,
-MiMo, and Glint fixes. Hosted CI `37137392582`, ARM MioTTS speech/rate
-`37137394514`, x86 prompt/capability speech `37137396334`, and Echo 2B
-stage/decoded/file/nightly regression `37138488949` are dispatched. ARM MioTTS `37137394514` PASS: 18 assertions/4 cases, 44100 Hz/132300 samples,
-CLI/session readback 0% WER, released 24000 Hz baseline rejected. Generated
-feature HTML is refreshed from that actual integrated CLI. Lint `37137535938`
-and Go binding runs are in flight; Dart and Rust PASS. Combined x86 prompt
-speech `37137396334` PASS: all Qwen3 off/on/clear/CLI transcripts and MiMo
-forced/auto English/Chinese CLI/ABI outputs remain exact. All 1988 unit tests
-PASS. Echo `37137398069` was cancelled after detecting the wrong original
-mixed-precision full-file oracle; corrected run `37138488949` uses the separate
-F32 references with the same strict thresholds and pinned nightly driver.
-Full terminal log retained cold; remaining Echo/CI/lint gates pending.
-Original source is preserved as `archive/miotts-echo-q4-source-20261003`.
+MioTTS and the opt-in Echo scheduler source are integrated; see
+[the integration report](docs/miotts-echo-integration-2026-10-03.md) and HISTORY.
+Q4 tooling is present, but no Q4 candidate has passed runtime acceptance.
+Large artifacts/logs stay under `/mnt/storage/crispasr/miotts-echo-20261002/`
+and `/mnt/storage/crispasr/miotts-echo-integration-20261003/`.
 
-**These changes are tested on the feature branch but have not landed on main.**
-Main still lacks the MioTTS sample-rate accessor and the Echo scheduler gate.
-
-Completed feature validation:
-
-- MioTTS model-derived output rate, tokenizer companion download, resident voice
-  preset restoration, and session temperature/seed wiring pass hosted ARM
-  [37034738840](https://github.com/CrispStrobe/CrispASR/actions/runs/37034738840)
-  and x86 [37036548868](https://github.com/CrispStrobe/CrispASR/actions/runs/37036548868).
-  CLI and session speech readbacks both have 0% WER; WAV output is 132300 samples,
-  3.000 seconds at 44100 Hz. Native tests pass 18 assertions/4 cases. The released
-  24000 Hz baseline is rejected; 24 kHz/missing-key fixtures test dispatch only.
-- Echo opt-in `CRISPASR_LLAMA_PIPELINE_DISABLE=1` passes F32-reference stage,
-  magnitude, cache, exact decoded-output, five-file CLI/ABI and three Piper
-  roundtrip checks on two physical T4 GPUs. Forty-eight timed AB/BA calls show
-  2.5–3.6% speed gain, with 1536 reused graphs per candidate process versus zero
-  for controls. This does not prove CUDA graph capture or performance on other
-  GPUs. Defaults remain unchanged. Feature receipts:
-  `docs/miotts-rate-validation-2026-10-02.json` and
-  `docs/index-echo-scheduler-ab-2026-10-02.json`.
-- Feature CI [37037038753](https://github.com/CrispStrobe/CrispASR/actions/runs/37037038753)
-  passes all 13 jobs; lint [37037042008](https://github.com/CrispStrobe/CrispASR/actions/runs/37037042008)
-  passes all 10 jobs. These are feature-source results, not main integration proof.
-
-Q4 is still unvalidated:
-
-- Four decoder recipes are defined: plain Q4 baseline; F16 sensitive tensors with
-  Q8 attention/down and Q4 gate/up; all gate/up Q4 with down Q8; and only layers
-  4–27 gate/up Q4. All 177 original F32 tensors, including 24 recurrent
-  convolution matrices, must retain F32; acoustic tower/connector stay original.
-  Source pair: `cstr/index-echo-9b-GGUF@dffbadf0f173446fee0364a0807803d2b2fb6f49`.
-- Kaggle q4-guards v1 passed the F16 control on two T4s, then failed repository
-  creation with HTTP 403 before any candidate ran. Terminal logs and all 31
-  outputs are preserved. CPU preparation has been removed from the GPU wrapper.
+- Four decoder recipes are defined in `tools/index_echo_quant_recipes.py`:
+  plain Q4 baseline; F16 sensitive tensors with Q8 attention/down and Q4 gate/up;
+  all gate/up Q4 with down Q8; and only layers 4–27 gate/up Q4. All 177 original
+  F32 tensors, including 24 recurrent convolution matrices, must retain F32;
+  the acoustic tower/connector remain original. Source pair:
+  `cstr/index-echo-9b-GGUF@dffbadf0f173446fee0364a0807803d2b2fb6f49`.
+- Kaggle q4-guards v1 passed the F16 control on two T4s, then repository creation
+  failed with HTTP 403 before any candidate ran. All 31 outputs and terminal
+  logs are retained. CPU preparation was removed from the GPU wrapper.
 - Hosted CPU preparation [37044026371](https://github.com/CrispStrobe/CrispASR/actions/runs/37044026371)
-  was cancelled to correct F32 preservation guards. Corrected run
+  was cancelled to correct F32 guards. Corrected
   [37046153440](https://github.com/CrispStrobe/CrispASR/actions/runs/37046153440)
-  produced a 5.05 GB plain Q4 decoder but failed its HF commit with HTTP 400:
-  private repository storage quota reached. No prepared candidate has a successful
-  upload/pin or GPU acceptance. Private staging was a transfer choice, not a
-  runtime requirement; retrying the same quota-limited route will not fix it.
-- GPU-only q4-guards v2 is not pushed. Prepared candidate revisions/hashes remain
-  pending; its old preparation-run reference must also be updated before launch.
+  produced a 5.05 GB plain Q4 decoder, but its HF upload commit failed with HTTP
+  400 (private repository storage quota). No candidate has successfully uploaded
+  artifact pins or GPU acceptance. Private staging is a transfer choice, not a
+  runtime requirement; do not retry the quota-limited route unchanged.
+- GPU-only q4-guards v2 has not been pushed. Preparation-run/revision/checksum
+  pins are deliberately unset; a successful producer/transfer is required.
 
-Next: establish a feasible artifact transfer route; prepare and pin all candidates
-on hosted CPU; run GPU-only canonical stage/magnitude/cache and exact-output plus
-TTS→ASR acceptance without relaxing gates. Separately rebase the proven MioTTS/Echo
-feature onto current main, preserve the newly landed Qwen3/MiMo ABI changes,
-regenerate capabilities from the actual CLI, and pass integration checks before
-landing. No Q4 weight/default change or new release is justified by current proof.
+Next: establish a feasible artifact transfer route; prepare/audit/pin all
+candidates on hosted CPU; then run GPU-only canonical stage/magnitude/cache,
+exact full decoded-output and TTS→ASR gates without relaxing thresholds.
+Public weights and defaults remain unchanged until a candidate passes.
+Original feature and integration proof source remain available as
+`archive/miotts-echo-q4-source-20261003` and
+`archive/miotts-echo-integration-proof-20261003`.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
@@ -224,15 +187,6 @@ second is small and unbreaks the platform immediately.
 
 Found while reproducing #369, and NOT that issue's cause: the reporter is on
 Windows CPU/Vulkan and sees wrong-language output, not silence.
-
-## OPEN 2026-08-05 — MioTTS sample-rate fix awaits main integration
-
-Main still stamps a 24000 Hz WAV header for the public 44100 Hz codec. The
-model-derived getter and CLI/server/session fixes have passed hosted ARM and
-x86 decoded speech checks on `fix/miotts-rate-echo-profile`; they are not yet
-shipped. See the active MioTTS/Index-Echo claim above for immutable source,
-proof runs, and the integration gate. The remaining task is integration, not
-another hardcoded rate or an unperformed model test.
 
 ## OPEN 2026-08-05 — carried out of the #316 round-2 work
 

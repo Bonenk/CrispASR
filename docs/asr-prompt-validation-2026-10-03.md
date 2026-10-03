@@ -1,8 +1,9 @@
 # ASR prompt fixes and validation — 2026-10-03
 
 Qwen3 hotwords, MiMo language prompts, and Glint authentication are integrated on
-main. The earlier MioTTS/Echo feature and Echo Q4 work still have delivery gates;
-they are not included in this completion claim. No new release/tag was cut.
+main. MioTTS/Echo source is also integrated; see the separate
+[MioTTS/Echo integration report](miotts-echo-integration-2026-10-03.md). Echo Q4
+model acceptance remains pending. No new release/tag was cut.
 
 ## Integrated fixes
 
@@ -37,12 +38,12 @@ six recordings were unavailable; Windows/Vulkan compile success does not prove
 speech behavior on that hardware. No new per-stage cosine or GPU performance
 claim follows from these prompt fixes.
 
-## Remaining work
+## Related work
 
 | Work | Proven so far | Remaining gate |
 |---|---|---|
-| MioTTS | Feature-branch ARM/x86 tests prove model-derived 44100 Hz WAV output, 3.000-second duration, preset restoration and CLI/session speech readbacks at 0% WER. | Rebase and integrate into main, preserving current ABI fixes; regenerate capabilities and pass integration checks. |
-| Echo scheduler | Feature-branch two-T4 stage/magnitude/cache/output and roundtrip acceptance; 48 AB/BA timed calls show 2.5–3.6% improvement with the opt-in pipeline-disable gate. | Main integration; no default flip or broader hardware claim. |
+| MioTTS | Feature-branch ARM/x86 tests prove model-derived 44100 Hz WAV output, 3.000-second duration, preset restoration and CLI/session speech readbacks at 0% WER. | Integrated with current ABI fixes and regenerated capabilities; see the integration report. |
+| Echo scheduler | Feature-branch two-T4 stage/magnitude/cache/output and roundtrip acceptance; 48 AB/BA timed calls show 2.5–3.6% improvement with the opt-in pipeline-disable gate. | Source integrated; no default flip or broader hardware claim. |
 | Echo Q4 | F16 GPU control passes. Corrected hosted CPU preparation produces a 5.05 GB plain Q4 decoder. Recipes preserve all original F32 tensors. | HF upload failed private-storage quota; no candidate has a successful artifact pin or GPU acceptance. Establish transfer, prepare/pin candidates, then run unchanged canonical and roundtrip gates. |
 
 The private HF repository was chosen for unvalidated staging; the runtime does
