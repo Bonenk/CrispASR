@@ -16,6 +16,14 @@ it goes stale for more than a day.
 Integration worktree `/mnt/storage/crispasr/issue488-pr489-glint-20261003/worktree`, branch `integrate/miotts-echo-20261003`. Original feature worktree `/mnt/volume1/wt-index-echo-9b`, branch `fix/miotts-rate-echo-profile`,
 latest source `d10134a4f14740fc6f1a1cdf3ff5a7cba549c0a0`. Large artifacts and
 terminal logs live under `/mnt/storage/crispasr/miotts-echo-20261002/`.
+Integration checkpoint: rebased source `1973ab6fb574047aacb62659198bb598110ef718`
+is on `integrate/miotts-echo-source-20261003`, retaining current main's Qwen3,
+MiMo, and Glint fixes. Hosted CI `37137392582`, ARM MioTTS speech/rate
+`37137394514`, x86 prompt/capability speech `37137396334`, and Echo 2B
+stage/decoded/file/nightly regression `37137398069` are dispatched. Generated
+feature HTML will be refreshed from the integrated hosted CLI before landing.
+Original source is preserved as `archive/miotts-echo-q4-source-20261003`.
+
 **These changes are tested on the feature branch but have not landed on main.**
 Main still lacks the MioTTS sample-rate accessor and the Echo scheduler gate.
 
