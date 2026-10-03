@@ -1,10 +1,12 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-10-03 — Qwen3 hotwords #488, MiMo PR #489, Glint sync authentication
+## DONE 2026-10-03 — Qwen3 hotwords #488, MiMo PR #489, Glint sync authentication
 
 Worktree `/mnt/volume1/wt-488-489-glint`, branch `fix/qwen3-mimo-glint`. Read full issue, linked #218, PR description/diff/comments (none). Confirmed Qwen3 hotwords suppress language prefill. PR workflows require approval (zero jobs). Glint fails checkout using optional PAT. Next: prompt contract regressions, hosted native/ABI speech checks, generated capabilities, credential fallback, then main integration. Echo Q4 preparation run 37046153440 failed private HF storage quota after first quantization; no GPU acceptance.
 
 Checkpoint: branch `fix/qwen3-mimo-glint@217f260a1` includes author-preserving PR #489, Qwen3 shared prompt builder (ABI/CLI/streaming), MiMo native language/instruction defaults, and Glint built-in-token checkout plus explicit CI dispatch. Hosted speech/capability/unit proof run `37120210334`; Glint dry-run authentication/provenance proof `37120211560`. Both launched; results pending. No Windows/Vulkan speech proof claimed.
+
+Result: PR #489 merged as `1647d5f9c`, complete fixes and generated capability docs landed as `f9eb35f4d`. Actual hosted CPU run `37120330648` PASS: Qwen3 Q8_0 three Piper short clips off/on/clear plus CLI all exact; MiMo Q4_K English/Chinese/auto CLI/ABI byte-identical, no external Whisper LID; prompt units 17 assertions/3 cases, native MiMo units 12 assertions/6 cases. Glint dry-run `37120211560` PASS: default-token checkout, unchanged upstream `77738f3ed9b15f627196cc5bbd7f6406814ba2fb`, 48 MP3/AAC assertions/13 cases. Receipt `docs/asr-prompt-validation-2026-10-03.json`. Reporter Windows/Vulkan clips were unavailable; no physical GPU claim. Worktree and its private Git metadata moved to `/mnt/storage/crispasr/issue488-pr489-glint-20261003/`; old worktree path remains a symlink after `/mnt/volume1` filled. Main CI and a normal main Glint rerun remain operational follow-up.
 
 ## Start here
 
