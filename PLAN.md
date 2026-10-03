@@ -20,10 +20,16 @@ Integration checkpoint: rebased source `1973ab6fb574047aacb62659198bb598110ef718
 is on `integrate/miotts-echo-source-20261003`, retaining current main's Qwen3,
 MiMo, and Glint fixes. Hosted CI `37137392582`, ARM MioTTS speech/rate
 `37137394514`, x86 prompt/capability speech `37137396334`, and Echo 2B
-stage/decoded/file/nightly regression `37137398069` are dispatched. ARM MioTTS `37137394514` PASS: 18 assertions/4 cases, 44100 Hz/132300 samples,
+stage/decoded/file/nightly regression `37138488949` are dispatched. ARM MioTTS `37137394514` PASS: 18 assertions/4 cases, 44100 Hz/132300 samples,
 CLI/session readback 0% WER, released 24000 Hz baseline rejected. Generated
 feature HTML is refreshed from that actual integrated CLI. Lint `37137535938`
-and Go/Dart binding runs are in flight; remaining speech/Echo/CI gates pending.
+and Go binding runs are in flight; Dart and Rust PASS. Combined x86 prompt
+speech `37137396334` PASS: all Qwen3 off/on/clear/CLI transcripts and MiMo
+forced/auto English/Chinese CLI/ABI outputs remain exact. All 1988 unit tests
+PASS. Echo `37137398069` was cancelled after detecting the wrong original
+mixed-precision full-file oracle; corrected run `37138488949` uses the separate
+F32 references with the same strict thresholds and pinned nightly driver.
+Full terminal log retained cold; remaining Echo/CI/lint gates pending.
 Original source is preserved as `archive/miotts-echo-q4-source-20261003`.
 
 **These changes are tested on the feature branch but have not landed on main.**
