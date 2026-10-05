@@ -114,8 +114,13 @@ jobs:
           esac
           kaggle kernels status "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" || true
           mkdir -p /tmp/kout
-          kaggle kernels output "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" -p /tmp/kout >/dev/null 2>&1 || true
-          ls -la /tmp/kout | head -40 || true
+          # Never hide the CLI's own output: a kernel that died early has no
+          # output files, and the reason is in what these two commands print.
+          mask() { sed "s/${KAGGLE_ACCOUNT}/<account>/g"; }
+          kaggle kernels output "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" -p /tmp/kout 2>&1 | mask | tail -20 || true
+          ls -laR /tmp/kout | mask | head -60 || true
+          echo "=== kaggle kernels logs (last 300 lines) ==="
+          kaggle kernels logs "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" 2>&1 | mask | tail -300 || true
           for f in /tmp/kout/*.log; do
             [ -f "$f" ] || continue
             echo "=== $f (last 400 lines, account name masked) ==="
