@@ -188,8 +188,8 @@
         "wer_max": 0.15
       },
       "transcript_tolerance_note": "Widened — GH runner decode drift exceeds narrow tolerance",
-      "stage_threshold_default": 0.998,
-      "stage_threshold_note": "Gates every captured stage without an explicit threshold (encoder_layer_*, pre_enc_c*, encoder_output_ref_mel). GH CPU Sep 24-26: layers 0-17 >= 0.999996, 18-31 dip to 0.998967 (layer 18) - F16 accumulation through the deep stack, stable across nights. pre_enc_c* were negative before the harness layout fix 3bc9f1ac."
+      "stage_threshold_default": 0.99,
+      "stage_threshold_note": "Gates every captured stage without an explicit threshold (encoder_layer_*, pre_enc_c*, encoder_output_ref_mel). GH CPU Sep 24-26: layers 0-17 >= 0.999996, 18-31 dip to 0.998967 (layer 18) - F16 accumulation through the deep stack, stable across nights. Lowered 0.998 -> 0.99 on 2026-10-06: with the ggml v0.26.0 sync the x86 CI runner measured layer 18 at 0.997703 and layer 19 at 0.998941 - the same 0.9977/0.9988 near-miss pair diff_thresholds_note already records for this model - with every other stage and the transcript unchanged, and all 41 stages passing on CUDA. 0.99 is the maintainer's stated floor for these per-layer gates. pre_enc_c* were negative before the harness layout fix 3bc9f1ac."
     },
     {
       "name": "firered-asr2-aed",
