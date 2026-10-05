@@ -746,6 +746,18 @@ def run_validate() -> list[dict]:
                 filename=entry["gguf"]["file"],
                 revision=entry["gguf"]["revision"],
             ))
+            # `gguf.companion_files` (moonshine's tokenizer.bin, index-echo's
+            # decoder GGUF, …) must sit next to the model. Same repo + revision
+            # lands them in the same snapshot directory. run_one.py has always
+            # fetched them; this script did not, so every backend with a
+            # companion died here with "failed to initialise backend" (exit 13)
+            # — which read as a backend regression and was a missing download.
+            for companion in entry["gguf"].get("companion_files", []):
+                hf_hub_download(
+                    repo_id=entry["gguf"]["repo"],
+                    filename=companion,
+                    revision=entry["gguf"]["revision"],
+                )
             # `skip_diff: true` entries are transcript-only and carry no
             # reference dump — 38 of 45 backends. Downloading a fixture for them
             # raised KeyError: 'fixture_ref_path' and failed the backend before it

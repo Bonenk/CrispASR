@@ -24,25 +24,16 @@ from pathlib import Path
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 # The ref under test. Edit and push once per bump.
-os.environ.setdefault("CRISPASR_REF", "live-translate")
+os.environ.setdefault("CRISPASR_REF", "ci/kaggle-log")
 os.environ.setdefault("CRISPASR_REGRESSION_MODE", "validate")
 os.environ.setdefault("CRISPASR_REGRESSION_BUILD", "cuda")
+# Second pass: only the backends the first pass (version 1, ten backends:
+# parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron passed) did not
+# settle. moonshine-tiny and index-echo-2b died for want of their companion
+# files (harness gap, fixed in the ref above); wav2vec2 flipped a word.
 os.environ.setdefault(
     "CRISPASR_REGRESSION_BACKENDS",
-    ",".join(
-        [
-            "parakeet-tdt-0.6b-en",
-            "canary-1b-v2",
-            "cohere-transcribe",
-            "nemotron-3.5-asr-streaming-0.6b",
-            "qwen3-asr-0.6b",
-            "voxtral-mini-3b-2507",
-            "index-echo-2b",
-            "moonshine-tiny",
-            "wav2vec2-xlsr-en",
-            "sensevoice-small",
-        ]
-    ),
+    ",".join(["moonshine-tiny", "index-echo-2b", "wav2vec2-xlsr-en"]),
 )
 
 subprocess.run(["nvidia-smi"], check=False)
@@ -58,4 +49,31 @@ subprocess.check_call(["git", "checkout", os.environ["CRISPASR_REF"]], cwd=str(R
 script = REPO / "tools" / "kaggle" / "crispasr-regression.py"
 print(f"exec {script} at ref {os.environ['CRISPASR_REF']}", flush=True)
 sys.argv[0] = str(script)
-exec(compile(script.read_text(), str(script), "exec"))
+suite_exit = 0
+try:
+    exec(compile(script.read_text(), str(script), "exec"))
+except SystemExit as e:  # keep going: the diagnostic below is the point
+    suite_exit = e.code or 0
+
+# wav2vec2 on the SAME binary, GPU vs CPU. If the CPU run prints the expected
+# sentence and the GPU run does not, the difference is GPU arithmetic on a
+# borderline CTC frame, not a wrong graph.
+try:
+    from huggingface_hub import hf_hub_download
+
+    w2v = hf_hub_download(
+        repo_id="cstr/wav2vec2-large-xlsr-53-english-GGUF",
+        filename="wav2vec2-xlsr-en-q4_k.gguf",
+        revision="3de5f69700e163286eaae85952fba9bf4ab761f6",
+    )
+    exe = "/kaggle/working/build/bin/crispasr"
+    wav = "/kaggle/working/CrispASR/samples/jfk.wav"
+    for label, extra in (("GPU", []), ("CPU (-ng)", ["-ng"])):
+        r = subprocess.run([exe, "-m", w2v, "-f", wav, "-np"] + extra, capture_output=True, text=True, timeout=600)
+        print(f"wav2vec2 {label}: rc={r.returncode} text={r.stdout.strip()!r}", flush=True)
+        if r.returncode != 0:
+            print(r.stderr[-1500:], flush=True)
+except Exception as e:  # diagnostic only
+    print(f"wav2vec2 diagnostic failed: {e!r}", flush=True)
+
+sys.exit(suite_exit)
