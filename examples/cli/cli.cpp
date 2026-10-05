@@ -808,8 +808,34 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.server_api_keys = ARGV_NEXT;
     } else if (arg == "--stream-step") {
         params.stream_step_ms = std::stoi(ARGV_NEXT);
+        params.stream_step_explicit = true;
     } else if (arg == "--stream-length") {
         params.stream_length_ms = std::stoi(ARGV_NEXT);
+        params.stream_length_explicit = true;
+    } else if (arg == "--stream-realtime") {
+        params.stream_realtime = true;
+    } else if (arg == "--stream-session") {
+        params.stream_session = true;
+    } else if (arg == "--live-translate") {
+        // Preset: microphone in, transcript + translation out. The stream
+        // defaults it implies are applied in crispasr_run.cpp.
+        params.live_translate = true;
+        params.mic = true;
+        params.stream = true;
+    } else if (arg == "--translate-model") {
+        params.translate_model = ARGV_NEXT;
+    } else if (arg == "--translate-backend") {
+        params.translate_backend = ARGV_NEXT;
+    } else if (arg == "--translate-prompt") {
+        params.translate_prompt = ARGV_NEXT;
+    } else if (arg == "--translate-beam") {
+        params.translate_beam = std::stoi(ARGV_NEXT);
+        if (params.translate_beam < 0) {
+            fprintf(stderr, "crispasr: --translate-beam must be >= 0\n");
+            exit(2);
+        }
+    } else if (arg == "--no-translate-drafts") {
+        params.translate_drafts = false;
     } else if (arg == "--stream-keep") {
         params.stream_keep_ms = std::stoi(ARGV_NEXT);
     } else if (arg == "--stream-json") {
@@ -1292,6 +1318,36 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.stream_continuous ? "true" : "false");
     fprintf(out, "  --monitor                         [%-7s] show unicode progress symbols during streaming\n",
             params.stream_monitor ? "true" : "false");
+    fprintf(out,
+            "  --live-translate                  [%-7s] live microphone transcription + sentence-by-sentence "
+            "translation (implies --mic --stream --vad; pair with -l SRC and --tr-tl TGT)\n",
+            params.live_translate ? "true" : "false");
+    fprintf(out,
+            "  --translate-model FNAME           [%-7s] text translator (m2m100 / madlad GGUF, or 'auto') run "
+            "behind a streaming recogniser; enables translation on --stream / --mic too\n",
+            params.translate_model.c_str());
+    fprintf(out,
+            "  --translate-backend NAME          [%-7s] translator: m2m100, madlad, or llm (a translation chat LLM "
+            "GGUF such as Hy-MT2); default: detect from the model\n",
+            params.translate_backend.c_str());
+    fprintf(out, "  --translate-prompt TEXT                     llm translator prompt: hy-mt2, index-translate, or a "
+                 "template with {src} {tgt} {text} (default: by model file name, else hy-mt2)\n");
+    fprintf(out,
+            "  --translate-beam N                [%-7d] translator beam size (1 = greedy, fastest); 0 = the "
+            "translator's default\n",
+            params.translate_beam);
+    fprintf(out,
+            "  --no-translate-drafts             [%-7s] translate committed sentences only, no draft of the open "
+            "one\n",
+            params.translate_drafts ? "false" : "true");
+    fprintf(out,
+            "  --stream-session                  [%-7s] live translation: drive the recogniser's incremental "
+            "session (nemotron, qwen3, vibevoice-streaming) instead of re-decoding each step\n",
+            params.stream_session ? "true" : "false");
+    fprintf(out,
+            "  --stream-realtime                 [%-7s] input is real time: read the whole backlog per step when "
+            "decoding falls behind (implied by --live-translate)\n",
+            params.stream_realtime ? "true" : "false");
     fprintf(out, "  --server                          [%-7s] run as HTTP server (persistent model, POST /inference)\n",
             params.server ? "true" : "false");
     fprintf(out, "  --host HOST                       [%-7s] server bind address\n", params.server_host.c_str());

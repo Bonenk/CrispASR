@@ -3,6 +3,8 @@
 CrispASR supports three streaming modes — pipe input, microphone
 capture, and continuous live mode — and per-token confidence output.
 All work with every supported backend.
+A fourth, [live transcription + translation](#live-transcription--translation---live-translate),
+adds a text translator behind the recogniser.
 
 `--backend vibevoice-streaming -m auto` uses the model's native streaming
 protocol: fixed 2.93-second chunks, 0.53-second lookahead, and one persistent
@@ -223,6 +225,195 @@ crispasr --live --monitor -m model.gguf
 `--live` runs indefinitely, emitting one transcript line per processed
 chunk. `--monitor` adds visual feedback so you can tell processing
 state at a glance.
+
+## Live transcription + translation (`--live-translate`)
+
+Listen, transcribe, and translate sentence by sentence — all local, two
+models: a streaming recogniser and a text translator behind it.
+
+```bash
+# German speech in, German + English text out:
+crispasr --live-translate -l de --tr-tl en \
+    -m auto --backend parakeet --translate-model auto
+
+# Same pipeline on a pipe instead of the microphone (a live feed, or a file
+# replayed in real time). --stream-realtime tells it the input is live:
+ffmpeg -re -i talk.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
+  | crispasr --stream --stream-realtime -l de --tr-tl en \
+      -m auto --backend parakeet --translate-model auto
+```
+
+On a terminal, finished sentence pairs scroll up and the sentence still being
+spoken is redrawn dimmed below them, with a draft translation:
+
+```
+de  Wir haben heute drei Punkte auf der Tagesordnung.
+en  Today we have three points on the agenda.
+de  Zuerst sprechen wir über die Ergebnisse des                    ← still open
+en  First we talk about the results of                             ← draft
+```
+
+When stdout is not a terminal you get one `[de] …` / `[en] …` pair per
+sentence. With `--stream-json` you get events instead (below).
+
+`-l` is the spoken language and is required. `--tr-tl` is the language to
+translate into (default: `en`, or `de` when the speech is English).
+`--translate-model` takes a translator GGUF or `auto` (m2m100-418M, 100
+languages, ~500 MB). The kind of translator is detected from the file
+(`--translate-backend m2m100|madlad|llm` overrides); see the table below.
+Passing `--translate-model` on a plain `--stream` / `--mic` run enables
+translation there too; `--live-translate` is the preset that also implies
+`--mic`, `--vad`, and `--stream-realtime`.
+
+### How it stays close to the speaker
+
+Translating only when an utterance ends (a `final`) waits for a pause — on a
+lecture that is tens of seconds. Translating every partial re-translates text
+that is still changing. This mode commits **sentences**:
+
+- A sentence is committed as soon as the recogniser has moved past it and two
+  consecutive partials agree on it, period included. That second condition
+  matters: recognisers put a period at the cut end of every partial
+  (`Ich gehe.` → `Ich gehe nach Hause.`), and it must not split the sentence.
+- A committed sentence is **final**. It is translated once and never revised —
+  not by later partials and not when the utterance closes.
+- The open remainder is re-translated as a dimmed draft
+  (`--no-translate-drafts` turns that off).
+- Translation runs on its own thread, so a slow translator delays the
+  translation line and never the recogniser.
+- Each step decodes only the audio that is not yet committed. With a
+  recogniser that has word timestamps (parakeet) the boundary is the end
+  time of the last committed word and decoding starts 0.3 s before it;
+  without them it is estimated from when each word first showed up, and
+  decoding starts ~1.5 s earlier so the end of the committed text is in view
+  to line up against. Either way a step no longer re-decodes the whole
+  utterance (median decoded per step on the test clip: 5.5 s estimated,
+  3.5 s with timestamps).
+- A pause half as long as `--stream-final-on-silence-ms` commits the open text
+  if it ends a sentence, instead of waiting for the next word or the final.
+- If the open sentence grows past ~9 s of audio, its stable part is committed
+  at a clause boundary so it stops being re-decoded. That piece is settled
+  *text*, not a translation unit: it is held and translated together with
+  the rest of its sentence (translated cold, "…auf den starken Export nach |
+  Frankreich und Italien zurückzuführen." came out as "…due to strong
+  exports." / "Caused by France and Italy.").
+- With `--stream-realtime`, a step that ran long reads the whole backlog at
+  once rather than working through it one `--stream-step` at a time. (The
+  Windows side — `PeekNamedPipe`, and virtual-terminal mode for the live
+  view — is written but has not been run on Windows.)
+
+### Incremental sessions (`--stream-session`)
+
+`--stream-session` hands the recogniser only each step's *new* audio through
+its own stateful session (`nemotron`, `qwen3`, `vibevoice-streaming`) instead
+of re-decoding the open speech. A turn ends when no new text has arrived for
+`--stream-final-on-silence-ms`. It works — but it is not the fast path it
+should be yet: nemotron's session cost ~4.5 s of compute per second of audio
+on Metal at load ~20 (30 s clip, display two minutes behind). Until that
+encoder is fast, re-decoding with parakeet is the better live recogniser.
+
+### Which models
+
+| Recogniser | Notes |
+|---|---|
+| `parakeet` (parakeet-tdt-0.6b-v3, 25 European languages) | **Use this.** Accurate, punctuated, stable partials. Not a streaming model — the open sentence is re-decoded each step — so on a laptop expect a second or two behind the speaker. |
+| `moonshine-de` (61 M, German only, CC-BY-NC-SA) | Several times cheaper per step, so it keeps up on a busy machine. Partials are less stable (punctuation flips, so commits come later), and it **stops at the first longer pause in a clip** and drops the rest. |
+| `nemotron` (39 languages, cache-aware) | The architecturally right answer: a true streaming model whose cost follows the new audio only. Too slow on Apple Silicon today — see the measurements below — and this mode does not drive its incremental session yet. |
+| `canary` | Can translate speech directly (`-tl en`), but one decode gives the transcript *or* the translation, not both. |
+
+| Translator | Per sentence (de→en) | Notes |
+|---|---|---|
+| `m2m100` (418M, the `auto` default) | 130–500 ms | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
+| **`llm`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 400–870 ms | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. Pass the GGUF to `--translate-model`; a file that is none of the built-in translators is run as a translation chat LLM. |
+| `madlad` (MADLAD-400 3B, q4_k 2 GB) | 0.75–2.8 s | Good translations, too slow to keep up sentence by sentence; also slows the recogniser (same GPU). |
+| `m2m100` with `wmt21-dense-24-wide-x-en` (4.7B, q4_k 2.7 GB) | 1–6.5 s, first two 13–15 s | Very good translations, not live: the display ran 20–35 s behind. |
+| **`llm`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | not measured on a quiet machine (1.7–4 s at load 57) | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."). Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |
+
+A translation LLM only works with the instruction it was trained on.
+`--translate-prompt hy-mt2` and `--translate-prompt index-translate` are built
+in (the second is chosen automatically for a file named like the model,
+otherwise the first); anything else is taken as a template —
+`--translate-prompt 'Translate from {src} to {tgt}:\n{text}'`. A reasoning
+model's `<think>` block is removed from the output.
+Drafts of the open sentence switch themselves off while committed sentences
+take more than ~500 ms to translate — a slow translator would still be busy
+with a draft when the next real sentence arrives.
+
+Measured 2026-10-05 on an M1 (16 GB, Metal), a 50 s German clip replayed in
+real time. **The machine was running unrelated heavy jobs throughout (load
+average 5–40); the best runs were at load ~5, nothing was measured on an idle
+machine:**
+
+- parakeet-v3 q4_k + m2m100, load ~5: all 11 sentences correct, the stream
+  kept real time (96 steps of 500 ms, median step cost 358 ms: ~260 ms
+  recogniser for ~5.5 s of open audio, ~110 ms VAD). A sentence's
+  translation appeared **450–900 ms (median 640 ms)** after the audio that
+  decided it; drafts ~555 ms. At load 10–20 the same run is 2–4 s behind and
+  long sentences get split at clause boundaries.
+- parakeet decode cost: ~32 ms per second of audio at load ~5 (q4_k and
+  q8_0 the same), ~60–200 ms under load.
+- moonshine-de q4_k: translation 0.5–1.7 s after the deciding audio, median
+  ~1.0 s (load 14–18). It transcribes up to the first longer pause of a clip
+  and drops what follows (15 s clip: the sentence after a 0.7 s pause is
+  missing; the same sentence alone transcribes fine), so it needs short
+  decode regions — try `--stream-final-on-silence-ms 400`.
+- nemotron q4_k: usable again on Metal after two fixes (the ggml fork had
+  lost the `_hp` matmul kernel, which aborted every non-streaming run; the
+  one-shot GPU stream cache resubmitted cached graphs and produced word
+  salad after ~4.5 s). Speed is still not there: a 50 s clip took 57–106 s in
+  streaming mode under load 7–19. Its `<de-DE>` language-tag tokens are now
+  stripped from text, word lists and the session stream.
+
+Other models people ask about (Hugging Face tags `speech-translation`,
+`streaming-translation`, `simultaneous-translation`, looked at 2026-10-05,
+none of these run here unless stated):
+
+- `sbintuitions/hikari-medium` — causal-Whisper simultaneous speech
+  translation, **English speech only** (→ ja/ru/de) plus English streaming
+  ASR. The right kind of model for English→German; needs a backend port.
+- `netease-youdao/Confucius4-T3PO` — append-only streaming text translation
+  with KV-cache reuse, the ideal protocol for this mode; Qwen2.5-14B, zh↔en,
+  smallest GGUF 10.5 GB.
+- `febilly/Hy-MT2-1.8B-StreamRevise(-v4)` — Hy-MT2 fine-tuned to revise its
+  own previous translation as the ASR hypothesis changes (no flicker);
+  trained on zh/en/ja only.
+- Index-Echo S2TT (`--backend index-echo`, already in this repo) — direct
+  speech→text translation; upstream documents Chinese speech with
+  English/Japanese/Spanish output.
+- `unswnlporg/tor-simt-llama-3-8b-*-de-en` (8B), Phi-4-multimodal, GigaChat
+  audio: too large for a laptop next to a recogniser.
+
+`CRISPASR_STREAM_TIMING=1` prints one line per step (audio taken in, VAD
+cost, decode cost, seconds decoded) — a step that costs more than the audio
+it took in is a stream falling behind. The closing
+`crispasr[translate]: …` line reports translate time, lag behind the audio,
+and how many partials were discarded because they did not line up with the
+committed text.
+
+### Events (`--stream-json`)
+
+The stream's own `partial` / `final` / `silence` events are still emitted,
+plus:
+
+| `type` | When | Fields |
+|---|---|---|
+| `sentence` | A sentence was committed. | `utterance_id`, `sentence_id`, `text`, `t` |
+| `translation` | Its translation is ready. | `utterance_id`, `sentence_id`, `text`, `translation`, `source_lang`, `target_lang`, `t`, `mt_ms`, `lag_ms` |
+| `translation_partial` | Draft translation of the open remainder. May change or never be followed up. | `utterance_id`, `text`, `translation`, `t`, `mt_ms`, `lag_ms` |
+
+`t` is the stream time of the step that decided the event; `lag_ms` is how
+long after that audio arrived the translation was ready. `sentence_id` counts
+up across the whole stream. Two things differ from plain `--stream-json`
+while translating: `partial.text` covers only the region still being decoded
+(not the whole utterance), and `final.text` is the utterance **as committed**
+— its sentences joined — rather than a fresh re-decode, so `--stream-final-mode`
+has no effect.
+
+Not done here: `--punc-model` is switched to `--stream-punc partial`
+automatically (sentences are found in partials); there is no speaker
+labelling on `sentence` events. The first Ctrl+C ends the stream cleanly
+(the sentence in progress is committed and translated); a second one kills
+the process.
 
 ## Per-token confidence
 
