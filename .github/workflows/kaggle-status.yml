@@ -114,13 +114,18 @@ jobs:
           esac
           kaggle kernels status "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" || true
           mkdir -p /tmp/kout
-          # Never hide the CLI's own output: a kernel that died early has no
-          # output files, and the reason is in what these two commands print.
+          # Logs FIRST, and never the whole output tree: a kernel's working
+          # directory holds the cloned repo, the build and the models, and an
+          # unfiltered 'kernels output' sat downloading until the job timed
+          # out. Never hide the CLI's own output either — a kernel that died
+          # early has no files, and the reason is in what these print.
           mask() { sed "s/${KAGGLE_ACCOUNT}/<account>/g"; }
-          kaggle kernels output "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" -p /tmp/kout 2>&1 | mask | tail -20 || true
-          ls -laR /tmp/kout | mask | head -60 || true
           echo "=== kaggle kernels logs (last 300 lines) ==="
-          kaggle kernels logs "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" 2>&1 | mask | tail -300 || true
+          timeout 180 kaggle kernels logs "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" 2>&1 | mask | tail -300 || true
+          echo "=== small output files ==="
+          timeout 180 kaggle kernels output "${KAGGLE_ACCOUNT}/${STATUS_KERNEL}" -p /tmp/kout \
+            --file-pattern '(progress\.jsonl|\.log|summary.*\.json)$' 2>&1 | mask | tail -20 || true
+          ls -laR /tmp/kout 2>/dev/null | mask | head -40 || true
           for f in /tmp/kout/*.log; do
             [ -f "$f" ] || continue
             echo "=== $f (last 400 lines, account name masked) ==="
