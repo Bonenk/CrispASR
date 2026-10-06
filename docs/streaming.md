@@ -380,15 +380,16 @@ m2m100 / Opus-MT on the GPU; measured in interleaved pairs at load 10–50:
 | Opus-MT q8_0, translator alone (warm, 4 pairs) | median 81–128 ms | 60–76 ms |
 | Opus-MT q8_0, in the live pipeline (3 pairs) | **median 38–69 ms** | 98–118 ms |
 | m2m100 q8_0, translator alone (4 pairs) | median 307–476 ms | 203–288 ms |
-| m2m100 q8_0, in the live pipeline (3 pairs) | median 195–251 ms, worst sentence up to 2.2 s | median 226–274 ms, worst ≤ 560 ms |
+| m2m100 q8_0, in the live pipeline (3 pairs) | median 195–251 ms, worst sentence 0.3–2.2 s | median 174–274 ms, worst sentence 0.5–0.7 s |
 
 Tokens were identical on both devices in every isolated run. Alone, the GPU
 wins because it is immune to the CPU contention on this machine. In the live
 pipeline the recogniser already owns the GPU, and each of a sentence's ~20
 single-token decoder steps queues behind it — for Opus-MT, whose step is
 ~4 ms of CPU work, that queueing costs more than the step. So Opus-MT stays
-on the CPU. m2m100 is a draw on the median and better on the tail; it stays
-on the CPU until that is repeated on a quiet machine.
+on the CPU. m2m100 is a draw on the median; the GPU had the shorter worst case in
+two of three pairs. It stays on the CPU until that is repeated on a quiet
+machine.
 
 Where an Opus-MT decoder step goes (`CRISPASR_M2M100_BENCH=1`, CPU): graph
 build 0.11 ms, allocation 0.15 ms, compute 3.5–4 ms, read-back 0.04 ms.
