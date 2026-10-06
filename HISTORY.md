@@ -21,7 +21,13 @@ technical deep-dives are in `LEARNINGS.md`.
   `cstr/opus-mt-en-de-GGUF` (f16 + q8_0, CC-BY-4.0); `--translate-backend
   marian` picks the model for the language pair. Parity against the
   reference at load ~4: f16 exact greedy and beam 4 (14/14, 8/8); q8_0 12/14
-  and 8/8 greedy; q4_k 8/14 and 3/8, not published.
+  and 8/8 greedy; q4_k 8/14 and 3/8, not published. Follow-up: beam search
+  in the m2m100/marian runtime now snapshots the decoder cache per beam
+  instead of replaying prefixes (same tokens; Opus-MT beam 4 median 792→431
+  and 1378→361 ms, m2m100 beam 5 20.6→11.8 s for five sentences incl. load);
+  relu (`tc-big-gmw-gmw`, 12/12) and multi-target (`en-ROMANCE`, 8/8)
+  checkpoints verified; keep-the-embedding quantisation measured and
+  rejected (`CRISPASR_MARIAN_KEEP`).
 - **Live translation**: the next commit candidate is translated ahead of time
   and reused at commit (10 of 11 sentences); the LLM translator no longer
   resets between sentences (the runtime keeps the shared instruction prefix);

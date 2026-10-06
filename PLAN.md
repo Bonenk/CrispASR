@@ -52,15 +52,18 @@ Open, in the order they would help:
 6. **hikari-medium port** (causal Whisper, English→German simultaneous S2TT).
 7. A StreamRevise-style draft (revise the previous translation instead of
    re-translating) for de/en; base Hy-MT2 is not trained for it.
-8. moonshine-de stops at the first longer pause of a clip. m2m100 beam search
-   has no KV cache. Windows paths are compiled by CI only, never run.
+8. moonshine-de stops at the first longer pause of a clip. Windows paths are
+   compiled by CI only, never run. No timing here was taken on an idle
+   machine (load 4-30 throughout).
 9. Opus-MT: only de↔en is hosted (`cstr/opus-mt-{de-en,en-de}-GGUF`, f16 +
    q8_0, CC-BY-4.0 per the OPUS-MT project's own statement). Other pairs
    need converting and a registry row. A multi-target checkpoint
    (`opus-mt-en-ROMANCE`, f16) matched the reference 8/8 greedy and beam 4,
-   and `-tl es` selects the target; the gelu/relu activation branches are
-   still unrun (every checkpoint tried is swish). Beam search has no KV cache (beam 4 ≈ 600-750 ms per
-   sentence against ~40 ms greedy).
+   and `-tl es` selects the target; a relu checkpoint
+   (`opus-mt-tc-big-gmw-gmw`, 437 MB f16, de↔en↔nl in one file) matched
+   12/12 greedy and beam 4. gelu is the one activation branch never run.
+   Quantisation: everything is quantised, measured — see the table in
+   `examples/crispasr-quantize/main.cpp` (`CRISPASR_MARIAN_KEEP`).
 
 ## OPEN 2026-10-03 — Index-Echo Q4 candidate preparation and GPU acceptance
 

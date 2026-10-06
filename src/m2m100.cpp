@@ -22,6 +22,7 @@
 //                                               (core/marian_tokenizer.h)
 
 #include "m2m100.h"
+#include "core/attention.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 m2m100 GPU path)
@@ -1535,7 +1536,14 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
     const int prompt_len = (int)dec_ids.size();
 
     if (ctx->beam_size > 1) {
-        // Beam search via replay-from-prefix.
+        // Beam search on per-beam snapshots of the self-attention cache: one
+        // single-token forward per beam per step, O(beam x T). The cross-
+        // attention K/V are shared by every beam and never snapshotted.
+        // (Replaying each beam's whole suffix per step, as this did before,
+        // is O(beam x T^2/2) forwards — and for a text-to-text model the
+        // decode IS the cost. CRISPASR_M2M100_BEAM_REPLAY=1 restores it.)
+        const char* env_replay = std::getenv("CRISPASR_M2M100_BEAM_REPLAY");
+        const bool beam_replay = env_replay && *env_replay && *env_replay != '0';
         auto replay = [](m2m100_context* c, const int32_t* toks, int n, int pl) -> float* {
             auto lg = run_decoder_step(c, (const int*)toks, n, pl);
             if (lg.empty())
@@ -1544,22 +1552,13 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
             std::memcpy(out, lg.data(), lg.size() * sizeof(float));
             return out;
         };
-        // core_beam_decode replays each beam's whole suffix every step, so the
-        // decoder work is O(beam × T²/2), not O(T). Its header assumes an audio
-        // encoder dominates wall time — true for the ASR callers, false here:
-        // this is text-to-text, and the cost IS the decode. Typical sentences
-        // are cheap (measured 1.53× at T=17 on the 418M), but a generation that
-        // runs to max_new_tokens is not, and a runaway is exactly what #439
-        // reported. Print the worst case rather than let it be discovered as a
-        // hang — a silent 100,000-forward decode looks identical to a crash.
-        if (ctx->beam_size > 1) {
+        if (beam_replay) {
             const long long worst =
                 (long long)ctx->beam_size * (long long)max_new_tokens * (long long)max_new_tokens / 2;
             if (worst > 20000) {
                 std::fprintf(stderr,
                              "%s: beam %d with up to %d tokens is worst-case ~%lld decoder forwards "
-                             "(beam search replays each beam's suffix per step). Cap with "
-                             "--translate-max-tokens, or use --beam-size 1 for greedy.\n",
+                             "(replay mode). Cap with --translate-max-tokens.\n",
                              tag, ctx->beam_size, max_new_tokens, worst);
             }
         }
@@ -1575,7 +1574,26 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
         // the forced target-language BOS: HF generates it, we prompt with it.
         // Marian has none.
         bcfg.length_offset = hp.marian ? 0 : 1;
-        auto br = core_beam_decode::run_with_probs(ctx, logits.data(), replay, bcfg);
+        core_beam_decode::Result br;
+        if (beam_replay) {
+            br = core_beam_decode::run_with_probs(ctx, logits.data(), replay, bcfg);
+        } else {
+            core_attn::kv_snapshot_pool kv_pool(ctx->kv_k, ctx->kv_v);
+            auto save_fn = [&kv_pool](m2m100_context*) -> core_attn::kv_snapshot* { return kv_pool.save(); };
+            auto restore_fn = [&kv_pool](m2m100_context*, core_attn::kv_snapshot* sn) { kv_pool.restore(sn); };
+            auto snap_free_fn = [&kv_pool](core_attn::kv_snapshot* sn) { kv_pool.release(sn); };
+            auto step_fn = [](m2m100_context* c, int32_t tok, int n_past) -> float* {
+                const int t = (int)tok;
+                auto lg = run_decoder_step(c, &t, 1, n_past);
+                if (lg.empty())
+                    return nullptr;
+                float* out = (float*)std::malloc(lg.size() * sizeof(float));
+                std::memcpy(out, lg.data(), lg.size() * sizeof(float));
+                return out;
+            };
+            br = core_beam_decode::run_with_probs_branched(ctx, logits.data(), save_fn, restore_fn, snap_free_fn,
+                                                           step_fn, bcfg);
+        }
         for (int32_t t : br.tokens) {
             if (t == hp.eos_token_id)
                 break;

@@ -720,6 +720,53 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                __func__);
     }
 
+    // Marian / Opus-MT: everything is quantized by default, and that is a
+    // measured choice. `shared.embed.weight` is the input embedding of the
+    // encoder AND the decoder AND the output projection (tied), scaled by
+    // sqrt(d_model) on the way in — the obvious suspect when a quant's greedy
+    // output stops matching f16. Holding it at source precision
+    // (CRISPASR_MARIAN_KEEP=embed) and counting sentences whose greedy output
+    // equals the reference implementation (opus-mt-de-en /14, en-de /8):
+    //
+    //             all quantized            embedding kept
+    //     q8_0    84 MB   12/14   8/8      111 MB   12/14   8/8
+    //     q6_k    66 MB   11/14   7/8      101 MB   12/14   8/8
+    //     q5_k    56 MB   10/14   5/8       95 MB    9/14   6/8
+    //     q4_k    47 MB    8/14   3/8       89 MB   10/14   4/8
+    //
+    // Nearly double the file for one or two sentences, and nothing at q8_0:
+    // the flips come from the 12 blocks, not the embedding (same finding as
+    // t5 above). And the "mismatches" are not damage — "departs" / "leaves",
+    // "reduce taxes" / "lower taxes", "on 3 October in Berlin" / "in Berlin on
+    // 3 October". Translation has near-tied continuations where recognition
+    // does not, so exact-match against f16 is the wrong bar for this family.
+    // CRISPASR_MARIAN_KEEP stays as the lever: "embed", or a comma list of
+    // name fragments to hold at source precision.
+    const bool is_marian = (arch == "marian");
+    std::vector<std::string> marian_keep;
+    if (is_marian) {
+        const char* e = std::getenv("CRISPASR_MARIAN_KEEP");
+        std::string spec = e && *e ? e : "none";
+        if (spec == "embed")
+            spec = "shared.embed";
+        if (spec != "none") {
+            size_t b = 0;
+            while (b <= spec.size()) {
+                const size_t c = spec.find(',', b);
+                const std::string item = spec.substr(b, c == std::string::npos ? std::string::npos : c - b);
+                if (!item.empty())
+                    marian_keep.push_back(item);
+                if (c == std::string::npos)
+                    break;
+                b = c + 1;
+            }
+        }
+        printf("%s: marian — keeping at source precision:", __func__);
+        for (const auto& k : marian_keep)
+            printf(" %s*", k.c_str());
+        printf("%s\n", marian_keep.empty() ? " (nothing)" : "");
+    }
+
     const bool is_parakeet = (arch == "parakeet");
     bool parakeet_is_rnnt = false;
     if (is_parakeet) {
@@ -987,6 +1034,8 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
               (sname.find("joint.") == 0 || sname.find("decoder.") == 0 || sname.find("head.ctc.") == 0 ||
                sname.find("encoder.pre.") == 0 || sname.find("preprocessor.") == 0)) &&
             !(t5_keep_embed && (sname.find("shared.embed") == 0 || sname.find("lm_head") == 0)) &&
+            !(is_marian && std::any_of(marian_keep.begin(), marian_keep.end(),
+                                       [&](const std::string& k) { return sname.find(k) != std::string::npos; })) &&
             !(is_tada && !tada_quant_all && (sname.find("talker.token_embd") == 0 || sname.find("tada.") == 0)) &&
             ([&]() {
                 if (!is_tada || tada_quant_all || (tada_keep_head == 0 && tada_keep_tail == 0))

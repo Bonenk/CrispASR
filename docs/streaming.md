@@ -351,7 +351,7 @@ the machine is yours and the lowest algorithmic latency matters.
 | Translator | Per sentence (de→en) | Notes |
 |---|---|---|
 | **`opus-mt-de-en` / `opus-mt-en-de`: Opus-MT** (`marian` backend; ~75M parameters, q8_0 84 MB, CC-BY-4.0; [`cstr/opus-mt-de-en-GGUF`](https://huggingface.co/cstr/opus-mt-de-en-GGUF), [`cstr/opus-mt-en-de-GGUF`](https://huggingface.co/cstr/opus-mt-en-de-GGUF)) | **23–118 ms, median ~45** (load 7–10; m2m100 in the same interleaved runs: 125–922 ms, median 315–650) | **Fastest by a wide margin, and better text than m2m100** ("new colleague", "furniture packers"). One model per language pair: `--translate-backend marian` picks it from `-l` / `--tr-tl`; other pairs need `models/convert-marian-to-gguf.py`. At f16 the output equals the reference implementation exactly, greedy and with beam 4 (14/14 de→en, 8/8 en→de); the q8_0 file that is downloaded by default matches on 12/14 and 8/8 (the rest differ in wording). |
-| `m2m100` (418M, the `auto` default) | 92–392 ms, median 210 | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
+| `m2m100` (418M, the `auto` default) | 92–392 ms, median 210 | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — beam search is cached since 2026-10 but still costs several greedy decodes. |
 | **`hy-mt2`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 370–910 ms, median 570 | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. `--translate-model hy-mt2`, or pass any GGUF: a file that is none of the built-in translators is run as a translation chat LLM. |
 | **`index-translate`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | 476–1100 ms, median 692 | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."), a little slower than Hy-MT2. Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |
 | `madlad` (MADLAD-400 3B, q4_k 2 GB) | 0.75–2.8 s (load ~6–8) | Good translations, too slow to keep up sentence by sentence; also slows the recogniser (same GPU). |
@@ -370,9 +370,25 @@ in (the second is chosen automatically for a file named like the model,
 otherwise the first); anything else is taken as a template —
 `--translate-prompt 'Translate from {src} to {tgt}:\n{text}'`. A reasoning
 model's `<think>` block is removed from the output.
-m2m100 and Opus-MT run on the CPU by design on Apple Silicon; the LLM
+m2m100 and Opus-MT run on the CPU by default on Apple Silicon; the LLM
 translators need the GPU (Hy-MT2 on CPU: ~8.5 s per sentence against ~0.6 s,
-`CRISPASR_TRANSLATE_CPU=1`, load 12–27).
+`CRISPASR_TRANSLATE_CPU=1`, load 12–27). Measured with `CRISPASR_M2M100_GPU=1`
+in the live pipeline (load 9–24, one run per arm, so indicative only):
+Opus-MT is slower on the GPU (median 112 ms against 61 ms; the model is too
+small to pay for the dispatch) and one of 11 sentences changed wording;
+m2m100 gave identical text on both and was not slower on the GPU (median
+245 ms against 453 ms, but the CPU arm ran at the higher load).
+
+**Quantisation of Opus-MT.** q8_0 differs from f16 on 2 of 14 German
+sentences and q4_k on 6 of 14, which looks alarming next to the recognisers
+and is not: the differences are "departs" / "leaves", "reduce taxes" /
+"lower taxes", "on 3 October in Berlin" / "in Berlin on 3 October".
+Translation has many near-tied continuations, so a small logit change picks
+another valid sentence where a recogniser would still pick the same word.
+Keeping the shared embedding (also the output projection) at full precision
+was measured and does not pay: q8_0 unchanged at 12/14 for 111 MB instead of
+84 MB, q4_k 10/14 instead of 8/14 for 89 MB instead of 47 MB. q8_0 is what
+ships.
 Drafts of the open sentence switch themselves off while committed sentences
 take more than ~500 ms to translate — a slow translator would still be busy
 with a draft when the next real sentence arrives.
