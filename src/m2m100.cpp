@@ -66,6 +66,16 @@ static bool m2m100_bench_enabled() {
     return v != 0;
 }
 
+// Per-step split of the decoder, accumulated over one translate call.
+struct m2m100_step_bench {
+    double build_ms = 0, alloc_ms = 0, compute_ms = 0, read_ms = 0;
+    int steps = 0;
+};
+static m2m100_step_bench g_m2m100_step_bench;
+static double m2m100_now_ms() {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 struct m2m100_bench_stage {
     const char* name;
     std::chrono::steady_clock::time_point t0;
@@ -1225,12 +1235,16 @@ static std::vector<float> run_decoder_step(m2m100_context* c, const int* tokens,
     const int vocab = hp.vocab_size;
     const int Lk = offset + n_tokens;
 
+    const bool bench = m2m100_bench_enabled();
+    double tb0 = bench ? m2m100_now_ms() : 0;
     ggml_cgraph* gf = build_decoder_graph(c, n_tokens, offset);
+    double tb1 = bench ? m2m100_now_ms() : 0;
     ggml_backend_sched_reset(c->sched);
     if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
         fprintf(stderr, "m2m100: failed to alloc decoder graph\n");
         return {};
     }
+    double tb2 = bench ? m2m100_now_ms() : 0;
 
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "dec_tokens"), tokens, 0, n_tokens * sizeof(int32_t));
 
@@ -1257,10 +1271,19 @@ static std::vector<float> run_decoder_step(m2m100_context* c, const int* tokens,
         fprintf(stderr, "m2m100: decoder compute failed\n");
         return {};
     }
+    double tb3 = bench ? m2m100_now_ms() : 0;
 
     ggml_tensor* logits = ggml_graph_get_tensor(gf, "logits");
     std::vector<float> out(vocab);
     ggml_backend_tensor_get(logits, out.data(), 0, vocab * sizeof(float));
+    if (bench) {
+        auto& b = g_m2m100_step_bench;
+        b.build_ms += tb1 - tb0;
+        b.alloc_ms += tb2 - tb1;
+        b.compute_ms += tb3 - tb2;
+        b.read_ms += m2m100_now_ms() - tb3;
+        b.steps++;
+    }
     // generation_config bad_words_ids: never generated, in greedy and in beam
     // (Marian: <pad>, which is also the decoder start token).
     for (int id : hp.suppress_ids)
@@ -1634,6 +1657,17 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
                 return nullptr;
             offset++;
         }
+    }
+
+    if (m2m100_bench_enabled()) {
+        auto& b = g_m2m100_step_bench;
+        std::fprintf(stderr,
+                     "  m2m100_bench: decoder steps %d: build %.2f  alloc %.2f  compute %.2f  read %.2f ms "
+                     "(per step %.2f / %.2f / %.2f / %.2f)\n",
+                     b.steps, b.build_ms, b.alloc_ms, b.compute_ms, b.read_ms, b.build_ms / std::max(1, b.steps),
+                     b.alloc_ms / std::max(1, b.steps), b.compute_ms / std::max(1, b.steps),
+                     b.read_ms / std::max(1, b.steps));
+        b = m2m100_step_bench();
     }
 
     // 6. Detokenize

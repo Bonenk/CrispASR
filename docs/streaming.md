@@ -372,12 +372,28 @@ otherwise the first); anything else is taken as a template —
 model's `<think>` block is removed from the output.
 m2m100 and Opus-MT run on the CPU by default on Apple Silicon; the LLM
 translators need the GPU (Hy-MT2 on CPU: ~8.5 s per sentence against ~0.6 s,
-`CRISPASR_TRANSLATE_CPU=1`, load 12–27). Measured with `CRISPASR_M2M100_GPU=1`
-in the live pipeline (load 9–24, one run per arm, so indicative only):
-Opus-MT is slower on the GPU (median 112 ms against 61 ms; the model is too
-small to pay for the dispatch) and one of 11 sentences changed wording;
-m2m100 gave identical text on both and was not slower on the GPU (median
-245 ms against 453 ms, but the CPU arm ran at the higher load).
+`CRISPASR_TRANSLATE_CPU=1`, load 12–27). `CRISPASR_M2M100_GPU=1` puts
+m2m100 / Opus-MT on the GPU; measured in interleaved pairs at load 10–50:
+
+| | CPU | GPU |
+|---|---|---|
+| Opus-MT q8_0, translator alone (warm, 4 pairs) | median 81–128 ms | 60–76 ms |
+| Opus-MT q8_0, in the live pipeline (3 pairs) | **median 38–69 ms** | 98–118 ms |
+| m2m100 q8_0, translator alone (4 pairs) | median 307–476 ms | 203–288 ms |
+| m2m100 q8_0, in the live pipeline (3 pairs) | median 195–251 ms, worst sentence up to 2.2 s | median 226–274 ms, worst ≤ 560 ms |
+
+Tokens were identical on both devices in every isolated run. Alone, the GPU
+wins because it is immune to the CPU contention on this machine. In the live
+pipeline the recogniser already owns the GPU, and each of a sentence's ~20
+single-token decoder steps queues behind it — for Opus-MT, whose step is
+~4 ms of CPU work, that queueing costs more than the step. So Opus-MT stays
+on the CPU. m2m100 is a draw on the median and better on the tail; it stays
+on the CPU until that is repeated on a quiet machine.
+
+Where an Opus-MT decoder step goes (`CRISPASR_M2M100_BENCH=1`, CPU): graph
+build 0.11 ms, allocation 0.15 ms, compute 3.5–4 ms, read-back 0.04 ms.
+The graph is rebuilt per token, but that is ~7% of the step; more than half
+of the compute is the output projection over the 58k-word vocabulary.
 
 **Quantisation of Opus-MT.** q8_0 differs from f16 on 2 of 14 German
 sentences and q4_k on 6 of 14, which looks alarming next to the recognisers
