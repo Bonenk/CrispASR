@@ -13,7 +13,7 @@ it goes stale for more than a day.
 
 ## OPEN 2026-10-05 — live transcribe + translate (`--live-translate`)
 
-On branch `live-translate` (PR open, not merged): `examples/cli/crispasr_live_translate.h`
+Merged to `main` 2026-10-06 (#493, `20a48962`): `examples/cli/crispasr_live_translate.h`
 (sentence-commit policy, pure), `crispasr_live_translate_sink.h` (translator
 thread + TTY/plain/JSON output), wiring in `crispasr_run.cpp`, flags in
 `cli.cpp`, `tests/test-live-translate.cpp` (16 cases), `docs/streaming.md`.
@@ -21,16 +21,15 @@ Verified end to end de→en and en→de with parakeet-v3 + m2m100 on a real-time
 pipe and on the microphone. Numbers and model verdicts are in
 `docs/streaming.md` — all taken on a box at load 6–40, so upper bounds only.
 
-Same branch, separate commits:
+Same merge, separate commits:
 
 - **ggml fork merged with upstream master (v0.26.0, `ffa4e8b8`).** Local
   branch `sync/upstream-2026-10` in the submodule: `56e86a68` restores the
   Metal `_hp` matmul kernel the kernels/ split had dropped (every
   `GGML_PREC_F32` mul_mat with an F32 right-hand side aborted on non-tensor
   Apple GPUs), `c36dab89` is the merge. 8 conflict files; the carried-patch
-  manifest went 29 → 46 guards, none removed. Pushed to the fork as
-  CrispStrobe/ggml#5 (base `crispstrobe-ops`, not merged); the pin here
-  points at `c36dab89` on that branch. Verified on Metal/CPU only
+  manifest went 29 → 46 guards, none removed. Merged into the fork's `crispstrobe-ops` as
+  CrispStrobe/ggml#5; the pin here is `c36dab89`. Verified on Metal/CPU only
   (parakeet, nemotron, m2m100 transcripts; `test-backend-ops -b MTL0` 2071/2071
   on five ops). ⚠ CUDA, Vulkan (C++ and GLSL), WebGPU, SYCL were resolved by
   reading and never compiled — the Vulkan flash-attention `nbm1` stride next
@@ -61,13 +60,13 @@ Open, in the order they would help:
    template path ignores `enable_thinking`, so an empty `<think>` block is
    generated and stripped; `test-chat-ggml.cpp:342` fails with Hy-MT2
    (assumes a gemma-style template; not checked against a baseline build).
-4. The ggml bump is verified as far as it can be without merging: PR CI
+4. The ggml bump was verified before merging: PR CI
    green (80 checks; CrispStrobe/ggml#5 green incl. Vulkan and the CUDA
    compile), and on a Kaggle GPU with CUDA seven backends pass outright
    (parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron,
    moonshine-tiny) and index-echo-2b passes all 67 stages. wav2vec2 prints
    "…what ou can do…" there — identically on `main`, so not the bump.
-   Merge order: ggml#5 first, then this branch. Left in the Kaggle suite:
+   Left in the Kaggle suite:
    no `transcript_format: srt` (index-echo's transcript compare cannot
    pass), voxtral-mini-3b's pinned revision 404s, and wav2vec2's word flip
    on that hardware. canary's per-layer gate is 0.99 since this bump (x86
