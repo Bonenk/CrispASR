@@ -23,17 +23,38 @@ from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 
-# The ref under test. Edit and push once per bump.
-os.environ.setdefault("CRISPASR_REF", "ci/kaggle-log")
+# The ref under test and the backends to run. Edit, push ONCE, read the log
+# (kaggle-status.yml: trigger_run + kernel_dir to push, status_kernel to read).
+#
+# Record of the v0.26.0 sync (2026-10-05/06, three pushes):
+#   pass 1, bumped ref, ten backends — parakeet, canary, cohere, sensevoice,
+#     qwen3-asr, nemotron PASS (byte-equal transcripts, all stages).
+#   pass 2, bumped ref — moonshine-tiny PASS once the suite fetched its
+#     companion file; index-echo-2b passes all 67 stages and fails only the
+#     transcript compare, because this suite does not implement
+#     `transcript_format: srt` (run_one.py does); wav2vec2 prints
+#     "…for you ask what ou can do…", on GPU and with -ng alike.
+#   pass 3, `main`, wav2vec2 only — the SAME sentence. So that one predates
+#     the bump: it is this hardware/build, not the merge.
+#   voxtral-mini-3b never ran: its pinned GGUF revision 404s.
+os.environ.setdefault("CRISPASR_REF", "main")
 os.environ.setdefault("CRISPASR_REGRESSION_MODE", "validate")
 os.environ.setdefault("CRISPASR_REGRESSION_BUILD", "cuda")
-# Second pass: only the backends the first pass (version 1, ten backends:
-# parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron passed) did not
-# settle. moonshine-tiny and index-echo-2b died for want of their companion
-# files (harness gap, fixed in the ref above); wav2vec2 flipped a word.
 os.environ.setdefault(
     "CRISPASR_REGRESSION_BACKENDS",
-    ",".join(["moonshine-tiny", "index-echo-2b", "wav2vec2-xlsr-en"]),
+    ",".join(
+        [
+            "parakeet-tdt-0.6b-en",
+            "canary-1b-v2",
+            "cohere-transcribe",
+            "nemotron-3.5-asr-streaming-0.6b",
+            "qwen3-asr-0.6b",
+            "index-echo-2b",
+            "moonshine-tiny",
+            "wav2vec2-xlsr-en",
+            "sensevoice-small",
+        ]
+    ),
 )
 
 subprocess.run(["nvidia-smi"], check=False)

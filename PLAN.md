@@ -61,8 +61,17 @@ Open, in the order they would help:
    template path ignores `enable_thinking`, so an empty `<think>` block is
    generated and stripped; `test-chat-ggml.cpp:342` fails with Hy-MT2
    (assumes a gemma-style template; not checked against a baseline build).
-4. Read CI for the ggml bump (CUDA/Vulkan were never compiled locally), then
-   merge CrispStrobe/ggml#5 and this branch.
+4. The ggml bump is verified as far as it can be without merging: PR CI
+   green (80 checks; CrispStrobe/ggml#5 green incl. Vulkan and the CUDA
+   compile), and on a Kaggle GPU with CUDA seven backends pass outright
+   (parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron,
+   moonshine-tiny) and index-echo-2b passes all 67 stages. wav2vec2 prints
+   "…what ou can do…" there — identically on `main`, so not the bump.
+   Merge order: ggml#5 first, then this branch. Left in the Kaggle suite:
+   no `transcript_format: srt` (index-echo's transcript compare cannot
+   pass), voxtral-mini-3b's pinned revision 404s, and wav2vec2's word flip
+   on that hardware. canary's per-layer gate is 0.99 since this bump (x86
+   layer 18 = 0.9977).
 5. **VAD re-runs over the whole 15 s window every step** (~70-130 ms).
 6. **hikari-medium port** (causal Whisper, English→German simultaneous S2TT).
 7. A StreamRevise-style draft (revise the previous translation instead of
