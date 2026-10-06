@@ -1382,6 +1382,18 @@ constexpr Entry k_registry[] = {
     {"madlad", "madlad400-3b-mt-q4_k.gguf",
      "https://huggingface.co/cstr/madlad400-3b-mt-GGUF/resolve/main/madlad400-3b-mt-q4_k.gguf",
      "~1.9 GB", nullptr, nullptr},
+    // Translation chat LLMs for live translation (`--translate-model hy-mt2`
+    // / `index-translate`, see docs/streaming.md). NOT backends: they run in
+    // the vendored LLM runtime behind the crispasr_chat_* ABI and are listed
+    // here only so the names resolve and auto-download. Both are the
+    // publishers' own GGUFs, Apache-2.0. Each needs its own instruction
+    // wording — examples/cli/crispasr_run.cpp picks it by these names.
+    {"hy-mt2", "Hy-MT2-1.8B-Q4_K_M.gguf",
+     "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/main/Hy-MT2-1.8B-Q4_K_M.gguf",
+     "~1.1 GB", nullptr, nullptr},
+    {"index-translate", "Index-Translate-2B.Q4_K_M.gguf",
+     "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/main/Index-Translate-2B.Q4_K_M.gguf",
+     "~1.3 GB", nullptr, nullptr},
     // Kokoro-82M: official baseline + English default voice. The German
     // backbone + German default voice ride along via k_extras (see below)
     // so users running `-m auto --backend kokoro` get a working multilingual
