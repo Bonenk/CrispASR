@@ -375,8 +375,20 @@ public:
         // included. (b) is what rejects the period a recogniser puts at the
         // cut end of every partial: "Ich gehe." → "Ich gehe nach Hause."
         size_t cut = 0; // open[0..cut) gets committed
+        // The terminator has to have been written before, by the previous
+        // partial or the one before it. A recogniser that cannot decide
+        // between "vorstellen. Er kommt" and "vorstellen, er kommt" flips
+        // between them on alternate partials; asking for two in a row then
+        // never commits (seen: a sentence held back 5 s until the NEXT one
+        // ended). Two of the last three is the same evidence without the
+        // deadlock, and either reading is a fine place to cut.
         for (size_t i = 0; i + 1 < open.size() && i < agree; ++i) {
-            if (lt_ends_sentence(open, i) && open[i].raw == prev_open_[i].raw)
+            if (!lt_ends_sentence(open, i))
+                continue;
+            const bool prev1 = open[i].raw == prev_open_[i].raw;
+            const bool prev2 =
+                i < prev_open2_.size() && open[i].raw == prev_open2_[i].raw && open[i].norm == prev_open2_[i].norm;
+            if (prev1 || prev2)
                 cut = i + 1;
         }
         size_t done = 0;
@@ -403,6 +415,11 @@ public:
                 done = fc;
             }
         }
+        // The partial before this one, re-based onto the same starting point.
+        if (prev_open_.size() >= done)
+            prev_open2_.assign(prev_open_.begin() + (std::ptrdiff_t)done, prev_open_.end());
+        else
+            prev_open2_.clear();
         prev_open_.assign(open.begin() + (std::ptrdiff_t)done, open.end());
         last_text_ = text;
         up.tail = lt_join(prev_open_, 0, prev_open_.size());
@@ -430,6 +447,7 @@ public:
             }
         }
         prev_open_.clear();
+        prev_open2_.clear();
         up.tail_changed = !last_tail_.empty();
         last_tail_.clear();
         return up;
@@ -535,6 +553,7 @@ private:
     void reset_utterance() {
         committed_.clear();
         prev_open_.clear();
+        prev_open2_.clear();
         last_tail_.clear();
         last_text_.clear();
         n_committed_ = 0;
@@ -640,6 +659,7 @@ private:
     std::vector<std::string> committed_; // norms, current utterance, last kKeep
     size_t n_committed_ = 0;             // words committed in this utterance
     std::vector<lt_word> prev_open_;     // previous partial's open words
+    std::vector<lt_word> prev_open2_;    // the one before that, on the same base
     std::string last_tail_;
     std::string last_text_; // the last partial that resolved (lined up)
     int align_misses_ = 0;

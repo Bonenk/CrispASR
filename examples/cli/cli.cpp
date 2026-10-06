@@ -1323,13 +1323,14 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "translation (implies --mic --stream --vad; pair with -l SRC and --tr-tl TGT)\n",
             params.live_translate ? "true" : "false");
     fprintf(out,
-            "  --translate-model FNAME           [%-7s] text translator (m2m100 / madlad GGUF, or 'auto') run "
+            "  --translate-model FNAME           [%-7s] text translator (m2m100 / marian / madlad GGUF, or 'auto') run "
             "behind a streaming recogniser; enables translation on --stream / --mic too\n",
             params.translate_model.c_str());
-    fprintf(out,
-            "  --translate-backend NAME          [%-7s] translator: m2m100, madlad, or llm (a translation chat LLM "
-            "GGUF such as Hy-MT2); default: detect from the model\n",
-            params.translate_backend.c_str());
+    fprintf(
+        out,
+        "  --translate-backend NAME          [%-7s] translator: m2m100, marian, madlad, or llm (a translation chat LLM "
+        "GGUF such as Hy-MT2); default: detect from the model\n",
+        params.translate_backend.c_str());
     fprintf(out, "  --translate-prompt TEXT                     llm translator prompt: hy-mt2, index-translate, or a "
                  "template with {src} {tgt} {text} (default: by model file name, else hy-mt2)\n");
     fprintf(out,

@@ -168,8 +168,9 @@ public:
         if (cfg_.log && !mt_ms_.empty()) {
             fprintf(cfg_.log,
                     "crispasr[translate]: %zu sentence(s); translate median %.0f ms, p90 %.0f ms; "
-                    "lag behind audio median %.0f ms, p90 %.0f ms; %d partial(s) discarded (no alignment)\n",
-                    mt_ms_.size(), pct(mt_ms_, 0.5), pct(mt_ms_, 0.9), pct(lag_ms_, 0.5), pct(lag_ms_, 0.9),
+                    "lag behind audio median %.0f ms, p90 %.0f ms; %d translated ahead of time; "
+                    "%d partial(s) discarded (no alignment)\n",
+                    mt_ms_.size(), pct(mt_ms_, 0.5), pct(mt_ms_, 0.9), pct(lag_ms_, 0.5), pct(lag_ms_, 0.9), reused_,
                     committer_.align_misses());
         }
     }
@@ -262,12 +263,22 @@ private:
                 // dropped once the tail no longer starts with what it translated.
                 if (tail_src_.compare(0, tail_draft_src_.size(), tail_draft_src_) != 0 || tail_draft_src_.empty())
                     tail_draft_.clear();
-                if (cfg_.drafts && mt_avg_ms_ <= cfg_.draft_max_mt_ms &&
-                    count_words(tail_src_) >= cfg_.draft_min_words) {
+                // What to translate ahead of time. If the open text already
+                // contains a finished sentence (it is only waiting for a
+                // second partial to agree), translate exactly that sentence:
+                // when it commits a moment later the translation is already
+                // there, and the wait for agreement has paid for it. That is
+                // worth doing even with a slow translator. Otherwise draft
+                // the whole open text, which is display only.
+                const std::string candidate = first_complete_sentence(tail_src_);
+                const bool speculative = !candidate.empty();
+                const std::string& draft_text = speculative ? candidate : tail_src_;
+                if (cfg_.drafts && (speculative || mt_avg_ms_ <= cfg_.draft_max_mt_ms) && draft_text != spec_src_ &&
+                    count_words(draft_text) >= (speculative ? 1 : cfg_.draft_min_words)) {
                     job d;
                     d.draft = true;
                     d.utterance_id = utterance_id;
-                    d.text = tail_src_;
+                    d.text = draft_text;
                     d.t_audio = t_audio;
                     d.arrived = arrived;
                     if (cfg_.sync) {
@@ -311,6 +322,15 @@ private:
 
     void execute(const job& j) {
         const auto t0 = clock::now();
+        // Already translated ahead of time? Then it costs nothing now.
+        std::string ready;
+        if (!j.draft) {
+            std::lock_guard<std::mutex> lk(mu_);
+            if (!spec_tr_.empty() && spec_src_ == j.text) {
+                ready = spec_tr_;
+                ++reused_;
+            }
+        }
         // A committed sentence shows its translation as it is generated; a
         // draft is replaced in one go (it is about to change anyway).
         progress_fn progress;
@@ -323,13 +343,17 @@ private:
                 }
             };
         }
-        std::string tr = translate_(j.text, progress);
+        std::string tr = ready.empty() ? translate_(j.text, progress) : ready;
         const auto t1 = clock::now();
         const double mt_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         const double lag_ms = std::chrono::duration<double, std::milli>(t1 - j.arrived).count();
 
         std::lock_guard<std::mutex> lk(mu_);
         if (j.draft) {
+            // Remember it whatever happens to the display: the sentence may
+            // commit while this was running, and then this IS its translation.
+            spec_src_ = j.text;
+            spec_tr_ = tr;
             // Stale if the tail moved on to different text while we worked.
             if (tail_src_.compare(0, j.text.size(), j.text) != 0)
                 return;
@@ -483,6 +507,17 @@ private:
         return out;
     }
 
+    // The first sentence of `text` that is finished AND followed by more
+    // text — i.e. the one the committer will commit next if the recogniser
+    // does not change its mind. Empty when there is none.
+    static std::string first_complete_sentence(const std::string& text) {
+        const std::vector<lt_word> w = lt_split_words(text);
+        for (size_t i = 0; i + 1 < w.size(); ++i)
+            if (lt_ends_sentence(w, i))
+                return lt_join(w, 0, i + 1);
+        return std::string();
+    }
+
     static int count_words(const std::string& s) {
         int n = 0;
         bool in = false;
@@ -554,6 +589,9 @@ private:
     std::string tail_src_;
     std::string tail_draft_;
     std::string tail_draft_src_;
+    std::string spec_src_; // last text translated ahead of time, and its translation
+    std::string spec_tr_;
+    int reused_ = 0;
     int live_rows_ = 0;
     std::vector<double> mt_ms_;
     double mt_avg_ms_ = 0.0; // running average over committed sentences

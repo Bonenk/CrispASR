@@ -8,8 +8,21 @@
 //
 // Supports facebook/m2m100_418M, m2m100_1.2B, and wmt21-dense-24-wide
 // (same architecture at different scales).
+//
+// Also runs MarianMT / Opus-MT (GGUF architecture "marian",
+// models/convert-marian-to-gguf.py). Same skeleton, six differences, all read
+// from the GGUF and all off for an m2m100 file:
+//   post-norm layers and no output LayerNorm    (hp.pre_norm, out_ln absent)
+//   activation from config.json (swish)         (hp.activation)
+//   positions start at row 0, not row 2         (hp.pos_offset)
+//   a bias on the logits                        (final_logits_bias)
+//   decoder starts from <pad> alone, no language tokens; <pad> is never
+//   generated                                   (hp.suppress_ids)
+//   tokenizer: SentencePiece unigram for the pieces, vocab.json for the ids
+//                                               (core/marian_tokenizer.h)
 
 #include "m2m100.h"
+#include "core/attention.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 m2m100 GPU path)
@@ -26,6 +39,7 @@
 #include <cassert>
 #include <chrono>
 #include "core/sentencepiece.h"
+#include "core/marian_tokenizer.h"
 #include "core/crispasr_env.h"
 
 #include <cmath>
@@ -50,6 +64,16 @@ static bool m2m100_bench_enabled() {
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
+}
+
+// Per-step split of the decoder, accumulated over one translate call.
+struct m2m100_step_bench {
+    double build_ms = 0, alloc_ms = 0, compute_ms = 0, read_ms = 0;
+    int steps = 0;
+};
+static m2m100_step_bench g_m2m100_step_bench;
+static double m2m100_now_ms() {
+    return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 struct m2m100_bench_stage {
@@ -86,6 +110,18 @@ struct m2m100_hparams {
     bool early_stopping = true;
     int pad_token_id = 1;
     int dec_start_token = 2;
+    // ── Marian (every default below is M2M-100's) ──
+    enum Activation { ACT_RELU = 0, ACT_SILU = 1, ACT_GELU = 2 };
+    bool marian = false;       // general.architecture == "marian"
+    bool pre_norm = true;      // config.json normalize_before
+    int activation = ACT_RELU; // config.json activation_function
+    int pos_offset = 2;        // row of position 0 in the pos_emb tables
+    int unk_token_id = 3;
+    std::vector<int> suppress_ids; // generation_config bad_words_ids (single tokens)
+    int gen_num_beams = 5;
+    int gen_max_length = 0;  // 0 = not declared
+    std::string source_lang; // tokenizer_config.json; "" when the checkpoint has none
+    std::string target_lang;
     int head_dim() const { return d_model / enc_n_heads; }
 };
 
@@ -166,6 +202,7 @@ struct m2m100_model {
     ggml_tensor* dec_out_ln_w = nullptr;
     ggml_tensor* dec_out_ln_b = nullptr;
     // lm_head shares shared_embed (tied weights)
+    ggml_tensor* final_logits_bias = nullptr; // Marian only
 };
 
 // ── Tokenizer ────────────────────────────────────────────────────
@@ -192,6 +229,8 @@ struct m2m100_context {
     m2m100_context_params params;
     m2m100_model model;
     m2m100_tokenizer tokenizer;
+    core_marian_tok::Tokenizer marian_tok; // used instead of `tokenizer` when hp.marian
+    bool warned_lang = false;
 
     // Weight storage
     ggml_context* ctx_w = nullptr;
@@ -232,15 +271,23 @@ static ggml_tensor* T(m2m100_context* c, const char* name) {
 static ggml_tensor* TR(m2m100_context* c, const char* name) {
     auto* t = T(c, name);
     if (!t) {
-        fprintf(stderr, "m2m100: required tensor '%s' not found\n", name);
+        fprintf(stderr, "%s: required tensor '%s' not found\n", c->model.hp.marian ? "marian" : "m2m100", name);
     }
     return t;
 }
 
 // ── Load metadata ────────────────────────────────────────────────
 
-static void load_metadata(m2m100_context* c, gguf_context* g) {
+static bool load_marian_metadata(m2m100_context* c, gguf_context* g);
+
+static bool load_metadata(m2m100_context* c, gguf_context* g) {
     auto& hp = c->model.hp;
+    {
+        const int aidx = gguf_find_key(g, "general.architecture");
+        if (aidx >= 0 && gguf_get_kv_type(g, aidx) == GGUF_TYPE_STRING &&
+            std::strcmp(gguf_get_val_str(g, aidx), "marian") == 0)
+            return load_marian_metadata(c, g);
+    }
     auto get_u32 = [&](const char* key, int def) -> int {
         int idx = gguf_find_key(g, key);
         return (idx >= 0) ? (int)gguf_get_val_u32(g, idx) : def;
@@ -304,6 +351,173 @@ static void load_metadata(m2m100_context* c, gguf_context* g) {
             }
         }
     }
+    return true;
+}
+
+// ── Load metadata: Marian ────────────────────────────────────────
+// Every key is required. A Marian GGUF with a tokenizer table missing would
+// still load and translate — into text segmented by some other rule — so a
+// missing or mistyped key fails the load instead.
+
+static bool load_marian_spm(gguf_context* g, const char* side, core_marian_tok::Normalizer& norm,
+                            core_marian_tok::Unigram& uni) {
+    auto key = [&](const char* leaf) { return std::string("tokenizer.marian.") + side + "." + leaf; };
+    auto fail = [&](const char* leaf, const char* why) {
+        fprintf(stderr, "marian: GGUF key '%s' %s\n", key(leaf).c_str(), why);
+        return false;
+    };
+    const int pidx = gguf_find_key(g, key("pieces").c_str());
+    const int sidx = gguf_find_key(g, key("scores").c_str());
+    const int tidx = gguf_find_key(g, key("types").c_str());
+    if (pidx < 0 || gguf_get_kv_type(g, pidx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, pidx) != GGUF_TYPE_STRING)
+        return fail("pieces", "is missing or not a string array");
+    if (sidx < 0 || gguf_get_kv_type(g, sidx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, sidx) != GGUF_TYPE_FLOAT32)
+        return fail("scores", "is missing or not a float32 array");
+    if (tidx < 0 || gguf_get_kv_type(g, tidx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, tidx) != GGUF_TYPE_INT32)
+        return fail("types", "is missing or not an int32 array");
+    const size_t n = gguf_get_arr_n(g, pidx);
+    if (n == 0 || gguf_get_arr_n(g, sidx) != n || gguf_get_arr_n(g, tidx) != n)
+        return fail("pieces", "/ scores / types differ in length");
+    std::vector<std::string> pieces(n);
+    for (size_t i = 0; i < n; i++)
+        pieces[i] = gguf_get_arr_str(g, pidx, i);
+    const float* sp = (const float*)gguf_get_arr_data(g, sidx);
+    const int32_t* tp = (const int32_t*)gguf_get_arr_data(g, tidx);
+    uni.load(pieces, std::vector<float>(sp, sp + n), std::vector<int32_t>(tp, tp + n));
+
+    // The charsmap is absent only for an "identity" normalizer; the converter
+    // records which it was, so absence cannot pass for it by accident.
+    const int nidx = gguf_find_key(g, key("normalizer").c_str());
+    if (nidx < 0 || gguf_get_kv_type(g, nidx) != GGUF_TYPE_STRING)
+        return fail("normalizer", "is missing");
+    const std::string norm_name = gguf_get_val_str(g, nidx);
+    const int cidx = gguf_find_key(g, key("charsmap").c_str());
+    if (cidx >= 0) {
+        if (gguf_get_kv_type(g, cidx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, cidx) != GGUF_TYPE_UINT8)
+            return fail("charsmap", "is not a uint8 array");
+        if (!norm.load_charsmap((const uint8_t*)gguf_get_arr_data(g, cidx), gguf_get_arr_n(g, cidx)))
+            return fail("charsmap", "is not a SentencePiece precompiled charsmap");
+    } else if (norm_name != "identity") {
+        return fail("charsmap", "is missing although the normalizer is not 'identity'");
+    }
+    struct {
+        const char* leaf;
+        bool* dst;
+    } flags[] = {{"add_dummy_prefix", &norm.add_dummy_prefix},
+                 {"remove_extra_whitespaces", &norm.remove_extra_whitespaces},
+                 {"escape_whitespaces", &norm.escape_whitespaces}};
+    for (auto& f : flags) {
+        const int idx = gguf_find_key(g, key(f.leaf).c_str());
+        if (idx < 0 || gguf_get_kv_type(g, idx) != GGUF_TYPE_BOOL)
+            return fail(f.leaf, "is missing or not a bool");
+        *f.dst = gguf_get_val_bool(g, idx);
+    }
+    return true;
+}
+
+static bool load_marian_metadata(m2m100_context* c, gguf_context* g) {
+    auto& hp = c->model.hp;
+    bool ok = true;
+    auto req_u32 = [&](const char* key) -> int {
+        const int idx = gguf_find_key(g, key);
+        if (idx < 0 || gguf_get_kv_type(g, idx) != GGUF_TYPE_UINT32) {
+            fprintf(stderr, "marian: GGUF key '%s' is missing\n", key);
+            ok = false;
+            return 0;
+        }
+        return (int)gguf_get_val_u32(g, idx);
+    };
+    auto get_str = [&](const char* key) -> std::string {
+        const int idx = gguf_find_key(g, key);
+        return (idx >= 0 && gguf_get_kv_type(g, idx) == GGUF_TYPE_STRING) ? gguf_get_val_str(g, idx) : "";
+    };
+    hp.marian = true;
+    hp.pos_offset = 0;
+    hp.bos_token_id = -1; // Marian has no <s>
+    hp.vocab_size = req_u32("marian.vocab_size");
+    hp.d_model = req_u32("marian.d_model");
+    hp.enc_n_layers = req_u32("marian.encoder.n_layers");
+    hp.enc_n_heads = req_u32("marian.encoder.n_heads");
+    hp.enc_ffn_dim = req_u32("marian.encoder.ffn_dim");
+    hp.dec_n_layers = req_u32("marian.decoder.n_layers");
+    hp.dec_n_heads = req_u32("marian.decoder.n_heads");
+    hp.dec_ffn_dim = req_u32("marian.decoder.ffn_dim");
+    hp.max_position_emb = req_u32("marian.max_position_embeddings");
+    hp.scale_embedding = req_u32("marian.scale_embedding") != 0;
+    hp.pre_norm = req_u32("marian.normalize_before") != 0;
+    hp.eos_token_id = req_u32("marian.eos_token_id");
+    hp.pad_token_id = req_u32("marian.pad_token_id");
+    hp.unk_token_id = req_u32("marian.unk_token_id");
+    hp.dec_start_token = req_u32("marian.decoder_start_token_id");
+    hp.gen_num_beams = req_u32("marian.gen.num_beams");
+    hp.gen_max_length = req_u32("marian.gen.max_length");
+    hp.early_stopping = req_u32("marian.gen.early_stopping") != 0;
+    hp.source_lang = get_str("marian.source_lang");
+    hp.target_lang = get_str("marian.target_lang");
+    if (!ok)
+        return false;
+    if (hp.d_model <= 0 || hp.enc_n_heads <= 0 || hp.enc_n_heads != hp.dec_n_heads ||
+        hp.d_model % hp.enc_n_heads != 0 || hp.vocab_size <= 0 || hp.max_position_emb <= 0 || hp.enc_n_layers <= 0 ||
+        hp.dec_n_layers <= 0) {
+        fprintf(stderr, "marian: implausible hyperparameters in the GGUF\n");
+        return false;
+    }
+
+    const std::string act = get_str("marian.activation_function");
+    if (act == "swish" || act == "silu") {
+        hp.activation = m2m100_hparams::ACT_SILU;
+    } else if (act == "relu") {
+        hp.activation = m2m100_hparams::ACT_RELU;
+    } else if (act == "gelu") {
+        hp.activation = m2m100_hparams::ACT_GELU;
+    } else {
+        fprintf(stderr, "marian: activation_function '%s' is not implemented\n", act.c_str());
+        return false;
+    }
+
+    {
+        const int idx = gguf_find_key(g, "marian.suppress_token_ids");
+        if (idx >= 0) {
+            if (gguf_get_kv_type(g, idx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, idx) != GGUF_TYPE_INT32) {
+                fprintf(stderr, "marian: GGUF key 'marian.suppress_token_ids' is not an int32 array\n");
+                return false;
+            }
+            const int32_t* d = (const int32_t*)gguf_get_arr_data(g, idx);
+            for (size_t i = 0; i < gguf_get_arr_n(g, idx); i++)
+                if (d[i] >= 0 && d[i] < hp.vocab_size)
+                    hp.suppress_ids.push_back(d[i]);
+        }
+    }
+
+    // vocab.json: the id space of the embedding table
+    const int tidx = gguf_find_key(g, "tokenizer.ggml.tokens");
+    if (tidx < 0 || gguf_get_kv_type(g, tidx) != GGUF_TYPE_ARRAY || gguf_get_arr_type(g, tidx) != GGUF_TYPE_STRING ||
+        (int)gguf_get_arr_n(g, tidx) != hp.vocab_size) {
+        fprintf(stderr, "marian: 'tokenizer.ggml.tokens' is missing or does not have vocab_size (%d) entries\n",
+                hp.vocab_size);
+        return false;
+    }
+    auto& mt = c->marian_tok;
+    c->tokenizer.id_to_token.resize(hp.vocab_size);
+    mt.vocab.reserve((size_t)hp.vocab_size * 2);
+    for (int i = 0; i < hp.vocab_size; i++) {
+        c->tokenizer.id_to_token[i] = gguf_get_arr_str(g, tidx, i);
+        mt.vocab.emplace(c->tokenizer.id_to_token[i], i);
+    }
+    mt.unk_id = hp.unk_token_id;
+    mt.eos_id = hp.eos_token_id;
+    if (hp.eos_token_id >= hp.vocab_size || hp.pad_token_id >= hp.vocab_size || hp.unk_token_id >= hp.vocab_size ||
+        hp.dec_start_token >= hp.vocab_size) {
+        fprintf(stderr, "marian: a special token id is outside the vocabulary\n");
+        return false;
+    }
+    if (!load_marian_spm(g, "source", mt.norm, mt.src))
+        return false;
+
+    for (const std::string& l : {hp.source_lang, hp.target_lang})
+        if (!l.empty())
+            c->tokenizer.lang_codes.push_back(l);
+    return true;
 }
 
 // ── Bind tensors ─────────────────────────────────────────────────
@@ -317,6 +531,11 @@ static bool bind_model(m2m100_context* c) {
     m.dec_pos_emb = TR(c, "dec.pos_emb");
     if (!m.shared_embed || !m.enc_pos_emb || !m.dec_pos_emb)
         return false;
+    if (hp.marian) {
+        m.final_logits_bias = TR(c, "final_logits_bias");
+        if (!m.final_logits_bias)
+            return false;
+    }
 
     // Encoder layers
     m.enc_layers.resize(hp.enc_n_layers);
@@ -344,8 +563,9 @@ static bool bind_model(m2m100_context* c) {
         l.ffn_ln_w = w("ffn_ln.weight");
         l.ffn_ln_b = w("ffn_ln.bias");
     }
-    m.enc_out_ln_w = TR(c, "enc.out_ln.weight");
-    m.enc_out_ln_b = TR(c, "enc.out_ln.bias");
+    // Marian has no output LayerNorm on either stack.
+    m.enc_out_ln_w = hp.marian ? nullptr : TR(c, "enc.out_ln.weight");
+    m.enc_out_ln_b = hp.marian ? nullptr : TR(c, "enc.out_ln.bias");
 
     // Decoder layers
     m.dec_layers.resize(hp.dec_n_layers);
@@ -383,8 +603,35 @@ static bool bind_model(m2m100_context* c) {
         l.ffn_ln_w = w("ffn_ln.weight");
         l.ffn_ln_b = w("ffn_ln.bias");
     }
-    m.dec_out_ln_w = TR(c, "dec.out_ln.weight");
-    m.dec_out_ln_b = TR(c, "dec.out_ln.bias");
+    m.dec_out_ln_w = hp.marian ? nullptr : TR(c, "dec.out_ln.weight");
+    m.dec_out_ln_b = hp.marian ? nullptr : TR(c, "dec.out_ln.bias");
+
+    if (hp.marian) {
+        // The M2M-100 path binds its layer tensors unchecked and has for a
+        // long time; a new converter does not get that benefit of the doubt.
+        for (const auto& stack : {std::make_pair("enc", hp.enc_n_layers), std::make_pair("dec", hp.dec_n_layers)}) {
+            const bool dec = stack.first[0] == 'd';
+            for (int i = 0; i < stack.second; i++) {
+                for (const char* part : {"attn_q", "attn_k", "attn_v", "attn_o", "attn_ln", "cross_q", "cross_k",
+                                         "cross_v", "cross_o", "cross_ln", "ffn_up", "ffn_down", "ffn_ln"}) {
+                    if (!dec && std::strncmp(part, "cross", 5) == 0)
+                        continue;
+                    for (const char* wb : {"weight", "bias"}) {
+                        char name[96];
+                        snprintf(name, sizeof(name), "%s.blk.%d.%s.%s", stack.first, i, part, wb);
+                        if (!TR(c, name))
+                            return false;
+                    }
+                }
+            }
+        }
+        if ((int)m.enc_pos_emb->ne[1] < hp.max_position_emb || (int)m.dec_pos_emb->ne[1] < hp.max_position_emb ||
+            (int)m.enc_pos_emb->ne[0] != hp.d_model || (int)m.shared_embed->ne[1] != hp.vocab_size ||
+            (int)m.shared_embed->ne[0] != hp.d_model || (int)m.final_logits_bias->ne[0] != hp.vocab_size) {
+            fprintf(stderr, "marian: tensor shapes do not match the GGUF hyperparameters\n");
+            return false;
+        }
+    }
 
     return true;
 }
@@ -494,6 +741,69 @@ static std::string detokenize(const m2m100_tokenizer& tok, const std::vector<int
     return result;
 }
 
+// ── Marian tokenizer glue ────────────────────────────────────────
+
+// Multi-target Marian checkpoints select the output language with a leading
+// `>>xxx<<` token. A single-pair model has no such token and this is a no-op.
+static std::string marian_with_target_code(const m2m100_context* c, const std::string& text,
+                                           const std::string& tgt_lang) {
+    if (tgt_lang.empty() || core_marian_tok::Tokenizer::language_code_len(text) > 0)
+        return text;
+    const std::string code = ">>" + tgt_lang + "<<";
+    if (c->marian_tok.vocab.find(code) == c->marian_tok.vocab.end())
+        return text;
+    return code + " " + text;
+}
+
+static std::string marian_detokenize(const m2m100_context* c, const std::vector<int>& ids) {
+    const auto& hp = c->model.hp;
+    std::vector<std::string> pieces;
+    pieces.reserve(ids.size());
+    for (int id : ids) {
+        if (id < 0 || id >= (int)c->tokenizer.id_to_token.size())
+            continue;
+        if (id == hp.eos_token_id || id == hp.pad_token_id || id == hp.unk_token_id)
+            continue;
+        pieces.push_back(c->tokenizer.id_to_token[id]);
+    }
+    return core_marian_tok::join_pieces(pieces);
+}
+
+// A single-pair model translates one direction whatever it is asked for; say
+// so once instead of answering a de→en request with an en→de model silently.
+static void marian_check_languages(m2m100_context* c, const char* src_lang, const char* tgt_lang) {
+    if (c->warned_lang)
+        return;
+    const auto& hp = c->model.hp;
+    auto differs = [](const std::string& model, const char* asked) {
+        return model.size() == 2 && asked && std::strlen(asked) == 2 && model != asked;
+    };
+    if (differs(hp.source_lang, src_lang) || differs(hp.target_lang, tgt_lang)) {
+        c->warned_lang = true;
+        fprintf(stderr, "marian: this model translates %s→%s; the requested %s→%s is ignored\n", hp.source_lang.c_str(),
+                hp.target_lang.c_str(), src_lang, tgt_lang);
+    }
+}
+
+// ── Layer pieces shared by both graphs ───────────────────────────
+
+static ggml_tensor* layer_norm(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
+    x = ggml_norm(ctx0, x, 1e-5f);
+    x = ggml_mul(ctx0, x, w);
+    return ggml_add(ctx0, x, b);
+}
+
+static ggml_tensor* ffn_activation(ggml_context* ctx0, ggml_tensor* x, int activation) {
+    switch (activation) {
+    case m2m100_hparams::ACT_SILU:
+        return ggml_silu(ctx0, x);
+    case m2m100_hparams::ACT_GELU:
+        return ggml_gelu_erf(ctx0, x);
+    default:
+        return ggml_relu(ctx0, x);
+    }
+}
+
 // ── KV cache allocation ──────────────────────────────────────────
 
 static bool alloc_kv_cache(m2m100_context* c, int max_ctx) {
@@ -501,6 +811,26 @@ static bool alloc_kv_cache(m2m100_context* c, int max_ctx) {
     const int hd = hp.head_dim();
     const int nh = hp.dec_n_heads;
     const int nl = hp.dec_n_layers;
+
+    // One translate call used to allocate a cache and never free the previous
+    // one (only the last was released, in m2m100_free) — ~10 MB leaked per
+    // sentence on the 418M, which a live session calls for every sentence and
+    // every draft. Reuse the buffer when it is big enough; cleared, as a fresh
+    // one was.
+    if (c->kv_buf && c->kv_max_ctx >= max_ctx) {
+        ggml_backend_buffer_clear(c->kv_buf, 0);
+        return true;
+    }
+    if (c->kv_buf) {
+        ggml_backend_buffer_free(c->kv_buf);
+        c->kv_buf = nullptr;
+    }
+    if (c->kv_ctx) {
+        ggml_free(c->kv_ctx);
+        c->kv_ctx = nullptr;
+    }
+    c->kv_k = c->kv_v = nullptr;
+    c->kv_max_ctx = 0;
 
     size_t n_tensors = 2; // k, v
     size_t ctx_size = ggml_tensor_overhead() * n_tensors + 64;
@@ -602,10 +932,10 @@ static ggml_cgraph* build_encoder_graph(m2m100_context* c, int T) {
         const auto& l = m.enc_layers[il];
         ggml_tensor* residual = cur;
 
-        // Pre-norm for self-attention
-        cur = ggml_norm(ctx0, cur, 1e-5f);
-        cur = ggml_mul(ctx0, cur, l.attn_ln_w);
-        cur = ggml_add(ctx0, cur, l.attn_ln_b);
+        // Pre-norm for self-attention (M2M-100); Marian normalizes after the
+        // residual instead.
+        if (hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.attn_ln_w, l.attn_ln_b);
 
         // Self-attention Q, K, V
         ggml_tensor* Q = ggml_add(ctx0, ggml_mul_mat(ctx0, l.attn_q_w, cur), l.attn_q_b);
@@ -624,24 +954,26 @@ static ggml_cgraph* build_encoder_graph(m2m100_context* c, int T) {
         // Output projection + residual
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.attn_o_w, attn), l.attn_o_b);
         cur = ggml_add(ctx0, cur, residual);
+        if (!hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.attn_ln_w, l.attn_ln_b);
 
         // FFN
         residual = cur;
-        cur = ggml_norm(ctx0, cur, 1e-5f);
-        cur = ggml_mul(ctx0, cur, l.ffn_ln_w);
-        cur = ggml_add(ctx0, cur, l.ffn_ln_b);
+        if (hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.ffn_ln_w, l.ffn_ln_b);
 
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.ffn_up_w, cur), l.ffn_up_b);
-        cur = ggml_relu(ctx0, cur);
+        cur = ffn_activation(ctx0, cur, hp.activation);
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.ffn_down_w, cur), l.ffn_down_b);
 
         cur = ggml_add(ctx0, cur, residual);
+        if (!hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.ffn_ln_w, l.ffn_ln_b);
     }
 
-    // Final encoder LayerNorm
-    cur = ggml_norm(ctx0, cur, 1e-5f);
-    cur = ggml_mul(ctx0, cur, m.enc_out_ln_w);
-    cur = ggml_add(ctx0, cur, m.enc_out_ln_b);
+    // Final encoder LayerNorm (absent in Marian)
+    if (m.enc_out_ln_w)
+        cur = layer_norm(ctx0, cur, m.enc_out_ln_w, m.enc_out_ln_b);
 
     ggml_set_name(cur, "enc_out");
     ggml_build_forward_expand(gf, cur);
@@ -769,9 +1101,8 @@ static ggml_cgraph* build_decoder_graph(m2m100_context* c, int n_tokens, int off
         ggml_tensor* residual = cur;
 
         // ---- Self-attention ----
-        cur = ggml_norm(ctx0, cur, 1e-5f);
-        cur = ggml_mul(ctx0, cur, l.attn_ln_w);
-        cur = ggml_add(ctx0, cur, l.attn_ln_b);
+        if (hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.attn_ln_w, l.attn_ln_b);
 
         ggml_tensor* Q = ggml_add(ctx0, ggml_mul_mat(ctx0, l.attn_q_w, cur), l.attn_q_b);
         ggml_tensor* K = ggml_add(ctx0, ggml_mul_mat(ctx0, l.attn_k_w, cur), l.attn_k_b);
@@ -808,12 +1139,13 @@ static ggml_cgraph* build_decoder_graph(m2m100_context* c, int n_tokens, int off
         cur = ggml_reshape_2d(ctx0, sa_out, D, n_tokens);
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.attn_o_w, cur), l.attn_o_b);
         cur = ggml_add(ctx0, cur, residual);
+        if (!hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.attn_ln_w, l.attn_ln_b);
 
         // ---- Cross-attention ----
         residual = cur;
-        cur = ggml_norm(ctx0, cur, 1e-5f);
-        cur = ggml_mul(ctx0, cur, l.cross_ln_w);
-        cur = ggml_add(ctx0, cur, l.cross_ln_b);
+        if (hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.cross_ln_w, l.cross_ln_b);
 
         ggml_tensor* CQ = ggml_add(ctx0, ggml_mul_mat(ctx0, l.cross_q_w, cur), l.cross_q_b);
         CQ = ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, CQ, hd, nh, n_tokens), 0, 2, 1, 3));
@@ -825,23 +1157,25 @@ static ggml_cgraph* build_decoder_graph(m2m100_context* c, int n_tokens, int off
         cur = ggml_reshape_2d(ctx0, ca_out, D, n_tokens);
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.cross_o_w, cur), l.cross_o_b);
         cur = ggml_add(ctx0, cur, residual);
+        if (!hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.cross_ln_w, l.cross_ln_b);
 
         // ---- FFN ----
         residual = cur;
-        cur = ggml_norm(ctx0, cur, 1e-5f);
-        cur = ggml_mul(ctx0, cur, l.ffn_ln_w);
-        cur = ggml_add(ctx0, cur, l.ffn_ln_b);
+        if (hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.ffn_ln_w, l.ffn_ln_b);
 
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.ffn_up_w, cur), l.ffn_up_b);
-        cur = ggml_relu(ctx0, cur);
+        cur = ffn_activation(ctx0, cur, hp.activation);
         cur = ggml_add(ctx0, ggml_mul_mat(ctx0, l.ffn_down_w, cur), l.ffn_down_b);
         cur = ggml_add(ctx0, cur, residual);
+        if (!hp.pre_norm)
+            cur = layer_norm(ctx0, cur, l.ffn_ln_w, l.ffn_ln_b);
     }
 
-    // Final LayerNorm
-    cur = ggml_norm(ctx0, cur, 1e-5f);
-    cur = ggml_mul(ctx0, cur, m.dec_out_ln_w);
-    cur = ggml_add(ctx0, cur, m.dec_out_ln_b);
+    // Final LayerNorm (absent in Marian)
+    if (m.dec_out_ln_w)
+        cur = layer_norm(ctx0, cur, m.dec_out_ln_w, m.dec_out_ln_b);
 
     // Take last token
     if (n_tokens > 1) {
@@ -850,6 +1184,8 @@ static ggml_cgraph* build_decoder_graph(m2m100_context* c, int n_tokens, int off
 
     // LM head (tied with shared_embed)
     cur = ggml_mul_mat(ctx0, m.shared_embed, cur);
+    if (m.final_logits_bias)
+        cur = ggml_add(ctx0, cur, m.final_logits_bias);
 
     ggml_set_name(cur, "logits");
     ggml_build_forward_expand(gf, cur);
@@ -874,10 +1210,11 @@ static std::vector<float> run_encoder(m2m100_context* c, const std::vector<int>&
     // Set input tokens
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_tokens"), token_ids.data(), 0, T * sizeof(int32_t));
 
-    // Set position IDs: offset=2 (M2M-100 padding_idx=1, first real pos=2)
+    // Set position IDs: offset=2 for M2M-100 (padding_idx=1, first real pos=2),
+    // 0 for Marian.
     std::vector<int32_t> positions(T);
     for (int i = 0; i < T; i++)
-        positions[i] = i + 2;
+        positions[i] = i + c->model.hp.pos_offset;
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_positions"), positions.data(), 0, T * sizeof(int32_t));
 
     if (ggml_backend_sched_graph_compute(c->sched, gf) != GGML_STATUS_SUCCESS) {
@@ -898,18 +1235,22 @@ static std::vector<float> run_decoder_step(m2m100_context* c, const int* tokens,
     const int vocab = hp.vocab_size;
     const int Lk = offset + n_tokens;
 
+    const bool bench = m2m100_bench_enabled();
+    double tb0 = bench ? m2m100_now_ms() : 0;
     ggml_cgraph* gf = build_decoder_graph(c, n_tokens, offset);
+    double tb1 = bench ? m2m100_now_ms() : 0;
     ggml_backend_sched_reset(c->sched);
     if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
         fprintf(stderr, "m2m100: failed to alloc decoder graph\n");
         return {};
     }
+    double tb2 = bench ? m2m100_now_ms() : 0;
 
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "dec_tokens"), tokens, 0, n_tokens * sizeof(int32_t));
 
     std::vector<int32_t> positions(n_tokens);
     for (int i = 0; i < n_tokens; i++)
-        positions[i] = offset + i + 2; // offset=2
+        positions[i] = offset + i + hp.pos_offset; // M2M-100: 2, Marian: 0
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "dec_positions"), positions.data(), 0,
                             n_tokens * sizeof(int32_t));
 
@@ -930,10 +1271,23 @@ static std::vector<float> run_decoder_step(m2m100_context* c, const int* tokens,
         fprintf(stderr, "m2m100: decoder compute failed\n");
         return {};
     }
+    double tb3 = bench ? m2m100_now_ms() : 0;
 
     ggml_tensor* logits = ggml_graph_get_tensor(gf, "logits");
     std::vector<float> out(vocab);
     ggml_backend_tensor_get(logits, out.data(), 0, vocab * sizeof(float));
+    if (bench) {
+        auto& b = g_m2m100_step_bench;
+        b.build_ms += tb1 - tb0;
+        b.alloc_ms += tb2 - tb1;
+        b.compute_ms += tb3 - tb2;
+        b.read_ms += m2m100_now_ms() - tb3;
+        b.steps++;
+    }
+    // generation_config bad_words_ids: never generated, in greedy and in beam
+    // (Marian: <pad>, which is also the decoder start token).
+    for (int id : hp.suppress_ids)
+        out[id] = -std::numeric_limits<float>::infinity();
     return out;
 }
 
@@ -964,12 +1318,25 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
             delete c;
             return nullptr;
         }
-        load_metadata(c, g);
+        const bool meta_ok = load_metadata(c, g);
         core_gguf::free_metadata(g);
+        if (!meta_ok) {
+            delete c;
+            return nullptr;
+        }
     }
 
     const auto& hp = c->model.hp;
-    if (params.verbosity >= 1) {
+    if (hp.marian) {
+        // generation_config.json num_beams (4 for Opus-MT); M2M-100's 5 otherwise.
+        c->beam_size = hp.gen_num_beams > 1 ? hp.gen_num_beams : 1;
+        if (params.verbosity >= 1) {
+            fprintf(stderr, "marian: %s→%s d=%d enc=%dL dec=%dL heads=%d ffn=%d vocab=%d\n",
+                    hp.source_lang.empty() ? "?" : hp.source_lang.c_str(),
+                    hp.target_lang.empty() ? "?" : hp.target_lang.c_str(), hp.d_model, hp.enc_n_layers, hp.dec_n_layers,
+                    hp.enc_n_heads, hp.enc_ffn_dim, hp.vocab_size);
+        }
+    } else if (params.verbosity >= 1) {
         fprintf(stderr, "m2m100: d=%d enc=%dL dec=%dL heads=%d ffn=%d vocab=%d langs=%d\n", hp.d_model, hp.enc_n_layers,
                 hp.dec_n_layers, hp.enc_n_heads, hp.enc_ffn_dim, hp.vocab_size, (int)c->tokenizer.lang_codes.size());
     }
@@ -983,6 +1350,10 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
     //     neutral — small encoder-decoder AR, launch-bound (LEARNING 34) — so
     //     Metal stays CPU unless forced. Mirrors LEARNING 34's is_metal gate.
     c->backend_cpu = core_cpu_backend::init();
+    // Honour the caller's thread count. It used to be parsed, stored and never
+    // applied, so `-t` did nothing for m2m100 / marian.
+    if (params.n_threads > 0)
+        core_cpu_backend::set_n_threads(c->backend_cpu, params.n_threads);
     const char* gpu_env = std::getenv("CRISPASR_M2M100_GPU");
     const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
     const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;
@@ -1001,8 +1372,10 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
             } else {
                 ggml_backend_free(gpu);
                 if (params.verbosity >= 1)
-                    fprintf(stderr, "m2m100: GPU default limited to CUDA/Vulkan (Metal neutral); set "
-                                    "CRISPASR_M2M100_GPU=1 to force\n");
+                    fprintf(stderr,
+                            "%s: GPU default limited to CUDA/Vulkan (Metal neutral); set "
+                            "CRISPASR_M2M100_GPU=1 to force\n",
+                            hp.marian ? "marian" : "m2m100");
             }
         }
     }
@@ -1066,34 +1439,87 @@ extern "C" void m2m100_set_beam_size(struct m2m100_context* ctx, int beam_size) 
     ctx->beam_size = beam_size > 1 ? beam_size : 1;
 }
 
+extern "C" int m2m100_model_beam_size(struct m2m100_context* ctx) {
+    if (!ctx)
+        return m2m100_default_beam_size();
+    const auto& hp = ctx->model.hp;
+    return hp.marian ? (hp.gen_num_beams > 1 ? hp.gen_num_beams : 1) : m2m100_default_beam_size();
+}
+
+extern "C" int m2m100_is_marian(struct m2m100_context* ctx) {
+    return ctx && ctx->model.hp.marian ? 1 : 0;
+}
+
+extern "C" int m2m100_tokenize(struct m2m100_context* ctx, const char* text, const char* src_lang, const char* tgt_lang,
+                               int32_t* out_ids, int capacity) {
+    if (!ctx || !text)
+        return -1;
+    std::vector<int> ids;
+    if (ctx->model.hp.marian) {
+        for (int32_t id :
+             ctx->marian_tok.encode(marian_with_target_code(ctx, text, tgt_lang ? tgt_lang : ""), /*add_eos=*/true))
+            ids.push_back((int)id);
+    } else {
+        ids = tokenize(ctx->tokenizer, text, src_lang ? src_lang : "");
+    }
+    for (int i = 0; i < (int)ids.size() && i < capacity && out_ids; i++)
+        out_ids[i] = ids[i];
+    return (int)ids.size();
+}
+
 extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, const char* src_lang,
                                   const char* tgt_lang, int max_new_tokens) {
     if (!ctx || !text || !src_lang || !tgt_lang)
         return nullptr;
-    if (max_new_tokens <= 0)
-        max_new_tokens = 200;
 
     const auto& hp = ctx->model.hp;
+    const char* tag = hp.marian ? "marian" : "m2m100";
+    // Rows of the position tables that hold real positions.
+    const int max_positions = (int)ctx->model.dec_pos_emb->ne[1] - hp.pos_offset;
+    if (max_new_tokens <= 0) {
+        // The checkpoint's own bound: max_length counts the start token.
+        max_new_tokens = (hp.marian && hp.gen_max_length > 1) ? hp.gen_max_length - 1 : 200;
+    }
+    if (hp.marian && max_new_tokens > max_positions - 1)
+        max_new_tokens = max_positions - 1; // one position is the start token
 
     m2m100_bench_stage _bs_total("translate_total");
 
     // 1. Tokenize input
-    std::vector<int> enc_ids = tokenize(ctx->tokenizer, text, src_lang);
+    std::vector<int> enc_ids;
+    if (hp.marian) {
+        marian_check_languages(ctx, src_lang, tgt_lang);
+        for (int32_t id : ctx->marian_tok.encode(marian_with_target_code(ctx, text, tgt_lang), /*add_eos=*/true))
+            enc_ids.push_back((int)id);
+    } else {
+        enc_ids = tokenize(ctx->tokenizer, text, src_lang);
+    }
     if (ctx->params.verbosity >= 2) {
-        fprintf(stderr, "m2m100: input %zu tokens:", enc_ids.size());
+        fprintf(stderr, "%s: input %zu tokens:", tag, enc_ids.size());
         for (int id : enc_ids)
             fprintf(stderr, " %d", id);
         fprintf(stderr, "\n");
     }
+    // A longer input would index past the position table. (The M2M-100 table
+    // has 1024 positions and never had this check.)
+    if ((int)enc_ids.size() > (int)ctx->model.enc_pos_emb->ne[1] - hp.pos_offset) {
+        fprintf(stderr, "%s: input is %zu tokens, the model has %d positions — split the text\n", tag, enc_ids.size(),
+                (int)ctx->model.enc_pos_emb->ne[1] - hp.pos_offset);
+        return nullptr;
+    }
 
     // 2. Run encoder
-    std::vector<float> enc_out = run_encoder(ctx, enc_ids);
+    std::vector<float> enc_out;
+    {
+        m2m100_bench_stage _bs_enc("encoder");
+        enc_out = run_encoder(ctx, enc_ids);
+    }
     if (enc_out.empty())
         return nullptr;
 
     int T_enc = (int)enc_ids.size();
     if (ctx->params.verbosity >= 1) {
-        fprintf(stderr, "m2m100: encoder done, T_enc=%d\n", T_enc);
+        fprintf(stderr, "%s: encoder done, T_enc=%d\n", tag, T_enc);
     }
 
     // 3. Compute cross-attention KV
@@ -1110,17 +1536,20 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
     }
 
     // 5. Greedy decode
-    // Start with decoder_start_token_id (eos=2) then forced_bos (target lang token)
-    auto tgt_it = ctx->tokenizer.lang_to_token_id.find(tgt_lang);
-    if (tgt_it == ctx->tokenizer.lang_to_token_id.end()) {
-        fprintf(stderr, "m2m100: unknown target language '%s'\n", tgt_lang);
-        return nullptr;
-    }
-    int forced_bos = tgt_it->second;
-
+    // Start with decoder_start_token_id (eos=2) then forced_bos (target lang token).
+    // Marian: decoder_start_token_id (<pad>) alone — no language token.
     std::vector<int> dec_ids;
     dec_ids.push_back(hp.dec_start_token); // </s> = 2
-    dec_ids.push_back(forced_bos);         // __de__ etc.
+    if (!hp.marian) {
+        auto tgt_it = ctx->tokenizer.lang_to_token_id.find(tgt_lang);
+        if (tgt_it == ctx->tokenizer.lang_to_token_id.end()) {
+            fprintf(stderr, "m2m100: unknown target language '%s'\n", tgt_lang);
+            return nullptr;
+        }
+        dec_ids.push_back(tgt_it->second); // __de__ etc.
+    }
+
+    m2m100_bench_stage _bs_dec("decode");
 
     // First step: prefill with [dec_start, forced_bos]
     std::vector<float> logits = run_decoder_step(ctx, dec_ids.data(), (int)dec_ids.size(), 0);
@@ -1130,7 +1559,14 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
     const int prompt_len = (int)dec_ids.size();
 
     if (ctx->beam_size > 1) {
-        // Beam search via replay-from-prefix.
+        // Beam search on per-beam snapshots of the self-attention cache: one
+        // single-token forward per beam per step, O(beam x T). The cross-
+        // attention K/V are shared by every beam and never snapshotted.
+        // (Replaying each beam's whole suffix per step, as this did before,
+        // is O(beam x T^2/2) forwards — and for a text-to-text model the
+        // decode IS the cost. CRISPASR_M2M100_BEAM_REPLAY=1 restores it.)
+        const char* env_replay = std::getenv("CRISPASR_M2M100_BEAM_REPLAY");
+        const bool beam_replay = env_replay && *env_replay && *env_replay != '0';
         auto replay = [](m2m100_context* c, const int32_t* toks, int n, int pl) -> float* {
             auto lg = run_decoder_step(c, (const int*)toks, n, pl);
             if (lg.empty())
@@ -1139,23 +1575,14 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
             std::memcpy(out, lg.data(), lg.size() * sizeof(float));
             return out;
         };
-        // core_beam_decode replays each beam's whole suffix every step, so the
-        // decoder work is O(beam × T²/2), not O(T). Its header assumes an audio
-        // encoder dominates wall time — true for the ASR callers, false here:
-        // this is text-to-text, and the cost IS the decode. Typical sentences
-        // are cheap (measured 1.53× at T=17 on the 418M), but a generation that
-        // runs to max_new_tokens is not, and a runaway is exactly what #439
-        // reported. Print the worst case rather than let it be discovered as a
-        // hang — a silent 100,000-forward decode looks identical to a crash.
-        if (ctx->beam_size > 1) {
+        if (beam_replay) {
             const long long worst =
                 (long long)ctx->beam_size * (long long)max_new_tokens * (long long)max_new_tokens / 2;
             if (worst > 20000) {
                 std::fprintf(stderr,
-                             "m2m100: beam %d with up to %d tokens is worst-case ~%lld decoder forwards "
-                             "(beam search replays each beam's suffix per step). Cap with "
-                             "--translate-max-tokens, or use --beam-size 1 for greedy.\n",
-                             ctx->beam_size, max_new_tokens, worst);
+                             "%s: beam %d with up to %d tokens is worst-case ~%lld decoder forwards "
+                             "(replay mode). Cap with --translate-max-tokens.\n",
+                             tag, ctx->beam_size, max_new_tokens, worst);
             }
         }
         core_beam_decode::Config bcfg;
@@ -1167,8 +1594,29 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
         // generation_config.json: length_penalty 1.0 (default), early_stopping per checkpoint
         bcfg.early_stopping =
             hp.early_stopping ? core_beam_decode::EarlyStopping::True : core_beam_decode::EarlyStopping::False;
-        bcfg.length_offset = 1; // the forced target-language BOS: HF generates it, we prompt with it
-        auto br = core_beam_decode::run_with_probs(ctx, logits.data(), replay, bcfg);
+        // the forced target-language BOS: HF generates it, we prompt with it.
+        // Marian has none.
+        bcfg.length_offset = hp.marian ? 0 : 1;
+        core_beam_decode::Result br;
+        if (beam_replay) {
+            br = core_beam_decode::run_with_probs(ctx, logits.data(), replay, bcfg);
+        } else {
+            core_attn::kv_snapshot_pool kv_pool(ctx->kv_k, ctx->kv_v);
+            auto save_fn = [&kv_pool](m2m100_context*) -> core_attn::kv_snapshot* { return kv_pool.save(); };
+            auto restore_fn = [&kv_pool](m2m100_context*, core_attn::kv_snapshot* sn) { kv_pool.restore(sn); };
+            auto snap_free_fn = [&kv_pool](core_attn::kv_snapshot* sn) { kv_pool.release(sn); };
+            auto step_fn = [](m2m100_context* c, int32_t tok, int n_past) -> float* {
+                const int t = (int)tok;
+                auto lg = run_decoder_step(c, &t, 1, n_past);
+                if (lg.empty())
+                    return nullptr;
+                float* out = (float*)std::malloc(lg.size() * sizeof(float));
+                std::memcpy(out, lg.data(), lg.size() * sizeof(float));
+                return out;
+            };
+            br = core_beam_decode::run_with_probs_branched(ctx, logits.data(), save_fn, restore_fn, snap_free_fn,
+                                                           step_fn, bcfg);
+        }
         for (int32_t t : br.tokens) {
             if (t == hp.eos_token_id)
                 break;
@@ -1188,7 +1636,7 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
                 }
             }
             if (best_id < 0) {
-                fprintf(stderr, "m2m100: non-finite logits — aborting decode\n");
+                fprintf(stderr, "%s: non-finite logits — aborting decode\n", tag);
                 break;
             }
 
@@ -1198,7 +1646,7 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
             dec_ids.push_back(best_id);
 
             if (ctx->params.verbosity >= 2) {
-                fprintf(stderr, "m2m100[dec]: step=%d tok=%d '%s'\n", step, best_id,
+                fprintf(stderr, "%s[dec]: step=%d tok=%d '%s'\n", tag, step, best_id,
                         best_id < (int)ctx->tokenizer.id_to_token.size() ? ctx->tokenizer.id_to_token[best_id].c_str()
                                                                          : "?");
             }
@@ -1211,10 +1659,21 @@ extern "C" char* m2m100_translate(struct m2m100_context* ctx, const char* text, 
         }
     }
 
+    if (m2m100_bench_enabled()) {
+        auto& b = g_m2m100_step_bench;
+        std::fprintf(stderr,
+                     "  m2m100_bench: decoder steps %d: build %.2f  alloc %.2f  compute %.2f  read %.2f ms "
+                     "(per step %.2f / %.2f / %.2f / %.2f)\n",
+                     b.steps, b.build_ms, b.alloc_ms, b.compute_ms, b.read_ms, b.build_ms / std::max(1, b.steps),
+                     b.alloc_ms / std::max(1, b.steps), b.compute_ms / std::max(1, b.steps),
+                     b.read_ms / std::max(1, b.steps));
+        b = m2m100_step_bench();
+    }
+
     // 6. Detokenize
-    std::string result = detokenize(ctx->tokenizer, dec_ids);
+    std::string result = hp.marian ? marian_detokenize(ctx, dec_ids) : detokenize(ctx->tokenizer, dec_ids);
     if (ctx->params.verbosity >= 1) {
-        fprintf(stderr, "m2m100: translated %zu tokens → '%s'\n", dec_ids.size(), result.c_str());
+        fprintf(stderr, "%s: translated %zu tokens → '%s'\n", tag, dec_ids.size(), result.c_str());
     }
 
     char* out = (char*)malloc(result.size() + 1);

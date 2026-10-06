@@ -287,6 +287,7 @@ inline const entry* table(size_t* n_out) {
         // ── Translation ────────────────────────────────────────────────────
         {"m2m100",                    "m2m100"},
         {"m2m_100",                   "m2m100"},
+        {"marian",                    "marian"},
         {"t5",                        "madlad"},
 
         // ── Music / audio analysis ─────────────────────────────────────────

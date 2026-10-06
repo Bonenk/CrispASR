@@ -509,6 +509,23 @@ their upstream terms apply to the weights and any redistribution of them:
     https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
     Attribution is required; commercial use is permitted by that license.
 
+  Helsinki-NLP Opus-MT (MarianMT) translation models
+    CC-BY-4.0, per the OPUS-MT project
+    (https://github.com/Helsinki-NLP/Opus-MT). Sources:
+    https://huggingface.co/Helsinki-NLP/opus-mt-de-en
+    https://huggingface.co/Helsinki-NLP/opus-mt-en-de
+    Attribution is required; commercial use is permitted by that license.
+    (The opus-mt-de-en model card is tagged apache-2.0 and opus-mt-en-de
+    cc-by-4.0. Both are the same opus-2020-02-26 release, and the project
+    states in both of its repositories — Helsinki-NLP/Opus-MT and
+    Helsinki-NLP/OPUS-MT-train, checked 2026-10-06 — that its pre-trained
+    models are distributed under CC-BY 4.0; that statement is the one
+    followed here.) Format conversions are hosted at
+    https://huggingface.co/cstr/opus-mt-de-en-GGUF and
+    https://huggingface.co/cstr/opus-mt-en-de-GGUF, under CC-BY-4.0 with
+    attribution to the OPUS-MT project (J. Tiedemann, S. Thottingal,
+    "OPUS-MT - Building open translation services for the World", EAMT 2020).
+
   OuteAI/OuteTTS-0.3-1B
     CC-BY-NC-SA-4.0 (non-commercial, ShareAlike):
     https://huggingface.co/OuteAI/OuteTTS-0.3-1B

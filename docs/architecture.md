@@ -204,6 +204,7 @@ regression test against `samples/jfk.wav`:
 | dots-tts | Qwen2.5-1.5B LLM + 24L VAESemanticEncoder + 18L DiT flow-matching head (CFG Euler) + BigVGAN @ 48 kHz; continuous-latent AR; CAM++ voice cloning; incremental streaming PatchEncoder | ✔ | mixed (DiT must stay F16; LLM+penc Q8) | ✔ | Metal | gguf_loader, kv_self_attn, swiglu, lstm, snake_beta (`core/activation.h`), adaln, conv, cpu_ops, audio_resample |
 | fireredtts3 | Qwen3-1.7B LLM (QK-norm, NEOX RoPE 1e6) + 8L CLS PatchEncoder + 11L AdaLN DiT flow head (+Conv1d branch, 10-step cosine Euler, CFG 2.0, sigmoid stop head) over continuous 64-d 25 Hz RedAE latents; RedAE = 18L sliding-window-64 Qwen3 encoder + CLS 2x downsample + 18L Qwen3 decoder + Vocos ISTFT head (n_fft 1920/hop 480, shipped window) @ 24 kHz; CAM++ 512-d ICL voice cloning (`--voice ref.wav --ref-text`), default English prompt baked into the core GGUF | ✔ | mixed (DiT+penc+RedAE stay F16; LLM Q4_K/Q8) | ✔ | — | gguf_loader, bpe (qwen_pretokenize), istft, torch_rng, kaldi_fbank via chatterbox_campplus, audio_resample |
 | m2m100 | facebook/m2m100 12L+12L transformer (text-to-text translation; WMT21 4.7B variant via `--backend m2m100-wmt21`) | ✔ | — | ✔ (cross-attn) | CUDA / Metal | gguf_loader, sentencepiece, beam_decode |
+| marian | MarianMT / Opus-MT 6L+6L transformer (d=512, post-norm, swish; one translation direction per checkpoint). Shares the m2m100 runtime. | ✔ | — | ✔ (cross-attn) | CUDA / Metal | gguf_loader, marian_tokenizer, beam_decode |
 | madlad / t5 | T5 encoder-decoder (MADLAD-400 12L+12L, gated-GELU, RMSNorm, bucketed rel-pos bias). Tokens match Python SP bit-by-bit; translation outputs match the HF reference. | ✔ | — | ✔ (cross-attn) | CUDA / Metal | gguf_loader, beam_decode, repeat_break |
 
 ### Architecture families
@@ -1393,6 +1394,50 @@ runtime. **Two separate checkpoints**: `en-x` for English-source
 translation, `x-en` for English-target. Pick whichever matches your
 direction (`-sl`/`-tl`) — the auto-download path picks `en-x` by
 default; load `x-en` explicitly with `-m <path>` for X→English.
+
+### marian
+
+MarianMT / Opus-MT (`Helsinki-NLP/opus-mt-de-en`, `opus-mt-en-de`): 6L encoder +
+6L decoder, d=512, 8 heads, FFN=2048, ~75M parameters, one translation
+direction per checkpoint. `--backend marian` (alias `opus-mt`); GGUF
+architecture `marian`, written by `models/convert-marian-to-gguf.py`.
+
+**It runs in the m2m100 runtime** (`src/m2m100.cpp`) rather than a sibling.
+Marian is the same BART-style skeleton — shared embedding table tied to the
+output layer, sinusoidal positions, cross-attention KV cache, the same decode
+loops — and what differs is read from the GGUF and is off for an m2m100 file:
+
+| | M2M-100 | Marian |
+|---|---|---|
+| LayerNorm | before each sublayer, plus one after each stack | after each residual, none after the stacks (`normalize_before: false`) |
+| FFN activation | ReLU | `activation_function` (swish for Opus-MT; relu and gelu are wired) |
+| Positions | row `i + 2` of a table with a padding row | row `i`; sin in the first half of the vector, cos in the second |
+| Logits | `E · h` | `E · h + final_logits_bias` |
+| Decoder prompt | `</s>`, target-language token | `<pad>` alone; `<pad>` is a bad word and never generated |
+| Tokenizer | SentencePiece BPE, one table | SentencePiece unigram for the pieces, `vocab.json` for the ids |
+
+**Tokenizer** (`src/core/marian_tokenizer.h`). Hugging Face's `MarianTokenizer`
+segments with `source.spm` and then looks each piece **string** up in
+`vocab.json`; the two id spaces are unrelated. A piece SentencePiece knows and
+`vocab.json` lacks is `<unk>` (`▁peoples` in opus-mt-en-de), so the GGUF carries
+both tables and the runtime keeps them apart. The SentencePiece side is
+reproduced in full: the model's precompiled `nmt_nfkc` charsmap (a Darts
+double-array trie, embedded as a byte array), its whitespace rules, and unigram
+Viterbi the way `EncodeOptimized` runs it (an `<unk>` edge only where no
+one-character piece exists, runs of unknowns merged). The converter exits on
+anything the runtime does not implement — a non-unigram model, byte fallback,
+untied embeddings, learned positions, multi-token bad words — and the loader
+refuses a Marian GGUF with a table missing. Not reproduced: the literal strings
+`</s>`, `<unk>`, `<pad>` in the input are ordinary text here, special tokens in
+Hugging Face.
+
+Multi-target checkpoints (`>>fra<<` prefixes) are not tested. The path exists:
+a leading `>>xxx<<` is one vocabulary token, and `-tl xxx` adds it when the
+vocabulary has that exact token.
+
+**Parity and speed**: see the translator table in `docs/streaming.md`, and
+`tools/marian_parity.py` to reproduce (token ids and greedy text against
+`MarianMTModel.generate(num_beams=1)`).
 
 ### foxnose-diarize
 

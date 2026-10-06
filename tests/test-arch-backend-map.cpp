@@ -111,6 +111,7 @@ static const std::vector<std::pair<std::string, std::string>>& converter_archs()
         {"parler-tts", "parler-tts"},
         // ── translation / music ──
         {"m2m100", "m2m100"},
+        {"marian", "marian"},
         {"t5", "madlad"},
         {"htdemucs", "htdemucs"},
         {"mel-band-roformer", "mel-band-roformer"},
@@ -253,6 +254,7 @@ TEST_CASE("every emitted backend name is a name a surface can open", "[unit][arc
         "csm",
         "parler-tts",
         "m2m100",
+        "marian",
         "madlad",
         "htdemucs",
         "mel-band-roformer",

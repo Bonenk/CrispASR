@@ -1382,6 +1382,20 @@ constexpr Entry k_registry[] = {
     {"madlad", "madlad400-3b-mt-q4_k.gguf",
      "https://huggingface.co/cstr/madlad400-3b-mt-GGUF/resolve/main/madlad400-3b-mt-q4_k.gguf",
      "~1.9 GB", nullptr, nullptr},
+    // Opus-MT / MarianMT (Helsinki-NLP, CC-BY-4.0): one ~75M model per language
+    // pair, the fastest translator for live translation. `marian` is the
+    // `-m auto` default (de->en); `--translate-model auto --translate-backend
+    // marian` picks the row for the language pair. q8_0: 84 MB, near-parity
+    // with the reference (12/14 de->en, 8/8 en->de greedy); f16 is exact.
+    {"marian", "opus-mt-de-en-q8_0.gguf",
+     "https://huggingface.co/cstr/opus-mt-de-en-GGUF/resolve/main/opus-mt-de-en-q8_0.gguf", "~84 MB", nullptr,
+     nullptr, nullptr, "CC-BY-4.0 (attribution required; OPUS-MT project, https://github.com/Helsinki-NLP/Opus-MT)"},
+    {"opus-mt-de-en", "opus-mt-de-en-q8_0.gguf",
+     "https://huggingface.co/cstr/opus-mt-de-en-GGUF/resolve/main/opus-mt-de-en-q8_0.gguf", "~84 MB", nullptr,
+     nullptr, nullptr, "CC-BY-4.0 (attribution required; OPUS-MT project, https://github.com/Helsinki-NLP/Opus-MT)"},
+    {"opus-mt-en-de", "opus-mt-en-de-q8_0.gguf",
+     "https://huggingface.co/cstr/opus-mt-en-de-GGUF/resolve/main/opus-mt-en-de-q8_0.gguf", "~84 MB", nullptr,
+     nullptr, nullptr, "CC-BY-4.0 (attribution required; OPUS-MT project, https://github.com/Helsinki-NLP/Opus-MT)"},
     // Translation chat LLMs for live translation (`--translate-model hy-mt2`
     // / `index-translate`, see docs/streaming.md). NOT backends: they run in
     // the vendored LLM runtime behind the crispasr_chat_* ABI and are listed
