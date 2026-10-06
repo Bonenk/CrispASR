@@ -11,6 +11,74 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## OPEN 2026-10-05 — live transcribe + translate (`--live-translate`)
+
+On branch `live-translate` (PR open, not merged): `examples/cli/crispasr_live_translate.h`
+(sentence-commit policy, pure), `crispasr_live_translate_sink.h` (translator
+thread + TTY/plain/JSON output), wiring in `crispasr_run.cpp`, flags in
+`cli.cpp`, `tests/test-live-translate.cpp` (16 cases), `docs/streaming.md`.
+Verified end to end de→en and en→de with parakeet-v3 + m2m100 on a real-time
+pipe and on the microphone. Numbers and model verdicts are in
+`docs/streaming.md` — all taken on a box at load 6–40, so upper bounds only.
+
+Same branch, separate commits:
+
+- **ggml fork merged with upstream master (v0.26.0, `ffa4e8b8`).** Local
+  branch `sync/upstream-2026-10` in the submodule: `56e86a68` restores the
+  Metal `_hp` matmul kernel the kernels/ split had dropped (every
+  `GGML_PREC_F32` mul_mat with an F32 right-hand side aborted on non-tensor
+  Apple GPUs), `c36dab89` is the merge. 8 conflict files; the carried-patch
+  manifest went 29 → 46 guards, none removed. Pushed to the fork as
+  CrispStrobe/ggml#5 (base `crispstrobe-ops`, not merged); the pin here
+  points at `c36dab89` on that branch. Verified on Metal/CPU only
+  (parakeet, nemotron, m2m100 transcripts; `test-backend-ops -b MTL0` 2071/2071
+  on five ops). ⚠ CUDA, Vulkan (C++ and GLSL), WebGPU, SYCL were resolved by
+  reading and never compiled — the Vulkan flash-attention `nbm1` stride next
+  to upstream's new sparse mode, and CUDA's sparse MMA next to the per-head
+  mask, are the two to watch in CI. ⚠ `GGML_PREC_F32` is now 10 (was 1): any
+  binding passing a raw `1` breaks silently; not audited. `ggml_*_set_prec`
+  are deprecated upstream (58 call lines here). `tests/test-metal-pipeline-cache.mm`
+  does not compile (pre-existing, 1-arg `ggml_metal_device_init`);
+  `test-ggml-scheduler-replay.cpp` is in no CMake target.
+- `src/nemotron.cpp` no longer resubmits cached chunk graphs in the GPU
+  stream-cache path (transcript byte-equal to the default path on a 50 s
+  clip; the opt-in pieces stay opt-in).
+- `examples/talk-llama/`: qwen35 loader skips an appended MTP block (below).
+
+Open, in the order they would help:
+
+1. **Re-measure on an idle machine.** Best runs were at load ~5-10.
+2. **nemotron's incremental session is ~4.5 s compute per audio-second on
+   Metal** (load ~20). `--stream-session` drives it and works; the encoder is
+   the problem (host-side cache round trip + a graph build per chunk; the
+   device-resident cache exists only for the one-shot path and must not
+   reuse graphs — `CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE=1` reproduces the
+   corruption whose scheduler-side cause nobody has found).
+3. **Index-Translate-2B** works: the qwen35 loader now skips the appended
+   MTP block. Left over:
+   `qwen35moe` has the same gap; the loader derives the layer pattern from
+   the interval instead of `qwen35.attention.recurrent_layers`; the chat
+   template path ignores `enable_thinking`, so an empty `<think>` block is
+   generated and stripped; `test-chat-ggml.cpp:342` fails with Hy-MT2
+   (assumes a gemma-style template; not checked against a baseline build).
+4. The ggml bump is verified as far as it can be without merging: PR CI
+   green (80 checks; CrispStrobe/ggml#5 green incl. Vulkan and the CUDA
+   compile), and on a Kaggle GPU with CUDA seven backends pass outright
+   (parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron,
+   moonshine-tiny) and index-echo-2b passes all 67 stages. wav2vec2 prints
+   "…what ou can do…" there — identically on `main`, so not the bump.
+   Merge order: ggml#5 first, then this branch. Left in the Kaggle suite:
+   no `transcript_format: srt` (index-echo's transcript compare cannot
+   pass), voxtral-mini-3b's pinned revision 404s, and wav2vec2's word flip
+   on that hardware. canary's per-layer gate is 0.99 since this bump (x86
+   layer 18 = 0.9977).
+5. **VAD re-runs over the whole 15 s window every step** (~70-130 ms).
+6. **hikari-medium port** (causal Whisper, English→German simultaneous S2TT).
+7. A StreamRevise-style draft (revise the previous translation instead of
+   re-translating) for de/en; base Hy-MT2 is not trained for it.
+8. moonshine-de stops at the first longer pause of a clip. m2m100 beam search
+   has no KV cache. Windows paths are compiled by CI only, never run.
+
 ## OPEN 2026-10-03 — Index-Echo Q4 candidate preparation and GPU acceptance
 
 MioTTS and the opt-in Echo scheduler source are integrated; see

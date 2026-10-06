@@ -687,6 +687,36 @@ struct whisper_params {
     std::string translate_source_lang; // overrides source_lang for the translator stage
     std::string translate_target_lang; // overrides target_lang for the translator stage
 
+    // Live transcribe + translate. A second, text-to-text backend (m2m100 /
+    // madlad) runs behind the streaming recogniser and translates each
+    // sentence as soon as the recogniser has committed to it — see
+    // crispasr_live_translate.h for the commit policy. Active on a streaming
+    // run when `translate_model` is set; `--live-translate` is the preset
+    // (microphone + VAD + a short step + the default translator).
+    bool live_translate = false;
+    std::string translate_model;   // translator GGUF, or "auto" for the registry default
+    std::string translate_backend; // m2m100 | madlad | llm; empty = detect from the GGUF
+    // Prompt for `--translate-backend llm` (a chat LLM trained to translate).
+    // {src} / {tgt} are replaced by the English language names, {text} by the
+    // sentence. Empty = the Hy-MT2 instruction.
+    std::string translate_prompt;
+    int translate_beam = 1;       // greedy: m2m100 beam search has no KV cache (~5x slower); 0 = backend default
+    bool translate_drafts = true; // re-translate the still-open sentence as a dimmed draft
+    // The input arrives in real time (microphone, a live feed). When decoding
+    // falls behind, read the whole backlog in one step instead of working
+    // through it one --stream-step at a time and staying behind for good.
+    bool stream_realtime = false;
+    // Live translation only: feed the recogniser's own incremental session
+    // (CrispasrBackend::create_realtime_session — nemotron, qwen3,
+    // vibevoice-streaming) each step's NEW audio, instead of re-decoding the
+    // open speech every step. The cost then follows the audio, not the
+    // length of the sentence.
+    bool stream_session = false;
+    // Whether the user set these, so the live-translate preset only replaces
+    // defaults and never an explicit choice.
+    bool stream_step_explicit = false;
+    bool stream_length_explicit = false;
+
     // Text-LLM chat (server-mode /v1/chat/completions). Independent from
     // the audio backend's `model` path so a server can serve ASR + chat
     // off two different GGUFs. When empty, /v1/chat/completions returns

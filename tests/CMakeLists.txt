@@ -775,6 +775,25 @@ catch_discover_tests(test-stream-partial-decode
     PROPERTIES LABELS "unit;stream-json"
 )
 
+# Live transcribe + translate: the sentence-commit policy and its sink
+# (examples/cli/crispasr_live_translate*.h). Header-only; the translator is a
+# lambda and the partials are scripted, so no model and no audio.
+add_executable(test-live-translate
+    test-live-translate.cpp
+)
+target_include_directories(test-live-translate PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+find_package(Threads REQUIRED)
+target_link_libraries(test-live-translate PRIVATE
+    Catch2::Catch2WithMain
+    Threads::Threads
+)
+catch_discover_tests(test-live-translate
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;live-translate"
+)
+
 # Pyannote-seg → ASR-segment speaker scoring (issue #107). Drives the
 # internal helper with synthetic log-softmax posteriors; no model, no
 # audio. Links against libcrispasr so it tests the actually-shipped

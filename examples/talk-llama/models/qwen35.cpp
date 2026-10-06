@@ -24,7 +24,9 @@ llm_build_qwen35::llm_build_qwen35(const llama_model& model, const llm_graph_par
     ggml_tensor* inp_pos = build_inp_pos();
     ggml_tensor* inp_out_ids = build_inp_out_ids();
 
-    for (int il = 0; il < n_layer; ++il) {
+    // NextN/MTP blocks are loaded as extra decoder blocks but not executed in the main pass
+    const int n_transformer_layers = n_layer - hparams.nextn_predict_layers;
+    for (int il = 0; il < n_transformer_layers; ++il) {
         ggml_tensor* inpSA = inpL;
 
         cur = build_norm(inpL, model.layers[il].attn_norm, nullptr, LLM_NORM_RMS, il);
@@ -41,7 +43,7 @@ llm_build_qwen35::llm_build_qwen35(const llama_model& model, const llm_graph_par
             cur = build_layer_attn(inp->get_attn(), cur, inp_pos, sections, il);
         }
 
-        if (il == n_layer - 1 && inp_out_ids) {
+        if (il == n_transformer_layers - 1 && inp_out_ids) {
             cur = ggml_get_rows(ctx0, cur, inp_out_ids);
             inpSA = ggml_get_rows(ctx0, inpSA, inp_out_ids);
         }

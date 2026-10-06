@@ -1547,8 +1547,21 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
             // graph-cache key even when all tensor shapes are otherwise identical.
             auto key = std::make_tuple(T_new, T_cache, has_conv_cache ? 1 : 0, src_bank);
             auto it = device_graphs.find(key);
-            if (it != device_graphs.end())
-                return *it->second;
+            if (it != device_graphs.end()) {
+                // A chunk graph must NOT be submitted twice. Its ggml_cpy nodes
+                // write into the persistent cache banks, and re-allocating the
+                // same graph after a scheduler reset computes garbage on Metal:
+                // the transcript was right for exactly as long as every chunk
+                // still had a new key (the first L frames, ~4.5 s) and turned to
+                // word salad at the first cache hit. Rebuilding the graph per
+                // chunk is exact and costs nothing measurable (15 s clip: 9.1 s
+                // rebuilt vs 9.5 s reused). CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE=1
+                // restores the reuse for whoever chases the scheduler side.
+                static const bool reuse = getenv("CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE") != nullptr;
+                if (reuse)
+                    return *it->second;
+                device_graphs.erase(it);
+            }
 
             const int dst_bank = 1 - src_bank;
             const size_t graph_size = 8192;
