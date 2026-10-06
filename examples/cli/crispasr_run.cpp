@@ -4105,7 +4105,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         std::unique_ptr<CrispasrBackend> tr_backend;
         std::shared_ptr<crispasr_chat_session> tr_llm(nullptr, &crispasr_chat_close);
         std::unique_ptr<crispasr::lt_sink> live_tr; // declared last: its thread uses the two above
-        if (params.live_translate || !params.translate_model.empty()) {
+        if (params.live_translate || !params.translate_model.empty() || !params.translate_backend.empty()) {
             std::string tr_src = !params.translate_source_lang.empty() ? params.translate_source_lang
                                  : !params.source_lang.empty()         ? params.source_lang
                                                                        : params.language;
@@ -4137,6 +4137,15 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 tr_name = "llm";
             } else if (tr_model == "auto" && (tr_name == "llm" || tr_name == "chat")) {
                 tr_registry = "hy-mt2";
+            } else if (tr_model.rfind("opus-mt-", 0) == 0 && tr_model.find('/') == std::string::npos &&
+                       tr_model.find(".gguf") == std::string::npos) {
+                // `--translate-model opus-mt-de-en`: a Marian model by registry name.
+                tr_registry = tr_model;
+                tr_model = "auto";
+                tr_name = "marian";
+            } else if (tr_model == "auto" && tr_name == "marian") {
+                // One Marian model per language pair: pick it from the languages.
+                tr_registry = "opus-mt-" + tr_src + "-" + tr_tgt;
             }
             if (tr_name.empty() && tr_model != "auto")
                 tr_name = crispasr_detect_backend_from_gguf(tr_model);
@@ -4148,10 +4157,17 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 tr_name = tr_model == "auto" ? "m2m100" : "llm";
             const bool tr_is_llm = tr_name == "llm" || tr_name == "chat";
             if (!tr_is_llm || tr_model == "auto")
-                tr_model = crispasr_resolve_model_cli(tr_model, tr_is_llm ? tr_registry : tr_name, params.no_prints,
-                                                      params.cache_dir, params.auto_download, "");
+                tr_model = crispasr_resolve_model_cli(tr_model, !tr_registry.empty() ? tr_registry : tr_name,
+                                                      params.no_prints, params.cache_dir, params.auto_download, "");
             if (tr_model.empty()) {
-                fprintf(stderr, "crispasr: error: could not resolve the translation model (--translate-model).\n");
+                if (tr_name == "marian")
+                    fprintf(stderr,
+                            "crispasr: error: no Opus-MT model is registered for %s -> %s (registered: de-en, "
+                            "en-de). Convert one with models/convert-marian-to-gguf.py and pass the file to "
+                            "--translate-model.\n",
+                            tr_src.c_str(), tr_tgt.c_str());
+                else
+                    fprintf(stderr, "crispasr: error: could not resolve the translation model (--translate-model).\n");
                 return 22;
             }
             whisper_params tr_params = params;

@@ -53,7 +53,7 @@ crispasr -m auto --backend whisper -f de.wav --translate
 crispasr --mic -m auto --backend parakeet
 
 # Live mic, transcribed AND translated sentence by sentence (German -> English)
-crispasr --live-translate -l de --tr-tl en -m auto --backend parakeet --translate-model hy-mt2
+crispasr --live-translate -l de --tr-tl en -m auto --backend parakeet --translate-backend marian
 
 # Text LID — auto-routes by GGUF arch, auto-downloads on first use
 crispasr-lid -m auto --text "Bonjour le monde"           # cstr/cld3-GGUF (default)
@@ -1348,7 +1348,7 @@ Four text-to-text translation backends, all driven by `--text "..."
 |---|---|---|---|
 | `m2m100` | [`facebook/m2m100_418M`](https://huggingface.co/cstr/m2m100-418m-GGUF) — 12L+12L transformer, ~502 MB Q8_0 | 100, any-to-any | ✓ production-ready (en→de exact match to Python ref) |
 | `m2m100-wmt21` | [`facebook/wmt21-dense-24-wide-en-x`](https://huggingface.co/cstr/wmt21-dense-24-wide-en-x-GGUF) + [`facebook/wmt21-dense-24-wide-x-en`](https://huggingface.co/cstr/wmt21-dense-24-wide-x-en-GGUF) — 24L+24L wider, ~2.5 GB Q4_K each | English ↔ 7 languages (separate `en-x` / `x-en` checkpoints) | ✓ runs on m2m100 runtime; vocab fix in 7f48bad |
-| `marian` (alias `opus-mt`) | [`Helsinki-NLP/opus-mt-de-en`](https://huggingface.co/Helsinki-NLP/opus-mt-de-en) / [`opus-mt-en-de`](https://huggingface.co/Helsinki-NLP/opus-mt-en-de) — MarianMT 6L+6L, d=512, ~75M parameters, 153 MB F16. No hosted GGUF and no `-m auto`: convert with `models/convert-marian-to-gguf.py` | one direction per checkpoint | ✓ token ids and greedy output equal to Hugging Face on the parity set (`tools/marian_parity.py`) |
+| `marian` (alias `opus-mt`) | [`Helsinki-NLP/opus-mt-de-en`](https://huggingface.co/Helsinki-NLP/opus-mt-de-en) / [`opus-mt-en-de`](https://huggingface.co/Helsinki-NLP/opus-mt-en-de) — MarianMT 6L+6L, d=512, ~75M parameters, 84 MB Q8_0 / 153 MB F16 ([`cstr/opus-mt-de-en-GGUF`](https://huggingface.co/cstr/opus-mt-de-en-GGUF), [`cstr/opus-mt-en-de-GGUF`](https://huggingface.co/cstr/opus-mt-en-de-GGUF)). `-m auto` = de→en, `-m opus-mt-en-de` the reverse; other pairs: `models/convert-marian-to-gguf.py` | one direction per checkpoint | ✓ F16: token ids and output equal to Hugging Face, greedy and beam 4 (14/14 de→en, 8/8 en→de). Q8_0: 12/14 and 8/8 greedy (`tools/marian_parity.py`) |
 | `madlad` (alias `t5`) | [`google/madlad400-3b-mt`](https://huggingface.co/cstr/madlad400-3b-mt-GGUF) — T5 12L+12L, ~1.9 GB Q4_K | 419 | ✓ tokens match Python SP bit-by-bit; outputs match HF reference |
 
 ```bash
@@ -1365,9 +1365,7 @@ Four text-to-text translation backends, all driven by `--text "..."
 
 # Opus-MT de→en (a single-pair model: -sl/-tl must name its own direction;
 # another pair is ignored with a warning)
-python models/convert-marian-to-gguf.py --input /path/to/opus-mt-de-en \
-    --output opus-mt-de-en-f16.gguf
-./build/bin/crispasr --backend marian -m opus-mt-de-en-f16.gguf \
+./build/bin/crispasr --backend marian -m auto \
     --text "Die Konferenz findet am 3. Oktober in Berlin statt." \
     -sl de -tl en
 
@@ -1412,8 +1410,8 @@ ffmpeg -re -i talk.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
 | Flag | Meaning |
 |---|---|
 | `--live-translate` | Preset: `--mic --stream --vad --stream-realtime`, 500 ms step, and the translator below. Needs `-l` (the spoken language). |
-| `--translate-model NAME\|FILE` | The translator. `auto` = m2m100-418M; `hy-mt2` / `index-translate` = translation LLMs fetched from the registry; or a GGUF path. Setting it on a plain `--stream` / `--mic` run turns translation on there too. |
-| `--translate-backend NAME` | `m2m100`, `madlad` or `llm`. Default: detected from the model file; a GGUF that is none of the translation backends is run as a translation chat LLM. |
+| `--translate-model NAME\|FILE` | The translator. `auto` = m2m100-418M; `opus-mt-de-en` / `opus-mt-en-de` = Opus-MT (fastest); `hy-mt2` / `index-translate` = translation LLMs; or a GGUF path. Setting it on a plain `--stream` / `--mic` run turns translation on there too. |
+| `--translate-backend NAME` | `m2m100`, `marian`, `madlad` or `llm`. Default: detected from the model file; a GGUF that is none of the translation backends is run as a translation chat LLM. Given without `--translate-model`, it picks that kind's default: `marian` the Opus-MT model for the language pair, `llm` Hy-MT2. |
 | `--translate-prompt TEXT` | LLM translators only: `hy-mt2`, `index-translate`, or a template with `{src}` `{tgt}` `{text}` (`\n` = newline). Default: by model. |
 | `--translate-beam N` | Beam for m2m100 / madlad. Default `1` (greedy): m2m100's beam search has no KV cache and is several times slower. `0` = the translator's own default. |
 | `--no-translate-drafts` | Translate committed sentences only; no draft of the sentence still being spoken. |

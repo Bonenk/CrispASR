@@ -16,7 +16,12 @@ technical deep-dives are in `LEARNINGS.md`.
   mode 23–118 ms (median ~45) against m2m100's 125–922 ms in the same
   interleaved runs (load 7–10), with better text. m2m100 output unchanged
   (11/11 identical before/after). Also fixes an m2m100 decoder-KV leak (a new
-  cache per translated sentence, never freed). GGUFs are not published yet.
+  cache per translated sentence, never freed), and `-t` now reaches the
+  m2m100/marian runtime. Published as `cstr/opus-mt-de-en-GGUF` and
+  `cstr/opus-mt-en-de-GGUF` (f16 + q8_0, CC-BY-4.0); `--translate-backend
+  marian` picks the model for the language pair. Parity against the
+  reference at load ~4: f16 exact greedy and beam 4 (14/14, 8/8); q8_0 12/14
+  and 8/8 greedy; q4_k 8/14 and 3/8, not published.
 - **Live translation**: the next commit candidate is translated ahead of time
   and reused at commit (10 of 11 sentences); the LLM translator no longer
   resets between sentences (the runtime keeps the shared instruction prefix);

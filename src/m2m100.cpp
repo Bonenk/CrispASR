@@ -1326,6 +1326,10 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
     //     neutral — small encoder-decoder AR, launch-bound (LEARNING 34) — so
     //     Metal stays CPU unless forced. Mirrors LEARNING 34's is_metal gate.
     c->backend_cpu = core_cpu_backend::init();
+    // Honour the caller's thread count. It used to be parsed, stored and never
+    // applied, so `-t` did nothing for m2m100 / marian.
+    if (params.n_threads > 0)
+        core_cpu_backend::set_n_threads(c->backend_cpu, params.n_threads);
     const char* gpu_env = std::getenv("CRISPASR_M2M100_GPU");
     const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
     const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;

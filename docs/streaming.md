@@ -259,7 +259,8 @@ sentence. With `--stream-json` you get events instead (below).
 `-l` is the spoken language and is required. `--tr-tl` is the language to
 translate into (default: `en`, or `de` when the speech is English).
 `--translate-model` takes `auto` (m2m100-418M, 100 languages, ~500 MB), a
-registry name — `hy-mt2` (Hy-MT2-1.8B, ~1.1 GB, the recommended one) or
+registry name — `opus-mt-de-en` / `opus-mt-en-de` (Opus-MT, 84 MB, the
+fastest), `hy-mt2` (Hy-MT2-1.8B, ~1.1 GB, the best speed-for-quality LLM) or
 `index-translate` (Index-Translate-2B, ~1.3 GB) — or a translator GGUF. The
 kind of translator is detected from the file
 (`--translate-backend m2m100|marian|madlad|llm` overrides); see the table below.
@@ -349,7 +350,7 @@ the machine is yours and the lowest algorithmic latency matters.
 
 | Translator | Per sentence (de→en) | Notes |
 |---|---|---|
-| **`marian`: Opus-MT** (`Helsinki-NLP/opus-mt-de-en` / `-en-de`, ~75M parameters, q8_0 84 MB, CC-BY-4.0) | **23–118 ms, median ~45** (load 7–10; m2m100 in the same interleaved runs: 125–922 ms, median 315–650) | **Fastest by a wide margin, and better text than m2m100** ("new colleague", "furniture packers"). One model per language pair. No registry entry yet — convert with `models/convert-marian-to-gguf.py` and pass the GGUF to `--translate-model`. Use f16 or q8_0: q8_0 matched f16 on the test sentences, q4_k changed 4 of 8. Greedy output matches the reference implementation exactly at f16 (14/14 de→en, 8/8 en→de). |
+| **`opus-mt-de-en` / `opus-mt-en-de`: Opus-MT** (`marian` backend; ~75M parameters, q8_0 84 MB, CC-BY-4.0; [`cstr/opus-mt-de-en-GGUF`](https://huggingface.co/cstr/opus-mt-de-en-GGUF), [`cstr/opus-mt-en-de-GGUF`](https://huggingface.co/cstr/opus-mt-en-de-GGUF)) | **23–118 ms, median ~45** (load 7–10; m2m100 in the same interleaved runs: 125–922 ms, median 315–650) | **Fastest by a wide margin, and better text than m2m100** ("new colleague", "furniture packers"). One model per language pair: `--translate-backend marian` picks it from `-l` / `--tr-tl`; other pairs need `models/convert-marian-to-gguf.py`. At f16 the output equals the reference implementation exactly, greedy and with beam 4 (14/14 de→en, 8/8 en→de); the q8_0 file that is downloaded by default matches on 12/14 and 8/8 (the rest differ in wording). |
 | `m2m100` (418M, the `auto` default) | 92–392 ms, median 210 | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
 | **`hy-mt2`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 370–910 ms, median 570 | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. `--translate-model hy-mt2`, or pass any GGUF: a file that is none of the built-in translators is run as a translation chat LLM. |
 | **`index-translate`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | 476–1100 ms, median 692 | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."), a little slower than Hy-MT2. Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |
@@ -369,6 +370,9 @@ in (the second is chosen automatically for a file named like the model,
 otherwise the first); anything else is taken as a template —
 `--translate-prompt 'Translate from {src} to {tgt}:\n{text}'`. A reasoning
 model's `<think>` block is removed from the output.
+m2m100 and Opus-MT run on the CPU by design on Apple Silicon; the LLM
+translators need the GPU (Hy-MT2 on CPU: ~8.5 s per sentence against ~0.6 s,
+`CRISPASR_TRANSLATE_CPU=1`, load 12–27).
 Drafts of the open sentence switch themselves off while committed sentences
 take more than ~500 ms to translate — a slow translator would still be busy
 with a draft when the next real sentence arrives.

@@ -54,13 +54,13 @@ Open, in the order they would help:
    re-translating) for de/en; base Hy-MT2 is not trained for it.
 8. moonshine-de stops at the first longer pause of a clip. m2m100 beam search
    has no KV cache. Windows paths are compiled by CI only, never run.
-9. **Publish the Opus-MT GGUFs** (`opus-mt-de-en` / `-en-de`, f16 + q8_0) and
-   add registry rows; until then `--translate-model` needs a local file. The
-   two HF cards disagree on the licence (apache-2.0 vs cc-by-4.0) — settle it
-   before publishing. Not verified for marian: beam-4 parity with the
-   reference, the multi-target `>>xxx<<` models, `-t` (ignored by the
-   m2m100/marian runtime).
-10. Translator on CPU vs GPU was never A/B'd cleanly (`CRISPASR_TRANSLATE_CPU`).
+9. Opus-MT: only de↔en is hosted (`cstr/opus-mt-{de-en,en-de}-GGUF`, f16 +
+   q8_0, CC-BY-4.0 per the OPUS-MT project's own statement). Other pairs
+   need converting and a registry row. A multi-target checkpoint
+   (`opus-mt-en-ROMANCE`, f16) matched the reference 8/8 greedy and beam 4,
+   and `-tl es` selects the target; the gelu/relu activation branches are
+   still unrun (every checkpoint tried is swish). Beam search has no KV cache (beam 4 ≈ 600-750 ms per
+   sentence against ~40 ms greedy).
 
 ## OPEN 2026-10-03 — Index-Echo Q4 candidate preparation and GPU acceptance
 
