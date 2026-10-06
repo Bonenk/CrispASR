@@ -16,6 +16,7 @@
 
 #include "../examples/cli/crispasr_live_translate_sink.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -421,6 +422,43 @@ TEST_CASE("live-translate: a forced clause split is not translated cold — the 
     fclose(f);
     REQUIRE(seen == std::vector<std::string>{
                         "das ist vor allem auf den starken Export nach Frankreich und Italien zurückzuführen."});
+}
+
+TEST_CASE("live-translate: a sentence translated ahead of time is not translated again when it commits",
+          "[unit][live-translate]") {
+    FILE* f = tmpfile();
+    REQUIRE(f != nullptr);
+    std::vector<std::string> seen;
+    {
+        crispasr::lt_sink_config cfg;
+        cfg.output = crispasr::lt_output::json;
+        cfg.src_lang = "de";
+        cfg.tgt_lang = "en";
+        cfg.sync = true;
+        cfg.out = f;
+        cfg.log = nullptr;
+        crispasr::lt_sink sink(cfg, [&](const std::string& s, const crispasr::lt_sink::progress_fn&) {
+            seen.push_back(s);
+            return "EN<" + s + ">";
+        });
+        const auto now = crispasr::lt_sink::clock::now();
+        // "Guten Morgen." is finished and followed by text: it is the next
+        // commit candidate, so exactly that sentence is translated now…
+        sink.on_partial(1, "Guten Morgen. Ich", 1.0, now);
+        REQUIRE(seen == std::vector<std::string>{"Guten Morgen."});
+        // …and when it commits on the next partial, nothing is translated twice.
+        sink.on_partial(1, "Guten Morgen. Ich bin", 1.5, now);
+        REQUIRE(std::count(seen.begin(), seen.end(), "Guten Morgen.") == 1);
+    }
+    rewind(f);
+    std::string all;
+    char buf[512];
+    while (fgets(buf, sizeof(buf), f))
+        all += buf;
+    fclose(f);
+    // The committed sentence still gets its translation event.
+    REQUIRE(all.find("\"type\":\"translation\",\"utterance_id\":1,\"sentence_id\":0,\"text\":\"Guten Morgen.\","
+                     "\"translation\":\"EN<Guten Morgen.>\"") != std::string::npos);
 }
 
 TEST_CASE("live-translate: threaded sink drains every committed sentence before it stops",

@@ -4214,7 +4214,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     gp.temperature = 0.0f; // greedy: a translation, not a conversation
                     gp.repeat_penalty = 1.0f;
                     crispasr_chat_error e{};
-                    crispasr_chat_reset(llm, &e); // every sentence is its own conversation
+                    // No reset between sentences: the chat runtime keeps the
+                    // tokens the new prompt shares with the previous one in its
+                    // KV cache and decodes only what differs. The instruction
+                    // comes first in every prompt, so it is read once per
+                    // session instead of once per sentence. (A cache that
+                    // cannot drop a suffix — recurrent state — is cleared by
+                    // the runtime itself, which is the old behaviour.)
                     const crispasr_chat_message msg{"user", content.c_str()};
                     struct state {
                         std::string out;
@@ -4507,9 +4513,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         // --stream-session: the recogniser keeps its own state across steps and
         // is handed only the new audio. Its text is the hypothesis for the
-        // whole turn so far; a turn ends when no new text has arrived for
-        // --stream-final-on-silence-ms (the model stopped emitting = the
-        // speaker stopped), which needs no VAD.
+        // whole turn so far. A turn ends when the SPEAKER has been silent for
+        // --stream-final-on-silence-ms — judged from the audio (VAD over the
+        // last few seconds), not from the text: a session that emits in
+        // bursts (several chunks per step on CPU) goes quiet for longer than
+        // that in the middle of a sentence, and closing the turn there cut
+        // sentences in half. Without a VAD model the text is all there is,
+        // and the wait is stretched to cover a burst.
         std::unique_ptr<CrispasrRealtimeSession> rt_session;
         if (params.stream_session) {
             if (!live_tr) {
@@ -4529,6 +4539,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         bool rt_open = false;
         std::string rt_text;
         int64_t rt_last_growth_sample = 0;
+        int64_t rt_last_speech_sample = 0;
         int64_t rt_turn_start_sample = 0;
         // Close the open turn: flush the session, hand the sink the final text.
         auto rt_close_turn = [&]() {
@@ -4646,6 +4657,16 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - timing_asr_t0).count();
                 timing_asr_audio_s = (double)fed / SR;
                 const double t_now = (double)cumulative_samples / (double)SR;
+                // Where did speech last end? VAD over the newest 3 s.
+                if (!stream_vad_path.empty()) {
+                    const int tail = std::min((int)pcm_window.size(), 3 * SR);
+                    const int tail_off = (int)pcm_window.size() - tail;
+                    const auto tail_slices = crispasr_compute_vad_slices(pcm_window.data() + tail_off, tail, SR,
+                                                                         stream_vad_path.c_str(), stream_vad_opts);
+                    if (!tail_slices.empty())
+                        rt_last_speech_sample = std::max(rt_last_speech_sample, cumulative_samples - (int64_t)tail +
+                                                                                    (int64_t)tail_slices.back().end);
+                }
                 if (!now_text.empty() && now_text != rt_text) {
                     if (!rt_open) {
                         rt_open = true;
@@ -4664,11 +4685,20 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     }
                     live_tr->on_partial(rt_turn, rt_text, t_now, step_arrived);
                 } else if (rt_open) {
-                    const int64_t quiet_ms = (cumulative_samples - rt_last_growth_sample) * 1000 / SR;
+                    // Silence by the audio when we can tell; otherwise by the
+                    // text, with room for a burst. Either way the model must
+                    // also have stopped emitting, or its last words are lost.
+                    const int64_t text_quiet_ms = (cumulative_samples - rt_last_growth_sample) * 1000 / SR;
+                    const bool by_audio = !stream_vad_path.empty();
+                    const int64_t quiet_ms =
+                        by_audio ? std::min(text_quiet_ms, (cumulative_samples - rt_last_speech_sample) * 1000 / SR)
+                                 : text_quiet_ms;
+                    const int64_t close_ms =
+                        by_audio ? params.stream_final_silence_ms : std::max(params.stream_final_silence_ms, 2500);
                     const bool too_long = cumulative_samples - rt_turn_start_sample > utterance_max_samples;
-                    if ((params.stream_final_silence_ms > 0 && quiet_ms >= params.stream_final_silence_ms) || too_long)
+                    if ((params.stream_final_silence_ms > 0 && quiet_ms >= close_ms) || too_long)
                         rt_close_turn();
-                    else if (params.stream_final_silence_ms > 0 && quiet_ms >= params.stream_final_silence_ms / 2)
+                    else if (params.stream_final_silence_ms > 0 && quiet_ms >= close_ms / 2)
                         live_tr->on_pause(rt_turn, t_now, step_arrived);
                 }
                 continue;
@@ -4697,8 +4727,38 @@ int crispasr_run_backend(const whisper_params& params_in) {
             bool decoded_segments_this_step = false;
             if (!stream_vad_path.empty()) {
                 const auto timing_vad_t0 = std::chrono::steady_clock::now();
-                const auto slices = crispasr_compute_vad_slices(pcm_window.data(), (int)pcm_window.size(), SR,
-                                                                stream_vad_path.c_str(), stream_vad_opts);
+                // Live translation: the VAD only has to look at audio that is
+                // still in play. Everything before the committed boundary (or
+                // the last finalised utterance) can no longer change what we
+                // do, yet re-scanning the whole rolling window was a fifth of
+                // every step. Start a second and a half before the earliest
+                // sample we may still decode, so the detector has warmed up
+                // by the time it matters.
+                int vad_off = 0;
+                if (live_tr) {
+                    const int64_t win_start = cumulative_samples - (int64_t)pcm_window.size();
+                    int64_t keep_from = finalized_until_sample;
+                    if (have_open_utterance) {
+                        keep_from = utterance_start_sample;
+                        const double from_s = live_tr->decode_from();
+                        if (from_s >= 0.0)
+                            keep_from = std::max<int64_t>(keep_from, (int64_t)(from_s * SR) - 24000);
+                    }
+                    keep_from -= 24000;
+                    vad_off =
+                        (int)std::min<int64_t>(std::max<int64_t>(keep_from - win_start, 0), (int64_t)pcm_window.size());
+                    // Nothing to gain below a second; keep the common case identical.
+                    if (vad_off < SR)
+                        vad_off = 0;
+                }
+                auto slices = crispasr_compute_vad_slices(pcm_window.data() + vad_off, (int)pcm_window.size() - vad_off,
+                                                          SR, stream_vad_path.c_str(), stream_vad_opts);
+                for (auto& sl : slices) {
+                    sl.start += vad_off;
+                    sl.end += vad_off;
+                    sl.t0_cs += (int64_t)vad_off * 100 / SR;
+                    sl.t1_cs += (int64_t)vad_off * 100 / SR;
+                }
                 timing_vad_ms =
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - timing_vad_t0).count();
                 // Snapshot for the straddling-slice subrange decode below.
