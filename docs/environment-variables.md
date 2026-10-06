@@ -164,6 +164,9 @@ surviving artifact. Applied on both the CLI and the session C-ABI.
 | `CRISPASR_RNNT_GPU_ENC_PROJ` | Parakeet's backend encoder-to-joint projection is default on CUDA. `0` restores the scalar CPU projection; `1` opts other GPU backends in. |
 | `CRISPASR_NGRAM_LOOPFIX_OFF` | Disable the n-gram decode-loop breaker. |
 | `CRISPASR_STREAM_SLICE_MEMO` | Memoize per-slice streaming partial decodes by absolute sample range (#404). **Default ON** — finals byte-equal, wall −12 % CPU / −6 % GPU in the quiet-box A/B; `=0` re-decodes closed slices every step. |
+| `CRISPASR_STREAM_TIMING` | `1` prints one stderr line per streaming step: audio taken in, total step cost, VAD cost, recogniser cost and seconds decoded. A step that costs more than the audio it took in is a stream falling behind. |
+| `CRISPASR_TRANSLATE_SYNC` | Live translation: run the translator on the streaming thread instead of its own. Deterministic event order for tests and debugging; the recogniser then waits for every translation. |
+| `CRISPASR_TRANSLATE_CPU` | Live translation: keep the translator off the GPU the recogniser is using (an A/B switch for GPU contention). |
 | `CRISPASR_GAP_FILL` / `_GAP_FILL_MIN_CS` | Re-transcribe spans a first pass left empty (long audio); on by default for parakeet, threshold non-JA 300 cs / JA 100 cs. |
 
 ### G2P / phonemizer
@@ -1097,6 +1100,10 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   (off by default).
 - `CRISPASR_NEMOTRON_GPU_STREAM_CACHE` — `1` keeps the per-layer streaming state
   in a device-resident ping-pong cache across chunks (off by default).
+- `CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE` — `1` restores resubmitting cached
+  chunk graphs in the stream-cache path. **Known-bad, for debugging only:** it
+  produces a corrupted transcript on Metal once the attention cache is full
+  (~4.5 s). The default rebuilds the graph per chunk.
 - `CRISPASR_NEMOTRON_MAES`
 - `CRISPASR_NEMOTRON_NO_WINDOW_MASK`
 - `CRISPASR_NEMOTRON_STREAMING`

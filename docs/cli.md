@@ -52,6 +52,9 @@ crispasr -m auto --backend whisper -f de.wav --translate
 # Live mic
 crispasr --mic -m auto --backend parakeet
 
+# Live mic, transcribed AND translated sentence by sentence (German -> English)
+crispasr --live-translate -l de --tr-tl en -m auto --backend parakeet --translate-model hy-mt2
+
 # Text LID — auto-routes by GGUF arch, auto-downloads on first use
 crispasr-lid -m auto --text "Bonjour le monde"           # cstr/cld3-GGUF (default)
 crispasr-lid -m auto:glotlid --text "Bonjour le monde"   # 2102 ISO 639-3 + script
@@ -1303,7 +1306,7 @@ otherwise they are pyannote-local track IDs.
 
 ## Multi-language / translation
 
-There are **three distinct translation paths**, each with its own
+There are **four distinct translation paths**, each with its own
 flags. Pick by what you have for input and what you need out:
 
 | You have | You want | Use |
@@ -1311,6 +1314,7 @@ flags. Pick by what you have for input and what you need out:
 | Audio in language X | Translated text in English | `-tr` / `--translate` (audio→EN-text on whisper, canary, granite, voxtral, qwen3) |
 | Audio in language X | Translated text in language Y | `-sl X -tl Y` (audio AST on canary, granite-4.1, qwen3) |
 | Plain text in language X | Translated text in language Y | `--text "..." -sl X -tl Y --backend m2m100` (text→text only) |
+| Live audio in language X | Transcript **and** its translation into Y, sentence by sentence | `--live-translate -l X --tr-tl Y` (streaming recogniser + text translator; see [below](#live-transcribe--translate---live-translate)) |
 
 ### Audio-side translate (`--translate`, `-sl`/`-tl`)
 
@@ -1375,6 +1379,41 @@ language prefix from `-tl` automatically. m2m100 / WMT21 use both
 | `-sl LANG`, `-tl LANG` | Source / target — same flags as audio AST; ISO-639-1 codes. |
 | `--translate-max-tokens N` | Max output tokens (default 256). |
 | `--tr-sl LANG`, `--tr-tl LANG` (long: `--translate-source-lang` / `--translate-target-lang`) | Translator-stage source/target. Falls back to `-sl`/`-tl`. Only matters in 2-stage pipelines where the primary backend's `-sl`/`-tl` mean something else (the primary's AST source/target). 2-stage piping (ASR → m2m100) needs `--translate-model PATH` — that's a follow-up; the override flags are plumbed but the standalone path is what's exercised today. |
+
+### Live transcribe + translate (`--live-translate`)
+
+A streaming recogniser with a text translator behind it: each sentence is
+translated as soon as the recogniser has committed to it. The mechanism,
+the model comparison and the JSON events are in
+[`streaming.md`](streaming.md#live-transcription--translation---live-translate).
+
+```bash
+# Microphone, German -> English
+crispasr --live-translate -l de --tr-tl en \
+    -m auto --backend parakeet --translate-model hy-mt2
+
+# Any real-time PCM source instead of the microphone
+ffmpeg -re -i talk.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
+  | crispasr --stream --stream-realtime -l de --tr-tl en \
+      -m auto --backend parakeet --translate-model hy-mt2
+```
+
+| Flag | Meaning |
+|---|---|
+| `--live-translate` | Preset: `--mic --stream --vad --stream-realtime`, 500 ms step, and the translator below. Needs `-l` (the spoken language). |
+| `--translate-model NAME\|FILE` | The translator. `auto` = m2m100-418M; `hy-mt2` / `index-translate` = translation LLMs fetched from the registry; or a GGUF path. Setting it on a plain `--stream` / `--mic` run turns translation on there too. |
+| `--translate-backend NAME` | `m2m100`, `madlad` or `llm`. Default: detected from the model file; a GGUF that is none of the translation backends is run as a translation chat LLM. |
+| `--translate-prompt TEXT` | LLM translators only: `hy-mt2`, `index-translate`, or a template with `{src}` `{tgt}` `{text}` (`\n` = newline). Default: by model. |
+| `--translate-beam N` | Beam for m2m100 / madlad. Default `1` (greedy): m2m100's beam search has no KV cache and is several times slower. `0` = the translator's own default. |
+| `--no-translate-drafts` | Translate committed sentences only; no draft of the sentence still being spoken. |
+| `--tr-tl LANG`, `--tr-sl LANG` | Translation target (default `en`, or `de` for English speech) / source (default `-l`). |
+| `--stream-realtime` | The input is live: when decoding falls behind, read the whole backlog in one step. Implied by `--live-translate`. |
+| `--stream-session` | Drive the recogniser's own incremental session (nemotron, qwen3, vibevoice-streaming) instead of re-decoding the open speech each step. |
+
+Output is a two-line pair per sentence on a terminal (the open sentence is
+redrawn below, dimmed), `[de] …` / `[en] …` lines when piped, and
+`sentence` / `translation` / `translation_partial` JSON events with
+`--stream-json`. The first Ctrl+C ends the stream cleanly.
 
 ## Threading / processors
 

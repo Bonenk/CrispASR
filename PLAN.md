@@ -11,38 +11,15 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## OPEN 2026-10-05 — live transcribe + translate (`--live-translate`)
+## OPEN 2026-10-05 — live transcribe + translate: follow-ups
 
-Merged to `main` 2026-10-06 (#493, `20a48962`): `examples/cli/crispasr_live_translate.h`
-(sentence-commit policy, pure), `crispasr_live_translate_sink.h` (translator
-thread + TTY/plain/JSON output), wiring in `crispasr_run.cpp`, flags in
-`cli.cpp`, `tests/test-live-translate.cpp` (16 cases), `docs/streaming.md`.
-Verified end to end de→en and en→de with parakeet-v3 + m2m100 on a real-time
-pipe and on the microphone. Numbers and model verdicts are in
-`docs/streaming.md` — all taken on a box at load 6–40, so upper bounds only.
-
-Same merge, separate commits:
-
-- **ggml fork merged with upstream master (v0.26.0, `ffa4e8b8`).** Local
-  branch `sync/upstream-2026-10` in the submodule: `56e86a68` restores the
-  Metal `_hp` matmul kernel the kernels/ split had dropped (every
-  `GGML_PREC_F32` mul_mat with an F32 right-hand side aborted on non-tensor
-  Apple GPUs), `c36dab89` is the merge. 8 conflict files; the carried-patch
-  manifest went 29 → 46 guards, none removed. Merged into the fork's `crispstrobe-ops` as
-  CrispStrobe/ggml#5; the pin here is `c36dab89`. Verified on Metal/CPU only
-  (parakeet, nemotron, m2m100 transcripts; `test-backend-ops -b MTL0` 2071/2071
-  on five ops). ⚠ CUDA, Vulkan (C++ and GLSL), WebGPU, SYCL were resolved by
-  reading and never compiled — the Vulkan flash-attention `nbm1` stride next
-  to upstream's new sparse mode, and CUDA's sparse MMA next to the per-head
-  mask, are the two to watch in CI. ⚠ `GGML_PREC_F32` is now 10 (was 1): any
-  binding passing a raw `1` breaks silently; not audited. `ggml_*_set_prec`
-  are deprecated upstream (58 call lines here). `tests/test-metal-pipeline-cache.mm`
-  does not compile (pre-existing, 1-arg `ggml_metal_device_init`);
-  `test-ggml-scheduler-replay.cpp` is in no CMake target.
-- `src/nemotron.cpp` no longer resubmits cached chunk graphs in the GPU
-  stream-cache path (transcript byte-equal to the default path on a 50 s
-  clip; the opt-in pieces stay opt-in).
-- `examples/talk-llama/`: qwen35 loader skips an appended MTP block (below).
+Shipped 2026-10-06 (#493) together with the ggml v0.26.0 sync — what landed
+and how it was verified is in `HISTORY.md`; usage, model verdicts and
+measurements are in `docs/streaming.md`. ⚠ Still true after the sync:
+`GGML_PREC_F32` is now 10 (was 1), so a binding passing a raw `1` breaks
+silently (not audited); `ggml_*_set_prec` are deprecated upstream (58 call
+lines here); `tests/test-metal-pipeline-cache.mm` does not compile and
+`test-ggml-scheduler-replay.cpp` is in no CMake target.
 
 Open, in the order they would help:
 

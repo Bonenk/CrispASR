@@ -4127,6 +4127,17 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
             std::string tr_model = params.translate_model.empty() ? std::string("auto") : params.translate_model;
             std::string tr_name = params.translate_backend;
+            // `--translate-model hy-mt2` / `index-translate`: a translation
+            // LLM by its registry name. `--translate-backend llm` with no
+            // model (or `auto`) means the default one.
+            std::string tr_registry;
+            if (tr_model == "hy-mt2" || tr_model == "index-translate") {
+                tr_registry = tr_model;
+                tr_model = "auto";
+                tr_name = "llm";
+            } else if (tr_model == "auto" && (tr_name == "llm" || tr_name == "chat")) {
+                tr_registry = "hy-mt2";
+            }
             if (tr_name.empty() && tr_model != "auto")
                 tr_name = crispasr_detect_backend_from_gguf(tr_model);
             // A GGUF that is none of our translation backends is taken to be
@@ -4136,7 +4147,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 tr_name = tr_model == "auto" ? "m2m100" : "llm";
             const bool tr_is_llm = tr_name == "llm" || tr_name == "chat";
             if (!tr_is_llm || tr_model == "auto")
-                tr_model = crispasr_resolve_model_cli(tr_model, tr_is_llm ? "" : tr_name, params.no_prints,
+                tr_model = crispasr_resolve_model_cli(tr_model, tr_is_llm ? tr_registry : tr_name, params.no_prints,
                                                       params.cache_dir, params.auto_download, "");
             if (tr_model.empty()) {
                 fprintf(stderr, "crispasr: error: could not resolve the translation model (--translate-model).\n");

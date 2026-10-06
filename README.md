@@ -904,7 +904,9 @@ python models/convert-wav2vec2-to-gguf.py \
 CrispASR has three feature areas that warrant their own docs pages:
 
 - **[Streaming & live transcription](docs/streaming.md)** — `--stream`,
-  `--mic`, `--live`, sliding-window chunking, per-token confidence.
+  `--mic`, `--live`, sliding-window chunking, per-token confidence, and
+  **live translation** (`--live-translate`: transcript plus its translation,
+  sentence by sentence, with m2m100 or a translation LLM such as Hy-MT2).
 - **[Text-to-Speech (TTS)](docs/tts.md)** — Kokoro (multilingual,
   smallest), Qwen3-TTS (highest fidelity, voice cloning), VibeVoice
   (lowest-latency streaming), Orpheus (3 B Llama + SNAC), Chatterbox
@@ -934,6 +936,9 @@ Quickest taste of each:
 ```bash
 # Streaming from microphone
 crispasr --mic -m model.gguf
+
+# Microphone, transcribed and translated live (German -> English)
+crispasr --live-translate -l de --tr-tl en -m auto --backend parakeet --translate-model hy-mt2
 
 # TTS via auto-downloaded VibeVoice (~636 MB on first run)
 crispasr --backend vibevoice-tts -m auto --tts "Hello world" --tts-output hello.wav
