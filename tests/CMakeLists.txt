@@ -2688,6 +2688,31 @@ catch_discover_tests(test-m2m100-params
     PROPERTIES LABELS "unit;m2m100"
 )
 
+# ─── test-marian-tokenizer — core/marian_tokenizer.h (SentencePiece normalizer,
+# unigram Viterbi, vocab.json id mapping) and the Marian branch of the m2m100
+# loader refusing a GGUF without its tokenizer tables. No model files. ─────────
+add_executable(test-marian-tokenizer
+    test-marian-tokenizer.cpp
+)
+target_include_directories(test-marian-tokenizer PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-marian-tokenizer PRIVATE
+    Catch2::Catch2WithMain
+    m2m100
+)
+catch_discover_tests(test-marian-tokenizer
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;marian;m2m100"
+)
+
+# marian-parity — in-process driver for tools/marian_parity.py (token ids,
+# greedy text and warm per-sentence timings against Hugging Face). Needs a
+# model, so it is not a test and is only built when asked for by name.
+add_executable(marian-parity EXCLUDE_FROM_ALL marian-parity.cpp)
+target_include_directories(marian-parity PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(marian-parity PRIVATE m2m100)
+
 # ─── test-moonshine-stream-params — Catch2 unit tests for moonshine_streaming_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-moonshine-stream-params

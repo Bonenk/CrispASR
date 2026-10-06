@@ -509,6 +509,18 @@ their upstream terms apply to the weights and any redistribution of them:
     https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
     Attribution is required; commercial use is permitted by that license.
 
+  Helsinki-NLP Opus-MT (MarianMT) translation models
+    CC-BY-4.0, per the OPUS-MT project
+    (https://github.com/Helsinki-NLP/Opus-MT). Sources:
+    https://huggingface.co/Helsinki-NLP/opus-mt-de-en
+    https://huggingface.co/Helsinki-NLP/opus-mt-en-de
+    Attribution is required; commercial use is permitted by that license.
+    (The opus-mt-de-en model card is tagged apache-2.0 and opus-mt-en-de
+    cc-by-4.0; the project's own statement, CC-BY-4.0, is the one followed
+    here.) CrispASR hosts no conversion of these yet: `--backend marian`
+    takes a GGUF produced locally by models/convert-marian-to-gguf.py. Anyone
+    redistributing such a GGUF carries the attribution.
+
   OuteAI/OuteTTS-0.3-1B
     CC-BY-NC-SA-4.0 (non-commercial, ShareAlike):
     https://huggingface.co/OuteAI/OuteTTS-0.3-1B

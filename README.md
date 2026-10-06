@@ -349,6 +349,7 @@ Driven by `--text "..." -sl <src> -tl <tgt>`.
 |---|---|---|---|---|
 | **m2m100** | [`facebook/m2m100_418M`](https://huggingface.co/cstr/m2m100-418m-GGUF) | 12L enc + 12L dec transformer, SentencePiece 128K ([more](docs/architecture.md#m2m100--wmt21)) | 100 langs, any-to-any | MIT |
 | **m2m100-wmt21** | [`facebook/wmt21-dense-24-wide-en-x`](https://huggingface.co/cstr/wmt21-dense-24-wide-en-x-GGUF) + [`facebook/wmt21-dense-24-wide-x-en`](https://huggingface.co/cstr/wmt21-dense-24-wide-x-en-GGUF) | Same as m2m100, scaled to 4.7B (24L enc) ([more](docs/architecture.md#m2m100--wmt21)) | English ↔ 7 langs (separate `en-x` / `x-en` checkpoints) | MIT |
+| **marian** | [`Helsinki-NLP/opus-mt-de-en`](https://huggingface.co/Helsinki-NLP/opus-mt-de-en), [`opus-mt-en-de`](https://huggingface.co/Helsinki-NLP/opus-mt-en-de) — convert locally with `models/convert-marian-to-gguf.py` (no hosted GGUF yet) | MarianMT 6L enc + 6L dec transformer, d=512, ~75M parameters, SentencePiece unigram + 58K joint vocab ([more](docs/architecture.md#marian)) | one direction per checkpoint (de→en, en→de) | CC-BY-4.0 (OPUS-MT; attribution required) |
 | **madlad** | [`google/madlad400-3b-mt`](https://huggingface.co/cstr/madlad400-3b-mt-GGUF) | T5 enc-dec (12L+12L, d=2048, gated-GELU, RMSNorm) ([more](docs/architecture.md#madlad)) | 419 languages | Apache-2.0 |
 
 ```bash
@@ -370,6 +371,13 @@ Driven by `--text "..." -sl <src> -tl <tgt>`.
     -m models/wmt21-dense-24-wide-x-en-q4_k.gguf \
     --text "Le président a dit qu'il ne serait pas présent." \
     -sl fr -tl en   # uses wmt21-dense-24-wide-x-en
+
+# Opus-MT / MarianMT (one small model per direction; no auto-download —
+# convert with models/convert-marian-to-gguf.py and pass the GGUF)
+./build/bin/crispasr --backend marian -m opus-mt-de-en-f16.gguf \
+    --text "Die Konferenz findet am 3. Oktober in Berlin statt." \
+    -sl de -tl en --beam-size 1
+# → The conference will take place on 3 October in Berlin.
 
 # MADLAD-400 3B (419 languages, bit-token-identical to Python SP)
 ./build/bin/crispasr --backend madlad -m auto \

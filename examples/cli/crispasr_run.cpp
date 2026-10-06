@@ -4142,8 +4142,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 tr_name = crispasr_detect_backend_from_gguf(tr_model);
             // A GGUF that is none of our translation backends is taken to be
             // a chat LLM trained to translate (Hy-MT2 and the like).
-            if (tr_name.empty() || (tr_model != "auto" && tr_name != "m2m100" && tr_name != "m2m100-wmt21" &&
-                                    tr_name != "madlad" && tr_name != "t5" && params.translate_backend.empty()))
+            if (tr_name.empty() ||
+                (tr_model != "auto" && tr_name != "m2m100" && tr_name != "m2m100-wmt21" && tr_name != "marian" &&
+                 tr_name != "madlad" && tr_name != "t5" && params.translate_backend.empty()))
                 tr_name = tr_model == "auto" ? "m2m100" : "llm";
             const bool tr_is_llm = tr_name == "llm" || tr_name == "chat";
             if (!tr_is_llm || tr_model == "auto")

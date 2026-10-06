@@ -4125,14 +4125,17 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
 #endif
 #ifdef CA_HAVE_M2M100
     if (s->backend == "m2m100" || s->backend == "m2m-100" || s->backend == "translate" ||
-        s->backend == "m2m100-wmt21") {
+        s->backend == "m2m100-wmt21" || s->backend == "marian" || s->backend == "opus-mt") {
         // WMT21 Dense (24-wide) shares m2m100's runtime — m2m100.cpp
         // supports facebook/m2m100_418M, m2m100_1.2B AND wmt21-dense-24-wide,
         // and WMT21 GGUFs carry the `m2m100` architecture. The catalogue
         // tags them backend="m2m100-wmt21" (direction picked from the
         // model's prefix at translate time), so accept that string and
-        // normalise to the shared m2m100 context.
-        s->backend = "m2m100";
+        // normalise to the shared m2m100 context. MarianMT / Opus-MT GGUFs
+        // (architecture `marian`) run through the same context too; the
+        // runtime branches on the GGUF, so the name is kept only for display.
+        const bool want_marian = s->backend == "marian" || s->backend == "opus-mt";
+        s->backend = want_marian ? "marian" : "m2m100";
         m2m100_context_params p = m2m100_context_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = 1;
@@ -4955,7 +4958,7 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
     // m2m100-wmt21 routes through the same m2m100 engine (WMT21 Dense
     // support) — advertise it so CrisperWeaver's strict front-door check
     // accepts ModelDefinitions tagged backend='m2m100-wmt21'.
-    list += ",m2m100,m2m100-wmt21";
+    list += ",m2m100,m2m100-wmt21,marian";
 #endif
 #ifdef CA_HAVE_T5_TRANSLATE
     list += ",madlad";
@@ -10686,7 +10689,9 @@ CA_EXPORT char* crispasr_session_translate_text(crispasr_session* s, const char*
     if (s->m2m100_ctx) {
         if (s->beam_size_explicit)
             m2m100_set_beam_size(s->m2m100_ctx, s->beam_size);
-        return m2m100_translate(s->m2m100_ctx, text, src_lang, tgt_lang, max_tokens > 0 ? max_tokens : 200);
+        // Marian: 0 = the checkpoint's own max_length (m2m100's 200 otherwise).
+        const int m2m_default_max = m2m100_is_marian(s->m2m100_ctx) ? 0 : 200;
+        return m2m100_translate(s->m2m100_ctx, text, src_lang, tgt_lang, max_tokens > 0 ? max_tokens : m2m_default_max);
     }
 #endif
 #ifdef CA_HAVE_T5_TRANSLATE

@@ -1339,15 +1339,16 @@ whether to switch to cross-lingual synthesis. See
 | `--truecase-model FNAME` | Truecaser: `auto` (German) or a path to a `.bin` |
 | `--flush-after N` | Flush SRT to stdout every N segments (`0` = all at the end, the default) |
 
-### Text-to-text translate (m2m100, WMT21, MADLAD-400)
+### Text-to-text translate (m2m100, WMT21, Opus-MT, MADLAD-400)
 
-Three text-to-text translation backends, all driven by `--text "..."
+Four text-to-text translation backends, all driven by `--text "..."
 -sl <src> -tl <tgt>`:
 
 | Backend | Model | Languages | Status |
 |---|---|---|---|
 | `m2m100` | [`facebook/m2m100_418M`](https://huggingface.co/cstr/m2m100-418m-GGUF) — 12L+12L transformer, ~502 MB Q8_0 | 100, any-to-any | ✓ production-ready (en→de exact match to Python ref) |
 | `m2m100-wmt21` | [`facebook/wmt21-dense-24-wide-en-x`](https://huggingface.co/cstr/wmt21-dense-24-wide-en-x-GGUF) + [`facebook/wmt21-dense-24-wide-x-en`](https://huggingface.co/cstr/wmt21-dense-24-wide-x-en-GGUF) — 24L+24L wider, ~2.5 GB Q4_K each | English ↔ 7 languages (separate `en-x` / `x-en` checkpoints) | ✓ runs on m2m100 runtime; vocab fix in 7f48bad |
+| `marian` (alias `opus-mt`) | [`Helsinki-NLP/opus-mt-de-en`](https://huggingface.co/Helsinki-NLP/opus-mt-de-en) / [`opus-mt-en-de`](https://huggingface.co/Helsinki-NLP/opus-mt-en-de) — MarianMT 6L+6L, d=512, ~75M parameters, 153 MB F16. No hosted GGUF and no `-m auto`: convert with `models/convert-marian-to-gguf.py` | one direction per checkpoint | ✓ token ids and greedy output equal to Hugging Face on the parity set (`tools/marian_parity.py`) |
 | `madlad` (alias `t5`) | [`google/madlad400-3b-mt`](https://huggingface.co/cstr/madlad400-3b-mt-GGUF) — T5 12L+12L, ~1.9 GB Q4_K | 419 | ✓ tokens match Python SP bit-by-bit; outputs match HF reference |
 
 ```bash
@@ -1362,6 +1363,14 @@ Three text-to-text translation backends, all driven by `--text "..."
     --text "The president said he would not attend." \
     -sl en -tl de
 
+# Opus-MT de→en (a single-pair model: -sl/-tl must name its own direction;
+# another pair is ignored with a warning)
+python models/convert-marian-to-gguf.py --input /path/to/opus-mt-de-en \
+    --output opus-mt-de-en-f16.gguf
+./build/bin/crispasr --backend marian -m opus-mt-de-en-f16.gguf \
+    --text "Die Konferenz findet am 3. Oktober in Berlin statt." \
+    -sl de -tl en
+
 # MADLAD-400 (419 languages — output matches Python SP)
 ./build/bin/crispasr --backend madlad -m auto \
     --text "Hello world." \
@@ -1371,7 +1380,9 @@ Three text-to-text translation backends, all driven by `--text "..."
 For MADLAD-400 the source-language tag is informational (T5 encoders
 are language-agnostic); the adapter synthesises the `<2xx>` target-
 language prefix from `-tl` automatically. m2m100 / WMT21 use both
-`-sl` and `-tl`.
+`-sl` and `-tl`. An Opus-MT model has its direction built in; `-sl` / `-tl`
+are checked against it. Unset, `--beam-size` is the checkpoint's own
+`num_beams` (4); `--beam-size 1` is greedy.
 
 | Flag | Meaning |
 |---|---|

@@ -262,7 +262,7 @@ translate into (default: `en`, or `de` when the speech is English).
 registry name — `hy-mt2` (Hy-MT2-1.8B, ~1.1 GB, the recommended one) or
 `index-translate` (Index-Translate-2B, ~1.3 GB) — or a translator GGUF. The
 kind of translator is detected from the file
-(`--translate-backend m2m100|madlad|llm` overrides); see the table below.
+(`--translate-backend m2m100|marian|madlad|llm` overrides); see the table below.
 Passing `--translate-model` on a plain `--stream` / `--mic` run enables
 translation there too; `--live-translate` is the preset that also implies
 `--mic`, `--vad`, and `--stream-realtime`.
