@@ -91,6 +91,8 @@ all consume the same symbols.
 | `crispasr_aligner_cli.{h,cpp}` | Adapter converting `CrispasrAlignedWord` → the CLI's `crispasr_word` shape. |
 | `crispasr_server.cpp` | HTTP server for the persistent-model mode + OpenAI-compatible endpoints. |
 | `crispasr_llm_pipeline.h` | Templated audio-LLM pipeline (mel → encoder → prompt → KV decode). |
+| `crispasr_live_translate.h` | Live translation commit policy (`lt_committer`), pure and unit-tested: which part of a streaming hypothesis is settled. A sentence commits once the recogniser has moved past it and two partials agree, or a pause follows; it tracks where decoding may resume (word timestamp or estimate). No I/O, no model. |
+| `crispasr_live_translate_sink.h` | Live translation output (`lt_sink`): groups committed pieces into whole-sentence translation units, runs the translator on its own thread (streamed output for LLM translators), draws the terminal view or emits `sentence` / `translation` JSON events. Driven from the streaming loop in `crispasr_run.cpp`. |
 | `crispasr_run.cpp` | Top-level pipeline dispatch: resolve → detect → load → slice → transcribe → align → diarize → merge → cluster → Speaker DB → write (#267: align before diarize). |
 
 ## `src/core/` — the shared model primitives

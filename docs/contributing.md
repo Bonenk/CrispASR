@@ -178,6 +178,37 @@ companion file + URL in the same registry row:
  "~80 MB"},                                   // companion_size
 ```
 
+## 5a. Translators for live translation (`--translate-model`)
+
+`--live-translate` puts a text translator behind a streaming recogniser
+(`docs/streaming.md`). A translator is one of two things, and neither is
+wired like an ASR backend:
+
+- **A translation backend** — anything with `CAP_TRANSLATE` and a
+  `translate_text()` override (m2m100, madlad). Nothing extra: add its name to
+  the "known translation backends" test in `crispasr_run.cpp` (search
+  `tr_name != "madlad"`), or a GGUF of that kind is taken for an LLM.
+- **A translation chat LLM** — a GGUF the vendored LLM runtime
+  (`examples/talk-llama/`, `crispasr_chat_*`) can load. Three places:
+  1. a `k_registry[]` row in `src/crispasr_model_registry.cpp` (name, file,
+     URL — the `hy-mt2` / `index-translate` rows are the template; these are
+     not backends and need no factory entry);
+  2. the name in the `tr_registry` test in `examples/cli/crispasr_run.cpp`, and
+     a **prompt preset** next to `hy-mt2` / `index-translate` there. A
+     translation LLM only works with the instruction wording it was trained
+     on — copy it from the model card, including the language-name
+     convention (Hy-MT2: English names; Index-Translate: Chinese);
+  3. a row in the translator table in `docs/streaming.md`, with a measured
+     per-sentence time and the load you measured it under.
+  If the GGUF does not load, check `block_count` against the layers the
+  architecture really has before blaming the runtime's age: Index-Translate's
+  file appends a multi-token-prediction block (`nextn_predict_layers = 1`)
+  that the loader had to learn to skip.
+
+The commit policy is pure and unit-tested (`examples/cli/crispasr_live_translate.h`,
+`tests/test-live-translate.cpp`): a behaviour change there starts with a
+failing case in that file, scripted from the partials that showed the problem.
+
 ## 5b. TTS backend wiring — `CAP_TTS` and `--codec-model`
 
 TTS backends need extra wiring beyond ASR:

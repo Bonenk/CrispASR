@@ -234,13 +234,13 @@ models: a streaming recogniser and a text translator behind it.
 ```bash
 # German speech in, German + English text out:
 crispasr --live-translate -l de --tr-tl en \
-    -m auto --backend parakeet --translate-model auto
+    -m auto --backend parakeet --translate-model hy-mt2
 
 # Same pipeline on a pipe instead of the microphone (a live feed, or a file
 # replayed in real time). --stream-realtime tells it the input is live:
 ffmpeg -re -i talk.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
   | crispasr --stream --stream-realtime -l de --tr-tl en \
-      -m auto --backend parakeet --translate-model auto
+      -m auto --backend parakeet --translate-model hy-mt2
 ```
 
 On a terminal, finished sentence pairs scroll up and the sentence still being
@@ -258,8 +258,10 @@ sentence. With `--stream-json` you get events instead (below).
 
 `-l` is the spoken language and is required. `--tr-tl` is the language to
 translate into (default: `en`, or `de` when the speech is English).
-`--translate-model` takes a translator GGUF or `auto` (m2m100-418M, 100
-languages, ~500 MB). The kind of translator is detected from the file
+`--translate-model` takes `auto` (m2m100-418M, 100 languages, ~500 MB), a
+registry name — `hy-mt2` (Hy-MT2-1.8B, ~1.1 GB, the recommended one) or
+`index-translate` (Index-Translate-2B, ~1.3 GB) — or a translator GGUF. The
+kind of translator is detected from the file
 (`--translate-backend m2m100|madlad|llm` overrides); see the table below.
 Passing `--translate-model` on a plain `--stream` / `--mic` run enables
 translation there too; `--live-translate` is the preset that also implies
@@ -323,11 +325,18 @@ encoder is fast, re-decoding with parakeet is the better live recogniser.
 
 | Translator | Per sentence (de→en) | Notes |
 |---|---|---|
-| `m2m100` (418M, the `auto` default) | 130–500 ms | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
-| **`llm`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 400–870 ms | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. Pass the GGUF to `--translate-model`; a file that is none of the built-in translators is run as a translation chat LLM. |
-| `madlad` (MADLAD-400 3B, q4_k 2 GB) | 0.75–2.8 s | Good translations, too slow to keep up sentence by sentence; also slows the recogniser (same GPU). |
-| `m2m100` with `wmt21-dense-24-wide-x-en` (4.7B, q4_k 2.7 GB) | 1–6.5 s, first two 13–15 s | Very good translations, not live: the display ran 20–35 s behind. |
-| **`llm`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | not measured on a quiet machine (1.7–4 s at load 57) | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."). Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |
+| `m2m100` (418M, the `auto` default) | 92–392 ms, median 210 | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
+| **`hy-mt2`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 370–910 ms, median 570 | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. `--translate-model hy-mt2`, or pass any GGUF: a file that is none of the built-in translators is run as a translation chat LLM. |
+| **`index-translate`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | 476–1100 ms, median 692 | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."), a little slower than Hy-MT2. Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |
+| `madlad` (MADLAD-400 3B, q4_k 2 GB) | 0.75–2.8 s (load ~6–8) | Good translations, too slow to keep up sentence by sentence; also slows the recogniser (same GPU). |
+| `m2m100` with `wmt21-dense-24-wide-x-en` (4.7B, q4_k 2.7 GB) | 1–6.5 s, first two 13–15 s (load ~6–8) | Very good translations, not live: the display ran 20–35 s behind. |
+
+The first three rows are from one session on 2026-10-06 at load average 4–5
+(the quietest this machine got), same 50 s German clip, parakeet-v3
+recogniser; every run kept real time (94–97 steps of 500 ms) and produced all
+11 sentences. Time from the audio that decided a sentence to its translation
+on screen: m2m100 0.32–1.7 s (median 0.95), Hy-MT2 0.62–1.7 s (median 1.1),
+Index-Translate 0.73–1.7 s (median 1.1).
 
 A translation LLM only works with the instruction it was trained on.
 `--translate-prompt hy-mt2` and `--translate-prompt index-translate` are built
@@ -339,19 +348,16 @@ Drafts of the open sentence switch themselves off while committed sentences
 take more than ~500 ms to translate — a slow translator would still be busy
 with a draft when the next real sentence arrives.
 
-Measured 2026-10-05 on an M1 (16 GB, Metal), a 50 s German clip replayed in
-real time. **The machine was running unrelated heavy jobs throughout (load
-average 5–40); the best runs were at load ~5, nothing was measured on an idle
-machine:**
+Recogniser measurements, 2026-10-05/06 on an M1 (16 GB, Metal), the same clip.
+**The machine was running unrelated heavy jobs for most of it (load average
+4–66); nothing here was measured on an idle machine:**
 
-- parakeet-v3 q4_k + m2m100, load ~5: all 11 sentences correct, the stream
-  kept real time (96 steps of 500 ms, median step cost 358 ms: ~260 ms
-  recogniser for ~5.5 s of open audio, ~110 ms VAD). A sentence's
-  translation appeared **450–900 ms (median 640 ms)** after the audio that
-  decided it; drafts ~555 ms. At load 10–20 the same run is 2–4 s behind and
-  long sentences get split at clause boundaries.
-- parakeet decode cost: ~32 ms per second of audio at load ~5 (q4_k and
-  q8_0 the same), ~60–200 ms under load.
+- parakeet-v3 q4_k at load 4–5: median step cost ~300 ms for a 500 ms step
+  (~240 ms recogniser for ~3.5 s of open audio with word-timestamp
+  boundaries, ~65 ms VAD). At load 10–20 the same run falls 2–4 s behind and
+  long sentences get committed at clause boundaries.
+- parakeet decode cost: 32–75 ms per second of audio at load ~5 (q4_k and
+  q8_0 the same), 100–480 ms under load.
 - moonshine-de q4_k: translation 0.5–1.7 s after the deciding audio, median
   ~1.0 s (load 14–18). It transcribes up to the first longer pause of a clip
   and drops what follows (15 s clip: the sentence after a 0.7 s pause is

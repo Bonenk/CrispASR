@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (320 lessons)
+## Index by topic (326 lessons)
 
 **Security & untrusted input** (2)
 
@@ -143,7 +143,7 @@ cross-reference when you already know which model you are touching.
 - L18945 — Device-side argmax can cost more than the readback it removes, and an unused graph output still runs
 - L19386 — 314. Index-Echo 9B: preload functional child weights before trusting offloaded cache references
 
-**ggml graphs, allocation & caching** (48)
+**ggml graphs, allocation & caching** (49)
 
 - L77 — A float `--tensor-type` override must not reach 1-D tensors (2026-09-29, #461)
 - L1254 — Reusing a cached scheduler graph across `sched_reset`/`alloc` cycles is CPU-safe but SIGSEGVs on GPU — the reused input tensor is bound to the prior cycle's freed buffer
@@ -193,8 +193,9 @@ cross-reference when you already know which model you are touching.
 - L19282 — 2026-10-01 — Phonon-2 FFN: verify scheduler placement, magnitude and whole-model cost
 - L19343 — 2026-10-02 — Scheduler disposal must distinguish restored graphs from live rewires (PR #480)
 - L19419 — 315. Index-Echo 9B: VAD scheduler placement and whole-case F32 acceptance
+- L19489 — 2026-10-06 — A cached ggml graph whose nodes write persistent state must not be resubmitted (nemotron stream cache)
 
-**GPU portability — Metal / CUDA / Vulkan** (26)
+**GPU portability — Metal / CUDA / Vulkan** (28)
 
 - L102 — A GPU decoder can spend most of its time in one scalar CPU projection before the decode loop
 - L1799 — When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data
@@ -222,6 +223,8 @@ cross-reference when you already know which model you are touching.
 - L17167 — cosyvoice3 \"CUDA test FAIL\" was a registry-alias + flow-quant discovery bug, NOT a CUDA bug
 - L18458 — "GPU picks a different token than CPU" is usually NOT a miscompute in an AR audio model — dump the LOGITS, and don't reach for the repetition detector
 - L19362 — 2026-10-02 — CUDA package coherence includes the CPU floor and architecture coverage (#483)
+- L19474 — 2026-10-06 — A carried patch in two files loses one half when upstream splits a file (ggml Metal `_hp` kernel)
+- L19522 — 2026-10-06 — Before blaming a dependency bump for a red GPU suite, check what the suite does not do, then run the baseline
 
 **Quantization** (11)
 
@@ -324,7 +327,7 @@ cross-reference when you already know which model you are touching.
 - L17207 — CrispEmbed #31 WASM OCR e2e
 - L19314 — 313. Index-Echo: audit effective nested dtypes and Silero waveform history
 
-**Per-model port notes** (45)
+**Per-model port notes** (46)
 
 - L895 — A model's capability list cannot be inferred from its vocabulary — and forcing a fake list does not simulate having the capability
 - L3500 — Multi-stream token architecture (Mini-Omni2)
@@ -371,8 +374,9 @@ cross-reference when you already know which model you are touching.
 - L18313 — Four bugs that together caused empty/garbage transcripts; all patched in src/vibevoice.cpp +…
 - L18538 — "Verified byte-identical at 225 s" verified a clip, not a length — and a decoder that drops spans needs a repair pass, not a better cap
 - L19253 — 2026-10-01 — Parakeet / Phonon-2 CPU decoding: probe the production projection and SOS
+- L19552 — 2026-10-06 — A GGUF's `block_count` can include blocks that are not part of the trunk (Qwen3.5 MTP)
 
-**Uncategorised** (9)
+**Uncategorised** (11)
 
 - L67 — A stage timer can hide per-process setup — two very different GPUs showing the same time is the tell (2026-09-29, #461)
 - L85 — Keeping the old path "for safety" and re-running it can double the cost (2026-09-30, #478)
@@ -383,6 +387,8 @@ cross-reference when you already know which model you are touching.
 - L18765 — An ISA gate that "safely refuses" the only CPU module ships a process that cannot run — and every safety layer downstream assumed the layer above had fired
 - L18878 — An amplifying decoder needs a bound against INPUT SIZE, not duration — and the regression corpus that would have caught it had never been committed
 - L19001 — A phoneme dialect mismatch is invisible to every guard built to catch a bad G2P
+- L19503 — 2026-10-06 — Lining up a new hypothesis with committed text needs an alignment, and word lists need the same attribution as the text
+- L19538 — 2026-10-06 — A diagnosis is a prediction: test the prediction before shipping the fix (moonshine-de, and a loaded box)
 
 ## Cross-reference by model / family
 
@@ -412,7 +418,7 @@ lookup, not a partition.
 - **voxcpm2** (4) — L9161, L9365, L9488, L18337
 - **openvoice2** (1) — L13098
 - **glm-asr** (1) — L14360
-- **qwen3** (17) — L1965, L3839, L4542, L5211, L7890, L8491, L9161, L9555, L11537, L14319, L14417, L14510, L15193, L15529, L15947, L17955, L18458
+- **qwen3** (18) — L1965, L3839, L4542, L5211, L7890, L8491, L9161, L9555, L11537, L14319, L14417, L14510, L15193, L15529, L15947, L17955, L18458, L19552
 - **madlad / T5** (1) — L7785
 - **mini-omni2** (2) — L3485, L3500
 - **titanet / speaker-id** (1) — L8958

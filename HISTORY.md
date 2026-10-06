@@ -6,6 +6,51 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-06 — Live transcribe + translate, ggml v0.26.0 sync (#493)
+
+`--live-translate` (and `--translate-model` on any `--stream` / `--mic` run)
+puts a text translator behind a streaming recogniser and translates sentence
+by sentence. A sentence is committed once the recogniser has moved past it and
+two partials agree on it, or a pause follows it; committed text is never
+revised; a forced clause split is held and translated with the rest of its
+sentence. Each step decodes only the audio not yet committed — from the last
+committed word's timestamp when the recogniser has word times, from an
+estimate otherwise. Translators: m2m100, madlad, or a translation chat LLM
+through the vendored LLM runtime (Hy-MT2-1.8B, Index-Translate-2B), whose
+output is shown as it is generated. Policy is pure and unit-tested
+(`examples/cli/crispasr_live_translate.h`, 20 cases). Also `--stream-realtime`,
+`--stream-session`, clean exit on the first Ctrl+C, `CRISPASR_STREAM_TIMING`.
+
+Measured on an M1 that was loaded for most of the work (load 5–66). The
+quietest session (load 4–5, 2026-10-06, 50 s German clip, parakeet-v3) kept
+real time with all three translators: per sentence m2m100 92–392 ms, Hy-MT2
+370–910 ms, Index-Translate-2B 476–1100 ms; translation on screen 0.3–1.7 s
+after the deciding audio (medians 0.95 / 1.1 / 1.1 s). MADLAD-3B and
+wmt21-dense-24-wide-x-en are too slow to follow. `--translate-model hy-mt2` /
+`index-translate` resolve and auto-download from the registry.
+
+Same merge:
+- **ggml fork synced with upstream master v0.26.0** (CrispStrobe/ggml#5, pin
+  `c36dab89`; was 47 ahead / 326 behind). 8 conflict files; carried-patch
+  manifest 29 → 46 guards. Restores the Metal `kernel_mul_mm_hp` the kernels/
+  split had dropped — every `GGML_PREC_F32` mul_mat with an F32 right-hand
+  side aborted on non-tensor Apple GPUs. Verified: PR CI 80/80, fork CI incl.
+  Vulkan and the CUDA compile, and on a Kaggle GPU seven backends pass outright
+  (parakeet, canary, cohere, sensevoice, qwen3-asr, nemotron, moonshine-tiny)
+  with index-echo-2b passing all 67 stages. canary's per-layer gate went
+  0.998 → 0.99 (x86 layer 18 = 0.9977 after the sync).
+- **nemotron**: GPU stream-cache path no longer resubmits cached chunk graphs
+  (word salad after ~4.5 s on Metal; transcripts now byte-equal to the default
+  path); `<xx-XX>` language-tag tokens stripped from text, words and the
+  realtime session.
+- **Qwen3.5 loader** skips an appended MTP block (`nextn_predict_layers`), so
+  `IndexTeam/Index-Translate-2B-GGUF` loads.
+- **Kaggle regression suite** fetches `gguf.companion_files`;
+  `kaggle-status.yml` can push a named kernel and read one back.
+
+Not done: timings on an idle machine; nemotron's incremental session is ~4.5 s
+compute per audio-second on Metal; Windows live paths never run; see PLAN.md.
+
 ## DONE 2026-10-03 — MioTTS/Echo source integration and Q4 tooling
 
 Rebased the proven feature onto current main without changing native code,
