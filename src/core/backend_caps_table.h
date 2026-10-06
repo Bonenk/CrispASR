@@ -104,6 +104,7 @@ static const BackendCaps k_backend_caps[] = {
     {"m2m100", 12832u, "translate,beam-search,src-tgt-language,auto-download"},
     {"m2m100-wmt21", 12832u, "translate,beam-search,src-tgt-language,auto-download"},
     {"madlad", 12832u, "translate,beam-search,src-tgt-language,auto-download"},
+    {"marian", 4640u, "translate,beam-search,src-tgt-language"},
     {"mega-asr", 32618u,
      "timestamps-ctc,token-confidence,translate,diarize,temperature,beam-search,flash-attn,punctuation-toggle,src-tgt-"
      "language,auto-download,parallel-processors"},

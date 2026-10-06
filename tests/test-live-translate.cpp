@@ -112,6 +112,24 @@ TEST_CASE("live-translate: the cut-end period of a partial does not split a sent
     REQUIRE(texts(c.on_partial(1, "Ich gehe nach Hause. Dann")) == std::vector<std::string>{"Ich gehe nach Hause."});
 }
 
+TEST_CASE("live-translate: a terminator that flips on alternate partials still commits", "[unit][live-translate]") {
+    // Seen live with parakeet-v3: "vorstellen. Er kommt" / "vorstellen, er
+    // kommt" on alternating partials for five seconds. Two-in-a-row never
+    // happened, and the sentence was held until the next one ended.
+    lt_committer c;
+    REQUIRE(c.on_partial(1, "Kollegen vorstellen.").committed.empty());
+    REQUIRE(c.on_partial(1, "Kollegen vorstellen, er kommt.").committed.empty());
+    REQUIRE(c.on_partial(1, "Kollegen vorstellen. Er kommt aus München.").committed.empty() == false);
+}
+
+TEST_CASE("live-translate: a terminator seen once only does not commit", "[unit][live-translate]") {
+    lt_committer c;
+    c.on_partial(1, "Kollegen vorstellen, er");
+    c.on_partial(1, "Kollegen vorstellen, er kommt");
+    // First time with a period: neither of the last two partials had it.
+    REQUIRE(c.on_partial(1, "Kollegen vorstellen. Er kommt aus").committed.empty());
+}
+
 TEST_CASE("live-translate: committed text never comes out twice", "[unit][live-translate]") {
     lt_committer c;
     c.on_partial(1, "Erster Satz. Zweiter");

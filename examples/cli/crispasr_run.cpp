@@ -4241,9 +4241,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
             } else {
                 tr_backend = crispasr_create_backend(tr_name);
                 if (!tr_backend || !(tr_backend->capabilities() & CAP_TRANSLATE)) {
-                    fprintf(stderr,
-                            "crispasr: error: backend '%s' cannot translate text (use m2m100, madlad or llm).\n",
-                            tr_name.c_str());
+                    fprintf(
+                        stderr,
+                        "crispasr: error: backend '%s' cannot translate text (use m2m100, marian, madlad or llm).\n",
+                        tr_name.c_str());
                     return 22;
                 }
                 if (!tr_backend->init(tr_params)) {

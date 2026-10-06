@@ -273,14 +273,19 @@ Translating only when an utterance ends (a `final`) waits for a pause — on a
 lecture that is tens of seconds. Translating every partial re-translates text
 that is still changing. This mode commits **sentences**:
 
-- A sentence is committed as soon as the recogniser has moved past it and two
-  consecutive partials agree on it, period included. That second condition
+- A sentence is committed as soon as the recogniser has moved past it and its
+  terminator has been written before — by the previous partial or the one
+  before that (a recogniser undecided between "vorstellen. Er kommt" and
+  "vorstellen, er kommt" flips between them on alternate partials). That second condition
   matters: recognisers put a period at the cut end of every partial
   (`Ich gehe.` → `Ich gehe nach Hause.`), and it must not split the sentence.
 - A committed sentence is **final**. It is translated once and never revised —
   not by later partials and not when the utterance closes.
 - The open remainder is re-translated as a dimmed draft
-  (`--no-translate-drafts` turns that off).
+  (`--no-translate-drafts` turns that off). If it already contains a
+  finished sentence that is only waiting to be confirmed, exactly that
+  sentence is translated ahead of time, so its translation is ready the
+  moment it commits (10 of 11 sentences on the test clip).
 - Translation runs on its own thread, so a slow translator delays the
   translation line and never the recogniser.
 - Each step decodes only the audio that is not yet committed. With a
@@ -308,11 +313,30 @@ that is still changing. This mode commits **sentences**:
 
 `--stream-session` hands the recogniser only each step's *new* audio through
 its own stateful session (`nemotron`, `qwen3`, `vibevoice-streaming`) instead
-of re-decoding the open speech. A turn ends when no new text has arrived for
-`--stream-final-on-silence-ms`. It works — but it is not the fast path it
-should be yet: nemotron's session cost ~4.5 s of compute per second of audio
-on Metal at load ~20 (30 s clip, display two minutes behind). Until that
-encoder is fast, re-decoding with parakeet is the better live recogniser.
+of re-decoding the open speech. A turn ends when the speaker has been silent
+for `--stream-final-on-silence-ms`, judged from the audio (VAD over the last
+3 s); without a VAD model, when no text has arrived for 2.5 s.
+
+For nemotron use the CPU (`-ng`): its chunks are 320 ms of audio, far too
+small for a GPU to pay off. Since 2026-10-06 a session runs one graph per
+chunk with its state kept in backend memory and caches the attention's K/V
+projections and position table instead of recomputing them for all 56 cached
+frames in every layer:
+
+| nemotron q4_k, 50 s German clip, load ~8 | Compute | Per 320 ms chunk |
+|---|---|---|
+| CPU, before (one graph per layer, host caches) | 52.6 s | — |
+| CPU, now | 24.5 s | 67 ms |
+| GPU (Metal), now | not faster than before | 148 ms |
+
+So it is real time on CPU with cores to spare it, and it follows the speaker
+closely while it has them (translations 0.44–0.76 s after the deciding audio
+in the first 22 s of a run). It is also CPU-bound: when unrelated jobs took
+the cores mid-run it fell 17–25 s behind, where parakeet on the GPU held
+~0.8 s at a load of 49. Transcript quality is below parakeet's ("bisher
+hinfragen" for "bis hierhin Fragen", sentences run together). Recommendation
+unchanged: parakeet for live use on a shared machine; nemotron on CPU when
+the machine is yours and the lowest algorithmic latency matters.
 
 ### Which models
 
@@ -320,11 +344,12 @@ encoder is fast, re-decoding with parakeet is the better live recogniser.
 |---|---|
 | `parakeet` (parakeet-tdt-0.6b-v3, 25 European languages) | **Use this.** Accurate, punctuated, stable partials. Not a streaming model — the open sentence is re-decoded each step — so on a laptop expect a second or two behind the speaker. |
 | `moonshine-de` (61 M, German only, CC-BY-NC-SA) | Several times cheaper per step, so it keeps up on a busy machine. Partials are less stable (punctuation flips, so commits come later), and it **stops at the first longer pause in a clip** and drops the rest. |
-| `nemotron` (39 languages, cache-aware) | The architecturally right answer: a true streaming model whose cost follows the new audio only. Too slow on Apple Silicon today — see the measurements below — and this mode does not drive its incremental session yet. |
+| `nemotron` (39 languages, cache-aware) | A true streaming model whose cost follows the new audio only. Real time on CPU with `--stream-session -ng`; CPU-bound and less accurate than parakeet — see [Incremental sessions](#incremental-sessions---stream-session). |
 | `canary` | Can translate speech directly (`-tl en`), but one decode gives the transcript *or* the translation, not both. |
 
 | Translator | Per sentence (de→en) | Notes |
 |---|---|---|
+| **`marian`: Opus-MT** (`Helsinki-NLP/opus-mt-de-en` / `-en-de`, ~75M parameters, q8_0 84 MB, CC-BY-4.0) | **23–118 ms, median ~45** (load 7–10; m2m100 in the same interleaved runs: 125–922 ms, median 315–650) | **Fastest by a wide margin, and better text than m2m100** ("new colleague", "furniture packers"). One model per language pair. No registry entry yet — convert with `models/convert-marian-to-gguf.py` and pass the GGUF to `--translate-model`. Use f16 or q8_0: q8_0 matched f16 on the test sentences, q4_k changed 4 of 8. Greedy output matches the reference implementation exactly at f16 (14/14 de→en, 8/8 en→de). |
 | `m2m100` (418M, the `auto` default) | 92–392 ms, median 210 | Fast, mediocre: dropped "Danach", wrote "colleagues" for one colleague. Greedy only (`--translate-beam 1`, the default here) — its beam search has no KV cache and beam 5 took ~6 s. |
 | **`hy-mt2`: Hy-MT2-1.8B** (`tencent/Hy-MT2-1.8B-GGUF`, Q4_K_M 1.1 GB, Apache-2.0, 33 languages) | 370–910 ms, median 570 | **Best trade-off measured.** Clearly better translations, and the translation is shown as it is generated. `--translate-model hy-mt2`, or pass any GGUF: a file that is none of the built-in translators is run as a translation chat LLM. |
 | **`index-translate`: Index-Translate-2B** (`IndexTeam/Index-Translate-2B-GGUF`, Q4_K_M 1.3 GB, Apache-2.0, 150 languages) | 476–1100 ms, median 692 | Best translations of the lot ("a warm welcome to today's meeting", "as early as 7 a.m."), a little slower than Hy-MT2. Needed a loader fix: its GGUF appends a multi-token-prediction block the vendored Qwen3.5 loader took for a recurrent layer. |

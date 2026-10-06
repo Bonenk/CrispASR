@@ -6,6 +6,29 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-06 — Live translation speed-ups, Opus-MT backend, nemotron streaming encoder
+
+- **`marian` backend (Opus-MT / MarianMT)** on the m2m100 runtime, six
+  GGUF-driven branches plus its own tokenizer (`src/core/marian_tokenizer.h`,
+  `models/convert-marian-to-gguf.py`). Exact greedy parity with the reference
+  implementation at f16 (14/14 de→en, 8/8 en→de; token ids and text); q8_0
+  matched f16 on the CLI test set, q4_k changed 4 of 8. Per sentence in live
+  mode 23–118 ms (median ~45) against m2m100's 125–922 ms in the same
+  interleaved runs (load 7–10), with better text. m2m100 output unchanged
+  (11/11 identical before/after). Also fixes an m2m100 decoder-KV leak (a new
+  cache per translated sentence, never freed). GGUFs are not published yet.
+- **Live translation**: the next commit candidate is translated ahead of time
+  and reused at commit (10 of 11 sentences); the LLM translator no longer
+  resets between sentences (the runtime keeps the shared instruction prefix);
+  VAD scans only audio still in play; a terminator needs two of the last three
+  partials, not two in a row (a flip-flopping period held a sentence back 5 s).
+- **nemotron realtime session**: one graph per chunk with state kept in
+  backend memory (was one graph per layer per chunk), cached K/V projections
+  and position table, prompt-kernel weights dequantised once. CPU, 50 s clip
+  at load ~8: 52.6 s → 24.5 s of compute, 67 ms per 320 ms chunk; transcript
+  differs from the old path by one word in 114. No gain on Metal (148 ms per
+  chunk) — use `-ng`. `--stream-session` closes turns on audio silence.
+
 ## DONE 2026-10-06 — Live transcribe + translate, ggml v0.26.0 sync (#493)
 
 `--live-translate` (and `--translate-model` on any `--stream` / `--mic` run)

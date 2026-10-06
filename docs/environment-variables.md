@@ -1100,6 +1100,13 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   (off by default).
 - `CRISPASR_NEMOTRON_GPU_STREAM_CACHE` — `1` keeps the per-layer streaming state
   in a device-resident ping-pong cache across chunks (off by default).
+- `CRISPASR_NEMOTRON_STREAM_HOST_CACHE` — `1` runs a realtime session the old
+  way: one graph per layer per chunk, per-layer state copied to the host and
+  back. Default: one graph per chunk, state kept in backend memory. A/B switch.
+- `CRISPASR_NEMOTRON_STREAM_NO_PROJ_CACHE` — `1` caches the past frames
+  themselves and re-projects them to K/V in every chunk (the reference
+  layout). Default: cache the K/V projections and the position table. Same
+  transcript on the test clips, ~2.5x more compute per chunk on CPU.
 - `CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE` — `1` restores resubmitting cached
   chunk graphs in the stream-cache path. **Known-bad, for debugging only:** it
   produces a corrupted transcript on Metal once the attention cache is full

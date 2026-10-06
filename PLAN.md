@@ -24,12 +24,12 @@ lines here); `tests/test-metal-pipeline-cache.mm` does not compile and
 Open, in the order they would help:
 
 1. **Re-measure on an idle machine.** Best runs were at load ~5-10.
-2. **nemotron's incremental session is ~4.5 s compute per audio-second on
-   Metal** (load ~20). `--stream-session` drives it and works; the encoder is
-   the problem (host-side cache round trip + a graph build per chunk; the
-   device-resident cache exists only for the one-shot path and must not
-   reuse graphs — `CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE=1` reproduces the
-   corruption whose scheduler-side cause nobody has found).
+2. **nemotron session** is real time on CPU now (67 ms per 320 ms chunk at
+   load ~8) but CPU-bound: it fell 17-25 s behind when other jobs took the
+   cores. Left: the prompt kernel is still a scalar loop (~8 % of the time),
+   Metal is no faster than before (per-op overhead on ~2000 tiny nodes), and
+   the graph-reuse corruption (`CRISPASR_NEMOTRON_GPU_STREAM_GRAPH_REUSE=1`)
+   has no root cause yet.
 3. **Index-Translate-2B** works: the qwen35 loader now skips the appended
    MTP block. Left over:
    `qwen35moe` has the same gap; the loader derives the layer pattern from
@@ -54,6 +54,13 @@ Open, in the order they would help:
    re-translating) for de/en; base Hy-MT2 is not trained for it.
 8. moonshine-de stops at the first longer pause of a clip. m2m100 beam search
    has no KV cache. Windows paths are compiled by CI only, never run.
+9. **Publish the Opus-MT GGUFs** (`opus-mt-de-en` / `-en-de`, f16 + q8_0) and
+   add registry rows; until then `--translate-model` needs a local file. The
+   two HF cards disagree on the licence (apache-2.0 vs cc-by-4.0) — settle it
+   before publishing. Not verified for marian: beam-4 parity with the
+   reference, the multi-target `>>xxx<<` models, `-t` (ignored by the
+   m2m100/marian runtime).
+10. Translator on CPU vs GPU was never A/B'd cleanly (`CRISPASR_TRANSLATE_CPU`).
 
 ## OPEN 2026-10-03 — Index-Echo Q4 candidate preparation and GPU acceptance
 

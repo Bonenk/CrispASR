@@ -1813,7 +1813,6 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
                 std::fprintf(stderr, "  nemotron_bench: chunk_build %.2f ms\n", ms(tb0, tb1));
                 std::fprintf(stderr, "  nemotron_bench: chunk_alloc_set %.2f ms\n", ms(tb1, tb2));
                 std::fprintf(stderr, "  nemotron_bench: chunk_compute %.2f ms\n", ms(tb2, tb3));
-                std::fprintf(stderr, "  nemotron_bench: chunk_nodes %d ms\n", ggml_graph_n_nodes(cg.gf));
             }
 
             // Deliberately keep this one readback: it is the chunk's actual
