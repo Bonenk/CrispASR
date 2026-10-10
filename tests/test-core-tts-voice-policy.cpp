@@ -8,6 +8,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 using core_tts_voice::Action;
@@ -51,6 +54,23 @@ TEST_CASE("tts voice: sentinels are exact, not normalised", "[unit][tts-voice][i
     REQUIRE_FALSE(is_builtin_request("default.wav"));
     REQUIRE_FALSE(is_builtin_request("voices/auto/ref.wav"));
     REQUIRE(decide("", "Default") == Action::Apply);
+}
+
+TEST_CASE("tts voice: a clip re-uploaded under the same name is a new reference", "[unit][tts-voice]") {
+    // POST /v1/voices?force=true rewrites <name>.wav in place. With the same
+    // name and the same transcript, a key built from those two alone never
+    // changes and the server keeps speaking as the clip it loaded first.
+    namespace fs = std::filesystem;
+    const fs::path wav = fs::temp_directory_path() / "crispasr-test-voice-key.wav";
+    std::ofstream(wav) << "old";
+    const std::string before = core_tts_voice::reference_key(wav.string(), "hello");
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "hello") == before);
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "goodbye") != before);
+
+    std::ofstream(wav) << "new";
+    fs::last_write_time(wav, fs::last_write_time(wav) + std::chrono::seconds(1));
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "hello") != before);
+    fs::remove(wav);
 }
 
 TEST_CASE("tts voice: a failed load must not dedupe the retry away", "[unit][tts-voice][issue-371]") {

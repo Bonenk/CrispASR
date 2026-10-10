@@ -14,7 +14,9 @@
 // business; the decision of WHETHER to act is what this header owns.
 #pragma once
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace core_tts_voice {
 
@@ -42,6 +44,16 @@ inline Action decide(const std::string& last, const std::string& requested) {
     if (requested == last)
         return Action::Unchanged;
     return is_builtin_request(requested) ? Action::Builtin : Action::Apply;
+}
+
+// Identity of a loaded reference clip, for adapters that dedupe on more than
+// the voice string: the file, its transcript and the file's mtime. Without the
+// mtime a clip re-uploaded under the same name and transcript (the server's
+// POST /v1/voices?force=true) keeps serving the voice that was loaded first.
+inline std::string reference_key(const std::string& path, const std::string& ref_text) {
+    std::error_code ec;
+    const auto mtime = std::filesystem::last_write_time(path, ec);
+    return path + '\x01' + ref_text + '\x01' + std::to_string(mtime.time_since_epoch().count());
 }
 
 } // namespace core_tts_voice

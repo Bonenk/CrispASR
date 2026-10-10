@@ -10,8 +10,8 @@
 // CRISPASR_ACCEPT_LICENSE before the download.
 //
 // Capabilities: plain text-to-speech, Voice Clone via --voice ref.wav
-// (+ --ref-text), Voice Design via --tts-instruct, and Voice Direction via
-// both. --tts-cfg-scale is upstream's --cfg-scale: unset or 1 runs the
+// (+ --ref-text) or a per-request `voice` in the server, Voice Design via
+// --tts-instruct, and Voice Direction via both. --tts-cfg-scale is upstream's --cfg-scale: unset or 1 runs the
 // instruction prompt alone, anything else guides against the instruction-free
 // prompt at twice the decode cost. See breeze_tts_2_synthesize_instructed().
 //
@@ -29,6 +29,7 @@
 
 #include "breeze_tts_2.h"
 #include "core/audio_resample.h"
+#include "core/tts_voice_policy.h"
 #include "core/wav_reader.h"
 
 #include <cstdio>
@@ -37,6 +38,9 @@
 #include <vector>
 
 namespace {
+
+const int k_codec_sample_rate = 24000;
+const int k_asr_sample_rate = 16000;
 
 bool file_exists(const std::string& p) {
     struct stat st;
@@ -101,39 +105,9 @@ public:
         if (!p.no_prints)
             fprintf(stderr, "crispasr[bt2-tts]: codec = '%s'\n", codec_path.c_str());
 
-        // Voice Clone: --voice ref.wav (+ --ref-text, else auto-transcribed).
-        if (!p.tts_voice.empty()) {
-            const std::string voice = p.tts_voice_dir.empty()
-                                          ? p.tts_voice
-                                          : crispasr_voice::resolve_voice_path(p.tts_voice, p.tts_voice_dir);
-            std::vector<float> pcm;
-            int sr = 0;
-            if (!crispasr::core::read_wav_mono_pcm16(voice, pcm, sr) || pcm.empty()) {
-                fprintf(stderr, "crispasr[bt2-tts]: cannot read --voice '%s' — ignoring\n", voice.c_str());
-            } else {
-                // The codec is a 24 kHz model; feeding it anything else
-                // silently changes the frame rate of the reference.
-                if (sr != 24000)
-                    pcm = core_audio::resample_polyphase(pcm.data(), (int)pcm.size(), sr, 24000);
-                ref_pcm_ = std::move(pcm);
-                ref_text_ = p.tts_ref_text;
-                if (ref_text_.empty())
-                    ref_text_ = crispasr_ref_text::resolve_cached(voice, ref_pcm_, p, "crispasr[bt2-tts]", ".bt2-ref");
-                if (ref_text_.empty()) {
-                    // The reference TEXT is not decoration: the clone prompt is
-                    // ref_text + ref audio + target text, and a missing
-                    // transcript misaligns the audio against the text encoder.
-                    fprintf(stderr, "crispasr[bt2-tts]: --voice given but no --ref-text and auto-transcription "
-                                    "failed — dropping the reference rather than cloning against an empty "
-                                    "transcript\n");
-                    ref_pcm_.clear();
-                } else if (!p.no_prints) {
-                    fprintf(stderr, "crispasr[bt2-tts]: voice = '%s'\n", voice.c_str());
-                }
-            }
-        }
-
-        return true;
+        // A startup --voice is loaded here so a bad one fails before serving,
+        // and so its transcription cost is not paid by the first request.
+        return prepare_voice(p);
     }
 
     void shutdown() override {
@@ -145,11 +119,11 @@ public:
 
     const char* name() const override { return "bt2-tts"; }
     uint32_t capabilities() const override { return CAP_TTS | CAP_VOICE_CLONING | CAP_AUTO_DOWNLOAD | CAP_TEMPERATURE; }
-    int input_sample_rate() const override { return 24000; }
-    int tts_sample_rate() const override { return 24000; }
+    int input_sample_rate() const override { return k_codec_sample_rate; }
+    int tts_sample_rate() const override { return k_codec_sample_rate; }
 
     std::vector<float> synthesize(const std::string& text, const whisper_params& p) override {
-        if (!ctx_ || text.empty())
+        if (!ctx_ || text.empty() || !prepare_voice(p))
             return {};
         if (p.seed != 0)
             breeze_tts_2_set_seed(ctx_, (uint64_t)p.seed);
@@ -169,9 +143,66 @@ public:
     std::vector<crispasr_segment> transcribe(const float*, int, int64_t, const whisper_params&) override { return {}; }
 
 private:
+    // Voice Clone: make the reference match this call's --voice / `voice`
+    // (+ --ref-text, else the <voice>.txt sidecar, else auto-transcribed). The
+    // server reuses one backend and passes the voice per request (#371), so it
+    // is consumed at synth time and re-encoded only when it changes. Returns
+    // false when the voice cannot be used: a clone request must fail rather
+    // than come back in the default voice.
+    bool prepare_voice(const whisper_params& p) {
+        std::string voice, key;
+        if (!core_tts_voice::is_builtin_request(p.tts_voice)) {
+            voice = crispasr_voice::resolve_voice_path(p.tts_voice, p.tts_voice_dir);
+            key = core_tts_voice::reference_key(voice, p.tts_ref_text);
+        }
+        if (key == voice_key_)
+            return true;
+        voice_key_.clear();
+        ref_pcm_.clear();
+        ref_text_.clear();
+        if (!voice.empty() && !load_reference(voice, p))
+            return false;
+        voice_key_ = key;
+        return true;
+    }
+
+    bool load_reference(const std::string& voice, const whisper_params& p) {
+        std::vector<float> pcm;
+        int sr = 0;
+        if (!crispasr::core::read_wav_mono_pcm16(voice, pcm, sr) || pcm.empty()) {
+            fprintf(stderr, "crispasr[bt2-tts]: cannot read voice '%s' as a WAV reference\n", voice.c_str());
+            return false;
+        }
+        auto resampled = [&](int rate) {
+            return sr == rate ? pcm : core_audio::resample_polyphase(pcm.data(), (int)pcm.size(), sr, rate);
+        };
+        std::string text = p.tts_ref_text.empty() ? crispasr_ref_text::sidecar(voice) : p.tts_ref_text;
+        if (text.empty())
+            text = crispasr_ref_text::resolve_cached(voice, resampled(k_asr_sample_rate), p, "crispasr[bt2-tts]",
+                                                     ".bt2-reftext");
+        if (text.empty()) {
+            // The reference TEXT is not decoration: the clone prompt is
+            // ref_text + ref audio + target text, and a missing transcript
+            // misaligns the audio against the text encoder.
+            fprintf(stderr,
+                    "crispasr[bt2-tts]: voice '%s' has no --ref-text or .txt transcript and "
+                    "auto-transcription failed\n",
+                    voice.c_str());
+            return false;
+        }
+        // The codec is a 24 kHz model; feeding it anything else silently
+        // changes the frame rate of the reference.
+        ref_pcm_ = resampled(k_codec_sample_rate);
+        ref_text_ = std::move(text);
+        if (!p.no_prints)
+            fprintf(stderr, "crispasr[bt2-tts]: voice = '%s' ref_text = '%s'\n", voice.c_str(), ref_text_.c_str());
+        return true;
+    }
+
     breeze_tts_2_context* ctx_ = nullptr;
     std::vector<float> ref_pcm_;
     std::string ref_text_;
+    std::string voice_key_; // identity of the loaded reference, "" when none
 };
 
 } // namespace
