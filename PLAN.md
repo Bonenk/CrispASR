@@ -4399,3 +4399,17 @@ Breeze synthesis features remain outside main/release. Integration CI has seven
 passing jobs and the immutable release dry run has nine; no failures observed,
 but remaining jobs are queued/running. Final tracked proof/docs scan passes
 four tests with zero skips (55.208 seconds); all 227 anchors resolve.
+
+## CLAIMED 2026-10-11 — Breeze session sampler wiring and decoded surfaces
+
+Continue in `/mnt/storage/crispasr/salvage-20261008/breeze-synthesis-composition`,
+branch `test/breeze-synthesis-composition`. Audit found Breeze open nested
+inside CA_HAVE_CONFUCIUS4_TTS and runtime seed/temperature/max-token session
+setters missing despite native hooks. Repair the independent compile guard,
+forward open seed and public setter calls, observe guards fail on old actual
+source and pass on repaired dispatch. Preserve all pending contributor histories;
+no merge/default/quant change. Then run full compiled C ABI plus CLI/server
+plain/clone/design/direction on GH CPU with pinned models, retained PCM,
+ASR and closed-loop speaker controls. Model-backed evidence must distinguish
+contract/repeatability, decoded speech and unresolved exact generated codes.
+All source/model/build/proof work stays on storage; heavy models run on GH.
