@@ -36,6 +36,23 @@ def digest(p):
     return h.hexdigest()
 
 
+BASELINE_SOURCE = '7e7094320f1d9f765379a7fcf5f84a03283fb21b'
+BASELINE_HEADER_SHA256 = '5f83c2c972c3fd66eb0c4c3497a274d868ab11d1e08c7c340f97a84026d939c3'
+
+
+def baseline_header():
+    # Actions checks out only HEAD. Fetch the immutable baseline if absent;
+    # never substitute a moving branch or reconstruct the old implementation.
+    if subprocess.run(['git', 'cat-file', '-e', BASELINE_SOURCE + '^{commit}'],
+                      cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
+        subprocess.run(['git', 'fetch', '--depth=1',
+                        'https://github.com/CrispStrobe/CrispASR.git', BASELINE_SOURCE],
+                       cwd=ROOT, check=True, timeout=300)
+    raw = subprocess.check_output(['git', 'show', BASELINE_SOURCE + ':src/core/ngram_loop_fix.h'], cwd=ROOT)
+    assert hashlib.sha256(raw).hexdigest() == BASELINE_HEADER_SHA256, 'Baseline header provenance mismatch'
+    return raw.decode('utf8')
+
+
 def run(cmd, name, timeout=7200):
     with (OUT / (name + '.log')).open('w') as log:
         p = subprocess.run(list(map(str, cmd)), cwd=ROOT, stdout=log,
@@ -116,7 +133,9 @@ def main():
                    reporter_m4_macos26_tested=False, passed=False)
     try:
         # These libraries see the actual Python process ctype locale, with no classifier injection.
-        baseline = subprocess.check_output(['git', 'show', '7e7094320:src/core/ngram_loop_fix.h'], cwd=ROOT, text=True)
+        baseline = baseline_header()
+        receipt['baseline_source'] = BASELINE_SOURCE
+        receipt['baseline_header_sha256'] = BASELINE_HEADER_SHA256
         for label, header in [('baseline', baseline), ('candidate', (ROOT / 'src/core/ngram_loop_fix.h').read_text())]:
             (SCRATCH / (label + '.h')).write_text(header)
             cpp = SCRATCH / (label + '.cpp')
