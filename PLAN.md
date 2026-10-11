@@ -4343,3 +4343,26 @@ unchanged. Strict generated-code parity still fails all eight cases despite
 
 Final tracked documentation checkpoint passes all four no-secrets tests, zero
 skips (53.812 seconds), and 227 internal anchors across 82 Markdown files.
+
+## CLAIMED 2026-10-11 — Breeze backbone precision boundary probe
+
+Continue in `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+branch `fix/breeze-guided-validation`. Depth probe 38154207238 completed
+successfully and all 106 arrays independently match hashes, shapes, dtypes and
+finite receipts. Original BF16 cached/full-prefix and depth-only promoted FP32
+all preserve all 15 design-s1 frame-zero picks. Native depth with original hidden
+also preserves all 15. Native backbone from either original or native embeddings
+flips only codebook 5: original 193 ranks second to 936, gap 0.016719/0.017995.
+This localizes the first flip to backbone-state differences, not depth cache.
+Capture original BF16 raw post-layer states and a separately labelled FP32
+backbone promotion using identical BF16-rounded weights/embeddings; compare
+native per-layer states and normalized final hidden. Retain original fixture,
+prompt/logit equality, capture-off/on equality, scales and all raw arrays.
+No canonical replacement, tolerance change or speech acceptance. GH CPU only.
+
+Composition GH 38156532213 has passed Linux unit, Windows, macOS, iOS, Android
+and AMR g++ jobs. Linux unit rebuilt actual source and passed all 2,019 CTests,
+plus seven mode, four ownership and UTF-8 controls. Remaining jobs still run.
+Fresh full Release dry run 38156833241 pins `3fdc1838dc1b95f517a3862a9379b24d20d6c0c1`;
+no tag or publication requested. Packaging and actual fresh-archive GPU checks
+remain pending. Earlier queue statuses are superseded by these observations.
