@@ -7,6 +7,20 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-11 — Locale-dependent transcript byte loss
+
+[PR #538](https://github.com/CrispStrobe/CrispASR/pull/538) merged as
+`7bcdbdfe1dc0f3e00a310fca1a9f521162b5d1d3` after all 45 applicable checks
+passed, with one intentional skip. ASCII-only whitespace classification keeps
+UTF-8 continuation bytes intact during repetition cleanup. Actual macOS libc
+reproduces the old corruption; corrected cleanup preserves the reporter's
+Chinese contexts exactly. Both supplied clips pass actual Q4_K C ABI decoding
+on hosted macOS and Linux, including raw-token/segment/word byte preservation.
+Hosted macOS has no Metal device; this proves the locale cause and CPU paths,
+not M4/macOS26 or GPU numerical parity. Receipts:
+`docs/qwen3-locale-utf8-2026-10-11.json` and
+`docs/qwen3-locale-utf8-linux-2026-10-11.json`.
+
 ## DONE 2026-10-11 — HTDemucs Metal Q8 contiguous-copy abort
 
 [PR #537](https://github.com/CrispStrobe/CrispASR/pull/537) merged as

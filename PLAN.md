@@ -4068,7 +4068,7 @@ code/shape gates. Add GH CPU native F16/codec controls against pinned references
 retain strict cosine/magnitude/argmax/code and reused-context checks. #534/#535
 have all applicable checks green and are merged; synthesis PRs remain pending.
 
-## CLAIMED 2026-10-11 — #533 reporter clips and missing continuation byte
+## Completed investigation 2026-10-11 — #533 reporter clips and missing continuation byte
 
 Worktree `/mnt/storage/crispasr/salvage-20261008/issue533-byte-preservation`,
 branch `fix/qwen3-byte-preservation`. Read both new reporter comments in full:
@@ -4316,3 +4316,30 @@ ownership/failure guards. Preserve contributor histories and work on storage.
 Source checkpoint and model-free checks precede GH model/ASR/server controls.
 Existing depth probe branch stays pinned; no speech acceptance or release from
 this composition alone.
+
+### 2026-10-11 integration checkpoint
+
+PR #538 merged as `7bcdbdfe1dc0f3e00a310fca1a9f521162b5d1d3` after
+45 applicable checks passed, one intentional skip. Release notes and HISTORY
+include the locale-dependent byte-loss fix and actual macOS/Linux C ABI proof.
+Reporter M4/macOS26 confirmation remains pending; no physical GPU claim.
+Earlier pending-CI entries above are superseded by this checkpoint.
+
+Breeze composition source `a59772ba7f510518c9a704992d993faedcccff0e` is
+pushed on `test/breeze-synthesis-composition`; full integration CI
+[38156532213](https://github.com/CrispStrobe/CrispASR/actions/runs/38156532213)
+is queued. It preserves all three contributor histories and passes 7 actual
+compiled dispatch controls, 4 ownership/failure controls, 4 UTF-8 publication
+controls, 8 strict comparator controls and 4 no-secrets tests (zero skips).
+The dispatch tests replay the actual production function against backend stubs:
+parent #529 fails 5/7 and parent #531 fails 4/7; composed source passes 7/7,
+including plain/clone/design/direction, reused contexts, failure and optional
+output count. Full C API syntax check passes with Breeze enabled and C2PA's source include path.
+These are contract controls, not real-model CLI/C ABI/server or speech acceptance.
+Receipt: `docs/breeze-synthesis-composition-2026-10-11.json`.
+Depth diagnostic 38154207238 has started on GH CPU; its pinned branch remains
+unchanged. Strict generated-code parity still fails all eight cases despite
+107/107 oracle-fed stages passing; no merge of pending synthesis PRs or tag.
+
+Final tracked documentation checkpoint passes all four no-secrets tests, zero
+skips (53.812 seconds), and 227 internal anchors across 82 Markdown files.

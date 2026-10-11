@@ -1,7 +1,26 @@
 # v0.8.43 — audio correctness, frontend parity and measured opt-in optimizations
 
-This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535 and #537. Experimental quantization candidates and unfinished hardware
+This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535, #537 and #538. Experimental quantization candidates and unfinished hardware
 validation are excluded from the released behavior described below.
+
+## Transcript cleanup: preserve UTF-8 continuation bytes
+
+The post-decode repetition cleanup now recognizes only the six ASCII whitespace
+bytes. Locale-dependent `std::isspace` could classify raw UTF-8 continuation
+bytes 0xA0 and 0x85 as whitespace on macOS, stripping bytes from Chinese
+characters such as 造 and 加 and breaking strict binding decoding.
+
+PR #538 passed all 45 applicable checks, with one intentional skip. Actual
+macOS libc reproduces the old corruption and the corrected cleanup preserves
+both reported contexts byte-for-byte. Both supplied WAVs also pass actual Q4_K
+C ABI decoding on hosted macOS and Linux: all raw-token 造/加 occurrences survive
+segment/word publication, with strict UTF-8 and no replacement characters.
+The hosted Mac has no Metal device; physical M4/macOS26 and GPU numerical parity
+remain untested. Linux is a regression control: its libc does not reproduce
+the locale classification bug.
+
+Evidence: [macOS root-cause and clip proof](docs/qwen3-locale-utf8-2026-10-11.json),
+[Linux reporter-clip proof](docs/qwen3-locale-utf8-linux-2026-10-11.json).
 
 ## HTDemucs: Q8 source separation on Metal
 
@@ -30,8 +49,8 @@ Segment/word times, confidence and counts are preserved.
 
 PR #534 passed all 54 applicable checks, with one intentional skip. The hosted
 native build passed 2,008 unit tests and four strict ctypes regression tests.
-This protects result publication; the underlying missing-continuation-byte
-investigation in #533/#538 is separate and has no completed Metal claim.
+This protects result publication; PR #538 separately fixes the locale-dependent
+continuation-byte loss described above.
 
 Evidence: [session UTF-8 controls](docs/session-utf8-2026-10-11.json).
 
