@@ -1,0 +1,89 @@
+{
+  "version": "2026-10-11.release-package.5",
+  "source": "3fdc1838dc1b95f517a3862a9379b24d20d6c0c1",
+  "build_run": 38156833241,
+  "package_artifact_id": 11712422669,
+  "package_sha256": "857a79c767ec91f406cceb114e4b330eb462b5c0aaee1e9fb3bda8fe758ae8c8",
+  "package_mirror_revision": "5b6375f32716e5f3cf92c08ba449bfaf93986cc4",
+  "package_mirror_path": "release/38156833241/crispasr-linux-x86_64-cuda.tar.gz",
+  "package_transport": "public byte-identical CI archive mirror",
+  "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+  "model_revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+  "original_revision": "10e579dedf52a16a159cbc5d35e17f8bffa77190",
+  "original_sha256": "7762f2a73d8ae7dad05d667fbf0bca393a0b3b7ad622b1b1f09473fa8f5d0463",
+  "reference_revision": "cb678dfd4806778aa55c39fe7b7a710a54cdc153",
+  "artifact_zip_sha256": "315aa5a975b85f63779eb881e969d663dfc2b6af3c86686d663b57c82c318ffd",
+  "cuda_runtime_version": 12080,
+  "driver_version": "580.178.04\n580.178.04",
+  "cuda_plugin_sha256": "10091e540804155c1e884940ab7fa3c697674ac77333d5a0dcd5395f977973bc",
+  "entry_sha256": "5de1ed43b2500845037951d2473b387f187035aaa5143f31a4d381921770d20c",
+  "validated": true,
+  "stages": {
+    "mel_spectrogram": {
+      "cosine_min": 1.0,
+      "native_norm": 3802.327423724644,
+      "reference_norm": 3802.3278125707384,
+      "relative_l2": 1.0037382467243056e-05,
+      "max_abs": 0.006104469299316406,
+      "passed": true
+    },
+    "pre_encode_output": {
+      "cosine_min": 1.0,
+      "native_norm": 35037.27131994719,
+      "reference_norm": 35037.281174288575,
+      "relative_l2": 4.749317146031651e-05,
+      "max_abs": 0.046783447265625,
+      "passed": true
+    },
+    "encoder_output": {
+      "cosine_min": 0.9999908804893494,
+      "native_norm": 16.613050709011176,
+      "reference_norm": 16.612932357599302,
+      "relative_l2": 0.00028003937974455275,
+      "max_abs": 0.001037895679473877,
+      "passed": true
+    }
+  },
+  "failed": [],
+  "packaged_cabi_gpu_allocation": "7, 1330",
+  "loaded_ggml_plugins": [
+    "libggml-base.so.0",
+    "libggml-cpu-skylakex.so",
+    "libggml-cuda.so",
+    "libggml.so.0"
+  ],
+  "gpu_process_allocations": "7, 1330",
+  "fresh_original_transcript_controls": 26,
+  "reused_controls": 26,
+  "independently_verified_original_transcripts": true,
+  "independently_verified_full_arrays": 6,
+  "stream_presets": [
+    0,
+    2,
+    3
+  ],
+  "stream_cases": 9,
+  "stream_checks": [
+    "early emission",
+    "reset/repeat exact tokens and confidence",
+    "packet-size token equality",
+    "finite probabilities",
+    "no duplicate final flush"
+  ],
+  "public_proof": {
+    "revision": "ec581d4b27b87fbbe971f4771bc8894765a70fa1",
+    "path": "release/38156833241/fresh-cuda-package-proof.zip",
+    "sha256": "76b5556fd7002fbe9e6fa4c19ac670ba3af7b4bc2c7038c5cbaec6d4a4de6df1",
+    "bytes": 3166554,
+    "anonymous_verified": true,
+    "account_redacted_logs": [
+      "kaggle-v5/crispasr-release-cuda-package-validation.log",
+      "kaggle-v5/terminal.log"
+    ]
+  },
+  "limits": [
+    "Actual immutable source 3fdc1838 archive; later source changes require new candidate validation",
+    "T4 CUDA 12.8 hardware only; no GTX1660/MX150/CUDA13 physical hardware acceptance",
+    "Nemotron F16 stage/transcript/stream controls; no universal model or timing acceptance"
+  ]
+}

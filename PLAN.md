@@ -4573,3 +4573,15 @@ Native speech raw 20 PCM arrays also independently match SHA/shape/finite contro
 C ABI, CLI and reused server WER is 0–0.1, reference WER 1/9. Speaker gate stopped
 on missing pkg_resources and remains pending, not passed. Details:
 docs/breeze-native-speech-2026-10-11.json.
+
+Fresh release dry run 38156833241 is SUCCESS, all 35 build/validation jobs
+green plus publishing bookkeeping with empty tag (nothing published). Exact
+Linux CUDA tar 857a79c767ec91f406cceb114e4b330eb462b5c0aaee1e9fb3bda8fe758ae8c8
+passes on dual T4s with CUDA runtime 12.8, driver 580.178.04. Actual packaged C ABI
+loads its CUDA plugin and allocates 1330 MiB; three F16 stages, 26 original
+NVIDIA transcript controls, reverse reused state and nine streaming cases pass.
+Six full arrays and all original transcripts independently verified. Windows
+12.8/12.6 CLI/runtime/library SHA pairing and mixed-version negative control pass
+in GH 38169253465. Public proof and limitations are pinned in
+docs/release-fresh-cuda-package-2026-10-11.json and
+docs/release-fresh-windows-pairs-2026-10-11.json. No tag or pending PR promotion.
