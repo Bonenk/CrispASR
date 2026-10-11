@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.8.43
+
+* **Transcript correctness:** preserve UTF-8 continuation bytes during cleanup
+  and sanitize malformed result bytes before native callbacks/getters publish
+  them, retaining strict binding decoding.
+* **Session audio/control fixes:** VoxCPM2 synthesis reports its native 48 kHz
+  rate; Breeze sessions forward temperature, 64-bit seed and token limits,
+  including restoration of the model limit when cleared.
+* **Native discovery:** canonical capabilities include Hikari and German
+  Dattazigzag Moonshine; ggml plugins are found beside the loaded native library.
+* **Native inference:** Nemotron frontend padding/length masks match reference
+  behavior; HTDemucs Q8 attention avoids unsupported Metal contiguous copies.
+* **Distribution:** packages use immutable source pins and checked CUDA runtime
+  pairing. Experimental quantizations and pending Breeze instruction/voice-cache
+  features are excluded. The Dart API is unchanged.
+
 ## 0.8.42
 
 * **Persistent streaming:** `streamKind` exposes unavailable, rolling-window,
