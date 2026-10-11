@@ -132,6 +132,12 @@ jobs:
       - name: Install dependencies
         run: bash tools/ci-apt.sh update && bash tools/ci-apt.sh install -y cmake ninja-build g++ libopenblas-dev patchelf
 
+      - name: Install pinned capability-table formatter
+        run: |
+          python3 -m pip install clang-format==18.1.8
+          ln -s "$(command -v clang-format)" "$RUNNER_TEMP/clang-format-18"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
       # Examples/server stay at their defaults: some tests link `common`, which
       # lives under examples/, so switching them off would break configure.
       - name: Configure (tests ON)
@@ -144,6 +150,12 @@ jobs:
 
       - name: Build
         run: cmake --build build -j $(nproc)
+
+      # Compare real compiled artifacts; missing CLI/shared library is a failure.
+      - name: Check generated capability table and C ABI
+        run: |
+          python3 tools/gen-backend-caps-table.py --check --crispasr build/bin/crispasr
+          python3 tests/test_backend_caps_abi.py --cli build/bin/crispasr --build-dir build
 
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
