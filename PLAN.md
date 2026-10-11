@@ -4089,3 +4089,39 @@ Cover real production-header behavior, explicit transcript precedence, missing
 files and retry contracts. Model/server acceptance still depends on original
 Breeze parity and decoded roundtrips; no merge or release from cache tests alone.
 PR #537 is reviewed; physical Metal Q8/F16 acceptance remains pending.
+
+### 2026-10-11 current integration and validation checkpoint
+
+PR #534 is merged as `a38d66428f4f89cfac8702ef7be65e52eea84104`: all
+54 applicable checks pass, plus the hosted full native build/2,008 unit tests
+and four strict ctypes controls. PR #535 is merged as
+`3e4bea709f3d7be225e73d6faf9d2eec00e69633`: all 42 applicable checks pass,
+plus actual full CLI/shared-library discovery across 136 canonical rows.
+Release notes now include both; no bump or tag.
+
+Original unadjusted Breeze reference GH 38121758868 is SUCCESS: 145 finite
+arrays independently hash/shape/type verified; all eight cases retained.
+Scale-zero generates 31 frames because HF computes max_length before the
+negative-prompt swap. The seven-frame prompt-length difference explains the
+excess. Public unchanged proof is pinned at fixture dataset revision
+`bb8c9394f77aa8062eac258a1bf26e925ea2fb6c`,
+`breeze-guided-20261011/unadjusted-oracle-proof.zip`, SHA256
+`0bcd5ecd956315d3ccecd0f1ebdb49e08051af14c21265199542a534a8515a8a`.
+Explicit active-prompt max_length preserves inference while imposing the same
+24-frame budget; combined original/native GH 38146159521 at `ac7227125`
+is running. No truncation, shape/code waiver or decoded-speech acceptance.
+
+PR #538 (`0b9da8d127e793f7130d1ceeffc010da644ec089`) follows #534:
+ASCII-only whitespace classification preserves byte-level UTF-8 continuation
+bytes during loop cleanup. Injected classifier controls reproduce three
+original failures, then all five controls pass. Actual reporter clips are
+queued on GH macOS 38147247663 and Linux 38147249399. Actual macOS 26/M4
+classifier behavior and model acceptance remain unproven.
+
+PR #536 is based on #529 and remains pending original/model/server gates.
+A production-header sidecar-only cache regression fails its contributor head;
+adding sidecar identity when no explicit transcript overrides it passes all
+seven local policy controls. Full hosted unit tests are still required.
+PR #537 removes redundant contiguous copies of already-contiguous Q/K/V
+weight-row views. Reporter Metal Q8 and F16 A/B claims are read; immutable
+input/output and source provenance are needed for hardware acceptance.

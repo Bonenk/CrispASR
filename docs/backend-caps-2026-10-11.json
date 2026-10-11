@@ -1,0 +1,22 @@
+{
+  "pr": 535,
+  "source": "d048456e6b8fb7ec0f9143f245defd0c1b248f92",
+  "merge_commit": "3e4bea709f3d7be225e73d6faf9d2eec00e69633",
+  "missing_canonical_rows": [
+    "hikari",
+    "moonshine-tiny-de-dattazigzag"
+  ],
+  "before": "Actual immutable packaged library omitted both rows; lookup and enumeration failed.",
+  "after": {
+    "canonical_cli_cabi_rows": 136,
+    "list_sizing_and_error_contracts": "PASS",
+    "hosted_unit_tests": 2008,
+    "run": 38120863027,
+    "job": 114415128728
+  },
+  "ci": {
+    "passed": 42,
+    "intentional_skip": 1
+  },
+  "scope": "Canonical discovery and generated-table consistency; no new synthesis/model acceptance."
+}

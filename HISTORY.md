@@ -7,6 +7,23 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-11 — Session UTF-8 publication and canonical discovery
+
+[PR #534](https://github.com/CrispStrobe/CrispASR/pull/534) merged as
+`a38d66428f4f89cfac8702ef7be65e52eea84104` after 54 applicable checks passed.
+Assembled result normalization prevents malformed bytes from losing complete
+Python transcription chunks; valid UTF-8 and timing/confidence survive.
+[Hosted native controls](https://github.com/CrispStrobe/CrispASR/actions/runs/38119248758)
+pass 2,008 unit tests and four strict ctypes regressions. Underlying byte loss
+in #533 is a separate active investigation.
+
+[PR #535](https://github.com/CrispStrobe/CrispASR/pull/535) merged as
+`3e4bea709f3d7be225e73d6faf9d2eec00e69633` after 42 applicable checks passed.
+The generated C ABI capability table now includes canonical Hikari and German
+Dattazigzag Moonshine rows. [Hosted native validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38120863027)
+compares all 136 actual CLI/shared-library rows and sizing/error contracts.
+Each PR has one intentional CI skip; no new version/tag or model claim.
+
 ## Index-Echo 9B model card archive (2026-10-10)
 
 The detailed validation and profiling notes below moved from the public model

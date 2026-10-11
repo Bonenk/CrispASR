@@ -1,8 +1,36 @@
 # Draft release notes — changes after v0.8.42
 
-This draft covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527 and #528. No new tag has
+This draft covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534 and #535. No new tag has
 been cut. Experimental quantization candidates and unfinished hardware
 validation are excluded from the released behavior described below.
+
+## Session results: valid UTF-8 before publication
+
+Malformed assembled result bytes now become U+FFFD before segment callbacks
+and result getters publish them. Python's strict decoder stays enabled; a bad
+byte no longer discards an otherwise usable transcription chunk. Valid UTF-8,
+including characters assembled from multiple byte-level tokens, is unchanged.
+Segment/word times, confidence and counts are preserved.
+
+PR #534 passed all 54 applicable checks, with one intentional skip. The hosted
+native build passed 2,008 unit tests and four strict ctypes regression tests.
+This protects result publication; the underlying missing-continuation-byte
+investigation in #533/#538 is separate and has no completed Metal claim.
+
+Evidence: [session UTF-8 controls](docs/session-utf8-2026-10-11.json).
+
+## C ABI: complete canonical backend discovery
+
+The generated capability table now includes Hikari and the German Dattazigzag
+Moonshine backend, which the actual CLI listed but C ABI lookup omitted.
+CI compares the built CLI and shared library across all 136 canonical names,
+checks list sizing/error contracts and verifies generator output using pinned
+clang-format 18. Aliases remain outside the canonical enumeration.
+
+PR #535 passed all 42 applicable checks, with one intentional skip; its hosted
+full native build passed the actual CLI/C ABI comparison and 2,008 unit tests.
+
+Evidence: [canonical discovery proof](docs/backend-caps-2026-10-11.json).
 
 ## VoxCPM2: correct session audio rate and configurable CFM steps
 

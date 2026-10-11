@@ -36,9 +36,22 @@
   },
   "policy": "one U+FFFD per malformed byte, matching CLI JSON; normalize before publication, getters remain read-only",
   "hardware_reproduction": false,
-  "reporter_recording_available": false,
+  "reporter_recording_available": true,
   "pending": [
-    "hosted full native build and CI",
-    "reporter Chinese recording / Metal comparison"
-  ]
+    "Underlying continuation-byte preservation: draft PR538; reporter clip CPU/macOS tests queued. No macOS 26/M4 acceptance yet."
+  ],
+  "fix_source": "0bbd31921a11041b504f5cdddde293f854c7b2f5",
+  "merge_commit": "a38d66428f4f89cfac8702ef7be65e52eea84104",
+  "pr": 534,
+  "hosted_native_ci": {
+    "run": 38119248758,
+    "job": 114410376524,
+    "unit_tests": 2008,
+    "strict_ctypes_tests": 4,
+    "result": "PASS"
+  },
+  "pr_checks": {
+    "passed": 54,
+    "intentionally_skipped": 1
+  }
 }
