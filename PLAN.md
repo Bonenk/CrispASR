@@ -3976,3 +3976,21 @@ returns success. Require all eight requested cases and required stage inventory,
 then add deletion/missing-case controls before original guided/model validation.
 CPU Canary allocation probe launched: GH **38119476469**, immutable source
 `170f7e6289bdbb65e30a5004e7c76e396cc5c664`, currently queued; no result claim.
+
+### 2026-10-11 terminal local checkpoint — strict guided gate
+
+The #529 validation repair is `3de24603eb4b4326842013c5dd3c31116bf26045`,
+fast-forwarded to the author's opted-in maintainer-editable PR branch after
+all eight regression tests and all four secret tests pass (no skips, 47.924 s).
+All contributor commits are retained. Six missing/empty/error controls fail on
+the original comparator; the complete matrix and mismatch controls also pass
+as tests of the repaired gate. `docs/breeze-guided-validation-2026-10-11.json`
+records the exact scope. This establishes gate correctness, not actual original
+model or decoded guidance acceptance. Current fork PR CI is pending.
+
+#531 final-table head `e1e504536` passes the full four-test secret scan without
+skips (145.072 s); final native CI pending. #534 has no failed checks so far,
+but remains draft until final native CI completes. Canary actual-model probe
+**38119476469** remains queued; no runtime fix or model result is claimed.
+Issues #532/#533 and PRs #529/#531 have received precise progress/proof replies.
+No pending/rejected model experiment has been promoted and no release tag cut.

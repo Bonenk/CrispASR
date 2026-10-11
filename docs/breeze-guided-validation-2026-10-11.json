@@ -1,0 +1,66 @@
+{
+  "pr": 529,
+  "contributor_head": "3ebd2a561b694673f45897535cd2bd139aea418b",
+  "fixed_head": "3de24603eb4b4326842013c5dd3c31116bf26045",
+  "maintainer_fix_applied_to_author_branch": true,
+  "negative_control_before": {
+    "reference_cases": [
+      "plain"
+    ],
+    "reference_stages": [
+      "codes"
+    ],
+    "native_stages": [],
+    "returncode": 0,
+    "reported": "0/0 stages passed; 1/1 guided cases passed"
+  },
+  "before_tests": {
+    "tests": 8,
+    "failures": 6
+  },
+  "after_tests": {
+    "tests": 8,
+    "passed": 8,
+    "seconds": 0.341
+  },
+  "no_secrets": {
+    "tests": 4,
+    "passed": 4,
+    "skipped": 0,
+    "seconds": 47.924
+  },
+  "required_cases": [
+    "plain",
+    "clone",
+    "design-s0",
+    "design-s1",
+    "design-s4",
+    "direct-s0",
+    "direct-s1",
+    "direct-s4"
+  ],
+  "required_stages": [
+    "prompt_input_ids",
+    "backbone_logits_frame0",
+    "codes",
+    "neg_prompt_input_ids for scale 0 and 4 instruction cases"
+  ],
+  "rejected": [
+    "missing reference cases",
+    "missing reference stages",
+    "missing native stages",
+    "missing negative prompts",
+    "empty codes",
+    "reference-generation errors",
+    "wrong shapes/dtypes/nonfinite arrays",
+    "numeric magnitude and code mismatches"
+  ],
+  "original_guided_model_acceptance": false,
+  "full_decoded_speech_acceptance": false,
+  "pending": [
+    "final-head CI",
+    "independent pinned original guided captures",
+    "actual plain/design/clone/direction decoded output",
+    "composition with PR531 reference setters"
+  ]
+}
