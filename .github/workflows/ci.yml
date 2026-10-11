@@ -159,6 +159,11 @@ jobs:
 
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
+      - name: Breeze guided acceptance deletion controls
+        run: |
+          python3 -m pip install numpy
+          python3 tests/test_breeze_guided_validation.py -v
+
       - name: Run the unit tier
         run: ctest --test-dir build -L unit -E live --output-on-failure --timeout 300
 
