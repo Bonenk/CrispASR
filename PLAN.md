@@ -4246,3 +4246,16 @@ Corrected harness checkpoint `aab781e77` is pushed on the maintainer branch.
 Eight strict comparator controls pass; all four no-secrets tests pass with
 zero skips (151.742 s). Rebuild/recheck GH 38152301380 is queued, reusing the
 pinned original archive. No new reference weights or relaxed gates.
+
+### CLAIMED 2026-10-11 — Breeze first differing depth decision
+
+Continue in the existing `pr529-guided-validation` worktree and maintainer
+branch. Pinned upstream source is read through depth forward, generation
+preparation, cache updates and CFG/full-prefix paths. Add a design-s1 frame-zero
+probe using the preserved original code history: original BF16 full-prefix and
+cached depth forwards, a separately labelled FP32 depth-only promotion control,
+and native F16 logits with original versus native backbone hidden states.
+Preserve original fixture hashes, prompt parity, raw logits, ranks/gaps and
+finite arrays. Native history-forcing is a diagnostic entry point; production
+sampling remains unchanged. All CPU model/build work belongs on GH CI.
+Do not replace canonical BF16 captures or relax exact-code/speech gates.
