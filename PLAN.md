@@ -4560,3 +4560,16 @@ loading the speaker encoder because webrtcvad imports missing pkg_resources.
 No speaker acceptance is claimed. Retry 38169287241 keeps source a2f58338ef and
 all gates unchanged, adding setuptools==80.9.0 to the worker dependencies.
 Fresh Windows CUDA 12.8/12.6 paired-package proof is dispatched as 38169253465.
+
+Breeze backbone retry 38163903250 succeeded at 5732be84f: original prompt/logits
+are byte-exact; all 222 arrays independently match hashes, shapes, dtypes and
+finite values. 116 comparisons cover all 28 backbone layers plus final norm,
+two embedding sources, and canonical BF16 versus FP32-promoted arithmetic.
+Native with oracle embeddings has minimum cosine 0.999999821 against FP32
+and 0.999952674 against BF16. This supports arithmetic precision as a contributor
+without resolving eight-case full-generation mismatch or proving its sole cause.
+Full verified proof is public; details: docs/breeze-backbone-boundaries-2026-10-11.json.
+Native speech raw 20 PCM arrays also independently match SHA/shape/finite controls;
+C ABI, CLI and reused server WER is 0–0.1, reference WER 1/9. Speaker gate stopped
+on missing pkg_resources and remains pending, not passed. Details:
+docs/breeze-native-speech-2026-10-11.json.
