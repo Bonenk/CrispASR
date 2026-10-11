@@ -1,0 +1,38 @@
+{
+  "failed_run": 38158762302,
+  "failed_source": "e7219be4bcfbb7974a76f1d4aadab4004694230e",
+  "failed_job": 114527094982,
+  "status": "FAILED before native comparison",
+  "stage": "Fresh original BF16 eager CPU frame-zero logits did not equal immutable original fixture",
+  "prompt_control": "passed before the failing logit assertion",
+  "old_and_new_logged_packages": {
+    "torch": "2.14.1+cpu",
+    "torchaudio": "2.11.0+cpu",
+    "numpy": "2.5.4",
+    "transformers": "4.57.3"
+  },
+  "prior_original_depth_run": 38154207238,
+  "original_array_retention_in_failed_run": false,
+  "model_or_cpu_cause_established": false,
+  "native_boundary_result_claimed": false,
+  "public_failed_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "e4bdba818982aa579afb2114968eb36ddd246210",
+    "path": "breeze-guided-20261011/original-boundary-failed-proof.zip",
+    "sha256": "38cfde451e27e000db287f4c9ee80d4162a4b7d1308dccc67c667fc2a9481126",
+    "bytes": 11109,
+    "anonymous_sha256_verified": true
+  },
+  "repair_source": "5732be84fd9dc16911b3d317aada27820c18f8a5",
+  "repair": "Save actual and immutable original tensors, byte-equivalence/norm/error receipt, CPU/runtime/checkpoint SHA provenance before the unchanged strict assertion; index failed arrays too",
+  "weight_free_control": "Actual helper: exact control passes; one-ULP change rejects and retains both arrays plus failure receipt",
+  "no_secrets": {
+    "passed": 4,
+    "skipped": 0,
+    "seconds": 85.034
+  },
+  "retry_run": 38163903250,
+  "retry_status_observed": "queued",
+  "retry_versions_pinned_to_observed_versions": true,
+  "gate_waived": false
+}

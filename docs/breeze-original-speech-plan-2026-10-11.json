@@ -1,0 +1,54 @@
+{
+  "source": "d89e854049bea3deb2cd691a8490cdd0b0229adf",
+  "branch": "test/breeze-original-speech",
+  "script": "tools/ci-heavy/breeze_original_speech.py",
+  "status": "Prepared, not dispatched; requires native model worker artifact",
+  "native_run": 38159960891,
+  "native_source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
+  "upstream": "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2",
+  "original_model": "3e28c5151381a722f1d8661b4118c298caa77aa4",
+  "precision": "original BF16 eager CPU",
+  "modes": [
+    "plain",
+    "clone",
+    "design",
+    "direction"
+  ],
+  "expected": "I found the file you asked about and opened it.",
+  "reference": "Native generated reference, byte-hash checked; exact same PCM16 conversion as native clone setter/CLI",
+  "seed": 7,
+  "max_frames": 128,
+  "temperature": 0.9,
+  "depth_temperature": 0.9,
+  "top_k": 50,
+  "top_p": 1,
+  "repetition_penalty": 1.1,
+  "generated_codes_exact_gate_waived": false,
+  "planned_acceptance": {
+    "original_and_native_abi_roundtrips": 8,
+    "wer_max": 0.2,
+    "independent_jfk_recognizer_control_required": true
+  },
+  "asr_precision": "Previously independently parity-tested Nemotron F16; original and ASR in separate processes",
+  "asr_package_run": 38156833241,
+  "asr_package_source": "3fdc1838dc1b95f517a3862a9379b24d20d6c0c1",
+  "asr_package_sha256": "fee8a089191385c75840b522fb9709828a84af7c99abc6bcb261d3224c245b94",
+  "checks": [
+    "Python compilation",
+    "CLI argument help",
+    "Actual WER controls at 0, .2 and .4; unchanged threshold",
+    "Exact reviewed loading section compile"
+  ],
+  "no_secrets": {
+    "passed": 4,
+    "skipped": 0,
+    "seconds": 44.972
+  },
+  "limitations": [
+    "No original/native decoded result yet",
+    "Full-generation oracle with production sampling settings; not fast-streaming timing",
+    "Does not accept all native CLI/server modes or speaker similarity; separate native worker records those",
+    "Does not waive failed exact generated-code or original-byte-equivalence diagnostics",
+    "No new tag, quant or model default"
+  ]
+}

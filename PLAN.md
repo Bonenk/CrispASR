@@ -4509,3 +4509,35 @@ exact-code diagnostics separate; no gate waiver or model/synthesis acceptance.
 Heavy model work stays on GH, hardware work on Kaggle; no local large models.
 Do not dispatch until the native worker artifact exists. Preserve all queued
 workers' source branches unchanged until their checkout is observed.
+
+### 2026-10-11 original-equivalence failure and speech-oracle checkpoint
+
+Backbone 38158762302 failed before any native comparison: its fresh original
+BF16 eager CPU logits failed the unchanged byte equality against the immutable
+original fixture. Prompt equality had passed. Earlier depth 38154207238 passed
+this control; the logged Torch/Torchaudio/NumPy/Transformers versions match.
+No CPU/model cause can be established from the original failed run because
+the assertion preceded array retention. Raw failed logs are now durable/public
+at fixture revision `e4bdba818982aa579afb2114968eb36ddd246210`, proof SHA
+`38cfde451e27e000db287f4c9ee80d4162a4b7d1308dccc67c667fc2a9481126`;
+anonymous remote hash verified. Repair `5732be84fd9dc16911b3d317aada27820c18f8a5`
+retains both arrays/scale/errors plus CPU/runtime/checkpoint hashes before the
+unchanged assertion. Actual exact/one-ULP helper controls pass; four secrets
+checks pass with zero skips (85.034 seconds). Version-pinned retry
+38163903250 is queued. No native result claimed or gate waived.
+Receipt: `docs/breeze-original-equivalence-2026-10-11.json`.
+
+Original speech comparison worker `d89e854049bea3deb2cd691a8490cdd0b0229adf`
+is prepared on `test/breeze-original-speech`: pinned original BF16 full
+generation, identical native reference WAV/text/sampling settings, four modes,
+retained prompts/codes/PCM and eight original/native ABI ASR roundtrips, each
+requiring WER <= .2 after an independent JFK control. The actual verified CPU
+Python release package and Nemotron F16 recognizer run after original model
+process exit. Syntax/help/unchanged WER controls and pinned loader compilation
+pass; four no-secrets checks pass, zero skips (44.972 seconds). Do not dispatch
+until native 38159960891 uploads its artifact; that run has now started.
+Receipt: `docs/breeze-original-speech-plan-2026-10-11.json`.
+PR #539 remains queued; Release 38156833241 has 27 successful jobs and no
+failure observed. Some Windows CUDA artifacts have arrived; both Windows
+12.8/12.6 pairs and the fresh Linux CUDA hardware archive are not yet complete.
+No release tag, default/quant promotion or synthesis feature merge.
