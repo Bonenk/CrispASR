@@ -4259,3 +4259,23 @@ Preserve original fixture hashes, prompt parity, raw logits, ranks/gaps and
 finite arrays. Native history-forcing is a diagnostic entry point; production
 sampling remains unchanged. All CPU model/build work belongs on GH CI.
 Do not replace canonical BF16 captures or relax exact-code/speech gates.
+
+Breeze depth diagnostic source `f4c8cf0c0` is pushed; GH CPU 38154207238
+is queued. It uses sequential original/native processes and retains six
+variants' raw logits, ranks/gaps, cosine and norms under the same original
+history. Original prompt IDs and prefill logits must be byte-exact against
+the pinned archive before the probe proceeds. Production sampling defaults
+are unchanged. Native runtime history controls are queued, not yet proven.
+C++ syntax/Python compilation pass; all eight strict comparator controls,
+90 model-free decision rows (including near-tie and 2x scale controls), and
+four secret tests pass with zero skips (46.970 s). Launch receipt:
+`docs/breeze-depth-probe-launch-2026-10-11.json`. Corrected full boundary
+run 38152301380 is still in progress.
+
+Linux reporter-clip run 38148682586 is SUCCESS at `7e3f768b8`: both actual
+C ABI clips retain all 造/加 occurrences with strict UTF-8 and no replacement
+characters. glibc C.UTF-8 does not treat 0xA0/0x85 as space, so this is a
+regression control, not a Linux reproduction of the macOS libc defect.
+Full proof is public, anonymously hash-verified, and pinned in
+`docs/qwen3-locale-utf8-linux-2026-10-11.json`. No physical GPU claim.
+#538 has 39 passing checks and six pending; merge awaits completion.
