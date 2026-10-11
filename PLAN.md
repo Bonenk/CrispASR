@@ -4366,3 +4366,36 @@ plus seven mode, four ownership and UTF-8 controls. Remaining jobs still run.
 Fresh full Release dry run 38156833241 pins `3fdc1838dc1b95f517a3862a9379b24d20d6c0c1`;
 no tag or publication requested. Packaging and actual fresh-archive GPU checks
 remain pending. Earlier queue statuses are superseded by these observations.
+
+Verified depth-decision receipt and public original arrays/logs are archived in
+`docs/breeze-depth-decision-2026-10-11.json`. Public fixture revision
+`dcaddf36f66d4932ec6f5391ec0e8239cc5cc61a`, proof SHA256
+`8d10e90a0dc8a3da5ff6028753ce2b8ca641e2254feb5ca3a9049f3667d128fd`,
+1,140,836 bytes; anonymous remote hash verified. All 106 array hashes/shapes/
+dtypes/finite values independently verified. Backbone diagnostic worker passes
+Python compilation, eight strict comparator controls and four no-secrets tests
+with zero skips (51.214 seconds). It adds no production math changes.
+
+Backbone probe source `82de8d9f5` is pushed on the maintainer validation branch;
+GH CPU [38158522850](https://github.com/CrispStrobe/CrispASR/actions/runs/38158522850)
+is queued with `--backbone-boundaries`. BF16 captures remain canonical; raw
+post-block residuals and normalized hidden have separate slots. Native arrays
+start as NaN so missing captures fail; capture OFF/ON/OFF must preserve final
+hidden and logits exactly. No speech or release acceptance from this probe.
+
+Queued backbone run 38158522850 was cancelled before execution after review
+caught whole-module BF16 restoration casting originally FP32 buffers. Fixed
+source `e7219be4b` restores every original parameter/buffer dtype separately.
+A real tiny PyTorch module with BF16 parameters and mixed BF16/FP32 buffers
+fails byte/dtype preservation under the old actual source block and passes
+under the corrected block. All four no-secrets tests pass with zero skips
+(47.462 seconds). Replacement GH CPU
+[38158762302](https://github.com/CrispStrobe/CrispASR/actions/runs/38158762302)
+is queued; no model result is claimed for either queued version.
+
+PR #536 now passes all 51 applicable checks, one intentional skip. This does
+not waive combined real-model CLI/C ABI/server ASR/speaker validation. Pending
+Breeze synthesis features remain outside main/release. Integration CI has seven
+passing jobs and the immutable release dry run has nine; no failures observed,
+but remaining jobs are queued/running. Final tracked proof/docs scan passes
+four tests with zero skips (55.208 seconds); all 227 anchors resolve.
