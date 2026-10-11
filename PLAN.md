@@ -4067,3 +4067,13 @@ budget for native comparison. Do not silently truncate arrays or weaken exact
 code/shape gates. Add GH CPU native F16/codec controls against pinned references,
 retain strict cosine/magnitude/argmax/code and reused-context checks. #534/#535
 have all applicable checks green and are merged; synthesis PRs remain pending.
+
+## CLAIMED 2026-10-11 — #533 reporter clips and missing continuation byte
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/issue533-byte-preservation`,
+branch `fix/qwen3-byte-preservation`. Read both new reporter comments in full:
+byte 0xA0 vanishes deterministically from 造/加, with two linked 30-second WAVs.
+Trace byte-level decoding versus Unicode whitespace cleanup, prove a controlled
+before/after regression, and run actual clips through C ABI on GH CPU/Metal
+where supported. Preserve the merged UTF-8 publication contract as defense;
+fix the byte-loss cause and keep model/platform acceptance claims separate.
