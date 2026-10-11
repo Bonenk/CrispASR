@@ -24,11 +24,12 @@
     "native_breeze": "g++ C++17 complete translation unit PASS; existing deprecated attention precision warning"
   },
   "ci": "https://github.com/CrispStrobe/CrispASR/actions/runs/38162567542",
-  "ci_observed": "queued",
+  "ci_observed": "56 SUCCESS; one intentional SKIPPED; no pending/failing checks",
   "limitations": [
     "Contract tests compile actual source with recording stubs; no model numerics or speech claimed",
-    "Full source CI pending before merge",
-    "Queued composition speech proof is attributed separately to a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
-    "No version bump, tag or publication"
-  ]
+    "No version bump, tag or publication",
+    "Successful real speech composition proof is separately attributed to a2f58338ef; does not merge pending features"
+  ],
+  "merged": true,
+  "merge_commit": "913266271cf29a052a945373ceeda675ba7acbd2"
 }

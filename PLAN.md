@@ -4609,3 +4609,30 @@ logit array, decision/rank/gap, cosine and magnitude. This tests whether the
 backbone precision difference itself can reproduce the first divergent
 codebook choice; it does not replace canonical BF16 or imply acceptance.
 Use GH heavy CPU, no local model execution and no Kaggle CPU work.
+
+Independent Breeze sampler PR #539 is MERGED as 913266271cf after 56 passing
+checks and one intentional skip. Release notes and history now include only
+this accepted existing-backend wiring; #529/#530/#531/#536 remain pending.
+Original speech run 38172313354 failed before any generation: generic HF
+repetition penalty indexed mixed text prompt ID 262146 into the 2052-entry
+audio vocabulary. Repair uses the pinned upstream generated-backbone-only
+penalty helper via the supported custom logits processor API, keeping effective
+penalty 1.1 and excluding prompt/reference and depth codebooks. No checkpoint
+or upstream source is modified. Actual tiny Torch/HF controls reproduce the
+old crash and prove prompt exclusion, CB0-only history, signs, unique duplicates,
+stateless reuse and invalid-batch rejection. Original full-generation output
+and all unchanged speech gates still require a fresh GH run.
+Precision decision probe is dispatched as 38172976584 at fd2f9b2fa; canonical
+90 logger decisions are unchanged in same-runtime A/B, missing captures reject,
+45 new logger routes pass. These are logger controls, not new model evidence.
+
+## CLAIMED 2026-10-11 — Prepare isolated v0.8.43 release candidate
+
+Use a new storage worktree and release/v0.8.43-candidate branch from accepted
+main including #539 and comprehensive notes. Run the repository bump-version
+script once for 0.8.43, preserving its annotated local tag, then push only the
+candidate branch and dispatch the complete empty-tag release dry run at that
+exact event source. Do not publish the tag until candidate CI/package checks
+and the exact candidate CUDA archive hardware test pass. Old 3fdc1838 archive
+acceptance does not transfer to the sampler change or version-bumped candidate.
+Pending feature PRs and rejected quantization candidates are excluded.

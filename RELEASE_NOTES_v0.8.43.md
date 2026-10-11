@@ -1,7 +1,23 @@
 # v0.8.43 — audio correctness, frontend parity and measured opt-in optimizations
 
-This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535, #537 and #538. Experimental quantization candidates and unfinished hardware
+This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535, #537, #538 and #539. Experimental quantization candidates and unfinished hardware
 validation are excluded from the released behavior described below.
+
+## Breeze TTS 2: honor session sampler controls
+
+The existing Breeze session path now forwards temperature, seed and token
+limits to the native context. The TTS seed setter also forwards the full 64-bit
+seed. Clearing a token limit restores the model's GGUF metadata limit. Breeze
+opening no longer depends on the unrelated Confucius build guard, and the CLI
+accepts `--tts-instruct` as an alias for its existing `--instruct` option.
+
+PR #539 passed all 56 applicable checks, with one intentional skip. Eight
+source-compiled controls cover dispatch, native setter arguments, limit reset,
+standalone Breeze builds and unsupported/null contexts; the previous source
+failed six controls. This change does not include the pending instruction,
+reference-ownership or server voice-cache features from #529/#531/#536.
+
+Evidence: [independent sampler control proof](docs/breeze-independent-sampler-2026-10-11.json).
 
 ## Transcript cleanup: preserve UTF-8 continuation bytes
 

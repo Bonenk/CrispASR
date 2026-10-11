@@ -7,6 +7,16 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-11 — Existing Breeze session sampler wiring
+
+PR #539 merged as `913266271cf29a052a945373ceeda675ba7acbd2` after
+56 passing checks and one intentional skip. C ABI setters forward temperature,
+64-bit seed and token limits; native clear-limit restores GGUF metadata.
+Standalone Breeze builds use their own open guard, and CLI `--tts-instruct`
+aliases existing `--instruct`. Eight source-compiled controls pass; six failed
+on the old source. Pending guidance, ownership and server-cache features are
+excluded. Receipt: `docs/breeze-independent-sampler-2026-10-11.json`.
+
 ## DONE 2026-10-11 — Locale-dependent transcript byte loss
 
 [PR #538](https://github.com/CrispStrobe/CrispASR/pull/538) merged as
