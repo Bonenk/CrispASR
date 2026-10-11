@@ -4541,3 +4541,22 @@ PR #539 remains queued; Release 38156833241 has 27 successful jobs and no
 failure observed. Some Windows CUDA artifacts have arrived; both Windows
 12.8/12.6 pairs and the fresh Linux CUDA hardware archive are not yet complete.
 No release tag, default/quant promotion or synthesis feature merge.
+
+## CLAIMED 2026-10-11 — Fresh release CUDA archive hardware validation
+
+Reuse the existing prebuilt-package GPU worker in the separate storage worktree
+`release-cuda-hardware`, preserving the old proof and source. Pin the actual
+Linux CUDA archive from release dry run 38156833241 at source 3fdc1838dc, verify
+its original artifact ZIP and tar SHA256, and publish a byte-identical immutable
+public fixture mirror before dispatching. Keep all existing original-transcript,
+stage, streaming, state reuse and actual CUDA allocation gates. No compilation
+or CPU reference work on Kaggle. Archive terminal prior logs before repushing;
+respect the single account and two-session cap. Fresh hardware acceptance remains
+pending until the exact new archive passes; old archive results do not transfer.
+
+Native Breeze speech run 38159960891 passed actual C ABI/CLI/server surface
+contracts and all 20 recognition controls (reference included), then failed
+loading the speaker encoder because webrtcvad imports missing pkg_resources.
+No speaker acceptance is claimed. Retry 38169287241 keeps source a2f58338ef and
+all gates unchanged, adding setuptools==80.9.0 to the worker dependencies.
+Fresh Windows CUDA 12.8/12.6 paired-package proof is dispatched as 38169253465.
