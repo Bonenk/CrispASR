@@ -4475,3 +4475,19 @@ source contract before/after (old failures retained), register its eight
 controls in CTest and CI, and require normal full integration CI before merge.
 The queued combined model speech proof remains separately attributed to its
 composition source; these contract checks do not establish speech parity.
+
+### 2026-10-11 independent sampler PR checkpoint
+
+[PR #539](https://github.com/CrispStrobe/CrispASR/pull/539), source
+`af26991cf37e6af14276a1ee5d4e124995811bc5`, isolates the existing-backend
+Breeze opening/sampler fixes from the pending synthesis composition. All
+eight compiled actual-source controls pass after six failed against unchanged
+main; four no-secrets checks pass with zero skips (48.462 seconds), complete
+C ABI/native Breeze C++ syntax and clang-format 18 pass. Full integration
+38162567542 is queued, required before merge. Original failed/control raw logs
+remain in storage; hashes and exact scope are in
+`docs/breeze-independent-sampler-2026-10-11.json`. No model/speech acceptance
+attributed to these recording-stub contracts. Backbone 38158762302 and
+composition speech 38159960891 are still queued. Release 38156833241 has
+24 successful jobs and no failure observed; Apple framework compilation has
+finished and packaging continues. No tag/default/quant promotion.
