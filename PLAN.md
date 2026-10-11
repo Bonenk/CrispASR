@@ -4054,3 +4054,16 @@ uses GH scratch, never this VPS's RAM or a Kaggle CPU fallback. No new original
 reference, native parity or speech acceptance is claimed until terminal output
 is downloaded and independently verified. The worker is on the maintainer's
 validation branch; the contributor PR still retains head `3de24603e`.
+
+## CLAIMED 2026-10-11 — Native Breeze guided parity and frame-budget audit
+
+Continue in `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`.
+Original GH reference run 38121758868 is SUCCESS; independently verified 145
+complete finite arrays and all eight cases from artifact 11695878891. The scale-0
+original cases emit 31 frames despite the declared 24-frame configuration;
+other cases emit 24. Audit upstream stopping-length setup before negative-prompt
+swap, preserve this unadjusted receipt, and require an explicitly matched frame
+budget for native comparison. Do not silently truncate arrays or weaken exact
+code/shape gates. Add GH CPU native F16/codec controls against pinned references,
+retain strict cosine/magnitude/argmax/code and reused-context checks. #534/#535
+have all applicable checks green and are merged; synthesis PRs remain pending.
