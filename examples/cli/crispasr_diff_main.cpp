@@ -1602,8 +1602,13 @@ static int bt2_tts_dump(const std::string& model_path, const std::string& fixtur
                 for (int j = 0; j < n_te_slots; ++j) {
                     char layer_name[48];
                     std::snprintf(layer_name, sizeof(layer_name), "te_seg%d_layer%d", k, j);
-                    put_f(out_dir, layer_name, layers[j].data(), {seg_len, d_te});
+                    // HF hidden_states ends with the normalized final state;
+                    // the native layer dump retains the pre-norm residual.
+                    put_f(out_dir, layer_name, j == n_te_slots - 1 ? h.data() : layers[j].data(), {seg_len, d_te});
                 }
+                char raw_name[48];
+                std::snprintf(raw_name, sizeof(raw_name), "te_seg%d_final_pre_norm", k);
+                put_f(out_dir, raw_name, layers.back().data(), {seg_len, d_te});
                 char nm[32];
                 std::snprintf(nm, sizeof(nm), "te_seg%d_hidden", k);
                 put_f(out_dir, nm, h.data(), {seg_len, d_te});
