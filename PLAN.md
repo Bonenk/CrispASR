@@ -3917,3 +3917,21 @@ merge, original guided-stage or actual decoded/clone acceptance yet. #529
 exported-API compatibility and reference+instruction composition still pending.
 Integrated release matrix 38024994245 has 12 successful jobs and no failures
 at this checkpoint; immutable source stays f51dc7770. No bump/tag yet.
+
+
+## CLAIMED 2026-10-11 — Session UTF-8 and Canary alignment crash
+
+Owner: this maintainer session. Separate worktrees under
+`/mnt/storage/crispasr/salvage-20261008/issue533-utf8` and
+`/mnt/storage/crispasr/salvage-20261008/issue532-canary`, branches
+`fix/session-byte-bpe-utf8` and `fix/canary-ctc-allocation`. Whole new issues
+#533/#532 and all comments read before starting. Reproduce split-byte BPE
+through native session result getters/bindings; retain complete valid text and
+existing timestamps/probabilities. Trace Canary CTC allocation on changed/reused
+alignment shapes, keep original diff/decoded controls and use GH for model work.
+No gate relaxation or speculative backend changes.
+Contributor TTS hosted build 38026088284 is SUCCESS, as is immutable full
+release matrix 38024994245 (36 successful jobs, no failures). Download terminal
+artifacts, apply generated capability tables to #531 and validate its final
+head before integration. Read all live open issue/PR discussions, including
+#529's updated contributor head, before further fixes/answers.
