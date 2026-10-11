@@ -1634,7 +1634,8 @@ static std::vector<ggml_fp16_t> build_causal_mask(int T, int Lk, int n_past) {
 // [branches.size(), dd_backbone_hidden].
 static bool depth_decode_frame(breeze_tts_2_context* c, const float* bb_hidden,
                                const std::vector<breeze_cfg::Branch>& branches, int32_t cb0, float temperature,
-                               std::vector<int32_t>& codes, std::vector<std::vector<float>>* out_logits) {
+                               std::vector<int32_t>& codes, std::vector<std::vector<float>>* out_logits,
+                               const int32_t* history_codes = nullptr) {
     const auto& hp = c->model.hp;
     const int n_cb = (int)hp.num_codebooks;
     const int vocab = (int)hp.dd_vocab_size;
@@ -1670,7 +1671,8 @@ static bool depth_decode_frame(breeze_tts_2_context* c, const float* bb_hidden,
             T = 1;
             n_past = cbi;
             positions = {cbi};
-            const int32_t id = codes[(size_t)cbi - 1] + (cbi - 1) * (int32_t)hp.audio_vocab_size;
+            const int32_t previous = history_codes ? history_codes[cbi - 1] : codes[(size_t)cbi - 1];
+            const int32_t id = previous + (cbi - 1) * (int32_t)hp.audio_vocab_size;
             std::vector<float> row;
             if (!embed_rows(c, &id, 1, row))
                 return false;
@@ -2278,6 +2280,28 @@ extern "C" int breeze_tts_2_run_depth_dump(struct breeze_tts_2_context* ctx, con
                 std::memcpy(out_logits_cb[i], logits[i].data(), logits[i].size() * sizeof(float));
         }
     }
+    return 0;
+}
+
+extern "C" int breeze_tts_2_run_depth_history_dump(struct breeze_tts_2_context* ctx, const float* backbone_hidden,
+                                                   const int32_t* history_codes, int n_codes, float** out_logits_cb,
+                                                   int32_t* out_picks) {
+    if (!ctx || !backbone_hidden || !history_codes || n_codes != (int)ctx->model.hp.num_codebooks)
+        return -1;
+    for (int i = 0; i < n_codes; ++i)
+        if (history_codes[i] < 0 || history_codes[i] >= (int32_t)ctx->model.hp.reserved_lo)
+            return -1;
+    std::vector<int32_t> picks;
+    std::vector<std::vector<float>> logits;
+    if (!depth_decode_frame(ctx, backbone_hidden, breeze_cfg::plan(false, 1.0f), history_codes[0], 0.0f, picks, &logits,
+                            history_codes))
+        return -1;
+    if (out_picks)
+        std::memcpy(out_picks, picks.data(), picks.size() * sizeof(int32_t));
+    if (out_logits_cb)
+        for (size_t i = 0; i < logits.size(); ++i)
+            if (out_logits_cb[i])
+                std::memcpy(out_logits_cb[i], logits[i].data(), logits[i].size() * sizeof(float));
     return 0;
 }
 

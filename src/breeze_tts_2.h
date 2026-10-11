@@ -187,6 +187,14 @@ int breeze_tts_2_run_backbone_dump(struct breeze_tts_2_context* ctx, const float
 int breeze_tts_2_run_depth_dump(struct breeze_tts_2_context* ctx, const float* backbone_hidden, int32_t cb0,
                                 float** out_logits_cb, int32_t* out_codes);
 
+// Diagnostic variant: each codebook sees the supplied history, even when an
+// earlier native argmax differs. out_picks contains native argmax choices,
+// not the forced history. n_codes must equal the model's num_codebooks;
+// all history codes must be valid, non-reserved codec IDs.
+int breeze_tts_2_run_depth_history_dump(struct breeze_tts_2_context* ctx, const float* backbone_hidden,
+                                        const int32_t* history_codes, int n_codes, float** out_logits_cb,
+                                        int32_t* out_picks);
+
 // Stage 5: full greedy generation. Writes row-major [n_frames * 16] codes.
 // Greedy regardless of the context's temperature so it can be held to
 // exact-integer equality against the oracle.
