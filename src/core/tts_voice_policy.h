@@ -14,6 +14,7 @@
 // business; the decision of WHETHER to act is what this header owns.
 #pragma once
 
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <system_error>
@@ -54,7 +55,14 @@ inline std::string reference_file_key(const std::filesystem::path& path) {
     if (ec)
         return "missing";
     const auto size = std::filesystem::file_size(path, ec);
-    return std::to_string(mtime.time_since_epoch().count()) + ':' + (ec ? "unknown" : std::to_string(size));
+    // libc++ can use a 128-bit filesystem clock representation, which has
+    // no std::to_string overload. Split seconds and subsecond nanoseconds
+    // into standard chrono representations without discarding precision.
+    const auto elapsed = mtime.time_since_epoch();
+    const auto seconds = std::chrono::duration_cast<std::chrono::seconds>(elapsed);
+    const auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed - seconds);
+    return std::to_string(seconds.count()) + ':' + std::to_string(nanos.count()) + ':' +
+           (ec ? "unknown" : std::to_string(size));
 }
 
 // Include the transcript sidecar when no explicit transcript overrides it:
