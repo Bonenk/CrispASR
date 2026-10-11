@@ -1,0 +1,46 @@
+{
+  "source": "c222540e1cdef04d011807040a44030ff8ba9228",
+  "contracts_passed": 4,
+  "output_rate_dispatch_passed": true,
+  "cli_cabi_rows_checked": 136,
+  "changed_capabilities": [
+    {
+      "name": "tada",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-1b",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-tts-1b",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-3b-ml",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "dots-tts",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    }
+  ],
+  "generated_caps_sha256": "91907394d7e4c4d26815fe7b7707dd488baee9866fa6276abb907555fcba1dba",
+  "model_acceptance": false,
+  "original_guidance_parity": false,
+  "workflow_run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38026088284",
+  "workflow_conclusion": "success",
+  "artifact_id": 11661638474,
+  "generated_files_applied": [
+    "src/core/backend_caps_table.h",
+    "docs/feature-matrix.md",
+    "docs/feature-matrix.html"
+  ],
+  "feature_matrix_scope": "136 backends compiled in hosted CPU build; optional ONNX Runtime adapters not compiled",
+  "integration_status": "draft PR 531; actual model plain/clone acceptance and PR529 original guided parity remain pending"
+}

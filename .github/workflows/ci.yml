@@ -170,6 +170,12 @@ jobs:
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v
 
+      - name: TTS session failure, ownership and conversion contracts
+        run: python3 tests/test_tts_session_contracts.py -v
+
+      - name: Breeze session reference and instruction composition
+        run: python3 tests/test_breeze_session_modes.py -v
+
   # ===========================================================================
   # The -DCRISPASR_AMR_FETCH=ON path compiles opencore-amr from source (for
   # platforms without a system libopencore-amr). It is OFF by default, so the

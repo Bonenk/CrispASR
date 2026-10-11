@@ -5613,6 +5613,14 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+    add_test(NAME test-breeze-session-modes
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-breeze-session-modes PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
+    add_test(NAME test-tts-session-contracts
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_tts_session_contracts.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-tts-session-contracts PROPERTIES LABELS "unit;session;tts" TIMEOUT 60)
 endif()
 
 # ─── test-release-workflow — validate release.yml targets (issue #131).
