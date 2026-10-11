@@ -4279,3 +4279,12 @@ regression control, not a Linux reproduction of the macOS libc defect.
 Full proof is public, anonymously hash-verified, and pinned in
 `docs/qwen3-locale-utf8-linux-2026-10-11.json`. No physical GPU claim.
 #538 has 39 passing checks and six pending; merge awaits completion.
+
+Raw boundary diagnostic proof is public at fixture revision
+`dfcbfe37c52d7dab09f10c1c2617728b75380eb5`,
+`breeze-guided-20261011/raw-boundary-diagnostic-proof.zip`, SHA256
+`97afdcf4eed295075db5fdcb4ceff0c0d0a0f003306528fd81774f54fc605bdc`,
+8,377,800 bytes. All 138 native arrays independently pass SHA/shape/type/finite
+verification; anonymous archive download hash matches. The archive preserves
+the raw 105/107 stage failure and excludes the relabelled control directory.
+Main documentation secret scan passes all four checks with zero skips (60.565 s).

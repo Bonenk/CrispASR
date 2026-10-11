@@ -51,5 +51,16 @@
   "corrected_harness_status": "queued",
   "strict_comparator_controls_passed": 8,
   "secrets_checks_passed": 4,
-  "secrets_checks_skipped": 0
+  "secrets_checks_skipped": 0,
+  "raw_proof": {
+    "revision": "dfcbfe37c52d7dab09f10c1c2617728b75380eb5",
+    "path": "breeze-guided-20261011/raw-boundary-diagnostic-proof.zip",
+    "bytes": 8377800,
+    "sha256": "97afdcf4eed295075db5fdcb4ceff0c0d0a0f003306528fd81774f54fc605bdc",
+    "anonymous_verified": true,
+    "native_arrays_independently_verified": 138,
+    "raw_boundaries_passed": 105,
+    "required_boundaries": 107,
+    "corrected_control_excluded": true
+  }
 }
