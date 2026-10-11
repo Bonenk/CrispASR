@@ -4125,3 +4125,14 @@ seven local policy controls. Full hosted unit tests are still required.
 PR #537 removes redundant contiguous copies of already-contiguous Q/K/V
 weight-row views. Reporter Metal Q8 and F16 A/B claims are read; immutable
 input/output and source provenance are needed for hardware acceptance.
+
+## CLAIMED 2026-10-11 — PR #537 immutable CPU/Metal Q8 row-view A/B
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/pr537-metal-validation`,
+branch `test/htdemucs-metal-views`. Read the whole PR and all follow-ups.
+Retain the contributor's three-line fix. Build baseline and candidate shared
+libraries on GH macOS against identical ggml; pin F16/Q8 model SHA and input
+PCM bytes. Require exact CPU before/after stems, F16 Metal before/after equality,
+and Q8 actual Metal finite stems with cosine AND magnitude versus same-model
+CPU. Record original Metal abort if reproduced. No substitute CPU fallback or
+claim of original Python parity from this regression A/B. Archive all outputs.
