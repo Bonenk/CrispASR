@@ -4044,3 +4044,13 @@ no Kaggle CPU fallback, no shared-environment package installation, no fixture
 overwrite. Save immutable provenance/hashes and fail incomplete/nonfinite dumps.
 Once complete, compare actual native #529 output with strict crispasr-diff;
 decoded full-speech/ASR controls remain separate acceptance requirements.
+
+Pinned reference worker `3ac8eedae3e1ce48fd6fa4002b7f3e91fc00c95d`
+passes syntax/extraction checks, all eight strict comparator controls and all
+four secret tests with no skips (106.897 s). GH CPU run
+[38121758868](https://github.com/CrispStrobe/CrispASR/actions/runs/38121758868)
+is dispatched at that exact head; currently queued. Source/model/codec delivery
+uses GH scratch, never this VPS's RAM or a Kaggle CPU fallback. No new original
+reference, native parity or speech acceptance is claimed until terminal output
+is downloaded and independently verified. The worker is on the maintainer's
+validation branch; the contributor PR still retains head `3de24603e`.
