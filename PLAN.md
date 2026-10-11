@@ -4413,3 +4413,27 @@ plain/clone/design/direction on GH CPU with pinned models, retained PCM,
 ASR and closed-loop speaker controls. Model-backed evidence must distinguish
 contract/repeatability, decoded speech and unresolved exact generated codes.
 All source/model/build/proof work stays on storage; heavy models run on GH.
+
+### 2026-10-11 Breeze sampler source checkpoint
+
+Source `a2f58338ef9a86dfee114cdd5cd610dfe7b556c6` on the separate composition
+branch fixes the independent Breeze open guard, open seed forwarding, runtime
+seed/temperature/token-limit dispatch and checkpoint-default limit reset.
+The documented `--tts-instruct` alias now parses alongside `--instruct`.
+Eight actual compiled controls pass (old code fails 6/8), seven mode controls
+pass, four ownership/failure controls pass, both C++ syntax checks pass and
+all four no-secrets checks pass with zero skips (55.242 seconds).
+Full current-source integration CI is
+[38159958466](https://github.com/CrispStrobe/CrispASR/actions/runs/38159958466).
+It supersedes the older partial integration run after source changes; that
+run's eight passing builds and 2,019 Linux CTests remain attributed to its old
+source. Real CLI/C ABI/server speech worker
+[38159960891](https://github.com/CrispStrobe/CrispASR/actions/runs/38159960891)
+is queued. It retains all PCM/ASR/speaker evidence for plain, clone, design,
+direction, seeded reuse, negative-alone equivalence and unknown-voice recovery.
+It uses the independently parity-tested Nemotron F16 recognizer, requires a
+known JFK control first, then unchanged WER <= .2 and closed-loop clone speaker
+similarity improvement. No speech result claimed yet, no gate waiver.
+Receipt: `docs/breeze-session-sampler-2026-10-11.json`.
+Backbone probe 38158762302 remains queued. Release dry run has twenty passing
+jobs and no failure observed; remaining packaging/platform checks are pending.
