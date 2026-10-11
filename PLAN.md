@@ -4665,3 +4665,21 @@ hash-verified in docs/breeze-reference-dispatch-2026-10-11.json. Next useful
 control is default versus explicit AVX2 dispatch on the SAME GH host before
 retrying native precision decisions. Preserve both results and every gate.
 Release candidate excludes the pending feature and is unchanged at eb633d908.
+
+Original/native decoded speech run 38173377874 is SUCCESS at
+080a0fe5a17a32cf9515e8077d76856257ad0689. All four original codec/PCM pairs
+and all eight original/native PCM roundtrips independently pass hash/finite
+checks. Original plain/clone/design/direction WER: .2/.1/0/0; native:
+.1/0/0/.1. Unchanged WER maximum .2, independent JFK recognizer WER 0.
+Full original and native arrays, transcripts, executed loader and provenance
+are publicly archived and anonymously SHA256 verified. See
+docs/breeze-original-speech-plan-2026-10-11.json. This establishes fixed-control
+decoded speech quality, not exact generated-code parity, GPU portability,
+streaming speed or acceptance of every backend in the pending feature PRs.
+
+Same-host original CPU-dispatch A/B is dispatched as 38174972934 at
+0fbdbeff8040cf3bc6192ce14cfca2964c266627. Fresh default and AVX2-capped
+processes run the unchanged original-only probe, seed 42 before loading,
+retain all failed arrays, and require both immutable byte controls to pass.
+No local model execution or native acceptance. Candidate eb633d908 is
+unchanged; release jobs are building, with no failures at this checkpoint.

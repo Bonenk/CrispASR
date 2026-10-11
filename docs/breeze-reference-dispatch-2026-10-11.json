@@ -44,5 +44,20 @@
   "dispatch_documentation": [
     "https://uxlfoundation.github.io/oneDNN/dev_guide_cpu_dispatcher_control.html",
     "https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-linux/2024-2/instruction-set-specific-dispatch-on-intel-archs.html"
-  ]
+  ],
+  "same_host_control": {
+    "run": 38174972934,
+    "source": "0fbdbeff8040cf3bc6192ce14cfca2964c266627",
+    "status": "queued at last check",
+    "script": "tools/ci-heavy/breeze_reference_cpu_dispatch.py",
+    "original_only": true,
+    "variants": [
+      "default",
+      "AVX2-capped PyTorch/oneDNN/MKL"
+    ],
+    "seed": 42,
+    "unchanged_byte_gate": true,
+    "both_variants_retained_on_failure": true,
+    "acceptance": "Both variants must pass the unchanged original byte control; a failed branch keeps the job failed. Same-host control does not accept native generation."
+  }
 }
