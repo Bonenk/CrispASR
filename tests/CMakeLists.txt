@@ -5582,6 +5582,14 @@ set_tests_properties(test-separate-live PROPERTIES
     LABELS "live;separation"
     TIMEOUT 300)
 
+# #533: compile native finalization/getters and decode via Python ctypes.
+if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME test-session-utf8
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+endif()
+
 # ─── test-release-workflow — validate release.yml targets (issue #131).
 # Static test: no binary or model needed, just parses YAML.
 add_test(NAME test-release-workflow

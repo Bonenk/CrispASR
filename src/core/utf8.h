@@ -27,8 +27,8 @@ namespace core_utf8 {
 // On MALFORMED input it degrades rather than rejecting: a stray continuation
 // byte is not counted, and an over-long or truncated sequence still counts its
 // leading byte once. Callers here are estimating a duration or a length ratio,
-// where a slightly-off count on invalid input beats throwing; nothing in this
-// header validates UTF-8, and it should not be used as a validity check.
+// where a slightly-off count on invalid input beats throwing. length() does not
+// validate UTF-8, and it should not be used as a validity check.
 inline size_t length(const char* s, size_t n_bytes) {
     size_t n = 0;
     for (size_t i = 0; i < n_bytes; i++)
@@ -50,6 +50,68 @@ inline size_t length(const char* s) {
         if (((unsigned char)*s & 0xC0) != 0x80)
             n++;
     return n;
+}
+
+// RFC 3629 sequence length, or zero for malformed/truncated input.
+inline size_t sequence_length(const std::string& s, size_t i) {
+    if (i >= s.size())
+        return 0;
+    const unsigned char c = (unsigned char)s[i];
+    if (c < 0x80)
+        return 1;
+    size_t n;
+    unsigned char lo = 0x80, hi = 0xBF;
+    if (c >= 0xC2 && c <= 0xDF)
+        n = 2;
+    else if (c >= 0xE0 && c <= 0xEF) {
+        n = 3;
+        if (c == 0xE0)
+            lo = 0xA0;
+        else if (c == 0xED)
+            hi = 0x9F;
+    } else if (c >= 0xF0 && c <= 0xF4) {
+        n = 4;
+        if (c == 0xF0)
+            lo = 0x90;
+        else if (c == 0xF4)
+            hi = 0x8F;
+    } else
+        return 0;
+    if (s.size() - i < n)
+        return 0;
+    for (size_t k = 1; k < n; ++k) {
+        const unsigned char b = (unsigned char)s[i + k];
+        if (k == 1 ? (b < lo || b > hi) : (b < 0x80 || b > 0xBF))
+            return 0;
+    }
+    return n;
+}
+
+// Normalize an ASSEMBLED string, never individual byte-level BPE pieces.
+// Match the CLI JSON policy: replace each malformed byte with U+FFFD.
+// Valid strings take no allocation and retain their original storage.
+inline void replace_invalid(std::string& s) {
+    size_t i = 0;
+    while (i < s.size()) {
+        const size_t n = sequence_length(s, i);
+        if (!n)
+            break;
+        i += n;
+    }
+    if (i == s.size())
+        return;
+    std::string clean(s, 0, i);
+    while (i < s.size()) {
+        const size_t n = sequence_length(s, i);
+        if (n) {
+            clean.append(s, i, n);
+            i += n;
+        } else {
+            clean += "\xEF\xBF\xBD";
+            ++i;
+        }
+    }
+    s.swap(clean);
 }
 
 } // namespace core_utf8

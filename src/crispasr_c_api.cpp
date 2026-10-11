@@ -16,6 +16,7 @@
 #include "core/win_compat.h"
 #include "core/arch_backend_map.h" // #335: general.architecture → backend table, SHARED with the CLI
 #include "core/bpe.h"
+#include "core/utf8.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
 #include "core/tts_ref_cache.h"     // #334: reuse the CLI-side reference-transcript cache
@@ -2461,6 +2462,23 @@ struct crispasr_session_result {
     int n_logit_frames = 0;
 };
 
+// #533: finalize assembled strings before publishing callbacks or results.
+// Byte-level tokens may contain partial characters; repairing those pieces
+// individually would corrupt valid Chinese/Korean text. Getters stay read-only.
+static void normalize_session_result_utf8(crispasr_session_result* r) {
+    if (!r)
+        return;
+    for (auto& seg : r->segments) {
+        core_utf8::replace_invalid(seg.text);
+        core_utf8::replace_invalid(seg.speaker);
+        for (auto& word : seg.words) {
+            core_utf8::replace_invalid(word.text);
+            for (auto& alt : word.alts)
+                core_utf8::replace_invalid(alt.text);
+        }
+    }
+}
+
 // ── Streamed-segment/token polling (Dart FFI path) ──────────────────────
 // The default callbacks push into the OWNING SESSION's buffers (ud = the
 // session), so two sessions — concurrent or sequential — can't interleave
@@ -2535,6 +2553,7 @@ CA_EXPORT crispasr_session_result* crispasr_drain_streamed_segments(void) {
     r->segments = std::move(s->streamed_segments);
     s->streamed_segments.clear();
     s->streamed_seg_count.store(0, std::memory_order_relaxed);
+    normalize_session_result_utf8(r);
     return r;
 }
 
@@ -5715,6 +5734,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
         crispasr_session_result* r = transcribe_autochunk(s, pcm, n_samples, language);
         apply_session_hygiene(r, !s->hygiene_defer_merge);
         apply_session_punc_model(s, r);
+        normalize_session_result_utf8(r);
         _fire_segment_callbacks(s, r);
         return r;
     }
@@ -5746,6 +5766,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
     }
     apply_session_hygiene(best, !s->hygiene_defer_merge);
     apply_session_punc_model(s, best);
+    normalize_session_result_utf8(best);
     _fire_segment_callbacks(s, best);
     return best;
 }
