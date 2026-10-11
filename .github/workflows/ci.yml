@@ -174,7 +174,9 @@ jobs:
         run: python3 tests/test_tts_session_contracts.py -v
 
       - name: Breeze session reference and instruction composition
-        run: python3 tests/test_breeze_session_modes.py -v
+        run: |
+          python3 tests/test_breeze_session_modes.py -v
+          python3 tests/test_breeze_session_controls.py -v
 
   # ===========================================================================
   # The -DCRISPASR_AMR_FETCH=ON path compiles opencore-amr from source (for

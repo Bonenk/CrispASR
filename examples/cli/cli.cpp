@@ -680,7 +680,7 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.align_granularity = ARGV_NEXT;
     } else if (arg == "--text-file") {
         params.text_file = ARGV_NEXT;
-    } else if (arg == "--instruct") {
+    } else if (arg == "--instruct" || arg == "--tts-instruct") {
         params.tts_instruct = ARGV_NEXT;
     } else if (arg == "--tts-phonemes") {
         params.tts_phonemes = ARGV_NEXT;

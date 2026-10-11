@@ -3924,7 +3924,6 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
-#ifdef CA_HAVE_CONFUCIUS4_TTS
 #ifdef CA_HAVE_BT2_TTS
     if (s->backend == "bt2-tts" || s->backend == "bt2" || s->backend == "bt2tts" || s->backend == "breeze-tts-2" ||
         s->backend == "breeze_tts_2" || s->backend == "breeze-tts2") {
@@ -3933,6 +3932,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         cp.n_threads = s->n_threads;
         cp.verbosity = g_open_verbosity_tls;
         cp.use_gpu = g_open_use_gpu_tls;
+        cp.seed = g_open_seed_tls;
         if (g_open_temperature_tls > 0.0f)
             cp.temperature = g_open_temperature_tls;
         // Resolve the codec BEFORE the model load, mirroring the CLI adapter:
@@ -3966,6 +3966,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_CONFUCIUS4_TTS
     if (s->backend == "confucius4-tts" || s->backend == "confucius4_tts" || s->backend == "confucius4") {
         s->backend = "confucius4-tts";
         confucius4_tts_params p = confucius4_tts_default_params();
@@ -13092,6 +13093,13 @@ CA_EXPORT int crispasr_session_set_temperature(crispasr_session* s, float temper
     s->temperature = temperature;
     s->seed = seed;
     int touched = 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx) {
+        breeze_tts_2_set_temperature(s->bt2_ctx, temperature);
+        breeze_tts_2_set_seed(s->bt2_ctx, seed);
+        touched++;
+    }
+#endif
 #ifdef CA_HAVE_MIOTTS
     if (s->miotts_ctx) {
         miotts_set_temperature(s->miotts_ctx, temperature);
@@ -13221,6 +13229,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
     if (!s)
         return -1;
     int touched = 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx) {
+        breeze_tts_2_set_seed(s->bt2_ctx, seed);
+        touched++;
+    }
+#endif
 #ifdef CA_HAVE_MIOTTS
     if (s->miotts_ctx) {
         miotts_set_seed(s->miotts_ctx, seed);
@@ -13747,6 +13761,10 @@ CA_EXPORT int crispasr_session_set_max_new_tokens(crispasr_session* s, int n) {
     if (!s)
         return -1;
     s->max_new_tokens = n > 0 ? n : 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx)
+        breeze_tts_2_set_max_new_tokens(s->bt2_ctx, s->max_new_tokens);
+#endif
 #ifdef CRISPASR_HAS_ONNX
     if (s->moonshine_onnx_ctx)
         moonshine_onnx_set_max_new_tokens(s->moonshine_onnx_ctx, s->max_new_tokens);

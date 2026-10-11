@@ -5617,6 +5617,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-breeze-session-modes PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
+    add_test(NAME test-breeze-session-controls
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_controls.py
+    )
+    set_tests_properties(test-breeze-session-controls PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
     add_test(NAME test-tts-session-contracts
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_tts_session_contracts.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
