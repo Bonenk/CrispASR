@@ -4437,3 +4437,27 @@ similarity improvement. No speech result claimed yet, no gate waiver.
 Receipt: `docs/breeze-session-sampler-2026-10-11.json`.
 Backbone probe 38158762302 remains queued. Release dry run has twenty passing
 jobs and no failure observed; remaining packaging/platform checks are pending.
+
+### 2026-10-11 actual fresh CPU release packages
+
+Downloaded the actual Linux CPU CLI/shared archives from immutable Release
+38156833241, source `3fdc1838dc1b95f517a3862a9379b24d20d6c0c1`. CLI starts
+and reports that source/version 0.8.42. Quantizer reaches its documented usage
+path (exit 1 for insufficient positional arguments; startup only). Both CLI
+executables use $ORIGIN and all seven ELF dependency closures pass, including
+bundled OpenBLAS/OpenMP/Fortran/C2PA. Relocated shared-library load passes and
+all 17 library closures resolve internally. Actual CLI/shared C ABI capability
+comparison passes all 136 canonical rows and size/error contracts. Actual
+whisper_version=0.8.42 and C API version=0.7.0 (deliberate stable ABI); session,
+result, instruction and additive Nemotron preencode exports are present.
+Loader overrides were cleared. Archives/log hashes and limitations are in
+`docs/release-cpu-package-2026-10-11.json`. No models/GPU were exercised, no
+new tag, and the full platform matrix is still pending.
+
+Fresh CPU package raw logs and archive/contract receipts are public at fixture
+revision `9c76e78e281c01fa0782c63bb45bf718551ba0b2`,
+`release/38156833241/cpu-package-proof.zip`, SHA256
+`234bcc11071e9f4bd520afa6e0f1dfe1559b4bec84d6e18c916c66774f8293af`,
+81,689 bytes; anonymous remote hash verified. Final tracked proof/docs scan
+passes all four tests with zero skips (52.341 seconds); public archive text
+was also checked for credentials and the account name before upload.

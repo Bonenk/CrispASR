@@ -1,0 +1,80 @@
+{
+  "cli-version": {
+    "returncode": 0,
+    "log_sha256": "295fa12010f8b606e1b73d36a82380a2f0fc4d9573313182dcdc282b2ca6f312"
+  },
+  "quantizer-help": {
+    "returncode": 1,
+    "log_sha256": "8e29f02dde694bb8a68d5fc57b422c52496b9b940f5ab305e7119847ba49d19b",
+    "expected_usage_exit": true,
+    "scope": "usage/startup only; no quantization"
+  },
+  "cli-dependency-contract": {
+    "returncode": 0,
+    "log_sha256": "a6e5fd34c2fccdff9151643e5b62099c6c5b4d17f79c74bd70ce79edeee3baa6"
+  },
+  "library-relocation": {
+    "returncode": 0,
+    "log_sha256": "bc0f1fd37f8b086c387389eac273cf9a138b5a0993b8289c93d13902b8653de7"
+  },
+  "capabilities": {
+    "returncode": 0,
+    "log_sha256": "9d8903054204907681b67286bcc0cf469f156016428ef91b939629e97b49b8cc"
+  },
+  "whisper_version": "0.8.42",
+  "crispasr_c_api_version": "0.7.0",
+  "crispasr_session_open": {
+    "export_present": true
+  },
+  "crispasr_session_close": {
+    "export_present": true
+  },
+  "crispasr_session_synthesize_raw": {
+    "export_present": true
+  },
+  "crispasr_session_result_segment_text": {
+    "export_present": true
+  },
+  "nemotron_run_preencode_ext": {
+    "export_present": true
+  },
+  "crispasr_session_set_instruct": {
+    "export_present": true
+  },
+  "source": "3fdc1838dc1b95f517a3862a9379b24d20d6c0c1",
+  "run": 38156833241,
+  "model_inference": false,
+  "gpu_tested": false,
+  "archives": {
+    "cli": {
+      "archive": "crispasr-linux-x86_64.tar.gz",
+      "bytes": 42823472,
+      "sha256": "0bbd8d17b7365a3e8b02342f24aeb1e1f23694c49083c2bd25e2a721eada5a4e",
+      "extracted_roots": [
+        "crispasr-linux-x86_64"
+      ]
+    },
+    "lib": {
+      "archive": "libcrispasr-linux-x86_64.tar.gz",
+      "bytes": 22504518,
+      "sha256": "ceea7057421a2e7e95d0fd1603787dbc716e899790120585e05c24f37c488e3d",
+      "extracted_roots": [
+        "libcrispasr-linux-x86_64"
+      ]
+    }
+  },
+  "scope": "Actual fresh Linux CPU CLI/shared package startup, dependency closure, relocated load and 136-row C ABI/CLI capability contracts. No models, GPU or whole release acceptance.",
+  "pipeline_complete_at_recording": false,
+  "loader_environment_overrides_cleared": [
+    "LD_LIBRARY_PATH",
+    "GGML_BACKEND_PATH",
+    "DYLD_LIBRARY_PATH"
+  ],
+  "proof": {
+    "revision": "9c76e78e281c01fa0782c63bb45bf718551ba0b2",
+    "path": "release/38156833241/cpu-package-proof.zip",
+    "bytes": 81689,
+    "sha256": "234bcc11071e9f4bd520afa6e0f1dfe1559b4bec84d6e18c916c66774f8293af",
+    "anonymous_verified": true
+  }
+}
