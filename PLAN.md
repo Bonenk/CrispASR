@@ -4126,16 +4126,6 @@ PR #537 removes redundant contiguous copies of already-contiguous Q/K/V
 weight-row views. Reporter Metal Q8 and F16 A/B claims are read; immutable
 input/output and source provenance are needed for hardware acceptance.
 
-## CLAIMED 2026-10-11 — PR #537 immutable CPU/Metal Q8 row-view A/B
-
-Worktree `/mnt/storage/crispasr/salvage-20261008/pr537-metal-validation`,
-branch `test/htdemucs-metal-views`. Read the whole PR and all follow-ups.
-Retain the contributor's three-line fix. Build baseline and candidate shared
-libraries on GH macOS against identical ggml; pin F16/Q8 model SHA and input
-PCM bytes. Require exact CPU before/after stems, F16 Metal before/after equality,
-and Q8 actual Metal finite stems with cosine AND magnitude versus same-model
-CPU. Record original Metal abort if reproduced. No substitute CPU fallback or
-claim of original Python parity from this regression A/B. Archive all outputs.
 
 ### 2026-10-11 hardware-worker checkpoint
 
@@ -4213,3 +4203,21 @@ Full proof is public at fixture dataset revision
 1,553,292 bytes, anonymous remote hash verified. Compact receipt:
 `docs/qwen3-locale-utf8-2026-10-11.json`. #537 A/B is now running but cannot
 be advertised as physical Metal acceptance without its actual device probe.
+
+### 2026-10-11 HTDemucs integration complete
+
+PR #537 merged as `ad7e91172f4bee46d2e8c7ea1a1765acb625f4b0`: all 35
+applicable checks pass, two intentional skips. Independent hosted fused CPU
+F16/Q8 outputs match byte-for-byte; every stem cosine/norm ratio 1, max error 0.
+The contributor supplied a complete pinned Apple M4/macOS26.6.2 receipt:
+original Q8 Metal exit134, candidate exit0; F16 Metal stems exact, Q8 Metal/
+CPU cosine minimum0.999495 and magnitude ratio0.99953–1.00000. These are
+attributed reporter hardware results; hosted Mac's Metal probe is NONE.
+Source/input/models/stem hashes and limits are archived in
+`docs/htdemucs-metal-views-2026-10-11.json`; full public independently hashed
+proof is fixture dataset `684d1488e2833fc0448d7b01a344670743e0cbbb`,
+`htdemucs/metal-row-views-20261011/proof.zip`, SHA256
+`cd0944fdb42cde993c1ea4c95202b922b5dd00dbfa2e4074033b6b6d0ebd9298`.
+Release notes and HISTORY include the fix. No music-corpus/speed claim.
+#538 remaining CI, #529 numeric diagnosis and #536 server/model gates remain
+pending; no release tag.

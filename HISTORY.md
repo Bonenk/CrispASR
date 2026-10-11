@@ -7,6 +7,19 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-11 — HTDemucs Metal Q8 contiguous-copy abort
+
+[PR #537](https://github.com/CrispStrobe/CrispASR/pull/537) merged as
+`ad7e91172f4bee46d2e8c7ea1a1765acb625f4b0` after 35 applicable checks
+passed, two intentional skips. Three already-contiguous cross-attention weight
+views feed matmul directly, removing unsupported Metal Q8 CONT copies.
+[Independent hosted fused CPU A/B](https://github.com/CrispStrobe/CrispASR/actions/runs/38148987616)
+has exact F16/Q8 stems; the [contributor's pinned M4 receipt](https://github.com/CrispStrobe/CrispASR/pull/537#issuecomment-6110238302)
+reports Q8 Metal abort resolved, F16 Metal outputs exact, and Q8 CPU/Metal
+cosine/magnitude agreement. Hosted Metal device is NONE; physical results are
+attributed to the contributor. This is a focused regression, not a music-quality
+benchmark or speed claim. Full receipt: `docs/htdemucs-metal-views-2026-10-11.json`.
+
 ## DONE 2026-10-11 — Session UTF-8 publication and canonical discovery
 
 [PR #534](https://github.com/CrispStrobe/CrispASR/pull/534) merged as

@@ -1,8 +1,25 @@
 # Draft release notes — changes after v0.8.42
 
-This draft covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534 and #535. No new tag has
+This draft covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535 and #537. No new tag has
 been cut. Experimental quantization candidates and unfinished hardware
 validation are excluded from the released behavior described below.
+
+## HTDemucs: Q8 source separation on Metal
+
+Cross-attention now uses its already-contiguous Q/K/V weight-row views directly,
+removing redundant Q8 copies that Metal cannot execute. The previous graph
+aborted with `unsupported op 'CONT'` on Q8 models.
+
+PR #537 passed all 35 applicable CI checks, with two intentional skips. An
+independent hosted macOS test forces the changed fused graph on CPU: all four
+F16 and Q8 stems are byte-identical before/after. The contributor's pinned M4
+receipt reports the Q8 abort fixed, byte-identical F16 Metal stems, and Q8
+Metal/CPU per-stem cosine 0.999495–1.000000 with norm ratio 0.99953–1.00000.
+Those physical Metal results are attributed to the contributor; the hosted Mac
+has no Metal device. The fixture is speech-only, so this is a focused regression
+check rather than a music-corpus quality or performance claim.
+
+Evidence: [source, models, output hashes and attributed Metal receipt](docs/htdemucs-metal-views-2026-10-11.json).
 
 ## Session results: valid UTF-8 before publication
 
