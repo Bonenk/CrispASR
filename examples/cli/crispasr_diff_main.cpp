@@ -1590,7 +1590,20 @@ static int bt2_tts_dump(const std::string& model_path, const std::string& fixtur
                 continue;
             const int seg_len = pos - start;
             std::vector<float> h((size_t)seg_len * d_te);
-            if (breeze_tts_2_run_text_encoder_dump(ctx, &f_ids.i[start], seg_len, h.data(), nullptr, 0) == seg_len) {
+            // The pinned oracle includes embedding + all 26 TE layers.
+            // Keep every boundary so the first numerical divergence is visible.
+            const int n_te_slots = 27;
+            std::vector<std::vector<float>> layers(n_te_slots, std::vector<float>((size_t)seg_len * d_te));
+            std::vector<float*> layer_ptrs(n_te_slots);
+            for (int j = 0; j < n_te_slots; ++j)
+                layer_ptrs[j] = layers[j].data();
+            if (breeze_tts_2_run_text_encoder_dump(ctx, &f_ids.i[start], seg_len, h.data(), layer_ptrs.data(),
+                                                   n_te_slots) == seg_len) {
+                for (int j = 0; j < n_te_slots; ++j) {
+                    char layer_name[48];
+                    std::snprintf(layer_name, sizeof(layer_name), "te_seg%d_layer%d", k, j);
+                    put_f(out_dir, layer_name, layers[j].data(), {seg_len, d_te});
+                }
                 char nm[32];
                 std::snprintf(nm, sizeof(nm), "te_seg%d_hidden", k);
                 put_f(out_dir, nm, h.data(), {seg_len, d_te});

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ['HEAVY_OUT'])
@@ -25,9 +26,23 @@ def main():
     import numpy as np
     from huggingface_hub import hf_hub_download
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--reference-dir', required=True, type=Path)
+    group = ap.add_mutually_exclusive_group(required=True)
+    group.add_argument('--reference-dir', type=Path)
+    group.add_argument('--reference-proof', action='store_true',
+                       help='Reuse the pinned, independently verified matched-budget original archive')
     args = ap.parse_args()
-    ref = args.reference_dir.resolve()
+    if args.reference_proof:
+        archive = Path(hf_hub_download('cstr/crispasr-regression-fixtures',
+            'breeze-guided-20261011/matched-budget-failed-parity-proof.zip', repo_type='dataset',
+            revision='27896a1fab69d45c8b246eb659823f92a5e0e458'))
+        assert digest(archive) == '13d5eed11955e07f2e5fc2f681df123c1b2b35d2f11998416571dbf962d54f33'
+        proof = SCRATCH / 'reused-proof'
+        proof.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(archive) as z:
+            z.extractall(proof)
+        ref = proof / 'reference'
+    else:
+        ref = args.reference_dir.resolve()
     oracle = json.loads((ref / 'validation.json').read_text())
     assert oracle['complete'] and oracle['max_frames'] == 24
     assert oracle['script_version'] == '2026-10-11.breeze-guided-gh-cpu.2'
@@ -78,6 +93,24 @@ def main():
         env.update(BREEZE_CODEC=str(models[1]), BREEZE_FIXTURE_DIR=str(fixture), OPENBLAS_NUM_THREADS='1')
         native = OUT / 'native-dumps'
         native.mkdir()
+        base = OUT / 'native-boundaries'
+        base.mkdir()
+        receipt['base_dump_returncode'] = run(
+            [build / 'bin/crispasr-diff', 'bt2-tts', models[0], fixture, base], 'native-boundaries', env)
+        # These are oracle-fed boundaries. Full generation/codec output is
+        # separately retained and never relabelled as stage acceptance.
+        required = {Path(name).stem for name in oracle['arrays']
+                    if '/' not in name and (name.startswith(('te_', 'backbone_', 'prompt_', 'dd_logits_'))
+                                             or name == 'dd_codes_frame0_stepwise.npy')}
+        code = ('import sys; from pathlib import Path; '
+                'from tools.reference_backends.breeze_tts_2 import compare; '
+                'raise SystemExit(compare(Path(sys.argv[1]), download=False, '
+                'only=set(sys.argv[2:]), strict=True))')
+        receipt['boundary_comparison_returncode'] = run(
+            [sys.executable, '-c', code, base, *sorted(required)], 'boundary-comparison', env)
+        receipt['boundary_required_stages'] = sorted(required)
+        receipt['boundary_pass'] = (receipt['base_dump_returncode'] == 0 and
+                                    receipt['boundary_comparison_returncode'] == 0)
         dump_rc = run([build / 'bin/crispasr-diff', 'bt2-tts-guided', models[0], fixture, native],
                       'native-guided', env)
         # Score all available stages even when the native context controls fail.
@@ -93,7 +126,13 @@ def main():
             assert a.size and np.isfinite(a).all(), str(p)
             receipt['arrays'][str(p.relative_to(native))] = dict(
                 shape=list(a.shape), dtype=str(a.dtype), sha256=digest(p))
-        receipt['complete'] = dump_rc == 0 and compare_rc == 0
+        receipt['boundary_arrays'] = {}
+        for p in sorted(base.rglob('*.npy')):
+            a = np.load(p, allow_pickle=False)
+            assert a.size and np.isfinite(a).all(), str(p)
+            receipt['boundary_arrays'][str(p.relative_to(base))] = dict(
+                shape=list(a.shape), dtype=str(a.dtype), sha256=digest(p))
+        receipt['complete'] = dump_rc == 0 and compare_rc == 0 and receipt['boundary_pass']
         assert receipt['complete'], 'Strict native guided parity/context controls failed; inspect retained logs/arrays'
     except BaseException as exc:
         receipt['error'] = f'{type(exc).__name__}: {exc}'
