@@ -261,7 +261,7 @@ def compare_stage(name: str, ref: np.ndarray, cpp: np.ndarray) -> dict:
 
 
 def compare(cpp_dump: Path, download: bool = True,
-            only: Optional[Set[str]] = None, sub: str = "") -> int:
+            only: Optional[Set[str]] = None, sub: str = "", strict: bool = False) -> int:
     """Diff a C++ dump directory against the reference fixtures, or the `sub`
     directory of both.
 
@@ -316,6 +316,8 @@ def compare(cpp_dump: Path, download: bool = True,
               f"{', '.join(missing[:12])}{' ...' if len(missing) > 12 else ''}")
     print(f"\n{len(rows) - failures}/{len(rows)} stages passed "
           f"(cos >= {COS_THRESHOLD}, exact ints, argmax match on logits)")
+    if strict:
+        failures += len(missing) + int(not rows)
     return 1 if failures else 0
 
 
@@ -325,16 +327,45 @@ def compare_guided(cpp_dump: Path, download: bool = True) -> int:
     matrix exists to be run whole.
     """
     root = fixture_dir(download=download) / GUIDED_DIR
-    cases = sorted(p.name for p in root.iterdir() if p.is_dir()) if root.is_dir() else []
-    if not cases:
-        print(f"no guided fixtures under {root}; run tools/kaggle/breeze-refdump")
+    cases = ("plain", "clone", "design-s0", "design-s1", "design-s4",
+             "direct-s0", "direct-s1", "direct-s4")
+    meta = load_meta(download=download)
+    if meta.get("guided_errors"):
+        print(f"reference generation failed: {meta['guided_errors']}")
         return 1
-    guided = load_meta(download=download).get("guided", {})
+    guided = meta.get("guided", {})
     failed = []
     for case in cases:
         print(f"\n== {case} {json.dumps(guided.get(case, {}))}")
         sub = f"{GUIDED_DIR}/{case}"
-        if not (Path(cpp_dump) / sub).is_dir() or compare(cpp_dump, download=download, sub=sub):
+        required = {"prompt_input_ids", "backbone_logits_frame0", "codes"}
+        if case.endswith(("s0", "s4")):
+            required.add("neg_prompt_input_ids")
+        valid = True
+        for side, directory in (("reference", root / case),
+                                ("native", Path(cpp_dump) / sub)):
+            for stage in sorted(required):
+                path = directory / f"{stage}.npy"
+                if not path.is_file():
+                    print(f"missing {side} {case}/{stage}")
+                    valid = False
+                    continue
+                try:
+                    values = np.load(path, allow_pickle=False)
+                    shape_ok = (values.ndim == 2 and values.shape[1] == 16
+                                if stage == "codes" else
+                                values.shape == (2052,) if stage == "backbone_logits_frame0"
+                                else values.ndim == 1)
+                    dtype_ok = (np.issubdtype(values.dtype, np.integer)
+                                if _is_int_stage(stage) else
+                                np.issubdtype(values.dtype, np.floating))
+                    if not (shape_ok and dtype_ok and values.size and np.isfinite(values).all()):
+                        print(f"invalid {side} {case}/{stage}: {values.shape} {values.dtype}")
+                        valid = False
+                except (OSError, ValueError, TypeError) as exc:
+                    print(f"invalid {side} {case}/{stage}: {exc}")
+                    valid = False
+        if not valid or compare(cpp_dump, download=download, sub=sub, strict=True):
             failed.append(case)
     print(f"\n{len(cases) - len(failed)}/{len(cases)} guided cases passed"
           + (f"; FAILED: {', '.join(failed)}" if failed else ""))
