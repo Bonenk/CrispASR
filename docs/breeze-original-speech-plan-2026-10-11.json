@@ -1,8 +1,8 @@
 {
-  "source": "d89e854049bea3deb2cd691a8490cdd0b0229adf",
+  "source": "080a0fe5a",
   "branch": "test/breeze-original-speech",
   "script": "tools/ci-heavy/breeze_original_speech.py",
-  "status": "Prepared, not dispatched; requires native model worker artifact",
+  "status": "Repaired original sampler caller pushed; retry dispatched",
   "native_run": 38169287241,
   "native_source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "upstream": "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2",
@@ -37,12 +37,13 @@
     "Python compilation",
     "CLI argument help",
     "Actual WER controls at 0, .2 and .4; unchanged threshold",
-    "Exact reviewed loading section compile"
+    "Exact reviewed loading section compile",
+    "Actual Torch/HF: old prompt crash, prompt exclusion, backbone-only history, signs/unique duplicates, reused processor and invalid-batch rejection"
   ],
   "no_secrets": {
     "passed": 4,
     "skipped": 0,
-    "seconds": 44.972
+    "seconds": 204.863
   },
   "limitations": [
     "No original/native decoded result yet",
@@ -51,7 +52,10 @@
     "Does not waive failed exact generated-code or original-byte-equivalence diagnostics",
     "No new tag, quant or model default"
   ],
-  "original_speech_run": 38172313354,
+  "original_speech_run": 38173377874,
   "original_speech_status": "queued at dispatch",
-  "native_receipt_complete": true
+  "native_receipt_complete": true,
+  "previous_original_run": 38172313354,
+  "previous_failure": "Generic Transformers repetition penalty indexes mixed text prompt ID 262146 into audio logits of width 2052",
+  "sampler_adapter": "Pinned upstream apply_repetition_penalty via custom logits processor, generated codebook-zero history only; generic HF penalty 1.0, effective penalty 1.1"
 }

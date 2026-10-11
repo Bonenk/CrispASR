@@ -1,0 +1,38 @@
+{
+  "candidate_commit": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+  "branch": "release/v0.8.43-candidate",
+  "version": "0.8.43",
+  "tag": "v0.8.43",
+  "tag_state": "annotated local only; not pushed or published",
+  "ci_run": 38173748841,
+  "release_dry_run": 38173750598,
+  "dry_run_tag_input": "",
+  "publication_requested_by_workflow": false,
+  "version_check": "Every versioned file agrees; required Flutter changelog present",
+  "no_secrets": {
+    "passed": 4,
+    "skipped": 0,
+    "seconds": 45.769
+  },
+  "anchors": {
+    "passed": 227,
+    "files": 82
+  },
+  "base_accepted_main": "97fa7f86f",
+  "new_sampler_merge": "913266271cf29a052a945373ceeda675ba7acbd2",
+  "excluded_pending_prs": [
+    529,
+    530,
+    531,
+    536,
+    521,
+    492
+  ],
+  "requirements_before_publication": [
+    "Exact candidate complete CI and release matrix",
+    "Actual staged candidate CPU CLI/library/Python ABI/import tests",
+    "Actual candidate Windows CUDA 12.8/12.6 runtime pairing and wrong-runtime rejection",
+    "Actual candidate Linux CUDA archive stage/transcript/streaming hardware test"
+  ],
+  "previous_archive_proof": "docs/release-fresh-cuda-package-2026-10-11.json; source 3fdc1838, not transferred to candidate"
+}

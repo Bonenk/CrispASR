@@ -4636,3 +4636,18 @@ exact event source. Do not publish the tag until candidate CI/package checks
 and the exact candidate CUDA archive hardware test pass. Old 3fdc1838 archive
 acceptance does not transfer to the sampler change or version-bumped candidate.
 Pending feature PRs and rejected quantization candidates are excluded.
+
+Isolated v0.8.43 candidate is frozen at eb633d908120cc5f44b8af8cd4aeb1191f16bfd8,
+branch release/v0.8.43-candidate. Repository bump script ran once; required
+Flutter changelog was added before validation. All version fields agree, all
+227 doc anchors pass, and four secret tests pass with zero skips (45.769 s).
+Annotated v0.8.43 tag exists locally only and has NOT been pushed. Candidate
+CI 38173748841 and full empty-tag release dry run 38173750598 are dispatched.
+Do not reuse old 3fdc1838 archive acceptance; inspect these candidate artifacts
+and rerun actual CUDA hardware controls before publication. Main remains
+0.8.42 until candidate integration. Receipt:
+docs/release-candidate-v0.8.43-2026-10-11.json.
+Original speech repair 080a0fe5a is dispatched as 38173377874 with the unchanged
+complete native speech artifact 38169287241; four secret tests pass with zero
+skips (204.863 s). Precision-decision run 38172976584 is in progress. No new
+original decoded or alternate-state model result is claimed yet.
