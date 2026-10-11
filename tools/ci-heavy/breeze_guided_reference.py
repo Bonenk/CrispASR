@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the pinned upstream Breeze oracle on GH CPU, preserving all stage captures.
 
-This adapts delivery of the reviewed contributor dumper, not its inference.
+Preserve the reviewed model computation with an explicit matched frame budget.
 No Kaggle CPU fallback, automatic fixture overwrite, or native acceptance claim.
 """
 import hashlib
@@ -16,7 +16,7 @@ import time
 UPSTREAM = '58ec70ce5fa4cc361bdebf77ec40d1365da00ab2'
 MODEL = '3e28c5151381a722f1d8661b4118c298caa77aa4'
 DUMPER_SHA = '09c26e31a63ec36d852f2918415929c6148e5d1c750a68f9a5cb8e49819b4761'
-SCRIPT_VERSION = '2026-10-11.breeze-guided-gh-cpu.1'
+SCRIPT_VERSION = '2026-10-11.breeze-guided-gh-cpu.2'
 CASES = ('plain', 'clone', 'design-s0', 'design-s1', 'design-s4',
          'direct-s0', 'direct-s1', 'direct-s4')
 ROOT = Path(__file__).resolve().parents[2]
@@ -55,6 +55,19 @@ def main():
     needle = 'snapshot_download(HF_MODEL, local_dir=str(CKPT), token=HF_TOKEN or None,'
     assert code.count(needle) == 1
     code = code.replace(needle, needle + '\n                  revision=MODEL_REVISION,')
+    # Upstream builds MaxLengthCriteria from the positive prompt, then swaps
+    # the shorter negative prompt at scale zero and subtracts that new length.
+    # A max_new_tokens=24 request therefore emits 31 frames for our seven-token
+    # instruction. Set the stopping length against the actually active prompt.
+    needle = 'return_dict_in_generate=True)'
+    assert code.count(needle) == 1
+    code = code.replace(needle, 'return_dict_in_generate=True, max_new_tokens=None, '
+                        'max_length=active_prompt_length(gen_inputs) + MAX_FRAMES)')
+    def active_prompt_length(inputs):
+        ids = inputs['input_ids']
+        if inputs.get('cfg_scale', 1.0) == 0.0 and inputs.get('cfg_negative_prompt_ids') is not None:
+            ids = inputs['cfg_negative_prompt_ids']
+        return int(ids.shape[1])
     compile(code, str(dumper), 'exec')
     (OUT / 'reviewed-oracle.py').write_text(source)
     (OUT / 'executed-oracle-section.py').write_text(code)
@@ -71,6 +84,7 @@ def main():
                HF_TOKEN=os.environ.get('HF_TOKEN', ''), MODEL_REVISION=MODEL,
                DEVICE='cpu', RUN_DEVICE='cpu', RUN_GPU=None, SEED=42, GREEDY=True,
                MAX_FRAMES=24, DUMP_TE_LAYERS=True, N_DUMP_FRAMES=5,
+               active_prompt_length=active_prompt_length,
                SCRIPT_VERSION=SCRIPT_VERSION,
                SYN_TEXT='The quick brown fox jumps over the lazy dog.',
                REF_TEXT='And so my fellow Americans, ask not what your country can do for you, '
@@ -79,6 +93,8 @@ def main():
                    source=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                    oracle_sha256=DUMPER_SHA, sample_sha256=digest(ROOT / 'samples/jfk.wav'),
                    device='cpu', seed=42, greedy=True, max_frames=24,
+                   frame_budget='explicit active prompt length + 24; max_new_tokens=None',
+                   unadjusted_reference_run=38121758868,
                    packages={p: importlib.metadata.version(p) for p in
                              ('torch', 'torchaudio', 'transformers', 'qwen-tts', 'numpy')},
                    native_parity_tested=False, full_speech_asr_tested=False,
@@ -96,6 +112,7 @@ def main():
                 assert a.size and np.isfinite(a).all(), (case, name, a.shape)
                 if name == 'codes':
                     assert a.ndim == 2 and a.shape[1] == 16 and a.dtype.kind in 'iu'
+                    assert 0 < a.shape[0] <= 24, (case, 'frame budget', a.shape)
                 elif name == 'backbone_logits_frame0':
                     assert a.shape == (2052,) and a.dtype.kind == 'f'
                 else:
