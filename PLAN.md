@@ -4491,3 +4491,21 @@ attributed to these recording-stub contracts. Backbone 38158762302 and
 composition speech 38159960891 are still queued. Release 38156833241 has
 24 successful jobs and no failure observed; Apple framework compilation has
 finished and packaging continues. No tag/default/quant promotion.
+
+## CLAIMED 2026-10-11 — original Breeze decoded speech comparison
+
+Prepare a separate storage worktree/branch `test/breeze-original-speech` from
+the pinned synthesis composition. The native CLI/C ABI/server speech worker
+is queued; its receipt alone cannot establish matching original Python decoded
+behavior. Prepare a GH CPU oracle that consumes its immutable artifact, checks
+source/model/reference hashes, and generates plain/clone/design/direction using
+the pinned upstream BF16 runtime, identical text/reference WAV, seed, temperatures,
+top-k, repetition penalty and frame budget. Retain actual original prompts,
+codes, PCM and all ASR transcripts. Release original model memory before using
+the already verified actual CPU Python release archive and pinned F16 recognizer.
+Require the independent JFK recognizer control and unchanged WER <= .2 for
+both original and native cases; failures stay failures. Keep original/existing
+exact-code diagnostics separate; no gate waiver or model/synthesis acceptance.
+Heavy model work stays on GH, hardware work on Kaggle; no local large models.
+Do not dispatch until the native worker artifact exists. Preserve all queued
+workers' source branches unchanged until their checkout is observed.
