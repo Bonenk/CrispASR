@@ -1,0 +1,48 @@
+{
+  "run": 38172976584,
+  "source": "fd2f9b2fa",
+  "status": "FAILED before native comparison",
+  "arrays_independently_verified": 8,
+  "original_equivalence": {
+    "prompt_byte_exact": true,
+    "logits_byte_exact": false,
+    "finite": true,
+    "shape": [
+      2052
+    ],
+    "expected_shape": [
+      2052
+    ],
+    "cosine": 0.9999910750191624,
+    "norm_ratio": 1.0012624604937135,
+    "relative_l2": 0.004412063354583565,
+    "maximum_error": 0.0625,
+    "unequal_values": 1469,
+    "actual_argmax": 404,
+    "expected_argmax": 404
+  },
+  "successful_control_run": 38163903250,
+  "successful_cpu": "AMD EPYC 7763; PyTorch AVX2",
+  "failed_cpu": "Intel Xeon Platinum 8573C; PyTorch AVX512",
+  "checkpoint_hashes_identical": true,
+  "package_versions_identical": true,
+  "prompt_ids_and_text_mask_identical": true,
+  "original_embeds_relative_l2_between_runs": 0.013288041856014612,
+  "original_hidden_relative_l2_between_runs": 0.007485532407333442,
+  "public_proof": {
+    "revision": "3b29c7086ee7d6002ca87d024277f8079152e14f",
+    "path": "breeze-guided-20261011/precision-original-control-failed-proof.zip",
+    "sha256": "b2871f9f54cf034bbe97d1a57e4b637aebf7077a4c04faeadcaf6ceb2b871ad3",
+    "bytes": 95739,
+    "anonymous_verified": true
+  },
+  "limits": [
+    "CPU/dispatch difference correlates with original mismatch; not yet established as cause",
+    "No native alternative-hidden decision result; no strict byte or generation gate waiver"
+  ],
+  "next_control": "Same-host original default versus explicitly AVX2-capped PyTorch/oneDNN/MKL, with both arrays and unchanged immutable byte gate retained",
+  "dispatch_documentation": [
+    "https://uxlfoundation.github.io/oneDNN/dev_guide_cpu_dispatcher_control.html",
+    "https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-linux/2024-2/instruction-set-specific-dispatch-on-intel-archs.html"
+  ]
+}

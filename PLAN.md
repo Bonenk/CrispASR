@@ -4651,3 +4651,17 @@ Original speech repair 080a0fe5a is dispatched as 38173377874 with the unchanged
 complete native speech artifact 38169287241; four secret tests pass with zero
 skips (204.863 s). Precision-decision run 38172976584 is in progress. No new
 original decoded or alternate-state model result is claimed yet.
+
+Precision-decision run 38172976584 FAILED at its unchanged original-only
+byte control before native comparison. All eight arrays independently verify.
+Original logits cosine 0.999991075, norm ratio 1.001262460, relative L2
+0.004412063, max error 0.0625; 1469 values differ, argmax 404 unchanged.
+Package versions and all checkpoint SHA256s match successful 38163903250.
+That run used AMD EPYC 7763/PyTorch AVX2; this failure used Intel Xeon
+Platinum 8573C/PyTorch AVX512. Prompt IDs/mask match exactly; already-assembled
+original embeddings differ (relative L2 0.013288). CPU dispatch is a hypothesis,
+not a proven cause. Full failed arrays/provenance are public and anonymously
+hash-verified in docs/breeze-reference-dispatch-2026-10-11.json. Next useful
+control is default versus explicit AVX2 dispatch on the SAME GH host before
+retrying native precision decisions. Preserve both results and every gate.
+Release candidate excludes the pending feature and is unchanged at eb633d908.
