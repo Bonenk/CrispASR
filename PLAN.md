@@ -3964,3 +3964,15 @@ head before integration. Read all live open issue/PR discussions, including
   re-read. #529 author head is now `3ebd2a561`; review of the new diff and guided
   proof remains in progress. Reporter-dependent hardware results and rejected
   OmniVoice/Echo/MiMo gates remain open, without threshold/default changes.
+
+## CLAIMED 2026-10-11 — Breeze guided acceptance must reject missing evidence
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+branch `fix/breeze-guided-validation`, preserving contributor head `3ebd2a561`.
+The updated #529 comparator discovers only available reference directories and
+inherits a missing-stage path that reports but does not fail. A negative control
+with only `guided/plain/codes.npy` in the reference and an empty C++ directory
+returns success. Require all eight requested cases and required stage inventory,
+then add deletion/missing-case controls before original guided/model validation.
+CPU Canary allocation probe launched: GH **38119476469**, immutable source
+`170f7e6289bdbb65e30a5004e7c76e396cc5c664`, currently queued; no result claim.
