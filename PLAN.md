@@ -4157,3 +4157,37 @@ and exact/changed-sample/scale-error controls pass. Full four-test secret scan
 passes without skips (43.363 s). Exact CPU/F16 Metal stems and original Q8
 Metal abort/finite candidate numerical gates remain pending; no original
 Python parity, reporter music-corpus, speed or hardware acceptance claim.
+
+### 2026-10-11 terminal Breeze result and next boundary diagnostic
+
+GH 38146159521 is FAILED at source `ac7227125`: all eight matched-budget
+original cases have complete 24-frame captures. All prompt/negative-prompt IDs
+match; frame-zero backbone cosine 0.999675–0.999994, norm ratio 0.9969–1.0014,
+and argmax pass. All native reused-context/scale-zero/near-one controls pass.
+Exact audio codes FAIL on 8/8 cases: first differences range from frame zero
+codebook 5 (design-s1) to frame four codebook 5 (plain/design-s0). No acceptance,
+tolerance relaxation or numerical-rounding explanation is inferred.
+
+Independently verified all 145 original and 28 native arrays. Full failed proof
+is public at fixture dataset revision `27896a1fab69d45c8b246eb659823f92a5e0e458`,
+`breeze-guided-20261011/matched-budget-failed-parity-proof.zip`, SHA256
+`13d5eed11955e07f2e5fc2f681df123c1b2b35d2f11998416571dbf962d54f33`,
+5,896,927 bytes; anonymous download hash verified. Compact receipt is
+`docs/breeze-guided-parity-2026-10-11.json`.
+
+Diagnostic `9144c2796` adds all 27 existing TE layer outputs per text segment
+to crispasr-diff and scores oracle-fed TE/projection/backbone/depth stages at
+unchanged strict gates before re-scoring the full guided matrix. It reuses the
+pinned original archive, avoiding another reference generation. Original full
+generation/codec stages remain separate, never silently accepted as a subset.
+All eight strict comparator controls and four secret checks pass without skips
+(50.452 s); all 145 archived original arrays pass preflight. GH CPU 38150047103
+is queued. Source remains on the maintainer validation branch, not #529's fork.
+
+#536 macOS job 114495588783 failed: libc++ filesystem-clock count has no
+unambiguous std::to_string overload. Follow-up `1bc158ed9` on the contributor
+branch serializes seconds plus subsecond nanoseconds using standard chrono
+representations, retaining timestamp precision. All seven local policy
+controls and four secret checks pass without skips (50.088 s); hosted CI pending.
+Reporter-clip macOS 38148680663 is now actually running; Linux and #537
+Metal A/B remain queued. No new hardware acceptance or merge/tag.
