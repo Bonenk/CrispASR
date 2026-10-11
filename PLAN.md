@@ -4077,3 +4077,15 @@ Trace byte-level decoding versus Unicode whitespace cleanup, prove a controlled
 before/after regression, and run actual clips through C ABI on GH CPU/Metal
 where supported. Preserve the merged UTF-8 publication contract as defense;
 fix the byte-loss cause and keep model/platform acceptance claims separate.
+
+## CLAIMED 2026-10-11 — PR #536 reference transcript cache invalidation
+
+Owner: this maintainer session. Worktree
+`/mnt/storage/crispasr/salvage-20261008/pr536-voice-cache`, branch
+`fix/bt2-voice-cache`. Whole PR #536 and its unique changes against #529 read.
+Preserve contributor commits; reproduce a sidecar-only transcript edit retaining
+the WAV mtime, then include the sidecar identity in the shared reference key.
+Cover real production-header behavior, explicit transcript precedence, missing
+files and retry contracts. Model/server acceptance still depends on original
+Breeze parity and decoded roundtrips; no merge or release from cache tests alone.
+PR #537 is reviewed; physical Metal Q8/F16 acceptance remains pending.
