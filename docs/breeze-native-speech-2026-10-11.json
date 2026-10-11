@@ -1,8 +1,8 @@
 {
   "source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "device": "CPU; GPU backends compiled OFF",
-  "complete": false,
-  "speech_pass": false,
+  "complete": true,
+  "speech_pass": true,
   "original_generated_code_gate_waived": false,
   "expected": "I found the file you asked about and opened it.",
   "instruction": "Speak clearly and calmly.",
@@ -231,7 +231,7 @@
     }
   },
   "failures": [],
-  "cli_sha256": "8517a20bfe191e0bdcf4f0e0d0c3a981acf5099f6aa234dcbb60b655552d4790",
+  "cli_sha256": "ecd1f93b718d14157034f25972a4c1e7de7d3309ebbebcf31385928248b7da43",
   "library_sha256": "d3536d2bf9c65879644b3a2c1ca29893e37f86f7a9e22b6b30441023c43ed205",
   "models": {
     "breeze": {
@@ -263,10 +263,27 @@
     "wer_max": 0.2,
     "audio_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e"
   },
-  "error": "ModuleNotFoundError: No module named 'pkg_resources'",
-  "run": 38159960891,
+  "speaker_encoder": {
+    "package_version": "0.1.4",
+    "model_sha256": "39373b86598fa3da9fcddee6142382efe09777e8d37dc9c0561f41f0070f134e"
+  },
+  "speaker": {
+    "clone_reference": 0.8116065263748169,
+    "baseline_reference": 0.4498146176338196
+  },
+  "run": 38169287241,
   "arrays_independently_verified": 20,
-  "retry_run": 38169287241,
+  "public_proof": {
+    "revision": "77f6fd4b9af45053d71f9d66939fb54aa3cbfffd",
+    "path": "breeze-guided-20261011/native-speech-surfaces-proof.zip",
+    "sha256": "9fc5fa299ce256f0241b55e2d0f95e02056783d49b8a5511173f68eed3c41155",
+    "bytes": 5167074,
+    "anonymous_verified": true
+  },
+  "speaker_test_passed": true,
+  "prior_run": 38159960891,
+  "prior_failure": "Speaker dependency webrtcvad could not import pkg_resources",
   "retry_dependency": "setuptools==80.9.0",
-  "speaker_test_passed": false
+  "original_speech_comparison_run": 38172313354,
+  "original_speech_comparison_status": "queued at dispatch"
 }

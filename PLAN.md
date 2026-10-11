@@ -4585,3 +4585,27 @@ Six full arrays and all original transcripts independently verified. Windows
 in GH 38169253465. Public proof and limitations are pinned in
 docs/release-fresh-cuda-package-2026-10-11.json and
 docs/release-fresh-windows-pairs-2026-10-11.json. No tag or pending PR promotion.
+
+Native Breeze retry 38169287241 is SUCCESS at unchanged a2f58338ef: all 20
+retained PCM arrays independently match SHA/length/finite controls, every ASR
+check passes and the independent JFK recognizer has zero WER. Closed-loop
+clone/reference cosine 0.811606526 exceeds baseline/reference 0.449814618.
+Speaker model SHA and actual source/model/codec pins are retained. Full
+public proof is anonymously hash verified. This proves the composition's
+native speech surfaces on these fixed cases, not original full-generation
+parity or every backend in #530/#531. Original decoded speech comparison
+38172313354 is dispatched from d89e854049 with this successful native artifact;
+its original/native eight ASR checks remain pending.
+
+## CLAIMED 2026-10-11 — Trace backbone precision into depth decisions
+
+In the existing storage diagnostic worktree pr529-guided-validation, add an
+opt-in precision-decision control to the existing teacher-forced probe. Feed
+the captured original FP32-promoted backbone hidden state into original BF16
+and FP32 depth decoders and into the native depth graph under the exact same
+original code history. Preserve all existing canonical captures, strict
+original byte controls, defaults and generation gates. Retain each new raw
+logit array, decision/rank/gap, cosine and magnitude. This tests whether the
+backbone precision difference itself can reproduce the first divergent
+codebook choice; it does not replace canonical BF16 or imply acceptance.
+Use GH heavy CPU, no local model execution and no Kaggle CPU work.

@@ -3,7 +3,7 @@
   "branch": "test/breeze-original-speech",
   "script": "tools/ci-heavy/breeze_original_speech.py",
   "status": "Prepared, not dispatched; requires native model worker artifact",
-  "native_run": 38159960891,
+  "native_run": 38169287241,
   "native_source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "upstream": "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2",
   "original_model": "3e28c5151381a722f1d8661b4118c298caa77aa4",
@@ -50,5 +50,8 @@
     "Does not accept all native CLI/server modes or speaker similarity; separate native worker records those",
     "Does not waive failed exact generated-code or original-byte-equivalence diagnostics",
     "No new tag, quant or model default"
-  ]
+  ],
+  "original_speech_run": 38172313354,
+  "original_speech_status": "queued at dispatch",
+  "native_receipt_complete": true
 }
