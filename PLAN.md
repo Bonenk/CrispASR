@@ -3935,3 +3935,32 @@ release matrix 38024994245 (36 successful jobs, no failures). Download terminal
 artifacts, apply generated capability tables to #531 and validate its final
 head before integration. Read all live open issue/PR discussions, including
 #529's updated contributor head, before further fixes/answers.
+
+### 2026-10-11 launch checkpoint — assembled UTF-8 and CTC allocation
+
+- #533 fix is draft [PR #534](https://github.com/CrispStrobe/CrispASR/pull/534),
+  source `0bbd31921`. Production finalization/getters compiled into a native
+  shared fixture reproduce 24 strict-decoder errors before the fix and pass
+  all four tests afterward. Normalize assembled strings before callbacks and
+  publication; timing/confidence preserved. All four secret tests pass without
+  skips (56.347 s). Full native CI is running. Reporter Metal/recording and the
+  reason for malformed decoded bytes remain unmeasured; no decoding-parity claim.
+- #531 hosted contract worker **38026088284 SUCCESS** at `c222540e1`, artifact
+  **11661638474**. All four contracts, actual native output-rate dispatch, and
+  all 136 compiled CLI/C ABI capability rows pass. Exact generated header and
+  feature matrices applied at `e1e504536`; final-head CI is running. This CPU
+  build does not compile optional ONNX adapters. Model plain/clone and #529
+  original guided acceptance remain pending; PR stays draft.
+- Immutable full release dry run **38024994245 SUCCESS**: all 36 jobs pass at
+  event source `f51dc777018483a6719ff32159141c513e70e542`, with no publication.
+  This does not validate later #531/#534 native changes. No bump/tag yet.
+- #532 actual-model CPU allocation probe is prepared on
+  `fix/canary-ctc-allocation`. It will run native CTC logits for 11/4/33/90/11 s,
+  bucket OFF/128, with exact fresh/reused short-shape controls and full saved
+  logits/hashes. It is a runtime replay diagnostic, not original-model parity
+  or reproduction of the unavailable German recording/device. No speculative
+  runtime fix has been applied before reproduction.
+- Full bodies/comments of all 12 live issues and five prior live PRs have been
+  re-read. #529 author head is now `3ebd2a561`; review of the new diff and guided
+  proof remains in progress. Reporter-dependent hardware results and rejected
+  OmniVoice/Echo/MiMo gates remain open, without threshold/default changes.
