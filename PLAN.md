@@ -4191,3 +4191,25 @@ representations, retaining timestamp precision. All seven local policy
 controls and four secret checks pass without skips (50.088 s); hosted CI pending.
 Reporter-clip macOS 38148680663 is now actually running; Linux and #537
 Metal A/B remain queued. No new hardware acceptance or merge/tag.
+
+### 2026-10-11 actual macOS UTF-8 root cause proved
+
+Reporter-clip GH 38148680663 is SUCCESS at `7e3f768b8` on macOS 14.8.9
+arm64, actual locale `en_US.UTF-8`. Real libc std::isspace classifies both
+0xA0 and 0x85 as whitespace. The original production cleanup corrupts the
+provided 造/加 contexts; candidate preserves their bytes exactly despite the
+same classifier. Both reporter 30-second WAVs pass actual Q4_K C ABI inference:
+strict raw-token and result/word UTF-8, no U+FFFD, and 造/加 counts preserved
+through cleanup. Clip 01 retains one 造; clip 16 retains all ten 加 generated
+by this CPU run. These counts do not claim the reporter's GPU transcript matches.
+
+The actual Metal probe returns NONE. This is macOS CPU/locale proof, not M4/
+macOS26 or GPU inference acceptance. #538's shared post-decode byte-loss
+cause is proved; final native CI still pending. Linux clip check remains queued.
+Full proof is public at fixture dataset revision
+`2cf3d11e58d88da740bbfcc7ec2167bb72db718d`,
+`qwen3/locale-utf8-20261011/proof.zip`, SHA256
+`c1b81aa064d50bee54d276b975a27af2aab6db71ea5b3fb6e034cdd36f059552`,
+1,553,292 bytes, anonymous remote hash verified. Compact receipt:
+`docs/qwen3-locale-utf8-2026-10-11.json`. #537 A/B is now running but cannot
+be advertised as physical Metal acceptance without its actual device probe.
