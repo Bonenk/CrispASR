@@ -4302,3 +4302,17 @@ Full corrected rebuild proof is public at fixture revision
 `ba5b995c8197c96d9197a0dc5a5d7e9c51593903b18aec5a1515fa87e781e0cb`,
 8,575,560 bytes, anonymous download hash verified. Both the 107-stage
 pass and unchanged eight-case generation failure are retained.
+
+## CLAIMED 2026-10-11 — Compose pending Breeze synthesis surfaces
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/breeze-synthesis-composition`,
+branch `test/breeze-synthesis-composition`. Compose current main, the maintainer
+#529 diagnostic branch, #531 ownership/rate fixes and #536 per-request voices
+without merging pending model features to main. Read-only merge audit finds a
+C ABI conflict: #529 passes instruction but no reference; #531 passes reference
+but no instruction. Resolve by passing both in one synthesis call. Test actual
+C ABI dispatch with plain/reference/instruction/combined parameters and existing
+ownership/failure guards. Preserve contributor histories and work on storage.
+Source checkpoint and model-free checks precede GH model/ASR/server controls.
+Existing depth probe branch stays pinned; no speech acceptance or release from
+this composition alone.
