@@ -3994,3 +3994,23 @@ but remains draft until final native CI completes. Canary actual-model probe
 **38119476469** remains queued; no runtime fix or model result is claimed.
 Issues #532/#533 and PRs #529/#531 have received precise progress/proof replies.
 No pending/rejected model experiment has been promoted and no release tag cut.
+
+## CLAIMED 2026-10-11 — Generated C ABI capability drift
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/caps-drift`, branch
+`fix/backend-caps-drift`. Actual immutable release CLI lists 136 backends but its
+C ABI table omits `hikari` and `moonshine-tiny-de-dattazigzag`. The generated
+header repair must be independent of #531's pending synthesis/model scope.
+Regenerate from the actual native-identical packaged CLI, preserve baseline
+capabilities, and add non-skipping actual CLI/shared-library comparison plus
+pinned-format generator drift checks in the CI job that really builds both.
+Do not claim raw backend aliases are canonical capability-table keys.
+
+Canary CPU probe **38119476469 SUCCESS** at `170f7e6289`: all ten actual-model
+11/4/33/90/11-second bucket OFF/128 allocations succeed; all saved arrays are
+finite, shapes/hash verified locally, and returning 11-second logits are exact.
+No crash reproduced and no runtime fix; reporter assertion/device/audio still
+needed. Full proof publicly pinned at dataset commit `2cfe9f89b0d64a3450e03023b87f5178fbdc949a`.
+Immutable release CUDA CLI/quantizer startup/dependency closure and real WASM
+exports/getters/piano/readme checks pass. CUDA plugin bytes differ from the
+previous T4-validated archive, so this archive has no new physical GPU claim.
