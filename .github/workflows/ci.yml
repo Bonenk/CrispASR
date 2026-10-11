@@ -162,6 +162,9 @@ jobs:
       - name: Run the unit tier
         run: ctest --test-dir build -L unit -E live --output-on-failure --timeout 300
 
+      - name: UTF-8 loop cleanup under platform ctype classification
+        run: python3 tests/test_ngram_locale.py -v
+
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v
 
