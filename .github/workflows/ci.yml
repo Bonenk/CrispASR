@@ -165,6 +165,9 @@ jobs:
       - name: UTF-8 loop cleanup under platform ctype classification
         run: python3 tests/test_ngram_locale.py -v
 
+      - name: Breeze session sampler controls
+        run: python3 tests/test_breeze_session_controls.py -v
+
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v
 

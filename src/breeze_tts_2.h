@@ -126,6 +126,7 @@ void breeze_tts_2_set_temperature(struct breeze_tts_2_context* ctx, float t);
 void breeze_tts_2_set_topk(struct breeze_tts_2_context* ctx, int k);
 void breeze_tts_2_set_seed(struct breeze_tts_2_context* ctx, uint64_t seed);
 void breeze_tts_2_set_n_threads(struct breeze_tts_2_context* ctx, int n);
+// n <= 0 restores the checkpoint's generation limit.
 void breeze_tts_2_set_max_new_tokens(struct breeze_tts_2_context* ctx, int n);
 
 // ---------------------------------------------------------------------------

@@ -5588,6 +5588,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+    add_test(NAME test-breeze-session-controls
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_controls.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-breeze-session-controls PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
     add_test(NAME test-ngram-locale
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ngram_locale.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

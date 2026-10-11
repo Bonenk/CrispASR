@@ -2005,8 +2005,8 @@ extern "C" void breeze_tts_2_set_n_threads(struct breeze_tts_2_context* ctx, int
         core_cpu_backend::set_n_threads(ctx->backend, n);
 }
 extern "C" void breeze_tts_2_set_max_new_tokens(struct breeze_tts_2_context* ctx, int n) {
-    if (ctx && n > 0)
-        ctx->max_new_tokens = n;
+    if (ctx)
+        ctx->max_new_tokens = n > 0 ? n : (int)ctx->model.hp.s_max_new_tokens;
 }
 
 namespace {
