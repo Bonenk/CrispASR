@@ -73,6 +73,32 @@ TEST_CASE("tts voice: a clip re-uploaded under the same name is a new reference"
     fs::remove(wav);
 }
 
+TEST_CASE("tts voice: sidecar transcript edits invalidate only implicit text", "[unit][tts-voice]") {
+    namespace fs = std::filesystem;
+    const fs::path wav = fs::temp_directory_path() / "crispasr-test-sidecar-key.wav";
+    fs::path text = wav;
+    text.replace_extension(".txt");
+    fs::remove(text);
+    std::ofstream(wav) << "audio";
+    const auto wav_mtime = fs::last_write_time(wav);
+    const std::string missing = core_tts_voice::reference_key(wav.string(), "");
+    const std::string explicit_text = core_tts_voice::reference_key(wav.string(), "explicit");
+    std::ofstream(text) << "first";
+    const auto text_mtime = fs::last_write_time(text);
+    const std::string first = core_tts_voice::reference_key(wav.string(), "");
+    REQUIRE(first != missing);
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "") == first);
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "explicit") == explicit_text);
+    std::ofstream(text) << "other";
+    fs::last_write_time(text, text_mtime + std::chrono::seconds(1));
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "") != first);
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "explicit") == explicit_text);
+    REQUIRE(fs::last_write_time(wav) == wav_mtime);
+    fs::remove(text);
+    REQUIRE(core_tts_voice::reference_key(wav.string(), "") == missing);
+    fs::remove(wav);
+}
+
 TEST_CASE("tts voice: a failed load must not dedupe the retry away", "[unit][tts-voice][issue-371]") {
     // The subtle one. If a load fails and the caller leaves `last` set to the
     // voice it FAILED to apply, the next identical request returns Unchanged and

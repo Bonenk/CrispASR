@@ -46,14 +46,24 @@ inline Action decide(const std::string& last, const std::string& requested) {
     return is_builtin_request(requested) ? Action::Builtin : Action::Apply;
 }
 
-// Identity of a loaded reference clip, for adapters that dedupe on more than
-// the voice string: the file, its transcript and the file's mtime. Without the
-// mtime a clip re-uploaded under the same name and transcript (the server's
-// POST /v1/voices?force=true) keeps serving the voice that was loaded first.
-inline std::string reference_key(const std::string& path, const std::string& ref_text) {
+// Identity of a reference file. Missing files use a stable identity so a
+// successful retry can be distinguished from a previously absent sidecar.
+inline std::string reference_file_key(const std::filesystem::path& path) {
     std::error_code ec;
     const auto mtime = std::filesystem::last_write_time(path, ec);
-    return path + '\x01' + ref_text + '\x01' + std::to_string(mtime.time_since_epoch().count());
+    if (ec)
+        return "missing";
+    const auto size = std::filesystem::file_size(path, ec);
+    return std::to_string(mtime.time_since_epoch().count()) + ':' + (ec ? "unknown" : std::to_string(size));
+}
+
+// Include the transcript sidecar when no explicit transcript overrides it:
+// editing <voice>.txt without rewriting the WAV must reload the reference.
+inline std::string reference_key(const std::string& path, const std::string& ref_text) {
+    std::string key = path + '\x01' + ref_text + '\x01' + reference_file_key(path);
+    if (ref_text.empty())
+        key += '\x01' + reference_file_key(std::filesystem::path(path).replace_extension(".txt"));
+    return key;
 }
 
 } // namespace core_tts_voice
