@@ -4031,3 +4031,16 @@ inspection receipt are now archived in docs. No Canary runtime change, original
 model parity, reporter-recording reproduction, new package GPU acceptance or
 release publication is inferred. #529/#531/#534 native unit jobs pass; other
 checks remain pending and the two synthesis PRs still need model acceptance.
+
+## CLAIMED 2026-10-11 — Pinned original Breeze guidance reference on GH CPU
+
+Worktree `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+branch `fix/breeze-guided-validation`. Port delivery of the contributor's
+reference dumper to heavy-cpu without changing inference or matrix tolerances.
+Pin original source `58ec70ce5fa4cc361bdebf77ec40d1365da00ab2` and model
+`3e28c5151381a722f1d8661b4118c298caa77aa4`; retain all eight guided cases,
+seed 42, BF16/eager, 24 greedy frames and complete stage arrays. GH CPU only:
+no Kaggle CPU fallback, no shared-environment package installation, no fixture
+overwrite. Save immutable provenance/hashes and fail incomplete/nonfinite dumps.
+Once complete, compare actual native #529 output with strict crispasr-diff;
+decoded full-speech/ASR controls remain separate acceptance requirements.
