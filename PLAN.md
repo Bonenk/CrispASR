@@ -4461,3 +4461,17 @@ revision `9c76e78e281c01fa0782c63bb45bf718551ba0b2`,
 81,689 bytes; anonymous remote hash verified. Final tracked proof/docs scan
 passes all four tests with zero skips (52.341 seconds); public archive text
 was also checked for credentials and the account name before upload.
+
+## CLAIMED 2026-10-11 — independent Breeze session sampler repair
+
+Isolate the existing-backend sampler fixes from the pending guidance/voice
+composition in a new storage worktree, branch `fix/breeze-session-sampler`.
+Main source confirms the same nested Confucius compile guard and missing
+open-seed/runtime temperature/seed/token-limit dispatch. Preserve checkpoint
+defaults, restore metadata token limit when clearing an override, and add
+the already documented `--tts-instruct` CLI alias. No pending guidance,
+reference ownership or server-cache feature is included. Compile the actual
+source contract before/after (old failures retained), register its eight
+controls in CTest and CI, and require normal full integration CI before merge.
+The queued combined model speech proof remains separately attributed to its
+composition source; these contract checks do not establish speech parity.
