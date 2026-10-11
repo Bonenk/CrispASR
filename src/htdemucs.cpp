@@ -4260,9 +4260,10 @@ static ggml_tensor* g_cross_attn_layer(ggml_context* g, ggml_tensor* x, ggml_ten
     ggml_tensor* Wk = ggml_view_2d(g, W, dim, dim, W->nb[1], (size_t)dim * W->nb[1]);
     ggml_tensor* Wv = ggml_view_2d(g, W, dim, dim, W->nb[1], (size_t)2 * dim * W->nb[1]);
 
-    ggml_tensor* Q = ggml_mul_mat(g, ggml_cont(g, Wq), qn);
-    ggml_tensor* K = ggml_mul_mat(g, ggml_cont(g, Wk), kn);
-    ggml_tensor* V = ggml_mul_mat(g, ggml_cont(g, Wv), kn);
+    // Row slices are already contiguous; ggml_cont would be a Q8_0 -> Q8_0 copy Metal does not support.
+    ggml_tensor* Q = ggml_mul_mat(g, Wq, qn);
+    ggml_tensor* K = ggml_mul_mat(g, Wk, kn);
+    ggml_tensor* V = ggml_mul_mat(g, Wv, kn);
     if (ca.cross_attn_in_proj_b) {
         ggml_tensor* b = ca.cross_attn_in_proj_b;
         const size_t es = ggml_element_size(b);
