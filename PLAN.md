@@ -4136,3 +4136,24 @@ PCM bytes. Require exact CPU before/after stems, F16 Metal before/after equality
 and Q8 actual Metal finite stems with cosine AND magnitude versus same-model
 CPU. Record original Metal abort if reproduced. No substitute CPU fallback or
 claim of original Python parity from this regression A/B. Archive all outputs.
+
+### 2026-10-11 hardware-worker checkpoint
+
+The first #533 macOS job 38147247663 failed before compilation/model loading:
+Actions' shallow checkout lacked the pinned baseline commit. Receipt is archived
+locally; no inference or Metal result is inferred. The queued identical Linux
+job 38147249399 was cancelled before wasting work. Worker `7e3f768b8` fetches
+full baseline SHA and verifies its header SHA256. An empty-repository fetch
+control and cached reread pass, all five byte-preservation controls pass, and
+all four secret checks pass without skips (46.909 s). Replacement macOS
+38148680663 and Linux 38148682586 jobs are queued at that immutable head.
+
+#537 worker `d473b82060d1a0fe6264d40deebdbaeeb8d73303` is pushed separately
+from the contributor PR; GH macOS 38148987616 is queued. Source A/B allows
+exactly the three CONT differences and explanatory comment; unchanged ggml,
+pinned F16/Q8 model SHA and retained deterministic stereo input. It forces the
+fused CPU graph so the changed nodes are actually covered. Local preflight
+and exact/changed-sample/scale-error controls pass. Full four-test secret scan
+passes without skips (43.363 s). Exact CPU/F16 Metal stems and original Q8
+Metal abort/finite candidate numerical gates remain pending; no original
+Python parity, reporter music-corpus, speed or hardware acceptance claim.
