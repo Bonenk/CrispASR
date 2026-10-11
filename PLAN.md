@@ -4014,3 +4014,20 @@ needed. Full proof publicly pinned at dataset commit `2cfe9f89b0d64a3450e03023b8
 Immutable release CUDA CLI/quantizer startup/dependency closure and real WASM
 exports/getters/piano/readme checks pass. CUDA plugin bytes differ from the
 previous T4-validated archive, so this archive has no new physical GPU claim.
+
+### 2026-10-11 independent capability fix checkpoint
+
+Regenerated the baseline table from the immutable actual CLI: exactly two new
+canonical rows, Hikari and German Dattazigzag Moonshine. The original full
+packaged library fails both row lookups. Compiling the unchanged production
+capability ABI functions against the regenerated table passes all 136 CLI rows
+and size/error contracts; this local fixture is not a full project build.
+The dedicated fix adds actual CLI/shared-library validation and pinned
+clang-format-18 generator checking to linux-unit, without a missing-binary
+skip. Full hosted native build remains the acceptance gate.
+
+The actual Canary CPU allocation receipt and immutable CUDA/WASM package
+inspection receipt are now archived in docs. No Canary runtime change, original
+model parity, reporter-recording reproduction, new package GPU acceptance or
+release publication is inferred. #529/#531/#534 native unit jobs pass; other
+checks remain pending and the two synthesis PRs still need model acceptance.
