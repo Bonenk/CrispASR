@@ -4288,3 +4288,17 @@ Raw boundary diagnostic proof is public at fixture revision
 verification; anonymous archive download hash matches. The archive preserves
 the raw 105/107 stage failure and excludes the relabelled control directory.
 Main documentation secret scan passes all four checks with zero skips (60.565 s).
+
+Corrected native rebuild 38152301380 is terminal FAILED at `aab781e77`:
+all 107/107 oracle-fed boundaries pass unchanged gates; full guided code
+parity still fails 8/8. The harness normalization fix is independently
+confirmed by a rebuilt binary, not just archived relabelling. All 140 native
+arrays independently match SHA/shape/type/finite receipts. Depth decision
+probe 38154207238 remains queued; no decoded speech/ASR acceptance yet.
+
+Full corrected rebuild proof is public at fixture revision
+`e980fcac568798b62a4a1ffb26c7c272499e89be`,
+`breeze-guided-20261011/corrected-boundary-rebuild-proof.zip`, SHA256
+`ba5b995c8197c96d9197a0dc5a5d7e9c51593903b18aec5a1515fa87e781e0cb`,
+8,575,560 bytes, anonymous download hash verified. Both the 107-stage
+pass and unchanged eight-case generation failure are retained.

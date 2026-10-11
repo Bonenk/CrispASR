@@ -46,9 +46,9 @@
   "exact_guided_cases_passed": 0,
   "exact_guided_cases_required": 8,
   "acceptance": false,
-  "corrected_harness_source": "aab781e77",
+  "corrected_harness_source": "aab781e77b2620669e5fce319a6f234038c0676d",
   "corrected_harness_run": 38152301380,
-  "corrected_harness_status": "queued",
+  "corrected_harness_status": "failure",
   "strict_comparator_controls_passed": 8,
   "secrets_checks_passed": 4,
   "secrets_checks_skipped": 0,
@@ -62,5 +62,17 @@
     "raw_boundaries_passed": 105,
     "required_boundaries": 107,
     "corrected_control_excluded": true
+  },
+  "corrected_harness_boundary_pass": true,
+  "corrected_harness_boundary_passed": 107,
+  "corrected_harness_guided_pass": false,
+  "corrected_harness_native_arrays_verified": 140,
+  "corrected_harness_native_binary_sha256": "d3fd580465ffd1c329d047d6e7edf927061d82af3a4b64734f321ecd251f4a3b",
+  "corrected_harness_proof": {
+    "revision": "e980fcac568798b62a4a1ffb26c7c272499e89be",
+    "path": "breeze-guided-20261011/corrected-boundary-rebuild-proof.zip",
+    "bytes": 8575560,
+    "sha256": "ba5b995c8197c96d9197a0dc5a5d7e9c51593903b18aec5a1515fa87e781e0cb",
+    "anonymous_verified": true
   }
 }
