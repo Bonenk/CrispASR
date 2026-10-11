@@ -4221,3 +4221,28 @@ proof is fixture dataset `684d1488e2833fc0448d7b01a344670743e0cbbb`,
 Release notes and HISTORY include the fix. No music-corpus/speed claim.
 #538 remaining CI, #529 numeric diagnosis and #536 server/model gates remain
 pending; no release tag.
+
+### 2026-10-11 Breeze boundary capture: final-slot convention corrected
+
+GH 38150047103 is terminal FAILED at `9144c2796`: 105/107 oracle-fed
+boundaries pass; all backbone/depth logits and all 16 stepwise frame-zero
+codes pass. The two failures compare the original normalized final TE state
+with the native pre-normalization residual (norm ratios 1702.6/1729.1).
+Both original final slots are byte-identical to their respective normalized
+hidden outputs. Native normalized outputs pass at cosine 0.999966/0.999938.
+A separately copied archived-array control, explicitly relabelling only those
+two slots while retaining raw residuals, passes 107/107 unchanged strict
+gates. This is a diagnostic control, not a rebuilt native run.
+
+The CLI harness now emits HF-compatible final normalized slots and retains
+`te_seg{k}_final_pre_norm` separately. Runtime math and all generation gates
+remain unchanged. All eight generation cases still fail exact codes; full
+speech/ASR remains untested. Receipt: `docs/breeze-boundaries-2026-10-11.json`.
+The corrected native harness will be rerun on the maintainer branch.
+#536 portable timestamp fix now passes the hosted macOS build. #538 CI is
+still settling without failures; no release tag has been cut.
+
+Corrected harness checkpoint `aab781e77` is pushed on the maintainer branch.
+Eight strict comparator controls pass; all four no-secrets tests pass with
+zero skips (151.742 s). Rebuild/recheck GH 38152301380 is queued, reusing the
+pinned original archive. No new reference weights or relaxed gates.
