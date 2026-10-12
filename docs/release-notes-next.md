@@ -77,7 +77,10 @@ controls pass. These small tests establish boundary and capture behavior.
 
 [Actual-weight numerical/codec validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38278884937)
 and [complete native F16/Q8/Q4 speech validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38272642504)
-are still in progress. The reported short-prompt silence is not yet declared
+are separate gates. The numerical/codec run completed with failure: F16 neural
+stages pass, but isolated DAC replay fails cosine/magnitude; Q4_K also fails
+neural boundaries. Complete native speech remains in progress. No threshold is
+relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
 sampler equality.

@@ -5337,3 +5337,27 @@ completed CANN architectures and separate the unmerged Dia work from release
 acceptance. Actual-weight Dia diff `38278884937` has started; complete native
 speech `38272642504` remains running. Breeze #543 has three nightly model
 checks left; CANN #544 has four. No failure, merge or new release tag is claimed.
+
+
+## UPDATE 2026-10-12 — Dia actual-weight diff rejected at DAC; codec A/B claimed
+
+Run `38278884937` completed with failure at source `9dd9715cf`. F16 passes
+exact encoder/decoder inputs and all captured neural boundaries, including all
+encoder/decoder blocks and every replayed logit (minimum logit cosine
+0.9999989, maximum norm error 0.0008548312). Isolated published DAC replay fails
+against actual original F32 PCM: cosine 0.9976444, norm error 0.04271824, maximum
+absolute error 1.69772e-05. Q4_K retains multiple strict neural failures and the
+same isolated codec failure. Complete 39 MB hosted artifact and logs are stored
+on CIFS at `dia-short-20261012/generic-proof`. No gate relaxation or acceptance.
+
+Continue the claimed Dia investigation with an original-codec A/B using the
+exact preserved code grid/reference archive. Verify original checkpoint SHA,
+read the actual DAC layers/quantizer/decoder/weight-normalization path, compare
+published GGUF weights to the actual effective original weights, and decode
+them through original modules. Export diagnostic F32 and narrowly promoted
+codec variants; replay the unchanged code grid through native diff on GH.
+This distinguishes checkpoint/conversion/precision drift from a codec graph
+defect before modifying production math. Preserve full existing thresholds,
+recipes and speech gates; this is bounded codec evidence, not full speech.
+Also exercise missing-stage/scale negatives once the corresponding positive
+encoder stage passes, even when an independent codec stage fails.
