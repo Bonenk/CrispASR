@@ -5053,3 +5053,18 @@ rounding to depth attention K/V in its uncached CFG forwards, without changing
 that original inference flow. Capture actual cache-write and attention counts
 and rounding-error witness; compare all eight complete
 code grids. GH CPU only, no canonical fixture or acceptance-gate change.
+
+
+Breeze v5 COMPLETE: actual Breeze CUDA0 6482/6924 MiB in stage/guided
+dumps, all reuse/scale self-checks pass. Independent verification: 163 arrays,
+107 original stages, 20 speech/interface controls; all 20 PCM arrays byte-equal
+prior real-CUDA run. Speaker .894997/.527019 unchanged. Strict guided
+codes 0/8 still FAIL and the worker remains red; no feature acceptance.
+Full immutable CUDA proof 48cff19f, SHA
+4c368fa9158c6abc4a6fb06c583bcad5119bd695b7be6960e4ed5179fd03f304.
+Independent #542 initialization repair awaits general CI; hardware evidence
+is the composition package, with identical device/weight-load source prefix
+and explicit separate branch-cache implementation. Original-only F16 KV
+control c9575d6be queued GH CPU 38223133652; all 4 secret checks pass, zero
+skips (97.452 s), helper rounding invariants and eight strict comparator
+controls pass. No default, fixture, math or acceptance gate changed.

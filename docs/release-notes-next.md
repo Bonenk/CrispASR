@@ -24,8 +24,9 @@ established.
 PRs #492, #521, #529, #530, #531 and #536 remain pending their documented
 model, quantization, generation or hardware gates. Breeze CUDA speech and
 107 stage comparisons pass; strict mixed-device guided generation fails 0/8.
-Draft #542 fixes dynamic plugin registration before Breeze GPU selection; its
-CUDA rebuild and actual model-backend validation remain queued. Successful
+Draft #542 fixes dynamic plugin registration before Breeze GPU selection.
+Its composition CUDA build and actual model-backend validation pass; standalone
+PR general CI remains pending. Strict original guided codes remain 0/8. Successful
 speech alone does not waive strict generation failures. Canary CUDA allocation/reuse controls do not reproduce
 #532 and do not establish original Q4 parity. No new default, quantization
 format or performance claim follows from these diagnostics.
