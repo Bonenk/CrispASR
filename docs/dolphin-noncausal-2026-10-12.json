@@ -46,8 +46,8 @@
     "anonymous_verified": true
   },
   "full_checkpoint_run": 38211719379,
-  "full_checkpoint_status": "queued after automatic C ABI detection repair",
-  "full_checkpoint_accepted": false,
+  "full_checkpoint_status": "SUCCESS: both checkpoints and both samples; all stage, decoded speech and automatic session gates",
+  "full_checkpoint_accepted": true,
   "reporter_clip_reproduced": false,
   "reporter_kylin_gcc9_reproduced": false,
   "release_v0843_changed": false,
@@ -63,5 +63,63 @@
       "nonstream_chinese_diff": "16/16 PASS; exact decoded original raw transcript",
       "full_checkpoint_accepted": false
     }
-  ]
+  ],
+  "full_checkpoint_model_inference": true,
+  "full_checkpoint_independent_verification": {
+    "run": 38211719379,
+    "source": "b87235519ee3db247baee0cc60d023cf5471f5af",
+    "passed": true,
+    "cases": {
+      "small.cn-zh": {
+        "stages": 16,
+        "cosine_min": 0.9999990121537781,
+        "norm_ratio_min": 0.9999902552914292,
+        "norm_ratio_max": 1.0000453928623065,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn-jfk": {
+        "stages": 16,
+        "cosine_min": 0.999986733910269,
+        "norm_ratio_min": 0.9999930996332826,
+        "norm_ratio_max": 1.0000570405541498,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn.streaming-zh": {
+        "stages": 16,
+        "cosine_min": 0.9993513115486191,
+        "norm_ratio_min": 0.9999075719190516,
+        "norm_ratio_max": 1.0000548279270796,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn.streaming-jfk": {
+        "stages": 16,
+        "cosine_min": 0.9994739785588368,
+        "norm_ratio_min": 0.9999665207878113,
+        "norm_ratio_max": 1.000044869570301,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      }
+    },
+    "complete_native_reference_arrays_verified": 128,
+    "stages": 64,
+    "ctc_argmax_exact": true,
+    "reporter_clip_reproduced": false,
+    "reporter_kylin_gcc9_reproduced": false,
+    "gpu_tested": false
+  },
+  "full_checkpoint_public_proof": {
+    "revision": "25c38157ab8c698c62cd36c6f34f823c03db2729",
+    "path": "dolphin-20261012/full-checkpoint-proof.zip",
+    "sha256": "e17f4758518b7edb319d5f45bfa23480d05b25082fdad2a7cd90004db7c21fc7",
+    "bytes": 372029735,
+    "anonymous_verified": true
+  },
+  "pr_status": "ready for review; remaining general CI before merge"
 }

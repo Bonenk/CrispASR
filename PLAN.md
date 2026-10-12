@@ -4938,3 +4938,24 @@ Archived failure, repaired process-start library isolation; v2 d22fa7caa
 submitted and source pull byte equality PASS. Speech/stage/generation pending.
 Canary CUDA probe 78f0c269d submitted with source pull byte equality PASS;
 independent processes for cached bucket values 0/128; acceptance pending.
+
+
+Dolphin #541 is ready for review after full CPU 38211719379 SUCCESS and
+independent recomputation of 128 complete arrays / 64 stage comparisons.
+All four decoded original raw transcripts and automatic Session paths pass.
+Full anonymously verified proof: 25c38157 / dolphin-20261012/full-checkpoint-proof.zip,
+SHA e17f4758518b7edb319d5f45bfa23480d05b25082fdad2a7cd90004db7c21fc7.
+Remaining general PR CI gates before merge; published v0.8.43 unchanged.
+
+Canary CUDA v1 COMPLETE: all ten 11/4/33/90/11-second arrays finite, exact
+fresh/reused returning shape, both buckets allocate on actual T4. Independent
+array/hash/cosine/norm verification complete and public proof 182a2bd4,
+SHA b9e61df6f1044a4c97be573d74d9e0c3253260c1027cf30337b1da7997194522.
+No crash reproduced or original parity accepted. CPU/GPU Q4 min cosine .981333
+and argmax differences are retained. v2 probes consecutive same-bucket graph
+reuse at 11/11.05/11 seconds in each independent bucket process.
+
+Closed shipped/resolved #481, #478, #533 after full report/comment/code audit.
+Remaining exact reporter hardware/performance limits documented in replies.
+Release-next draft now starts after published v0.8.43; historical comprehensive
+notes remain in RELEASE_NOTES_v0.8.43.md and publication in HISTORY.md.

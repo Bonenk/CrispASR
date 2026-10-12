@@ -23546,3 +23546,28 @@ The 1,179,413,408-byte hybrid retains only 14,155,776 bytes of Q4 payload:
 8.3% smaller than F16, mostly source precision, no compact-Q4/default pin or
 speed claim. No original streaming parity, specific MMQ trace, or full
 24-layer GPU capture validation is claimed.
+
+
+## 2026-10-12 — v0.8.43 publication and actual-package validation
+
+v0.8.43 is published at frozen source eb633d908120cc5f44b8af8cd4aeb1191f16bfd8.
+All release build/validation jobs in 38199002944 passed; 50 assets are public.
+[Comprehensive release notes](RELEASE_NOTES_v0.8.43.md) cover the 14 accepted
+PRs and retain the exclusions for unfinished model/quantization/hardware work.
+
+Actual tagged CPU CLI/shared/Python packages pass digest checks, dependency
+closure, relocated loading, C ABI 0.7.0, 136 capability rows and automatic
+binding discovery. Actual Windows CUDA 12.8/12.6 package/runtime pairing
+38207603649 passes, including mixed-runtime rejection. Actual final CUDA CLI
+and shared archives each pass on dual T4s in fresh processes: three original
+stage comparisons, 26 original speech cases in fresh/reused sessions and
+nine streaming controls per archive. All 12 native/reference arrays, 52 word
+cases and 18 streaming controls were independently verified, with exact
+archive/plugin byte witnesses. Full immutable public evidence and hashes:
+[Tagged validation receipt](docs/release-tag-v0.8.43-2026-10-12.json). This is
+package/Nemotron control coverage; it does not certify all model backends.
+
+Already implemented/shipped Phonon-2 #481, VoxCPM2 prefill/thread #478 and
+UTF-8 byte/chunk-loss #533 reports are closed with release/proof links and
+explicit remaining reporter-hardware/benchmark limits. Dolphin #541 follows
+this frozen release and is pending final general CI at this checkpoint.
