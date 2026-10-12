@@ -5113,9 +5113,21 @@ three grids differ, so no claim of complete integer generation parity.
 
 ## CLAIMED 2026-10-12 — Restore complete generated capability coverage in #531
 
-Refreshed #531 has 53 passing checks, two intentional skips, and one ONNX
+Refreshed #531 has 52 passing checks, two intentional skips, and one ONNX
 acceptance failure: CPU-only feature generation omitted optional Moonshine
 ONNX rows. Run the contributor generator worker with the pinned ONNX SDK,
 verify complete CLI/C ABI rows, and apply generated outputs unchanged. Retain
 required wiring checks; no manual table edits or model/gate changes. Hosted
 unit tier proves UTF-8 cleanup and all speaker/reference contracts pass.
+
+
+## CLAIMED 2026-10-12 — Refresh validated Breeze contributor composition
+
+Prepare a separate integration worktree from the hardware-tested composition,
+preserving #529/#530/#536 contributor commits. Merge current main and corrected
+#531, resolve CLI/C ABI sampler/reference/instruction compatibility, then run
+source-compiled contracts and hosted CLI/library/general CI. Retain canonical
+BF16 exact-code diagnostics; assess stage magnitudes and the already recorded
+original/native decoded roundtrips under the authoritative development method.
+No arithmetic, quantization, recipe or default change to force exact AR codes.
+Keep unrelated model quality reports separately pending.
