@@ -31,7 +31,18 @@ the prior real-CUDA run. The later branch-cache code differs between composition
 and standalone builds; this is not a complete standalone-binary GPU proof.
 See [the CUDA dispatch receipt](breeze-cuda-dispatch-2026-10-12.json).
 
-## Pending integration — PRs #531, #543 and #544
+## TTS session ownership, conversion rates and speaker boundaries — PR #531 merged
+
+Rejected Breeze reference updates preserve the previous reference; replaced Moss
+reference resources are released. Melo/OpenVoice conversions use the actual
+input rate and return owned PCM at the converter model's output rate. Supertonic
+direct speaker getters now safely reject null contexts and invalid indices.
+Contributor history from #530 is preserved. All 48 applicable CI checks pass,
+one intentional skip; the hosted native tier passes all 2,009 unit tests and
+all 140 ONNX-enabled CLI/C ABI capability rows. Separate model-quality reports
+in #530 remain unresolved.
+
+## Pending integration — PRs #543 and #544
 
 The TTS ownership/rate/speaker repairs now pass the complete ONNX capability
 catalogue and native C ABI checks, plus all 2009 weight-free native tests.
@@ -47,13 +58,11 @@ integration are pending, so these features are not presented as merged.
 The CANN follow-up exposes CLI backend/device selection and adds a separate
 opt-in x86_64/910B and arm64/310P compile matrix for CLI, shared library, diff
 and quantizer. Ten production-source routing controls pass, with four failing
-against the previous helper. Both architecture build results and general CI
-remain pending. Hosted compilation cannot establish Ascend inference or speed.
+against the previous helper. The x86_64/910B build passes all four targets and ggml-cann; ARM64/310P and general CI remain pending. Hosted compilation cannot establish Ascend inference or speed.
 
 ## Work excluded from release acceptance
 
-PRs #492, #521, #529, #530, #531 and #536 remain pending their documented
-model, quantization, generation or hardware gates. Breeze's actual-CUDA strict
+PRs #492, #521, #529 and #536 remain pending their documented model, quantization, generation or hardware gates. The additional model-quality reports recorded in merged contributor PR #530 remain unresolved. Breeze's actual-CUDA strict
 guided generation remains 0/8 against canonical BF16. Original-only arithmetic
 controls reproduce some complete native grids: joint F32 matches 1/8 CPU and
 3/8 CUDA; F16 KV rounding matches 2/8 CPU and 3/8 CUDA. These diagnostics do not

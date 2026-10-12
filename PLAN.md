@@ -5152,7 +5152,7 @@ PR #531 head `d9fa1574e` corrects the unit job's native-only roster mismatch by
 fetching the pinned ONNX SDK. Hosted linux-unit run `38251502074`, job
 `114818732081`, passes exact generation (140 rows), actual CLI/C ABI
 capabilities/size/error contracts, all 2009 weight-free CTests, and ownership,
-speaker, locale, sampler and UTF-8 suites. Other general checks remain pending.
+speaker, locale, sampler and UTF-8 suites. All 48 applicable checks passed, one intentional skip; #531 merged as `d73e39dc8c3f68b485e31b06c26d1351f41654f4`. GitHub also marked its preserved contributor ancestor #530 merged; the model-quality reports in that PR remain unresolved.
 
 PR #543 head `986ac0aba` includes the CI repair and pinned refreshed CUDA
 worker v6. Build `38236488844` / native source `e6b4ce362` runs on actual T4s:
@@ -5162,13 +5162,11 @@ verified complete arrays, magnitude bounds, own-process CUDA allocation,
 speaker controls and unchanged 0/8 canonical-code diagnostic are archived in
 `docs/breeze-cuda-integration-package-2026-10-12.json`. Worker ERROR reflects
 only that unchanged exact-code assertion. No new fixture, default or gate.
-Integration remains draft pending general CI and #531; broader #530 reports
-remain separately unresolved.
+Integration remains draft pending its remaining general CI; #531 is now merged. Broader #530 model-quality reports remain separately unresolved.
 
 PR #544 maintainer head `cfff1abb0` preserves all three contributor commits,
 fixes CLI formatting, adds shared-library CANN compilation, and passes ten
 production-source routing controls (previous helper fails four). The dedicated
 manual `cann-build.yml` avoids duplicating general platform jobs. A targeted
 x86_64/910B rerun of `38252679792` uses byte-identical production files/job
-steps from source `76017342e`; it is queued. ARM64/310P validation is still
-pending. No compile or physical Ascend/model acceptance is claimed yet.
+steps from source `76017342e`; all four targets and ggml-cann compiled successfully. The image digest and full log hash are recorded in `docs/cann-pr544-compile-2026-10-12.json`. A targeted ARM64/310P rerun is queued; normal PR CI remains pending. No physical Ascend/model acceptance is claimed.
