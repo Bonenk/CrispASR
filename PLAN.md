@@ -5261,3 +5261,34 @@ wire the generic dispatcher and native diff with teacher-forced history,
 explicit input alignment, cosine AND magnitude. Validate original decoded
 codec output separately from free-running speech. Preserve source/model pins
 and all existing sampler/quality gates; no performance/default change.
+
+
+## UPDATE 2026-10-12 — Dia generic harness implemented; hosted proof dispatched
+
+Source `9dd9715cf9ee8d7c7d5c194ca270a75ad8819024` on
+`fix/dia-pinned-diff` replaces the orphaned reference stub with a clean-source
+verified original generate() capture and registers `dia` in both the generic
+reference dispatcher and native diff. It records exact text/model/code/DAC
+provenance, preserves both CFG branches, and captures all 12 encoder blocks,
+all 18 decoder blocks at step zero, every decoder input/logit pair and actual
+original DAC PCM. New native snapshots are debug-gated and marked as outputs;
+production arithmetic, sampling recipes and GPU defaults are unchanged.
+
+Diff gates input alignment before numerical interpretation, then checks cosine
+and per-row magnitude under existing strict F16 source-parity thresholds.
+Decoder history and DAC codes are replayed separately. This does not establish
+free-running sampler equality or replace complete CLI/C ABI ASR acceptance.
+Three tiny-original neural transparency/ownership/error-restoration controls
+pass (the final DAC in those tests is a dummy, no speech claim), as do actual
+boundary controls, C++ syntax, formatting, Python compilation, anchors and all
+four staged secret tests without skips (53.442 s).
+
+Heavy generic-diff run `38278884937` tests actual pinned original weights/DAC
+and F16/Q4_K sequentially, including missing-stage and uniform-scale negative
+controls. It exercises the actual reference dispatcher and builds crispasr-diff.
+Default reference length 128 is bounded numerical/codec evidence, not full
+short-speech acceptance. Exact-source general CI is `38278888334`. Both accepted
+runs are queued. The earlier complete speech worker `38272642504` is running at
+boundary-fix source `6aa849b53`; that source's hosted linux-unit, Windows, macOS
+and iOS checks pass, with other platform jobs still in flight. No reported
+silence resolution, merge or release is claimed before actual decoded proof.
