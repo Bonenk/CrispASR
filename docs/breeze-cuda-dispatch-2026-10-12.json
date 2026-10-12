@@ -189,6 +189,33 @@
     "run": 38219077361,
     "status": "queued",
     "gpu_accepted": false,
-    "change": "Initialize CPU wrapper to register dynamic plugins before choosing Breeze GPU; emit actual compute backend"
+    "change": "Initialize CPU wrapper to register dynamic plugins before choosing Breeze GPU; emit actual compute backend",
+    "pr": 542
+  },
+  "joint_arithmetic_followup": {
+    "source": "31c338218894ac64437cea1ef0ee6b1bb766d7bd",
+    "run": 38219796806,
+    "status": "queued",
+    "original_only": true,
+    "canonical_fixtures_changed": false,
+    "acceptance_gates_changed": false,
+    "dispatch": "AVX2",
+    "initialization_seed": 42,
+    "cases": 8,
+    "frames": 24
+  },
+  "prepared_next_worker": {
+    "source": "a2b7173b5",
+    "version": "2026-10-12.breeze-cuda-speech.5",
+    "deployed": false,
+    "awaiting": "Completed fixed build plus independently verified exact archive/mirror pins",
+    "requires_breeze_backend": "CUDA",
+    "native_dump_min_gpu_mib": 4096,
+    "old_receipts_rejected": true,
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 51.744
+    }
   }
 }

@@ -5016,3 +5016,13 @@ backbone/depth/LM-head arithmetic only, explicitly casting backbone inputs.
 Compare complete generated grids to immutable canonical and saved CPU/GPU
 native diagnostics without changing any acceptance gate or fixture. This
 control may explain rounding amplification; it cannot certify the port.
+
+
+Independent production registration-order fix is draft #542, head 7a33fe272;
+CUDA composition build 38219077361 at 435c68486 remains queued. Worker guard
+036ab9fb5 now demands explicit Breeze CUDA compute-backend names plus >4 GiB
+resident allocation in both native dumps, so CUDA codec alone cannot pass.
+Original-only all-eight arithmetic control 31c338218 queued GH CPU
+38219796806 with pinned package versions, explicit AVX2 and seed 42. Neither
+queued run is acceptance. Canary #532 and Breeze #529/#536 updated with
+immutable complete proof links and exact scope/failure limitations.
