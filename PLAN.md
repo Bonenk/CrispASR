@@ -5833,3 +5833,32 @@ hardware; no changed seed, canonical inputs, reference, thresholds or gate waive
 Standalone converter is integrated on main `4e5d3d5c7`; dedicated real-conversion
 run 38314778401 and final-main CI remain queued at this checkpoint. Current open
 issues and PR heads are unchanged. No release tag is created.
+
+### 2026-10-12 portable Dia candidate `3ba3a317a` — hosted checks queued
+
+The claimed candidate is pushed on `fix/dia-pinned-diff`, remains unmerged, and
+is gated by `CRISPASR_DIA_PORTABLE_RNG=1` in the shared synthesis loop. Its actual
+native filter plus compiled MCG31/exponential race reproduces all 11,034 original
+draws, 1,226 decoder transitions and 1,210 codec frames in complete weight-free
+feedback. Noise cosine 0.9999999999999962 and norm error 3.2631726210041734e-9 are
+both retained; final F32 noise bits differ from MKL. Six tiny actual contracts
+pass in 14.834 s; the new candidate contract rejects compiled unmodified
+75fcdc70f on 9/9 first draws (1 FAIL, 9.352 s). Source-only native compilation,
+clang18 formatting, syntax and four staged no-secrets tests pass (53.159 s).
+Full source/array/log hashes are in
+`docs/dia-portable-sampler-candidate-2026-10-12.json`.
+
+Clean source `3ba3a317ab5d2996adfde1efef2c23811fc9e049` is queued for:
+- [38317325099](https://github.com/CrispStrobe/CrispASR/actions/runs/38317325099):
+  complete original/native-filter portable RNG replay, pinned Torch 2.6 CPU;
+- [38317327337](https://github.com/CrispStrobe/CrispASR/actions/runs/38317327337):
+  actual original-neural/DAC canonical code check, freshly built native F16
+  C ABI and CLI generation, validated +1,312-byte DAC export and all four ASR
+  controls, with original seed/reference/thresholds unchanged.
+
+Neither queued run is a validation result. Default sampler, production model
+pins and acceptance gates remain unchanged. Shared runtime reaches existing
+CLI, C-ABI/server and bindings without a new backend/registry/CMake/schema or
+quantization entry. Actual free speech, GPU and Q4 acceptance remain pending.
+Dedicated converter run 38314778401 is still queued; final-main CI is pending,
+so no 0.8.44 release tag is created. Current outside issues/PR heads are unchanged.
