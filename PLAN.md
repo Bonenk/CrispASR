@@ -328,7 +328,9 @@ actual-worker builds refresh their compiler cache. Thresholds stay unchanged.
   `docs/index-echo-q4-imatrix-preparation-2026-10-09.json`. Release notes for already merged changes
   are drafted in `docs/release-notes-next.md`; no tag cut. Callback support merged as PR #523
   (`74a35b198`) after 42 applicable CI checks passed (one intentional skip). Build/launch pins: `docs/index-echo-calibration-build-2026-10-09.json`.
-  Real GPU calibration/coverage/full candidate acceptance still needed.
+  Actual GPU calibration and coverage are complete; all three calibrated Q4
+  candidates remain rejected. Next localize decoder magnitude drift before any
+  new recipe; full candidate acceptance is still missing.
 
 - **VoxCPM2 — step/rate repairs on branch; primary Q4 recognizer rejection isolated.**
   Profile branch forwards positive step overrides through native/C ABI/CLI,
@@ -607,13 +609,14 @@ Q4 passes all three Piper clips at WER zero; this does not establish complete
 acceptance. See `docs/index-echo-q4-rejection-2026-10-09.json` for immutable
 public proof and every recipe outcome. No candidate is promoted to registry.
 
-Next: audit first divergent stages and critical tensors; establish whether
-representative calibration can reduce the low-bit error. The generic imatrix
-collector is not installed on Echo's llama decoder callback, so an env-only
-calibration attempt currently collects no decoder statistics. Verify coverage
-before a calibrated quant experiment, then retain all existing stage/magnitude/
-cache, exact full-output and roundtrip gates. Do not retry the rejected recipes
-unchanged or weaken gates. Task work/proof is claimed above on storage.
+Actual decoder collection is now integrated (PR #523), with disjoint EN/ZH
+GPU calibration and all 96 required FFN statistics verified. The three calibrated
+recipes still fail stage/magnitude and complete Chinese translation controls;
+see `docs/index-echo-q4-imatrix-validation-2026-10-09.json`. First quantized
+layers diverge at block 0 (plain/FFN-guarded) or block 4 (middle); final/logit
+relative L2 remains 4–12.5%. Next localize this error before another recipe.
+Retain existing stage/magnitude/cache, full-output and roundtrip gates; do not
+retry rejected recipes unchanged or weaken gates. Task/proof is claimed above.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
@@ -5141,3 +5144,39 @@ BF16 exact-code diagnostics; assess stage magnitudes and the already recorded
 original/native decoded roundtrips under the authoritative development method.
 No arithmetic, quantization, recipe or default change to force exact AR codes.
 Keep unrelated model quality reports separately pending.
+
+
+## CLAIMED 2026-10-12 — Review and validate PR #544 CANN selection/build coverage
+
+Whole PR description, comments and three contributor commits read at head
+`b80272710ab378c6fd821c3c7142dceabc65a131`. Use the separate storage worktree
+`/mnt/storage/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
+check requested CANN device selection with production-source controls, and run
+the opt-in x86_64/910B and arm64/310P container compile jobs on GitHub. Preserve
+contributor history; compilation is not Ascend hardware/model acceptance.
+
+
+## UPDATE 2026-10-12 — Refreshed integration proof and CANN review
+
+PR #531 head `d9fa1574e` corrects the unit job's native-only roster mismatch by
+fetching the pinned ONNX SDK. Hosted linux-unit run `38251502074`, job
+`114818732081`, passes exact generation (140 rows), actual CLI/C ABI
+capabilities/size/error contracts, all 2009 weight-free CTests, and ownership,
+speaker, locale, sampler and UTF-8 suites. All 48 applicable checks passed, one intentional skip; #531 merged as `d73e39dc8c3f68b485e31b06c26d1351f41654f4`. GitHub also marked its preserved contributor ancestor #530 merged; the model-quality reports in that PR remain unresolved.
+
+PR #543 head `986ac0aba` includes the CI repair and pinned refreshed CUDA
+worker v6. Build `38236488844` / native source `e6b4ce362` runs on actual T4s:
+107 original stage comparisons and 20 speech/interface roundtrips pass; all
+20 speech arrays match the earlier GPU proof byte-for-byte. Independently
+verified complete arrays, magnitude bounds, own-process CUDA allocation,
+speaker controls and unchanged 0/8 canonical-code diagnostic are archived in
+`docs/breeze-cuda-integration-package-2026-10-12.json`. Worker ERROR reflects
+only that unchanged exact-code assertion. No new fixture, default or gate.
+Integration remains draft pending its remaining general CI; #531 is now merged. Broader #530 model-quality reports remain separately unresolved.
+
+PR #544 maintainer head `cfff1abb0` preserves all three contributor commits,
+fixes CLI formatting, adds shared-library CANN compilation, and passes ten
+production-source routing controls (previous helper fails four). The dedicated
+manual `cann-build.yml` avoids duplicating general platform jobs. A targeted
+x86_64/910B rerun of `38252679792` uses byte-identical production files/job
+steps from source `76017342e`; all four targets and ggml-cann compiled successfully. The image digest and full log hash are recorded in `docs/cann-pr544-compile-2026-10-12.json`. A targeted ARM64/310P rerun is queued; normal PR CI remains pending. No physical Ascend/model acceptance is claimed.

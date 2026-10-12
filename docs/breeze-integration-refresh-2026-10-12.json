@@ -1,7 +1,7 @@
 {
   "tested_composition": "b5199d969",
   "tested_native_build_source": "435c68486ffb75a820d8105614e9f973d56249d0",
-  "main_base": "b87c25e3c",
+  "main_base": "dd05b5e26",
   "contributor_refresh": "9022414abe7b29f4d3bc1d42f78e3aed00d6f452",
   "runtime_files": [
     {
@@ -33,7 +33,7 @@
   "canonical_exact_code_gate_changed": false,
   "defaults_changed": false,
   "general_ci": "Pending new integration head",
-  "model_acceptance": "Original/reference decoded controls and CUDA stages/speech preserved; full refreshed package acceptance pending",
+  "model_acceptance": "Refreshed package executed on actual T4: 107 stage/magnitude and 20 speech/interface cases pass; unchanged canonical exact-code diagnostic fails 0/8. No recipe or gate changes.",
   "local_contracts_passed": {
     "session_modes": 7,
     "session_sampler": 8,
@@ -53,7 +53,8 @@
     "all_bundle_files_verified": true,
     "source": "e6b4ce362d69d7965f57896466228af71b2ece1c",
     "run": 38236488844,
-    "gpu_executed": false,
-    "scope": "Build source e6b4ce36; later generated capability catalogue and CI-only fixes are independently checked on hosted CPU. Fresh GPU validation pending."
+    "gpu_executed": true,
+    "scope": "Build source e6b4ce36 runs on actual T4; subsequent catalogue/CI-only changes independently validated on hosted CPU. All four Breeze runtime files remain byte-identical.",
+    "proof_receipt": "breeze-cuda-integration-package-2026-10-12.json"
   }
 }

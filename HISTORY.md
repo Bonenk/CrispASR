@@ -7,6 +7,20 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-12 — TTS session ownership, conversion rates and speaker boundaries
+
+PR #531 merged as `d73e39dc8c3f68b485e31b06c26d1351f41654f4` after all
+48 applicable checks passed, with one intentional skip. Preserve existing Breeze
+references on rejected updates, release replaced Moss reference resources, and
+return owned conversion PCM with actual source/output rates. Supertonic direct
+speaker getters safely reject null contexts and invalid indices. Source-compiled
+negative controls reproduce the previous crashes. The pinned ONNX-enabled
+CLI/shared library exposes all 140 generated capability rows; native CI passes
+2,009 unit tests and ownership, speaker, locale, sampler and UTF-8 contracts.
+Contributor @rslife's #530 history is preserved and GitHub marked that ancestor
+merged. Its separate decoded/model-quality reports remain unresolved.
+Receipt: `docs/contributor-tts-contracts-2026-10-11.json`.
+
 ## DONE 2026-10-12 — Breeze dynamic GPU registration order
 
 PR #542 merged as `f8eb4325e99a2a5bc9581d5c3999e831e332026b` after 36
