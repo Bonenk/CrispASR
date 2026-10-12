@@ -5109,3 +5109,13 @@ preserved. Final precision isolation proof `b3d1ef591`, SHA
 `66990b07a0d6c9e3e0fd481bbbfb525afdad5f4b710896c6d758620444f781e8`,
 anonymous full ZIP verified. No fixture/default/math/gate change; remaining
 three grids differ, so no claim of complete integer generation parity.
+
+
+## CLAIMED 2026-10-12 — Restore complete generated capability coverage in #531
+
+Refreshed #531 has 53 passing checks, two intentional skips, and one ONNX
+acceptance failure: CPU-only feature generation omitted optional Moonshine
+ONNX rows. Run the contributor generator worker with the pinned ONNX SDK,
+verify complete CLI/C ABI rows, and apply generated outputs unchanged. Retain
+required wiring checks; no manual table edits or model/gate changes. Hosted
+unit tier proves UTF-8 cleanup and all speaker/reference contracts pass.
