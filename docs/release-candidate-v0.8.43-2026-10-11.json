@@ -3,7 +3,7 @@
   "branch": "release/v0.8.43-candidate",
   "version": "0.8.43",
   "tag": "v0.8.43",
-  "tag_state": "annotated local only; not pushed or published",
+  "tag_state": "annotated tag pushed at frozen validated source; draft release awaiting tagged assets",
   "ci_run": 38173748841,
   "release_dry_run": 38173750598,
   "dry_run_tag_input": "",
@@ -222,5 +222,10 @@
     "anonymous_verified": true
   },
   "all_candidate_requirements_satisfied": true,
-  "next_action": "Integrate frozen candidate and push existing annotated tag; monitor tagged release build separately"
+  "next_action": "Monitor tagged release assets and finalize notes/publication after build completion; candidate archive proofs retain separate hashes",
+  "main_integration_commit": "d71153547a6ed76b5d5ec3d9881a7c5dd1a9b284",
+  "tagged_release_run": 38199002944,
+  "tagged_release_status": "queued at checkpoint",
+  "draft_release_created": true,
+  "comprehensive_release_body_prepared": true
 }

@@ -4738,3 +4738,30 @@ satisfied; integrate frozen source and push the annotated bump-script tag.
 Tagged rebuilds must be tracked separately from validated dry-run archive pins.
 No pending feature, quant pin or default enters the release. CPU precision
 diagnostic 38198367653 remains queued independently of this accepted release.
+
+Frozen candidate integrated into main as d71153547a6ed76b5d5ec3d9881a7c5dd1a9b284.
+Only four maintainer documentation files differ from validated eb633d908;
+production sources and versioned files are identical. Annotated v0.8.43 tag
+is pushed at eb633d908. Draft release with comprehensive notes exists; tagged
+release run 38199002944 is queued. Keep draft until final assets are complete;
+final release notes body is prepared with immutable proof links, and must be
+restored after workflow notes attachment. Candidate archive hashes and tagged
+rebuild hashes are separate provenance. Version sync and 227 anchors pass;
+four secret tests pass with zero skips (50.370 s).
+
+Same-host CPU control 38198367653 SUCCESS: all 106 arrays independently verify
+hashes/shapes/dtypes/finite values; 53 default/AVX2 pairs byte-identical; both
+original prompt/logit byte gates pass. Both paths were AVX2 on AMD EPYC 7763,
+so this gives no AVX512 contrast and does not explain the Intel mismatch. Full
+immutable successful and failed-bootstrap proof is public. Native not executed.
+
+## CLAIMED 2026-10-12 — Execute precision decisions under explicit AVX2 control
+
+Add a small GH CPU entrypoint selecting AVX2 for PyTorch/oneDNN/MKL before
+Torch import, seeding initialization identically to the successful same-host
+control, and invoking the unchanged breeze_depth_probe.py --precision-decisions.
+Preserve default probe, canonical BF16 fixture, full original byte control and
+every native decision/generation gate. Record complete arrays/provenance and
+strict failures; no native math/default or model pin changes. This extends the
+existing first-near-tie precision investigation, not a cause or parity claim.
+Actual fresh-process controls must verify path/argv/seed/dispatch before GH.
