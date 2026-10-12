@@ -4683,3 +4683,17 @@ processes run the unchanged original-only probe, seed 42 before loading,
 retain all failed arrays, and require both immutable byte controls to pass.
 No local model execution or native acceptance. Candidate eb633d908 is
 unchanged; release jobs are building, with no failures at this checkpoint.
+
+2026-10-12 checkpoint: candidate CI 38173748841 SUCCESS (13 jobs); release
+dry run 38173750598 SUCCESS (35 build/validation jobs plus empty-tag bookkeeping;
+nothing published). Continue the already claimed exact-candidate CPU/Python,
+Windows CUDA-pair and actual CUDA hardware checks against eb633d908. Repin
+existing package worker v6 to its byte-identical candidate CI archive, preserving
+all original stage/26 recognition/9 streaming controls. Archive v5 before push.
+
+CPU dispatch diagnostic 38174972934 FAILED before model loading in BOTH arms:
+runpy bootstrap omitted the script directory, so sibling breeze_guided_reference
+cannot import. No reference arrays were produced; no CPU precision conclusion.
+Repair the bootstrap import path and test sibling imports in actual fresh
+processes before retrying the already claimed same-host experiment. Preserve
+both failed logs and every immutable byte gate.

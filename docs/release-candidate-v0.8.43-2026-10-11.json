@@ -34,5 +34,8 @@
     "Actual candidate Windows CUDA 12.8/12.6 runtime pairing and wrong-runtime rejection",
     "Actual candidate Linux CUDA archive stage/transcript/streaming hardware test"
   ],
-  "previous_archive_proof": "docs/release-fresh-cuda-package-2026-10-11.json; source 3fdc1838, not transferred to candidate"
+  "previous_archive_proof": "docs/release-fresh-cuda-package-2026-10-11.json; source 3fdc1838, not transferred to candidate",
+  "ci_status": "success: all 13 jobs",
+  "release_status": "success: all 35 build/validation jobs; empty-tag publication step published nothing",
+  "hardware_status": "Exact candidate archive hardware test being prepared; prior archive proof does not transfer"
 }
