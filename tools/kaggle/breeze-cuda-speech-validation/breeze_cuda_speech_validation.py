@@ -47,9 +47,8 @@ kh.provenance(VERSION,ROOT)
 os.environ['HF_TOKEN'] = kh.resolve_hf_token(require=True)
 subprocess.run([sys.executable,'-m','pip','install','-q','numpy','huggingface_hub','gguf',
                 'resemblyzer==0.1.4','setuptools==80.9.0'],check=True)
-# Torch is the preinstalled GPU build; never replace it.
-import torch
-assert torch.cuda.is_available(), 'Torch speaker validation needs the actual GPU'
+# The speaker encoder uses preinstalled Torch in a separate GPU process,
+# keeping its host CUDA runtime out of native package validation.
 from huggingface_hub import hf_hub_download
 PACKAGE = Path(hf_hub_download('cstr/crispasr-regression-fixtures',BUNDLE_PATH,revision=BUNDLE_REV,repo_type='dataset'))
 
@@ -177,6 +176,8 @@ def main():
             maps=Path('/proc/self/maps').read_text()
             assert str(bundle/'libggml-cuda.so') in maps and memory>=256, 'C ABI must load actual bundled CUDA plugin and allocate on GPU'
             receipt.setdefault('cabi_cuda_allocations_mib',[]).append(memory)
+            for name in ['libcudart.so.12','libcublas.so.12','libcublasLt.so.12']:
+                assert str(bundle/name) in maps, 'C ABI must use the packaged CUDA user runtime: '+name
             receipt['gpu_executed']=True;save()
             s.accept_marking_responsibility(ATTESTATION)
             assert s.output_sample_rate() == RATE and s.input_sample_rate() == RATE
@@ -299,14 +300,24 @@ def main():
                 row.update(transcript=actual,wer=wer(row['expected'],actual),wer_max=.2)
                 if row['wer']>.2:receipt['failures'].append(name+' ASR WER exceeds .2')
                 print(name,actual,'WER',row['wer'],flush=True);save()
-        import resemblyzer,importlib.metadata
-        from resemblyzer import VoiceEncoder,preprocess_wav
-        receipt['speaker_encoder']=dict(package_version=importlib.metadata.version('resemblyzer'),
-            model_sha256=sha(Path(resemblyzer.__file__).parent/'pretrained.pt'))
-        encoder=VoiceEncoder(device='cuda')
-        embed=lambda name:encoder.embed_utterance(preprocess_wav(np.load(OUT/(name+'.npy')),source_sr=RATE))
-        r=embed('reference');baseline=embed('abi-plain');clone=embed('abi-clone')
-        similarities=dict(clone_reference=float(np.dot(clone,r)),baseline_reference=float(np.dot(baseline,r)))
+        speaker_code = r"""
+import torch,numpy as np,json,hashlib,pathlib,sys,importlib.metadata,resemblyzer
+from resemblyzer import VoiceEncoder,preprocess_wav
+assert torch.cuda.is_available()
+p=pathlib.Path(sys.argv[1]);encoder=VoiceEncoder(device='cuda');vectors={}
+for name in ['reference','abi-plain','abi-clone']:
+ vectors[name]=encoder.embed_utterance(preprocess_wav(np.load(p/(name+'.npy')),source_sr=24000))
+ np.save(p/('speaker-'+name+'.npy'),vectors[name])
+r=vectors['reference'];result=dict(package_version=importlib.metadata.version('resemblyzer'),
+ model_sha256=hashlib.sha256((pathlib.Path(resemblyzer.__file__).parent/'pretrained.pt').read_bytes()).hexdigest(),
+ torch=torch.__version__,device=torch.cuda.get_device_name(),
+ clone_reference=float(np.dot(vectors['abi-clone'],r)),baseline_reference=float(np.dot(vectors['abi-plain'],r)))
+(p/'speaker.json').write_text(json.dumps(result,indent=2)+'\n')
+"""
+        run([sys.executable,'-c',speaker_code,OUT],'gpu-speaker')
+        speaker=json.loads((OUT/'speaker.json').read_text())
+        receipt['speaker_encoder']=speaker
+        similarities={key:speaker[key] for key in ['clone_reference','baseline_reference']}
         receipt['speaker']=similarities
         if similarities['clone_reference']<=similarities['baseline_reference']:
             receipt['failures'].append('Closed-loop clone speaker similarity did not improve')
