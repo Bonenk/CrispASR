@@ -170,11 +170,23 @@ Q4_K passes only 13/40 and first fails at encoder layer 6. This distinct
 full-utterance result neither erases the startup-codec failure nor accepts
 native free generation. [The complete original receipt](docs/dia-full-original-short-2026-10-12.json)
 preserves full stage metrics and all 21 artifact hashes. A separately labelled
-original-model control using the exact compiled native sampler is in progress;
+original-model control using the exact compiled native sampler also fails
+short speech (WER 1), as does native free generation. Its 37-step identical
+input prefix passes neural cosine/magnitude; [the sampler receipt](docs/dia-native-sampler-control-2026-10-12.json)
+retains the first discrete divergence and complete proof. This implicates the
+sampling path but does not yet isolate probability filtering from RNG behavior;
 these are excluded investigations. Thresholds, reference PCM and production
 recipes remain unchanged. The
 [complete rejected proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
 and [receipt](docs/dia-rejected-proof-2026-10-12.json) preserve both failures.
+
+The completed eight-boundary diagnostic isolates the startup codec failure to
+the precision of the final output weights. Preserving three original F32
+tensors passes all 48 canonical startup comparisons and adds only 1,312 bytes.
+[The full codec receipt](docs/dia-codec-precision-2026-10-12.json) retains all
+variants, rejected published results, four negative controls and 47 artifact
+hashes. The standalone conversion and full-utterance validation remain excluded
+from release acceptance; production codec pins are unchanged.
 
 MiMo PR #492 and OmniVoice draft PR #521 remain unmerged. MiMo's diagnostic
 F32 precision path reproduces the original codes and decoded speech but is

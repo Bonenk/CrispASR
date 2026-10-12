@@ -109,7 +109,25 @@ retains all stage metrics and 21 artifact hashes. The workflow remains failed
 on Q4_K. This distinct full-utterance result does not supersede the 128-step
 startup-codec failure or accept native free-running short speech. The separately
 labelled original-model/native-sampler control isolates stochastic sampling;
-canonical original PCM, defaults and thresholds remain unchanged.
+canonical original PCM, defaults and thresholds remain unchanged. That control
+has now finished with failure: original neural/DAC using the compiled native
+sampler also emits quiet short audio with WER 1, as does native free generation.
+They share 37 exact input steps with minimum neural cosine 0.9999993818 and
+maximum norm error 0.0006661525. The first sampled difference is step 36/head 8.
+[The full sampler receipt](dia-native-sampler-control-2026-10-12.json) retains
+all inputs, logits, draws, PCM and log hashes. The native sampling path is
+sufficient to trigger the failure with original modules; pure RNG versus
+probability/filter differences still requires separate evidence. No gate waiver.
+The eight-boundary codec worker has now completed successfully. The published
+startup failure first appears at the output convolution; native code matches
+actual original modules using those same rounded weights. Three original F32
+final-output tensors pass all 48 canonical startup comparisons, with PCM cosine
+0.9999927 and norm error 0.002027489. The export adds only 1,312 bytes.
+[The full codec receipt](dia-codec-precision-2026-10-12.json) preserves the
+published failure, all four variants, four failing negative controls and 47
+artifact hashes. Actual physical audits verify three original F32 payloads and
+131 unchanged unrelated payloads/types. Reproducible standalone export and fresh
+full-utterance validation remain diagnostic work; production pins are unchanged.
 The generic reference/diff additionally observes eight DAC boundaries, preserving
 canonical PCM/codes and requiring every declared stage. Seven local capture
 contracts plus three parameter contracts pass; this remains unmerged diagnostic work until hosted acceptance.

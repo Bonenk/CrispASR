@@ -5609,3 +5609,61 @@ with canonical startup and full-utterance references unchanged. Actual sampler
 control 38299826144 has started independently; native short-speech acceptance
 and Q4 neural repair remain separate pending gates. Production promotion
 requires full speech and hardware validation; no gate relaxation or new tag.
+
+### 2026-10-12 critical-output export and proof checkpoint
+
+Complete codec proof is retained on storage: 47 files, 1,188,061,032 bytes,
+all full SHA256s and every canonical/control stage metric in
+`docs/dia-codec-precision-2026-10-12.json`. All eight variant comparisons have
+48 rows each; published canonical has two failures (output convolution/PCM),
+the seven other variant/reference comparisons pass all rows. Four missing/
+scaled encoder/codec negative runs exit 1 as required. Original coefficients
+round exactly to all 134 published tensors. Physical narrow-candidate audit
+verifies three original F32 payloads and 131 unrelated preserved payloads/types.
+Its 108,697,184-byte GGUF is only 1,312 bytes larger than published. Final
+PCM cosine 0.9999927 and norm error 0.002027489 pass unchanged startup gates;
+this is not native free-speech acceptance.
+
+Standalone converter/shared parameter lookup and full tensor audit are pushed
+at `a0b702d0d26b543a82bee689c69ac296d319e5b2`, `fix/dia-pinned-diff`.
+Six tiny original-module/export contracts pass (30.849 s), Python compilation,
+CLI help and 227 documentation anchors pass. All four staged no-secrets tests
+pass without skips (68.410 s). Initial local export assertions passed but
+cleanup failed because reader maps remained open on CIFS; the shared reader
+context now closes them deterministically, and the complete rerun passes.
+
+Fresh hosted standalone export run
+[38306172119](https://github.com/CrispStrobe/CrispASR/actions/runs/38306172119)
+is queued at that exact source. It requires the byte-identical previously
+validated narrow candidate, then fresh strict comparisons against both retained
+startup and full-utterance original references. The original/native-sampler
+control 38299826144 remains running at fixed `1d8d5bbc2`; no source change to
+that active run. Original speech, startup precision, native free speech, Q4
+neural parity and physical GPU behavior remain distinct gates. Updated notes
+and proof receipts describe the accepted numerical control without promoting
+production codec pins, merging unvalidated runtime changes or cutting a tag.
+
+### 2026-10-12 sampler control rejects short speech; inspect real distributions
+
+Run 38299826144 at fixed `1d8d5bbc2` completed FAILURE on both original-model/
+native-sampler and native free-speech ASR, with WER 1 and empty transcripts.
+The preserved canonical Torch original still reads verbatim (WER 0). Original
+neural/DAC using the compiled actual native sampler produces 16.521 s at RMS
+0.000170839; native produces 13.305 s at RMS 0.000384941. They share 37 exact
+input steps, prefix minimum cosine 0.9999993818 and max norm error 0.0006661525
+(PASS). The first sampled difference is step 36/head 8: original control 226,
+native 221; inputs first differ at step 37. All complete inputs, logits, draws,
+PCM, source/header copies and logs are retained on storage and hashed in
+`docs/dia-native-sampler-control-2026-10-12.json`. This demonstrates that the
+native sampling path alone can trigger quiet short output even with original
+neural/codec modules, but does not yet isolate random-stream versus probability
+filter/numerical differences, accept native speech, or waive a gate.
+
+Next inspect exact final probability/support distributions at step zero and
+the first observed divergence, using actual pinned original sampler/CFG source
+and a mechanically instrumented actual native header. This is weight-free
+replay of a few retained logits, not a new local model run. Preserve canonical
+defaults and failed speech, and establish whether any filter/normalization
+defect exists before changing RNG or production sampling. Work continues in
+the claimed storage reference worktree; standalone codec run 38306172119 is
+independently queued at immutable `a0b702d0d`.
