@@ -231,3 +231,5 @@ Those controls are documented in
 and do not replace canonical fixtures or waive the recorded diagnostic.
 
 Dia diagnostic follow-up: [standalone codec export](docs/dia-dac-standalone-export-2026-10-12.json) now passes fresh 48/48 startup and 40/40 full-history comparisons with byte-identical validated conversion and complete physical tensor audit (+1,312 bytes). [Pinned Torch 2.6 probability replay](docs/dia-sampling-probability-hosted-2026-10-12.json) confirms matching support on both 333-row arms and max probability error below 3.61e-7. Random-stream compatibility and free-running short speech remain unaccepted; production pins/defaults are unchanged.
+
+Pinned Dia RNG witness: [hosted and isolated local Torch 2.6 replay](docs/dia-canonical-random-hosted-2026-10-12.json) reproduce all 1,226 original decoder transitions and 1,210 codec frames. The row-split negative differs on 9,090 draws. Cross-host F32 exponential noise is not byte-identical, while discrete draws and MT states agree. This component result does not establish a native sampler fix or free-running speech acceptance.

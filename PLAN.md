@@ -5806,3 +5806,30 @@ include the conversion tool separately from unmerged runtime/RNG changes.
 
 Pinned RNG witness 38312385854 remains queued at unchanged `75fcdc70f`.
 No production/default/pin change or speech/GPU/Q4 acceptance waiver.
+
+### 2026-10-12 pinned canonical RNG witness and portable sampler CLAIM
+
+Pinned clean source `75fcdc70f` now passes hosted run
+[38312385854](https://github.com/CrispStrobe/CrispASR/actions/runs/38312385854).
+The unchanged worker also passes locally using private Torch 2.6.0+cpu,
+Pydantic 2.11.3 and GGUF 0.18.0 under storage, without changing shared packages.
+Both reproduce all 1,226 actual original decoder transitions, all 1,210 codec
+frames, and every exponential-race draw plus MT state transition. The fixed
+row-split negative differs on 9,090 of 11,034 draws on both hosts. Complete
+receipts and file hashes are in `docs/dia-canonical-random-hosted-2026-10-12.json`.
+Noise is not byte-portable across hosts: 2,153,802 of 11,342,952 F32 values differ,
+maximum absolute error 9.5367431640625e-7, despite identical discrete outcomes.
+This is a retained-logit component proof, not new neural/PCM/free-speech acceptance.
+
+CLAIM next: implement and validate a portable batched exponential-race sampler
+against the pinned actual provider sequence, first in a weight-free diagnostic
+on the runtime worktree. Read PyTorch 2.6 CPU source and Intel's documented
+MCG31 initialization, recurrence and exponential transform; compare the actual
+retained noise, every draw and state consumption before touching production.
+Keep existing path/defaults while establishing the candidate. Then actual
+original-neural and native CLI/C-ABI speech roundtrips remain required on hosted
+hardware; no changed seed, canonical inputs, reference, thresholds or gate waiver.
+
+Standalone converter is integrated on main `4e5d3d5c7`; dedicated real-conversion
+run 38314778401 and final-main CI remain queued at this checkpoint. Current open
+issues and PR heads are unchanged. No release tag is created.
