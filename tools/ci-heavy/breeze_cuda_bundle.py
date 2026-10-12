@@ -37,7 +37,7 @@ def run(command, label):
 def main():
     source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     ggml = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT / 'ggml', text=True).strip()
-    receipt = dict(source=source, ggml=ggml, cuda='12.4.1', architectures=[75],
+    receipt = dict(source=source, ggml=ggml, cuda='12.4.1', architectures=[60, 75],
                    pending_composition='a2f58338ef9a86dfee114cdd5cd610dfe7b556c6',
                    build_complete=False, gpu_executed=False, model_acceptance=False)
     (OUT / 'validation.json').write_text(json.dumps(receipt, indent=2) + '\n')
@@ -48,7 +48,7 @@ def main():
     (links / 'libcuda.so.1').symlink_to(stubs[0])
     run(['cmake', '-G', 'Ninja', '-S', ROOT, '-B', BUILD,
          '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
-         '-DGGML_BACKEND_DL=ON', '-DGGML_CUDA=ON', '-DCMAKE_CUDA_ARCHITECTURES=75',
+         '-DGGML_BACKEND_DL=ON', '-DGGML_CUDA=ON', '-DCMAKE_CUDA_ARCHITECTURES=60;75',
          '-DGGML_NATIVE=OFF', '-DGGML_BLAS=OFF', '-DGGML_OPENBLAS=OFF',
          '-DGGML_VULKAN=OFF', '-DGGML_METAL=OFF',
          '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=ON',

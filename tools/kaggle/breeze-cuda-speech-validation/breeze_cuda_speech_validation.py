@@ -35,7 +35,7 @@ os.environ.update(TMPDIR=str(SCRATCH), HF_HOME=str(SCRATCH/'hf'), HF_XET_CACHE=s
 assert len(BUNDLE_SHA) == 64 and len(BUNDLE_REV) == 40, 'Build/mirror pins are pending; do not launch'
 hardware = subprocess.check_output(['nvidia-smi', '--query-gpu=name,compute_cap,memory.total,driver_version',
                                    '--format=csv,noheader'], text=True).strip()
-assert hardware and all(float(row.split(',')[1]) == 7.5 for row in hardware.splitlines()), 'Requires actual sm75 GPU'
+assert hardware and all(float(row.split(',')[1]) in (6.0,7.5) for row in hardware.splitlines()), 'Requires actual sm60/sm75 GPU'
 for command in [['git','init',ROOT],['git','-C',ROOT,'remote','add','origin','https://github.com/CrispStrobe/CrispASR.git'],
                 ['git','-C',ROOT,'fetch','--depth=1','origin',SOURCE],['git','-C',ROOT,'checkout','FETCH_HEAD']]:
     subprocess.run(list(map(str,command)),check=True)
