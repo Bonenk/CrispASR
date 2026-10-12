@@ -23571,3 +23571,17 @@ Already implemented/shipped Phonon-2 #481, VoxCPM2 prefill/thread #478 and
 UTF-8 byte/chunk-loss #533 reports are closed with release/proof links and
 explicit remaining reporter-hardware/benchmark limits. Dolphin #541 follows
 this frozen release and is pending final general CI at this checkpoint.
+
+
+## 2026-10-12 — Dolphin noncausal decoding and automatic sessions (#541)
+
+Merged #541 as 065ae1fdd7ba1b4d4923ef8d254957f82a0f4f72 after 45 applicable
+CI checks passed, one intentional skip. Both depthwise convolution sites now
+honor causal=false; noncausal CSGU adds zero padding after normalization,
+matching the original. The shared architecture table registers Dolphin for
+automatic C ABI/binding sessions. Full original validation covers streaming
+and non-streaming models, Chinese/JFK samples, 64 stage comparisons, exact
+CTC argmax/raw text and matching automatic sessions; all 128 saved arrays
+independently verified. See [full proof](docs/dolphin-noncausal-2026-10-12.json).
+Issue #540 closed by the fix. Published v0.8.43 remains unchanged; reporter
+private clip/Kylin/GCC9 and GPU validation were not reproduced.

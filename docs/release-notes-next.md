@@ -4,7 +4,7 @@ The published release is documented in [v0.8.43 release notes](../RELEASE_NOTES_
 and [the tagged validation receipt](release-tag-v0.8.43-2026-10-12.json). No later
 tag has been cut.
 
-## Dolphin non-streaming decoding — PR #541 pending final CI
+## Dolphin non-streaming decoding — PR #541 merged
 
 Honor the checkpoint causal flag in both depthwise convolution sites and preserve
 the original causal/noncausal LayerNorm/padding order. Register Dolphin in the
@@ -15,9 +15,9 @@ Both non-streaming and streaming models pass Chinese/JFK original references:
 and matching automatic C ABI/Python sessions. Independent checks cover all
 128 complete native/reference arrays. The 12 original-module/native controls
 and causal-only/normalization-order negative controls are also retained.
-See [the full proof receipt](dolphin-noncausal-2026-10-12.json). General PR CI
-must finish before merge; reporter Kylin/GCC9/private-clip and GPU validation
-are not established.
+See [the full proof receipt](dolphin-noncausal-2026-10-12.json). All 45 applicable general CI checks pass, one intentional skip; the fix is
+merged on main. Reporter Kylin/GCC9/private-clip and GPU validation are not
+established.
 
 ## Work excluded from release acceptance
 

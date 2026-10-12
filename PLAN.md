@@ -4959,3 +4959,8 @@ Closed shipped/resolved #481, #478, #533 after full report/comment/code audit.
 Remaining exact reporter hardware/performance limits documented in replies.
 Release-next draft now starts after published v0.8.43; historical comprehensive
 notes remain in RELEASE_NOTES_v0.8.43.md and publication in HISTORY.md.
+
+
+Dolphin #541 merged 065ae1fdd after all 45 applicable general checks pass
+(one intentional skip); #540 closed. Full two-model/two-sample original proof
+and automatic C ABI validation accepted. No change to frozen v0.8.43 tag.

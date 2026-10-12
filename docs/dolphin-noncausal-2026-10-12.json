@@ -121,5 +121,7 @@
     "bytes": 372029735,
     "anonymous_verified": true
   },
-  "pr_status": "ready for review; remaining general CI before merge"
+  "pr_status": "MERGED after 45 applicable successful checks and one intentional skip",
+  "merge_commit": "065ae1fdd7ba1b4d4923ef8d254957f82a0f4f72",
+  "issue_status": "closed by merged fix"
 }
