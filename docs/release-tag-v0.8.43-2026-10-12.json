@@ -1,0 +1,213 @@
+{
+  "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+  "release_run": 38199002944,
+  "archives": {
+    "cpu-cli": {
+      "name": "crispasr-linux-x86_64.tar.gz",
+      "bytes": 42822913,
+      "sha256": "e81b597cb80e49d8687a4bceb1eb24bf55928c55ff1292a9cde12e9b4fe0eb57"
+    },
+    "cpu-libraries": {
+      "name": "libcrispasr-linux-x86_64.tar.gz",
+      "bytes": 22504638,
+      "sha256": "89ae56accb0b32450094d523594d93fd08bc07abe90b2c5b7102ef2c132001c3"
+    },
+    "python-package": {
+      "name": "crispasr-python-linux-x86_64.tar.gz",
+      "bytes": 10981683,
+      "sha256": "c900b2ff5fc1cc0a6ff5f4b8b349fa53763ed919237458d03fafd7f92f09cda5"
+    }
+  },
+  "checks": {
+    "candidate-cli-dependencies": {
+      "passed": true,
+      "log_sha256": "a6e5fd34c2fccdff9151643e5b62099c6c5b4d17f79c74bd70ce79edeee3baa6"
+    },
+    "candidate-library-relocation": {
+      "passed": true,
+      "log_sha256": "0ea50bc36c05e39669624940a3bbeca15a59fa89ac2e8132fb75b095578df157"
+    },
+    "candidate-cpu-capabilities": {
+      "passed": true,
+      "log_sha256": "9d8903054204907681b67286bcc0cf469f156016428ef91b939629e97b49b8cc"
+    },
+    "candidate-python-dependencies": {
+      "passed": true,
+      "log_sha256": "d3d16c543a72488f831133f80566129ba618596b9c4e4c469755fe9bb9b05ec9"
+    },
+    "candidate-python-capabilities": {
+      "passed": true,
+      "log_sha256": "9d8903054204907681b67286bcc0cf469f156016428ef91b939629e97b49b8cc"
+    },
+    "candidate-python-import": {
+      "passed": true,
+      "log_sha256": "e4f4d5bcbfb8fcd73d46eb835a5206a44400b62ee1a3940b83dcfded35e6cc13"
+    }
+  },
+  "version": "0.8.43",
+  "c_abi_version": "0.7.0",
+  "canonical_capability_rows": 136,
+  "passed": true,
+  "model_inference": false,
+  "gpu_inference": false,
+  "public_proof": {
+    "revision": "e5d57833d50bc7e74aa61679e8a3842822b91a24",
+    "path": "release/38199002944/cpu-python-package-proof.zip",
+    "sha256": "5dd83920e7d96b29bc402cadca8f8e8927474e9e642536de7686774afed98e7f",
+    "bytes": 7347,
+    "anonymous_verified": true
+  },
+  "github_assets": [
+    {
+      "name": "crispasr-linux-x86_64.tar.gz",
+      "bytes": 42822913,
+      "sha256": "e81b597cb80e49d8687a4bceb1eb24bf55928c55ff1292a9cde12e9b4fe0eb57",
+      "asset_id": 632596319,
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-linux-x86_64.tar.gz"
+    },
+    {
+      "name": "libcrispasr-linux-x86_64.tar.gz",
+      "bytes": 22504638,
+      "sha256": "89ae56accb0b32450094d523594d93fd08bc07abe90b2c5b7102ef2c132001c3",
+      "asset_id": 632630189,
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/libcrispasr-linux-x86_64.tar.gz"
+    },
+    {
+      "name": "crispasr-python-linux-x86_64.tar.gz",
+      "bytes": 10981683,
+      "sha256": "c900b2ff5fc1cc0a6ff5f4b8b349fa53763ed919237458d03fafd7f92f09cda5",
+      "asset_id": 632580664,
+      "url": "https://github.com/CrispStrobe/CrispASR/releases/download/v0.8.43/crispasr-python-linux-x86_64.tar.gz"
+    }
+  ],
+  "archive_provenance": "Actual published tagged assets, independently checked against GitHub release SHA256 digests; distinct from dry-run candidate rebuild",
+  "check_label_note": "Historical validator check labels retain candidate prefix; archive paths and run pins identify actual tagged assets",
+  "windows_pair_run": 38207603649,
+  "windows_pair_status": "SUCCESS: actual tagged CLI/shared/runtime CUDA 12.8 and 12.6; mixed-runtime negative control correctly rejected",
+  "final_release_matrix": "SUCCESS: all release build/validation jobs and publication completed",
+  "public_assets": 50,
+  "final_release_notes_characters": 17962,
+  "cuda_package_validation": {
+    "worker_source": "c3a0cb1b8",
+    "version": "2026-10-12.release-package.8",
+    "status": "COMPLETE PASS on actual dual T4s; both archives in fresh processes",
+    "fresh_process_per_archive": true,
+    "hardware_accepted": true,
+    "archives": {
+      "cuda-cli": {
+        "archive_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
+        "archive_bytes": 225358330,
+        "artifact_id": 11727998351,
+        "public_mirror": {
+          "revision": "c00064122d9327d3b72be260e21ddc529b1ca054",
+          "path": "release/38199002944/crispasr-linux-x86_64-cuda.tar.gz",
+          "anonymous_verified": true
+        }
+      },
+      "cuda-libraries": {
+        "archive_sha256": "faf67fd049098fdf346e922906b93b5119e1a04d080c945a8690338009451cb6",
+        "archive_bytes": 196326872,
+        "artifact_id": 11727819539,
+        "public_mirror": {
+          "revision": "3d3eb4124764e335df430132a9116e985c41bd7f",
+          "path": "release/38199002944/libcrispasr-linux-x86_64-cuda.tar.gz",
+          "anonymous_verified": true
+        }
+      }
+    },
+    "independent_verification": {
+      "cli": {
+        "passed": true,
+        "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+        "stages": {
+          "mel_spectrogram": {
+            "cosine_min": 1.0,
+            "native_norm": 3802.327423724644,
+            "reference_norm": 3802.3278125707384,
+            "relative_l2": 1.0037382467243056e-05,
+            "max_abs": 0.006104469299316406,
+            "passed": true
+          },
+          "pre_encode_output": {
+            "cosine_min": 1.0,
+            "native_norm": 35037.27131994719,
+            "reference_norm": 35037.281174288575,
+            "relative_l2": 4.749317146031651e-05,
+            "max_abs": 0.046783447265625,
+            "passed": true
+          },
+          "encoder_output": {
+            "cosine_min": 0.9999908804893494,
+            "native_norm": 16.613050709011176,
+            "reference_norm": 16.612932357599302,
+            "relative_l2": 0.00028003937974455275,
+            "max_abs": 0.001037895679473877,
+            "passed": true
+          }
+        },
+        "full_arrays_verified": 6,
+        "original_word_controls": 26,
+        "fresh_reused_exact": true,
+        "streaming_controls": 9,
+        "cuda_plugin_byte_matches_actual_archive": true,
+        "entry_matches_uploaded_script": true,
+        "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+        "package_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
+        "gpu_plugin_sha256": "18e90585fedc427e665de340540c57e54d3755396f1587c45dc67a00023d7cf1"
+      },
+      "shared": {
+        "passed": true,
+        "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+        "stages": {
+          "mel_spectrogram": {
+            "cosine_min": 1.0,
+            "native_norm": 3802.3274239051407,
+            "reference_norm": 3802.3278125707384,
+            "relative_l2": 1.0037380127038821e-05,
+            "max_abs": 0.006104469299316406,
+            "passed": true
+          },
+          "pre_encode_output": {
+            "cosine_min": 1.0,
+            "native_norm": 35037.27129616613,
+            "reference_norm": 35037.281174288575,
+            "relative_l2": 4.749120018825607e-05,
+            "max_abs": 0.046783447265625,
+            "passed": true
+          },
+          "encoder_output": {
+            "cosine_min": 0.9999908804893494,
+            "native_norm": 16.61305074969874,
+            "reference_norm": 16.612932357599302,
+            "relative_l2": 0.000279996483422425,
+            "max_abs": 0.0010377168655395508,
+            "passed": true
+          }
+        },
+        "full_arrays_verified": 6,
+        "original_word_controls": 26,
+        "fresh_reused_exact": true,
+        "streaming_controls": 9,
+        "cuda_plugin_byte_matches_actual_archive": true,
+        "entry_matches_uploaded_script": true,
+        "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+        "package_sha256": "faf67fd049098fdf346e922906b93b5119e1a04d080c945a8690338009451cb6",
+        "gpu_plugin_sha256": "66185e586a9a5e2a4a580ab51d22284529a60386599728d72f5d6e1312d6b398"
+      }
+    },
+    "public_proof": {
+      "revision": "a5c5642fb48f1895f7b0bc2263abd89b80a6fd5a",
+      "path": "release/38199002944/tagged-cuda-windows-package-proof.zip",
+      "sha256": "fddbd06d970fe7fa199cb5aa1e55cd47970843cf04bc2a155e2b8b649751251d",
+      "bytes": 6330376,
+      "anonymous_verified": true
+    }
+  },
+  "windows_public_proof": {
+    "revision": "1505202b9fd3289171f30db819d12eb3fd46d646",
+    "path": "release/38199002944/tagged-windows-pair-proof.zip",
+    "sha256": "975526e7b3493b0277035101ba90442ce5927c2a55eaf138f9ab4f4f7ba9d754",
+    "bytes": 2217,
+    "anonymous_verified": true
+  }
+}

@@ -1,0 +1,289 @@
+{
+  "source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
+  "device": "CPU; GPU backends compiled OFF",
+  "complete": true,
+  "speech_pass": true,
+  "original_generated_code_gate_waived": false,
+  "expected": "I found the file you asked about and opened it.",
+  "instruction": "Speak clearly and calmly.",
+  "seed": 7,
+  "max_frames": 128,
+  "cases": {
+    "reference": {
+      "samples": 88320,
+      "rate": 24000,
+      "duration": 3.68,
+      "rms": 0.03245174017848451,
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "pcm_sha256": "68b7d6eed7495d6b2afbbaa4b6b16b4b1f74e9913d410b483237cb783668f9a6",
+      "transcript": "A quick brown fox jumps over the lazy dog.",
+      "wer": 0.1111111111111111,
+      "wer_max": 0.2
+    },
+    "abi-plain": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590862671728639,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "de67c525493ac908b6c570d0d1bfa3c3c0d8b768a0df022081023df8cfb6ed36",
+      "transcript": "I found file you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "abi-design": {
+      "samples": 74880,
+      "rate": 24000,
+      "duration": 3.12,
+      "rms": 0.08311120376335947,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "ab3a1727561b0cc6f953c2982c03e0276ff6b547ea93f600b1b21a5c30e12223",
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "abi-plain-repeat": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590862671728639,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "de67c525493ac908b6c570d0d1bfa3c3c0d8b768a0df022081023df8cfb6ed36",
+      "transcript": "I found file you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "abi-design-repeat": {
+      "samples": 74880,
+      "rate": 24000,
+      "duration": 3.12,
+      "rms": 0.08311120376335947,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "ab3a1727561b0cc6f953c2982c03e0276ff6b547ea93f600b1b21a5c30e12223",
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "abi-negative": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590862671728639,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "de67c525493ac908b6c570d0d1bfa3c3c0d8b768a0df022081023df8cfb6ed36",
+      "transcript": "I found file you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "abi-clone": {
+      "samples": 55680,
+      "rate": 24000,
+      "duration": 2.32,
+      "rms": 0.034465536029517435,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "5ba0d378f9135745459a5af9a3640ba8f3962e7aa330d75426891e44f80a26fe",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "abi-direction": {
+      "samples": 80640,
+      "rate": 24000,
+      "duration": 3.36,
+      "rms": 0.04999641732702125,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "62582c667da898ef93bbb87d6875a74b1af11a34275a52498a4b962619fe8980",
+      "transcript": "I found the file who asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "abi-clone-repeat": {
+      "samples": 55680,
+      "rate": 24000,
+      "duration": 2.32,
+      "rms": 0.034465536029517435,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "5ba0d378f9135745459a5af9a3640ba8f3962e7aa330d75426891e44f80a26fe",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "cli-plain": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590815315161073,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "b0670bcef9b09be1984a5a159b46265c7789e43033bbf76e4c032288e5c13a07",
+      "transcript": "I found file you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "cli-clone": {
+      "samples": 55680,
+      "rate": 24000,
+      "duration": 2.32,
+      "rms": 0.03446453798106077,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "6aea486b7907e2ebb2c8ed3a66d482d826e1a53b6c14957228dd5a33f0639883",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "cli-design": {
+      "samples": 74880,
+      "rate": 24000,
+      "duration": 3.12,
+      "rms": 0.083108688279051,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "f317ee7a49aafd4a7bd8cb37b509d4ea5dd07d781789e8732059aec7197e5969",
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "cli-direction": {
+      "samples": 80640,
+      "rate": 24000,
+      "duration": 3.36,
+      "rms": 0.049994924136141615,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "23298a3c2d995b04382142acab4ba25396b52de5b41fd5c1ff1617530265fb61",
+      "transcript": "I found the file who asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "server-plain": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590759160905891,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "a0aa569da220995a9cbc30bcca6802c06c18279d8851b0208220a591bc840ca7",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "server-clone": {
+      "samples": 55680,
+      "rate": 24000,
+      "duration": 2.32,
+      "rms": 0.03446705570441964,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "7c291fd87f2b8ce7c620dfb5b4ad0a0953fa68fa72695f087ac98ed7d0ffba47",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "server-design": {
+      "samples": 74880,
+      "rate": 24000,
+      "duration": 3.12,
+      "rms": 0.08311734551095142,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "043bb7e6f047fb0cfd94054e0ca2fe05035a89606600fd4effddb1fc591c5f82",
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "server-direction": {
+      "samples": 80640,
+      "rate": 24000,
+      "duration": 3.36,
+      "rms": 0.05000126381953108,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "d7bdfc5eb21cdc6e3fe4cd40e4d881ea675cc1b8fc3071e58f6f341010bf003d",
+      "transcript": "I found the file who asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2
+    },
+    "server-plain-repeat": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590759160905891,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "a0aa569da220995a9cbc30bcca6802c06c18279d8851b0208220a591bc840ca7",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "server-clone-repeat": {
+      "samples": 55680,
+      "rate": 24000,
+      "duration": 2.32,
+      "rms": 0.03446705570441964,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "7c291fd87f2b8ce7c620dfb5b4ad0a0953fa68fa72695f087ac98ed7d0ffba47",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    },
+    "server-negative": {
+      "samples": 72960,
+      "rate": 24000,
+      "duration": 3.04,
+      "rms": 0.01590759160905891,
+      "expected": "I found the file you asked about and opened it.",
+      "pcm_sha256": "a0aa569da220995a9cbc30bcca6802c06c18279d8851b0208220a591bc840ca7",
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2
+    }
+  },
+  "failures": [],
+  "cli_sha256": "ecd1f93b718d14157034f25972a4c1e7de7d3309ebbebcf31385928248b7da43",
+  "library_sha256": "d3536d2bf9c65879644b3a2c1ca29893e37f86f7a9e22b6b30441023c43ed205",
+  "models": {
+    "breeze": {
+      "repo": "cstr/breeze-tts-2-GGUF",
+      "revision": "5314fe9ae3ec6eac1a9238c4f6888fdc9fda0e83",
+      "filename": "breeze-tts-2-f16.gguf",
+      "sha256": "08ea3fbffe9701a3d04a4a63554876841d923fdd21e20add36d28f3ac3447da7",
+      "bytes": 5714604032
+    },
+    "codec": {
+      "repo": "cstr/qwen3-tts-tokenizer-12hz-GGUF",
+      "revision": "344e279551177654762e5c7d39e217834325f222",
+      "filename": "qwen3-tts-tokenizer-12hz.gguf",
+      "sha256": "70dc95dbfdd9aa5d9d406236ff771d061bf17b0cda02a72513953355606e719b",
+      "bytes": 358453280
+    }
+  },
+  "unknown_voice_status": 500,
+  "surface_contracts_pass": true,
+  "asr_model": {
+    "precision": "F16; independent stage/transcript controls passed",
+    "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+    "sha256": "14cbc98df495d8ab452c6a4ac367136d94ab5da55e73afaa96ba4f749dd95d09"
+  },
+  "asr_control": {
+    "expected": "And so my fellow Americans ask not what your country can do for you ask what you can do for your country",
+    "transcript": "And so my fellow Americans ask not what your country can do for you. Ask what you can do for your country.",
+    "wer": 0.0,
+    "wer_max": 0.2,
+    "audio_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e"
+  },
+  "speaker_encoder": {
+    "package_version": "0.1.4",
+    "model_sha256": "39373b86598fa3da9fcddee6142382efe09777e8d37dc9c0561f41f0070f134e"
+  },
+  "speaker": {
+    "clone_reference": 0.8116065263748169,
+    "baseline_reference": 0.4498146176338196
+  },
+  "run": 38169287241,
+  "arrays_independently_verified": 20,
+  "public_proof": {
+    "revision": "77f6fd4b9af45053d71f9d66939fb54aa3cbfffd",
+    "path": "breeze-guided-20261011/native-speech-surfaces-proof.zip",
+    "sha256": "9fc5fa299ce256f0241b55e2d0f95e02056783d49b8a5511173f68eed3c41155",
+    "bytes": 5167074,
+    "anonymous_verified": true
+  },
+  "speaker_test_passed": true,
+  "prior_run": 38159960891,
+  "prior_failure": "Speaker dependency webrtcvad could not import pkg_resources",
+  "retry_dependency": "setuptools==80.9.0",
+  "original_speech_comparison_run": 38172313354,
+  "original_speech_comparison_status": "queued at dispatch"
+}

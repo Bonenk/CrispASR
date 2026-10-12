@@ -4078,7 +4078,7 @@ code/shape gates. Add GH CPU native F16/codec controls against pinned references
 retain strict cosine/magnitude/argmax/code and reused-context checks. #534/#535
 have all applicable checks green and are merged; synthesis PRs remain pending.
 
-## CLAIMED 2026-10-11 — #533 reporter clips and missing continuation byte
+## Completed investigation 2026-10-11 — #533 reporter clips and missing continuation byte
 
 Worktree `/mnt/storage/crispasr/salvage-20261008/issue533-byte-preservation`,
 branch `fix/qwen3-byte-preservation`. Read both new reporter comments in full:
@@ -4326,3 +4326,818 @@ ownership/failure guards. Preserve contributor histories and work on storage.
 Source checkpoint and model-free checks precede GH model/ASR/server controls.
 Existing depth probe branch stays pinned; no speech acceptance or release from
 this composition alone.
+
+### 2026-10-11 integration checkpoint
+
+PR #538 merged as `7bcdbdfe1dc0f3e00a310fca1a9f521162b5d1d3` after
+45 applicable checks passed, one intentional skip. Release notes and HISTORY
+include the locale-dependent byte-loss fix and actual macOS/Linux C ABI proof.
+Reporter M4/macOS26 confirmation remains pending; no physical GPU claim.
+Earlier pending-CI entries above are superseded by this checkpoint.
+
+Breeze composition source `a59772ba7f510518c9a704992d993faedcccff0e` is
+pushed on `test/breeze-synthesis-composition`; full integration CI
+[38156532213](https://github.com/CrispStrobe/CrispASR/actions/runs/38156532213)
+is queued. It preserves all three contributor histories and passes 7 actual
+compiled dispatch controls, 4 ownership/failure controls, 4 UTF-8 publication
+controls, 8 strict comparator controls and 4 no-secrets tests (zero skips).
+The dispatch tests replay the actual production function against backend stubs:
+parent #529 fails 5/7 and parent #531 fails 4/7; composed source passes 7/7,
+including plain/clone/design/direction, reused contexts, failure and optional
+output count. Full C API syntax check passes with Breeze enabled and C2PA's source include path.
+These are contract controls, not real-model CLI/C ABI/server or speech acceptance.
+Receipt: `docs/breeze-synthesis-composition-2026-10-11.json`.
+Depth diagnostic 38154207238 has started on GH CPU; its pinned branch remains
+unchanged. Strict generated-code parity still fails all eight cases despite
+107/107 oracle-fed stages passing; no merge of pending synthesis PRs or tag.
+
+Final tracked documentation checkpoint passes all four no-secrets tests, zero
+skips (53.812 seconds), and 227 internal anchors across 82 Markdown files.
+
+## CLAIMED 2026-10-11 — Breeze backbone precision boundary probe
+
+Continue in `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+branch `fix/breeze-guided-validation`. Depth probe 38154207238 completed
+successfully and all 106 arrays independently match hashes, shapes, dtypes and
+finite receipts. Original BF16 cached/full-prefix and depth-only promoted FP32
+all preserve all 15 design-s1 frame-zero picks. Native depth with original hidden
+also preserves all 15. Native backbone from either original or native embeddings
+flips only codebook 5: original 193 ranks second to 936, gap 0.016719/0.017995.
+This localizes the first flip to backbone-state differences, not depth cache.
+Capture original BF16 raw post-layer states and a separately labelled FP32
+backbone promotion using identical BF16-rounded weights/embeddings; compare
+native per-layer states and normalized final hidden. Retain original fixture,
+prompt/logit equality, capture-off/on equality, scales and all raw arrays.
+No canonical replacement, tolerance change or speech acceptance. GH CPU only.
+
+Composition GH 38156532213 has passed Linux unit, Windows, macOS, iOS, Android
+and AMR g++ jobs. Linux unit rebuilt actual source and passed all 2,019 CTests,
+plus seven mode, four ownership and UTF-8 controls. Remaining jobs still run.
+Fresh full Release dry run 38156833241 pins `3fdc1838dc1b95f517a3862a9379b24d20d6c0c1`;
+no tag or publication requested. Packaging and actual fresh-archive GPU checks
+remain pending. Earlier queue statuses are superseded by these observations.
+
+Verified depth-decision receipt and public original arrays/logs are archived in
+`docs/breeze-depth-decision-2026-10-11.json`. Public fixture revision
+`dcaddf36f66d4932ec6f5391ec0e8239cc5cc61a`, proof SHA256
+`8d10e90a0dc8a3da5ff6028753ce2b8ca641e2254feb5ca3a9049f3667d128fd`,
+1,140,836 bytes; anonymous remote hash verified. All 106 array hashes/shapes/
+dtypes/finite values independently verified. Backbone diagnostic worker passes
+Python compilation, eight strict comparator controls and four no-secrets tests
+with zero skips (51.214 seconds). It adds no production math changes.
+
+Backbone probe source `82de8d9f5` is pushed on the maintainer validation branch;
+GH CPU [38158522850](https://github.com/CrispStrobe/CrispASR/actions/runs/38158522850)
+is queued with `--backbone-boundaries`. BF16 captures remain canonical; raw
+post-block residuals and normalized hidden have separate slots. Native arrays
+start as NaN so missing captures fail; capture OFF/ON/OFF must preserve final
+hidden and logits exactly. No speech or release acceptance from this probe.
+
+Queued backbone run 38158522850 was cancelled before execution after review
+caught whole-module BF16 restoration casting originally FP32 buffers. Fixed
+source `e7219be4b` restores every original parameter/buffer dtype separately.
+A real tiny PyTorch module with BF16 parameters and mixed BF16/FP32 buffers
+fails byte/dtype preservation under the old actual source block and passes
+under the corrected block. All four no-secrets tests pass with zero skips
+(47.462 seconds). Replacement GH CPU
+[38158762302](https://github.com/CrispStrobe/CrispASR/actions/runs/38158762302)
+is queued; no model result is claimed for either queued version.
+
+PR #536 now passes all 51 applicable checks, one intentional skip. This does
+not waive combined real-model CLI/C ABI/server ASR/speaker validation. Pending
+Breeze synthesis features remain outside main/release. Integration CI has seven
+passing jobs and the immutable release dry run has nine; no failures observed,
+but remaining jobs are queued/running. Final tracked proof/docs scan passes
+four tests with zero skips (55.208 seconds); all 227 anchors resolve.
+
+## CLAIMED 2026-10-11 — Breeze session sampler wiring and decoded surfaces
+
+Continue in `/mnt/storage/crispasr/salvage-20261008/breeze-synthesis-composition`,
+branch `test/breeze-synthesis-composition`. Audit found Breeze open nested
+inside CA_HAVE_CONFUCIUS4_TTS and runtime seed/temperature/max-token session
+setters missing despite native hooks. Repair the independent compile guard,
+forward open seed and public setter calls, observe guards fail on old actual
+source and pass on repaired dispatch. Preserve all pending contributor histories;
+no merge/default/quant change. Then run full compiled C ABI plus CLI/server
+plain/clone/design/direction on GH CPU with pinned models, retained PCM,
+ASR and closed-loop speaker controls. Model-backed evidence must distinguish
+contract/repeatability, decoded speech and unresolved exact generated codes.
+All source/model/build/proof work stays on storage; heavy models run on GH.
+
+### 2026-10-11 Breeze sampler source checkpoint
+
+Source `a2f58338ef9a86dfee114cdd5cd610dfe7b556c6` on the separate composition
+branch fixes the independent Breeze open guard, open seed forwarding, runtime
+seed/temperature/token-limit dispatch and checkpoint-default limit reset.
+The documented `--tts-instruct` alias now parses alongside `--instruct`.
+Eight actual compiled controls pass (old code fails 6/8), seven mode controls
+pass, four ownership/failure controls pass, both C++ syntax checks pass and
+all four no-secrets checks pass with zero skips (55.242 seconds).
+Full current-source integration CI is
+[38159958466](https://github.com/CrispStrobe/CrispASR/actions/runs/38159958466).
+It supersedes the older partial integration run after source changes; that
+run's eight passing builds and 2,019 Linux CTests remain attributed to its old
+source. Real CLI/C ABI/server speech worker
+[38159960891](https://github.com/CrispStrobe/CrispASR/actions/runs/38159960891)
+is queued. It retains all PCM/ASR/speaker evidence for plain, clone, design,
+direction, seeded reuse, negative-alone equivalence and unknown-voice recovery.
+It uses the independently parity-tested Nemotron F16 recognizer, requires a
+known JFK control first, then unchanged WER <= .2 and closed-loop clone speaker
+similarity improvement. No speech result claimed yet, no gate waiver.
+Receipt: `docs/breeze-session-sampler-2026-10-11.json`.
+Backbone probe 38158762302 remains queued. Release dry run has twenty passing
+jobs and no failure observed; remaining packaging/platform checks are pending.
+
+### 2026-10-11 actual fresh CPU release packages
+
+Downloaded the actual Linux CPU CLI/shared archives from immutable Release
+38156833241, source `3fdc1838dc1b95f517a3862a9379b24d20d6c0c1`. CLI starts
+and reports that source/version 0.8.42. Quantizer reaches its documented usage
+path (exit 1 for insufficient positional arguments; startup only). Both CLI
+executables use $ORIGIN and all seven ELF dependency closures pass, including
+bundled OpenBLAS/OpenMP/Fortran/C2PA. Relocated shared-library load passes and
+all 17 library closures resolve internally. Actual CLI/shared C ABI capability
+comparison passes all 136 canonical rows and size/error contracts. Actual
+whisper_version=0.8.42 and C API version=0.7.0 (deliberate stable ABI); session,
+result, instruction and additive Nemotron preencode exports are present.
+Loader overrides were cleared. Archives/log hashes and limitations are in
+`docs/release-cpu-package-2026-10-11.json`. No models/GPU were exercised, no
+new tag, and the full platform matrix is still pending.
+
+Fresh CPU package raw logs and archive/contract receipts are public at fixture
+revision `9c76e78e281c01fa0782c63bb45bf718551ba0b2`,
+`release/38156833241/cpu-package-proof.zip`, SHA256
+`234bcc11071e9f4bd520afa6e0f1dfe1559b4bec84d6e18c916c66774f8293af`,
+81,689 bytes; anonymous remote hash verified. Final tracked proof/docs scan
+passes all four tests with zero skips (52.341 seconds); public archive text
+was also checked for credentials and the account name before upload.
+
+## CLAIMED 2026-10-11 — independent Breeze session sampler repair
+
+Isolate the existing-backend sampler fixes from the pending guidance/voice
+composition in a new storage worktree, branch `fix/breeze-session-sampler`.
+Main source confirms the same nested Confucius compile guard and missing
+open-seed/runtime temperature/seed/token-limit dispatch. Preserve checkpoint
+defaults, restore metadata token limit when clearing an override, and add
+the already documented `--tts-instruct` CLI alias. No pending guidance,
+reference ownership or server-cache feature is included. Compile the actual
+source contract before/after (old failures retained), register its eight
+controls in CTest and CI, and require normal full integration CI before merge.
+The queued combined model speech proof remains separately attributed to its
+composition source; these contract checks do not establish speech parity.
+
+### 2026-10-11 independent sampler PR checkpoint
+
+[PR #539](https://github.com/CrispStrobe/CrispASR/pull/539), source
+`af26991cf37e6af14276a1ee5d4e124995811bc5`, isolates the existing-backend
+Breeze opening/sampler fixes from the pending synthesis composition. All
+eight compiled actual-source controls pass after six failed against unchanged
+main; four no-secrets checks pass with zero skips (48.462 seconds), complete
+C ABI/native Breeze C++ syntax and clang-format 18 pass. Full integration
+38162567542 is queued, required before merge. Original failed/control raw logs
+remain in storage; hashes and exact scope are in
+`docs/breeze-independent-sampler-2026-10-11.json`. No model/speech acceptance
+attributed to these recording-stub contracts. Backbone 38158762302 and
+composition speech 38159960891 are still queued. Release 38156833241 has
+24 successful jobs and no failure observed; Apple framework compilation has
+finished and packaging continues. No tag/default/quant promotion.
+
+## CLAIMED 2026-10-11 — original Breeze decoded speech comparison
+
+Prepare a separate storage worktree/branch `test/breeze-original-speech` from
+the pinned synthesis composition. The native CLI/C ABI/server speech worker
+is queued; its receipt alone cannot establish matching original Python decoded
+behavior. Prepare a GH CPU oracle that consumes its immutable artifact, checks
+source/model/reference hashes, and generates plain/clone/design/direction using
+the pinned upstream BF16 runtime, identical text/reference WAV, seed, temperatures,
+top-k, repetition penalty and frame budget. Retain actual original prompts,
+codes, PCM and all ASR transcripts. Release original model memory before using
+the already verified actual CPU Python release archive and pinned F16 recognizer.
+Require the independent JFK recognizer control and unchanged WER <= .2 for
+both original and native cases; failures stay failures. Keep original/existing
+exact-code diagnostics separate; no gate waiver or model/synthesis acceptance.
+Heavy model work stays on GH, hardware work on Kaggle; no local large models.
+Do not dispatch until the native worker artifact exists. Preserve all queued
+workers' source branches unchanged until their checkout is observed.
+
+### 2026-10-11 original-equivalence failure and speech-oracle checkpoint
+
+Backbone 38158762302 failed before any native comparison: its fresh original
+BF16 eager CPU logits failed the unchanged byte equality against the immutable
+original fixture. Prompt equality had passed. Earlier depth 38154207238 passed
+this control; the logged Torch/Torchaudio/NumPy/Transformers versions match.
+No CPU/model cause can be established from the original failed run because
+the assertion preceded array retention. Raw failed logs are now durable/public
+at fixture revision `e4bdba818982aa579afb2114968eb36ddd246210`, proof SHA
+`38cfde451e27e000db287f4c9ee80d4162a4b7d1308dccc67c667fc2a9481126`;
+anonymous remote hash verified. Repair `5732be84fd9dc16911b3d317aada27820c18f8a5`
+retains both arrays/scale/errors plus CPU/runtime/checkpoint hashes before the
+unchanged assertion. Actual exact/one-ULP helper controls pass; four secrets
+checks pass with zero skips (85.034 seconds). Version-pinned retry
+38163903250 is queued. No native result claimed or gate waived.
+Receipt: `docs/breeze-original-equivalence-2026-10-11.json`.
+
+Original speech comparison worker `d89e854049bea3deb2cd691a8490cdd0b0229adf`
+is prepared on `test/breeze-original-speech`: pinned original BF16 full
+generation, identical native reference WAV/text/sampling settings, four modes,
+retained prompts/codes/PCM and eight original/native ABI ASR roundtrips, each
+requiring WER <= .2 after an independent JFK control. The actual verified CPU
+Python release package and Nemotron F16 recognizer run after original model
+process exit. Syntax/help/unchanged WER controls and pinned loader compilation
+pass; four no-secrets checks pass, zero skips (44.972 seconds). Do not dispatch
+until native 38159960891 uploads its artifact; that run has now started.
+Receipt: `docs/breeze-original-speech-plan-2026-10-11.json`.
+PR #539 remains queued; Release 38156833241 has 27 successful jobs and no
+failure observed. Some Windows CUDA artifacts have arrived; both Windows
+12.8/12.6 pairs and the fresh Linux CUDA hardware archive are not yet complete.
+No release tag, default/quant promotion or synthesis feature merge.
+
+## CLAIMED 2026-10-11 — Fresh release CUDA archive hardware validation
+
+Reuse the existing prebuilt-package GPU worker in the separate storage worktree
+`release-cuda-hardware`, preserving the old proof and source. Pin the actual
+Linux CUDA archive from release dry run 38156833241 at source 3fdc1838dc, verify
+its original artifact ZIP and tar SHA256, and publish a byte-identical immutable
+public fixture mirror before dispatching. Keep all existing original-transcript,
+stage, streaming, state reuse and actual CUDA allocation gates. No compilation
+or CPU reference work on Kaggle. Archive terminal prior logs before repushing;
+respect the single account and two-session cap. Fresh hardware acceptance remains
+pending until the exact new archive passes; old archive results do not transfer.
+
+Native Breeze speech run 38159960891 passed actual C ABI/CLI/server surface
+contracts and all 20 recognition controls (reference included), then failed
+loading the speaker encoder because webrtcvad imports missing pkg_resources.
+No speaker acceptance is claimed. Retry 38169287241 keeps source a2f58338ef and
+all gates unchanged, adding setuptools==80.9.0 to the worker dependencies.
+Fresh Windows CUDA 12.8/12.6 paired-package proof is dispatched as 38169253465.
+
+Breeze backbone retry 38163903250 succeeded at 5732be84f: original prompt/logits
+are byte-exact; all 222 arrays independently match hashes, shapes, dtypes and
+finite values. 116 comparisons cover all 28 backbone layers plus final norm,
+two embedding sources, and canonical BF16 versus FP32-promoted arithmetic.
+Native with oracle embeddings has minimum cosine 0.999999821 against FP32
+and 0.999952674 against BF16. This supports arithmetic precision as a contributor
+without resolving eight-case full-generation mismatch or proving its sole cause.
+Full verified proof is public; details: docs/breeze-backbone-boundaries-2026-10-11.json.
+Native speech raw 20 PCM arrays also independently match SHA/shape/finite controls;
+C ABI, CLI and reused server WER is 0–0.1, reference WER 1/9. Speaker gate stopped
+on missing pkg_resources and remains pending, not passed. Details:
+docs/breeze-native-speech-2026-10-11.json.
+
+Fresh release dry run 38156833241 is SUCCESS, all 35 build/validation jobs
+green plus publishing bookkeeping with empty tag (nothing published). Exact
+Linux CUDA tar 857a79c767ec91f406cceb114e4b330eb462b5c0aaee1e9fb3bda8fe758ae8c8
+passes on dual T4s with CUDA runtime 12.8, driver 580.178.04. Actual packaged C ABI
+loads its CUDA plugin and allocates 1330 MiB; three F16 stages, 26 original
+NVIDIA transcript controls, reverse reused state and nine streaming cases pass.
+Six full arrays and all original transcripts independently verified. Windows
+12.8/12.6 CLI/runtime/library SHA pairing and mixed-version negative control pass
+in GH 38169253465. Public proof and limitations are pinned in
+docs/release-fresh-cuda-package-2026-10-11.json and
+docs/release-fresh-windows-pairs-2026-10-11.json. No tag or pending PR promotion.
+
+Native Breeze retry 38169287241 is SUCCESS at unchanged a2f58338ef: all 20
+retained PCM arrays independently match SHA/length/finite controls, every ASR
+check passes and the independent JFK recognizer has zero WER. Closed-loop
+clone/reference cosine 0.811606526 exceeds baseline/reference 0.449814618.
+Speaker model SHA and actual source/model/codec pins are retained. Full
+public proof is anonymously hash verified. This proves the composition's
+native speech surfaces on these fixed cases, not original full-generation
+parity or every backend in #530/#531. Original decoded speech comparison
+38172313354 is dispatched from d89e854049 with this successful native artifact;
+its original/native eight ASR checks remain pending.
+
+## CLAIMED 2026-10-11 — Trace backbone precision into depth decisions
+
+In the existing storage diagnostic worktree pr529-guided-validation, add an
+opt-in precision-decision control to the existing teacher-forced probe. Feed
+the captured original FP32-promoted backbone hidden state into original BF16
+and FP32 depth decoders and into the native depth graph under the exact same
+original code history. Preserve all existing canonical captures, strict
+original byte controls, defaults and generation gates. Retain each new raw
+logit array, decision/rank/gap, cosine and magnitude. This tests whether the
+backbone precision difference itself can reproduce the first divergent
+codebook choice; it does not replace canonical BF16 or imply acceptance.
+Use GH heavy CPU, no local model execution and no Kaggle CPU work.
+
+Independent Breeze sampler PR #539 is MERGED as 913266271cf after 56 passing
+checks and one intentional skip. Release notes and history now include only
+this accepted existing-backend wiring; #529/#530/#531/#536 remain pending.
+Original speech run 38172313354 failed before any generation: generic HF
+repetition penalty indexed mixed text prompt ID 262146 into the 2052-entry
+audio vocabulary. Repair uses the pinned upstream generated-backbone-only
+penalty helper via the supported custom logits processor API, keeping effective
+penalty 1.1 and excluding prompt/reference and depth codebooks. No checkpoint
+or upstream source is modified. Actual tiny Torch/HF controls reproduce the
+old crash and prove prompt exclusion, CB0-only history, signs, unique duplicates,
+stateless reuse and invalid-batch rejection. Original full-generation output
+and all unchanged speech gates still require a fresh GH run.
+Precision decision probe is dispatched as 38172976584 at fd2f9b2fa; canonical
+90 logger decisions are unchanged in same-runtime A/B, missing captures reject,
+45 new logger routes pass. These are logger controls, not new model evidence.
+
+## CLAIMED 2026-10-11 — Prepare isolated v0.8.43 release candidate
+
+Use a new storage worktree and release/v0.8.43-candidate branch from accepted
+main including #539 and comprehensive notes. Run the repository bump-version
+script once for 0.8.43, preserving its annotated local tag, then push only the
+candidate branch and dispatch the complete empty-tag release dry run at that
+exact event source. Do not publish the tag until candidate CI/package checks
+and the exact candidate CUDA archive hardware test pass. Old 3fdc1838 archive
+acceptance does not transfer to the sampler change or version-bumped candidate.
+Pending feature PRs and rejected quantization candidates are excluded.
+
+Isolated v0.8.43 candidate is frozen at eb633d908120cc5f44b8af8cd4aeb1191f16bfd8,
+branch release/v0.8.43-candidate. Repository bump script ran once; required
+Flutter changelog was added before validation. All version fields agree, all
+227 doc anchors pass, and four secret tests pass with zero skips (45.769 s).
+Annotated v0.8.43 tag exists locally only and has NOT been pushed. Candidate
+CI 38173748841 and full empty-tag release dry run 38173750598 are dispatched.
+Do not reuse old 3fdc1838 archive acceptance; inspect these candidate artifacts
+and rerun actual CUDA hardware controls before publication. Main remains
+0.8.42 until candidate integration. Receipt:
+docs/release-candidate-v0.8.43-2026-10-11.json.
+Original speech repair 080a0fe5a is dispatched as 38173377874 with the unchanged
+complete native speech artifact 38169287241; four secret tests pass with zero
+skips (204.863 s). Precision-decision run 38172976584 is in progress. No new
+original decoded or alternate-state model result is claimed yet.
+
+Precision-decision run 38172976584 FAILED at its unchanged original-only
+byte control before native comparison. All eight arrays independently verify.
+Original logits cosine 0.999991075, norm ratio 1.001262460, relative L2
+0.004412063, max error 0.0625; 1469 values differ, argmax 404 unchanged.
+Package versions and all checkpoint SHA256s match successful 38163903250.
+That run used AMD EPYC 7763/PyTorch AVX2; this failure used Intel Xeon
+Platinum 8573C/PyTorch AVX512. Prompt IDs/mask match exactly; already-assembled
+original embeddings differ (relative L2 0.013288). CPU dispatch is a hypothesis,
+not a proven cause. Full failed arrays/provenance are public and anonymously
+hash-verified in docs/breeze-reference-dispatch-2026-10-11.json. Next useful
+control is default versus explicit AVX2 dispatch on the SAME GH host before
+retrying native precision decisions. Preserve both results and every gate.
+Release candidate excludes the pending feature and is unchanged at eb633d908.
+
+Original/native decoded speech run 38173377874 is SUCCESS at
+080a0fe5a17a32cf9515e8077d76856257ad0689. All four original codec/PCM pairs
+and all eight original/native PCM roundtrips independently pass hash/finite
+checks. Original plain/clone/design/direction WER: .2/.1/0/0; native:
+.1/0/0/.1. Unchanged WER maximum .2, independent JFK recognizer WER 0.
+Full original and native arrays, transcripts, executed loader and provenance
+are publicly archived and anonymously SHA256 verified. See
+docs/breeze-original-speech-plan-2026-10-11.json. This establishes fixed-control
+decoded speech quality, not exact generated-code parity, GPU portability,
+streaming speed or acceptance of every backend in the pending feature PRs.
+
+Same-host original CPU-dispatch A/B is dispatched as 38174972934 at
+0fbdbeff8040cf3bc6192ce14cfca2964c266627. Fresh default and AVX2-capped
+processes run the unchanged original-only probe, seed 42 before loading,
+retain all failed arrays, and require both immutable byte controls to pass.
+No local model execution or native acceptance. Candidate eb633d908 is
+unchanged; release jobs are building, with no failures at this checkpoint.
+
+2026-10-12 checkpoint: candidate CI 38173748841 SUCCESS (13 jobs); release
+dry run 38173750598 SUCCESS (35 build/validation jobs plus empty-tag bookkeeping;
+nothing published). Continue the already claimed exact-candidate CPU/Python,
+Windows CUDA-pair and actual CUDA hardware checks against eb633d908. Repin
+existing package worker v6 to its byte-identical candidate CI archive, preserving
+all original stage/26 recognition/9 streaming controls. Archive v5 before push.
+
+CPU dispatch diagnostic 38174972934 FAILED before model loading in BOTH arms:
+runpy bootstrap omitted the script directory, so sibling breeze_guided_reference
+cannot import. No reference arrays were produced; no CPU precision conclusion.
+Repair the bootstrap import path and test sibling imports in actual fresh
+processes before retrying the already claimed same-host experiment. Preserve
+both failed logs and every immutable byte gate.
+
+Candidate eb633d908 actual CPU CLI/library/Python packages PASS: dependency
+closure (glibc <= 2.34), relocated load, all 136 CLI/C ABI capability rows
+including error/buffer contracts, version 0.8.43 / stable C ABI 0.7.0, required
+exports, binding byte equality and automatic bundled-library discovery with
+loader overrides cleared. Full proof is public and anonymously hash verified
+in docs/release-candidate-v0.8.43-2026-10-11.json. Candidate Windows 12.8/12.6
+CLI/runtime pair and mixed-runtime rejection run 38198054235 is in progress.
+
+Actual candidate CUDA CI ZIP 11719048109 and tar hashes are verified. Public
+byte-identical mirror is pinned; worker 26a369a7d v6 is pushed to Kaggle and
+RUNNING. Source pull is byte equal; v5 terminal logs were archived first, all
+20 recent kernels were terminal (zero active). Same three stage/magnitude,
+26 fresh/reused speech and nine streaming packet/reset/flush gates remain.
+No build, model conversion or CPU-only job on Kaggle. Release tag stays local.
+
+CPU dispatch bootstrap repair 7bcf259d2 adds sibling import path before runpy.
+Actual fresh-process controls reproduce the old failure and prove new import,
+argv, seeded RNG and selected AVX2 behavior; four secret checks pass, zero skips.
+Retry 38198367653 is queued with all original byte gates unchanged. The failed
+38174972934 logs remain archived; its zero-array result gives no precision
+conclusion. No issues/PR heads or reporter follow-ups changed since last audit.
+
+Candidate Windows package pair run 38198054235 is SUCCESS: both actual 12.8
+and 12.6 CLI manifests, runtime ZIPs and shared-library archives have matching
+three-DLL SHA256s; mixed 12.8 CLI / 12.6 runtime is correctly rejected. This
+is package consistency, not physical Windows GPU validation. All 227 anchors
+pass; four secret checks pass with zero skips (121.399 s). GPU v6 remains
+RUNNING; repaired CPU dispatch retry remains queued at this checkpoint.
+
+Candidate CUDA v6 is COMPLETE and PASS on dual T4 (actual archive source
+eb633d908, plugin SHA byte-matches extracted CI archive; C ABI loads bundled
+CUDA plugin and owns 1330 MiB). All six full stage arrays independently verify
+cosine and magnitudes: encoder cosine .999990880489, relative L2 .00028003938;
+26 original word controls and fresh/reverse-reused output equality pass; nine
+streaming packet/reset/flush controls pass. Full immutable hardware/Windows
+proof is public and anonymously hash verified. All candidate requirements are
+satisfied; integrate frozen source and push the annotated bump-script tag.
+Tagged rebuilds must be tracked separately from validated dry-run archive pins.
+No pending feature, quant pin or default enters the release. CPU precision
+diagnostic 38198367653 remains queued independently of this accepted release.
+
+Frozen candidate integrated into main as d71153547a6ed76b5d5ec3d9881a7c5dd1a9b284.
+Only four maintainer documentation files differ from validated eb633d908;
+production sources and versioned files are identical. Annotated v0.8.43 tag
+is pushed at eb633d908. Draft release with comprehensive notes exists; tagged
+release run 38199002944 is queued. Keep draft until final assets are complete;
+final release notes body is prepared with immutable proof links, and must be
+restored after workflow notes attachment. Candidate archive hashes and tagged
+rebuild hashes are separate provenance. Version sync and 227 anchors pass;
+four secret tests pass with zero skips (50.370 s).
+
+Same-host CPU control 38198367653 SUCCESS: all 106 arrays independently verify
+hashes/shapes/dtypes/finite values; 53 default/AVX2 pairs byte-identical; both
+original prompt/logit byte gates pass. Both paths were AVX2 on AMD EPYC 7763,
+so this gives no AVX512 contrast and does not explain the Intel mismatch. Full
+immutable successful and failed-bootstrap proof is public. Native not executed.
+
+## CLAIMED 2026-10-12 — Execute precision decisions under explicit AVX2 control
+
+Add a small GH CPU entrypoint selecting AVX2 for PyTorch/oneDNN/MKL before
+Torch import, seeding initialization identically to the successful same-host
+control, and invoking the unchanged breeze_depth_probe.py --precision-decisions.
+Preserve default probe, canonical BF16 fixture, full original byte control and
+every native decision/generation gate. Record complete arrays/provenance and
+strict failures; no native math/default or model pin changes. This extends the
+existing first-near-tie precision investigation, not a cause or parity claim.
+Actual fresh-process controls must verify path/argv/seed/dispatch before GH.
+
+Explicit AVX2 precision-decision worker 8ed327bc53f8eb9d86df62ecacec54908175b6a1
+is dispatched as 38199379678. Wrapper selects PyTorch/oneDNN/MKL AVX2 before
+Torch import; optional seed 42 is inherited by the fresh original process and
+recorded in provenance. Ordinary probe behavior and every strict original
+byte/native decision gate are unchanged. Actual model-free reference controls
+stop before first download and prove default RNG preservation / opt-in seed;
+fresh entrypoint control proves selected AVX2, inheritance and argv. Four
+secret checks pass, zero skips (49.997 s); no local model execution.
+Tag release 38199002944 is building with no failures at checkpoint; v0.8.43
+release remains draft awaiting final assets and final notes restoration.
+
+Release publication correction: the existing per-job softprops actions publish
+the initially created draft as soon as assets land. v0.8.43 is now PUBLIC with
+the first two assets, and tagged run 38199002944 is still building. Prior
+statements that it remains draft are superseded. This follows the existing
+incremental release workflow; candidate validation remains complete, and final
+tagged-asset completion/hash verification and final notes restoration remain.
+
+
+Explicit AVX2 precision run 38199379678 SUCCESS. All 268 full arrays and 135
+codebook decisions independently verify; canonical original prompt/logits are
+byte-exact. Original-only promoted backbone plus FP32 depth reproduces the
+first native codebook-5 flip 193 → 936. Promoting depth alone, or using BF16
+depth with the promoted backbone, retains 193. Under exactly the same promoted
+hidden state, original FP32 and native depth agree on all 15 picks; minimum
+full-distribution cosine .99999975436. Joint arithmetic sensitivity is sufficient
+for this isolated flip. This does not explain every free-running mismatch,
+accept the eight failed generation cases, or establish the Intel mismatch cause.
+Full immutable proof is public and anonymously SHA256 verified; canonical
+fixtures, generation gates, defaults and production math remain unchanged.
+
+## CLAIMED 2026-10-12 — Breeze composition CUDA speech validation
+
+Build the already CPU-tested pending-feature composition a2f58338 with CUDA on
+GH CI, including CLI, C ABI, server and diff tools. Use a probe-only packaging
+branch; no production graph or default changes. Kaggle is only for actual GPU
+execution: verify bundled plugin/device allocation, F16 conditioning and reuse,
+decoded ASR roundtrips, stage magnitudes/cosines and quant controls where pinned
+fixtures permit. Archive all terminal evidence and retain strict failures.
+This evidence supports review of pending #529/#531/#536; no feature acceptance
+or merge follows merely from a green build or the isolated precision control.
+
+
+Published tagged CPU CLI, shared library and Python archives independently
+verify against GitHub asset SHA256/size, and pass dependency closure, relocated
+library load, C ABI 0.7.0, 136 capability/error contracts and automatic packaged
+Python backend discovery. Actual CLI reports 0.8.43 / eb633d90. Immutable
+public proof is anonymously hash verified; tagged rebuild hashes are distinct
+from the validated dry-run candidate. CUDA/Windows builds remain in progress,
+without failed jobs; final matrix/asset completion and notes restoration remain.
+
+
+Breeze composition CUDA package dispatched as GH run 38205813889 at source
+e4c8461b900084afe5320ea2d734d3d86dfa644c, based on CPU-tested a2f58338.
+Probe-only reuse of the existing CUDA workflow builds sm75 / toolkit 12.4.1,
+CLI with server support, shared ABI, diff, quantizer and matching bindings;
+user-space runtime is bundled, driver/stub is excluded. Build is queued,
+no GPU/model acceptance claimed. Local Python syntax/diff pass; four secret
+checks pass with zero skips (63.289 s). Main receipt/claim/precision/public
+CPU asset pins also pass 227 anchors and four secret checks, zero skips
+(116.727 s). Exact artifact/public mirror pins are required before GPU launch.
+
+
+CUDA composition run 38205813889 is compiling after successful toolkit setup.
+Probe worker 9f2c9c8a9 is prepared: unchanged 20 speech/ASR/reuse controls, actual
+per-process CUDA allocation witnesses, GPU speaker encoder, full original stage
+arrays/cosine/magnitude controls and separately strict guided-generation gate.
+Nonidentical guided codes keep the worker failed even if speech/stages pass.
+Archive pins deliberately remain BUILD_PENDING and prevent launch before model
+downloads; no Kaggle execution or quant acceptance claimed. Worker syntax/diff
+and four secret tests pass, zero skips (52.065 s). v0.8.43 tagged release has
+35 public assets and no failed jobs; six remaining build jobs are in progress.
+Comprehensive public release notes retain the final 17,509-character body.
+
+## CLAIMED 2026-10-12 — Dolphin noncausal checkpoint bug #540
+
+Read the complete issue (no comments). Audit both encoder depthwise convolutions
+against pinned upstream source and the non-streaming checkpoint configuration.
+Implement causal/noncausal padding and CSGU normalization order correctly, with
+actual ggml controls that fail on the previous causal-only behavior. Use a
+separate storage worktree and GH CPU for conversion, original per-stage dumps,
+diff and decoded speech on both non-streaming and existing streaming models.
+Do not alter the already tagged v0.8.43 release or accept a model from a build.
+
+
+Dolphin fix 014f20755 is pushed as draft PR #541. Original upstream CSGU and
+actual encoder-layer merge convolution generate twelve native ggml controls:
+12/12 pass (max error 1.79e-7); old causal-only mutation fails six noncausal
+cases, padding-before-normalization mutation fails three noncausal CSGU cases.
+Full original/native/mutation proof is public and anonymously hash verified.
+Source syntax/clang18/index/227 anchors and four secret tests pass, zero skips
+(49.679 s). Both immutable original checkpoints/configs are pinned; GH CPU
+38207601849 is queued for conversion, fresh Chinese/JFK original dumps, diff,
+complete native per-stage cosines/magnitudes and automatic C ABI speech.
+Keep draft/issue open until that evidence; private reporter clip/Kylin not
+reproduced. The frozen v0.8.43 tag is unchanged. A new learning and its generated
+index are on the fix branch, alongside the actual native CTest controls.
+
+Tagged Windows builds completed. Actual tagged CUDA 12.8/12.6 pair validation
+is dispatched as 38207603649; pending. Remaining release builds are Linux CUDA
+CLI/shared and HIP CLI, no failures at checkpoint. Breeze CUDA composition
+38205813889 continues compiling; worker 63f4ef80c additionally isolates Torch
+speaker inference in a separate GPU process, requiring the native C ABI to
+load the bundled CUDA runtime/BLAS files. Four secret tests pass, zero skips
+(47.728 s); immutable archive pins remain pending and prevent Kaggle launch.
+
+## CLAIMED 2026-10-12 — Final tagged CUDA CLI/shared package hardware validation
+
+All 35 build/validation jobs in tagged release run 38199002944 passed; final
+publish succeeded and all 50 public assets are present. Restore comprehensive
+final notes after workflow attachment and mark the release latest. Windows
+12.8/12.6 actual tagged package pair run 38207603649 succeeded independently.
+
+Independently verify actual published CUDA CLI and shared-library tars against
+GitHub asset digests and byte-identical CI ZIP contents, then create immutable
+public mirrors. The final CLI CUDA plugin differs from the candidate; the
+final shared-library plugin also differs from the CLI plugin. Run both actual
+packages on Kaggle, in separate fresh processes, retaining the unchanged three
+full stage arrays/cosine/magnitude gates, 26 original speech/reuse controls and
+nine streaming reset/packet/flush controls for each. No archive/hash substitution
+or untested hardware acceptance. Archive terminal v6 logs before repushing,
+check the single account has at most two active sessions and pull back exact
+submitted source. Large assets/evidence stay on storage. No production changes.
+
+
+v0.8.43 final tagged workflow 38199002944 is SUCCESS, all 50 assets public;
+comprehensive 17,509-character release notes restored after publication. Actual
+tagged Windows CUDA 12.8/12.6 CLI/runtime/library pairing 38207603649 passes,
+including mixed-runtime rejection. Both actual Linux CUDA archives independently
+match CI and GitHub digests and immutable anonymous public mirrors. Their GPU
+plugins differ from the hardware-tested candidate and each other, so prepared
+v7 validates both in fresh processes; hardware acceptance remains pending.
+
+Breeze CUDA packaging retry 38209137738 SUCCESS at 557e2cc7, sm60/sm75. First
+run compiled successfully but omitted an unversioned library alias; repaired
+builder preserves SONAME aliases. Queued sm75-only intermediate retry canceled
+before execution. Exact archive verification/pinning precedes GPU launch.
+
+Dolphin full checkpoint retry 38208703707 passes all 16 nonstreaming Chinese
+crispasr-diff stages and exact original decoded raw speech. Automatic Python
+Session opening then fails: converter writes dolphin but shared architecture
+table omits it. b87235519 adds the entry and C ABI regression probes, preserves
+partial native receipts, and dispatches full two-model/two-sample retry
+38211719379. No full checkpoint or reporter-machine acceptance yet.
+
+## CLAIMED 2026-10-12 — Canary #532 actual CUDA allocation/reuse probe
+
+Refresh complete issue/comments (no new reporter data). Existing CPU lengths
+11/4/33/90/11 s, buckets 0/128 all pass but do not exercise the GPU allocator.
+Use a separate storage probe worktree and exact verified tagged CUDA archive,
+pinned 392 MB Q4_K aligner, and GPU-only Kaggle execution after a slot is free.
+Capture all ten complete logits arrays, returning-short fresh/reuse equality,
+actual process GPU allocation and exact packaged CUDA-library byte witness.
+Compare saved CPU arrays only as CPU/GPU diagnostics, not original parity.
+Keep any allocation failure; no speculative runtime fix or claim of replaying
+the private German/VAD/diarization recording. No new native build is needed.
+
+
+Final tagged CUDA worker v8 COMPLETE PASS on dual T4s, CLI and shared archive
+in separate fresh processes. Independently verified 12 full arrays, 52
+original word cases, 18 streaming controls, exact archive/plugin byte pins.
+Public complete GPU/Windows proof a5c5642f / tagged-cuda-windows-package-proof.zip
+SHA fddbd06d970fe7fa199cb5aa1e55cd47970843cf04bc2a155e2b8b649751251d.
+Release notes now describe actual tagged bytes, all 50 published assets.
+
+Breeze exact CI ZIP CRC and tar SHA/size, all 25 bundle files (including
+SONAME aliases), and anonymous immutable mirror verified. v1 GPU guard
+correctly fails before speech because host CUDA12.8 replaced bundled12.4.
+Archived failure, repaired process-start library isolation; v2 d22fa7caa
+submitted and source pull byte equality PASS. Speech/stage/generation pending.
+Canary CUDA probe 78f0c269d submitted with source pull byte equality PASS;
+independent processes for cached bucket values 0/128; acceptance pending.
+
+
+Dolphin #541 is ready for review after full CPU 38211719379 SUCCESS and
+independent recomputation of 128 complete arrays / 64 stage comparisons.
+All four decoded original raw transcripts and automatic Session paths pass.
+Full anonymously verified proof: 25c38157 / dolphin-20261012/full-checkpoint-proof.zip,
+SHA e17f4758518b7edb319d5f45bfa23480d05b25082fdad2a7cd90004db7c21fc7.
+Remaining general PR CI gates before merge; published v0.8.43 unchanged.
+
+Canary CUDA v1 COMPLETE: all ten 11/4/33/90/11-second arrays finite, exact
+fresh/reused returning shape, both buckets allocate on actual T4. Independent
+array/hash/cosine/norm verification complete and public proof 182a2bd4,
+SHA b9e61df6f1044a4c97be573d74d9e0c3253260c1027cf30337b1da7997194522.
+No crash reproduced or original parity accepted. CPU/GPU Q4 min cosine .981333
+and argmax differences are retained. v2 probes consecutive same-bucket graph
+reuse at 11/11.05/11 seconds in each independent bucket process.
+
+Closed shipped/resolved #481, #478, #533 after full report/comment/code audit.
+Remaining exact reporter hardware/performance limits documented in replies.
+Release-next draft now starts after published v0.8.43; historical comprehensive
+notes remain in RELEASE_NOTES_v0.8.43.md and publication in HISTORY.md.
+
+
+Dolphin #541 merged 065ae1fdd after all 45 applicable general checks pass
+(one intentional skip); #540 closed. Full two-model/two-sample original proof
+and automatic C ABI validation accepted. No change to frozen v0.8.43 tag.
+
+
+## CLAIMED 2026-10-12 — Breeze direct-init CUDA registration order
+
+Completed CUDA worker v4 proves 20 speech/interface controls and 107 original
+stages pass, but all eight strict guided-code gates fail. Guided process
+allocates only 868 MiB while stage process allocates 6482 MiB: code audit finds
+Breeze selects the GPU before core CPU initialization registers dynamic
+plugins; the later codec runs on CUDA while Breeze stays on CPU. Fix the
+Breeze initialization order in the separate composition worktree, record
+the actual selected Breeze backend, and build/test on GH CI plus Kaggle.
+Require that backend witness for both stage and guided processes; preserve
+all original fixture, cosine/norm, exact-code and speech gates. Archive the
+completed mixed-device v4 separately and never call it full CUDA generation.
+
+
+Canary CUDA cached follow-up 9132234df COMPLETE PASS: sixteen full logits
+arrays independently verified, including six consecutive same-bucket cases
+11/11.05/11 seconds. Initial ten arrays byte-equal prior GPU probe, returning
+and fresh/reused outputs exact. Public proof 29d14881 / cached CUDA proof,
+SHA bff8914b2d881d023ecb4b56d66ea827c11e50aa6c4dd33aa11be2c55ba4c389.
+Reported allocation crash still not reproduced; Q4 CPU/GPU differences remain
+diagnostic, not original parity. #532 stays open awaiting assertion/device/clip.
+
+Closed shipped/resolved #488 (hotword system turn), #482 (AudioSeal graph
+capacity) and #484 (Intel SIMD release packaging), with published evidence
+and exact private-hardware/recording limitations in each issue reply.
+Current audit: six open issues, six open PRs; no new contributor heads.
+
+
+Breeze v4 COMPLETE: independently verified 163 arrays, all 107 stages
+(min cosine .9996649853; norm ratio .995455–1.003287), 20 speech/interface
+cases (max WER .111111), speaker clone/reference .894997 versus baseline
+.527019. Strict code generation 0/8 still FAIL. Direct-init code audit
+identifies CPU Breeze plus CUDA codec in the guided dump; no full CUDA guided
+acceptance. Public immutable mixed-device proof edf3eb38, SHA
+1a61be46acbff0602f30181cbc86a8592ace624ebeccc5bd65ad4069254dd6ab.
+Registration-order fix 435c68486 queued GH build 38219077361; original
+gates retained and next GPU worker must witness Breeze's own CUDA backend.
+
+
+## CLAIMED 2026-10-12 — All-eight original Breeze arithmetic control
+
+The isolated design-s1 frame-zero probe explains one argmax flip when both
+original backbone and depth arithmetic are promoted to F32. Extend that
+original-only diagnostic to all eight full 24-frame guided generations on
+GH CPU with explicit AVX2 dispatch and initialization seed 42. Keep original
+BF16-rounded weights, text/codec computation and canonical fixtures; promote
+backbone/depth/LM-head arithmetic only, explicitly casting backbone inputs.
+Compare complete generated grids to immutable canonical and saved CPU/GPU
+native diagnostics without changing any acceptance gate or fixture. This
+control may explain rounding amplification; it cannot certify the port.
+
+
+Independent production registration-order fix is draft #542, head 7a33fe272;
+CUDA composition build 38219077361 at 435c68486 remains queued. Worker guard
+036ab9fb5 now demands explicit Breeze CUDA compute-backend names plus >4 GiB
+resident allocation in both native dumps, so CUDA codec alone cannot pass.
+Original-only all-eight arithmetic control 31c338218 queued GH CPU
+38219796806 with pinned package versions, explicit AVX2 and seed 42. Neither
+queued run is acceptance. Canary #532 and Breeze #529/#536 updated with
+immutable complete proof links and exact scope/failure limitations.
+
+
+Breeze corrected CUDA build 38219077361 SUCCESS, exact tar SHA
+b1306a24ef0f460c0ed84bbcfa07712af1eecab442f8b58a37256b2eb196b3e7,
+all 25 bundled file hashes/aliases and anonymous mirror bed22cc2 verified.
+Worker v5 b5199d969 submitted; source-pull bytes identical, actual GPU running.
+Requires Breeze's own CUDA backend witness; all old strict gates remain.
+
+All-eight original joint-F32 arithmetic control 38219796806 SUCCESS, 145
+complete arrays independently verified. All eight promoted originals differ
+from canonical BF16; design-s1 matches the native CPU's ENTIRE 24x16 grid.
+Other seven promoted-original/native grids still differ: this explains one
+complete case, not all guided failures. No fixture/default/gate changed.
+Public control proof fc241f7a, SHA
+d58605dc03e78b426bd8b032fbcd452ca5a73ce5c05d08231b6d011f28cff130.
+
+
+## CLAIMED 2026-10-12 — Original Breeze F16 KV-storage control
+
+The full joint-F32 original control reproduces native design-s1 exactly, but
+not seven other grids. Native backbone/depth KV storage is F16. Run the same
+original-only control with explicit F16 rounding on F32 DynamicCache writes,
+preserving F32 attention math and BF16 text/codec caches. Apply the same
+rounding to depth attention K/V in its uncached CFG forwards, without changing
+that original inference flow. Capture actual cache-write and attention counts
+and rounding-error witness; compare all eight complete
+code grids. GH CPU only, no canonical fixture or acceptance-gate change.
+
+
+Breeze v5 COMPLETE: actual Breeze CUDA0 6482/6924 MiB in stage/guided
+dumps, all reuse/scale self-checks pass. Independent verification: 163 arrays,
+107 original stages, 20 speech/interface controls; all 20 PCM arrays byte-equal
+prior real-CUDA run. Speaker .894997/.527019 unchanged. Strict guided
+codes 0/8 still FAIL and the worker remains red; no feature acceptance.
+Full immutable CUDA proof 48cff19f, SHA
+4c368fa9158c6abc4a6fb06c583bcad5119bd695b7be6960e4ed5179fd03f304.
+Independent #542 initialization repair awaits general CI; hardware evidence
+is the composition package, with identical device/weight-load source prefix
+and explicit separate branch-cache implementation. Original-only F16 KV
+control c9575d6be queued GH CPU 38223133652; all 4 secret checks pass, zero
+skips (97.452 s), helper rounding invariants and eight strict comparator
+controls pass. No default, fixture, math or acceptance gate changed.
+
+
+## CLAIMED 2026-10-12 — Original Breeze full-inference F32 control
+
+F32 transformer/F16 KV control independently verifies 145 arrays and real
+rounding (37,632 cache writes, 47,700 depth forwards). It reproduces 2/8
+native CPU grids, 3/8 actual CUDA grids; canonical BF16 exact gate stays 0/8.
+Remaining plain/direction first divergence could originate in BF16 text/audio
+embedding arithmetic retained by these controls. Run an original-only full
+inference F32 control on GH CPU, preserving BF16-rounded loaded weights and
+the unused training codec plus external audio tokenizer. Leave canonical
+fixtures, generation recipe and gates unchanged; record module dtypes and
+compare every complete grid and magnitude/cosine. No native math/default edit.
+
+
+PR #542 MERGED `f8eb4325e`: 36 applicable checks pass, two intentional skips.
+Main CI is queued/running; actual GPU composition scope remains explicit.
+Original F16 KV control COMPLETE: 145 independently verified arrays; 2/8 CPU,
+3/8 actual CUDA, 0/8 canonical BF16 exact grids. Public proof `b826a537`, SHA
+`38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2`.
+Whole-inference F32 control 38227576695 remains running; no gate/default change.
+
+
+## CLAIMED 2026-10-12 — Refresh PR #531 and protect Supertonic speaker getters
+
+Audit found the contributor Supertonic getters dereference null contexts and
+accept negative indices through the direct API. Refresh #531 against main,
+preserving contributor commits and previously merged UTF-8/Breeze fixes; add
+weight-free source-compiled failure controls before correcting those guards.
+No model arithmetic, quantization or defaults change. Keep broader acceptance
+limitations and run hosted general CI on the resulting exact head.
+
+
+Whole-inference F32 original control COMPLETE (38227576695, source 95330ca08):
+145 arrays independently verified; 5/8 native CPU and 5/8 actual CUDA complete
+24x16 grids match, 0/8 canonical BF16. Parameter bytes 10,628,513,410 ->
+13,706,837,634, all active inference parameters F32, unused training codec
+preserved. Final precision isolation proof `b3d1ef591`, SHA
+`66990b07a0d6c9e3e0fd481bbbfb525afdad5f4b710896c6d758620444f781e8`,
+anonymous full ZIP verified. No fixture/default/math/gate change; remaining
+three grids differ, so no claim of complete integer generation parity.
+
+
+## CLAIMED 2026-10-12 — Restore complete generated capability coverage in #531
+
+Refreshed #531 has 52 passing checks, two intentional skips, and one ONNX
+acceptance failure: CPU-only feature generation omitted optional Moonshine
+ONNX rows. Run the contributor generator worker with the pinned ONNX SDK,
+verify complete CLI/C ABI rows, and apply generated outputs unchanged. Retain
+required wiring checks; no manual table edits or model/gate changes. Hosted
+unit tier proves UTF-8 cleanup and all speaker/reference contracts pass.
+
+
+## CLAIMED 2026-10-12 — Refresh validated Breeze contributor composition
+
+Prepare a separate integration worktree from the hardware-tested composition,
+preserving #529/#530/#536 contributor commits. Merge current main and corrected
+#531, resolve CLI/C ABI sampler/reference/instruction compatibility, then run
+source-compiled contracts and hosted CLI/library/general CI. Retain canonical
+BF16 exact-code diagnostics; assess stage magnitudes and the already recorded
+original/native decoded roundtrips under the authoritative development method.
+No arithmetic, quantization, recipe or default change to force exact AR codes.
+Keep unrelated model quality reports separately pending.

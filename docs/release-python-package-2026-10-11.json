@@ -1,0 +1,35 @@
+{
+  "source": "3fdc1838dc1b95f517a3862a9379b24d20d6c0c1",
+  "release_run": 38156833241,
+  "archive": "crispasr-python-linux-x86_64.tar.gz",
+  "archive_bytes": 10982563,
+  "archive_sha256": "fee8a089191385c75840b522fb9709828a84af7c99abc6bcb261d3224c245b94",
+  "version": "0.8.42",
+  "module_sha256": "2fac8ea1171d2cf6d70c719a638be9482e793f1b0063ba7e8703baa73adfd64c",
+  "binding_sha256": "96267b70d8cc432260b6249f26efca12a342fd7f61e2b3c59f2f02b33fda260c",
+  "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:28:48) [GCC 14.3.0]",
+  "backend_count": 117,
+  "registry_count": 293,
+  "actual_loaded_bundle_files": [
+    "libblas.so.3",
+    "libcrispasr.so",
+    "libggml-base.so",
+    "libggml-cpu.so",
+    "libggml.so",
+    "libgomp.so.1"
+  ],
+  "automatic_library_discovery": true,
+  "loader_overrides_cleared": true,
+  "model_or_gpu_inference": false,
+  "binding_sources_byte_equal_pinned_git": true,
+  "dependency_closure": {
+    "elf_files": 8,
+    "glibc_max": "2.34",
+    "all_non_system_dependencies_bundled": true
+  },
+  "capability_abi": {
+    "canonical_rows": 136,
+    "passed": true,
+    "actual_cli_python_library_comparison": true
+  }
+}

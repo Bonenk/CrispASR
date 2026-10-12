@@ -5619,12 +5619,16 @@ if(UNIX AND Python3_EXECUTABLE)
     set_tests_properties(test-breeze-session-modes PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
     add_test(NAME test-breeze-session-controls
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_controls.py
-    )
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-breeze-session-controls PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
     add_test(NAME test-tts-session-contracts
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_tts_session_contracts.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-tts-session-contracts PROPERTIES LABELS "unit;session;tts" TIMEOUT 60)
+    add_test(NAME test-ngram-locale
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ngram_locale.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-ngram-locale PROPERTIES LABELS "unit;session;ngram-loop" TIMEOUT 60)
 endif()
 
 # ─── test-release-workflow — validate release.yml targets (issue #131).
@@ -6259,3 +6263,10 @@ if(MSVC)
 endif()
 add_test(NAME test-align-characters COMMAND test-align-characters)
 set_tests_properties(test-align-characters PROPERTIES LABELS "unit;align")
+
+# #540: actual upstream CSGU/merge fixtures, including normalization at edges.
+add_executable(test-dolphin-depthwise test-dolphin-depthwise.cpp)
+target_include_directories(test-dolphin-depthwise PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-dolphin-depthwise PRIVATE ggml ggml-cpu)
+add_test(NAME dolphin-depthwise-checkpoint-padding COMMAND test-dolphin-depthwise)
+set_tests_properties(dolphin-depthwise-checkpoint-padding PROPERTIES LABELS "unit;dolphin")
