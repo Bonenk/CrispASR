@@ -5314,3 +5314,26 @@ test binary returns success when an unknown backend or empty operator filter
 skips every case; reject those false positives. Validate the wrapper against
 the actual binary on hosted CPU before sending a hardware procedure. This is
 operator correctness evidence, not model speech acceptance or NPU performance.
+
+
+## UPDATE 2026-10-12 — Non-vacuous Ascend operator wrapper dispatched
+
+Source `e5652705bac011aafe0806228e38b4e8a86410e2` on
+`validation/cann-hardware-ops` adds `tools/validate_backend_ops.py`. It executes
+the existing upstream CPU-reference tests without changing their math or
+tolerances, requires a completed selected backend plus nonzero successful
+operator cases, and saves complete logs/hashes and incremental receipts even
+after failure/timeout. Operator coverage is separate from full-model speech,
+quantized-model quality and performance. No physical Ascend claim is made.
+
+Hosted ARM CPU worker `38281476089` compiles the actual upstream tester and
+checks one tiny real positive case plus three real false-success controls:
+missing backend, unmatched parameters and unknown operator. All raw negative
+probes must return zero upstream, while the wrapper must reject each. This
+run is queued; the hardware procedure has not been sent to the contributor
+pending that validation. Python compilation/help and all four staged secret
+tests pass without skips (50.094 s). The draft release notes now record both
+completed CANN architectures and separate the unmerged Dia work from release
+acceptance. Actual-weight Dia diff `38278884937` has started; complete native
+speech `38272642504` remains running. Breeze #543 has three nightly model
+checks left; CANN #544 has four. No failure, merge or new release tag is claimed.

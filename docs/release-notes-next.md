@@ -58,11 +58,36 @@ integration are pending, so these features are not presented as merged.
 The CANN follow-up exposes CLI backend/device selection and adds a separate
 opt-in x86_64/910B and arm64/310P compile matrix for CLI, shared library, diff
 and quantizer. Ten production-source routing controls pass, with four failing
-against the previous helper. The x86_64/910B build passes all four targets and ggml-cann; ARM64/310P and general CI remain pending. Hosted compilation cannot establish Ascend inference or speed.
+against the previous helper. Current-source x86_64/910B (ACL graph on) and
+ARM64/310P (ACL graph off) builds both pass all four targets and ggml-cann.
+See [the complete compile receipt](cann-pr544-compile-2026-10-12.json). General
+PR CI and integration remain pending. Hosted compilation cannot establish
+Ascend inference or speed.
+
+## Dia reference and short-speech fixes — validation in progress
+
+The active Dia branch preserves aligned audio frames during delay reversal,
+zeroing invalid individual codebook entries to match the pinned original
+method. Eight complete code-grid regressions pass; five fail before the fix.
+The reference/diff integration observes original generation and real DAC calls,
+checks exact input boundaries plus stage cosine and magnitude, and rejects
+missing or uniformly scaled reference stages. Input validation rejects
+unaligned whitespace/NUL before model loading; four tiny-original capture
+controls pass. These small tests establish boundary and capture behavior.
+
+[Actual-weight numerical/codec validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38278884937)
+and [complete native F16/Q8/Q4 speech validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38272642504)
+are still in progress. The reported short-prompt silence is not yet declared
+resolved, and the runtime changes are not merged or included in release
+acceptance. Decoder-history and DAC-code replay do not establish free-running
+sampler equality.
 
 ## Work excluded from release acceptance
 
-PRs #492, #521, #529 and #536 remain pending their documented model, quantization, generation or hardware gates. The additional model-quality reports recorded in merged contributor PR #530 remain unresolved. Breeze's actual-CUDA strict
+PRs #492 and #521 remain pending their documented model, quantization or
+hardware gates. Contributor PRs #529 and #536 are incorporated in the validated
+Breeze composition awaiting #543 integration. The additional model-quality
+reports recorded in merged contributor PR #530 remain unresolved. Breeze's actual-CUDA strict
 guided generation remains 0/8 against canonical BF16. Original-only arithmetic
 controls reproduce some complete native grids: joint F32 matches 1/8 CPU and
 3/8 CUDA; F16 KV rounding matches 2/8 CPU and 3/8 CUDA. These diagnostics do not
