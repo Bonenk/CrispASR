@@ -5584,3 +5584,28 @@ remain queued. Both release-note drafts now distinguish the completed original
 WER-0/F16 full-utterance replay from the failed startup codec and native free
 short speech. No unmerged Dia production change, accepted Q4 fix or new tag.
 Open issues/PRs were checked again; no new external follow-up to act on.
+
+## CLAIMED 2026-10-12 — reproducible Dia DAC critical-output precision export
+
+Codec run 38294496529 at `778dac9cc` completed SUCCESS. The published codec
+fails canonical startup `dac_output_conv` and PCM (cosine 0.9976444, norm error
+0.04271824), while the same native graph passes against actual original
+modules loaded with the published rounded weights. All-F32 original weights
+pass canonical PCM at cosine 1.0000000 and norm error 0.000001932156.
+The narrow original-F32 final Snake/output-convolution export also passes
+canonical PCM at cosine 0.9999927 and norm error 0.002027489. This isolates
+the startup failure to exported weight precision rather than decoder graph
+math. Complete source-original controls and four missing/scaled negatives
+are retained in artifact 11770585576 (981,046,884-byte ZIP); full download and
+file-hash audit are in progress on storage. No released codec/default changes.
+
+Make this exact export reproducible with a dedicated conversion CLI using
+the actual original DAC package/checkpoint and existing verified tensor mapping,
+preserving published unrelated weights and unknown-name rejection. Add tiny
+real-module coverage and physical tensor-type/byte audit; no reconstructed
+weight-normalization math. Work in storage `reference-worktree` on
+`fix/dia-pinned-diff`. Real-checkpoint export and stage validation run on GH,
+with canonical startup and full-utterance references unchanged. Actual sampler
+control 38299826144 has started independently; native short-speech acceptance
+and Q4 neural repair remain separate pending gates. Production promotion
+requires full speech and hardware validation; no gate relaxation or new tag.
