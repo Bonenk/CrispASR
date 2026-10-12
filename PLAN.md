@@ -5292,3 +5292,25 @@ runs are queued. The earlier complete speech worker `38272642504` is running at
 boundary-fix source `6aa849b53`; that source's hosted linux-unit, Windows, macOS
 and iOS checks pass, with other platform jobs still in flight. No reported
 silence resolution, merge or release is claimed before actual decoded proof.
+
+
+## UPDATE 2026-10-12 — Dia early alignment guard; Ascend validation follow-up claimed
+
+Dia reference source `bdbf899cb910b7c85103b62ad5f80918518cb8d4` rejects
+leading/trailing whitespace and NUL before source/model loading. Seven
+regression assertions fail on the preceding source; all four tiny-original
+capture tests pass after the fix. All four staged no-secrets tests pass without
+skips (55.194 s). Current-source normal CI is `38280449012`; earlier generic
+CI `38278888334` is cancelled/superseded. Actual-weight generic diff
+`38278884937` remains queued at `9dd9715cf`; its valid default prompt and native
+runtime are unchanged. Full native speech run `38272642504` remains in progress.
+No numerical or speech acceptance is inferred from the small guard tests.
+
+#544's contributor offered real Ascend testing in comment `6128212082`. Claim
+a separate storage-worktree validation script that executes existing ggml
+CPU-reference operator tests, retains complete logs and source provenance, and
+requires proof the selected backend actually ran nonzero cases. The upstream
+test binary returns success when an unknown backend or empty operator filter
+skips every case; reject those false positives. Validate the wrapper against
+the actual binary on hosted CPU before sending a hardware procedure. This is
+operator correctness evidence, not model speech acceptance or NPU performance.
