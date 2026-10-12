@@ -165,6 +165,9 @@ jobs:
       - name: TTS session failure, ownership and conversion contracts
         run: python3 tests/test_tts_session_contracts.py -v
 
+      - name: Supertonic speaker API null and bounds contracts
+        run: python3 tests/test_supertonic_speaker_contracts.py -v
+
       - name: UTF-8 loop cleanup under platform ctype classification
         run: python3 tests/test_ngram_locale.py -v
 

@@ -42,5 +42,31 @@
     "docs/feature-matrix.html"
   ],
   "feature_matrix_scope": "136 backends compiled in hosted CPU build; optional ONNX Runtime adapters not compiled",
-  "integration_status": "draft PR 531; actual model plain/clone acceptance and PR529 original guided parity remain pending"
+  "integration_status": "draft PR 531; actual model plain/clone acceptance and PR529 original guided parity remain pending",
+  "refresh": {
+    "base": "d2cdbefdb",
+    "merge_commit": "043261c27",
+    "preserved_main_controls": [
+      "UTF-8 result normalization",
+      "locale-independent loop cleanup",
+      "Breeze sampler setters and independent open guard",
+      "Breeze dynamic GPU registration"
+    ],
+    "supertonic_speaker_contracts": {
+      "production_source_compiled": true,
+      "old_null_context": "SIGSEGV",
+      "old_negative_index": "SIGABRT assertion",
+      "valid_order_control": "PASS before and after",
+      "fixed_controls_passed": 3
+    },
+    "local_post_merge_controls": {
+      "tts_failure_ownership_rate": 4,
+      "breeze_sampler": 8,
+      "ngram_locale": 5,
+      "session_utf8_assertions": 4,
+      "session_utf8_cleanup": "FAIL CIFS TemporaryDirectory teardown; hosted rerun required"
+    },
+    "general_ci": "Pending refreshed head",
+    "model_acceptance": false
+  }
 }
