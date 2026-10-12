@@ -19,7 +19,7 @@ import wave
 import tarfile
 import zipfile
 
-VERSION = '2026-10-12.breeze-cuda-speech.3'
+VERSION = '2026-10-12.breeze-cuda-speech.4'
 SOURCE = '557e2cc7b58493e647cd8ae65b0fa80185760f61'
 # Exact CI archive: all member SHA/size checks and anonymous mirror verified.
 BUNDLE_REV = '33e02a2e4da0c7a027367a63811ed2cf02a6354b'
@@ -76,7 +76,7 @@ def gpu_memory(pid):
                 if row.strip() and int(row.split(',')[0].strip()) == pid] or [0])
 
 
-def run(command, label, env=None):
+def run(command, label, env=None, min_gpu_mib=256):
     with (OUT / (label + '.log')).open('w') as log:
         process = subprocess.Popen(list(map(str,command)),cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env=env)
         deadline=time.monotonic()+7200
@@ -89,7 +89,7 @@ def run(command, label, env=None):
     GPU_PROCESSES[label]=dict(pid=process.pid,peak_mib=peak,returncode=process.returncode)
     (OUT/'gpu-subprocesses.json').write_text(json.dumps(GPU_PROCESSES,indent=2)+'\n')
     print(label,'rc',process.returncode,'GPU MiB',peak,flush=True)
-    assert process.returncode == 0 and peak>=256,(label,process.returncode,peak)
+    assert process.returncode == 0 and peak>=min_gpu_mib,(label,process.returncode,peak)
 
 
 def write_wav(path, pcm):
@@ -314,17 +314,23 @@ import torch,numpy as np,json,hashlib,pathlib,sys,importlib.metadata,resemblyzer
 from resemblyzer import VoiceEncoder,preprocess_wav
 assert torch.cuda.is_available()
 p=pathlib.Path(sys.argv[1]);encoder=VoiceEncoder(device='cuda');vectors={}
+assert all(parameter.is_cuda for parameter in encoder.parameters())
+weight_bytes=sum(parameter.numel()*parameter.element_size() for parameter in encoder.parameters())
+torch.cuda.reset_peak_memory_stats()
 for name in ['reference','abi-plain','abi-clone']:
  vectors[name]=encoder.embed_utterance(preprocess_wav(np.load(p/(name+'.npy')),source_sr=24000))
  np.save(p/('speaker-'+name+'.npy'),vectors[name])
-r=vectors['reference'];result=dict(package_version=importlib.metadata.version('resemblyzer'),
+torch.cuda.synchronize()
+peak_bytes=torch.cuda.max_memory_allocated()
+assert peak_bytes > weight_bytes, 'Actual CUDA inference activations must exceed resident model weights'
+r=vectors['reference'];result=dict(cuda_weights_bytes=weight_bytes,peak_cuda_allocated_bytes=peak_bytes,all_parameters_cuda=True,package_version=importlib.metadata.version('resemblyzer'),
  model_sha256=hashlib.sha256((pathlib.Path(resemblyzer.__file__).parent/'pretrained.pt').read_bytes()).hexdigest(),
  torch=torch.__version__,device=torch.cuda.get_device_name(),
  clone_reference=float(np.dot(vectors['abi-clone'],r)),baseline_reference=float(np.dot(vectors['abi-plain'],r)))
 (p/'speaker.json').write_text(json.dumps(result,indent=2)+'\n')
 """
         speaker_env = dict(os.environ, LD_LIBRARY_PATH=os.environ['CRISPASR_HOST_LIBRARY_PATH'])
-        run([sys.executable,'-c',speaker_code,OUT],'gpu-speaker',env=speaker_env)
+        run([sys.executable,'-c',speaker_code,OUT],'gpu-speaker',env=speaker_env,min_gpu_mib=1)
         speaker=json.loads((OUT/'speaker.json').read_text())
         receipt['speaker_encoder']=speaker
         similarities={key:speaker[key] for key in ['clone_reference','baseline_reference']}
