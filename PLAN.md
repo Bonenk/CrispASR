@@ -4871,3 +4871,21 @@ CLI/shared and HIP CLI, no failures at checkpoint. Breeze CUDA composition
 speaker inference in a separate GPU process, requiring the native C ABI to
 load the bundled CUDA runtime/BLAS files. Four secret tests pass, zero skips
 (47.728 s); immutable archive pins remain pending and prevent Kaggle launch.
+
+## CLAIMED 2026-10-12 — Final tagged CUDA CLI/shared package hardware validation
+
+All 35 build/validation jobs in tagged release run 38199002944 passed; final
+publish succeeded and all 50 public assets are present. Restore comprehensive
+final notes after workflow attachment and mark the release latest. Windows
+12.8/12.6 actual tagged package pair run 38207603649 succeeded independently.
+
+Independently verify actual published CUDA CLI and shared-library tars against
+GitHub asset digests and byte-identical CI ZIP contents, then create immutable
+public mirrors. The final CLI CUDA plugin differs from the candidate; the
+final shared-library plugin also differs from the CLI plugin. Run both actual
+packages on Kaggle, in separate fresh processes, retaining the unchanged three
+full stage arrays/cosine/magnitude gates, 26 original speech/reuse controls and
+nine streaming reset/packet/flush controls for each. No archive/hash substitution
+or untested hardware acceptance. Archive terminal v6 logs before repushing,
+check the single account has at most two active sessions and pull back exact
+submitted source. Large assets/evidence stay on storage. No production changes.
