@@ -4910,3 +4910,15 @@ Session opening then fails: converter writes dolphin but shared architecture
 table omits it. b87235519 adds the entry and C ABI regression probes, preserves
 partial native receipts, and dispatches full two-model/two-sample retry
 38211719379. No full checkpoint or reporter-machine acceptance yet.
+
+## CLAIMED 2026-10-12 — Canary #532 actual CUDA allocation/reuse probe
+
+Refresh complete issue/comments (no new reporter data). Existing CPU lengths
+11/4/33/90/11 s, buckets 0/128 all pass but do not exercise the GPU allocator.
+Use a separate storage probe worktree and exact verified tagged CUDA archive,
+pinned 392 MB Q4_K aligner, and GPU-only Kaggle execution after a slot is free.
+Capture all ten complete logits arrays, returning-short fresh/reuse equality,
+actual process GPU allocation and exact packaged CUDA-library byte witness.
+Compare saved CPU arrays only as CPU/GPU diagnostics, not original parity.
+Keep any allocation failure; no speculative runtime fix or claim of replaying
+the private German/VAD/diarization recording. No new native build is needed.
