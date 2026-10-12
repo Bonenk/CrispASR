@@ -4,7 +4,7 @@
   "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
   "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "branch": "probe/breeze-cuda-speech-composition",
-  "status": "v4 COMPLETE: CUDA speech/stages pass; mixed-device strict guided generation fails; registration-order fix GH build queued",
+  "status": "CUDA registration-order build SUCCESS; exact worker v5 RUNNING; original joint arithmetic capture SUCCESS, comparisons pending",
   "workflow": ".github/workflows/index-echo-cuda-validation.yml",
   "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
   "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
@@ -187,35 +187,64 @@
   "registration_order_fix": {
     "source": "435c68486",
     "run": 38219077361,
-    "status": "queued",
+    "status": "SUCCESS build; GPU v5 RUNNING",
     "gpu_accepted": false,
     "change": "Initialize CPU wrapper to register dynamic plugins before choosing Breeze GPU; emit actual compute backend",
-    "pr": 542
+    "pr": 542,
+    "public_mirror": {
+      "revision": "bed22cc2a7f8699de38b9ed141961a75873a822e",
+      "path": "breeze-guided-20261012/cuda-speech-435c6848/breeze-cuda-speech-validation.tar.gz",
+      "sha256": "b1306a24ef0f460c0ed84bbcfa07712af1eecab442f8b58a37256b2eb196b3e7",
+      "bytes": 489118165,
+      "anonymous_verified": true,
+      "all_bundle_files_verified": true,
+      "source": "435c68486ffb75a820d8105614e9f973d56249d0",
+      "run": 38219077361
+    },
+    "transport": {
+      "run": 38219077361,
+      "artifact_id": 11733484345,
+      "zip_bytes": 487276563,
+      "zip_sha256": "97bc3268c821562eb9ec1cf91534fd30b18d62997fb1da7f9b75c6dd5ee2947c",
+      "zip_crc_verified": true
+    }
   },
   "joint_arithmetic_followup": {
     "source": "31c338218894ac64437cea1ef0ee6b1bb766d7bd",
     "run": 38219796806,
-    "status": "queued",
+    "status": "SUCCESS independently verified 145 arrays; complete design-s1 grid matches native CPU; other seven still differ",
     "original_only": true,
     "canonical_fixtures_changed": false,
     "acceptance_gates_changed": false,
     "dispatch": "AVX2",
     "initialization_seed": 42,
     "cases": 8,
-    "frames": 24
+    "frames": 24,
+    "public_proof": {
+      "revision": "fc241f7a5cf1a4eeca39ee07cd455688cb22b2ab",
+      "path": "breeze-guided-20261012/guided-joint-arithmetic-proof.zip",
+      "sha256": "d58605dc03e78b426bd8b032fbcd452ca5a73ce5c05d08231b6d011f28cff130",
+      "bytes": 5966594,
+      "anonymous_verified": true
+    },
+    "native_cpu_exact_cases": 1,
+    "canonical_bf16_exact_cases": 0,
+    "original_acceptance": false
   },
   "prepared_next_worker": {
-    "source": "a2b7173b5",
+    "source": "b5199d969",
     "version": "2026-10-12.breeze-cuda-speech.5",
-    "deployed": false,
-    "awaiting": "Completed fixed build plus independently verified exact archive/mirror pins",
+    "deployed": true,
+    "awaiting": "Actual CUDA model/backend and unchanged speech/stage/generation results",
     "requires_breeze_backend": "CUDA",
     "native_dump_min_gpu_mib": 4096,
     "old_receipts_rejected": true,
     "no_secrets": {
       "passed": 4,
       "skipped": 0,
-      "seconds": 51.744
-    }
+      "seconds": 129.973
+    },
+    "status": "RUNNING",
+    "source_pull_byte_equal": true
   }
 }

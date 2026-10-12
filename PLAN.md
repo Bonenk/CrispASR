@@ -5026,3 +5026,30 @@ Original-only all-eight arithmetic control 31c338218 queued GH CPU
 38219796806 with pinned package versions, explicit AVX2 and seed 42. Neither
 queued run is acceptance. Canary #532 and Breeze #529/#536 updated with
 immutable complete proof links and exact scope/failure limitations.
+
+
+Breeze corrected CUDA build 38219077361 SUCCESS, exact tar SHA
+b1306a24ef0f460c0ed84bbcfa07712af1eecab442f8b58a37256b2eb196b3e7,
+all 25 bundled file hashes/aliases and anonymous mirror bed22cc2 verified.
+Worker v5 b5199d969 submitted; source-pull bytes identical, actual GPU running.
+Requires Breeze's own CUDA backend witness; all old strict gates remain.
+
+All-eight original joint-F32 arithmetic control 38219796806 SUCCESS, 145
+complete arrays independently verified. All eight promoted originals differ
+from canonical BF16; design-s1 matches the native CPU's ENTIRE 24x16 grid.
+Other seven promoted-original/native grids still differ: this explains one
+complete case, not all guided failures. No fixture/default/gate changed.
+Public control proof fc241f7a, SHA
+d58605dc03e78b426bd8b032fbcd452ca5a73ce5c05d08231b6d011f28cff130.
+
+
+## CLAIMED 2026-10-12 — Original Breeze F16 KV-storage control
+
+The full joint-F32 original control reproduces native design-s1 exactly, but
+not seven other grids. Native backbone/depth KV storage is F16. Run the same
+original-only control with explicit F16 rounding on F32 DynamicCache writes,
+preserving F32 attention math and BF16 text/codec caches. Apply the same
+rounding to depth attention K/V in its uncached CFG forwards, without changing
+that original inference flow. Capture actual cache-write and attention counts
+and rounding-error witness; compare all eight complete
+code grids. GH CPU only, no canonical fixture or acceptance-gate change.
