@@ -19,7 +19,7 @@ import wave
 import tarfile
 import zipfile
 
-VERSION = '2026-10-12.breeze-cuda-speech.4'
+VERSION = '2026-10-12.breeze-cuda-speech.5'
 SOURCE = '557e2cc7b58493e647cd8ae65b0fa80185760f61'
 # Exact CI archive: all member SHA/size checks and anonymous mirror verified.
 BUNDLE_REV = '33e02a2e4da0c7a027367a63811ed2cf02a6354b'
