@@ -40,7 +40,7 @@
   ],
   "next": "Verify exact CI archive bytes and immutable public mirror before pinning and launching a Kaggle GPU-only speech/stage worker; preserve all strict generation failures.",
   "worker": {
-    "source": "9f2c9c8a98e0294ee7db84ee50d8d13e2261e990",
+    "source": "63f4ef80cea3d76e28f4636ce59b8e2848a7ca04",
     "path": "tools/kaggle/breeze-cuda-speech-validation/breeze_cuda_speech_validation.py",
     "version": "2026-10-12.breeze-cuda-speech.1",
     "launched": false,
@@ -49,7 +49,7 @@
     "no_secrets": {
       "passed": 4,
       "skipped": 0,
-      "seconds": 52.065
+      "seconds": 47.728
     },
     "controls": [
       "20 generated speech surface cases with unchanged WER <= .2 and reuse/error contracts",
@@ -58,6 +58,7 @@
       "Complete pinned stage arrays and cosine/norm/exact controls",
       "Strict guided generation comparison retained independently; failure keeps job failed"
     ],
-    "quantization_tested": false
+    "quantization_tested": false,
+    "speaker_runtime": "Separate GPU subprocess using preinstalled Torch; native C ABI/CLI/server/diff must use bundled CUDA user runtime"
   }
 }

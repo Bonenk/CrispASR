@@ -4849,3 +4849,25 @@ actual ggml controls that fail on the previous causal-only behavior. Use a
 separate storage worktree and GH CPU for conversion, original per-stage dumps,
 diff and decoded speech on both non-streaming and existing streaming models.
 Do not alter the already tagged v0.8.43 release or accept a model from a build.
+
+
+Dolphin fix 014f20755 is pushed as draft PR #541. Original upstream CSGU and
+actual encoder-layer merge convolution generate twelve native ggml controls:
+12/12 pass (max error 1.79e-7); old causal-only mutation fails six noncausal
+cases, padding-before-normalization mutation fails three noncausal CSGU cases.
+Full original/native/mutation proof is public and anonymously hash verified.
+Source syntax/clang18/index/227 anchors and four secret tests pass, zero skips
+(49.679 s). Both immutable original checkpoints/configs are pinned; GH CPU
+38207601849 is queued for conversion, fresh Chinese/JFK original dumps, diff,
+complete native per-stage cosines/magnitudes and automatic C ABI speech.
+Keep draft/issue open until that evidence; private reporter clip/Kylin not
+reproduced. The frozen v0.8.43 tag is unchanged. A new learning and its generated
+index are on the fix branch, alongside the actual native CTest controls.
+
+Tagged Windows builds completed. Actual tagged CUDA 12.8/12.6 pair validation
+is dispatched as 38207603649; pending. Remaining release builds are Linux CUDA
+CLI/shared and HIP CLI, no failures at checkpoint. Breeze CUDA composition
+38205813889 continues compiling; worker 63f4ef80c additionally isolates Torch
+speaker inference in a separate GPU process, requiring the native C ABI to
+load the bundled CUDA runtime/BLAS files. Four secret tests pass, zero skips
+(47.728 s); immutable archive pins remain pending and prevent Kaggle launch.

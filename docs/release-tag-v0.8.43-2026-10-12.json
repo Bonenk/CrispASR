@@ -81,5 +81,8 @@
     }
   ],
   "archive_provenance": "Actual published tagged assets, independently checked against GitHub release SHA256 digests; distinct from dry-run candidate rebuild",
-  "check_label_note": "Historical validator check labels retain candidate prefix; archive paths and run pins identify actual tagged assets"
+  "check_label_note": "Historical validator check labels retain candidate prefix; archive paths and run pins identify actual tagged assets",
+  "windows_pair_run": 38207603649,
+  "windows_pair_status": "queued; actual tagged CLI/shared/runtime archives, both CUDA 12.8 and 12.6",
+  "final_release_matrix": "building; remaining Linux CUDA CLI/shared and HIP CLI at checkpoint, no failed jobs"
 }
