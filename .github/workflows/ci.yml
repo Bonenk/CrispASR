@@ -157,6 +157,9 @@ jobs:
           python3 tools/gen-backend-caps-table.py --check --crispasr build/bin/crispasr
           python3 tests/test_backend_caps_abi.py --cli build/bin/crispasr --build-dir build
 
+      - name: Check production GPU backend/device selection without hardware
+        run: python3 tests/test_gpu_backend_selection.py -v
+
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
       - name: Run the unit tier
@@ -470,7 +473,7 @@ jobs:
                 -DCRISPASR_BUILD_TESTS=OFF \
                 -DCRISPASR_BUILD_SERVER=OFF
               cmake --build build-cann \
-                --target crispasr-cli crispasr-diff crispasr-quantize \
+                --target crispasr-cli crispasr-lib crispasr-diff crispasr-quantize \
                 -j "$(nproc)"
               chown -R '"${HOST_UID}"':'"${HOST_GID}"' /workspace/build-cann
             '
