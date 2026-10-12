@@ -5667,3 +5667,33 @@ defaults and failed speech, and establish whether any filter/normalization
 defect exists before changing RNG or production sampling. Work continues in
 the claimed storage reference worktree; standalone codec run 38306172119 is
 independently queued at immutable `a0b702d0d`.
+
+### 2026-10-12 real-logit probability replay checkpoint
+
+Probability observer source is pushed at
+`2cdf631b36821604d894f9775df7db679ea57d2e`, branch `fix/dia-pinned-diff`.
+It executes actual pinned original CFG/masking and sampler functions, with only
+the final Torch multinomial intercepted to retain probabilities. The actual
+native header is mechanically instrumented to observe `dist.probabilities()`;
+its RNG is untouched, and no filter/math is reconstructed. Both retained
+original-control/native logit arms cover all 37 shared input steps (333 rows
+each), with exact replay of every saved native pre-override sample required.
+
+Local weight-free execution reproduces every sample, with zero support
+mismatches for both arms. Maximum probability error is 1.7881393e-7 for the
+original-control arm and 3.6076092e-7 for native; first divergent step/head
+has error 6.1332246e-9 and 1.0324503e-8 respectively. Actual local Torch is
+2.11.0+cu130, differing from hosted original 2.6.0; it is explicitly not
+pinned-original acceptance. The uncommitted-script SHA/dirty state, original
+source/header/observer hashes, complete probability/support/variation arrays
+and all 17 files (10,979,903 bytes) are retained in
+`docs/dia-sampling-probability-local-2026-10-12.json`. No model weights loaded.
+
+Pinned Torch 2.6 hosted run
+[38307628341](https://github.com/CrispStrobe/CrispASR/actions/runs/38307628341)
+is queued at exact `2cdf631b3` to repeat this component check. Python syntax,
+227 documentation anchors and all four staged no-secrets tests pass without
+skips (69.953 s). Standalone critical-codec export run 38306172119 remains
+queued at unchanged `a0b702d0d`. Failed short speech and Q4 neural gates remain
+failed, with no production sampler, recipe, model-pin or release-tag change.
+No new external issue/PR replies were found during this continuation.
