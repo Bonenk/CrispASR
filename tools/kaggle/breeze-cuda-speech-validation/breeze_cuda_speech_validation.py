@@ -19,7 +19,7 @@ import wave
 import tarfile
 import zipfile
 
-VERSION = '2026-10-12.breeze-cuda-speech.1'
+VERSION = '2026-10-12.breeze-cuda-speech.2'
 SOURCE = '557e2cc7b58493e647cd8ae65b0fa80185760f61'
 # Exact CI archive: all member SHA/size checks and anonymous mirror verified.
 BUNDLE_REV = '33e02a2e4da0c7a027367a63811ed2cf02a6354b'
@@ -35,8 +35,8 @@ assert len(BUNDLE_SHA) == 64 and len(BUNDLE_REV) == 40, 'Build/mirror pins are p
 hardware = subprocess.check_output(['nvidia-smi', '--query-gpu=name,compute_cap,memory.total,driver_version',
                                    '--format=csv,noheader'], text=True).strip()
 assert hardware and all(float(row.split(',')[1]) in (6.0,7.5) for row in hardware.splitlines()), 'Requires actual sm60/sm75 GPU'
-for command in [['git','init',ROOT],['git','-C',ROOT,'remote','add','origin','https://github.com/CrispStrobe/CrispASR.git'],
-                ['git','-C',ROOT,'fetch','--depth=1','origin',SOURCE],['git','-C',ROOT,'checkout','FETCH_HEAD']]:
+for command in ([] if (ROOT/'.git').exists() else [['git','init',ROOT],['git','-C',ROOT,'remote','add','origin','https://github.com/CrispStrobe/CrispASR.git'],
+                ['git','-C',ROOT,'fetch','--depth=1','origin',SOURCE],['git','-C',ROOT,'checkout','FETCH_HEAD']]):
     subprocess.run(list(map(str,command)),check=True)
 assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip() == SOURCE
 sys.path.insert(0,str(ROOT/'tools/kaggle'))
@@ -76,9 +76,9 @@ def gpu_memory(pid):
                 if row.strip() and int(row.split(',')[0].strip()) == pid] or [0])
 
 
-def run(command, label):
+def run(command, label, env=None):
     with (OUT / (label + '.log')).open('w') as log:
-        process = subprocess.Popen(list(map(str,command)),cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
+        process = subprocess.Popen(list(map(str,command)),cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env=env)
         deadline=time.monotonic()+7200
         peak=0
         while process.poll() is None:
@@ -128,6 +128,14 @@ def main():
     with tarfile.open(PACKAGE) as archive:
         archive.extractall(SCRATCH, filter='data')
     bundle = SCRATCH / 'bundle'
+    # ELF dependency search is fixed at process startup. Restart after the
+    # verified extraction so host CUDA cannot replace the bundled runtime.
+    if os.environ.get('CRISPASR_BREEZE_BUNDLED_RUNTIME') != '1':
+        native_env = dict(os.environ, CRISPASR_BREEZE_BUNDLED_RUNTIME='1',
+                         CRISPASR_HOST_LIBRARY_PATH=os.environ.get('LD_LIBRARY_PATH',''))
+        native_env['LD_LIBRARY_PATH'] = str(bundle)+':'+native_env['CRISPASR_HOST_LIBRARY_PATH']
+        os.execve(sys.executable, [sys.executable, str(Path(__file__).resolve())], native_env)
+
     provenance = json.loads((bundle/'provenance.json').read_text())
     assert provenance['source'] == SOURCE and provenance['build_complete'] and not provenance['gpu_executed']
     for name,row in provenance['files'].items():
@@ -156,7 +164,7 @@ def main():
         receipt.update(cli_sha256=sha(binary), library_sha256=sha(library),
                        cuda_plugin_sha256=sha(bundle/'libggml-cuda.so'))
         models = SCRATCH / 'models'
-        models.mkdir()
+        models.mkdir(exist_ok=True)
         pins = [
             ('breeze','cstr/breeze-tts-2-GGUF','5314fe9ae3ec6eac1a9238c4f6888fdc9fda0e83',
              'breeze-tts-2-f16.gguf','08ea3fbffe9701a3d04a4a63554876841d923fdd21e20add36d28f3ac3447da7'),
@@ -173,6 +181,8 @@ def main():
             s = Session(str(paths['breeze']),lib_path=str(library),backend='bt2-tts',n_threads=4)
             memory=gpu_memory(os.getpid())
             maps=Path('/proc/self/maps').read_text()
+            receipt['loaded_cuda_runtime_paths'] = sorted({line.split()[-1] for line in maps.splitlines() if any(name in line for name in ['libcudart','libcublas'])})
+            save()
             assert str(bundle/'libggml-cuda.so') in maps and memory>=256, 'C ABI must load actual bundled CUDA plugin and allocate on GPU'
             receipt.setdefault('cabi_cuda_allocations_mib',[]).append(memory)
             for name in ['libcudart.so.12','libcublas.so.12','libcublasLt.so.12']:
@@ -231,7 +241,7 @@ def main():
         proc=subprocess.Popen([str(x) for x in [binary,'--server','--port','11449','--backend','bt2-tts',
             '-m',paths['breeze'],'--codec-model',paths['codec'],'-t','4',
             '--max-new-tokens',LIMIT,'--voice-dir',voice_dir,'--accept-marking-responsibility']],
-            cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
+            cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env=env)
         url='http://127.0.0.1:11449'
         def request(fields):
             body=dict(input=TEXT,response_format='f32',seed=SEED,spoken_disclaimer=False,
@@ -313,7 +323,8 @@ r=vectors['reference'];result=dict(package_version=importlib.metadata.version('r
  clone_reference=float(np.dot(vectors['abi-clone'],r)),baseline_reference=float(np.dot(vectors['abi-plain'],r)))
 (p/'speaker.json').write_text(json.dumps(result,indent=2)+'\n')
 """
-        run([sys.executable,'-c',speaker_code,OUT],'gpu-speaker')
+        speaker_env = dict(os.environ, LD_LIBRARY_PATH=os.environ['CRISPASR_HOST_LIBRARY_PATH'])
+        run([sys.executable,'-c',speaker_code,OUT],'gpu-speaker',env=speaker_env)
         speaker=json.loads((OUT/'speaker.json').read_text())
         receipt['speaker_encoder']=speaker
         similarities={key:speaker[key] for key in ['clone_reference','baseline_reference']}
