@@ -347,6 +347,12 @@ crispasr --gpu-backend cann -dev 0 -m model.gguf -f audio.wav
 crispasr --gpu-backend cpu -m model.gguf -f audio.wav        # benchmarking
 ```
 
+The manual [CANN compile workflow](../.github/workflows/cann-build.yml) builds
+CLI, shared library, diff and quantizer with the official CANN SDK images on
+x86_64/910B (ACL graphs enabled) and arm64/310P (ACL graphs disabled). Run it
+with `gh workflow run cann-build.yml --ref <branch>`. Hosted runners have no
+Ascend NPU, so a successful build does not establish inference or performance.
+
 ## Opus / AAC support (default, no ffmpeg, no libopus)
 
 `.opus` (Ogg/Opus, **including WebM/Matroska Opus**) and raw ADTS `.aac`
