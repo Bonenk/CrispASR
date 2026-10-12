@@ -1,0 +1,483 @@
+{
+  "run": 38209137738,
+  "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38209137738",
+  "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
+  "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
+  "branch": "probe/breeze-cuda-speech-composition",
+  "status": "v5 COMPLETE: explicit CUDA Breeze, 107 stages/20 speech and reuse pass; strict guided codes still 0/8 FAIL",
+  "workflow": ".github/workflows/index-echo-cuda-validation.yml",
+  "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
+  "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
+  "configuration": {
+    "cuda": "12.4.1",
+    "sm": [
+      60,
+      75
+    ],
+    "ggml_backend_dl": true,
+    "server": true,
+    "targets": [
+      "crispasr-cli",
+      "crispasr-lib",
+      "crispasr-diff",
+      "crispasr-quantize"
+    ],
+    "bundled_cuda_user_runtime": true,
+    "driver_bundled": false,
+    "bindings_match_source": true
+  },
+  "local_checks": {
+    "python_compile": true,
+    "diff_check": true,
+    "no_secrets_passed": 4,
+    "no_secrets_skipped": 0,
+    "no_secrets_seconds": 63.289
+  },
+  "gpu_executed": true,
+  "model_acceptance": false,
+  "production_defaults_changed": false,
+  "pending_prs": [
+    529,
+    531,
+    536
+  ],
+  "next": "Build fix 435c68486, pin exact archive/mirror, require explicit Breeze CUDA backend witness for stage and guided dumps, rerun all unchanged gates",
+  "worker": {
+    "source": "6a50e2f16",
+    "path": "tools/kaggle/breeze-cuda-speech-validation/breeze_cuda_speech_validation.py",
+    "version": "2026-10-12.breeze-cuda-speech.4",
+    "launched": true,
+    "archive_pins": "Exact immutable CI/mirror archive and all 25 file hashes verified",
+    "syntax_check": true,
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 66.662
+    },
+    "controls": [
+      "20 generated speech surface cases with unchanged WER <= .2 and reuse/error contracts",
+      "Actual process CUDA allocation for C ABI, CLI, server, diff and recognizer",
+      "GPU speaker encoder; clone/reference similarity must improve over baseline",
+      "Complete pinned stage arrays and cosine/norm/exact controls",
+      "Strict guided generation comparison retained independently; failure keeps job failed"
+    ],
+    "quantization_tested": false,
+    "speaker_runtime": "Separate GPU subprocess using preinstalled Torch; native C ABI/CLI/server/diff must use bundled CUDA user runtime",
+    "source_pull_byte_equal": true,
+    "previous_gpu_run": "v1 FAILED before speech: host CUDA12.8 loaded instead of packaged12.4; terminal logs/output preserved",
+    "runtime_isolation": "Native worker restarts with bundle LD_LIBRARY_PATH at process startup; separate speaker process restores host library path",
+    "complete": true
+  },
+  "artifact_id": 11729765083,
+  "previous_runs": [
+    {
+      "run": 38205813889,
+      "status": "FAILED: missing unversioned shared library alias after successful compilation and dependency checks"
+    },
+    {
+      "run": 38208702240,
+      "status": "CANCELED before execution to include both eligible Kaggle GPU architectures"
+    }
+  ],
+  "public_mirror": {
+    "revision": "33e02a2e4da0c7a027367a63811ed2cf02a6354b",
+    "path": "breeze-guided-20261012/cuda-speech-557e2cc7/breeze-cuda-speech-validation.tar.gz",
+    "sha256": "4ac96a0121e600fab6e585bd7ec611e387305d26506e394d91e8615f415bad6b",
+    "bytes": 489117846,
+    "anonymous_verified": true,
+    "all_bundle_files_verified": true,
+    "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
+    "run": 38209137738
+  },
+  "completed_v4": {
+    "independent_verification": {
+      "complete_arrays_hash_checked": 163,
+      "stage_comparisons": 107,
+      "float_cosine_min": 0.9996649853348926,
+      "norm_ratio_min": 0.995454892333466,
+      "norm_ratio_max": 1.0032874385062711,
+      "speech_cases": 20,
+      "speech_wer_max": 0.1111111111111111,
+      "speaker": {
+        "cuda_weights_bytes": 5694464,
+        "peak_cuda_allocated_bytes": 57500672,
+        "all_parameters_cuda": true,
+        "package_version": "0.1.4",
+        "model_sha256": "39373b86598fa3da9fcddee6142382efe09777e8d37dc9c0561f41f0070f134e",
+        "torch": "2.11.0+cu128",
+        "device": "Tesla T4",
+        "clone_reference": 0.8949968814849854,
+        "baseline_reference": 0.5270190834999084
+      },
+      "guided": {
+        "plain": {
+          "exact": false,
+          "match_fraction": 0.2109375,
+          "first_mismatch": 69,
+          "first_frame": 4,
+          "first_codebook": 5
+        },
+        "clone": {
+          "exact": false,
+          "match_fraction": 0.08333333333333333,
+          "first_mismatch": 24,
+          "first_frame": 1,
+          "first_codebook": 8
+        },
+        "design-s0": {
+          "exact": false,
+          "match_fraction": 0.2109375,
+          "first_mismatch": 69,
+          "first_frame": 4,
+          "first_codebook": 5
+        },
+        "design-s1": {
+          "exact": false,
+          "match_fraction": 0.0546875,
+          "first_mismatch": 5,
+          "first_frame": 0,
+          "first_codebook": 5
+        },
+        "design-s4": {
+          "exact": false,
+          "match_fraction": 0.059895833333333336,
+          "first_mismatch": 11,
+          "first_frame": 0,
+          "first_codebook": 11
+        },
+        "direct-s0": {
+          "exact": false,
+          "match_fraction": 0.08333333333333333,
+          "first_mismatch": 24,
+          "first_frame": 1,
+          "first_codebook": 8
+        },
+        "direct-s1": {
+          "exact": false,
+          "match_fraction": 0.2708333333333333,
+          "first_mismatch": 55,
+          "first_frame": 3,
+          "first_codebook": 7
+        },
+        "direct-s4": {
+          "exact": false,
+          "match_fraction": 0.13020833333333334,
+          "first_mismatch": 10,
+          "first_frame": 0,
+          "first_codebook": 10
+        }
+      },
+      "strict_generation_accepted": false,
+      "full_cuda_guided_generation_proven": false,
+      "device_scope": "CUDA speech/stages; guided Breeze selected CPU before dynamic plugin registration, CUDA codec only"
+    },
+    "public_proof": {
+      "revision": "edf3eb38e77471d6f426d631fec1f7cefab756b0",
+      "path": "breeze-guided-20261012/cuda-speech-stage-mixed-device-proof.zip",
+      "sha256": "1a61be46acbff0602f30181cbc86a8592ace624ebeccc5bd65ad4069254dd6ab",
+      "bytes": 14054277,
+      "anonymous_verified": true
+    },
+    "strict_guided_cases_passed": 0,
+    "strict_guided_cases_total": 8,
+    "guided_breeze_backend": "CPU, before dynamic CUDA plugin registration",
+    "guided_codec_backend": "CUDA",
+    "full_cuda_guided_generation_proven": false
+  },
+  "registration_order_fix": {
+    "source": "435c68486",
+    "run": 38219077361,
+    "status": "Merged PR #542; 36 applicable checks passed, two intentional skips",
+    "gpu_accepted": true,
+    "change": "Initialize CPU wrapper to register dynamic plugins before choosing Breeze GPU; emit actual compute backend",
+    "pr": 542,
+    "public_mirror": {
+      "revision": "bed22cc2a7f8699de38b9ed141961a75873a822e",
+      "path": "breeze-guided-20261012/cuda-speech-435c6848/breeze-cuda-speech-validation.tar.gz",
+      "sha256": "b1306a24ef0f460c0ed84bbcfa07712af1eecab442f8b58a37256b2eb196b3e7",
+      "bytes": 489118165,
+      "anonymous_verified": true,
+      "all_bundle_files_verified": true,
+      "source": "435c68486ffb75a820d8105614e9f973d56249d0",
+      "run": 38219077361
+    },
+    "transport": {
+      "run": 38219077361,
+      "artifact_id": 11733484345,
+      "zip_bytes": 487276563,
+      "zip_sha256": "97bc3268c821562eb9ec1cf91534fd30b18d62997fb1da7f9b75c6dd5ee2947c",
+      "zip_crc_verified": true
+    },
+    "hardware_scope": "Composition package at 435c68486, not complete standalone PR binary; device-selection/weight-loading source section identical, later branch-cache implementation differs",
+    "identical_initialization_prefix": {
+      "bytes": 3838,
+      "sha256": "68438849bdbc0de5a5de417c998e96b83e87355c4f5c9e4ae5d781306f306265",
+      "includes": [
+        "device selection",
+        "weight loading",
+        "scheduler setup",
+        "text-encoder normalization setup"
+      ],
+      "entire_initialization_function_equal": false
+    },
+    "standalone_source": "7a33fe272ac85cbb138b505c56327b7476f16f98",
+    "merge_commit": "f8eb4325e99a2a5bc9581d5c3999e831e332026b",
+    "merged_at": "2026-10-12T09:08:27Z"
+  },
+  "joint_arithmetic_followup": {
+    "source": "31c338218894ac64437cea1ef0ee6b1bb766d7bd",
+    "run": 38219796806,
+    "status": "SUCCESS independently verified 145 arrays; complete design-s1 grid matches native CPU; other seven still differ",
+    "original_only": true,
+    "canonical_fixtures_changed": false,
+    "acceptance_gates_changed": false,
+    "dispatch": "AVX2",
+    "initialization_seed": 42,
+    "cases": 8,
+    "frames": 24,
+    "public_proof": {
+      "revision": "fc241f7a5cf1a4eeca39ee07cd455688cb22b2ab",
+      "path": "breeze-guided-20261012/guided-joint-arithmetic-proof.zip",
+      "sha256": "d58605dc03e78b426bd8b032fbcd452ca5a73ce5c05d08231b6d011f28cff130",
+      "bytes": 5966594,
+      "anonymous_verified": true
+    },
+    "native_cpu_exact_cases": 1,
+    "canonical_bf16_exact_cases": 0,
+    "original_acceptance": false
+  },
+  "prepared_next_worker": {
+    "source": "b5199d969",
+    "version": "2026-10-12.breeze-cuda-speech.5",
+    "deployed": true,
+    "awaiting": "None; outputs independently checked and public proof verified",
+    "requires_breeze_backend": "CUDA",
+    "native_dump_min_gpu_mib": 4096,
+    "old_receipts_rejected": true,
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 129.973
+    },
+    "status": "COMPLETE; strict guided generation gate FAILED",
+    "source_pull_byte_equal": true
+  },
+  "completed_v5": {
+    "worker_source": "b5199d969",
+    "complete": true,
+    "strict_guided_pass": false,
+    "independent_verification": {
+      "complete_arrays_hash_checked": 163,
+      "stage_comparisons": 107,
+      "float_cosine_min": 0.9996649853348926,
+      "norm_ratio_min": 0.995454892333466,
+      "norm_ratio_max": 1.0032874385062711,
+      "speech_cases": 20,
+      "speech_arrays_byte_equal_prior_gpu": 20,
+      "speech_wer_max": 0.1111111111111111,
+      "speaker": {
+        "cuda_weights_bytes": 5694464,
+        "peak_cuda_allocated_bytes": 57500672,
+        "all_parameters_cuda": true,
+        "package_version": "0.1.4",
+        "model_sha256": "39373b86598fa3da9fcddee6142382efe09777e8d37dc9c0561f41f0070f134e",
+        "torch": "2.11.0+cu128",
+        "device": "Tesla T4",
+        "clone_reference": 0.8949968814849854,
+        "baseline_reference": 0.5270190834999084
+      },
+      "guided": {
+        "plain": {
+          "exact": false,
+          "match_fraction": 0.2109375,
+          "first_mismatch": 69,
+          "first_frame": 4,
+          "first_codebook": 5,
+          "frame0_cosine": 0.9999898387817304,
+          "frame0_norm_ratio": 1.0014135204661145
+        },
+        "clone": {
+          "exact": false,
+          "match_fraction": 0.08072916666666667,
+          "first_mismatch": 24,
+          "first_frame": 1,
+          "first_codebook": 8,
+          "frame0_cosine": 0.9999847182669152,
+          "frame0_norm_ratio": 1.0004902023266677
+        },
+        "design-s0": {
+          "exact": false,
+          "match_fraction": 0.2109375,
+          "first_mismatch": 69,
+          "first_frame": 4,
+          "first_codebook": 5,
+          "frame0_cosine": 0.9999898387817304,
+          "frame0_norm_ratio": 1.0014135204661145
+        },
+        "design-s1": {
+          "exact": false,
+          "match_fraction": 0.0546875,
+          "first_mismatch": 5,
+          "first_frame": 0,
+          "first_codebook": 5,
+          "frame0_cosine": 0.9999942751922906,
+          "frame0_norm_ratio": 0.9996165253817935
+        },
+        "design-s4": {
+          "exact": false,
+          "match_fraction": 0.0625,
+          "first_mismatch": 11,
+          "first_frame": 0,
+          "first_codebook": 11,
+          "frame0_cosine": 0.9998679093370197,
+          "frame0_norm_ratio": 0.9967053288974671
+        },
+        "direct-s0": {
+          "exact": false,
+          "match_fraction": 0.08072916666666667,
+          "first_mismatch": 24,
+          "first_frame": 1,
+          "first_codebook": 8,
+          "frame0_cosine": 0.9999847182669152,
+          "frame0_norm_ratio": 1.0004902023266677
+        },
+        "direct-s1": {
+          "exact": false,
+          "match_fraction": 0.28125,
+          "first_mismatch": 55,
+          "first_frame": 3,
+          "first_codebook": 7,
+          "frame0_cosine": 0.9999890730271821,
+          "frame0_norm_ratio": 0.9993960045594853
+        },
+        "direct-s4": {
+          "exact": false,
+          "match_fraction": 0.16145833333333334,
+          "first_mismatch": 10,
+          "first_frame": 0,
+          "first_codebook": 10,
+          "frame0_cosine": 0.9996701825852126,
+          "frame0_norm_ratio": 1.0013505276591157
+        }
+      },
+      "strict_generation_accepted": false,
+      "guided_codes_exact_cases": 0,
+      "full_cuda_guided_execution_proven": true,
+      "device_scope": "Explicit Breeze compute-backend names CUDA and >4 GiB actual process model allocation in stage and guided dumps"
+    },
+    "public_proof": {
+      "revision": "48cff19fe13c01665c56bc9dbf95fcbb63856225",
+      "path": "breeze-guided-20261012/cuda-speech-stage-fixed-init-proof.zip",
+      "sha256": "4c368fa9158c6abc4a6fb06c583bcad5119bd695b7be6960e4ed5179fd03f304",
+      "bytes": 14054493,
+      "anonymous_verified": true
+    },
+    "gpu_processes": {
+      "cli-plain": {
+        "pid": 240,
+        "peak_mib": 6662,
+        "returncode": 0
+      },
+      "cli-clone": {
+        "pid": 272,
+        "peak_mib": 6916,
+        "returncode": 0
+      },
+      "cli-design": {
+        "pid": 308,
+        "peak_mib": 6992,
+        "returncode": 0
+      },
+      "cli-direction": {
+        "pid": 358,
+        "peak_mib": 7208,
+        "returncode": 0
+      },
+      "gpu-speaker": {
+        "pid": 484,
+        "peak_mib": 210,
+        "returncode": 0
+      },
+      "gpu-stage-dump": {
+        "pid": 669,
+        "peak_mib": 6482,
+        "returncode": 0,
+        "breeze_compute_backends": [
+          "CUDA0"
+        ]
+      },
+      "gpu-guided-dump": {
+        "pid": 707,
+        "peak_mib": 6924,
+        "returncode": 0,
+        "breeze_compute_backends": [
+          "CUDA0"
+        ]
+      }
+    }
+  },
+  "kv_storage_followup": {
+    "source": "c9575d6be",
+    "run": 38223133652,
+    "status": "queued",
+    "original_only": true,
+    "canonical_fixtures_changed": false,
+    "acceptance_gates_changed": false
+  },
+  "kv_arithmetic_followup": {
+    "run": 38223133652,
+    "source": "c9575d6be606bc99549757165f2e4264bd3dc95a",
+    "complete_arrays_hash_shape_dtype_finite_verified": 145,
+    "exact_cases_to_control": {
+      "canonical_bf16_original": 0,
+      "native_cpu_prior": 2,
+      "mixed_device_native_prior": 2,
+      "actual_cuda_native": 3,
+      "original_joint_f32": 7
+    },
+    "kv_storage_witness": {
+      "cache_calls": 37632,
+      "depth_attention_calls": 47700,
+      "cache_changed_elements": 97688762,
+      "cache_max_abs_rounding_error": 0.015621185302734375,
+      "depth_changed_elements": 80437616,
+      "depth_max_abs_rounding_error": 0.0035858154296875
+    },
+    "public_proof": {
+      "revision": "b826a5371dcfba0260e118f16801e9ee865eecf3",
+      "path": "breeze-guided-20261012/guided-kv-arithmetic-proof.zip",
+      "sha256": "38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2",
+      "bytes": 5968115,
+      "anonymous_verified": true
+    },
+    "native_acceptance": false
+  },
+  "full_inference_arithmetic_followup": {
+    "run": 38227576695,
+    "source": "95330ca0850ac942c59fee2e9dc8818fc6d223a2",
+    "complete_arrays_hash_shape_dtype_finite_verified": 145,
+    "exact_cases_to_control": {
+      "canonical_bf16_original": 0,
+      "native_cpu_prior": 5,
+      "mixed_device_native_prior": 5,
+      "actual_cuda_native": 5,
+      "original_joint_f32": 3,
+      "original_joint_f32_kv_f16": 4
+    },
+    "full_inference_control": {
+      "active_parameter_dtype": "torch.float32",
+      "unused_training_codec_preserved": true,
+      "parameter_bytes_before": 10628513410,
+      "parameter_bytes_after": 13706837634
+    },
+    "public_proof": {
+      "revision": "b3d1ef5915750afa36960c56b0ea197bc7b6837f",
+      "path": "breeze-guided-20261012/guided-full-inference-arithmetic-proof.zip",
+      "sha256": "66990b07a0d6c9e3e0fd481bbbfb525afdad5f4b710896c6d758620444f781e8",
+      "bytes": 9195225,
+      "anonymous_verified": true
+    },
+    "native_acceptance": false,
+    "status": "SUCCESS; complete arrays independently verified, anonymous immutable archive verified"
+  }
+}

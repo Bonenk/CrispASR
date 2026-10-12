@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-12",
+  "pr": 544,
+  "head": "cfff1abb0f4274e50f2dd5db419f5ae482c00847",
+  "compiled_source": "76017342e3bd56c891fa0c79e88843e094d3e43d",
+  "production_files_and_compile_job_byte_identical": true,
+  "run": 38252679792,
+  "completed_x86_job": 114826508116,
+  "x86_64_910b": {
+    "conclusion": "success",
+    "soc_type": "ascend910b",
+    "use_acl_graph": "on",
+    "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-beta.2-910b-openeuler24.03-py3.12",
+    "image_digest": "sha256:0c8097e72727bfcc2f761b11abdceb9a1a54f6b1061341c7d3a78dbcee2dba3a",
+    "compiled_targets": [
+      "ggml-cann",
+      "crispasr-cli",
+      "crispasr-lib",
+      "crispasr-diff",
+      "crispasr-quantize"
+    ],
+    "log_bytes": 679188,
+    "log_sha256": "96a8844b0bd4de7945c464f5d6725840b2d32a2b046c4170da50ddfba5298a35"
+  },
+  "arm64_310p": {
+    "status": "queued",
+    "job": 114865630227,
+    "soc_type": "ascend310p",
+    "use_acl_graph": "off"
+  },
+  "source_routing_controls": {
+    "pass": 10,
+    "previous_helper_failures": 4,
+    "actual_npu_inference": false
+  },
+  "physical_ascend_validation": false,
+  "performance_claim": false
+}

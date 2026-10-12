@@ -1,0 +1,150 @@
+{
+  "source": "c222540e1cdef04d011807040a44030ff8ba9228",
+  "contracts_passed": 4,
+  "output_rate_dispatch_passed": true,
+  "cli_cabi_rows_checked": 136,
+  "changed_capabilities": [
+    {
+      "name": "tada",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-1b",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-tts-1b",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "tada-3b-ml",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    },
+    {
+      "name": "dots-tts",
+      "bits": 205056,
+      "capabilities": "temperature,auto-download,tts,voice-cloning"
+    }
+  ],
+  "generated_caps_sha256": "91907394d7e4c4d26815fe7b7707dd488baee9866fa6276abb907555fcba1dba",
+  "model_acceptance": false,
+  "original_guidance_parity": false,
+  "workflow_run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38026088284",
+  "workflow_conclusion": "success",
+  "artifact_id": 11661638474,
+  "generated_files_applied": [
+    "src/core/backend_caps_table.h",
+    "docs/feature-matrix.md",
+    "docs/feature-matrix.html"
+  ],
+  "feature_matrix_scope": "136 backends compiled in hosted CPU build; optional ONNX Runtime adapters not compiled",
+  "integration_status": "draft PR 531; actual model plain/clone acceptance and PR529 original guided parity remain pending",
+  "refresh": {
+    "base": "d2cdbefdb",
+    "merge_commit": "043261c27",
+    "preserved_main_controls": [
+      "UTF-8 result normalization",
+      "locale-independent loop cleanup",
+      "Breeze sampler setters and independent open guard",
+      "Breeze dynamic GPU registration"
+    ],
+    "supertonic_speaker_contracts": {
+      "production_source_compiled": true,
+      "old_null_context": "SIGSEGV",
+      "old_negative_index": "SIGABRT assertion",
+      "valid_order_control": "PASS before and after",
+      "fixed_controls_passed": 3
+    },
+    "local_post_merge_controls": {
+      "tts_failure_ownership_rate": 4,
+      "breeze_sampler": 8,
+      "ngram_locale": 5,
+      "session_utf8_assertions": 4,
+      "session_utf8_cleanup": "FAIL CIFS TemporaryDirectory teardown; hosted rerun required",
+      "hosted_session_utf8_suite": "PASS all four tests including teardown, run 38229945090 linux-unit and 38235603426"
+    },
+    "general_ci": "Pending refreshed head",
+    "model_acceptance": false
+  },
+  "complete_onnx_refresh": {
+    "validation": {
+      "source": "9022414abe7b29f4d3bc1d42f78e3aed00d6f452",
+      "contracts_passed": 4,
+      "output_rate_dispatch_passed": true,
+      "speaker_contracts_passed": 3,
+      "sampler_contracts_passed": 8,
+      "utf8_contracts_passed": 4,
+      "with_onnx": true,
+      "cli_cabi_rows_checked": 140,
+      "changed_capabilities": [
+        {
+          "name": "tada",
+          "bits": 205056,
+          "capabilities": "temperature,auto-download,tts,voice-cloning"
+        },
+        {
+          "name": "tada-1b",
+          "bits": 205056,
+          "capabilities": "temperature,auto-download,tts,voice-cloning"
+        },
+        {
+          "name": "tada-tts-1b",
+          "bits": 205056,
+          "capabilities": "temperature,auto-download,tts,voice-cloning"
+        },
+        {
+          "name": "tada-3b-ml",
+          "bits": 205056,
+          "capabilities": "temperature,auto-download,tts,voice-cloning"
+        },
+        {
+          "name": "dots-tts",
+          "bits": 205056,
+          "capabilities": "temperature,auto-download,tts,voice-cloning"
+        }
+      ],
+      "generated_caps_sha256": "56c05ff0c7349178031c89f7d6604e36c5bd0eeaca0074eb666f27275a6cf411",
+      "model_acceptance": false,
+      "original_guidance_parity": false
+    },
+    "transport": {
+      "run": 38235603426,
+      "source": "9022414abe7b29f4d3bc1d42f78e3aed00d6f452",
+      "artifact_id": 11741291472,
+      "bytes": 54620,
+      "sha256": "f50c81b46af9823a3d5ed2d3de71af3baed9ca9064fc8419d5784a4c0e20d5e1",
+      "crc_verified": true,
+      "generated_files": [
+        {
+          "path": "backend_caps_table.h",
+          "sha256": "56c05ff0c7349178031c89f7d6604e36c5bd0eeaca0074eb666f27275a6cf411"
+        },
+        {
+          "path": "feature-matrix.md",
+          "sha256": "9a24065a321919fd04b89da1aa2f83ee6d33184596a667c2e5bd7589d9750ec3"
+        },
+        {
+          "path": "feature-matrix.html",
+          "sha256": "1c4dbb57a000c207516ec181ce4516e56994432007b3c7dd9c860f2b39436785"
+        }
+      ]
+    },
+    "generated_outputs_applied_byte_equal": true,
+    "prior_failure": {
+      "run": 38229945339,
+      "cause": "Moonshine absent from 136-backend generated feature matrix"
+    },
+    "current_general_ci": "Pending regenerated artifact head",
+    "public_proof": {
+      "revision": "a870b211d985d459bc4b457c152590cded745e8e",
+      "path": "contributor-tts-20261012/onnx-contracts-proof.zip",
+      "sha256": "f50c81b46af9823a3d5ed2d3de71af3baed9ca9064fc8419d5784a4c0e20d5e1",
+      "bytes": 54620,
+      "anonymous_verified": true
+    }
+  }
+}

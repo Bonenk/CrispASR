@@ -7,6 +7,30 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-12 — TTS session ownership, conversion rates and speaker boundaries
+
+PR #531 merged as `d73e39dc8c3f68b485e31b06c26d1351f41654f4` after all
+48 applicable checks passed, with one intentional skip. Preserve existing Breeze
+references on rejected updates, release replaced Moss reference resources, and
+return owned conversion PCM with actual source/output rates. Supertonic direct
+speaker getters safely reject null contexts and invalid indices. Source-compiled
+negative controls reproduce the previous crashes. The pinned ONNX-enabled
+CLI/shared library exposes all 140 generated capability rows; native CI passes
+2,009 unit tests and ownership, speaker, locale, sampler and UTF-8 contracts.
+Contributor @rslife's #530 history is preserved and GitHub marked that ancestor
+merged. Its separate decoded/model-quality reports remain unresolved.
+Receipt: `docs/contributor-tts-contracts-2026-10-11.json`.
+
+## DONE 2026-10-12 — Breeze dynamic GPU registration order
+
+PR #542 merged as `f8eb4325e99a2a5bc9581d5c3999e831e332026b` after 36
+applicable passing checks and two intentional skips. Initialize the CPU wrapper
+before GPU selection so dynamically built CUDA plugins are registered. Actual
+T4 composition evidence covers the identical device/weight-loading source
+prefix, 107 original stages and 20 unchanged speech outputs. The broader
+instruction/cache features and strict original guided-code gate remain pending.
+Receipt: `docs/breeze-cuda-dispatch-2026-10-12.json`.
+
 ## DONE 2026-10-11 — Existing Breeze session sampler wiring
 
 PR #539 merged as `913266271cf29a052a945373ceeda675ba7acbd2` after
@@ -23546,3 +23570,42 @@ The 1,179,413,408-byte hybrid retains only 14,155,776 bytes of Q4 payload:
 8.3% smaller than F16, mostly source precision, no compact-Q4/default pin or
 speed claim. No original streaming parity, specific MMQ trace, or full
 24-layer GPU capture validation is claimed.
+
+
+## 2026-10-12 — v0.8.43 publication and actual-package validation
+
+v0.8.43 is published at frozen source eb633d908120cc5f44b8af8cd4aeb1191f16bfd8.
+All release build/validation jobs in 38199002944 passed; 50 assets are public.
+[Comprehensive release notes](RELEASE_NOTES_v0.8.43.md) cover the 14 accepted
+PRs and retain the exclusions for unfinished model/quantization/hardware work.
+
+Actual tagged CPU CLI/shared/Python packages pass digest checks, dependency
+closure, relocated loading, C ABI 0.7.0, 136 capability rows and automatic
+binding discovery. Actual Windows CUDA 12.8/12.6 package/runtime pairing
+38207603649 passes, including mixed-runtime rejection. Actual final CUDA CLI
+and shared archives each pass on dual T4s in fresh processes: three original
+stage comparisons, 26 original speech cases in fresh/reused sessions and
+nine streaming controls per archive. All 12 native/reference arrays, 52 word
+cases and 18 streaming controls were independently verified, with exact
+archive/plugin byte witnesses. Full immutable public evidence and hashes:
+[Tagged validation receipt](docs/release-tag-v0.8.43-2026-10-12.json). This is
+package/Nemotron control coverage; it does not certify all model backends.
+
+Already implemented/shipped Phonon-2 #481, VoxCPM2 prefill/thread #478 and
+UTF-8 byte/chunk-loss #533 reports are closed with release/proof links and
+explicit remaining reporter-hardware/benchmark limits. Dolphin #541 follows
+this frozen release and is pending final general CI at this checkpoint.
+
+
+## 2026-10-12 — Dolphin noncausal decoding and automatic sessions (#541)
+
+Merged #541 as 065ae1fdd7ba1b4d4923ef8d254957f82a0f4f72 after 45 applicable
+CI checks passed, one intentional skip. Both depthwise convolution sites now
+honor causal=false; noncausal CSGU adds zero padding after normalization,
+matching the original. The shared architecture table registers Dolphin for
+automatic C ABI/binding sessions. Full original validation covers streaming
+and non-streaming models, Chinese/JFK samples, 64 stage comparisons, exact
+CTC argmax/raw text and matching automatic sessions; all 128 saved arrays
+independently verified. See [full proof](docs/dolphin-noncausal-2026-10-12.json).
+Issue #540 closed by the fix. Published v0.8.43 remains unchanged; reporter
+private clip/Kylin/GCC9 and GPU validation were not reproduced.

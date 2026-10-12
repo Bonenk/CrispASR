@@ -1,8 +1,8 @@
 {
-  "source": "d89e854049bea3deb2cd691a8490cdd0b0229adf",
+  "source": "080a0fe5a17a32cf9515e8077d76856257ad0689",
   "branch": "test/breeze-original-speech",
   "script": "tools/ci-heavy/breeze_original_speech.py",
-  "status": "Prepared, not dispatched; requires native model worker artifact",
+  "status": "SUCCESS: original and native decoded speech comparison",
   "native_run": 38169287241,
   "native_source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "upstream": "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2",
@@ -37,21 +37,132 @@
     "Python compilation",
     "CLI argument help",
     "Actual WER controls at 0, .2 and .4; unchanged threshold",
-    "Exact reviewed loading section compile"
+    "Exact reviewed loading section compile",
+    "Actual Torch/HF: old prompt crash, prompt exclusion, backbone-only history, signs/unique duplicates, reused processor and invalid-batch rejection"
   ],
   "no_secrets": {
     "passed": 4,
     "skipped": 0,
-    "seconds": 44.972
+    "seconds": 204.863
   },
   "limitations": [
-    "No original/native decoded result yet",
     "Full-generation oracle with production sampling settings; not fast-streaming timing",
     "Does not accept all native CLI/server modes or speaker similarity; separate native worker records those",
     "Does not waive failed exact generated-code or original-byte-equivalence diagnostics",
     "No new tag, quant or model default"
   ],
-  "original_speech_run": 38172313354,
-  "original_speech_status": "queued at dispatch",
-  "native_receipt_complete": true
+  "original_speech_run": 38173377874,
+  "original_speech_status": "success",
+  "native_receipt_complete": true,
+  "previous_original_run": 38172313354,
+  "previous_failure": "Generic Transformers repetition penalty indexes mixed text prompt ID 262146 into audio logits of width 2052",
+  "sampler_adapter": "Pinned upstream apply_repetition_penalty via custom logits processor, generated codebook-zero history only; generic HF penalty 1.0, effective penalty 1.1",
+  "complete": true,
+  "roundtrip_pass": true,
+  "failures": [],
+  "roundtrips": {
+    "original-plain": {
+      "transcript": "I found the fall U asked about and opened it.",
+      "wer": 0.2,
+      "wer_max": 0.2,
+      "pcm_sha256": "b12152f51e28ae14acf6c78cfe9e18451bc6b8e5febbdba07284b085d4603eb8"
+    },
+    "native-plain": {
+      "transcript": "I found file you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2,
+      "pcm_sha256": "de67c525493ac908b6c570d0d1bfa3c3c0d8b768a0df022081023df8cfb6ed36"
+    },
+    "original-clone": {
+      "transcript": "I found the fire you asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2,
+      "pcm_sha256": "1bd66cb61311ac6d487043053ac6ea5269e0b9293cfabbd438fc8347d46a4f87"
+    },
+    "native-clone": {
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2,
+      "pcm_sha256": "5ba0d378f9135745459a5af9a3640ba8f3962e7aa330d75426891e44f80a26fe"
+    },
+    "original-design": {
+      "transcript": "I found the file you asked about and opened it.",
+      "wer": 0.0,
+      "wer_max": 0.2,
+      "pcm_sha256": "cf78b17d9ffccdb7f168c28a1993fd760c7122f755bf4a3282c54defea26c50f"
+    },
+    "native-design": {
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2,
+      "pcm_sha256": "ab3a1727561b0cc6f953c2982c03e0276ff6b547ea93f600b1b21a5c30e12223"
+    },
+    "original-direction": {
+      "transcript": "I found the file you asked about and opened it",
+      "wer": 0.0,
+      "wer_max": 0.2,
+      "pcm_sha256": "2fc14b39850b5471c269d6b571db196b98c20ba93d3cbd593ac61ef1b70586c8"
+    },
+    "native-direction": {
+      "transcript": "I found the file who asked about and opened it.",
+      "wer": 0.1,
+      "wer_max": 0.2,
+      "pcm_sha256": "62582c667da898ef93bbb87d6875a74b1af11a34275a52498a4b962619fe8980"
+    }
+  },
+  "original_cases": {
+    "plain": {
+      "template": "tts_plain",
+      "cfg_scale": 1.0,
+      "frames": 38,
+      "samples": 72960,
+      "duration": 3.04,
+      "rms": 0.035766238313334246,
+      "pcm_sha256": "b12152f51e28ae14acf6c78cfe9e18451bc6b8e5febbdba07284b085d4603eb8",
+      "codes_sha256": "e3131430f93435b51f94ecab799641c8701505aca16747ff54599a5e18fb7bc1"
+    },
+    "clone": {
+      "template": "ref_clone_tata",
+      "cfg_scale": 1.0,
+      "frames": 36,
+      "samples": 69120,
+      "duration": 2.88,
+      "rms": 0.03767983920014906,
+      "pcm_sha256": "1bd66cb61311ac6d487043053ac6ea5269e0b9293cfabbd438fc8347d46a4f87",
+      "codes_sha256": "8b83c667572efccc622305ab14363b5d52283900a214466bc1f2d777aae0498a"
+    },
+    "design": {
+      "template": "tts_instruction",
+      "cfg_scale": 4.0,
+      "frames": 38,
+      "samples": 72960,
+      "duration": 3.04,
+      "rms": 0.05843982333778751,
+      "pcm_sha256": "cf78b17d9ffccdb7f168c28a1993fd760c7122f755bf4a3282c54defea26c50f",
+      "codes_sha256": "70806fa18ff7d726514748544f8328ae29eeddd4b4b1f8a9aaa8e994b1b9a29d"
+    },
+    "direction": {
+      "template": "ref_edit_tata",
+      "cfg_scale": 4.0,
+      "frames": 47,
+      "samples": 90240,
+      "duration": 3.76,
+      "rms": 0.03602575630729864,
+      "pcm_sha256": "2fc14b39850b5471c269d6b571db196b98c20ba93d3cbd593ac61ef1b70586c8",
+      "codes_sha256": "0379ecf669dedf136a1caeda8e5331cdee8d0cdde06e1ab882809250b0cb70d1"
+    }
+  },
+  "asr_control": {
+    "transcript": "And so my fellow Americans ask not what your country can do for you. Ask what you can do for your country.",
+    "wer": 0.0,
+    "wer_max": 0.2
+  },
+  "public_proof": {
+    "revision": "6ab3c175cd2ce4846942ad60277d2d30d77c7e53",
+    "path": "breeze-guided-20261011/original-native-speech-proof.zip",
+    "sha256": "aba93e6723dd8098942fcaeb9579b4a6fa73bb30b98e6c78cb1a64d67aa35dbc",
+    "bytes": 6327994,
+    "anonymous_verified": true
+  },
+  "independently_verified": "Four original code/PCM pairs and all eight PCM roundtrips: SHA256 and finite values; unchanged WER <= .2; independent JFK WER 0"
 }
