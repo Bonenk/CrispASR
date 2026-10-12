@@ -164,6 +164,9 @@ jobs:
           python3 tools/gen-backend-caps-table.py --check --crispasr build/bin/crispasr
           python3 tests/test_backend_caps_abi.py --cli build/bin/crispasr --build-dir build
 
+      - name: Check production GPU backend/device selection without hardware
+        run: python3 tests/test_gpu_backend_selection.py -v
+
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
       - name: Breeze guided acceptance deletion controls
