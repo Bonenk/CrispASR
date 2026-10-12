@@ -59,16 +59,17 @@ and reference audio now reach synthesis together through the C ABI; server
 voice caches include transcript-sidecar changes and reject unknown voices while
 preserving subsequent valid requests. See [the merge receipt](breeze-merge-2026-10-12.json).
 
-## CANN backend/device selection — PR #544 validation pending
+## CANN backend/device selection — PR #544 merged
 
 The CANN follow-up exposes CLI backend/device selection and adds a separate
 opt-in x86_64/910B and arm64/310P compile matrix for CLI, shared library, diff
 and quantizer. Ten production-source routing controls pass, with four failing
 against the previous helper. Current-source x86_64/910B (ACL graph on) and
 ARM64/310P (ACL graph off) builds both pass all four targets and ggml-cann.
-See [the complete compile receipt](cann-pr544-compile-2026-10-12.json). General
-PR CI and integration remain pending. Hosted compilation cannot establish
-Ascend inference or speed.
+See [the complete compile receipt](cann-pr544-compile-2026-10-12.json). PR #544
+merged as `a86e366043f4a23251f10b67d982778cd89f83dd` after 46 passing
+checks and one intentional skip. See [the merge receipt](cann-merge-2026-10-12.json).
+Hosted compilation cannot establish Ascend inference or speed.
 
 The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
 real positive ADD case and rejects three actual upstream false-success cases:
@@ -100,6 +101,10 @@ acceptance. Decoder-history and DAC-code replay do not establish free-running
 sampler equality. Two follow-ups at source `3fb35f49e` are queued: [original/published/F32 codec A/B](https://github.com/CrispStrobe/CrispASR/actions/runs/38285563002)
 and [complete original short-speech control](https://github.com/CrispStrobe/CrispASR/actions/runs/38285566623).
 Their results are pending; neither changes production defaults or thresholds.
+The [complete rejected numerical and speech proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
+is public and immutable: 54,845,734 bytes, anonymously downloaded and fully
+SHA256 verified. [The receipt](dia-rejected-proof-2026-10-12.json) retains every
+artifact file hash, both failed runs and the follow-up source provenance.
 
 ## Work excluded from release acceptance
 

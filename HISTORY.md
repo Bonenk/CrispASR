@@ -7,6 +7,18 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-12 — CANN CLI routing and opt-in compile coverage
+
+PR #544 merged as `a86e366043f4a23251f10b67d982778cd89f83dd` after 46
+passing checks and one intentional skip, preserving the contributor history.
+CLI backend/device selection reaches the existing CANN helper. Ten compiled
+routing controls pass; four fail with the previous helper. The opt-in SDK matrix
+compiles ggml-cann, CLI, shared library, diff and quantizer on x86_64/910B with
+ACL graphs and ARM64/310P without ACL graphs. Physical Ascend operators, model
+inference, quantized speech and speed remain pending the contributor experiment.
+Receipts: `docs/cann-merge-2026-10-12.json` and
+`docs/cann-pr544-compile-2026-10-12.json`.
+
 ## DONE 2026-10-12 — Breeze composed synthesis and server voice handling
 
 PR #543 merged as `8dfa0d72cbe5cc24d7853d4631fa758a4134b927` after 51

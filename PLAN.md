@@ -5421,3 +5421,21 @@ original/published/F32/narrow-F32 codec control run 38285563002 and complete
 uses the existing unchanged ASR gate before continuing strict numerical checks.
 Fresh source CI 38285708592 is queued. These runs have no acceptance result yet;
 prior codec and complete native short-speech failures remain rejected. No new tag.
+
+
+## UPDATE 2026-10-12 — CANN merged; rejected Dia proof publicly preserved
+
+PR #544 merged as `a86e366043f4a23251f10b67d982778cd89f83dd` after all
+46 applicable checks passed, one intentional skip. Contributor history is intact;
+physical Ascend results remain pending comment 6129427689's concrete procedure.
+The latest main must still complete its post-merge CI before a release tag.
+
+Complete failed Dia codec/numerical run 38278884937 and complete native speech
+run 38272642504 are archived publicly at dataset revision
+`43b643898356a14c9d7a8aa0168ef5ea0d64261d`,
+`dia-20261012/rejected-codec-and-short-speech-proof.zip`. All 54,845,734 bytes
+were anonymously re-downloaded and SHA256 verified:
+`7fadc88620221fa66cd7f4151260ef7020f49bcc95199ab0bb0dfd7b5fa5328e`.
+Receipt `docs/dia-rejected-proof-2026-10-12.json` retains complete file hashes,
+failures and source. Follow-up codec/full-original runs remain queued; these
+failed outputs are proof of rejection, not accepted fixtures or a default change.
