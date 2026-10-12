@@ -4,7 +4,7 @@
   "source": "e4c8461b900084afe5320ea2d734d3d86dfa644c",
   "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "branch": "probe/breeze-cuda-speech-composition",
-  "status": "queued",
+  "status": "building",
   "workflow": ".github/workflows/index-echo-cuda-validation.yml",
   "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
   "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
@@ -38,5 +38,26 @@
     531,
     536
   ],
-  "next": "Verify exact CI archive bytes and immutable public mirror before pinning and launching a Kaggle GPU-only speech/stage worker; preserve all strict generation failures."
+  "next": "Verify exact CI archive bytes and immutable public mirror before pinning and launching a Kaggle GPU-only speech/stage worker; preserve all strict generation failures.",
+  "worker": {
+    "source": "9f2c9c8a98e0294ee7db84ee50d8d13e2261e990",
+    "path": "tools/kaggle/breeze-cuda-speech-validation/breeze_cuda_speech_validation.py",
+    "version": "2026-10-12.breeze-cuda-speech.1",
+    "launched": false,
+    "archive_pins": "BUILD_PENDING; launch rejected before model downloads",
+    "syntax_check": true,
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 52.065
+    },
+    "controls": [
+      "20 generated speech surface cases with unchanged WER <= .2 and reuse/error contracts",
+      "Actual process CUDA allocation for C ABI, CLI, server, diff and recognizer",
+      "GPU speaker encoder; clone/reference similarity must improve over baseline",
+      "Complete pinned stage arrays and cosine/norm/exact controls",
+      "Strict guided generation comparison retained independently; failure keeps job failed"
+    ],
+    "quantization_tested": false
+  }
 }

@@ -4827,3 +4827,15 @@ no GPU/model acceptance claimed. Local Python syntax/diff pass; four secret
 checks pass with zero skips (63.289 s). Main receipt/claim/precision/public
 CPU asset pins also pass 227 anchors and four secret checks, zero skips
 (116.727 s). Exact artifact/public mirror pins are required before GPU launch.
+
+
+CUDA composition run 38205813889 is compiling after successful toolkit setup.
+Probe worker 9f2c9c8a9 is prepared: unchanged 20 speech/ASR/reuse controls, actual
+per-process CUDA allocation witnesses, GPU speaker encoder, full original stage
+arrays/cosine/magnitude controls and separately strict guided-generation gate.
+Nonidentical guided codes keep the worker failed even if speech/stages pass.
+Archive pins deliberately remain BUILD_PENDING and prevent launch before model
+downloads; no Kaggle execution or quant acceptance claimed. Worker syntax/diff
+and four secret tests pass, zero skips (52.065 s). v0.8.43 tagged release has
+35 public assets and no failed jobs; six remaining build jobs are in progress.
+Comprehensive public release notes retain the final 17,509-character body.
