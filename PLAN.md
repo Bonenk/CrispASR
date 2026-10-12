@@ -5764,3 +5764,19 @@ run [38312385854](https://github.com/CrispStrobe/CrispASR/actions/runs/383123858
 is queued; cancelled 38311994907 never executed. Python syntax and all four
 staged no-secrets tests pass without skips (55.747 s). The actual retained GGUF
 shape inspection is the evidence for the boundary-only layout correction.
+
+### 2026-10-12 CLAIM independently validated Dia DAC converter integration
+
+While pinned RNG witness 38312385854 waits for a hosted runner, salvage the
+standalone DAC exporter/helper and tiny actual-original-module contracts into a
+new storage worktree based on current main. Preserve the tested converter bytes/
+134-tensor map and critical original checkpoint pin; add explicit user-facing
+conversion instructions and require the CLI's published template hash before
+loading original dependencies. Validate the wrong-template rejection before the
+guard, then rerun complete tiny physical-export contracts. Existing full hosted
+converter proof 38306172119 requires byte-identical candidate output and passes
+startup 48/48 plus full canonical history 40/40. Integrate this conversion tool
+alone after validation, using rebase/fast-forward and no internal PR. Do not
+merge the diagnostic/runtime/RNG branch, promote model pins, claim native free
+speech/GPU/Q4 acceptance or tag a release. Check all applicable contributing
+integration points; no new backend/ABI/registry entry is introduced.
