@@ -91,5 +91,28 @@
       "anonymous_verified": true
     },
     "limitations": "Same host already AVX2; no AVX512 contrast and no causal explanation of earlier Intel mismatch; native not executed"
+  },
+  "precision_avx2_retry": {
+    "run": 38199379678,
+    "source": "8ed327bc53f8eb9d86df62ecacec54908175b6a1",
+    "status": "queued at dispatch",
+    "script": "tools/ci-heavy/breeze_precision_avx2.py",
+    "dispatch": {
+      "ATEN_CPU_CAPABILITY": "avx2",
+      "ONEDNN_MAX_CPU_ISA": "AVX2",
+      "MKL_ENABLE_INSTRUCTIONS": "AVX2"
+    },
+    "opt_in_initialization_seed": 42,
+    "original_probe_default_unchanged": true,
+    "strict_original_and_native_gates_unchanged": true,
+    "actual_model_free_controls": [
+      "Entrypoint selects AVX2 before first Torch import and forwards precision argv",
+      "Reference phase preserves ordinary RNG and sets opt-in initialization before first checkpoint download"
+    ],
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 49.997
+    }
   }
 }

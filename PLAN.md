@@ -4765,3 +4765,14 @@ every native decision/generation gate. Record complete arrays/provenance and
 strict failures; no native math/default or model pin changes. This extends the
 existing first-near-tie precision investigation, not a cause or parity claim.
 Actual fresh-process controls must verify path/argv/seed/dispatch before GH.
+
+Explicit AVX2 precision-decision worker 8ed327bc53f8eb9d86df62ecacec54908175b6a1
+is dispatched as 38199379678. Wrapper selects PyTorch/oneDNN/MKL AVX2 before
+Torch import; optional seed 42 is inherited by the fresh original process and
+recorded in provenance. Ordinary probe behavior and every strict original
+byte/native decision gate are unchanged. Actual model-free reference controls
+stop before first download and prove default RNG preservation / opt-in seed;
+fresh entrypoint control proves selected AVX2, inheritance and argv. Four
+secret checks pass, zero skips (49.997 s); no local model execution.
+Tag release 38199002944 is building with no failures at checkpoint; v0.8.43
+release remains draft awaiting final assets and final notes restoration.
