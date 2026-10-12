@@ -85,8 +85,8 @@ method. Eight complete code-grid regressions pass; five fail before the fix.
 The reference/diff integration observes original generation and real DAC calls,
 checks exact input boundaries plus stage cosine and magnitude, and rejects
 missing or uniformly scaled reference stages. Input validation rejects
-unaligned whitespace/NUL before model loading; four tiny-original capture
-controls pass. These small tests establish boundary and capture behavior.
+unaligned whitespace/NUL before model loading; five tiny-original generation
+controls and two observer contracts pass. These small tests establish boundary and capture behavior.
 
 [Actual-weight numerical/codec validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38278884937)
 and [complete native F16/Q8/Q4 speech validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38272642504)
@@ -98,12 +98,12 @@ CLI and C ABI: F16/Q8 are quiet, while Q4 produces louder non-speech. No thresho
 relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
-sampler equality. Follow-ups are queued; the codec trace uses source `24468e487`, while the complete original control retains `3fb35f49e`: [original/published/F32 codec A/B with eight boundaries](https://github.com/CrispStrobe/CrispASR/actions/runs/38289295345)
+sampler equality. The eight-boundary follow-up at `24468e487` stopped before native comparison on an unmapped published DAC input-projection bias; its actual original captures and full failure logs are retained in [the harness-failure receipt](dia-codec-trace-harness-failure-2026-10-12.json). The mapper repair at `778dac9cc` passes three tiny-original contracts covering all 134 parameters, code-replay independence and unknown-name rejection. A fresh comparison is queued, while the complete original speech control remains running at unchanged `3fb35f49e`: [original/published/F32 codec A/B with eight boundaries](https://github.com/CrispStrobe/CrispASR/actions/runs/38294496529)
 and [complete original short-speech control](https://github.com/CrispStrobe/CrispASR/actions/runs/38285566623).
 Their results are pending; neither changes production defaults or thresholds.
 The generic reference/diff additionally observes eight DAC boundaries, preserving
 canonical PCM/codes and requiring every declared stage. Seven local capture
-contracts pass; this remains unmerged diagnostic work until hosted acceptance.
+contracts plus three parameter contracts pass; this remains unmerged diagnostic work until hosted acceptance.
 The [complete rejected numerical and speech proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
 is public and immutable: 54,845,734 bytes, anonymously downloaded and fully
 SHA256 verified. [The receipt](dia-rejected-proof-2026-10-12.json) retains every

@@ -5512,3 +5512,24 @@ original modules, retain strict rejection of unknown tensors, and rerun
 the hosted comparison. Do not skip weights or change graph math, canonical
 PCM, production codecs/defaults or thresholds. Complete original short
 speech 38285566623 continues independently on unchanged 3fb35f49e.
+
+
+## UPDATE 2026-10-12 — Dia diagnostic parameter coverage repaired and rerun
+
+Source `778dac9ccbd4dae8592117e8e2cc2f76c608a3b2` maps the published
+DAC input-projection weights/biases to actual original modules, preserving
+every tensor and existing output/codebook mapping. Three tiny-original DAC
+contracts pass across all 134 Parameters, exact code-replay independence
+from input-projection bias, and unknown-name rejection. Old source fails
+19 assertions/subtests: 18 missing input-projection Parameters plus the
+replay contract. The seven existing tiny-original generation/observer
+tests also pass. Python syntax, 227 documentation anchors and all four
+staged secret checks pass without skips (50.007 s). No graph arithmetic,
+production codec, sampler, canonical PCM or threshold changed.
+
+Fresh hosted codec run 38294496529 is queued at that exact source; both
+new parameter and existing observer tests run before its downloads/weight
+comparisons. Complete original short speech 38285566623 remains running
+independently on unchanged 3fb35f49e. Failed run 38289295345's complete
+17 files (366,607,573 bytes), full hashes and GitHub artifact 11767387065
+remain recorded. No native/full-speech acceptance or release tag claimed.

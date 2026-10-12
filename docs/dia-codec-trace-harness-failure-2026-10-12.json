@@ -91,5 +91,11 @@
       "bytes": 49580,
       "sha256": "ed172cbfc1b70d0493b874e2cb67ffc13fff9c9a84def256e1a88db6f3ab1963"
     }
-  ]
+  ],
+  "github_artifact": {
+    "id": 11767387065,
+    "name": "heavy-38289295345",
+    "bytes": 280767348
+  },
+  "retained_file_bytes": 366607573
 }
