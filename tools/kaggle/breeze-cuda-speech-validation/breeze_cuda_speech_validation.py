@@ -87,6 +87,16 @@ def run(command, label, env=None, min_gpu_mib=256):
                 process.kill();process.wait();raise TimeoutError(label)
             time.sleep(.5)
     GPU_PROCESSES[label]=dict(pid=process.pid,peak_mib=peak,returncode=process.returncode)
+    if label in ('gpu-stage-dump', 'gpu-guided-dump'):
+        # The codec also allocates on CUDA. Its presence alone cannot prove
+        # that Breeze selected CUDA before dynamic plugins were registered.
+        actual_backend = [line.split(' = ', 1)[1].strip()
+                          for line in (OUT / (label + '.log')).read_text().splitlines()
+                          if line.startswith('breeze_tts_2: compute backend = ')]
+        GPU_PROCESSES[label]['breeze_compute_backends'] = actual_backend
+        (OUT/'gpu-subprocesses.json').write_text(json.dumps(GPU_PROCESSES,indent=2)+'\n')
+        assert actual_backend and all(name.startswith('CUDA') for name in actual_backend), (label, actual_backend)
+        assert peak >= 4096, 'Pinned F16 Breeze weights must reside on GPU, beyond codec allocation'
     (OUT/'gpu-subprocesses.json').write_text(json.dumps(GPU_PROCESSES,indent=2)+'\n')
     print(label,'rc',process.returncode,'GPU MiB',peak,flush=True)
     assert process.returncode == 0 and peak>=min_gpu_mib,(label,process.returncode,peak)
