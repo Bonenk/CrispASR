@@ -5724,3 +5724,30 @@ std::discrete_distribution. Observe actual Torch draws/noise/state against
 retained canonical history before implementing a portable sampler. Require exact
 original input transitions and retain failures/source/build versions. No seed
 selection, recipe/default change, fabricated reference or acceptance waiver.
+
+### 2026-10-12 canonical random witness pushed and pinned repeat dispatched
+
+Source `60a95cbb581b1123c4c0e23aa780aeab19ece1b7` adds the weight-free canonical
+random control. Actual pinned original generate, sampler, audio delay and output
+state code execute unchanged on retained logits; every original decoder input
+and final code grid must match. The observer verifies actual Torch multinomial
+against its source-derived exponential race, including exact consumed RNG
+state, and retains all exponential noise/states/pre-override draws. A fixed
+row-by-row negative control distinguishes the original batch RNG contract.
+No weights or PCM are computed, no random noise/forced tokens enter production,
+and this is not neural/native speech acceptance.
+
+Initial local Torch 2.11.0+cu130 run failed canonical input step 1, while its
+multinomial/exponential-race samples and states agreed. Preserve this version
+boundary rather than treating local Torch as the original 2.6 control. The exact
+initially executed dirty-script bytes (full hash verified), partial witness,
+complete error/build config and all 8 file hashes are retained in
+`docs/dia-canonical-random-local-rejection-2026-10-12.json`. Source inspection
+hashes identify the actual official v2.6.0 CPU multinomial/exponential/RNG files.
+
+Pinned Torch 2.6 repeat [38311994907](https://github.com/CrispStrobe/CrispASR/actions/runs/38311994907)
+is queued at exact clean `60a95cbb5`, requiring all 1,226 input transitions and
+1,210 codec frames. Script syntax, 227 documentation anchors and all four staged
+no-secrets tests pass without skips (56.992 s). No production/default/pin/tag
+change. Current open issues/PR heads are unchanged. Final-main CI remains pending;
+prior 4923f00 run was superseded after twelve successful jobs, not falsely green.
