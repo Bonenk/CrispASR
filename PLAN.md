@@ -5439,3 +5439,16 @@ were anonymously re-downloaded and SHA256 verified:
 Receipt `docs/dia-rejected-proof-2026-10-12.json` retains complete file hashes,
 failures and source. Follow-up codec/full-original runs remain queued; these
 failed outputs are proof of rejection, not accepted fixtures or a default change.
+
+
+## CLAIMED 2026-10-12 — Dia original/native DAC boundary tracing
+
+While the preserved-grid weight-precision and complete original short-speech
+workers are queued, extend the existing codec diagnostic with actual original
+RVQ latent, input convolution, four decoder block and output snake/convolution
+captures. Add gated native dumps of those same graph tensors, marking them as
+outputs before allocation. Compare complete aligned arrays with the unchanged
+cosine/magnitude gates to identify the earliest codec divergence. Preserve the
+canonical PCM/code archive and separately label precision-matched controls;
+no decoder math, sampler, production default or threshold changes. Work stays
+in the existing storage reference worktree; fresh hosted validation follows.
