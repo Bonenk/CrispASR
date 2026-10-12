@@ -19,7 +19,7 @@ import wave
 import tarfile
 import zipfile
 
-VERSION = '2026-10-12.breeze-cuda-speech.2'
+VERSION = '2026-10-12.breeze-cuda-speech.3'
 SOURCE = '557e2cc7b58493e647cd8ae65b0fa80185760f61'
 # Exact CI archive: all member SHA/size checks and anonymous mirror verified.
 BUNDLE_REV = '33e02a2e4da0c7a027367a63811ed2cf02a6354b'
@@ -241,7 +241,7 @@ def main():
         proc=subprocess.Popen([str(x) for x in [binary,'--server','--port','11449','--backend','bt2-tts',
             '-m',paths['breeze'],'--codec-model',paths['codec'],'-t','4',
             '--max-new-tokens',LIMIT,'--voice-dir',voice_dir,'--accept-marking-responsibility']],
-            cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,env=env)
+            cwd=ROOT,stdout=log,stderr=subprocess.STDOUT)
         url='http://127.0.0.1:11449'
         def request(fields):
             body=dict(input=TEXT,response_format='f32',seed=SEED,spoken_disclaimer=False,
