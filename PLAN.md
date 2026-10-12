@@ -5361,3 +5361,21 @@ defect before modifying production math. Preserve full existing thresholds,
 recipes and speech gates; this is bounded codec evidence, not full speech.
 Also exercise missing-stage/scale negatives once the corresponding positive
 encoder stage passes, even when an independent codec stage fails.
+
+
+## UPDATE 2026-10-12 — Dia complete short speech still rejected; original control next
+
+Complete CPU run `38272642504` is rejected at boundary source `6aa849b53`.
+F16, Q8_0 and Q4_K preserve successful long-prompt C ABI/CLI speech and explicit
+limit/reset controls. All three fail the reporter's short sentence through both
+C ABI and actual CLI: ASR returns empty text, WER 1.0. F16/Q8 PCM is quiet
+(RMS 0.00038494 / 0.00016538); Q4 produces non-speech with RMS 0.33368743. The code-entry zeroing repair does not resolve that silence. Full immutable
+run output is retained on CIFS under `dia-short-20261012/full-speech-proof`.
+
+Extend the generic original worker with an explicit full-capacity (3072-step)
+short-prompt generation and the existing unchanged independent ASR child/gate.
+Preserve actual original PCM/codes, source/model pins, same prompt/seed/recipe
+and ASR metadata before failure. Continue numerical comparisons after the ASR
+probe so upstream output failure cannot hide native boundaries. No prompt
+padding, seed selection, comparator relaxation or sampling/default change.
+The 128-step original archive remains bounded codec evidence only.

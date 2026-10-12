@@ -79,7 +79,9 @@ controls pass. These small tests establish boundary and capture behavior.
 and [complete native F16/Q8/Q4 speech validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38272642504)
 are separate gates. The numerical/codec run completed with failure: F16 neural
 stages pass, but isolated DAC replay fails cosine/magnitude; Q4_K also fails
-neural boundaries. Complete native speech remains in progress. No threshold is
+neural boundaries. Complete native speech also finished with failure: long
+prompts pass, but the reported short sentence is unrecognizable through both
+CLI and C ABI: F16/Q8 are quiet, while Q4 produces louder non-speech. No threshold is
 relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
