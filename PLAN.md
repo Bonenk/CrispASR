@@ -5533,3 +5533,28 @@ comparisons. Complete original short speech 38285566623 remains running
 independently on unchanged 3fb35f49e. Failed run 38289295345's complete
 17 files (366,607,573 bytes), full hashes and GitHub artifact 11767387065
 remain recorded. No native/full-speech acceptance or release tag claimed.
+
+
+## CLAIMED 2026-10-12 — Dia full original speech proven; isolate native sampling
+
+Run 38285566623 at 3fb35f49e finished with failure only on Q4_K numerical
+parity. Actual original seed-42 short speech has WER 0, RMS 0.0735338613,
+14.048073 seconds and 1226 captured decoder steps. F16 passes all 40
+strict neural/boundary/complete-DAC comparisons; isolated PCM cosine
+0.9999999 and norm error 0.00004443983. Missing/scaled encoder negatives
+fail as required. Q4_K first fails encoder_layer_6 (cosine 0.9993770),
+then later neural stages. This does not resolve the distinct 128-step
+startup codec failure or failed native free-running short speech. Complete
+artifacts/logs/full file hashes: docs/dia-full-original-short-2026-10-12.json.
+
+Next isolate stochastic sampling from native free-generation math/bookkeeping:
+compile the actual production dia_sampling.h into a tiny diagnostic adapter,
+then use that exact sampler/seed in the actual pinned original generate()
+without modifying its neural/CFG/mask/delay/DAC source. Label this as a
+separate native-sampler control, preserving the canonical original Torch
+reference. Compare original/control/native speech through the unchanged ASR
+gate and capture the first discrete input divergence plus preceding logits.
+Add small actual-header/original-neural plumbing tests, and run real models
+only on GH. No seed/prompt selection, original fixture replacement, sampler
+production change or acceptance waiver. Codec run 38294496529 remains queued
+independently at fixed 778dac9cc.
