@@ -70,6 +70,11 @@ def main():
                 assert sha(dest) == sha(path), f'Conflicting library {dest.name}'
             else:
                 shutil.copy2(path, dest)
+            # Explicit C ABI paths and dlopen discovery need the original
+            # aliases as well as the ELF SONAME (e.g. libcrispasr.so -> .so.1).
+            alias = bundle / path.name
+            if path.name != dest.name and not alias.exists():
+                alias.symlink_to(dest.name)
     # Copy toolkit user-space runtime, never driver or compatibility shim.
     for name in ['libcudart.so.12', 'libcublas.so.12', 'libcublasLt.so.12']:
         paths = list(CUDA.rglob(name))
