@@ -162,7 +162,7 @@ unmerged branch. F16 neural stages pass the pinned original reference, but the
 0.04271824). Q4_K also fails neural boundaries. Complete native long-prompt
 roundtrips pass, while the reported short sentence has WER 1.0 through both
 CLI and C ABI: F16/Q8 are quiet and Q4 produces louder non-speech. Eight-stage
-DAC tracing remains a follow-up experiment. The completed canonical original
+DAC tracing now isolates a final-weight precision defect. The completed canonical original
 short-speech control reads the sentence verbatim (WER 0, 14.048 seconds,
 RMS 0.073534). Replaying that full original history passes all 40 F16
 comparisons, including DAC PCM at cosine 0.9999999 and norm error 0.00004443983.
@@ -174,7 +174,7 @@ original-model control using the exact compiled native sampler also fails
 short speech (WER 1), as does native free generation. Its 37-step identical
 input prefix passes neural cosine/magnitude; [the sampler receipt](docs/dia-native-sampler-control-2026-10-12.json)
 retains the first discrete divergence and complete proof. This implicates the
-sampling path but does not yet isolate probability filtering from RNG behavior;
+sampling path. Pinned probability replay finds matching support and maximum probability error below 3.61e-7;
 these are excluded investigations. Thresholds, reference PCM and production
 recipes remain unchanged. The
 [complete rejected proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
@@ -185,8 +185,7 @@ the precision of the final output weights. Preserving three original F32
 tensors passes all 48 canonical startup comparisons and adds only 1,312 bytes.
 [The full codec receipt](docs/dia-codec-precision-2026-10-12.json) retains all
 variants, rejected published results, four negative controls and 47 artifact
-hashes. The standalone conversion and full-utterance validation remain excluded
-from release acceptance; production codec pins are unchanged.
+hashes. Standalone conversion now reproduces the validated bytes and passes fresh startup/full-history comparisons. Native free speech remains excluded from release acceptance; production codec pins are unchanged.
 
 MiMo PR #492 and OmniVoice draft PR #521 remain unmerged. MiMo's diagnostic
 F32 precision path reproduces the original codes and decoded speech but is
@@ -209,3 +208,5 @@ session changes are merged. Full-inference F32 original Breeze controls match
 Those controls are documented in
 [the full-inference receipt](docs/breeze-guided-full-inference-arithmetic-2026-10-12.json)
 and do not replace canonical fixtures or waive the recorded diagnostic.
+
+Dia diagnostic follow-up: [standalone codec export](docs/dia-dac-standalone-export-2026-10-12.json) now passes fresh 48/48 startup and 40/40 full-history comparisons with byte-identical validated conversion and complete physical tensor audit (+1,312 bytes). [Pinned Torch 2.6 probability replay](docs/dia-sampling-probability-hosted-2026-10-12.json) confirms matching support on both 333-row arms and max probability error below 3.61e-7. Random-stream compatibility and free-running short speech remain unaccepted; production pins/defaults are unchanged.

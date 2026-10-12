@@ -117,7 +117,7 @@ maximum norm error 0.0006661525. The first sampled difference is step 36/head 8.
 [The full sampler receipt](dia-native-sampler-control-2026-10-12.json) retains
 all inputs, logits, draws, PCM and log hashes. The native sampling path is
 sufficient to trigger the failure with original modules; pure RNG versus
-probability/filter differences still requires separate evidence. No gate waiver.
+probability/filter replay passes on pinned Torch 2.6 with matching support and maximum error below 3.61e-7; RNG compatibility remains unproven. No gate waiver.
 The eight-boundary codec worker has now completed successfully. The published
 startup failure first appears at the output convolution; native code matches
 actual original modules using those same rounded weights. Three original F32
@@ -126,8 +126,7 @@ final-output tensors pass all 48 canonical startup comparisons, with PCM cosine
 [The full codec receipt](dia-codec-precision-2026-10-12.json) preserves the
 published failure, all four variants, four failing negative controls and 47
 artifact hashes. Actual physical audits verify three original F32 payloads and
-131 unchanged unrelated payloads/types. Reproducible standalone export and fresh
-full-utterance validation remain diagnostic work; production pins are unchanged.
+131 unchanged unrelated payloads/types. Standalone export now reproduces the validated bytes and passes fresh startup/full-history comparisons; native free-speech acceptance remains failed and production pins are unchanged.
 The generic reference/diff additionally observes eight DAC boundaries, preserving
 canonical PCM/codes and requiring every declared stage. Seven local capture
 contracts plus three parameter contracts pass; this remains unmerged diagnostic work until hosted acceptance.
@@ -152,3 +151,5 @@ See [the KV arithmetic receipt](breeze-guided-kv-arithmetic-2026-10-12.json).
 Canary CUDA allocation/reuse controls do not reproduce #532 and do not establish
 original Q4 parity. No new default, quantization format or performance claim
 follows from these diagnostics.
+
+Dia diagnostic follow-up: [standalone codec export](dia-dac-standalone-export-2026-10-12.json) now passes fresh 48/48 startup and 40/40 full-history comparisons with byte-identical validated conversion and complete physical tensor audit (+1,312 bytes). [Pinned Torch 2.6 probability replay](dia-sampling-probability-hosted-2026-10-12.json) confirms matching support on both 333-row arms and max probability error below 3.61e-7. Random-stream compatibility and free-running short speech remain unaccepted; production pins/defaults are unchanged.

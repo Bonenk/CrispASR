@@ -5697,3 +5697,30 @@ skips (69.953 s). Standalone critical-codec export run 38306172119 remains
 queued at unchanged `a0b702d0d`. Failed short speech and Q4 neural gates remain
 failed, with no production sampler, recipe, model-pin or release-tag change.
 No new external issue/PR replies were found during this continuation.
+
+### 2026-10-12 pinned probability and standalone codec controls accepted
+
+Standalone export run 38306172119 completed SUCCESS at exact `a0b702d0d`.
+The converter reproduces the validated candidate byte for byte, audits all 134
+tensors (three original F32 output payloads, 131 unrelated payloads unchanged),
+and adds 1,312 bytes. The selected bias was already F32 and byte-identical;
+only the other two selected payloads change. Six tiny contracts pass. Fresh
+strict native comparisons pass startup 48/48 and full canonical history 40/40;
+full PCM cosine 1.0000000, norm error 0.00005458190. Complete stage tables,
+physical audit, logs and all file SHAs are in
+`docs/dia-dac-standalone-export-2026-10-12.json`. Free speech/GPU remain unaccepted.
+
+Pinned Torch 2.6.0+cpu run 38307628341 completed SUCCESS at clean `2cdf631b3`.
+Both 333-row arms reproduce every saved native sample, have zero support
+mismatch, and max absolute probability errors 1.7881393e-7 / 3.6076092e-7.
+Complete distributions/receipt/logs/file SHAs are in
+`docs/dia-sampling-probability-hosted-2026-10-12.json`.
+
+CLAIM next: weight-free canonical stochastic-draw replay in the storage reference
+worktree. Actual pinned PyTorch v2.6.0 multinomial/exponential CPU sources read:
+single-sample multinomial uses exponential race; MKL-enabled F32 CPU uses one MT
+word to seed a fresh MCG31 VSL stream per tensor. Native instead uses
+std::discrete_distribution. Observe actual Torch draws/noise/state against
+retained canonical history before implementing a portable sampler. Require exact
+original input transitions and retain failures/source/build versions. No seed
+selection, recipe/default change, fabricated reference or acceptance waiver.
