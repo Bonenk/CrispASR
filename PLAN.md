@@ -4839,3 +4839,13 @@ downloads; no Kaggle execution or quant acceptance claimed. Worker syntax/diff
 and four secret tests pass, zero skips (52.065 s). v0.8.43 tagged release has
 35 public assets and no failed jobs; six remaining build jobs are in progress.
 Comprehensive public release notes retain the final 17,509-character body.
+
+## CLAIMED 2026-10-12 — Dolphin noncausal checkpoint bug #540
+
+Read the complete issue (no comments). Audit both encoder depthwise convolutions
+against pinned upstream source and the non-streaming checkpoint configuration.
+Implement causal/noncausal padding and CSGU normalization order correctly, with
+actual ggml controls that fail on the previous causal-only behavior. Use a
+separate storage worktree and GH CPU for conversion, original per-stage dumps,
+diff and decoded speech on both non-streaming and existing streaming models.
+Do not alter the already tagged v0.8.43 release or accept a model from a build.
