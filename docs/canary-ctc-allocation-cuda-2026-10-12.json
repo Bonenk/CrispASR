@@ -371,8 +371,29 @@
   "cached_same_bucket_followup": {
     "worker_source": "9132234df",
     "version": "2026-10-12.canary-ctc-cuda.2",
-    "status": "running",
-    "source_pull_byte_equal": true
+    "status": "COMPLETE PASS",
+    "source_pull_byte_equal": true,
+    "complete_arrays_verified": 16,
+    "same_bucket_cases": 6,
+    "original_parity": false,
+    "reporter_crash_reproduced": false,
+    "independent_verification": {
+      "passed_allocation_and_returning_shape": true,
+      "original_parity": false,
+      "reporter_crash_reproduced": false,
+      "complete_arrays_verified": 16,
+      "same_bucket_cases": 6,
+      "all_ten_initial_arrays_byte_equal_prior_independently_verified_gpu_run": true,
+      "all_same_bucket_returning_shapes_exact": true,
+      "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04"
+    },
+    "public_proof": {
+      "revision": "29d14881fa96021d0f41cdb3e6f1670307b298b0",
+      "path": "canary/ctc-allocation-cuda-cached-20261012/proof.zip",
+      "sha256": "bff8914b2d881d023ecb4b56d66ea827c11e50aa6c4dd33aa11be2c55ba4c389",
+      "bytes": 260796315,
+      "anonymous_verified": true
+    }
   },
   "cpu_gpu_comparison_scope": "Diagnostic against earlier pinned CPU Q4 outputs; argmax differences and minimum cosine .981333 are not original parity acceptance"
 }

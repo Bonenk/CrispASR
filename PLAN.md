@@ -4978,3 +4978,28 @@ the actual selected Breeze backend, and build/test on GH CI plus Kaggle.
 Require that backend witness for both stage and guided processes; preserve
 all original fixture, cosine/norm, exact-code and speech gates. Archive the
 completed mixed-device v4 separately and never call it full CUDA generation.
+
+
+Canary CUDA cached follow-up 9132234df COMPLETE PASS: sixteen full logits
+arrays independently verified, including six consecutive same-bucket cases
+11/11.05/11 seconds. Initial ten arrays byte-equal prior GPU probe, returning
+and fresh/reused outputs exact. Public proof 29d14881 / cached CUDA proof,
+SHA bff8914b2d881d023ecb4b56d66ea827c11e50aa6c4dd33aa11be2c55ba4c389.
+Reported allocation crash still not reproduced; Q4 CPU/GPU differences remain
+diagnostic, not original parity. #532 stays open awaiting assertion/device/clip.
+
+Closed shipped/resolved #488 (hotword system turn), #482 (AudioSeal graph
+capacity) and #484 (Intel SIMD release packaging), with published evidence
+and exact private-hardware/recording limitations in each issue reply.
+Current audit: six open issues, six open PRs; no new contributor heads.
+
+
+Breeze v4 COMPLETE: independently verified 163 arrays, all 107 stages
+(min cosine .9996649853; norm ratio .995455–1.003287), 20 speech/interface
+cases (max WER .111111), speaker clone/reference .894997 versus baseline
+.527019. Strict code generation 0/8 still FAIL. Direct-init code audit
+identifies CPU Breeze plus CUDA codec in the guided dump; no full CUDA guided
+acceptance. Public immutable mixed-device proof edf3eb38, SHA
+1a61be46acbff0602f30181cbc86a8592ace624ebeccc5bd65ad4069254dd6ab.
+Registration-order fix 435c68486 queued GH build 38219077361; original
+gates retained and next GPU worker must witness Breeze's own CUDA backend.
