@@ -257,9 +257,23 @@ word errors with and without cleanup. This upstream result does not waive
 native acceptance; no cleanup default is promoted.
 The remaining CANN and hardware-specific work in PR #492 is not included.
 
-Before publication, finish integration CI for the chosen release commit and
-verify the produced packages and their runtime dependencies. The merged PR
-checks above do not substitute for final release-artifact validation.
+The final tagged release workflow passed every build/validation job and published
+50 assets. Actual published CPU CLI/library/Python archives match GitHub digests
+and pass dependency closure, relocated loading, all 136 capability rows and
+automatic binding discovery. Actual tagged Windows CUDA 12.8/12.6 CLI/runtime/
+library pairing passes, including wrong-runtime rejection.
+
+Both actual tagged Linux CUDA archives pass on dual T4s in separate fresh
+processes, each loading its own hash-verified CUDA library: three original
+stage/magnitude comparisons, 26 original transcript controls in fresh and
+reused sessions, and nine streaming packet/reset/flush controls per archive.
+Independent verification recomputed all 12 saved native/reference arrays and
+checked all 52 original word cases and 18 streaming controls. Encoder cosine
+is 0.99999088 for each archive. This validates the published bytes separately
+from the earlier candidate build; it does not certify every backend or GPU.
+
+Immutable evidence: [tagged CPU/Python package proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/blob/e5d57833d50bc7e74aa61679e8a3842822b91a24/release/38199002944/cpu-python-package-proof.zip),
+[tagged CUDA hardware and Windows runtime proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/blob/a5c5642fb48f1895f7b0bc2263abd89b80a6fd5a/release/38199002944/tagged-cuda-windows-package-proof.zip).
 
 The subsequent Nemotron attention isolation also rejects all three source-guarded
 Q4 arms. FFN+QKV source precision is closest at encoder cosine 0.998536 versus

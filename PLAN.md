@@ -4922,3 +4922,19 @@ actual process GPU allocation and exact packaged CUDA-library byte witness.
 Compare saved CPU arrays only as CPU/GPU diagnostics, not original parity.
 Keep any allocation failure; no speculative runtime fix or claim of replaying
 the private German/VAD/diarization recording. No new native build is needed.
+
+
+Final tagged CUDA worker v8 COMPLETE PASS on dual T4s, CLI and shared archive
+in separate fresh processes. Independently verified 12 full arrays, 52
+original word cases, 18 streaming controls, exact archive/plugin byte pins.
+Public complete GPU/Windows proof a5c5642f / tagged-cuda-windows-package-proof.zip
+SHA fddbd06d970fe7fa199cb5aa1e55cd47970843cf04bc2a155e2b8b649751251d.
+Release notes now describe actual tagged bytes, all 50 published assets.
+
+Breeze exact CI ZIP CRC and tar SHA/size, all 25 bundle files (including
+SONAME aliases), and anonymous immutable mirror verified. v1 GPU guard
+correctly fails before speech because host CUDA12.8 replaced bundled12.4.
+Archived failure, repaired process-start library isolation; v2 d22fa7caa
+submitted and source pull byte equality PASS. Speech/stage/generation pending.
+Canary CUDA probe 78f0c269d submitted with source pull byte equality PASS;
+independent processes for cached bucket values 0/128; acceptance pending.

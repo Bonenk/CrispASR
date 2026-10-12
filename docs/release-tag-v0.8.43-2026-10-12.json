@@ -86,13 +86,13 @@
   "windows_pair_status": "SUCCESS: actual tagged CLI/shared/runtime CUDA 12.8 and 12.6; mixed-runtime negative control correctly rejected",
   "final_release_matrix": "SUCCESS: all release build/validation jobs and publication completed",
   "public_assets": 50,
-  "final_release_notes_characters": 17509,
+  "final_release_notes_characters": 17962,
   "cuda_package_validation": {
-    "worker_source": "622729139",
-    "version": "2026-10-12.release-package.7",
-    "status": "prepared; submission in progress",
+    "worker_source": "c3a0cb1b8",
+    "version": "2026-10-12.release-package.8",
+    "status": "COMPLETE PASS on actual dual T4s; both archives in fresh processes",
     "fresh_process_per_archive": true,
-    "hardware_accepted": false,
+    "hardware_accepted": true,
     "archives": {
       "cuda-cli": {
         "archive_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
@@ -114,6 +114,100 @@
           "anonymous_verified": true
         }
       }
+    },
+    "independent_verification": {
+      "cli": {
+        "passed": true,
+        "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+        "stages": {
+          "mel_spectrogram": {
+            "cosine_min": 1.0,
+            "native_norm": 3802.327423724644,
+            "reference_norm": 3802.3278125707384,
+            "relative_l2": 1.0037382467243056e-05,
+            "max_abs": 0.006104469299316406,
+            "passed": true
+          },
+          "pre_encode_output": {
+            "cosine_min": 1.0,
+            "native_norm": 35037.27131994719,
+            "reference_norm": 35037.281174288575,
+            "relative_l2": 4.749317146031651e-05,
+            "max_abs": 0.046783447265625,
+            "passed": true
+          },
+          "encoder_output": {
+            "cosine_min": 0.9999908804893494,
+            "native_norm": 16.613050709011176,
+            "reference_norm": 16.612932357599302,
+            "relative_l2": 0.00028003937974455275,
+            "max_abs": 0.001037895679473877,
+            "passed": true
+          }
+        },
+        "full_arrays_verified": 6,
+        "original_word_controls": 26,
+        "fresh_reused_exact": true,
+        "streaming_controls": 9,
+        "cuda_plugin_byte_matches_actual_archive": true,
+        "entry_matches_uploaded_script": true,
+        "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+        "package_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
+        "gpu_plugin_sha256": "18e90585fedc427e665de340540c57e54d3755396f1587c45dc67a00023d7cf1"
+      },
+      "shared": {
+        "passed": true,
+        "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+        "stages": {
+          "mel_spectrogram": {
+            "cosine_min": 1.0,
+            "native_norm": 3802.3274239051407,
+            "reference_norm": 3802.3278125707384,
+            "relative_l2": 1.0037380127038821e-05,
+            "max_abs": 0.006104469299316406,
+            "passed": true
+          },
+          "pre_encode_output": {
+            "cosine_min": 1.0,
+            "native_norm": 35037.27129616613,
+            "reference_norm": 35037.281174288575,
+            "relative_l2": 4.749120018825607e-05,
+            "max_abs": 0.046783447265625,
+            "passed": true
+          },
+          "encoder_output": {
+            "cosine_min": 0.9999908804893494,
+            "native_norm": 16.61305074969874,
+            "reference_norm": 16.612932357599302,
+            "relative_l2": 0.000279996483422425,
+            "max_abs": 0.0010377168655395508,
+            "passed": true
+          }
+        },
+        "full_arrays_verified": 6,
+        "original_word_controls": 26,
+        "fresh_reused_exact": true,
+        "streaming_controls": 9,
+        "cuda_plugin_byte_matches_actual_archive": true,
+        "entry_matches_uploaded_script": true,
+        "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+        "package_sha256": "faf67fd049098fdf346e922906b93b5119e1a04d080c945a8690338009451cb6",
+        "gpu_plugin_sha256": "66185e586a9a5e2a4a580ab51d22284529a60386599728d72f5d6e1312d6b398"
+      }
+    },
+    "public_proof": {
+      "revision": "a5c5642fb48f1895f7b0bc2263abd89b80a6fd5a",
+      "path": "release/38199002944/tagged-cuda-windows-package-proof.zip",
+      "sha256": "fddbd06d970fe7fa199cb5aa1e55cd47970843cf04bc2a155e2b8b649751251d",
+      "bytes": 6330376,
+      "anonymous_verified": true
     }
+  },
+  "windows_public_proof": {
+    "revision": "1505202b9fd3289171f30db819d12eb3fd46d646",
+    "path": "release/38199002944/tagged-windows-pair-proof.zip",
+    "sha256": "975526e7b3493b0277035101ba90442ce5927c2a55eaf138f9ab4f4f7ba9d754",
+    "bytes": 2217,
+    "anonymous_verified": true
   }
 }

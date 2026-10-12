@@ -4,7 +4,7 @@
   "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
   "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "branch": "probe/breeze-cuda-speech-composition",
-  "status": "SUCCESS build/package; archive verification and GPU execution pending",
+  "status": "SUCCESS build; Kaggle v2 running after host-runtime isolation repair",
   "workflow": ".github/workflows/index-echo-cuda-validation.yml",
   "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
   "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
@@ -43,11 +43,11 @@
   ],
   "next": "Verify exact CI archive bytes and immutable public mirror before pinning and launching a Kaggle GPU-only speech/stage worker; preserve all strict generation failures.",
   "worker": {
-    "source": "63f4ef80cea3d76e28f4636ce59b8e2848a7ca04",
+    "source": "d22fa7caa",
     "path": "tools/kaggle/breeze-cuda-speech-validation/breeze_cuda_speech_validation.py",
-    "version": "2026-10-12.breeze-cuda-speech.1",
-    "launched": false,
-    "archive_pins": "BUILD_PENDING; launch rejected before model downloads",
+    "version": "2026-10-12.breeze-cuda-speech.2",
+    "launched": true,
+    "archive_pins": "Exact immutable CI/mirror archive and all 25 file hashes verified",
     "syntax_check": true,
     "no_secrets": {
       "passed": 4,
@@ -62,7 +62,10 @@
       "Strict guided generation comparison retained independently; failure keeps job failed"
     ],
     "quantization_tested": false,
-    "speaker_runtime": "Separate GPU subprocess using preinstalled Torch; native C ABI/CLI/server/diff must use bundled CUDA user runtime"
+    "speaker_runtime": "Separate GPU subprocess using preinstalled Torch; native C ABI/CLI/server/diff must use bundled CUDA user runtime",
+    "source_pull_byte_equal": true,
+    "previous_gpu_run": "v1 FAILED before speech: host CUDA12.8 loaded instead of packaged12.4; terminal logs/output preserved",
+    "runtime_isolation": "Native worker restarts with bundle LD_LIBRARY_PATH at process startup; separate speaker process restores host library path"
   },
   "artifact_id": 11729765083,
   "previous_runs": [
@@ -74,5 +77,15 @@
       "run": 38208702240,
       "status": "CANCELED before execution to include both eligible Kaggle GPU architectures"
     }
-  ]
+  ],
+  "public_mirror": {
+    "revision": "33e02a2e4da0c7a027367a63811ed2cf02a6354b",
+    "path": "breeze-guided-20261012/cuda-speech-557e2cc7/breeze-cuda-speech-validation.tar.gz",
+    "sha256": "4ac96a0121e600fab6e585bd7ec611e387305d26506e394d91e8615f415bad6b",
+    "bytes": 489117846,
+    "anonymous_verified": true,
+    "all_bundle_files_verified": true,
+    "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
+    "run": 38209137738
+  }
 }
