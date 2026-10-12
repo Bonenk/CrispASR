@@ -1245,11 +1245,11 @@ void supertonic_set_n_threads(struct supertonic_context* ctx, int n_threads) {
 }
 
 int supertonic_n_speakers(struct supertonic_context* ctx) {
-    return ctx->voices.size();
+    return ctx ? (int)ctx->voices.size() : 0;
 }
 
 const char* supertonic_get_speaker_name(struct supertonic_context* ctx, int i) {
-    if (i >= (int)ctx->voices.size()) {
+    if (!ctx || i < 0 || i >= (int)ctx->voices.size()) {
         return nullptr;
     }
     auto iter = ctx->voices.begin();
