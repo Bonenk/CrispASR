@@ -5003,3 +5003,16 @@ acceptance. Public immutable mixed-device proof edf3eb38, SHA
 1a61be46acbff0602f30181cbc86a8592ace624ebeccc5bd65ad4069254dd6ab.
 Registration-order fix 435c68486 queued GH build 38219077361; original
 gates retained and next GPU worker must witness Breeze's own CUDA backend.
+
+
+## CLAIMED 2026-10-12 — All-eight original Breeze arithmetic control
+
+The isolated design-s1 frame-zero probe explains one argmax flip when both
+original backbone and depth arithmetic are promoted to F32. Extend that
+original-only diagnostic to all eight full 24-frame guided generations on
+GH CPU with explicit AVX2 dispatch and initialization seed 42. Keep original
+BF16-rounded weights, text/codec computation and canonical fixtures; promote
+backbone/depth/LM-head arithmetic only, explicitly casting backbone inputs.
+Compare complete generated grids to immutable canonical and saved CPU/GPU
+native diagnostics without changing any acceptance gate or fixture. This
+control may explain rounding amplification; it cannot certify the port.
