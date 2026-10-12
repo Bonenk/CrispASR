@@ -5068,3 +5068,16 @@ and explicit separate branch-cache implementation. Original-only F16 KV
 control c9575d6be queued GH CPU 38223133652; all 4 secret checks pass, zero
 skips (97.452 s), helper rounding invariants and eight strict comparator
 controls pass. No default, fixture, math or acceptance gate changed.
+
+
+## CLAIMED 2026-10-12 — Original Breeze full-inference F32 control
+
+F32 transformer/F16 KV control independently verifies 145 arrays and real
+rounding (37,632 cache writes, 47,700 depth forwards). It reproduces 2/8
+native CPU grids, 3/8 actual CUDA grids; canonical BF16 exact gate stays 0/8.
+Remaining plain/direction first divergence could originate in BF16 text/audio
+embedding arithmetic retained by these controls. Run an original-only full
+inference F32 control on GH CPU, preserving BF16-rounded loaded weights and
+the unused training codec plus external audio tokenizer. Leave canonical
+fixtures, generation recipe and gates unchanged; record module dtypes and
+compare every complete grid and magnitude/cosine. No native math/default edit.
