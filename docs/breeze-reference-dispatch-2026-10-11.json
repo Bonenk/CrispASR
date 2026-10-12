@@ -95,7 +95,7 @@
   "precision_avx2_retry": {
     "run": 38199379678,
     "source": "8ed327bc53f8eb9d86df62ecacec54908175b6a1",
-    "status": "queued at dispatch",
+    "status": "SUCCESS",
     "script": "tools/ci-heavy/breeze_precision_avx2.py",
     "dispatch": {
       "ATEN_CPU_CAPABILITY": "avx2",
@@ -113,6 +113,31 @@
       "passed": 4,
       "skipped": 0,
       "seconds": 49.997
-    }
+    },
+    "independently_verified_arrays": 268,
+    "independently_verified_decisions": 135,
+    "original_prompt_logits_byte_exact": true,
+    "public_proof": {
+      "revision": "69745d157e33564827caeb906565bf4d79acab29",
+      "path": "breeze-guided-20261012/precision-decisions-proof.zip",
+      "sha256": "df574f37a415853ea82ad7e608d4121f9611956a4d4ed1c9564a9c70cddb6f7a",
+      "bytes": 2278983,
+      "anonymous_verified": true
+    },
+    "first_codebook5_control": {
+      "canonical_bf16": 193,
+      "original_promoted_backbone_bf16_depth": 193,
+      "original_promoted_backbone_fp32_depth": 936,
+      "native_same_promoted_hidden": 936,
+      "same_hidden_matching_codebooks": 15,
+      "same_hidden_minimum_cosine": 0.9999997543595904
+    },
+    "conclusion": "Original-only promoted backbone + FP32 depth reproduces native first codebook-5 pick 936 instead of canonical BF16 193; BF16 depth with promoted backbone retains 193. Joint arithmetic sensitivity is sufficient for this isolated flip.",
+    "limitations": [
+      "Same original teacher-forced frame/history, not a full free-generation acceptance",
+      "Eight strict full-generation failures remain recorded and unchanged",
+      "No GPU or additional decoded speech executed in this diagnostic",
+      "Does not establish the cause of the earlier Intel original-only mismatch"
+    ]
   }
 }

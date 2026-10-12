@@ -4783,3 +4783,36 @@ the first two assets, and tagged run 38199002944 is still building. Prior
 statements that it remains draft are superseded. This follows the existing
 incremental release workflow; candidate validation remains complete, and final
 tagged-asset completion/hash verification and final notes restoration remain.
+
+
+Explicit AVX2 precision run 38199379678 SUCCESS. All 268 full arrays and 135
+codebook decisions independently verify; canonical original prompt/logits are
+byte-exact. Original-only promoted backbone plus FP32 depth reproduces the
+first native codebook-5 flip 193 → 936. Promoting depth alone, or using BF16
+depth with the promoted backbone, retains 193. Under exactly the same promoted
+hidden state, original FP32 and native depth agree on all 15 picks; minimum
+full-distribution cosine .99999975436. Joint arithmetic sensitivity is sufficient
+for this isolated flip. This does not explain every free-running mismatch,
+accept the eight failed generation cases, or establish the Intel mismatch cause.
+Full immutable proof is public and anonymously SHA256 verified; canonical
+fixtures, generation gates, defaults and production math remain unchanged.
+
+## CLAIMED 2026-10-12 — Breeze composition CUDA speech validation
+
+Build the already CPU-tested pending-feature composition a2f58338 with CUDA on
+GH CI, including CLI, C ABI, server and diff tools. Use a probe-only packaging
+branch; no production graph or default changes. Kaggle is only for actual GPU
+execution: verify bundled plugin/device allocation, F16 conditioning and reuse,
+decoded ASR roundtrips, stage magnitudes/cosines and quant controls where pinned
+fixtures permit. Archive all terminal evidence and retain strict failures.
+This evidence supports review of pending #529/#531/#536; no feature acceptance
+or merge follows merely from a green build or the isolated precision control.
+
+
+Published tagged CPU CLI, shared library and Python archives independently
+verify against GitHub asset SHA256/size, and pass dependency closure, relocated
+library load, C ABI 0.7.0, 136 capability/error contracts and automatic packaged
+Python backend discovery. Actual CLI reports 0.8.43 / eb633d90. Immutable
+public proof is anonymously hash verified; tagged rebuild hashes are distinct
+from the validated dry-run candidate. CUDA/Windows builds remain in progress,
+without failed jobs; final matrix/asset completion and notes restoration remain.
