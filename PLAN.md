@@ -5213,3 +5213,31 @@ Keep existing full-speech gates and sampling defaults unchanged. Patch runtime
 only after the earliest divergence or a source-compiled failing control identifies
 a defect. Heavy models/builds run on GH CI or actual Kaggle GPU; large local
 artifacts stay on /mnt/storage.
+
+
+## UPDATE 2026-10-12 — Dia delayed-code boundary fix under speech validation
+
+Branch `fix/dia-delay-frame-preservation`, source
+`6aa849b5320af4da7cdfa9c25d25e31469230b2e`, fixes a concrete mismatch
+with pinned official Dia source `4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8`.
+Native delay reversal dropped a whole aligned frame when one codebook contained
+a special/invalid token; the original zeros only that entry and preserves the
+remaining frame. A fixture captured by executing the actual original output
+method fails five of eight cases against the old production function and passes
+all eight against the fix. This verifies exact codec-input codes, not neural
+stages or PCM. Both CLI and C ABI share the corrected function.
+
+The normal CI run is `38272645874`; heavy CPU run `38272642504` validates
+F16, Q8_0 and Q4_K sequentially. It adds the reporter's exact short prompt,
+"We are committed to making it secure.", through CLI and C ABI, retaining
+existing long-speech controls, independent ASR, WER limits and sampler defaults.
+Both runs were accepted for the exact source above and remain queued at this
+checkpoint. Local compiled reference controls, formatting, Python compilation,
+documentation anchors and all four staged secret tests pass without skips.
+Receipt on the branch: `docs/dia-delay-reversal-2026-10-12.json`.
+
+The old generic Dia reference module is incomplete and unregistered in both
+the reference dispatcher and crispasr-diff. Existing accepted numerical proof
+uses the dedicated pinned source-parity worker; it does not establish complete
+generic harness wiring. That integration remains pending. The reporter's
+short-speech silence is not yet claimed resolved; no merge or release tag.
