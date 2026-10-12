@@ -1,0 +1,131 @@
+{
+  "build_run": 38236488844,
+  "native_source": "e6b4ce362d69d7965f57896466228af71b2ece1c",
+  "worker_version": "2026-10-12.breeze-cuda-speech.6",
+  "worker_entry_sha256": "0f22e95635c659a4393ee9c3277bff7417dcb0620772cc589c25ffb9aa5e92b2",
+  "source_pull_byte_equal": true,
+  "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+  "bundle": {
+    "revision": "5792dad83d36d5633ea64b623fa6f714ca6488fe",
+    "path": "breeze-guided-20261012/cuda-speech-e6b4ce36/breeze-cuda-speech-validation.tar.gz",
+    "sha256": "b3aa2842ed04752ab9f04800eb2bdcac586fabf238f8a3fa5aac4a2148febb6f",
+    "bytes": 489118054,
+    "anonymous_verified": true,
+    "all_bundle_files_verified": true,
+    "source": "e6b4ce362d69d7965f57896466228af71b2ece1c",
+    "run": 38236488844
+  },
+  "proof": {
+    "revision": "80b1a27bd5dee83a2212a706d1068a23763cdd2e",
+    "path": "breeze-guided-20261012/cuda-speech-stage-refreshed-integration-proof.zip",
+    "sha256": "ce4baba7e1f03815224043f73dfd6fb47653255fd7088f27234fad1224c604d7",
+    "bytes": 14054644,
+    "anonymous_verified": true
+  },
+  "independent_verification": {
+    "complete_arrays_hash_checked": 163,
+    "stage_comparisons": 107,
+    "float_cosine_min": 0.9996649853348927,
+    "norm_ratio_min": 0.9954548923334662,
+    "norm_ratio_max": 1.0032874385062711,
+    "speech_cases": 20,
+    "speech_arrays_byte_equal_prior_gpu": 20,
+    "speech_wer_max": 0.1111111111111111,
+    "strict_generation_accepted": false,
+    "guided_codes_exact_cases": 0,
+    "full_cuda_guided_execution_proven": true,
+    "device_scope": "Explicit Breeze compute-backend names CUDA and >4 GiB actual process model allocation in stage and guided dumps"
+  },
+  "canonical_guided_comparison": {
+    "plain": {
+      "exact": false,
+      "match_fraction": 0.2109375,
+      "first_mismatch": 69,
+      "first_frame": 4,
+      "first_codebook": 5,
+      "frame0_cosine": 0.9999898387817304,
+      "frame0_norm_ratio": 1.0014135204661145
+    },
+    "clone": {
+      "exact": false,
+      "match_fraction": 0.08072916666666667,
+      "first_mismatch": 24,
+      "first_frame": 1,
+      "first_codebook": 8,
+      "frame0_cosine": 0.9999847182669152,
+      "frame0_norm_ratio": 1.0004902023266677
+    },
+    "design-s0": {
+      "exact": false,
+      "match_fraction": 0.2109375,
+      "first_mismatch": 69,
+      "first_frame": 4,
+      "first_codebook": 5,
+      "frame0_cosine": 0.9999898387817304,
+      "frame0_norm_ratio": 1.0014135204661145
+    },
+    "design-s1": {
+      "exact": false,
+      "match_fraction": 0.0546875,
+      "first_mismatch": 5,
+      "first_frame": 0,
+      "first_codebook": 5,
+      "frame0_cosine": 0.9999942751922906,
+      "frame0_norm_ratio": 0.9996165253817935
+    },
+    "design-s4": {
+      "exact": false,
+      "match_fraction": 0.0625,
+      "first_mismatch": 11,
+      "first_frame": 0,
+      "first_codebook": 11,
+      "frame0_cosine": 0.9998679093370197,
+      "frame0_norm_ratio": 0.9967053288974671
+    },
+    "direct-s0": {
+      "exact": false,
+      "match_fraction": 0.08072916666666667,
+      "first_mismatch": 24,
+      "first_frame": 1,
+      "first_codebook": 8,
+      "frame0_cosine": 0.9999847182669152,
+      "frame0_norm_ratio": 1.0004902023266677
+    },
+    "direct-s1": {
+      "exact": false,
+      "match_fraction": 0.28125,
+      "first_mismatch": 55,
+      "first_frame": 3,
+      "first_codebook": 7,
+      "frame0_cosine": 0.9999890730271821,
+      "frame0_norm_ratio": 0.9993960045594853
+    },
+    "direct-s4": {
+      "exact": false,
+      "match_fraction": 0.16145833333333334,
+      "first_mismatch": 10,
+      "first_frame": 0,
+      "first_codebook": 10,
+      "frame0_cosine": 0.9996701825852126,
+      "frame0_norm_ratio": 1.0013505276591157
+    }
+  },
+  "speaker": {
+    "cuda_weights_bytes": 5694464,
+    "peak_cuda_allocated_bytes": 57500672,
+    "all_parameters_cuda": true,
+    "package_version": "0.1.4",
+    "model_sha256": "39373b86598fa3da9fcddee6142382efe09777e8d37dc9c0561f41f0070f134e",
+    "torch": "2.11.0+cu128",
+    "device": "Tesla T4",
+    "clone_reference": 0.8949968814849854,
+    "baseline_reference": 0.5270190834999084
+  },
+  "worker_terminal_status": "ERROR",
+  "worker_failure": [
+    "Strict original guided generation gate failed; no waiver"
+  ],
+  "gates_or_fixtures_changed": false,
+  "general_ci": "Pending latest PR531/543 heads",
+  "scope": "Fixed-recipe F16 Breeze stage, magnitude, decoded-speech and interface controls on the refreshed native bundle. Canonical complete BF16 greedy codes remain diagnostic failures; no universal integer parity, new quantization or performance acceptance."
+}
