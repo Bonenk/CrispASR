@@ -37,7 +37,7 @@
   "previous_archive_proof": "docs/release-fresh-cuda-package-2026-10-11.json; source 3fdc1838, not transferred to candidate",
   "ci_status": "success: all 13 jobs",
   "release_status": "success: all 35 build/validation jobs; empty-tag publication step published nothing",
-  "hardware_status": "Version 6 actual candidate CUDA archive test RUNNING; uploaded script byte verified; old version 5 logs archived",
+  "hardware_status": "SUCCESS: actual candidate CUDA archive validated on dual T4; complete arrays independently verified",
   "cpu_python_package_validation": {
     "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
     "release_run": 38173750598,
@@ -127,7 +127,11 @@
       "status": "RUNNING",
       "failureMessage": null
     },
-    "kernel": "${KAGGLE_ACCOUNT}/crispasr-release-cuda-package-validation"
+    "kernel": "${KAGGLE_ACCOUNT}/crispasr-release-cuda-package-validation",
+    "status_at_terminal": {
+      "status": "COMPLETE",
+      "failureMessage": null
+    }
   },
   "windows_pair_run": 38198054235,
   "windows_pair_status": "SUCCESS: both actual candidate runtime pairs and mixed-version negative control",
@@ -171,5 +175,52 @@
     "passed": 4,
     "skipped": 0,
     "seconds": 121.399
-  }
+  },
+  "cuda_hardware_verification": {
+    "passed": true,
+    "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+    "stages": {
+      "mel_spectrogram": {
+        "cosine_min": 1.0,
+        "native_norm": 3802.327423724644,
+        "reference_norm": 3802.3278125707384,
+        "relative_l2": 1.0037382467243056e-05,
+        "max_abs": 0.006104469299316406,
+        "passed": true
+      },
+      "pre_encode_output": {
+        "cosine_min": 1.0,
+        "native_norm": 35037.27131994719,
+        "reference_norm": 35037.281174288575,
+        "relative_l2": 4.749317146031651e-05,
+        "max_abs": 0.046783447265625,
+        "passed": true
+      },
+      "encoder_output": {
+        "cosine_min": 0.9999908804893494,
+        "native_norm": 16.613050709011176,
+        "reference_norm": 16.612932357599302,
+        "relative_l2": 0.00028003937974455275,
+        "max_abs": 0.001037895679473877,
+        "passed": true
+      }
+    },
+    "full_arrays_verified": 6,
+    "original_word_controls": 26,
+    "fresh_reused_exact": true,
+    "streaming_controls": 9,
+    "cuda_plugin_byte_matches_actual_archive": true,
+    "entry_matches_uploaded_script": true,
+    "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+    "no_new_speed_claim": true
+  },
+  "cuda_windows_public_proof": {
+    "revision": "7d82790a0ba778990e2a1b7f3e8847cea9c9e1c5",
+    "path": "release/38173750598/cuda-windows-package-proof.zip",
+    "sha256": "b092611b4b1444b0b900558905e44e97f5cbc1fbbc5c52e47c0af0ae46f3bf01",
+    "bytes": 3168717,
+    "anonymous_verified": true
+  },
+  "all_candidate_requirements_satisfied": true,
+  "next_action": "Integrate frozen candidate and push existing annotated tag; monitor tagged release build separately"
 }

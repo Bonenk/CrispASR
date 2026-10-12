@@ -4726,3 +4726,15 @@ three-DLL SHA256s; mixed 12.8 CLI / 12.6 runtime is correctly rejected. This
 is package consistency, not physical Windows GPU validation. All 227 anchors
 pass; four secret checks pass with zero skips (121.399 s). GPU v6 remains
 RUNNING; repaired CPU dispatch retry remains queued at this checkpoint.
+
+Candidate CUDA v6 is COMPLETE and PASS on dual T4 (actual archive source
+eb633d908, plugin SHA byte-matches extracted CI archive; C ABI loads bundled
+CUDA plugin and owns 1330 MiB). All six full stage arrays independently verify
+cosine and magnitudes: encoder cosine .999990880489, relative L2 .00028003938;
+26 original word controls and fresh/reverse-reused output equality pass; nine
+streaming packet/reset/flush controls pass. Full immutable hardware/Windows
+proof is public and anonymously hash verified. All candidate requirements are
+satisfied; integrate frozen source and push the annotated bump-script tag.
+Tagged rebuilds must be tracked separately from validated dry-run archive pins.
+No pending feature, quant pin or default enters the release. CPU precision
+diagnostic 38198367653 remains queued independently of this accepted release.
