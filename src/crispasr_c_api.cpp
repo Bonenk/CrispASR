@@ -16,6 +16,7 @@
 #include "core/win_compat.h"
 #include "core/arch_backend_map.h" // #335: general.architecture → backend table, SHARED with the CLI
 #include "core/bpe.h"
+#include "core/utf8.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
 #include "core/tts_ref_cache.h"     // #334: reuse the CLI-side reference-transcript cache
@@ -2465,6 +2466,23 @@ struct crispasr_session_result {
     int n_logit_frames = 0;
 };
 
+// #533: finalize assembled strings before publishing callbacks or results.
+// Byte-level tokens may contain partial characters; repairing those pieces
+// individually would corrupt valid Chinese/Korean text. Getters stay read-only.
+static void normalize_session_result_utf8(crispasr_session_result* r) {
+    if (!r)
+        return;
+    for (auto& seg : r->segments) {
+        core_utf8::replace_invalid(seg.text);
+        core_utf8::replace_invalid(seg.speaker);
+        for (auto& word : seg.words) {
+            core_utf8::replace_invalid(word.text);
+            for (auto& alt : word.alts)
+                core_utf8::replace_invalid(alt.text);
+        }
+    }
+}
+
 // ── Streamed-segment/token polling (Dart FFI path) ──────────────────────
 // The default callbacks push into the OWNING SESSION's buffers (ud = the
 // session), so two sessions — concurrent or sequential — can't interleave
@@ -2539,6 +2557,7 @@ CA_EXPORT crispasr_session_result* crispasr_drain_streamed_segments(void) {
     r->segments = std::move(s->streamed_segments);
     s->streamed_segments.clear();
     s->streamed_seg_count.store(0, std::memory_order_relaxed);
+    normalize_session_result_utf8(r);
     return r;
 }
 
@@ -3903,7 +3922,6 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
-#ifdef CA_HAVE_CONFUCIUS4_TTS
 #ifdef CA_HAVE_BT2_TTS
     if (s->backend == "bt2-tts" || s->backend == "bt2" || s->backend == "bt2tts" || s->backend == "breeze-tts-2" ||
         s->backend == "breeze_tts_2" || s->backend == "breeze-tts2") {
@@ -3912,6 +3930,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         cp.n_threads = s->n_threads;
         cp.verbosity = g_open_verbosity_tls;
         cp.use_gpu = g_open_use_gpu_tls;
+        cp.seed = g_open_seed_tls;
         if (g_open_temperature_tls > 0.0f)
             cp.temperature = g_open_temperature_tls;
         // Resolve the codec BEFORE the model load, mirroring the CLI adapter:
@@ -3945,6 +3964,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_CONFUCIUS4_TTS
     if (s->backend == "confucius4-tts" || s->backend == "confucius4_tts" || s->backend == "confucius4") {
         s->backend = "confucius4-tts";
         confucius4_tts_params p = confucius4_tts_default_params();
@@ -5760,6 +5780,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
         crispasr_session_result* r = transcribe_autochunk(s, pcm, n_samples, language);
         apply_session_hygiene(r, !s->hygiene_defer_merge);
         apply_session_punc_model(s, r);
+        normalize_session_result_utf8(r);
         _fire_segment_callbacks(s, r);
         return r;
     }
@@ -5791,6 +5812,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
     }
     apply_session_hygiene(best, !s->hygiene_defer_merge);
     apply_session_punc_model(s, best);
+    normalize_session_result_utf8(best);
     _fire_segment_callbacks(s, best);
     return best;
 }
@@ -13067,6 +13089,13 @@ CA_EXPORT int crispasr_session_set_temperature(crispasr_session* s, float temper
     s->temperature = temperature;
     s->seed = seed;
     int touched = 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx) {
+        breeze_tts_2_set_temperature(s->bt2_ctx, temperature);
+        breeze_tts_2_set_seed(s->bt2_ctx, seed);
+        touched++;
+    }
+#endif
 #ifdef CA_HAVE_MIOTTS
     if (s->miotts_ctx) {
         miotts_set_temperature(s->miotts_ctx, temperature);
@@ -13196,6 +13225,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
     if (!s)
         return -1;
     int touched = 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx) {
+        breeze_tts_2_set_seed(s->bt2_ctx, seed);
+        touched++;
+    }
+#endif
 #ifdef CA_HAVE_MIOTTS
     if (s->miotts_ctx) {
         miotts_set_seed(s->miotts_ctx, seed);
@@ -13714,6 +13749,10 @@ CA_EXPORT int crispasr_session_set_max_new_tokens(crispasr_session* s, int n) {
     if (!s)
         return -1;
     s->max_new_tokens = n > 0 ? n : 0;
+#ifdef CA_HAVE_BT2_TTS
+    if (s->bt2_ctx)
+        breeze_tts_2_set_max_new_tokens(s->bt2_ctx, s->max_new_tokens);
+#endif
 #ifdef CRISPASR_HAS_ONNX
     if (s->moonshine_onnx_ctx)
         moonshine_onnx_set_max_new_tokens(s->moonshine_onnx_ctx, s->max_new_tokens);

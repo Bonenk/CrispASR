@@ -1,0 +1,110 @@
+{
+  "run": 38163903250,
+  "source": "5732be84fd9dc16911b3d317aada27820c18f8a5",
+  "complete": true,
+  "arrays_independently_verified": 222,
+  "original_control": {
+    "prompt_byte_exact": true,
+    "logits_byte_exact": true,
+    "finite": true,
+    "shape": [
+      2052
+    ],
+    "expected_shape": [
+      2052
+    ],
+    "cosine": 1.0000000000000002,
+    "norm_ratio": 1.0,
+    "relative_l2": 0.0,
+    "maximum_error": 0.0,
+    "unequal_values": 0,
+    "actual_argmax": 404,
+    "expected_argmax": 404
+  },
+  "backbone": [
+    {
+      "variant": "oracle_embeds",
+      "reference": "canonical_bf16",
+      "count": 29,
+      "minimum_cosine": 0.9999526739120483,
+      "norm_ratio_min": 0.9952076077461243,
+      "norm_ratio_max": 1.005318522453308,
+      "relative_l2_max": 0.01081457082182169,
+      "final": {
+        "slot": "hidden",
+        "variant": "oracle_embeds",
+        "reference": "canonical_bf16",
+        "cosine": 0.9999762773513794,
+        "norm_ratio": 1.00033438205719,
+        "relative_l2": 0.006913432385772467,
+        "maximum_error": 0.03725099563598633
+      }
+    },
+    {
+      "variant": "oracle_embeds",
+      "reference": "promoted_f32",
+      "count": 29,
+      "minimum_cosine": 0.9999998211860657,
+      "norm_ratio_min": 0.9999541640281677,
+      "norm_ratio_max": 1.0000039339065552,
+      "relative_l2_max": 0.00016064707597251981,
+      "final": {
+        "slot": "hidden",
+        "variant": "oracle_embeds",
+        "reference": "promoted_f32",
+        "cosine": 1.0000001192092896,
+        "norm_ratio": 1.0000039339065552,
+        "relative_l2": 0.00011433078907430172,
+        "maximum_error": 0.0003026723861694336
+      }
+    },
+    {
+      "variant": "native_embeds",
+      "reference": "canonical_bf16",
+      "count": 29,
+      "minimum_cosine": 0.9999400973320007,
+      "norm_ratio_min": 0.9953804612159729,
+      "norm_ratio_max": 1.0053331851959229,
+      "relative_l2_max": 0.011843711137771606,
+      "final": {
+        "slot": "hidden",
+        "variant": "native_embeds",
+        "reference": "canonical_bf16",
+        "cosine": 0.9999757409095764,
+        "norm_ratio": 1.0002071857452393,
+        "relative_l2": 0.006978722754865885,
+        "maximum_error": 0.03515505790710449
+      }
+    },
+    {
+      "variant": "native_embeds",
+      "reference": "promoted_f32",
+      "count": 29,
+      "minimum_cosine": 0.9999733567237854,
+      "norm_ratio_min": 0.9997977018356323,
+      "norm_ratio_max": 1.0010778903961182,
+      "relative_l2_max": 0.00733812665566802,
+      "final": {
+        "slot": "hidden",
+        "variant": "native_embeds",
+        "reference": "promoted_f32",
+        "cosine": 0.9999986290931702,
+        "norm_ratio": 0.9998767971992493,
+        "relative_l2": 0.0016674392390996218,
+        "maximum_error": 0.003667891025543213
+      }
+    }
+  ],
+  "public_proof": {
+    "revision": "fb8ed9f3d02c0f238fb77e4bbf2715f509044b70",
+    "path": "breeze-guided-20261011/backbone-boundary-proof.zip",
+    "sha256": "e7bc5e1137ba9984c023993e0c15ccd553ae76f45fc1e48ac40b4992e37e6a7f",
+    "bytes": 1956725,
+    "anonymous_verified": true
+  },
+  "limits": [
+    "Frame-zero design-s1 teacher-forced diagnostic, not full generation acceptance",
+    "Earlier original-only failure remains archived; its cause is not established",
+    "Eight strict generation cases still fail; no tolerance or generated-code waiver"
+  ]
+}

@@ -1,7 +1,87 @@
 # v0.8.43 — audio correctness, frontend parity and measured opt-in optimizations
 
-This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527 and #528. Experimental quantization candidates and unfinished hardware
+This release covers merged PRs #519, #520, #522, #523, #524, #525, #526, #527, #528, #534, #535, #537, #538 and #539. Experimental quantization candidates and unfinished hardware
 validation are excluded from the released behavior described below.
+
+## Breeze TTS 2: honor session sampler controls
+
+The existing Breeze session path now forwards temperature, seed and token
+limits to the native context. The TTS seed setter also forwards the full 64-bit
+seed. Clearing a token limit restores the model's GGUF metadata limit. Breeze
+opening no longer depends on the unrelated Confucius build guard, and the CLI
+accepts `--tts-instruct` as an alias for its existing `--instruct` option.
+
+PR #539 passed all 56 applicable checks, with one intentional skip. Eight
+source-compiled controls cover dispatch, native setter arguments, limit reset,
+standalone Breeze builds and unsupported/null contexts; the previous source
+failed six controls. This change does not include the pending instruction,
+reference-ownership or server voice-cache features from #529/#531/#536.
+
+Evidence: [independent sampler control proof](docs/breeze-independent-sampler-2026-10-11.json).
+
+## Transcript cleanup: preserve UTF-8 continuation bytes
+
+The post-decode repetition cleanup now recognizes only the six ASCII whitespace
+bytes. Locale-dependent `std::isspace` could classify raw UTF-8 continuation
+bytes 0xA0 and 0x85 as whitespace on macOS, stripping bytes from Chinese
+characters such as 造 and 加 and breaking strict binding decoding.
+
+PR #538 passed all 45 applicable checks, with one intentional skip. Actual
+macOS libc reproduces the old corruption and the corrected cleanup preserves
+both reported contexts byte-for-byte. Both supplied WAVs also pass actual Q4_K
+C ABI decoding on hosted macOS and Linux: all raw-token 造/加 occurrences survive
+segment/word publication, with strict UTF-8 and no replacement characters.
+The hosted Mac has no Metal device; physical M4/macOS26 and GPU numerical parity
+remain untested. Linux is a regression control: its libc does not reproduce
+the locale classification bug.
+
+Evidence: [macOS root-cause and clip proof](docs/qwen3-locale-utf8-2026-10-11.json),
+[Linux reporter-clip proof](docs/qwen3-locale-utf8-linux-2026-10-11.json).
+
+## HTDemucs: Q8 source separation on Metal
+
+Cross-attention now uses its already-contiguous Q/K/V weight-row views directly,
+removing redundant Q8 copies that Metal cannot execute. The previous graph
+aborted with `unsupported op 'CONT'` on Q8 models.
+
+PR #537 passed all 35 applicable CI checks, with two intentional skips. An
+independent hosted macOS test forces the changed fused graph on CPU: all four
+F16 and Q8 stems are byte-identical before/after. The contributor's pinned M4
+receipt reports the Q8 abort fixed, byte-identical F16 Metal stems, and Q8
+Metal/CPU per-stem cosine 0.999495–1.000000 with norm ratio 0.99953–1.00000.
+Those physical Metal results are attributed to the contributor; the hosted Mac
+has no Metal device. The fixture is speech-only, so this is a focused regression
+check rather than a music-corpus quality or performance claim.
+
+Evidence: [source, models, output hashes and attributed Metal receipt](docs/htdemucs-metal-views-2026-10-11.json).
+
+## Session results: valid UTF-8 before publication
+
+Malformed assembled result bytes now become U+FFFD before segment callbacks
+and result getters publish them. Python's strict decoder stays enabled; a bad
+byte no longer discards an otherwise usable transcription chunk. Valid UTF-8,
+including characters assembled from multiple byte-level tokens, is unchanged.
+Segment/word times, confidence and counts are preserved.
+
+PR #534 passed all 54 applicable checks, with one intentional skip. The hosted
+native build passed 2,008 unit tests and four strict ctypes regression tests.
+This protects result publication; PR #538 separately fixes the locale-dependent
+continuation-byte loss described above.
+
+Evidence: [session UTF-8 controls](docs/session-utf8-2026-10-11.json).
+
+## C ABI: complete canonical backend discovery
+
+The generated capability table now includes Hikari and the German Dattazigzag
+Moonshine backend, which the actual CLI listed but C ABI lookup omitted.
+CI compares the built CLI and shared library across all 136 canonical names,
+checks list sizing/error contracts and verifies generator output using pinned
+clang-format 18. Aliases remain outside the canonical enumeration.
+
+PR #535 passed all 42 applicable checks, with one intentional skip; its hosted
+full native build passed the actual CLI/C ABI comparison and 2,008 unit tests.
+
+Evidence: [canonical discovery proof](docs/backend-caps-2026-10-11.json).
 
 ## VoxCPM2: correct session audio rate and configurable CFM steps
 
@@ -177,9 +257,23 @@ word errors with and without cleanup. This upstream result does not waive
 native acceptance; no cleanup default is promoted.
 The remaining CANN and hardware-specific work in PR #492 is not included.
 
-Before publication, finish integration CI for the chosen release commit and
-verify the produced packages and their runtime dependencies. The merged PR
-checks above do not substitute for final release-artifact validation.
+The final tagged release workflow passed every build/validation job and published
+50 assets. Actual published CPU CLI/library/Python archives match GitHub digests
+and pass dependency closure, relocated loading, all 136 capability rows and
+automatic binding discovery. Actual tagged Windows CUDA 12.8/12.6 CLI/runtime/
+library pairing passes, including wrong-runtime rejection.
+
+Both actual tagged Linux CUDA archives pass on dual T4s in separate fresh
+processes, each loading its own hash-verified CUDA library: three original
+stage/magnitude comparisons, 26 original transcript controls in fresh and
+reused sessions, and nine streaming packet/reset/flush controls per archive.
+Independent verification recomputed all 12 saved native/reference arrays and
+checked all 52 original word cases and 18 streaming controls. Encoder cosine
+is 0.99999088 for each archive. This validates the published bytes separately
+from the earlier candidate build; it does not certify every backend or GPU.
+
+Immutable evidence: [tagged CPU/Python package proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/blob/e5d57833d50bc7e74aa61679e8a3842822b91a24/release/38199002944/cpu-python-package-proof.zip),
+[tagged CUDA hardware and Windows runtime proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/blob/a5c5642fb48f1895f7b0bc2263abd89b80a6fd5a/release/38199002944/tagged-cuda-windows-package-proof.zip).
 
 The subsequent Nemotron attention isolation also rejects all three source-guarded
 Q4 arms. FFN+QKV source precision is closest at encoder cosine 0.998536 versus

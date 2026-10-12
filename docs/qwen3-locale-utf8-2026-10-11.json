@@ -1,0 +1,65 @@
+{
+  "source": "7e3f768b8fdf5200fc98983927ae0e8923281b31",
+  "platform": "macOS-14.8.9-arm64-arm-64bit",
+  "machine": "arm64",
+  "locale": "en_US.UTF-8",
+  "reporter_m4_macos26_tested": false,
+  "passed": true,
+  "baseline_source": "7e7094320f1d9f765379a7fcf5f84a03283fb21b",
+  "baseline_header_sha256": "5f83c2c972c3fd66eb0c4c3497a274d868ab11d1e08c7c340f97a84026d939c3",
+  "baseline": {
+    "a0_is_space": true,
+    "byte85_is_space": true,
+    "cases": {
+      "系统改造，建设70兆瓦。": "e7b3bbe7bb9fe694b9e98020efbc8ce5bbbae8aebe3730e52086e793a6e38082",
+      "电加热管击穿、电加热元件、电加热管束、电加热器。": "e794b5e58a20e783ade7aea1e587bbe7a9bfe38081e794b5e58a20e783ade52083e4bbb6e38081e794b5e58a20e783ade7aea1e69d9fe38081e794b5e58a20e783ade599a8e38082"
+    }
+  },
+  "candidate": {
+    "a0_is_space": true,
+    "byte85_is_space": true,
+    "cases": {
+      "系统改造，建设70兆瓦。": "e7b3bbe7bb9fe694b9e980a0efbc8ce5bbbae8aebe3730e58586e793a6e38082",
+      "电加热管击穿、电加热元件、电加热管束、电加热器。": "e794b5e58aa0e783ade7aea1e587bbe7a9bfe38081e794b5e58aa0e783ade58583e4bbb6e38081e794b5e58aa0e783ade7aea1e69d9fe38081e794b5e58aa0e783ade599a8e38082"
+    }
+  },
+  "library_sha256": "254d82c533ef1ef0bc9116ea063df3fd64a7d083a979e7ea12e5d6cc1a54d281",
+  "model": {
+    "repo": "cstr/qwen3-asr-0.6b-GGUF",
+    "revision": "58bd3202f835f46b24b17142cb503b0860c737a5",
+    "filename": "qwen3-asr-0.6b-q4_k.gguf",
+    "sha256": "f63771c02dfa486d9399d41ab6ab8cd2d8ca24e077cd32130ea1f67f4fd8dade"
+  },
+  "metal_device": "NONE",
+  "run": 38148680663,
+  "job": 114497335707,
+  "proof": {
+    "revision": "2cf3d11e58d88da740bbfcc7ec2167bb72db718d",
+    "path": "qwen3/locale-utf8-20261011/proof.zip",
+    "bytes": 1553292,
+    "sha256": "c1b81aa064d50bee54d276b975a27af2aab6db71ea5b3fb6e034cdd36f059552",
+    "anonymous_verified": true
+  },
+  "strict_utf8_and_no_replacement_characters": true,
+  "cpu_clips": [
+    {
+      "clip": "fail_chunk_01.wav",
+      "clip_sha256": "b1e7cbf4abb432c2f84409ea00db0c45d94f466017f27dc4f23d357313db8e5a",
+      "samples": 459520,
+      "gpu_requested": false,
+      "continuation_a0_bytes": 2,
+      "zao_count": 1,
+      "jia_count": 0
+    },
+    {
+      "clip": "fail_chunk_16.wav",
+      "clip_sha256": "9080677ff23e65fe4ffeba70a7e504505869d020cfd64d9941c03f0421143d4a",
+      "samples": 518240,
+      "gpu_requested": false,
+      "continuation_a0_bytes": 10,
+      "zao_count": 0,
+      "jia_count": 10
+    }
+  ],
+  "limitation": "Hosted Mac has no Metal device; actual macOS CPU root-cause/clip proof only. Reporter macOS26/M4 and Metal/CUDA numerical parity remain untested."
+}

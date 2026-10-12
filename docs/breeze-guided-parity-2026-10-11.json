@@ -1,0 +1,121 @@
+{
+  "run": 38146159521,
+  "source": "ac7227125f47727e41728d3372e7c0e5b5f3b620",
+  "arrays_verified": {
+    "reference": 145,
+    "native": 28
+  },
+  "native_context_self_check_failures": 0,
+  "strict_guided_cases_passed": 0,
+  "strict_guided_cases_total": 8,
+  "full_speech_asr_tested": false,
+  "case_results": {
+    "plain": {
+      "backbone_cosine": 0.9999899670455799,
+      "backbone_norm_ratio": 1.0013787047455884,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 4,
+        "codebook": 5,
+        "reference": 947,
+        "native": 907
+      },
+      "code_match_fraction": 0.2109375
+    },
+    "clone": {
+      "backbone_cosine": 0.9999850502812153,
+      "backbone_norm_ratio": 1.0004908968794346,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 1,
+        "codebook": 8,
+        "reference": 230,
+        "native": 1713
+      },
+      "code_match_fraction": 0.08333333333333333
+    },
+    "design-s0": {
+      "backbone_cosine": 0.9999899670455799,
+      "backbone_norm_ratio": 1.0013787047455884,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 4,
+        "codebook": 5,
+        "reference": 947,
+        "native": 907
+      },
+      "code_match_fraction": 0.2109375
+    },
+    "design-s1": {
+      "backbone_cosine": 0.9999943707960073,
+      "backbone_norm_ratio": 0.9996629344760953,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 0,
+        "codebook": 5,
+        "reference": 193,
+        "native": 936
+      },
+      "code_match_fraction": 0.0546875
+    },
+    "design-s4": {
+      "backbone_cosine": 0.9998717587354352,
+      "backbone_norm_ratio": 0.9969408221555159,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 0,
+        "codebook": 11,
+        "reference": 544,
+        "native": 1878
+      },
+      "code_match_fraction": 0.059895833333333336
+    },
+    "direct-s0": {
+      "backbone_cosine": 0.9999850502812153,
+      "backbone_norm_ratio": 1.0004908968794346,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 1,
+        "codebook": 8,
+        "reference": 230,
+        "native": 1713
+      },
+      "code_match_fraction": 0.08333333333333333
+    },
+    "direct-s1": {
+      "backbone_cosine": 0.999989072798865,
+      "backbone_norm_ratio": 0.9994380137386156,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 3,
+        "codebook": 7,
+        "reference": 440,
+        "native": 1499
+      },
+      "code_match_fraction": 0.28125
+    },
+    "direct-s4": {
+      "backbone_cosine": 0.9996747057623716,
+      "backbone_norm_ratio": 1.0014357401260898,
+      "backbone_argmax_match": true,
+      "first_code_difference": {
+        "frame": 0,
+        "codebook": 10,
+        "reference": 117,
+        "native": 1757
+      },
+      "code_match_fraction": 0.13020833333333334
+    }
+  },
+  "proof": {
+    "revision": "27896a1fab69d45c8b246eb659823f92a5e0e458",
+    "path": "breeze-guided-20261011/matched-budget-failed-parity-proof.zip",
+    "sha256": "13d5eed11955e07f2e5fc2f681df123c1b2b35d2f11998416571dbf962d54f33",
+    "bytes": 5896927,
+    "arrays_verified": {
+      "reference": 145,
+      "native": 28
+    },
+    "anonymous_remote_verified": true
+  }
+}

@@ -2375,6 +2375,7 @@ class Session:
         (canary, cohere, parakeet, nemotron, moonshine). Other backends silently no-op.
 
         ``seed`` is the RNG seed for sampling; pass 0 for time-based.
+        Breeze (bt2-tts) forwards temperature and seed to its native sampler.
         Returns silently when no backend in the session honours the
         setter (so it's safe to call for any session)."""
         if not hasattr(self._lib, "crispasr_session_set_temperature"):

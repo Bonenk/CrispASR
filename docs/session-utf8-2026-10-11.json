@@ -1,0 +1,57 @@
+{
+  "issue": 533,
+  "scope": "assembled native session result UTF-8 contract, not Metal decoder parity",
+  "before": {
+    "tests": 4,
+    "errors": 24,
+    "failure": "strict ctypes UTF-8 decode raises UnicodeDecodeError"
+  },
+  "after": {
+    "tests_passed": 4,
+    "paths": [
+      "language-aware transcribe",
+      "legacy transcribe",
+      "best_of=1",
+      "best_of=3",
+      "segment callback",
+      "segment/word getters",
+      "word alternative text"
+    ],
+    "controls": [
+      "valid Chinese/Korean/Japanese/accented/emoji text unchanged",
+      "Korean byte-split tokens joined before normalization",
+      "stray continuation byte",
+      "truncated final character",
+      "overlong sequences",
+      "UTF-16 surrogates",
+      "above U+10FFFF"
+    ],
+    "preserved": [
+      "segment count",
+      "word count",
+      "segment times",
+      "word times",
+      "word probability"
+    ]
+  },
+  "policy": "one U+FFFD per malformed byte, matching CLI JSON; normalize before publication, getters remain read-only",
+  "hardware_reproduction": false,
+  "reporter_recording_available": true,
+  "pending": [
+    "Underlying continuation-byte preservation: draft PR538; reporter clip CPU/macOS tests queued. No macOS 26/M4 acceptance yet."
+  ],
+  "fix_source": "0bbd31921a11041b504f5cdddde293f854c7b2f5",
+  "merge_commit": "a38d66428f4f89cfac8702ef7be65e52eea84104",
+  "pr": 534,
+  "hosted_native_ci": {
+    "run": 38119248758,
+    "job": 114410376524,
+    "unit_tests": 2008,
+    "strict_ctypes_tests": 4,
+    "result": "PASS"
+  },
+  "pr_checks": {
+    "passed": 54,
+    "intentionally_skipped": 1
+  }
+}

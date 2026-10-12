@@ -1,0 +1,78 @@
+{
+  "source": "9144c2796ae6d4d6950187773092e95e49f791a8",
+  "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "device": "CPU; GPU backends compiled OFF",
+  "native_precision": "F16 backbone and codec",
+  "original_arrays_verified": 145,
+  "native_binary_sha256": "8242317b0598d47116ccc54c1ef6d0fa8529a31bda9cb6e253fb76e0b781d25d",
+  "models": [
+    {
+      "repo": "cstr/breeze-tts-2-GGUF",
+      "revision": "5314fe9ae3ec6eac1a9238c4f6888fdc9fda0e83",
+      "filename": "breeze-tts-2-f16.gguf",
+      "bytes": 5714604032,
+      "sha256": "08ea3fbffe9701a3d04a4a63554876841d923fdd21e20add36d28f3ac3447da7"
+    },
+    {
+      "repo": "cstr/qwen3-tts-tokenizer-12hz-GGUF",
+      "revision": "344e279551177654762e5c7d39e217834325f222",
+      "filename": "qwen3-tts-tokenizer-12hz.gguf",
+      "bytes": 358453280,
+      "sha256": "70dc95dbfdd9aa5d9d406236ff771d061bf17b0cda02a72513953355606e719b"
+    }
+  ],
+  "native_dump_pass": true,
+  "guided_parity_pass": false,
+  "full_speech_asr_tested": false,
+  "run": 38150047103,
+  "conclusion": "failure",
+  "boundary_raw_passed": 105,
+  "boundary_required": 107,
+  "raw_failures": [
+    "te_seg0_layer26",
+    "te_seg1_layer26"
+  ],
+  "cause": "Dump convention mismatch: original last hidden_states slot is post-normalization; native layer26 dump is pre-normalization.",
+  "original_final_slot_equals_hidden_exactly": [
+    true,
+    true
+  ],
+  "normalized_final_cosine": [
+    0.999966,
+    0.999938
+  ],
+  "corrected_archived_array_control_passed": 107,
+  "control_is_relabelled_archived_arrays_not_rebuilt_native": true,
+  "exact_guided_cases_passed": 0,
+  "exact_guided_cases_required": 8,
+  "acceptance": false,
+  "corrected_harness_source": "aab781e77b2620669e5fce319a6f234038c0676d",
+  "corrected_harness_run": 38152301380,
+  "corrected_harness_status": "failure",
+  "strict_comparator_controls_passed": 8,
+  "secrets_checks_passed": 4,
+  "secrets_checks_skipped": 0,
+  "raw_proof": {
+    "revision": "dfcbfe37c52d7dab09f10c1c2617728b75380eb5",
+    "path": "breeze-guided-20261011/raw-boundary-diagnostic-proof.zip",
+    "bytes": 8377800,
+    "sha256": "97afdcf4eed295075db5fdcb4ceff0c0d0a0f003306528fd81774f54fc605bdc",
+    "anonymous_verified": true,
+    "native_arrays_independently_verified": 138,
+    "raw_boundaries_passed": 105,
+    "required_boundaries": 107,
+    "corrected_control_excluded": true
+  },
+  "corrected_harness_boundary_pass": true,
+  "corrected_harness_boundary_passed": 107,
+  "corrected_harness_guided_pass": false,
+  "corrected_harness_native_arrays_verified": 140,
+  "corrected_harness_native_binary_sha256": "d3fd580465ffd1c329d047d6e7edf927061d82af3a4b64734f321ecd251f4a3b",
+  "corrected_harness_proof": {
+    "revision": "e980fcac568798b62a4a1ffb26c7c272499e89be",
+    "path": "breeze-guided-20261011/corrected-boundary-rebuild-proof.zip",
+    "bytes": 8575560,
+    "sha256": "ba5b995c8197c96d9197a0dc5a5d7e9c51593903b18aec5a1515fa87e781e0cb",
+    "anonymous_verified": true
+  }
+}

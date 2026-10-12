@@ -1,0 +1,177 @@
+{
+  "pr": 537,
+  "contributor_source": "aaf250f86ac596c8e88e2c357b83fc131183cb65",
+  "merge_commit": "ad7e91172f4bee46d2e8c7ea1a1765acb625f4b0",
+  "ci": {
+    "passed": 35,
+    "intentional_skips": [
+      "regression",
+      "model-registry URLs resolve"
+    ]
+  },
+  "independent_hosted_cpu": {
+    "run": 38148987616,
+    "source": "d473b82060d1a0fe6264d40deebdbaeeb8d73303",
+    "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "platform": "macOS-14.8.9-arm64-arm-64bit",
+    "passed": true,
+    "comparisons": [
+      {
+        "candidate": "candidate-f16-gpu0",
+        "reference": "baseline-f16-gpu0",
+        "require_exact": true,
+        "rows": [
+          {
+            "stem": "drums",
+            "cosine": 1.0,
+            "mine_norm": 0.13289493159133892,
+            "reference_norm": 0.13289493159133892,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "bass",
+            "cosine": 1.0,
+            "mine_norm": 0.07027255814261858,
+            "reference_norm": 0.07027255814261858,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "other",
+            "cosine": 1.0,
+            "mine_norm": 72.77035869538933,
+            "reference_norm": 72.77035869538933,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "vocals",
+            "cosine": 1.0,
+            "mine_norm": 0.04754969385958218,
+            "reference_norm": 0.04754969385958218,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          }
+        ],
+        "passed": true
+      },
+      {
+        "candidate": "candidate-q8_0-gpu0",
+        "reference": "baseline-q8_0-gpu0",
+        "require_exact": true,
+        "rows": [
+          {
+            "stem": "drums",
+            "cosine": 1.0,
+            "mine_norm": 0.13269637470078868,
+            "reference_norm": 0.13269637470078868,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "bass",
+            "cosine": 1.0000000000000002,
+            "mine_norm": 0.07026634534899891,
+            "reference_norm": 0.07026634534899891,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "other",
+            "cosine": 1.0000000000000002,
+            "mine_norm": 72.77213665141572,
+            "reference_norm": 72.77213665141572,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          },
+          {
+            "stem": "vocals",
+            "cosine": 1.0000000000000002,
+            "mine_norm": 0.04750221829141819,
+            "reference_norm": 0.04750221829141819,
+            "magnitude_ratio": 1.0,
+            "max_absolute_error": 0.0,
+            "exact": true,
+            "passed": true
+          }
+        ],
+        "passed": true
+      }
+    ],
+    "scope": "row-copy regression A/B, not original Python or music-corpus acceptance",
+    "baseline_source": "7e7094320f1d9f765379a7fcf5f84a03283fb21b",
+    "baseline_cpp_sha256": "ce4017e482b6bbb329096b55cef127218cf1e9716c64fadb0392a0efd9ce7eb0",
+    "candidate_cpp_sha256": "f3f158b88e85f656c13e6acf688bcd00b86956153f59d21b5ab25f37f51b22bb",
+    "input_sha256": "ac3efaafb3cba8da6dcf24ca69fbad094ad7813a4456de6eab02facdbab868cc",
+    "metal_device": "NONE",
+    "models": {
+      "repo": "cstr/htdemucs-GGUF",
+      "revision": "e24b8c69380f69b5ad96d8fa5d0e01b1aa2867db",
+      "sha256": {
+        "f16": "4e7c4dcb8ac6315115848ff642ff8465f56b96d0a8ac7450be82acfc3534f006",
+        "q8_0": "d378b50ce50608093e5f64416bcefacce3f7bc45c0cd9141c276750cb8662942"
+      }
+    },
+    "baseline_library_sha256": "b49021dcf5181274316c37a7d5d76cc8071c1df1437e44dd1006b7765bf0c446",
+    "candidate_library_sha256": "54649148311592ec606d9a697cb822bed43d997afa7be3738623d873a4a47307"
+  },
+  "public_proof": {
+    "revision": "684d1488e2833fc0448d7b01a344670743e0cbbb",
+    "path": "htdemucs/metal-row-views-20261011/proof.zip",
+    "bytes": 15910356,
+    "sha256": "cd0944fdb42cde993c1ea4c95202b922b5dd00dbfa2e4074033b6b6d0ebd9298",
+    "anonymous_verified": true
+  },
+  "reporter_physical_metal": {
+    "source_url": "https://github.com/CrispStrobe/CrispASR/pull/537#issuecomment-6110238302",
+    "attribution": "Contributor niksedk; physical results reported, not independently re-executed here. Full receipt archived in proof.zip.",
+    "device": "Apple M4",
+    "macos": "26.6.2",
+    "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "baseline_source": "473d732f29fa3ca2b952930de6bfe9309bbdbaf7",
+    "candidate_source": "aaf250f86ac596c8e88e2c357b83fc131183cb65",
+    "sample_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+    "q8_before_exit": 134,
+    "q8_after_exit": 0,
+    "f16_before_after_byte_exact": true,
+    "q8_cpu_before_after_byte_exact": true,
+    "q8_metal_vs_cpu_pcm16_cosine": [
+      0.999551,
+      0.999495,
+      0.999994,
+      1.0
+    ],
+    "q8_metal_vs_cpu_norm_ratio": [
+      0.99953,
+      0.99998,
+      0.99994,
+      1.0
+    ],
+    "f16_metal_stem_sha256": {
+      "drums": "d2da410c07cd47db2d7060a7ed6e0d8e091724a51185117875234ae50cf60d6c",
+      "bass": "ecbd202bc62f74362f212ba898d761cb131543d19f9633a4c04bdbd9117d81e9",
+      "other": "eecbc178f9ceccc5121847eba9aa667cb9530cb83dea5f5cc0d1280e8f949a5b",
+      "vocals": "20ea791d2b69a61eda6d701b4a19f0ff80003ca3c35ae1ea31fd83d4b44d6d32"
+    }
+  },
+  "limits": [
+    "Hosted Mac reports Metal NONE; independent physical GPU execution not claimed.",
+    "JFK is speech-only, not music-quality/corpus acceptance.",
+    "No speed claim; private two-minute mix not redistributed."
+  ]
+}

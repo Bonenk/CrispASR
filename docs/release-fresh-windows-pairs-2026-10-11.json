@@ -1,0 +1,53 @@
+{
+  "package-pair-cuda": {
+    "status": "PASS",
+    "flavor": "cuda",
+    "runtime_sha256": {
+      "cudart64_12.dll": "9d9b868955149875ac4ef43442aaaa8913d4a7b3e4d6dd60ee871626aa045768",
+      "cublas64_12.dll": "0a60a7ecbf906f7f3842826fecaf412f1587ff6269729339245a1ec224364161",
+      "cublasLt64_12.dll": "a21ddfc1c9cd090ab07d2c6aad235aa4f15fe60fe896d5db28adf7a279c09ef3"
+    },
+    "checked": [
+      "CLI runtime manifest",
+      "runtime ZIP",
+      "shared-library archive"
+    ]
+  },
+  "mixed-runtime-negative": {
+    "status": "correctly rejected",
+    "cli_toolkit": "12.8",
+    "library_runtime": "12.6",
+    "exit_status": 1
+  },
+  "package-pair-cuda126": {
+    "status": "PASS",
+    "flavor": "cuda126",
+    "runtime_sha256": {
+      "cudart64_12.dll": "d954ca542b3b6bcf03cc2b798a7d00051501cf734ca751050e986af505cf9dad",
+      "cublas64_12.dll": "01d8172b25d8e2d2cb6a276e76e719f5908c6124f484c8c8ca310fbe7b6634f3",
+      "cublasLt64_12.dll": "0d59d264782cec2782b9ac72483e53c9ba485a9d3a1e19b34071a17b8152102e"
+    },
+    "checked": [
+      "CLI runtime manifest",
+      "runtime ZIP",
+      "shared-library archive"
+    ]
+  },
+  "source": "3fdc1838dc1b95f517a3862a9379b24d20d6c0c1",
+  "build_run": 38156833241,
+  "proof_run": 38169253465,
+  "public_proof": {
+    "revision": "ec581d4b27b87fbbe971f4771bc8894765a70fa1",
+    "path": "release/38156833241/fresh-cuda-package-proof.zip",
+    "sha256": "76b5556fd7002fbe9e6fa4c19ac670ba3af7b4bc2c7038c5cbaec6d4a4de6df1",
+    "bytes": 3166554,
+    "anonymous_verified": true,
+    "account_redacted_logs": [
+      "kaggle-v5/crispasr-release-cuda-package-validation.log",
+      "kaggle-v5/terminal.log"
+    ]
+  },
+  "limits": [
+    "Byte pairing and wrong-version rejection; not a Windows physical GPU test"
+  ]
+}
