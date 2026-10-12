@@ -5131,3 +5131,13 @@ BF16 exact-code diagnostics; assess stage magnitudes and the already recorded
 original/native decoded roundtrips under the authoritative development method.
 No arithmetic, quantization, recipe or default change to force exact AR codes.
 Keep unrelated model quality reports separately pending.
+
+
+## CLAIMED 2026-10-12 — Review and validate PR #544 CANN selection/build coverage
+
+Whole PR description, comments and three contributor commits read at head
+`b80272710ab378c6fd821c3c7142dceabc65a131`. Use the separate storage worktree
+`/mnt/storage/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
+check requested CANN device selection with production-source controls, and run
+the opt-in x86_64/910B and arm64/310P container compile jobs on GitHub. Preserve
+contributor history; compilation is not Ascend hardware/model acceptance.
