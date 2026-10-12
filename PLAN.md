@@ -5477,3 +5477,19 @@ Fresh strict original/published/F32/narrow-F32 codec replay is queued as
 original short speech `38285566623` remains queued at unchanged `3fb35f49e`.
 Earlier numerical and native short-speech rejections remain public and rejected.
 Release tagging still requires green final-main CI; no tag or runtime merge.
+
+
+## UPDATE 2026-10-12 — Concrete v0.8.44 notes; original Dia speech running
+
+Prepared root `RELEASE_NOTES_v0.8.44.md` from the actual v0.8.43..main
+commit range and complete merge/validation receipts. It covers accepted
+#541/#542/#531/#543/#544 and the backend-operator wrapper, preserving
+contributors and distinguishing SDK compilation, source controls, real
+T4 stage/speech proof, canonical BF16 diagnostic failures and unmerged
+model work. No version bump, tag, asset publication or pending-model merge.
+
+Complete original Dia short-speech run 38285566623 at unchanged
+3fb35f49e started its hosted script at 18:23:30 UTC. Fresh eight-boundary
+codec run 38289295345 at 24468e487 remains queued. No follow-up result
+is available yet; prior short-speech and DAC failures remain rejected.
+Final integrated CI must pass before the version-bump/tag step.
