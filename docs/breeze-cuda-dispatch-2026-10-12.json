@@ -1,0 +1,42 @@
+{
+  "run": 38205813889,
+  "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38205813889",
+  "source": "e4c8461b900084afe5320ea2d734d3d86dfa644c",
+  "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
+  "branch": "probe/breeze-cuda-speech-composition",
+  "status": "queued",
+  "workflow": ".github/workflows/index-echo-cuda-validation.yml",
+  "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
+  "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
+  "configuration": {
+    "cuda": "12.4.1",
+    "sm": 75,
+    "ggml_backend_dl": true,
+    "server": true,
+    "targets": [
+      "crispasr-cli",
+      "crispasr-lib",
+      "crispasr-diff",
+      "crispasr-quantize"
+    ],
+    "bundled_cuda_user_runtime": true,
+    "driver_bundled": false,
+    "bindings_match_source": true
+  },
+  "local_checks": {
+    "python_compile": true,
+    "diff_check": true,
+    "no_secrets_passed": 4,
+    "no_secrets_skipped": 0,
+    "no_secrets_seconds": 63.289
+  },
+  "gpu_executed": false,
+  "model_acceptance": false,
+  "production_defaults_changed": false,
+  "pending_prs": [
+    529,
+    531,
+    536
+  ],
+  "next": "Verify exact CI archive bytes and immutable public mirror before pinning and launching a Kaggle GPU-only speech/stage worker; preserve all strict generation failures."
+}

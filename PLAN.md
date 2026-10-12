@@ -4816,3 +4816,14 @@ Python backend discovery. Actual CLI reports 0.8.43 / eb633d90. Immutable
 public proof is anonymously hash verified; tagged rebuild hashes are distinct
 from the validated dry-run candidate. CUDA/Windows builds remain in progress,
 without failed jobs; final matrix/asset completion and notes restoration remain.
+
+
+Breeze composition CUDA package dispatched as GH run 38205813889 at source
+e4c8461b900084afe5320ea2d734d3d86dfa644c, based on CPU-tested a2f58338.
+Probe-only reuse of the existing CUDA workflow builds sm75 / toolkit 12.4.1,
+CLI with server support, shared ABI, diff, quantizer and matching bindings;
+user-space runtime is bundled, driver/stub is excluded. Build is queued,
+no GPU/model acceptance claimed. Local Python syntax/diff pass; four secret
+checks pass with zero skips (63.289 s). Main receipt/claim/precision/public
+CPU asset pins also pass 227 anchors and four secret checks, zero skips
+(116.727 s). Exact artifact/public mirror pins are required before GPU launch.
