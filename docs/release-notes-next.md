@@ -98,9 +98,12 @@ CLI and C ABI: F16/Q8 are quiet, while Q4 produces louder non-speech. No thresho
 relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
-sampler equality. Two follow-ups at source `3fb35f49e` are queued: [original/published/F32 codec A/B](https://github.com/CrispStrobe/CrispASR/actions/runs/38285563002)
+sampler equality. Follow-ups are queued; the codec trace uses source `24468e487`, while the complete original control retains `3fb35f49e`: [original/published/F32 codec A/B with eight boundaries](https://github.com/CrispStrobe/CrispASR/actions/runs/38289295345)
 and [complete original short-speech control](https://github.com/CrispStrobe/CrispASR/actions/runs/38285566623).
 Their results are pending; neither changes production defaults or thresholds.
+The generic reference/diff additionally observes eight DAC boundaries, preserving
+canonical PCM/codes and requiring every declared stage. Seven local capture
+contracts pass; this remains unmerged diagnostic work until hosted acceptance.
 The [complete rejected numerical and speech proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
 is public and immutable: 54,845,734 bytes, anonymously downloaded and fully
 SHA256 verified. [The receipt](dia-rejected-proof-2026-10-12.json) retains every

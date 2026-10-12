@@ -5452,3 +5452,28 @@ cosine/magnitude gates to identify the earliest codec divergence. Preserve the
 canonical PCM/code archive and separately label precision-matched controls;
 no decoder math, sampler, production default or threshold changes. Work stays
 in the existing storage reference worktree; fresh hosted validation follows.
+
+
+## UPDATE 2026-10-12 — Eight DAC boundaries wired; strict hosted replay queued
+
+Dia source `24468e4876009a6d7688ca3324193e5f0d197714` extends generic default capture to 49 stages,
+including eight actual DAC boundaries: RVQ latent, input conv, four decoder
+blocks, output snake and output conv. Native tracing is gated by
+`CRISPASR_DIA_DAC_TRACE_DIR`, marks real outputs before allocation, and serializes
+complete channel/time arrays to original ordering. Archives explicitly declare
+the required trace schema; missing stages and uniform scaling keep failing under
+the unchanged cosine/magnitude gates. No graph arithmetic or sampler changed.
+
+Seven local tests pass (five tiny-original generation/capture, two small-module
+observer ownership/failure); both new observer contracts reject previous source.
+Native source/header C++ syntax and clang-format 18 pass; the DAC graph's 23
+arithmetic call sites retain their original sequence. All four final staged
+secret checks pass without skips (53.081 s). These are capture/compilation
+checks, not real-checkpoint codec or full-speech acceptance.
+
+Fresh strict original/published/F32/narrow-F32 codec replay is queued as
+`38289295345`; source CI is `38289298320`. Superseded codec-only run
+`38285563002` was cancelled while still queued, before a runner started. Complete
+original short speech `38285566623` remains queued at unchanged `3fb35f49e`.
+Earlier numerical and native short-speech rejections remain public and rejected.
+Release tagging still requires green final-main CI; no tag or runtime merge.
