@@ -62,5 +62,18 @@
     "arrays_produced": 0,
     "diagnostic_inconclusive": true,
     "repair": "Add script directory to sys.path before runpy; preserve all existing byte gates"
+  },
+  "same_host_retry": {
+    "run": 38198367653,
+    "source": "7bcf259d2ff2d2297831834cd63df23165d7a7a8",
+    "status": "queued at checkpoint",
+    "repair": "Bootstrap adds the script directory to sys.path before runpy",
+    "actual_controls": "Old sibling import failure reproduced; new default/AVX2 fresh processes import sibling, preserve argv and seeded RNG; selected capability AVX2",
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 136.166
+    },
+    "strict_original_gate_waived": false
   }
 }

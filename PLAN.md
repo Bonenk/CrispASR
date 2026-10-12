@@ -4697,3 +4697,32 @@ cannot import. No reference arrays were produced; no CPU precision conclusion.
 Repair the bootstrap import path and test sibling imports in actual fresh
 processes before retrying the already claimed same-host experiment. Preserve
 both failed logs and every immutable byte gate.
+
+Candidate eb633d908 actual CPU CLI/library/Python packages PASS: dependency
+closure (glibc <= 2.34), relocated load, all 136 CLI/C ABI capability rows
+including error/buffer contracts, version 0.8.43 / stable C ABI 0.7.0, required
+exports, binding byte equality and automatic bundled-library discovery with
+loader overrides cleared. Full proof is public and anonymously hash verified
+in docs/release-candidate-v0.8.43-2026-10-11.json. Candidate Windows 12.8/12.6
+CLI/runtime pair and mixed-runtime rejection run 38198054235 is in progress.
+
+Actual candidate CUDA CI ZIP 11719048109 and tar hashes are verified. Public
+byte-identical mirror is pinned; worker 26a369a7d v6 is pushed to Kaggle and
+RUNNING. Source pull is byte equal; v5 terminal logs were archived first, all
+20 recent kernels were terminal (zero active). Same three stage/magnitude,
+26 fresh/reused speech and nine streaming packet/reset/flush gates remain.
+No build, model conversion or CPU-only job on Kaggle. Release tag stays local.
+
+CPU dispatch bootstrap repair 7bcf259d2 adds sibling import path before runpy.
+Actual fresh-process controls reproduce the old failure and prove new import,
+argv, seeded RNG and selected AVX2 behavior; four secret checks pass, zero skips.
+Retry 38198367653 is queued with all original byte gates unchanged. The failed
+38174972934 logs remain archived; its zero-array result gives no precision
+conclusion. No issues/PR heads or reporter follow-ups changed since last audit.
+
+Candidate Windows package pair run 38198054235 is SUCCESS: both actual 12.8
+and 12.6 CLI manifests, runtime ZIPs and shared-library archives have matching
+three-DLL SHA256s; mixed 12.8 CLI / 12.6 runtime is correctly rejected. This
+is package consistency, not physical Windows GPU validation. All 227 anchors
+pass; four secret checks pass with zero skips (121.399 s). GPU v6 remains
+RUNNING; repaired CPU dispatch retry remains queued at this checkpoint.
