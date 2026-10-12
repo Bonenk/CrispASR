@@ -5170,3 +5170,31 @@ production-source routing controls (previous helper fails four). The dedicated
 manual `cann-build.yml` avoids duplicating general platform jobs. A targeted
 x86_64/910B rerun of `38252679792` uses byte-identical production files/job
 steps from source `76017342e`; all four targets and ggml-cann compiled successfully. The image digest and full log hash are recorded in `docs/cann-pr544-compile-2026-10-12.json`. A targeted ARM64/310P rerun is queued; normal PR CI remains pending. No physical Ascend/model acceptance is claimed.
+
+
+## UPDATE 2026-10-12 — Combined-source CI and isolated CANN matrix
+
+Breeze #543 is refreshed against merged main `dd05b5e26` at
+`3042d533a4b6f4f03c172c6328fdcdd0431d2553`. Only documentation changes;
+all four Breeze runtime files remain byte-identical to the completed T4 proof.
+Seven source-compiled session-mode controls, 227 documentation anchors and all
+four staged secret checks pass without skips (73.634 s). The completed GPU
+receipt is linked from the refreshed integration receipt; general CI is queued.
+
+CANN #544 is refreshed at `4149be6261b599a1a4e64fdc1d1e13e14454d801`,
+including the merged TTS fixes, complete ONNX catalogue and unit CI. Production
+CLI/routing source is unchanged. Ten routing scenarios, four ownership/rate and
+three speaker controls pass, plus anchors/index and all four secret checks
+without skips (69.502 s). The isolated current-source compile run is
+`38266299769`: ARM64/310P job `114869220977`, x86_64/910B job
+`114869221253`, both queued. Validation commit `03e605b64447228a193cb72a9565a54ee60baf70`
+changes only the registered `ci.yml` to the identical two-job manual CANN
+workflow. This avoids dispatching the general platform matrix while GitHub
+requires a newly named workflow to exist on main first. Its staged four secret
+checks pass without skips (51.200 s). The older-source run was archived and its
+still-queued ARM job cancelled; completed x86 compilation remains retained.
+Receipt: `docs/cann-pr544-compile-2026-10-12.json`.
+
+GitHub's incident `93njd414rpbx` affected Actions queuing from 12:21 UTC; GitHub
+reported mitigation at 14:36 UTC. Our refreshed runs still show queued rather
+than failed. No refreshed merge, Ascend inference/performance claim or new tag.
