@@ -5198,3 +5198,18 @@ Receipt: `docs/cann-pr544-compile-2026-10-12.json`.
 GitHub's incident `93njd414rpbx` affected Actions queuing from 12:21 UTC; GitHub
 reported mitigation at 14:36 UTC. Our refreshed runs still show queued rather
 than failed. No refreshed merge, Ascend inference/performance claim or new tag.
+
+
+## CLAIMED 2026-10-12 — Dia short-text silence and trustworthy reference capture
+
+Investigate #530's exact F16/DAC prompt, "We are committed to making it secure."
+Work in a storage worktree. Audit the pinned official old-checkpoint inference
+flow and both CLI/C ABI generation. The existing Dia reference backend installs
+unversioned upstream and reconstructs speaker-tag input outside generate();
+verify those assumptions against the actual blueprint before trusting its dumps.
+Add a pinned, complete short-prompt diagnostic with native/reference code and
+PCM captures, independent ASR and cosine/magnitude checks where aligned.
+Keep existing full-speech gates and sampling defaults unchanged. Patch runtime
+only after the earliest divergence or a source-compiled failing control identifies
+a defect. Heavy models/builds run on GH CI or actual Kaggle GPU; large local
+artifacts stay on /mnt/storage.
