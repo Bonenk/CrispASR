@@ -5751,3 +5751,16 @@ is queued at exact clean `60a95cbb5`, requiring all 1,226 input transitions and
 no-secrets tests pass without skips (56.992 s). No production/default/pin/tag
 change. Current open issues/PR heads are unchanged. Final-main CI remains pending;
 prior 4923f00 run was superseded after twelve successful jobs, not falsely green.
+
+Canonical replay layout correction before execution: run 38311994907 was still
+queued when audit of the actual retained GGUF showed `decoder_codes_rev` shape
+(1210, 9), while the identity codec returns (9, 1210). Cancelled that unstarted
+run, require both actual shapes explicitly, transpose only at the comparison/
+artifact boundary, and redispatch corrected source. Original generate/delay/
+sampler code, reference arrays, probabilities and gates remain unchanged.
+
+Corrected replay source `75fcdc70f` is pushed. Replacement pinned Torch 2.6
+run [38312385854](https://github.com/CrispStrobe/CrispASR/actions/runs/38312385854)
+is queued; cancelled 38311994907 never executed. Python syntax and all four
+staged no-secrets tests pass without skips (55.747 s). The actual retained GGUF
+shape inspection is the evidence for the boundary-only layout correction.

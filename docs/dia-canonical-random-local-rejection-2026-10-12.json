@@ -108,6 +108,12 @@
   "pinned_hosted_repeat": {
     "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38311994907",
     "source": "60a95cbb581b1123c4c0e23aa780aeab19ece1b7",
-    "status_at_checkpoint": "queued"
+    "status_at_checkpoint": "cancelled before execution after code-grid layout audit"
+  },
+  "corrected_pinned_hosted_repeat": {
+    "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38312385854",
+    "source": "75fcdc70fffeff48609bf5befe171a9ca01a172a",
+    "status_at_checkpoint": "queued",
+    "reason": "Compare actual codebook/time output against time/codebook capture by explicit transpose; no math/reference/gate change."
   }
 }
