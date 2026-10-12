@@ -3,7 +3,7 @@
   "branch": "release/v0.8.43-candidate",
   "version": "0.8.43",
   "tag": "v0.8.43",
-  "tag_state": "annotated tag pushed at frozen validated source; draft release awaiting tagged assets",
+  "tag_state": "annotated tag pushed; release published incrementally by existing workflow",
   "ci_run": 38173748841,
   "release_dry_run": 38173750598,
   "dry_run_tag_input": "",
@@ -222,10 +222,13 @@
     "anonymous_verified": true
   },
   "all_candidate_requirements_satisfied": true,
-  "next_action": "Monitor tagged release assets and finalize notes/publication after build completion; candidate archive proofs retain separate hashes",
+  "next_action": "Verify complete tagged assets and restore final notes after workflow completion; candidate/archive and tagged-rebuild hashes remain separate",
   "main_integration_commit": "d71153547a6ed76b5d5ec3d9881a7c5dd1a9b284",
   "tagged_release_run": 38199002944,
-  "tagged_release_status": "queued at checkpoint",
+  "tagged_release_status": "building at checkpoint; first two assets published",
   "draft_release_created": true,
-  "comprehensive_release_body_prepared": true
+  "comprehensive_release_body_prepared": true,
+  "release_is_draft": false,
+  "release_url": "https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.43",
+  "publication_behavior": "Initially created as draft; existing per-job release actions publish it when first assets land"
 }

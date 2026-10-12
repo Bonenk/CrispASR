@@ -4776,3 +4776,10 @@ fresh entrypoint control proves selected AVX2, inheritance and argv. Four
 secret checks pass, zero skips (49.997 s); no local model execution.
 Tag release 38199002944 is building with no failures at checkpoint; v0.8.43
 release remains draft awaiting final assets and final notes restoration.
+
+Release publication correction: the existing per-job softprops actions publish
+the initially created draft as soon as assets land. v0.8.43 is now PUBLIC with
+the first two assets, and tagged run 38199002944 is still building. Prior
+statements that it remains draft are superseded. This follows the existing
+incremental release workflow; candidate validation remains complete, and final
+tagged-asset completion/hash verification and final notes restoration remain.
