@@ -4964,3 +4964,17 @@ notes remain in RELEASE_NOTES_v0.8.43.md and publication in HISTORY.md.
 Dolphin #541 merged 065ae1fdd after all 45 applicable general checks pass
 (one intentional skip); #540 closed. Full two-model/two-sample original proof
 and automatic C ABI validation accepted. No change to frozen v0.8.43 tag.
+
+
+## CLAIMED 2026-10-12 — Breeze direct-init CUDA registration order
+
+Completed CUDA worker v4 proves 20 speech/interface controls and 107 original
+stages pass, but all eight strict guided-code gates fail. Guided process
+allocates only 868 MiB while stage process allocates 6482 MiB: code audit finds
+Breeze selects the GPU before core CPU initialization registers dynamic
+plugins; the later codec runs on CUDA while Breeze stays on CPU. Fix the
+Breeze initialization order in the separate composition worktree, record
+the actual selected Breeze backend, and build/test on GH CI plus Kaggle.
+Require that backend witness for both stage and guided processes; preserve
+all original fixture, cosine/norm, exact-code and speech gates. Archive the
+completed mixed-device v4 separately and never call it full CUDA generation.
