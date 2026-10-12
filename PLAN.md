@@ -5493,3 +5493,22 @@ Complete original Dia short-speech run 38285566623 at unchanged
 codec run 38289295345 at 24468e487 remains queued. No follow-up result
 is available yet; prior short-speech and DAC failures remain rejected.
 Final integrated CI must pass before the version-bump/tag step.
+
+
+## CLAIMED 2026-10-12 — Repair Dia codec diagnostic parameter coverage
+
+Run 38289295345 at 24468e487 failed before native comparison: published
+DAC includes `quantizer.quantizers.0.in_proj.bias`, which the diagnostic
+parameter mapper did not cover. Complete artifacts and terminal logs are
+preserved on storage; full file hashes are recorded in
+`docs/dia-codec-trace-harness-failure-2026-10-12.json`. Actual original
+DAC reproduction, weight-norm removal, and eight original boundary captures
+completed before the mapping exception. These are original-only controls,
+not native parity or speech acceptance.
+
+Extend the diagnostic mapping against the actual original DAC quantizer
+modules, exercise every exported quantizer/decoder mapping with tiny
+original modules, retain strict rejection of unknown tensors, and rerun
+the hosted comparison. Do not skip weights or change graph math, canonical
+PCM, production codecs/defaults or thresholds. Complete original short
+speech 38285566623 continues independently on unchanged 3fb35f49e.
