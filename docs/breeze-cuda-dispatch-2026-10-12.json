@@ -187,7 +187,7 @@
   "registration_order_fix": {
     "source": "435c68486",
     "run": 38219077361,
-    "status": "Actual CUDA selection fixed in composition; standalone PR general CI running",
+    "status": "Merged PR #542; 36 applicable checks passed, two intentional skips",
     "gpu_accepted": true,
     "change": "Initialize CPU wrapper to register dynamic plugins before choosing Breeze GPU; emit actual compute backend",
     "pr": 542,
@@ -219,7 +219,10 @@
         "text-encoder normalization setup"
       ],
       "entire_initialization_function_equal": false
-    }
+    },
+    "standalone_source": "7a33fe272ac85cbb138b505c56327b7476f16f98",
+    "merge_commit": "f8eb4325e99a2a5bc9581d5c3999e831e332026b",
+    "merged_at": "2026-10-12T09:08:27Z"
   },
   "joint_arithmetic_followup": {
     "source": "31c338218894ac64437cea1ef0ee6b1bb766d7bd",
@@ -420,5 +423,39 @@
     "original_only": true,
     "canonical_fixtures_changed": false,
     "acceptance_gates_changed": false
+  },
+  "kv_arithmetic_followup": {
+    "run": 38223133652,
+    "source": "c9575d6be606bc99549757165f2e4264bd3dc95a",
+    "complete_arrays_hash_shape_dtype_finite_verified": 145,
+    "exact_cases_to_control": {
+      "canonical_bf16_original": 0,
+      "native_cpu_prior": 2,
+      "mixed_device_native_prior": 2,
+      "actual_cuda_native": 3,
+      "original_joint_f32": 7
+    },
+    "kv_storage_witness": {
+      "cache_calls": 37632,
+      "depth_attention_calls": 47700,
+      "cache_changed_elements": 97688762,
+      "cache_max_abs_rounding_error": 0.015621185302734375,
+      "depth_changed_elements": 80437616,
+      "depth_max_abs_rounding_error": 0.0035858154296875
+    },
+    "public_proof": {
+      "revision": "b826a5371dcfba0260e118f16801e9ee865eecf3",
+      "path": "breeze-guided-20261012/guided-kv-arithmetic-proof.zip",
+      "sha256": "38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2",
+      "bytes": 5968115,
+      "anonymous_verified": true
+    },
+    "native_acceptance": false
+  },
+  "full_inference_arithmetic_followup": {
+    "run": 38227576695,
+    "source": "95330ca0850ac942c59fee2e9dc8818fc6d223a2",
+    "status": "Running original-only GH CPU control",
+    "acceptance": false
   }
 }

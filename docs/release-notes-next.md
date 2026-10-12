@@ -19,14 +19,27 @@ See [the full proof receipt](dolphin-noncausal-2026-10-12.json). All 45 applicab
 merged on main. Reporter Kylin/GCC9/private-clip and GPU validation are not
 established.
 
+## Breeze direct GPU initialization — PR #542 merged
+
+Register dynamic backend plugins before selecting the Breeze compute device.
+Direct library initialization now finds CUDA; verbose initialization reports the
+actual compute backend. All 36 applicable PR checks pass, with two intentional
+skips. The composition package exercises the identical initialization prefix on
+Tesla T4: Breeze uses 6482/6924 MiB in stage/guided dumps, 107 original stage
+comparisons pass, and all 20 speech/interface outputs remain byte-identical to
+the prior real-CUDA run. The later branch-cache code differs between composition
+and standalone builds; this is not a complete standalone-binary GPU proof.
+See [the CUDA dispatch receipt](breeze-cuda-dispatch-2026-10-12.json).
+
 ## Work excluded from release acceptance
 
 PRs #492, #521, #529, #530, #531 and #536 remain pending their documented
-model, quantization, generation or hardware gates. Breeze CUDA speech and
-107 stage comparisons pass; strict mixed-device guided generation fails 0/8.
-Draft #542 fixes dynamic plugin registration before Breeze GPU selection.
-Its composition CUDA build and actual model-backend validation pass; standalone
-PR general CI remains pending. Strict original guided codes remain 0/8. Successful
-speech alone does not waive strict generation failures. Canary CUDA allocation/reuse controls do not reproduce
-#532 and do not establish original Q4 parity. No new default, quantization
-format or performance claim follows from these diagnostics.
+model, quantization, generation or hardware gates. Breeze's actual-CUDA strict
+guided generation remains 0/8 against canonical BF16. Original-only arithmetic
+controls reproduce some complete native grids: joint F32 matches 1/8 CPU and
+3/8 CUDA; F16 KV rounding matches 2/8 CPU and 3/8 CUDA. These diagnostics do not
+change fixtures or acceptance gates; a full-inference F32 control is running.
+See [the KV arithmetic receipt](breeze-guided-kv-arithmetic-2026-10-12.json).
+Canary CUDA allocation/reuse controls do not reproduce #532 and do not establish
+original Q4 parity. No new default, quantization format or performance claim
+follows from these diagnostics.

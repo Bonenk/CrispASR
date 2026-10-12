@@ -5081,3 +5081,11 @@ inference F32 control on GH CPU, preserving BF16-rounded loaded weights and
 the unused training codec plus external audio tokenizer. Leave canonical
 fixtures, generation recipe and gates unchanged; record module dtypes and
 compare every complete grid and magnitude/cosine. No native math/default edit.
+
+
+PR #542 MERGED `f8eb4325e`: 36 applicable checks pass, two intentional skips.
+Main CI is queued/running; actual GPU composition scope remains explicit.
+Original F16 KV control COMPLETE: 145 independently verified arrays; 2/8 CPU,
+3/8 actual CUDA, 0/8 canonical BF16 exact grids. Public proof `b826a537`, SHA
+`38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2`.
+Whole-inference F32 control 38227576695 remains running; no gate/default change.

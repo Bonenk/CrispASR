@@ -7,6 +7,16 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-12 — Breeze dynamic GPU registration order
+
+PR #542 merged as `f8eb4325e99a2a5bc9581d5c3999e831e332026b` after 36
+applicable passing checks and two intentional skips. Initialize the CPU wrapper
+before GPU selection so dynamically built CUDA plugins are registered. Actual
+T4 composition evidence covers the identical device/weight-loading source
+prefix, 107 original stages and 20 unchanged speech outputs. The broader
+instruction/cache features and strict original guided-code gate remain pending.
+Receipt: `docs/breeze-cuda-dispatch-2026-10-12.json`.
+
 ## DONE 2026-10-11 — Existing Breeze session sampler wiring
 
 PR #539 merged as `913266271cf29a052a945373ceeda675ba7acbd2` after

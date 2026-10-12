@@ -1,0 +1,371 @@
+{
+  "complete_arrays_hash_shape_dtype_finite_verified": 145,
+  "cases": {
+    "plain": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.2109375,
+        "first_mismatch": 78,
+        "frame0_logits_cosine": 0.9999906948609605,
+        "frame0_logits_norm_ratio": 0.9985995770340572,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.999999755345235,
+        "frame0_logits_norm_ratio": 0.9999763510098566,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.9999997464922703,
+        "frame0_logits_norm_ratio": 0.9999674223747355,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.9999997444820801,
+        "frame0_logits_norm_ratio": 1.0000111179736482,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "clone": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.08072916666666667,
+        "first_mismatch": 24,
+        "frame0_logits_cosine": 0.9999858332430249,
+        "frame0_logits_norm_ratio": 0.9993466291799864,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.78125,
+        "first_mismatch": 285,
+        "frame0_logits_cosine": 0.9999998321947094,
+        "frame0_logits_norm_ratio": 0.9998372053217244,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.78125,
+        "first_mismatch": 285,
+        "frame0_logits_cosine": 0.9999998121710393,
+        "frame0_logits_norm_ratio": 0.9998360784899722,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.9999997986332354,
+        "frame0_logits_norm_ratio": 0.9998365112227581,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0000000000000002,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "design-s0": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.2109375,
+        "first_mismatch": 78,
+        "frame0_logits_cosine": 0.9999906948609605,
+        "frame0_logits_norm_ratio": 0.9985995770340572,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.999999755345235,
+        "frame0_logits_norm_ratio": 0.9999763510098566,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.9999997464922703,
+        "frame0_logits_norm_ratio": 0.9999674223747355,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": false,
+        "match_fraction": 0.19010416666666666,
+        "first_mismatch": 69,
+        "frame0_logits_cosine": 0.9999997444820801,
+        "frame0_logits_norm_ratio": 1.0000111179736482,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "design-s1": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.0546875,
+        "first_mismatch": 5,
+        "frame0_logits_cosine": 0.9999944133790554,
+        "frame0_logits_norm_ratio": 1.0001562200973626,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.9999995417929656,
+        "frame0_logits_norm_ratio": 0.9998191019170489,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.999999546793211,
+        "frame0_logits_norm_ratio": 0.9998065914044311,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.999999511787233,
+        "frame0_logits_norm_ratio": 0.9997726855727138,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0000000000000002,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "design-s4": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.059895833333333336,
+        "first_mismatch": 11,
+        "frame0_logits_cosine": 0.9998710608597818,
+        "frame0_logits_norm_ratio": 1.0025805350024222,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.6901041666666666,
+        "first_mismatch": 257,
+        "frame0_logits_cosine": 0.9999933995310998,
+        "frame0_logits_norm_ratio": 0.9995134628424319,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.6901041666666666,
+        "first_mismatch": 257,
+        "frame0_logits_cosine": 0.9999935476176404,
+        "frame0_logits_norm_ratio": 0.9994986537328431,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": false,
+        "match_fraction": 0.5989583333333334,
+        "first_mismatch": 186,
+        "frame0_logits_cosine": 0.9999926524921025,
+        "frame0_logits_norm_ratio": 0.9992773618857878,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "direct-s0": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.08072916666666667,
+        "first_mismatch": 24,
+        "frame0_logits_cosine": 0.9999858332430249,
+        "frame0_logits_norm_ratio": 0.9993466291799864,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.78125,
+        "first_mismatch": 285,
+        "frame0_logits_cosine": 0.9999998321947094,
+        "frame0_logits_norm_ratio": 0.9998372053217244,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.78125,
+        "first_mismatch": 285,
+        "frame0_logits_cosine": 0.9999998121710393,
+        "frame0_logits_norm_ratio": 0.9998360784899722,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.9999997986332354,
+        "frame0_logits_norm_ratio": 0.9998365112227581,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 1.0000000000000002,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "direct-s1": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.23958333333333334,
+        "first_mismatch": 55,
+        "frame0_logits_cosine": 0.999991573625952,
+        "frame0_logits_norm_ratio": 1.0003826331932695,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": false,
+        "match_fraction": 0.390625,
+        "first_mismatch": 116,
+        "frame0_logits_cosine": 0.9999988250060232,
+        "frame0_logits_norm_ratio": 0.9998204318972872,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": false,
+        "match_fraction": 0.390625,
+        "first_mismatch": 116,
+        "frame0_logits_cosine": 0.9999987786081704,
+        "frame0_logits_norm_ratio": 0.9998162212060174,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": false,
+        "match_fraction": 0.390625,
+        "first_mismatch": 116,
+        "frame0_logits_cosine": 0.9999987648717246,
+        "frame0_logits_norm_ratio": 0.9997784066440505,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.9999999999999999,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    },
+    "direct-s4": {
+      "canonical_bf16_original": {
+        "exact": false,
+        "match_fraction": 0.13020833333333334,
+        "first_mismatch": 10,
+        "frame0_logits_cosine": 0.9997289081922245,
+        "frame0_logits_norm_ratio": 0.9993609070049454,
+        "frame0_argmax_exact": true
+      },
+      "native_cpu_prior": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.999983342589849,
+        "frame0_logits_norm_ratio": 1.000795729559578,
+        "frame0_argmax_exact": true
+      },
+      "mixed_device_native_prior": {
+        "exact": true,
+        "match_fraction": 1.0,
+        "first_mismatch": null,
+        "frame0_logits_cosine": 0.9999826571871514,
+        "frame0_logits_norm_ratio": 1.0008248669146547,
+        "frame0_argmax_exact": true
+      },
+      "actual_cuda_native": {
+        "exact": false,
+        "match_fraction": 0.3177083333333333,
+        "first_mismatch": 57,
+        "frame0_logits_cosine": 0.9999810250494651,
+        "frame0_logits_norm_ratio": 1.0007105715512945,
+        "frame0_argmax_exact": true
+      },
+      "original_joint_f32": {
+        "exact": false,
+        "match_fraction": 0.4505208333333333,
+        "first_mismatch": 157,
+        "frame0_logits_cosine": 1.0,
+        "frame0_logits_norm_ratio": 1.0,
+        "frame0_argmax_exact": true
+      }
+    }
+  },
+  "exact_cases_to_control": {
+    "canonical_bf16_original": 0,
+    "native_cpu_prior": 2,
+    "mixed_device_native_prior": 2,
+    "actual_cuda_native": 3,
+    "original_joint_f32": 7
+  },
+  "canonical_fixture_changed": false,
+  "native_acceptance": false,
+  "original_control_scope": "joint F32 backbone/depth/LM-head, BF16-rounded weights; unchanged text/codec",
+  "kv_storage_control": "F16-rounded F32 DynamicCache writes and depth attention K/V; F32 attention math; BF16 text/codec unchanged",
+  "kv_storage_witness": {
+    "cache_calls": 37632,
+    "depth_attention_calls": 47700,
+    "cache_changed_elements": 97688762,
+    "cache_max_abs_rounding_error": 0.015621185302734375,
+    "depth_changed_elements": 80437616,
+    "depth_max_abs_rounding_error": 0.0035858154296875
+  },
+  "device": "GH CPU AVX2, initialization seed 42",
+  "strict_original_gate_unchanged": true,
+  "run": 38223133652,
+  "source": "c9575d6be606bc99549757165f2e4264bd3dc95a",
+  "public_proof": {
+    "revision": "b826a5371dcfba0260e118f16801e9ee865eecf3",
+    "path": "breeze-guided-20261012/guided-kv-arithmetic-proof.zip",
+    "sha256": "38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2",
+    "bytes": 5968115,
+    "anonymous_verified": true
+  }
+}
