@@ -1,0 +1,45 @@
+{
+  "tested_composition": "b5199d969",
+  "tested_native_build_source": "435c68486ffb75a820d8105614e9f973d56249d0",
+  "main_base": "b87c25e3c",
+  "contributor_refresh": "9022414abe7b29f4d3bc1d42f78e3aed00d6f452",
+  "runtime_files": [
+    {
+      "path": "src/breeze_tts_2.cpp",
+      "sha256": "0adf36b11b96b2913a1567bad4e2774128f9e595ba460d974f931ae44fa69535",
+      "bytes": 104546,
+      "byte_equal_tested_composition": true
+    },
+    {
+      "path": "src/breeze_tts_2.h",
+      "sha256": "334aa09828600f4e2e335597b67bb5f9d46f94eb5e9005bf54dba9f5b75d2129",
+      "bytes": 14522,
+      "byte_equal_tested_composition": true
+    },
+    {
+      "path": "src/core/breeze_cfg.h",
+      "sha256": "9c836c8671db9e5f3b7f9d943ced3fa26db161fac0d6737a56506c5aa836d3f6",
+      "bytes": 1850,
+      "byte_equal_tested_composition": true
+    },
+    {
+      "path": "examples/cli/crispasr_backend_bt2_tts.cpp",
+      "sha256": "bfc01f5953abd15ccae584f8b4b1feee22def549fd561f88933dac60b6b0a798",
+      "bytes": 9367,
+      "byte_equal_tested_composition": true
+    }
+  ],
+  "full_arithmetic_diagnostic": "breeze-guided-full-inference-arithmetic-2026-10-12.json",
+  "canonical_exact_code_gate_changed": false,
+  "defaults_changed": false,
+  "general_ci": "Pending new integration head",
+  "model_acceptance": "Original/reference decoded controls and CUDA stages/speech preserved; full refreshed package acceptance pending",
+  "local_contracts_passed": {
+    "session_modes": 7,
+    "session_sampler": 8,
+    "reference_ownership_rate": 4,
+    "supertonic_speakers": 3,
+    "strict_comparator_negative_controls": 8
+  },
+  "workflow_repair": "Restore original Index Echo workflow; give Breeze bundle a dedicated workflow, matching source triggers and separate cache namespace"
+}

@@ -1,19 +1,19 @@
-name: Breeze composition CUDA validation bundle
+name: Index Echo CUDA validation bundle
 
 on:
   workflow_dispatch:
   push:
-    branches: [probe/breeze-cuda-speech-composition]
+    branches: [feat/index-echo-9b]
     paths:
-      - '.github/workflows/breeze-cuda-speech-validation.yml'
-      - 'tools/ci-heavy/breeze_cuda_bundle.py'
+      - '.github/workflows/index-echo-cuda-validation.yml'
+      - 'tools/ci-heavy/index_echo_cuda_bundle.py'
       - 'src/crispasr.cpp'
 
 permissions:
   contents: read
 
 concurrency:
-  group: breeze-cuda-speech-validation-${{ github.ref }}
+  group: index-echo-cuda-validation-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
           key: index-echo-cuda124-${{ runner.os }}-${{ github.sha }}
           restore-keys: index-echo-cuda124-${{ runner.os }}-
       - name: Build targeted CUDA proof and package runtime
-        run: python3 tools/ci-heavy/breeze_cuda_bundle.py
+        run: python3 tools/ci-heavy/index_echo_cuda_bundle.py
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: breeze-cuda-speech-validation-${{ github.sha }}
-          path: breeze-cuda-out/
+          name: index-echo-cuda-validation-${{ github.sha }}
+          path: index-echo-cuda-out/
           if-no-files-found: error
           retention-days: 14
