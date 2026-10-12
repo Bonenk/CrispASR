@@ -5089,3 +5089,13 @@ Original F16 KV control COMPLETE: 145 independently verified arrays; 2/8 CPU,
 3/8 actual CUDA, 0/8 canonical BF16 exact grids. Public proof `b826a537`, SHA
 `38b3977e0caf693639eb7bdeb1d5e0b636854cc48a925123d3e7c1c04baaffb2`.
 Whole-inference F32 control 38227576695 remains running; no gate/default change.
+
+
+## CLAIMED 2026-10-12 — Refresh PR #531 and protect Supertonic speaker getters
+
+Audit found the contributor Supertonic getters dereference null contexts and
+accept negative indices through the direct API. Refresh #531 against main,
+preserving contributor commits and previously merged UTF-8/Breeze fixes; add
+weight-free source-compiled failure controls before correcting those guards.
+No model arithmetic, quantization or defaults change. Keep broader acceptance
+limitations and run hosted general CI on the resulting exact head.
