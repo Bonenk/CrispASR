@@ -5379,3 +5379,15 @@ and ASR metadata before failure. Continue numerical comparisons after the ASR
 probe so upstream output failure cannot hide native boundaries. No prompt
 padding, seed selection, comparator relaxation or sampling/default change.
 The 128-step original archive remains bounded codec evidence only.
+
+
+## UPDATE 2026-10-12 — Ascend operator wrapper verified on real ARM CPU binary
+
+Run `38281476089` passes at `e5652705b`: the actual upstream ADD case runs
+1/1, and three actual upstream false-success probes each return zero while
+the wrapper correctly returns failure. Source hashes, full control receipts
+and complete artifact hashes are in `docs/cann-hardware-wrapper-2026-10-12.json`.
+The rebased script/worker are byte-identical to that tested source; ggml stays
+at `c36dab89b662838f0f5d4826c399198c0b90bbfc`. Integrate the validated wrapper,
+then send the available hardware experiment to #544's contributor. This proves
+wrapper behavior, not physical Ascend operators, inference, speech or speed.
