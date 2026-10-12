@@ -1185,7 +1185,7 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(out, "  -ng,       --no-gpu               [%-7s] disable GPU\n", params.use_gpu ? "false" : "true");
     fprintf(out, "  -dev N,    --device N             [%-7d] GPU device ID (default: 0)\n", params.gpu_device);
     fprintf(out,
-            "  --gpu-backend NAME                [%-7s] force GPU backend: cuda|vulkan|metal|cpu (default: auto)\n",
+            "  --gpu-backend NAME                [%-7s] force GPU backend: cuda|vulkan|metal|cann|cpu (default: auto)\n",
             params.gpu_backend.empty() ? "auto" : params.gpu_backend.c_str());
     fprintf(out, "  -fa,       --flash-attn           [%-7s] enable flash attention\n",
             params.flash_attn ? "true" : "false");
@@ -2628,6 +2628,9 @@ int main(int argc, char** argv) {
         // never prevented.
         if (!params.gpu_backend.empty()) {
             crispasr_set_gpu_backend_pref(params.gpu_backend.c_str());
+            if (ci_starts_with(params.gpu_backend.c_str(), "cann")) {
+                crispasr_set_gpu_device_pref(params.gpu_device);
+            }
         }
     }
 
