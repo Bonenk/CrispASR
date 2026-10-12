@@ -5558,3 +5558,29 @@ Add small actual-header/original-neural plumbing tests, and run real models
 only on GH. No seed/prompt selection, original fixture replacement, sampler
 production change or acceptance waiver. Codec run 38294496529 remains queued
 independently at fixed 778dac9cc.
+
+### 2026-10-12 actual-native-sampler control dispatch
+
+Source `1d8d5bbc2351b74721abb11d0a39d2b8f86f2441` is pushed on
+`fix/dia-pinned-diff`, storage reference worktree. GH heavy run
+[38299826144](https://github.com/CrispStrobe/CrispASR/actions/runs/38299826144)
+is queued at that immutable source. It preserves the completed canonical
+Torch short-speech PCM/reference hashes and uses the actual production sampler
+header through a compiled adapter only in a separately labelled original
+neural control. Native C ABI remains free-running. Same fixed prompt, seed 42,
+sampling recipe and unchanged ASR gate; three actual speech recognition arms.
+Complete decoder inputs, raw logits, pre-override draws and PCM are retained,
+with first discrete divergence and cosine/magnitude over the identical prefix.
+Five tiny actual-header/original-neural/trace contracts pass (30.082 s);
+malformed/incomplete token traces fail. C++ clang18 format, Python compilation,
+227 documentation anchors and all four staged secret checks pass without skips
+(45.284 s). These local tests have no actual-checkpoint speech-quality claim.
+
+The independent eight-boundary codec run 38294496529 at fixed `778dac9cc`
+started on GH at 19:44:36 UTC; it is currently preparing runner scratch space,
+with no native comparison result yet. Main was fetched and already matches
+origin (`d8031fa8b`); current main CI 38298556509 and secret scan 38298556537
+remain queued. Both release-note drafts now distinguish the completed original
+WER-0/F16 full-utterance replay from the failed startup codec and native free
+short speech. No unmerged Dia production change, accepted Q4 fix or new tag.
+Open issues/PRs were checked again; no new external follow-up to act on.

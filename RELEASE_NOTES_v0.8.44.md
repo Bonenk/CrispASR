@@ -158,12 +158,20 @@ published. Version propagation and the annotated tag must use
 
 Dia short-text/delay-reversal and reference-harness changes remain on an
 unmerged branch. F16 neural stages pass the pinned original reference, but the
-isolated DAC replay fails cosine/magnitude (cosine 0.9976444, norm error
+128-step startup DAC replay fails cosine/magnitude (cosine 0.9976444, norm error
 0.04271824). Q4_K also fails neural boundaries. Complete native long-prompt
 roundtrips pass, while the reported short sentence has WER 1.0 through both
 CLI and C ABI: F16/Q8 are quiet and Q4 produces louder non-speech. Eight-stage
-DAC tracing and the complete original short-speech control are follow-up
-experiments, not released fixes. Thresholds, reference PCM and production
+DAC tracing remains a follow-up experiment. The completed canonical original
+short-speech control reads the sentence verbatim (WER 0, 14.048 seconds,
+RMS 0.073534). Replaying that full original history passes all 40 F16
+comparisons, including DAC PCM at cosine 0.9999999 and norm error 0.00004443983.
+Q4_K passes only 13/40 and first fails at encoder layer 6. This distinct
+full-utterance result neither erases the startup-codec failure nor accepts
+native free generation. [The complete original receipt](docs/dia-full-original-short-2026-10-12.json)
+preserves full stage metrics and all 21 artifact hashes. A separately labelled
+original-model control using the exact compiled native sampler is in progress;
+these are excluded investigations. Thresholds, reference PCM and production
 recipes remain unchanged. The
 [complete rejected proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
 and [receipt](docs/dia-rejected-proof-2026-10-12.json) preserve both failures.

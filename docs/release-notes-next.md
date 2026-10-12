@@ -98,9 +98,18 @@ CLI and C ABI: F16/Q8 are quiet, while Q4 produces louder non-speech. No thresho
 relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
-sampler equality. The eight-boundary follow-up at `24468e487` stopped before native comparison on an unmapped published DAC input-projection bias; its actual original captures and full failure logs are retained in [the harness-failure receipt](dia-codec-trace-harness-failure-2026-10-12.json). The mapper repair at `778dac9cc` passes three tiny-original contracts covering all 134 parameters, code-replay independence and unknown-name rejection. A fresh comparison is queued, while the complete original speech control remains running at unchanged `3fb35f49e`: [original/published/F32 codec A/B with eight boundaries](https://github.com/CrispStrobe/CrispASR/actions/runs/38294496529)
+sampler equality. The eight-boundary follow-up at `24468e487` stopped before native comparison on an unmapped published DAC input-projection bias; its actual original captures and full failure logs are retained in [the harness-failure receipt](dia-codec-trace-harness-failure-2026-10-12.json). The mapper repair at `778dac9cc` passes three tiny-original contracts covering all 134 parameters, code-replay independence and unknown-name rejection. The fresh comparison has started: [original/published/F32 codec A/B with eight boundaries](https://github.com/CrispStrobe/CrispASR/actions/runs/38294496529)
 and [complete original short-speech control](https://github.com/CrispStrobe/CrispASR/actions/runs/38285566623).
-Their results are pending; neither changes production defaults or thresholds.
+The complete original control has finished: seed 42, 1,210 DAC frames,
+14.048 seconds, RMS 0.073534 and verbatim ASR (WER 0). Native F16 replaying
+this full original history passes all 40 strict comparisons, including isolated
+DAC PCM (cosine 0.9999999, norm error 0.00004443983). Q4_K passes only 13/40
+and first fails encoder layer 6. [The full receipt](dia-full-original-short-2026-10-12.json)
+retains all stage metrics and 21 artifact hashes. The workflow remains failed
+on Q4_K. This distinct full-utterance result does not supersede the 128-step
+startup-codec failure or accept native free-running short speech. The separately
+labelled original-model/native-sampler control isolates stochastic sampling;
+canonical original PCM, defaults and thresholds remain unchanged.
 The generic reference/diff additionally observes eight DAC boundaries, preserving
 canonical PCM/codes and requiring every declared stage. Seven local capture
 contracts plus three parameter contracts pass; this remains unmerged diagnostic work until hosted acceptance.
