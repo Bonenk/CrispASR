@@ -5241,3 +5241,23 @@ the reference dispatcher and crispasr-diff. Existing accepted numerical proof
 uses the dedicated pinned source-parity worker; it does not establish complete
 generic harness wiring. That integration remains pending. The reporter's
 short-speech silence is not yet claimed resolved; no merge or release tag.
+
+
+## UPDATE 2026-10-12 — Current-source CANN compilation complete; Dia harness next
+
+CANN run `38266299769` completed successfully on both architectures at
+validation commit `03e605b64447228a193cb72a9565a54ee60baf70`, whose production
+files are unchanged from #544 head `4149be6261b599a1a4e64fdc1d1e13e14454d801`.
+ARM64/310P (ACL graph off), job `114869220977`, and x86_64/910B (ACL graph on),
+job `114869221253`, built ggml-cann, CLI, shared library, diff and quantizer.
+Complete logs, SHA256 and image digests are retained; the receipt above records
+them. General PR CI is still in flight; compilation is not Ascend inference.
+
+Dia boundary source `6aa849b53` is under hosted CI/full speech validation.
+Continue the claimed reference repair in a separate branch from that source,
+so active exact-source tests remain intact. Replace the orphan's unpinned
+load and invented batch preparation with actual pinned generate() captures;
+wire the generic dispatcher and native diff with teacher-forced history,
+explicit input alignment, cosine AND magnitude. Validate original decoded
+codec output separately from free-running speech. Preserve source/model pins
+and all existing sampler/quality gates; no performance/default change.
