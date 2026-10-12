@@ -5401,3 +5401,23 @@ The rebased script/worker are byte-identical to that tested source; ggml stays
 at `c36dab89b662838f0f5d4826c399198c0b90bbfc`. Integrate the validated wrapper,
 then send the available hardware experiment to #544's contributor. This proves
 wrapper behavior, not physical Ascend operators, inference, speech or speed.
+
+
+## UPDATE 2026-10-12 — Breeze integration merged; Dia diagnostic workers queued
+
+PR #543 merged as `8dfa0d72cbe5cc24d7853d4631fa758a4134b927` after all
+51 applicable checks passed, one intentional skip. #529 and #536 now report
+MERGED through preserved ancestry. Runtime files remain byte-identical to the
+actual T4 proof; unrelated #530 model reports and canonical BF16 0/8 diagnostic
+remain unresolved. Receipt: `docs/breeze-merge-2026-10-12.json`.
+
+The hosted-validated operator wrapper/procedure landed on main through
+`e636f3d02`; #544 contributor received commands in comment 6129427689.
+Physical Ascend results remain pending. #544's final Kokoro regression is running.
+
+Dia source `3fb35f49e371e4e85e981b00195f391d235a43da` is pushed. Actual
+original/published/F32/narrow-F32 codec control run 38285563002 and complete
+3072-capacity original short-speech run 38285566623 are queued on GH. The latter
+uses the existing unchanged ASR gate before continuing strict numerical checks.
+Fresh source CI 38285708592 is queued. These runs have no acceptance result yet;
+prior codec and complete native short-speech failures remain rejected. No new tag.

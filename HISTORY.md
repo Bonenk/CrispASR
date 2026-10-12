@@ -7,6 +7,30 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-12 — Breeze composed synthesis and server voice handling
+
+PR #543 merged as `8dfa0d72cbe5cc24d7853d4631fa758a4134b927` after 51
+passing checks and one intentional skip, preserving #529/#536 contributor history.
+Instructions and reference audio reach synthesis together through the C ABI;
+server caches track transcript sidecars and unknown voices fail with valid-request
+recovery. Four runtime files are byte-identical to the actual dual-T4 proof:
+107 original stages and 20 decoded/interface controls pass, maximum WER 0.111111,
+clone speaker cosine 0.894997 versus baseline 0.527019. Canonical BF16 exact
+code equality remains 0/8, retained with unchanged fixtures and comparator;
+original F32 arithmetic controls and decoded acceptance are separately recorded.
+Receipts: `docs/breeze-merge-2026-10-12.json` and
+`docs/breeze-cuda-integration-package-2026-10-12.json`.
+
+## DONE 2026-10-12 — Operator probe empty-test guards
+
+Validated wrapper and procedure landed through `e636f3d02`. Hosted ARM run
+38281476089 executes a real positive upstream ADD case and rejects three
+actual upstream zero-exit false successes: missing backend, empty parameter
+selection and unknown operator. Logs, counts and binary/source hashes are retained.
+The physical Ascend experiment was sent in #544 comment 6129427689;
+NPU correctness, model inference and speed remain unvalidated.
+Receipt: `docs/cann-hardware-wrapper-2026-10-12.json`.
+
 ## DONE 2026-10-12 — TTS session ownership, conversion rates and speaker boundaries
 
 PR #531 merged as `d73e39dc8c3f68b485e31b06c26d1351f41654f4` after all

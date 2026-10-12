@@ -42,7 +42,7 @@ one intentional skip; the hosted native tier passes all 2,009 unit tests and
 all 140 ONNX-enabled CLI/C ABI capability rows. Separate model-quality reports
 in #530 remain unresolved.
 
-## Pending integration — PRs #543 and #544
+## Breeze instruction, reference and server voice handling — PR #543 merged
 
 The TTS ownership/rate/speaker repairs now pass the complete ONNX capability
 catalogue and native C ABI checks, plus all 2009 weight-free native tests.
@@ -52,8 +52,14 @@ speech against the previous GPU run. Maximum ASR WER is 0.111111; speaker clone
 similarity is 0.894997 versus the 0.527019 baseline. See [the refreshed package
 receipt](breeze-cuda-integration-package-2026-10-12.json). Canonical complete
 BF16 code equality remains 0/8 and is retained as a separate diagnostic;
-fixtures, recipes, defaults and its comparator are unchanged. General CI and
-integration are pending, so these features are not presented as merged.
+fixtures, recipes, defaults and its comparator are unchanged. PR #543 merged
+as `8dfa0d72cbe5cc24d7853d4631fa758a4134b927` after 51 passing checks and
+one intentional skip, preserving contributor history from #529/#536. Instructions
+and reference audio now reach synthesis together through the C ABI; server
+voice caches include transcript-sidecar changes and reject unknown voices while
+preserving subsequent valid requests. See [the merge receipt](breeze-merge-2026-10-12.json).
+
+## CANN backend/device selection — PR #544 validation pending
 
 The CANN follow-up exposes CLI backend/device selection and adds a separate
 opt-in x86_64/910B and arm64/310P compile matrix for CLI, shared library, diff
@@ -63,6 +69,12 @@ ARM64/310P (ACL graph off) builds both pass all four targets and ggml-cann.
 See [the complete compile receipt](cann-pr544-compile-2026-10-12.json). General
 PR CI and integration remain pending. Hosted compilation cannot establish
 Ascend inference or speed.
+
+The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
+real positive ADD case and rejects three actual upstream false-success cases:
+missing backend, empty parameter selection and unknown operator. It preserves
+full logs, hashes and incremental receipts. The [physical-device procedure](cann-hardware-validation-2026-10-12.md)
+has been sent to the contributor; physical Ascend results remain pending.
 
 ## Dia reference and short-speech fixes — validation in progress
 
@@ -85,13 +97,15 @@ CLI and C ABI: F16/Q8 are quiet, while Q4 produces louder non-speech. No thresho
 relaxed. The reported short-prompt silence is not yet declared
 resolved, and the runtime changes are not merged or included in release
 acceptance. Decoder-history and DAC-code replay do not establish free-running
-sampler equality.
+sampler equality. Two follow-ups at source `3fb35f49e` are queued: [original/published/F32 codec A/B](https://github.com/CrispStrobe/CrispASR/actions/runs/38285563002)
+and [complete original short-speech control](https://github.com/CrispStrobe/CrispASR/actions/runs/38285566623).
+Their results are pending; neither changes production defaults or thresholds.
 
 ## Work excluded from release acceptance
 
 PRs #492 and #521 remain pending their documented model, quantization or
 hardware gates. Contributor PRs #529 and #536 are incorporated in the validated
-Breeze composition awaiting #543 integration. The additional model-quality
+Breeze composition merged through #543. The additional model-quality
 reports recorded in merged contributor PR #530 remain unresolved. Breeze's actual-CUDA strict
 guided generation remains 0/8 against canonical BF16. Original-only arithmetic
 controls reproduce some complete native grids: joint F32 matches 1/8 CPU and
