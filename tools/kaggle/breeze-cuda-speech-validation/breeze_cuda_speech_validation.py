@@ -19,12 +19,12 @@ import wave
 import tarfile
 import zipfile
 
-VERSION = '2026-10-12.breeze-cuda-speech.5'
-SOURCE = '435c68486ffb75a820d8105614e9f973d56249d0'
+VERSION = '2026-10-12.breeze-cuda-speech.6'
+SOURCE = 'e6b4ce362d69d7965f57896466228af71b2ece1c'
 # Exact CI archive: all member SHA/size checks and anonymous mirror verified.
-BUNDLE_REV = 'bed22cc2a7f8699de38b9ed141961a75873a822e'
-BUNDLE_PATH = 'breeze-guided-20261012/cuda-speech-435c6848/breeze-cuda-speech-validation.tar.gz'
-BUNDLE_SHA = 'b1306a24ef0f460c0ed84bbcfa07712af1eecab442f8b58a37256b2eb196b3e7'
+BUNDLE_REV = '5792dad83d36d5633ea64b623fa6f714ca6488fe'
+BUNDLE_PATH = 'breeze-guided-20261012/cuda-speech-e6b4ce36/breeze-cuda-speech-validation.tar.gz'
+BUNDLE_SHA = 'b3aa2842ed04752ab9f04800eb2bdcac586fabf238f8a3fa5aac4a2148febb6f'
 OUT = Path('/kaggle/working')
 SCRATCH = Path('/kaggle/temp/breeze-cuda-speech')
 ROOT = SCRATCH / 'sdk'
