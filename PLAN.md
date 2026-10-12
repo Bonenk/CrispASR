@@ -5099,3 +5099,13 @@ preserving contributor commits and previously merged UTF-8/Breeze fixes; add
 weight-free source-compiled failure controls before correcting those guards.
 No model arithmetic, quantization or defaults change. Keep broader acceptance
 limitations and run hosted general CI on the resulting exact head.
+
+
+Whole-inference F32 original control COMPLETE (38227576695, source 95330ca08):
+145 arrays independently verified; 5/8 native CPU and 5/8 actual CUDA complete
+24x16 grids match, 0/8 canonical BF16. Parameter bytes 10,628,513,410 ->
+13,706,837,634, all active inference parameters F32, unused training codec
+preserved. Final precision isolation proof `b3d1ef591`, SHA
+`66990b07a0d6c9e3e0fd481bbbfb525afdad5f4b710896c6d758620444f781e8`,
+anonymous full ZIP verified. No fixture/default/math/gate change; remaining
+three grids differ, so no claim of complete integer generation parity.

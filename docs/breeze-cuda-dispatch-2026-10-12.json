@@ -455,7 +455,29 @@
   "full_inference_arithmetic_followup": {
     "run": 38227576695,
     "source": "95330ca0850ac942c59fee2e9dc8818fc6d223a2",
-    "status": "Running original-only GH CPU control",
-    "acceptance": false
+    "complete_arrays_hash_shape_dtype_finite_verified": 145,
+    "exact_cases_to_control": {
+      "canonical_bf16_original": 0,
+      "native_cpu_prior": 5,
+      "mixed_device_native_prior": 5,
+      "actual_cuda_native": 5,
+      "original_joint_f32": 3,
+      "original_joint_f32_kv_f16": 4
+    },
+    "full_inference_control": {
+      "active_parameter_dtype": "torch.float32",
+      "unused_training_codec_preserved": true,
+      "parameter_bytes_before": 10628513410,
+      "parameter_bytes_after": 13706837634
+    },
+    "public_proof": {
+      "revision": "b3d1ef5915750afa36960c56b0ea197bc7b6837f",
+      "path": "breeze-guided-20261012/guided-full-inference-arithmetic-proof.zip",
+      "sha256": "66990b07a0d6c9e3e0fd481bbbfb525afdad5f4b710896c6d758620444f781e8",
+      "bytes": 9195225,
+      "anonymous_verified": true
+    },
+    "native_acceptance": false,
+    "status": "SUCCESS; complete arrays independently verified, anonymous immutable archive verified"
   }
 }

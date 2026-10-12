@@ -38,7 +38,9 @@ model, quantization, generation or hardware gates. Breeze's actual-CUDA strict
 guided generation remains 0/8 against canonical BF16. Original-only arithmetic
 controls reproduce some complete native grids: joint F32 matches 1/8 CPU and
 3/8 CUDA; F16 KV rounding matches 2/8 CPU and 3/8 CUDA. These diagnostics do not
-change fixtures or acceptance gates; a full-inference F32 control is running.
+change fixtures or acceptance gates. The completed full-inference F32 original
+control matches 5/8 CPU and 5/8 CUDA grids; canonical BF16 remains 0/8.
+See [the full-inference arithmetic receipt](breeze-guided-full-inference-arithmetic-2026-10-12.json).
 See [the KV arithmetic receipt](breeze-guided-kv-arithmetic-2026-10-12.json).
 Canary CUDA allocation/reuse controls do not reproduce #532 and do not establish
 original Q4 parity. No new default, quantization format or performance claim
