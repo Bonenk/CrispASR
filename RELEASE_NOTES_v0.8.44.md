@@ -104,6 +104,27 @@ missing backend, empty parameter selection and unknown operator. It preserves
 full logs, hashes and incremental receipts. [The hosted wrapper receipt](docs/cann-hardware-wrapper-2026-10-12.json) records the complete test outputs. The [physical-device procedure](docs/cann-hardware-validation-2026-10-12.md)
 has been sent to the contributor; physical Ascend results remain pending.
 
+## Dia: reproducible DAC precision conversion
+
+The explicit `models/convert-dia-dac-to-gguf.py` tool exports the critical
+original F32 output weights into the pinned published DAC layout. The narrow
+candidate adds **1,312 bytes** and preserves all 131 unrelated tensor payloads.
+It checks the published template before importing model dependencies, verifies
+the original checkpoint, and writes a complete 134-tensor physical audit.
+
+[Conversion instructions](docs/dia-dac-conversion.md) explain the pinned
+inputs, CLI, output hash and validation scope. Seven tiny original-module/CLI
+contracts pass; the unchanged export implementation already reproduces the
+candidate byte for byte in [hosted validation](https://github.com/CrispStrobe/CrispASR/actions/runs/38306172119),
+passing 48/48 startup and 40/40 full-history comparisons against original
+references. A dedicated workflow checks real conversion bytes and every tensor
+audit row whenever the converter changes.
+
+This tooling is independent of the unmerged Dia runtime investigation. Native
+short-speech and Q4 gates remain failed, and registry companion pins are
+unchanged. Fresh integration CI remains a separate pending check until its
+hosted result is recorded.
+
 ## Backend discovery and CI coverage
 
 Generated capability tables and both feature matrices now include the complete

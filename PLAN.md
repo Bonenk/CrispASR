@@ -5780,3 +5780,29 @@ alone after validation, using rebase/fast-forward and no internal PR. Do not
 merge the diagnostic/runtime/RNG branch, promote model pins, claim native free
 speech/GPU/Q4 acceptance or tag a release. Check all applicable contributing
 integration points; no new backend/ABI/registry entry is introduced.
+
+### 2026-10-12 independent DAC converter ready for integration
+
+The new storage worktree `dia-dac-converter-20261012`, branch
+`fix/dia-dac-converter`, contains only the validated export helper/converter,
+tiny parameter/export contracts, a real-conversion CI worker/workflow, and
+user-facing docs/notes. Export helper and 134-parameter contract source are
+byte-identical to validated `a0b702d0d`. The added CLI template pin rejects an
+unsupported file before loading Torch/DAC: the new case first fails with one
+ERROR on the old CLI, then all seven actual-original-module/export/CLI contracts
+pass in 33.292 s. Python compilation and CLI help pass. Both submodules are
+initialized at existing pins; no local full-model load or native build runs.
+
+The standalone exporter is already proven with real original weights in run
+38306172119 (candidate bytes exact, startup 48/48, full-history 40/40). Dedicated
+`dia-dac-export.yml` uses the existing hosted worker infrastructure to check the
+isolated integration with seven contracts, real pinned conversion, exact model
+SHA/size and all 134 audit rows. Actionlint and workflow contract checks pass;
+227 internal anchors pass across 85 files. The full local before/after logs,
+source hashes and applicable contributing audit are retained in
+`docs/dia-dac-converter-integration-2026-10-12.json`. Prior staged no-secrets run
+passes all four tests without skips (47.225 s). New comprehensive release notes
+include the conversion tool separately from unmerged runtime/RNG changes.
+
+Pinned RNG witness 38312385854 remains queued at unchanged `75fcdc70f`.
+No production/default/pin change or speech/GPU/Q4 acceptance waiver.

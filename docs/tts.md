@@ -137,6 +137,11 @@ object pipeline. To test raw streaming in `cmd.exe`, request
 
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts/confucius4-tts, 16 kHz for speecht5, 44.1 kHz for melotts/dia/parler-tts/zonos-tts/supertonic, 48 kHz for voxcpm2-tts/dots-tts/irodori-tts/moss-tts-local/sidon, 24 kHz for most others). Programmatic callers don't need this table: `crispasr_session_output_sample_rate()` returns the active backend's output rate, with `crispasr_session_input_channels()` / `output_channels()` alongside (everything is mono today) — #332.
 
+Dia's explicit [DAC companion conversion](dia-dac-conversion.md) preserves
+critical original F32 output weights with a 1,312-byte size increase. Its
+numerical reference checks pass; native short-speech and Q4 acceptance remain
+failed, so the published companion remains the registry default.
+
 ## dots.tts — voice cloning and performance
 
 `dots-tts` supports zero-shot voice cloning from a reference WAV. Place the

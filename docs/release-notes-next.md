@@ -4,6 +4,20 @@ The published release is documented in [v0.8.43 release notes](../RELEASE_NOTES_
 and [the tagged validation receipt](release-tag-v0.8.43-2026-10-12.json). No later
 tag has been cut.
 
+## Dia DAC precision conversion
+
+The explicit [converter](../models/convert-dia-dac-to-gguf.py) reproduces the
+original critical F32 output-weight candidate with a 1,312-byte size increase,
+leaving 131 unrelated payloads unchanged. It verifies published-template and
+original-checkpoint hashes and writes all 134 physical tensor audit rows.
+Seven tiny actual-original-module/CLI contracts pass, including observed
+wrong-template failure before the guard and early rejection after it.
+[Instructions and limits](dia-dac-conversion.md) link the unchanged export's
+48/48 startup and 40/40 full-history hosted numerical proof. The dedicated
+path-filtered conversion workflow requires the same candidate bytes and tensor
+audit. Its fresh integration result remains pending; runtime short-speech/Q4
+and GPU acceptance are not established, and registry pins remain unchanged.
+
 ## Dolphin non-streaming decoding — PR #541 merged
 
 Honor the checkpoint causal flag in both depthwise convolution sites and preserve
