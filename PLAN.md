@@ -4889,3 +4889,24 @@ nine streaming reset/packet/flush controls for each. No archive/hash substitutio
 or untested hardware acceptance. Archive terminal v6 logs before repushing,
 check the single account has at most two active sessions and pull back exact
 submitted source. Large assets/evidence stay on storage. No production changes.
+
+
+v0.8.43 final tagged workflow 38199002944 is SUCCESS, all 50 assets public;
+comprehensive 17,509-character release notes restored after publication. Actual
+tagged Windows CUDA 12.8/12.6 CLI/runtime/library pairing 38207603649 passes,
+including mixed-runtime rejection. Both actual Linux CUDA archives independently
+match CI and GitHub digests and immutable anonymous public mirrors. Their GPU
+plugins differ from the hardware-tested candidate and each other, so prepared
+v7 validates both in fresh processes; hardware acceptance remains pending.
+
+Breeze CUDA packaging retry 38209137738 SUCCESS at 557e2cc7, sm60/sm75. First
+run compiled successfully but omitted an unversioned library alias; repaired
+builder preserves SONAME aliases. Queued sm75-only intermediate retry canceled
+before execution. Exact archive verification/pinning precedes GPU launch.
+
+Dolphin full checkpoint retry 38208703707 passes all 16 nonstreaming Chinese
+crispasr-diff stages and exact original decoded raw speech. Automatic Python
+Session opening then fails: converter writes dolphin but shared architecture
+table omits it. b87235519 adds the entry and C ABI regression probes, preserves
+partial native receipts, and dispatches full two-model/two-sample retry
+38211719379. No full checkpoint or reporter-machine acceptance yet.

@@ -1,16 +1,19 @@
 {
-  "run": 38205813889,
-  "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38205813889",
-  "source": "e4c8461b900084afe5320ea2d734d3d86dfa644c",
+  "run": 38209137738,
+  "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38209137738",
+  "source": "557e2cc7b58493e647cd8ae65b0fa80185760f61",
   "base_cpu_tested_composition": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
   "branch": "probe/breeze-cuda-speech-composition",
-  "status": "building",
+  "status": "SUCCESS build/package; archive verification and GPU execution pending",
   "workflow": ".github/workflows/index-echo-cuda-validation.yml",
   "workflow_note": "Existing dispatchable workflow customized only on the probe branch; production Index-Echo workflow unchanged",
   "builder": "tools/ci-heavy/breeze_cuda_bundle.py",
   "configuration": {
     "cuda": "12.4.1",
-    "sm": 75,
+    "sm": [
+      60,
+      75
+    ],
     "ggml_backend_dl": true,
     "server": true,
     "targets": [
@@ -60,5 +63,16 @@
     ],
     "quantization_tested": false,
     "speaker_runtime": "Separate GPU subprocess using preinstalled Torch; native C ABI/CLI/server/diff must use bundled CUDA user runtime"
-  }
+  },
+  "artifact_id": 11729765083,
+  "previous_runs": [
+    {
+      "run": 38205813889,
+      "status": "FAILED: missing unversioned shared library alias after successful compilation and dependency checks"
+    },
+    {
+      "run": 38208702240,
+      "status": "CANCELED before execution to include both eligible Kaggle GPU architectures"
+    }
+  ]
 }

@@ -83,6 +83,37 @@
   "archive_provenance": "Actual published tagged assets, independently checked against GitHub release SHA256 digests; distinct from dry-run candidate rebuild",
   "check_label_note": "Historical validator check labels retain candidate prefix; archive paths and run pins identify actual tagged assets",
   "windows_pair_run": 38207603649,
-  "windows_pair_status": "queued; actual tagged CLI/shared/runtime archives, both CUDA 12.8 and 12.6",
-  "final_release_matrix": "building; remaining Linux CUDA CLI/shared and HIP CLI at checkpoint, no failed jobs"
+  "windows_pair_status": "SUCCESS: actual tagged CLI/shared/runtime CUDA 12.8 and 12.6; mixed-runtime negative control correctly rejected",
+  "final_release_matrix": "SUCCESS: all release build/validation jobs and publication completed",
+  "public_assets": 50,
+  "final_release_notes_characters": 17509,
+  "cuda_package_validation": {
+    "worker_source": "622729139",
+    "version": "2026-10-12.release-package.7",
+    "status": "prepared; submission in progress",
+    "fresh_process_per_archive": true,
+    "hardware_accepted": false,
+    "archives": {
+      "cuda-cli": {
+        "archive_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
+        "archive_bytes": 225358330,
+        "artifact_id": 11727998351,
+        "public_mirror": {
+          "revision": "c00064122d9327d3b72be260e21ddc529b1ca054",
+          "path": "release/38199002944/crispasr-linux-x86_64-cuda.tar.gz",
+          "anonymous_verified": true
+        }
+      },
+      "cuda-libraries": {
+        "archive_sha256": "faf67fd049098fdf346e922906b93b5119e1a04d080c945a8690338009451cb6",
+        "archive_bytes": 196326872,
+        "artifact_id": 11727819539,
+        "public_mirror": {
+          "revision": "3d3eb4124764e335df430132a9116e985c41bd7f",
+          "path": "release/38199002944/libcrispasr-linux-x86_64-cuda.tar.gz",
+          "anonymous_verified": true
+        }
+      }
+    }
+  }
 }
