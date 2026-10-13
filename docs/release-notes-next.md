@@ -89,7 +89,12 @@ The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
 real positive ADD case and rejects three actual upstream false-success cases:
 missing backend, empty parameter selection and unknown operator. It preserves
 full logs, hashes and incremental receipts. The [physical-device procedure](cann-hardware-validation-2026-10-12.md)
-has been sent to the contributor; physical Ascend results remain pending.
+has returned physical 310P3 results (SDK 9.1.0, ARM64, ACL graphs off).
+RMS_NORM 51/51, SOFT_MAX 107/107 and ROPE 109/109 pass, with unsupported
+cases retained. Restricted F32 ADD and F32/F16-weight matrix controls pass;
+broad ADD/MUL_MAT abort on unsupported BF16 inputs. The capability repair and
+physical rerun remain pending. Full-model speech and speed are unvalidated.
+See [the complete hardware receipt](cann-310p3-hardware-2026-10-13.json).
 
 ## Dia reference and short-speech fixes — validation in progress
 

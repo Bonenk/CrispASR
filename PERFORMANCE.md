@@ -1,5 +1,12 @@
 # CrispASR — Performance benchmarks
 
+Ascend checkpoint (2026-10-13): physical ARM64/310P3, SDK 9.1.0,
+ACL graphs off, has operator-level float correctness evidence. Broad ADD and
+MUL_MAT abort on unsupported BF16 inputs. No model-throughput or speech-quality
+claim is established; operator elapsed times are not model benchmarks. See
+[the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
+
+
 Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---

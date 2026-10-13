@@ -102,7 +102,12 @@ The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
 real positive ADD case and rejects three actual upstream false-success cases:
 missing backend, empty parameter selection and unknown operator. It preserves
 full logs, hashes and incremental receipts. [The hosted wrapper receipt](docs/cann-hardware-wrapper-2026-10-12.json) records the complete test outputs. The [physical-device procedure](docs/cann-hardware-validation-2026-10-12.md)
-has been sent to the contributor; physical Ascend results remain pending.
+has returned physical 310P3 results (SDK 9.1.0, ARM64, ACL graphs off).
+RMS_NORM 51/51, SOFT_MAX 107/107 and ROPE 109/109 pass, with unsupported
+cases retained. Restricted F32 ADD and F32/F16-weight matrix controls pass;
+broad ADD/MUL_MAT abort on unsupported BF16 inputs. The capability repair and
+physical rerun remain pending. Full-model speech and speed are unvalidated.
+See [the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
 
 ## Dia: reproducible DAC precision conversion
 
@@ -149,7 +154,7 @@ still require separate full-model and quantized speech validation.
 | TTS contracts #531 | 2,009 native unit tests, 140 actual ONNX-enabled CLI/C ABI rows; 48 passing checks, one intentional skip | Separate model-quality reports from #530 |
 | Breeze synthesis #543 | 107 original stage/magnitude comparisons, 20 real-T4 decoded speech/interface outputs; 51 passing checks, one intentional skip | Canonical BF16 complete greedy code equality remains 0/8 |
 | CANN #544 | x86_64/910B ACL-graph-on and ARM64/310P ACL-graph-off compilation of CLI, shared library, diff, quantizer and ggml-cann; 46 passing checks, one intentional skip | Physical Ascend inference, quantized model quality and speed |
-| Operator wrapper | Real hosted ARM CPU ADD case plus rejection of three upstream false-success cases | Physical CANN execution |
+| Operator wrapper | Hosted ARM false-success guards; physical 310P3 restricted float controls and RMS_NORM/SOFT_MAX/ROPE pass, with complete failed broad suites retained | BF16 capability repair/rerun; full-model CANN quality and speed |
 
 The refreshed Breeze GPU runtime files are byte-identical to the merged files;
 [the merge receipt](docs/breeze-merge-2026-10-12.json) records their full SHA256

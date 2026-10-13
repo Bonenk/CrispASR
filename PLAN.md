@@ -21,6 +21,12 @@ unchanged wrapper. Preserve both successful scoped controls and broad-suite
 aborts; inspect pinned ggml source before proposing a repair or bounded device
 follow-up. Update hardware documentation and release notes and answer the PR.
 No full-model, quantization or performance claim follows from operator tests.
+Audit completed: all 17 archived files hashed; all five receipt/log assessments
+match the unchanged wrapper. Restricted float controls and RMS_NORM/SOFT_MAX/
+ROPE pass; broad ADD and MUL_MAT abort. Complete receipt:
+`docs/cann-310p3-hardware-2026-10-13.json`. Candidate isolated routing test
+passes 13 cases under each of 310P/910B; the unchanged 310P predicate fails six
+of the same cases. No device execution follows from that source-only test.
 The attached complete logs identify rejected BF16 inputs: ADD advertises them
 unconditionally, while MUL_MAT guards weights but not the activation input on
 310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
@@ -43,7 +49,7 @@ Markdown updates; each acceptance gate precedes the dependent step.
    first differing draw is step 864/head 6, original 55/native 938. These are
    rejected speech controls, not an accepted runtime fix. Receipt:
    `docs/dia-neural-precision-hosted-2026-10-13.json`.
-2. NOW IN FLIGHT: candidate `2205d920d`, GH `38357576078` (queued).
+2. NOW IN FLIGHT: candidate `2205d920d`, GH `38357576078` (running since 07:00 UTC).
    Preserve F32 cross-attention caches behind an opt-in gate,
    keeping the existing F16 path/default. The actual pinned original preserves
    F32 projections; the tiny original F32/rounded/F32-repeat control is retained.
