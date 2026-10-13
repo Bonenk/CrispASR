@@ -6010,3 +6010,21 @@ Native F16 quiet speech/WER 1 remains unaccepted until actual precision controls
 return. Production model pins/defaults, original seed/reference and Q4/GPU gates
 remain unchanged. Main release notes distinguish durable tooling from the
 unmerged runtime investigation; no release tag is created.
+
+### 2026-10-13 original cross-cache precision isolation, tiny-model scope
+
+The source audit confirms native cross-attention projection readback rounds to
+F16 vectors and decoder inputs remain F16 even for original F32 weights. The
+pinned original `precompute_cross_attn_cache` and `KVCache.from_kv` retain the
+projected F32 tensors. A weight-free tiny actual-original model (fixture seed
+17, pinned Torch 2.6.0 CPU) compares F32 / cross-cache-only F16 roundtrip / F32
+repeat with identical first decoder inputs. The repeats are byte-identical;
+cache rounding changes 18,393 of 18,504 logits, max absolute 2.14949e-6,
+cosine 0.9999999999778083 and relative norm error 5.13458e-8. These are
+tiny-model causal measurements, not full-model/native speech acceptance.
+Complete raw arrays and executed probe are retained on storage; source pins,
+hashes and all comparisons are in
+`docs/dia-cross-cache-original-probe-2026-10-13.json`. Running neural precision
+job 38343667254 is unchanged. No runtime graph/default or model-pin change.
+If its F32 arm rejects speech, separately claim the F32 cross-cache isolation
+before implementation and retain unchanged stage, C ABI/CLI and ASR gates.
