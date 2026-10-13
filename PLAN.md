@@ -6,7 +6,20 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Actual RMSNorm primitive audit on retained Dia inputs
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded weight-free probe in
+`/mnt/storage/crispasr/dia-rmsnorm-probe-20261013`. Both CPU and actual T4
+rotary controls reject speech; actual original/native filters agree on identical
+logits. Compare actual Torch2.6 RMSNorm and existing ggml RMSNorm on verified
+retained decoder inputs, with default/negative controls and magnitude errors.
+Do not infer learned scales, load full weights locally, change sampling policy,
+or introduce a runtime candidate before a causal primitive result. Separately
+verify the completed exact-source CUDA package `38394649538`. Archive all
+results, including evidence against this hypothesis; no speech/speed promotion.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
