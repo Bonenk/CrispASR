@@ -7004,3 +7004,19 @@ pre-cross norm/Q, cross-attention/output, pre-MLP and fused gate/up/SiLU/down.
 Use actual fused original operator and audited native split layouts. Verify
 full OFF/ON/OFF trajectories before interpreting snapshots; heavy runs go to
 GH CI/Kaggle per protocol. Native speech/Q4 and release remain unaccepted.
+
+## CLAIMED 2026-10-13 — Transparent late decoder boundary capture
+
+Implement opt-in block-zero self-output/residual, pre-cross norm/Q,
+cross-attention pre/post-output, and pre-MLP fused gate/up/SiLU/down
+observation using actual original module hooks and native ggml output marks.
+Preserve all native arithmetic. Small original-model tests must prove hook
+transparency, cleanup and step selection; full original/native OFF/ON/OFF
+logits, feedback and decoded PCM must match before interpreting snapshots.
+Adapt the proven GH heavy capture worker and submit one pinned CPU job.
+Original source/weights/canonical feedback/precision/seed/negatives stay fixed;
+no speech or release acceptance. CIFS became intermittently unavailable and
+interrupted the local secret scan with a working-directory error. Source-only
+worktrees temporarily use /mnt/volume1/crispasr-dia-decoder-boundary-20261013
+and /mnt/volume1/crispasr-decoder-boundary-tracking-20261013; weights, builds
+and captures stay on storage/GH CI. Shared main checkout remains untouched.
