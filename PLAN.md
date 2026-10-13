@@ -5938,3 +5938,23 @@ This prevents 14-day GitHub artifact expiry from losing reproducibility; no new
 neural inference, production model pins or speech/Q4/GPU acceptance is involved.
 All temporary/package data stays under storage. Record only actually published
 and verified revisions. Current outside issue/PR heads remain unchanged.
+
+### 2026-10-13 complete public Dia archives verified; retrieval helper CLAIM
+
+Four independent ZIPs are published in public `cstr/crispasr-regression-fixtures`
+at immutable revision `6693718d8112b62425dfab5b941e61fb7b0334eb`, folder
+`dia-20261013`. Canonical original, compiled portable RNG replay, rejected native
+speech and real DAC conversion contain all 77 recorded source files,
+695,547,328 source bytes and 619,724,990 ZIP bytes. Every source file matches its
+tracked size/SHA; each ZIP is CRC and inner-file-hash checked. Artifact text
+passes the existing credential patterns and account guard. Every full public
+ZIP is anonymously re-read and has exact size/SHA. Full URLs, revisions, hashes
+and preserved acceptance scopes are in `docs/dia-public-proof-archives-2026-10-13.json`.
+No reference arrays, thresholds, production model pins or defaults changed.
+
+CLAIM next: add a small pinned anonymous archive-retrieval helper with strict
+size/hash, extraction-path and per-file manifest checks; test corrupt/missing/
+unsafe archive negatives before accepting any extraction. Use it for future
+Dia control inputs instead of expiring GitHub run downloads. Do not modify or
+cancel the currently executing precision run 38343667254, pinned at `5a8fe578e`.
+The public negative native F16 speech remains WER 1, not accepted or superseded.
