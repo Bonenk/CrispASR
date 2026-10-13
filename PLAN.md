@@ -6,7 +6,26 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Dia late-history self-attention capture on GH
+
+Owner: this maintainer session. Controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; new diagnostic worktree
+`/mnt/storage/crispasr/dia-attention-capture-20261013`, branch
+`diag/dia-attention-capture-20261013`, based on immutable CUDA/source-rotary
+candidate 2954c5a7c. Production main still has its original reference backend;
+do not mistake the rejected diagnostic branch's newer hooks for shipped code.
+Add opt-in original/native self-attention captures at selected late step/layer:
+post-rotation Q, complete K/V history and pre-output-projection attention.
+Preserve true shapes/branch order/scale, copied output arrays and hook cleanup.
+Test capture OFF/ON/OFF exact outputs and cache snapshots using tiny actual
+original modules before GH full-model teacher replay. Retain canonical reference,
+seed/filter/quality gates and all failures. Diagnostic capture must not alter
+neural math or promote source-rotary defaults. Use GH heavy-cpu for original CPU
+inference and complete native capture controls; actual CUDA follow-up requires
+a matching package and Kaggle terminal-log preservation. All large artifacts
+stay on storage. Main 03f7cd16f CI/lint/secret checks are queued; no release tag.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
