@@ -6823,3 +6823,17 @@ Collect both terminal jobs, including failures, then run independent audits and
 the existing same-input consumer. Preserve previous terminal Kaggle results
 before actual GPU follow-up. Issues/PR heads are unchanged; latest main CI is
 still queued/running. Native speech remains rejected; no release/default change.
+
+## CLAIMED 2026-10-13 — Prepare actual CUDA late-attention capture worker
+
+Prepare a separate diagnostic worker/kernel based on immutable capture source
+42b111c5e and matching compile package 2328f15ce. Consume the independently
+verified original CPU capture instead of rerunning original CPU inference on
+Kaggle. Keep six native runtime files byte-identical. Require actual CUDA
+scheduler work/allocation, complete native OFF/ON/OFF trajectory identity,
+original-audio GPU ASR positive, all 40 normal diff stages and unchanged negative
+controls before interpreting 72 late-attention arrays. Bundle delivery must be
+fully verified and pinned before launch. Existing terminal Kaggle logs/output
+must remain preserved. No Torch reinstall, runtime/default or release changes.
+CPU capture 38438623888 and CUDA package 38446095504 are still running; this
+claim authorizes preparation only until their complete artifacts pass audit.
