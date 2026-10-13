@@ -299,3 +299,17 @@ All 48 comparisons, repeats and eight negative controls are retained. This is
 CPU primitive evidence; full-model source-timescale speech remains rejected,
 with no runtime/default promotion or performance claim.
 [Rotary audit](dia-block0-rotary-isolation-2026-10-13.json).
+
+
+A bounded actual-source block-zero self-attention replay on canonical steps
+0–3 verifies byte-identical same-input K/V cache histories. Attention minimum
+head cosine is 0.9999999999999742 and maximum norm error 1.46145e-7. Missing
+cache reorder, tiled GQA heads, wrong sqrt-head scaling and doubled output all
+strongly reject. New step-1/3 norm rounding differences and the stopped initial
+expectation are retained. This does not establish late-history, higher-layer,
+GPU or full speech acceptance; production defaults remain unchanged.
+[Attention/cache audit](dia-block0-attention-isolation-2026-10-13.json).
+
+The pinned-config 3072-slot original cache also reproduces all short-prefix
+Q/K/V/attention outputs and cache history bytes exactly, with exact repeats.
+This checks production cache stride, without claiming late-history acceptance.

@@ -6,24 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia bounded block-zero cache and attention replay
-
-Owner: this maintainer session, controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`, tiny probe directory
-`/mnt/storage/crispasr/dia-block0-attention-probe-20261013`. Use audited original
-feedback for contiguous steps 0–3 and the already audited embedding/pre-SA/QKV
-weights. Execute actual original decoder embedding entry, Attention.forward
-and KVCache.update; capture before the output projection. Compare literal native
-cache reorder, GQA interleave and ggml attention operations on identical inputs,
-then composed native projection/rotation inputs. Preserve original scale=1,
-positions/branch shape, cache dtype, repeats and layout/scaling negatives. This
-is a bounded CPU boundary probe, not a full decoder/free-speech or CUDA claim.
-Do not reconstruct the original attention reference or run a local full model.
-If short-prefix primitives pass, late-history attention needs an actual hosted
-capture/replay; do not infer it from four steps. Main 3386096f2 CI/lint/secret
-checks queue; Ruby/pages are running. No runtime/default/quality gate changes.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6626,6 +6609,44 @@ with reconstructed attention references or repeat the already-rejected rotary
 full-model run. All large work remains on storage; heavy inference uses GH or
 actual Kaggle GPU per the usage guide. Final-main general CI remains pending;
 no release tag or model promotion.
+
+## UPDATE 2026-10-13 — Bounded original cache/GQA/attention replay complete
+
+Contiguous canonical feedback steps 0–3 execute the actual original decoder
+embedding entry, DenseGeneral, RotaryEmbedding, Attention.forward and
+KVCache.update; capture is before the self-attention output projection. Native
+replay uses literal audited cache-reorder/GQA/attention code and packaged ggml
+CPU operators. All eight same-original-input K/V histories match byte-for-byte.
+Same-input attention minimum head cosine is 0.9999999999999742, maximum norm
+error 1.46145e-7 and maximum absolute error 8.94070e-8. Composed native norm,
+projection and rotary arms also remain close (default max relative L2
+2.65937e-7; source-timescale max 2.53750e-7) on this short prefix.
+
+The initial assertion expected byte-exact first norm on every new input and
+stopped; that failed attempt is retained. Steps 1/3 differ by at most
+1.19209e-7, while steps 0/2 are exact. Both implementations' actual normalized
+inputs are preserved separately. This corrects a diagnostic expectation, not
+runtime math, the original reference or any acceptance threshold. Embeddings
+are byte-identical; original/native repeats are exact. Four negatives strongly
+reject: missing cache reorder relative L2 0.13801, tiled GQA heads 1.30181,
+incorrect sqrt-head scaling 0.26285 and doubled output 1. Full 57-file payload
+ledger with sources, initial attempt and verification:
+`docs/dia-block0-attention-isolation-2026-10-13.json`.
+
+A further actual-original stride control reads the pinned checkpoint config
+(audio_length 3072) and reruns the same Attention.forward/KVCache.update with
+the production-size cache. All Q/K/V/attention outputs and logical cache
+histories are byte-identical to the compact-cache baseline, including repeats.
+This rules out compact-cache stride as a hidden difference for this prefix;
+it still does not validate a 978-step history.
+
+Next required evidence is hosted late-history capture/replay on original
+feedback, including higher decoder layers whose two branches differ after
+cross-attention. Four block-zero steps do not establish step-978 behavior,
+self-output projection, cross-attention, a full decoder or free-speech quality.
+No speculative reorder/GQA/scaling repair, runtime/default/model promotion or
+release tag. Latest main CI remains queued; use GH for heavy CPU and Kaggle
+only for actual GPU follow-up per the usage guide.
 
 ## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 

@@ -23955,3 +23955,42 @@ speech/GPU acceptance. Latest main 921ddd8fa has green secret/Ruby checks;
 general CI/lint remain queued. Open issue updates and PR heads are unchanged.
 
 </details>
+
+
+## 2026-10-13 — Dia bounded self-attention and cache source replay
+
+Actual original prefix 0–3 and literal native cache/GQA/attention code yield
+byte-identical same-input K/V histories. Same-input attention minimum head
+cosine is 0.9999999999999742 and maximum norm error 1.46145e-7. Four strong
+negatives expose missing cache reorder, tiled GQA heads, wrong attention scaling
+and doubled output. The failed initial byte-exact norm expectation is retained;
+new steps 1/3 have max absolute norm difference 1.19209e-7. Original references,
+quality gates and production runtime remain unchanged. Late-history/higher-layer
+and actual speech acceptance remain pending.
+[Full ledger](docs/dia-block0-attention-isolation-2026-10-13.json).
+
+<details>
+<summary>Completed bounded cache/attention claim</summary>
+
+## CLAIMED 2026-10-13 — Dia bounded block-zero cache and attention replay
+
+Owner: this maintainer session, controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`, tiny probe directory
+`/mnt/storage/crispasr/dia-block0-attention-probe-20261013`. Use audited original
+feedback for contiguous steps 0–3 and the already audited embedding/pre-SA/QKV
+weights. Execute actual original decoder embedding entry, Attention.forward
+and KVCache.update; capture before the output projection. Compare literal native
+cache reorder, GQA interleave and ggml attention operations on identical inputs,
+then composed native projection/rotation inputs. Preserve original scale=1,
+positions/branch shape, cache dtype, repeats and layout/scaling negatives. This
+is a bounded CPU boundary probe, not a full decoder/free-speech or CUDA claim.
+Do not reconstruct the original attention reference or run a local full model.
+If short-prefix primitives pass, late-history attention needs an actual hosted
+capture/replay; do not infer it from four steps. Main 3386096f2 CI/lint/secret
+checks queue; Ruby/pages are running. No runtime/default/quality gate changes.
+
+</details>
+
+The pinned-config 3072-slot original cache also reproduces all short-prefix
+Q/K/V/attention outputs and cache history bytes exactly, with exact repeats.
+This checks production cache stride, without claiming late-history acceptance.
