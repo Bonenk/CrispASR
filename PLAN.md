@@ -11,6 +11,23 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Dia decoder stage capture at the first remaining divergence
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-late-stage-20261013`, diagnostic branch
+`diag/dia-late-stage-20261013`, based on the fixed cache source `2205d920d`.
+CPU OFF/ON/OFF control is complete and rejected; first remaining shared-history
+sample difference is step 978/head 2 with F32 weights/cross cache. Add an
+explicit diagnostic decoder capture step to the original reference hooks and
+native stage dumps, keeping step zero the default and preserving the immutable
+canonical reference. The diff must obtain the selected step from validated
+reference metadata and isolate/restore the new debug environment variable.
+Use tiny actual-original hook A/B and existing source-compiled diff contracts,
+then GH for real original/native layer capture at step 978. Preserve all
+original inputs/logits/PCM and mark teacher replay as diagnostic only. Do not
+alter neural math, sampler, source/model/seed/filter/quality gates or claim
+free-speech acceptance. Actual T4 model controls continue unchanged.
+
 ## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
 
 Owner: this maintainer session, storage controller worktree
@@ -55,7 +72,20 @@ Markdown updates; each acceptance gate precedes the dependent step.
    first differing draw is step 864/head 6, original 55/native 938. These are
    rejected speech controls, not an accepted runtime fix. Receipt:
    `docs/dia-neural-precision-hosted-2026-10-13.json`.
-2. NOW IN FLIGHT: candidate `2205d920d`, GH `38357576078` (running since 07:00 UTC).
+2. COMPLETE AS A REJECTED CONTROL: candidate `2205d920d`, GH `38357576078`
+   fails the fixed speech gate. All three arms pass 40/40 canonical stages;
+   all six CLI/C-ABI outputs are empty/WER 1. OFF/repeat inputs, logits and PCM
+   are byte-identical. Actual cross-cache vectors grow from 11,501,568 to
+   23,003,136 bytes (+11,501,568), without accepting speech. Shared input
+   history increases from 865 to 979 steps. New first draw is step 978/head 2,
+   original 877/native 904; norm error drops from 2.40e-5 to 5.01e-6.
+   Weight-free pinned-original/actual-native-filter replay shows matching
+   support on identical inputs, but neural differences swap tokens 46/904
+   across the nucleus boundary. The original removes 904; native includes it.
+   Complete controls and both causal boundaries are retained in
+   `docs/dia-cross-cache-hosted-2026-10-13.json` and
+   `docs/dia-cross-cache-boundary-2026-10-13.json`. No default/model promotion.
+   The diagnostic implemented the following fixed scope:
    Preserve F32 cross-attention caches behind an opt-in gate,
    keeping the existing F16 path/default. The actual pinned original preserves
    F32 projections; the tiny original F32/rounded/F32-repeat control is retained.
@@ -6189,3 +6219,31 @@ The fixed GH CPU cache control `38357576078` at `2205d920d` is unchanged and
 running since 07:00 UTC. No correctness/default/performance acceptance follows
 from allocation or compilation. Broad GPU acceptance and profiling stay gated
 on the fixed controls; complete failed results will be retained.
+
+
+## UPDATE 2026-10-13 — Completed Dia cache and CUDA package receipts
+
+CPU cache run `38357576078` completed 07:55 UTC as FAILURE: all 120 canonical
+stage rows pass, but all six native decoded controls reject. All 54 artifact
+files and full failed-step log are retained under storage; every worker log
+hash and OFF/repeat array hash is verified. The new first-draw support flip
+at step 978 is reproduced using pinned Torch 2.6 CPU original CFG/filter code,
+actual C++ filtering and the unchanged retained portable batch noise. On the
+same logits, original/native support agrees and both reproduce each recorded
+draw; this is residual neural sensitivity, not evidence of a filter defect.
+The shared input prefix still lies in the original's quiet leading region.
+
+CUDA package run `38361713994` is SUCCESS at exact source `989e212f`.
+Complete 489,745,988-byte archive SHA-256
+`1310ab21da79278a8db2739af4badd6ca05f5ef5ccd30ea697d8939e65496a53`,
+all 27 payload members/contained aliases and seven source files verify.
+Four Dia runtime files match the fixed CPU source byte-for-byte. Dependency
+closure passes 14 ELF files with $ORIGIN; the CUDA driver is external.
+Receipt: `docs/dia-cuda-package-2026-10-13.json`. This is compilation/package
+proof; the separate actual T4 model diagnostic remains in flight. Broad speech
+acceptance, profiling and release remain gated; no seed/filter/threshold change.
+
+PR #544 follow-up was answered in comment `6141026980`, linking the complete
+verified physical receipt, failed BF16 cases and immutable candidate procedure.
+The candidate SDK matrix `38365667723` is now in progress. Production ggml is
+unchanged pending the physical rerun and required acceptance.

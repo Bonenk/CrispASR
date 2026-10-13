@@ -176,3 +176,15 @@ Dia's unmerged [portable sampler replay](dia-portable-random-hosted-2026-10-13.j
 [Durable Dia proof retrieval](dia-proof-archives.md) preserves all 77 canonical/component/converter/rejected-speech files in immutable public archives. The stdlib helper verifies full archive and payload hashes, rejects invalid extraction and preserves existing paths; eight contracts and real archive retrieval pass. Future validation input transport also passes complete [original/native-filter replay](dia-public-input-replay-2026-10-13.json). These are reproducibility fixes, with native speech still rejected and cache precision under investigation.
 
 [Complete rejected neural precision and tiny cache proofs](dia-neural-public-proof-2026-10-13.json) are also durably public, with full anonymous archive verification and unchanged acceptance scopes. The TTS documentation records the short-prompt failure; the architecture guide corrects the original checkpoint’s CFG equation.
+
+
+Completed fixed-cache control (GH 38357576078, source 2205d920d): all three
+F16/F32/F16-repeat arms pass 40/40 canonical stages, but all six CLI/C ABI
+speech controls remain empty/WER 1. OFF/repeat inputs, logits and PCM match
+exactly. Actual cross-cache vectors double from 11,501,568 to 23,003,136 bytes;
+F32 extends shared input history from 865 to 979 steps and reduces maximum
+aligned logit norm error from 2.40e-5 to 5.01e-6. At step 978/head 2, tiny neural
+changes include token 904 across the nucleus boundary; original/native filters
+agree on identical logits and reproduce the recorded draws. This is a rejected
+speech control, with no sampling-policy or quality-gate waiver.
+Complete [cache controls](dia-cross-cache-hosted-2026-10-13.json) and [first-draw replay](dia-cross-cache-boundary-2026-10-13.json).
