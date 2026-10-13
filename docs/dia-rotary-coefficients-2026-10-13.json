@@ -1,0 +1,163 @@
+{
+  "scope": "Weight-free actual-source rotary/cache coefficient comparison. No neural graph, model, GPU or speech acceptance.",
+  "torch_version": "2.6.0+cpu",
+  "head_dim": 128,
+  "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "ggml_ops_sha256": "b72e1301a521fdb30027498f9171e308772b095052f764c176d9bef317897e26",
+  "extracted_helpers_sha256": "418b2c1666fe919d17437ea5b552dd5cd894b1aab5c07cb301303f2c73e60ab7",
+  "rows": [
+    {
+      "variant": "default-geometric",
+      "position": 0,
+      "max_abs": 0.0,
+      "cosine": 1.0,
+      "norm_ratio": 1.0,
+      "changed_coefficients": 0
+    },
+    {
+      "variant": "default-geometric",
+      "position": 38,
+      "max_abs": 4.351139068603516e-06,
+      "cosine": 0.9999999999979112,
+      "norm_ratio": 0.9999999990213881,
+      "changed_coefficients": 100
+    },
+    {
+      "variant": "default-geometric",
+      "position": 864,
+      "max_abs": 6.085634231567383e-05,
+      "cosine": 0.9999999994806748,
+      "norm_ratio": 0.999999998592398,
+      "changed_coefficients": 121
+    },
+    {
+      "variant": "default-geometric",
+      "position": 978,
+      "max_abs": 0.00012040138244628906,
+      "cosine": 0.9999999988173935,
+      "norm_ratio": 0.9999999954632208,
+      "changed_coefficients": 125
+    },
+    {
+      "variant": "default-geometric",
+      "position": 1225,
+      "max_abs": 0.00015176087617874146,
+      "cosine": 0.9999999983195138,
+      "norm_ratio": 0.9999999992567223,
+      "changed_coefficients": 126
+    },
+    {
+      "variant": "original-timescale-factors-base-one",
+      "position": 0,
+      "max_abs": 0.0,
+      "cosine": 1.0,
+      "norm_ratio": 1.0,
+      "changed_coefficients": 0
+    },
+    {
+      "variant": "original-timescale-factors-base-one",
+      "position": 38,
+      "max_abs": 5.960464477539063e-08,
+      "cosine": 0.9999999999999998,
+      "norm_ratio": 0.9999999980481771,
+      "changed_coefficients": 4
+    },
+    {
+      "variant": "original-timescale-factors-base-one",
+      "position": 864,
+      "max_abs": 5.960464477539063e-08,
+      "cosine": 0.9999999999999998,
+      "norm_ratio": 0.9999999955729223,
+      "changed_coefficients": 9
+    },
+    {
+      "variant": "original-timescale-factors-base-one",
+      "position": 978,
+      "max_abs": 5.960464477539063e-08,
+      "cosine": 1.0,
+      "norm_ratio": 0.999999999191971,
+      "changed_coefficients": 5
+    },
+    {
+      "variant": "original-timescale-factors-base-one",
+      "position": 1225,
+      "max_abs": 5.960464477539063e-08,
+      "cosine": 0.9999999999999998,
+      "norm_ratio": 1.0000000024361786,
+      "changed_coefficients": 3
+    },
+    {
+      "variant": "negative-double-timescale",
+      "position": 0,
+      "max_abs": 0.0,
+      "cosine": 1.0,
+      "norm_ratio": 1.0,
+      "changed_coefficients": 0
+    },
+    {
+      "variant": "negative-double-timescale",
+      "position": 38,
+      "max_abs": 1.926323413848877,
+      "cosine": 0.6176304462077855,
+      "norm_ratio": 0.9999999941084387,
+      "changed_coefficients": 128
+    },
+    {
+      "variant": "negative-double-timescale",
+      "position": 864,
+      "max_abs": 1.988604187965393,
+      "cosine": 0.2861728331090168,
+      "norm_ratio": 0.999999997316303,
+      "changed_coefficients": 128
+    },
+    {
+      "variant": "negative-double-timescale",
+      "position": 978,
+      "max_abs": 1.9971306920051575,
+      "cosine": 0.261437204921887,
+      "norm_ratio": 0.9999999930884325,
+      "changed_coefficients": 128
+    },
+    {
+      "variant": "negative-double-timescale",
+      "position": 1225,
+      "max_abs": 1.9998677968978882,
+      "cosine": 0.21430884327150265,
+      "norm_ratio": 0.9999999997885793,
+      "changed_coefficients": 128
+    }
+  ],
+  "files": [
+    {
+      "path": "actual-ggml-cache-helpers.cpp",
+      "bytes": 1745,
+      "sha256": "418b2c1666fe919d17437ea5b552dd5cd894b1aab5c07cb301303f2c73e60ab7"
+    },
+    {
+      "path": "actual-native-coefficients.f32",
+      "bytes": 7680,
+      "sha256": "2fd511ba6cc99f8f7f90822b99867f42d6075035d7a498369b180719d7107148"
+    },
+    {
+      "path": "actual-original-coefficients.npy",
+      "bytes": 2688,
+      "sha256": "54171d1633ac74757d60e9d1c81059a9df514df8f7b2ef99a394f16f8bb2dde3"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 2549,
+      "sha256": "1204d7e3d2f0dce3bc5cdfbcad72a640edc2642c1cf1485030e277540d7f638c"
+    },
+    {
+      "path": "original-timescales.f32",
+      "bytes": 256,
+      "sha256": "0f38c9ea2be251a9e979929d91834881afa4ce2a70209326e4a419b1630c0a2b"
+    },
+    {
+      "path": "probe.py",
+      "bytes": 4324,
+      "sha256": "0593c3d0a8f32ccd592bd55a3b377311f4be4e979ef330312617ac7bb30a64c9"
+    }
+  ]
+}

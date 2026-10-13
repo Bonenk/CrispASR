@@ -29,8 +29,10 @@ passing checks and one intentional skip, preserving the contributor history.
 CLI backend/device selection reaches the existing CANN helper. Ten compiled
 routing controls pass; four fail with the previous helper. The opt-in SDK matrix
 compiles ggml-cann, CLI, shared library, diff and quantizer on x86_64/910B with
-ACL graphs and ARM64/310P without ACL graphs. Physical Ascend operators, model
-inference, quantized speech and speed remain pending the contributor experiment.
+ACL graphs and ARM64/310P without ACL graphs. Physical 310P3 results arrived on 2026-10-13: restricted float controls and
+RMS_NORM/SOFT_MAX/ROPE pass, but broad ADD/MUL_MAT abort on BF16.
+Full-model inference, quantized speech and speed remain pending. See
+`docs/cann-310p3-hardware-2026-10-13.json`.
 Receipts: `docs/cann-merge-2026-10-12.json` and
 `docs/cann-pr544-compile-2026-10-12.json`.
 
@@ -55,6 +57,7 @@ Validated wrapper and procedure landed through `e636f3d02`. Hosted ARM run
 actual upstream zero-exit false successes: missing backend, empty parameter
 selection and unknown operator. Logs, counts and binary/source hashes are retained.
 The physical Ascend experiment was sent in #544 comment 6129427689;
+partial physical results returned in comment 6140622935 (broad suite fails);
 NPU correctness, model inference and speed remain unvalidated.
 Receipt: `docs/cann-hardware-wrapper-2026-10-12.json`.
 

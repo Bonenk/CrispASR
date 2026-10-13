@@ -11,6 +11,73 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-original-rope-20261013`, branch
+`fix/dia-original-rope-20261013`, based on late-capture candidate `b14fd8a4c`.
+The tiny actual-source probe shows position-978 rotary coefficient error drops
+from 1.2040138e-4 to 5.9604645e-8 using the original timescales with existing
+ggml frequency factors and base one; default position zero is exact and the
+wrong-timescale control strongly rejects. This motivates, but does not accept,
+a full-model experiment. Preserve the pinned original module's generated F32
+timescale buffer as a separately audited auxiliary GGUF tensor. Route existing
+RoPE ops through their frequency-factor parameter behind an opt-in gate, with
+no new custom backend kernel and unchanged default path. Audit every existing
+neural/codec coefficient, then fixed F32/cross-cache source-RoPE OFF/ON/OFF
+canonical and late-stage diff plus real CLI/C-ABI speech on GH. Retain negative
+controls, complete trajectories and all failures. No seed/filter/reference/
+threshold change, performance claim or model/default promotion. Actual T4 v2
+and unmodified late-layer job continue independently.
+
+## CLAIMED 2026-10-13 — Tiny actual-source rotary coefficient diagnostic
+
+Owner: this maintainer session. Private storage probe directory
+`/mnt/storage/crispasr/dia-short-20261012/rotary-coefficient-probe`.
+While late-layer GH and corrected actual-GPU controls run, compare the pinned
+original Float32 RotaryEmbedding with the actual pinned ggml CPU rotary-cache
+helper at positions 0/38/864/978/1225. Use the source helper itself, not a
+reconstructed neural reference. Test the existing operator's explicit frequency
+factors with the original module's actual timescales and base one against the
+default geometric recurrence. This is tiny weight-free primitive evidence;
+no local full model/build, neural math change, reference substitution, sampler
+change, model promotion, GPU or speech claim follows. Preserve coefficients,
+source excerpts/hashes and negative/default controls before deciding any next
+convert/dump/diff A/B experiment.
+
+## CLAIMED 2026-10-13 — Correct explicit Dia CUDA diff device request
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-cuda-device-20261013`, branch
+`fix/dia-cuda-replay-device-20261013`, based on composed CUDA source `3595fa25b`.
+The submitted v1 worker requires actual CUDA allocation/scheduler splits, but
+inspection shows the diff Environment guard clears TTS_GPU and params force
+CPU. Preserve terminal v1 logs/output before any resubmission; do not count its
+CPU stages as CUDA evidence. Capture the explicit GPU request before clearing
+debug variables and pass it through context params, keeping default CPU replay
+and environment restoration. Add source-compiled device/alias/isolation controls
+and update the compile package's exact source guards/provenance for the solely
+changed diff dispatcher. No native model math/cache/sampler change. After tests,
+submit one immutable-source actual GPU replacement; keep all v1 failures and
+fixed CPU rejection. This is validation plumbing, not a speech fix.
+
+## CLAIMED 2026-10-13 — Dia decoder stage capture at the first remaining divergence
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-late-stage-20261013`, diagnostic branch
+`diag/dia-late-stage-20261013`, based on the fixed cache source `2205d920d`.
+CPU OFF/ON/OFF control is complete and rejected; first remaining shared-history
+sample difference is step 978/head 2 with F32 weights/cross cache. Add an
+explicit diagnostic decoder capture step to the original reference hooks and
+native stage dumps, keeping step zero the default and preserving the immutable
+canonical reference. The diff must obtain the selected step from validated
+reference metadata and isolate/restore the new debug environment variable.
+Use tiny actual-original hook A/B and existing source-compiled diff contracts,
+then GH for real original/native layer capture at step 978. Preserve all
+original inputs/logits/PCM and mark teacher replay as diagnostic only. Do not
+alter neural math, sampler, source/model/seed/filter/quality gates or claim
+free-speech acceptance. Actual T4 model controls continue unchanged.
+
 ## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
 
 Owner: this maintainer session, storage controller worktree
@@ -21,11 +88,23 @@ unchanged wrapper. Preserve both successful scoped controls and broad-suite
 aborts; inspect pinned ggml source before proposing a repair or bounded device
 follow-up. Update hardware documentation and release notes and answer the PR.
 No full-model, quantization or performance claim follows from operator tests.
+Audit completed: all 17 archived files hashed; all five receipt/log assessments
+match the unchanged wrapper. Restricted float controls and RMS_NORM/SOFT_MAX/
+ROPE pass; broad ADD and MUL_MAT abort. Complete receipt:
+`docs/cann-310p3-hardware-2026-10-13.json`. Candidate isolated routing test
+passes 13 cases under each of 310P/910B; the unchanged 310P predicate fails six
+of the same cases. No device execution follows from that source-only test.
 The attached complete logs identify rejected BF16 inputs: ADD advertises them
 unconditionally, while MUL_MAT guards weights but not the activation input on
 310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
 on the existing two-architecture GH CANN matrix. Keep the production submodule
 pin unchanged until physical rerun and required validation accept the repair.
+Candidate pushed: shared ggml `21acf3162` and CrispASR `bfb4943ac` in
+`/mnt/storage/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
+Two-architecture SDK matrix `38365667723` is submitted, including the real
+`test-backend-ops` target and actual predicate controls. No production pin
+changed. The bounded physical rerun procedure is documented beside the verified
+original receipt. Candidate secret scans pass all four checks without skips.
 
 ## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
@@ -43,7 +122,20 @@ Markdown updates; each acceptance gate precedes the dependent step.
    first differing draw is step 864/head 6, original 55/native 938. These are
    rejected speech controls, not an accepted runtime fix. Receipt:
    `docs/dia-neural-precision-hosted-2026-10-13.json`.
-2. NOW IN FLIGHT: candidate `2205d920d`, GH `38357576078` (queued).
+2. COMPLETE AS A REJECTED CONTROL: candidate `2205d920d`, GH `38357576078`
+   fails the fixed speech gate. All three arms pass 40/40 canonical stages;
+   all six CLI/C-ABI outputs are empty/WER 1. OFF/repeat inputs, logits and PCM
+   are byte-identical. Actual cross-cache vectors grow from 11,501,568 to
+   23,003,136 bytes (+11,501,568), without accepting speech. Shared input
+   history increases from 865 to 979 steps. New first draw is step 978/head 2,
+   original 877/native 904; norm error drops from 2.40e-5 to 5.01e-6.
+   Weight-free pinned-original/actual-native-filter replay shows matching
+   support on identical inputs, but neural differences swap tokens 46/904
+   across the nucleus boundary. The original removes 904; native includes it.
+   Complete controls and both causal boundaries are retained in
+   `docs/dia-cross-cache-hosted-2026-10-13.json` and
+   `docs/dia-cross-cache-boundary-2026-10-13.json`. No default/model promotion.
+   The diagnostic implemented the following fixed scope:
    Preserve F32 cross-attention caches behind an opt-in gate,
    keeping the existing F16 path/default. The actual pinned original preserves
    F32 projections; the tiny original F32/rounded/F32-repeat control is retained.
@@ -6162,3 +6254,144 @@ observed control, not a presumed failing CPU negative; F32 must pass strict
 stages and ASR, and OFF repeats must agree. Failed/inconclusive runs retain
 all evidence and never waive CPU/main-composition/full-model/Q4 gates.
 Do not change the candidate’s C++ math or the executing CPU source.
+
+
+## UPDATE 2026-10-13 — Parallel Dia CUDA source and actual allocation
+
+Per the user's explicit Kaggle steering, diagnostic version 1 is running exact
+composed source `3595fa25b0bc40d3f32176b477005ddcd3280e28`. Pulled submitted
+kernel matches the rendered template byte-for-byte (SHA-256
+`aab5a983c22a47a5414a698bb516bc5269ad9cfb57bfb6136d8ecfc5f7dba74d`).
+The progress mirror records two physical Tesla T4 devices, SM75, 15,360 MiB
+per device, driver 580.178.04; native CUDA compilation is in progress, not yet
+model inference. GH CUDA package `38361713994` builds exact source `989e212f`.
+The fixed GH CPU cache control `38357576078` at `2205d920d` is unchanged and
+running since 07:00 UTC. No correctness/default/performance acceptance follows
+from allocation or compilation. Broad GPU acceptance and profiling stay gated
+on the fixed controls; complete failed results will be retained.
+
+
+## UPDATE 2026-10-13 — Completed Dia cache and CUDA package receipts
+
+CPU cache run `38357576078` completed 07:55 UTC as FAILURE: all 120 canonical
+stage rows pass, but all six native decoded controls reject. All 54 artifact
+files and full failed-step log are retained under storage; every worker log
+hash and OFF/repeat array hash is verified. The new first-draw support flip
+at step 978 is reproduced using pinned Torch 2.6 CPU original CFG/filter code,
+actual C++ filtering and the unchanged retained portable batch noise. On the
+same logits, original/native support agrees and both reproduce each recorded
+draw; this is residual neural sensitivity, not evidence of a filter defect.
+The shared input prefix still lies in the original's quiet leading region.
+
+CUDA package run `38361713994` is SUCCESS at exact source `989e212f`.
+Complete 489,745,988-byte archive SHA-256
+`1310ab21da79278a8db2739af4badd6ca05f5ef5ccd30ea697d8939e65496a53`,
+all 27 payload members/contained aliases and seven source files verify.
+Four Dia runtime files match the fixed CPU source byte-for-byte. Dependency
+closure passes 14 ELF files with $ORIGIN; the CUDA driver is external.
+Receipt: `docs/dia-cuda-package-2026-10-13.json`. This is compilation/package
+proof; the separate actual T4 model diagnostic remains in flight. Broad speech
+acceptance, profiling and release remain gated; no seed/filter/threshold change.
+
+PR #544 follow-up was answered in comment `6141026980`, linking the complete
+verified physical receipt, failed BF16 cases and immutable candidate procedure.
+The candidate SDK matrix `38365667723` is now in progress. Production ggml is
+unchanged pending the physical rerun and required acceptance.
+
+
+## UPDATE 2026-10-13 — Ascend candidate compilation, late-layer job and CUDA v1 rejection
+
+CANN matrix `38365667723` is SUCCESS at `bfb4943ac`: both SDK9.2 architecture
+builds include CLI/shared/diff/quantizer/operator test, and both chip-specific
+routing-control steps pass. Complete log/source receipt:
+`docs/cann-310p-bf16-compile-2026-10-13.json`. The actual SDK9.1/310P3 rerun
+requested in #544 remains pending; production shared-ggml pin is unchanged.
+
+Late-layer candidate `b14fd8a4c725fa2aa1509e0fbde139531e719cc0` is pushed.
+Ten tiny actual-original capture/ownership/validation controls pass (8.880s);
+two compiled parser/environment/retention controls pass; full native source
+and actual diff-header syntax checks pass. GH `38372751566` is queued with
+Torch2.6 CPU and unchanged source/model/generation pins. Complete native arrays
+are retained in new directories; default/late/default must reproduce identical
+full logits, feedback and decoded PCM before interpreting the late snapshots.
+
+Actual-T4 Kaggle v1 at `3595fa25b` is terminal ERROR. Full 4,514-entry log and
+all 19 output files are saved under storage and worker log hashes verify.
+It compiles successfully and passes the CPU diff, but observes zero process GPU
+allocation and zero CUDA splits; the hardware-execution guard correctly rejects.
+No CUDA generation/quality acceptance follows. Complete receipt:
+`docs/dia-cuda-first-attempt-2026-10-13.json`. The explicit device-request repair
+and source-compiled guard tests are ready; replacement will use one fixed new
+source after all terminal v1 output is preserved. Existing guide-approved HF
+compiler cache is warmed/refreshed separately from public model proofs.
+
+
+## UPDATE 2026-10-13 — Corrected GPU version submitted after preserving v1
+
+Explicit GPU routing candidate `35945f527c70377e00bf00808235337e130e11fd` is
+pushed as `fix/dia-cuda-replay-device-20261013` and fast-forwards the unmerged
+CUDA preparation branch. Three native neural/cache/sampler files remain
+byte-identical to `2205d920d`; only the diff request handoff changes. The new
+diff header SHA-256 is `d8e896fe52982107da26fa1fb8d857bd312113417484e6475172ca6d0249d364`.
+Four compiled request/source-pin controls pass, actual diff-header syntax and
+workflow lint pass, and all four secret checks pass without skips (46.570s).
+Kaggle version 2 was submitted only after complete terminal v1 preservation;
+its pulled rendered source matches byte-for-byte. Compiler-cache provenance is
+separate; immutable downloaded blobs inside this run's scratch are released
+only after exact audited export to make room for models and outputs.
+No GPU model/quality claim precedes the actual allocation/stage/speech results.
+
+
+## UPDATE 2026-10-13 — Original timescale candidate and corrected late-stage controls
+
+Primitive coefficient receipt `docs/dia-rotary-coefficients-2026-10-13.json`
+retains actual original module and compiled actual ggml cache helper outputs.
+At position 978, default maximum coefficient error is 1.2040138e-4; original
+F32 timescales/base-one factors give 5.9604645e-8. Position zero is exact in both
+arms; the doubled-timescale negative has cosine .261437 at 978. This motivates
+an experiment and does not accept native model speech.
+
+Candidate `ead5a5d5dab77e8d2e2c22a4fbb7450d44abc492` is pushed in the claimed
+storage worktree. It adds an audited actual-original auxiliary F32 timescale
+tensor and uses existing ggml frequency factors at all six rotary sites behind
+`CRISPASR_DIA_SOURCE_ROPE=1`. Default RoPE is unchanged; neural/codec coefficients
+are preserved. Seven tiny physical export/source-buffer checks, ten actual
+original capture controls, two compiled index/retention controls and one
+compiled op-dispatch control pass. Native source syntax/clang18 and all four
+secret checks pass without skips (46.810s). Real GGUF size/alignment overhead
+and model quality remain pending. Full fixed F32/cross-F32 rotary OFF/ON/OFF
+stage plus CLI/C-ABI/ASR control: GH `38382524080`. Corrected late-layer
+canonical/late/canonical replay and negatives: GH `38382527357`.
+
+Earlier late-layer run `38372751566` is retained as FAILURE. Actual original
+input/code grids match canonical and original ASR is WER 0. Both observed
+comparison calls return success with all 40 numerical rows; stderr inserts its
+known decoder marker inside one PASS tag, causing the worker to count 39.
+All 121 files and every worker log hash are verified. No repeat or negatives
+were executed, so no full late-capture acceptance is inferred. Receipt:
+`docs/dia-late-stage-first-attempt-2026-10-13.json`. The producer now flushes
+stdout before codec replay, and old-marker parsing preserves original raw logs
+and all numerical/failure fields. Retry uses the new fixed source without
+turning the rotary gate on for the baseline capture control.
+
+Corrected CUDA package `38374792784` is SUCCESS at `35945f527`; actual T4
+version 2 remains in progress after compiling. Its source has been pulled and
+verified exactly; no CUDA stage or decoded-speech acceptance is claimed yet.
+CANN compilation success was answered on #544 in comment `6142714932`; the
+physical candidate rerun remains outstanding. No new release tag or production
+model/default/shared-ggml pin is promoted by these diagnostics.
+
+
+## UPDATE 2026-10-13 — Physical Ascend BF16 capability candidate fully verified
+
+Contributor #544 comment `6143426863` returns exact candidate `bfb4943ac` /
+shared ggml `21acf3162` on physical ARM64/310P3, SDK9.1, ACL graph off.
+Archive SHA-256 `58e1af7a55edbad81c93f83645e279f538b3910b7c87f7fd25ece6a51f1df9e1`
+verifies; all member/log hashes and unchanged-wrapper assessments match.
+Actual compiler commands define ASCEND_310P and omit ACL graphs. All five
+broad suites complete: ADD103, RMS_NORM51, SOFT_MAX107, ROPE109, MUL_MAT554,
+924 executed cases all pass; 2,241 unsupported cases remain explicitly logged.
+Both previous BF16 aborts are resolved for the tested operators. Receipt:
+`docs/cann-310p3-bf16-physical-2026-10-13.json`. Compose validated current main
+into the isolated CANN branch and run full general CI before advancing the
+production submodule pin. No full-model or quantized speech/speed claim follows.

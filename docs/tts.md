@@ -2295,3 +2295,9 @@ crispasr --backend supertonic -m auto --tts "Guten Tag, wie geht es dir?" \
 - Long text is chunked at sentence boundaries (300 chars; 120 for ko/ja) and
   joined with 0.3 s silences, matching the upstream SDK.
 - Env: `SUPERTONIC_BENCH=1` prints per-stage timings.
+
+
+Dia cache precision checkpoint (2026-10-13): full F32 weights and F32 cross
+caches still reject the unchanged short seed-42 control through CLI and C ABI
+(empty transcript/WER 1), despite 40/40 canonical stage passes. No default or
+model pin was promoted; see [the complete OFF/ON/OFF receipt](dia-cross-cache-hosted-2026-10-13.json).

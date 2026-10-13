@@ -182,3 +182,15 @@ support and variation arrays plus source/observer hashes are retained in
 `docs/dia-sampling-probability-local-2026-10-12.json`. Hosted run `38307628341`
 repeats the component check under Torch 2.6. No model weights are loaded;
 speech, native RNG compatibility and production acceptance remain separate.
+
+
+Completed fixed-cache control (GH 38357576078, source 2205d920d): all three
+F16/F32/F16-repeat arms pass 40/40 canonical stages, but all six CLI/C ABI
+speech controls remain empty/WER 1. OFF/repeat inputs, logits and PCM match
+exactly. Actual cross-cache vectors double from 11,501,568 to 23,003,136 bytes;
+F32 extends shared input history from 865 to 979 steps and reduces maximum
+aligned logit norm error from 2.40e-5 to 5.01e-6. At step 978/head 2, tiny neural
+changes include token 904 across the nucleus boundary; original/native filters
+agree on identical logits and reproduce the recorded draws. This is a rejected
+speech control, with no sampling-policy or quality-gate waiver.
+Complete [cache controls](dia-cross-cache-hosted-2026-10-13.json) and [first-draw replay](dia-cross-cache-boundary-2026-10-13.json).

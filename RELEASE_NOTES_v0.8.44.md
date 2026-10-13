@@ -102,7 +102,12 @@ The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
 real positive ADD case and rejects three actual upstream false-success cases:
 missing backend, empty parameter selection and unknown operator. It preserves
 full logs, hashes and incremental receipts. [The hosted wrapper receipt](docs/cann-hardware-wrapper-2026-10-12.json) records the complete test outputs. The [physical-device procedure](docs/cann-hardware-validation-2026-10-12.md)
-has been sent to the contributor; physical Ascend results remain pending.
+has returned physical 310P3 results (SDK 9.1.0, ARM64, ACL graphs off).
+RMS_NORM 51/51, SOFT_MAX 107/107 and ROPE 109/109 pass, with unsupported
+cases retained. Restricted F32 ADD and F32/F16-weight matrix controls pass;
+broad ADD/MUL_MAT abort on unsupported BF16 inputs. The capability repair and
+physical rerun remain pending. Full-model speech and speed are unvalidated.
+See [the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
 
 ## Dia: reproducible DAC precision conversion
 
@@ -149,7 +154,7 @@ still require separate full-model and quantized speech validation.
 | TTS contracts #531 | 2,009 native unit tests, 140 actual ONNX-enabled CLI/C ABI rows; 48 passing checks, one intentional skip | Separate model-quality reports from #530 |
 | Breeze synthesis #543 | 107 original stage/magnitude comparisons, 20 real-T4 decoded speech/interface outputs; 51 passing checks, one intentional skip | Canonical BF16 complete greedy code equality remains 0/8 |
 | CANN #544 | x86_64/910B ACL-graph-on and ARM64/310P ACL-graph-off compilation of CLI, shared library, diff, quantizer and ggml-cann; 46 passing checks, one intentional skip | Physical Ascend inference, quantized model quality and speed |
-| Operator wrapper | Real hosted ARM CPU ADD case plus rejection of three upstream false-success cases | Physical CANN execution |
+| Operator wrapper | Hosted ARM false-success guards; physical 310P3 restricted float controls and RMS_NORM/SOFT_MAX/ROPE pass, with complete failed broad suites retained | BF16 capability repair/rerun; full-model CANN quality and speed |
 
 The refreshed Breeze GPU runtime files are byte-identical to the merged files;
 [the merge receipt](docs/breeze-merge-2026-10-12.json) records their full SHA256
@@ -234,3 +239,41 @@ Dia's unmerged [portable sampler replay](docs/dia-portable-random-hosted-2026-10
 [Durable Dia proof retrieval](docs/dia-proof-archives.md) preserves all 77 canonical/component/converter/rejected-speech files in immutable public archives. The stdlib helper verifies full archive and payload hashes, rejects invalid extraction and preserves existing paths; eight contracts and real archive retrieval pass. Future validation input transport also passes complete [original/native-filter replay](docs/dia-public-input-replay-2026-10-13.json). These are reproducibility fixes, with native speech still rejected and cache precision under investigation.
 
 [Complete rejected neural precision and tiny cache proofs](docs/dia-neural-public-proof-2026-10-13.json) are also durably public, with full anonymous archive verification and unchanged acceptance scopes. The TTS documentation records the short-prompt failure; the architecture guide corrects the original checkpoint’s CFG equation.
+
+
+Completed fixed-cache control (GH 38357576078, source 2205d920d): all three
+F16/F32/F16-repeat arms pass 40/40 canonical stages, but all six CLI/C ABI
+speech controls remain empty/WER 1. OFF/repeat inputs, logits and PCM match
+exactly. Actual cross-cache vectors double from 11,501,568 to 23,003,136 bytes;
+F32 extends shared input history from 865 to 979 steps and reduces maximum
+aligned logit norm error from 2.40e-5 to 5.01e-6. At step 978/head 2, tiny neural
+changes include token 904 across the nucleus boundary; original/native filters
+agree on identical logits and reproduce the recorded draws. This is a rejected
+speech control, with no sampling-policy or quality-gate waiver.
+Complete [cache controls](docs/dia-cross-cache-hosted-2026-10-13.json) and [first-draw replay](docs/dia-cross-cache-boundary-2026-10-13.json).
+
+
+The scoped 310P BF16 capability candidate also passes both SDK9.2 compile
+architectures, including the upstream operator binary; its physical rerun is
+still pending and the production ggml pin remains unchanged. The first Dia T4
+attempt is retained as a rejected validation path (CPU diff, zero observed GPU
+allocation/splits); a device-request repair is being validated. Neither result
+establishes full-model NPU/CUDA speech or speed acceptance.
+
+
+A source-faithful rotary-timescale candidate is now under fixed OFF/ON/OFF
+validation. Actual-source tiny coefficients at the remaining late boundary
+improve from maximum error 1.20e-4 to 5.96e-8 through existing ggml frequency
+factors; neural and speech acceptance remain pending. The auxiliary table is
+physically audited and existing coefficient bytes are preserved. Original and
+native late-step capture is tested for transparency; the first hosted attempt
+is retained as a logging/count rejection, with complete failed evidence and a
+corrected retry. These experiments remain unmerged and do not change release
+model pins, native quality gates or GPU defaults.
+
+
+The subsequent physical Ascend310P3/SDK9.1 candidate rerun is verified: all
+five broad operator suites complete with 924/924 executed cases passing,
+unsupported cases retained, and both previous BF16 aborts resolved. Exact
+source/compiler/archive/log provenance is recorded; full composed CI precedes
+integration. Operator correctness does not establish model-quality or speed.

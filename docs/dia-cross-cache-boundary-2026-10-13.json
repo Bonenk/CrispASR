@@ -1,0 +1,248 @@
+{
+  "scope": "Weight-free first-divergence replay of retained actual neural logits, pinned original CFG/filter code and instrumented actual native filter with unchanged portable batch noise; no model/speech acceptance",
+  "torch_version": "2.6.0+cpu",
+  "original_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+  "native_filter_sha256": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf",
+  "observer_sha256": "e4e225dccce9fb339a898bf25f1813db8089842432510575ec7e929d832e7afe",
+  "boundaries": [
+    {
+      "cache": "f32-cross-f16",
+      "step": 864,
+      "head": 6,
+      "original": 55,
+      "native": 938,
+      "rows": [
+        {
+          "arm": "original",
+          "torch_race_draw": 55,
+          "support_count": 42,
+          "boundary": [
+            {
+              "token": 55,
+              "rank_zero_based": 41,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.9418578147888184,
+              "after_nucleus_mass": 0.9565750956535339,
+              "torch_probability": 0.015385376289486885,
+              "noise": 0.005416492465883493,
+              "torch_race_score": 2.840468406677246
+            },
+            {
+              "token": 938,
+              "rank_zero_based": 38,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.8960817456245422,
+              "after_nucleus_mass": 0.9115403294563293,
+              "torch_probability": 0.01616036146879196,
+              "noise": 0.008116250857710838,
+              "torch_race_score": 1.9911116361618042
+            }
+          ],
+          "native_filter_draw": 55,
+          "original_native_filter_support_differences": 0,
+          "original_native_filter_max_probability_error": 5.587935447692871e-09
+        },
+        {
+          "arm": "native",
+          "torch_race_draw": 938,
+          "support_count": 42,
+          "boundary": [
+            {
+              "token": 55,
+              "rank_zero_based": 42,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.9565709233283997,
+              "after_nucleus_mass": 0.97128826379776,
+              "torch_probability": 0.0,
+              "noise": 0.005416492465883493,
+              "torch_race_score": 0.0
+            },
+            {
+              "token": 938,
+              "rank_zero_based": 38,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.8960766196250916,
+              "after_nucleus_mass": 0.9115360379219055,
+              "torch_probability": 0.016161290928721428,
+              "noise": 0.008116250857710838,
+              "torch_race_score": 1.9912261962890625
+            }
+          ],
+          "native_filter_draw": 938,
+          "original_native_filter_support_differences": 0,
+          "original_native_filter_max_probability_error": 7.450580596923828e-09
+        }
+      ],
+      "neural_support_differences": 2,
+      "original_only_tokens": [
+        55
+      ],
+      "native_only_tokens": [
+        1008
+      ]
+    },
+    {
+      "cache": "f32-cross-f32",
+      "step": 978,
+      "head": 2,
+      "original": 877,
+      "native": 904,
+      "rows": [
+        {
+          "arm": "original",
+          "torch_race_draw": 877,
+          "support_count": 32,
+          "boundary": [
+            {
+              "token": 877,
+              "rank_zero_based": 10,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.7288020849227905,
+              "after_nucleus_mass": 0.7458503842353821,
+              "torch_probability": 0.017905425280332565,
+              "noise": 0.006084977183490992,
+              "torch_race_score": 2.9425623416900635
+            },
+            {
+              "token": 904,
+              "rank_zero_based": 32,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.9521317481994629,
+              "after_nucleus_mass": 0.95646071434021,
+              "torch_probability": 0.0,
+              "noise": 0.0009702381212264299,
+              "torch_race_score": 0.0
+            }
+          ],
+          "native_filter_draw": 877,
+          "original_native_filter_support_differences": 0,
+          "original_native_filter_max_probability_error": 5.21540641784668e-08
+        },
+        {
+          "arm": "native",
+          "torch_race_draw": 904,
+          "support_count": 32,
+          "boundary": [
+            {
+              "token": 877,
+              "rank_zero_based": 10,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.7288033366203308,
+              "after_nucleus_mass": 0.7458521127700806,
+              "torch_probability": 0.017905911430716515,
+              "noise": 0.006084977183490992,
+              "torch_race_score": 2.9426422119140625
+            },
+            {
+              "token": 904,
+              "rank_zero_based": 31,
+              "top_k_kept": true,
+              "prior_nucleus_mass": 0.9478030800819397,
+              "after_nucleus_mass": 0.9521320462226868,
+              "torch_probability": 0.004546598996967077,
+              "noise": 0.0009702381212264299,
+              "torch_race_score": 4.686065196990967
+            }
+          ],
+          "native_filter_draw": 904,
+          "original_native_filter_support_differences": 0,
+          "original_native_filter_max_probability_error": 4.470348358154297e-08
+        }
+      ],
+      "neural_support_differences": 2,
+      "original_only_tokens": [
+        46
+      ],
+      "native_only_tokens": [
+        904
+      ]
+    }
+  ],
+  "retained_files": [
+    {
+      "path": "boundary.py",
+      "bytes": 6033,
+      "sha256": "fa4381ba68314e4fc33f2577ba7e3942631a23de42833f375e3c128d5f14d8ae"
+    },
+    {
+      "path": "boundary.log",
+      "bytes": 5317,
+      "sha256": "638fb11d04da8187dae2e479546d73b18d40d59d0101d76ca869278a5dac6334"
+    },
+    {
+      "path": "actual-boundary-observer.cpp",
+      "bytes": 4246,
+      "sha256": "e4e225dccce9fb339a898bf25f1813db8089842432510575ec7e929d832e7afe"
+    },
+    {
+      "path": "f32-cross-f16-native-cfg.npy",
+      "bytes": 4240,
+      "sha256": "6155cbfa0d5d6957ede9222989d70b750eebad4a142fda9ee0728460e5e0f7f2"
+    },
+    {
+      "path": "f32-cross-f16-original-cfg.npy",
+      "bytes": 4240,
+      "sha256": "4d0d21efef82f17e65225ba3ec4797b955ce8b2e0c7d9363e147756912758c7f"
+    },
+    {
+      "path": "f32-cross-f32-native-cfg.npy",
+      "bytes": 4240,
+      "sha256": "d178fe9508abdd2bedcb4666a3ffd1506986bf57fa06432431154d45a2f25121"
+    },
+    {
+      "path": "f32-cross-f32-original-cfg.npy",
+      "bytes": 4240,
+      "sha256": "cedf7552ad1bffbb155ad605a8e2f7feec80a9dbdeff46879392cbc9c9741b9b"
+    },
+    {
+      "path": "f32-cross-f16-native-torch-probabilities.npy",
+      "bytes": 4240,
+      "sha256": "3ffe1c1ae65e4d8b6c79baa04fd4db461025bc880a6d97cada09779d5912af5c"
+    },
+    {
+      "path": "f32-cross-f16-original-torch-probabilities.npy",
+      "bytes": 4240,
+      "sha256": "7beebdd5387d3f81e67e554f3cd01336189e533561bf23a474c6e1ae1331457c"
+    },
+    {
+      "path": "f32-cross-f32-native-torch-probabilities.npy",
+      "bytes": 4240,
+      "sha256": "fc6fbc277e879ce97ce03c4a3e9f503e35b1686714f72e0109c650092a8b5e98"
+    },
+    {
+      "path": "f32-cross-f32-original-torch-probabilities.npy",
+      "bytes": 4240,
+      "sha256": "305254b282e6f29d0368c43a6d3479fc4ed54dc10ab0f5a0b8939eb8ab568850"
+    },
+    {
+      "path": "f32-cross-f16-native-probabilities.f32",
+      "bytes": 8224,
+      "sha256": "bc5fdfbb72f053b9d007bd1e158caf53559447bd5e2ddcb5908251199fbba2df"
+    },
+    {
+      "path": "f32-cross-f32-native-probabilities.f32",
+      "bytes": 8224,
+      "sha256": "912457a1b8f42bc689ad70fcd88df573a4543add6f7cbc27bbf7f8a7d1b1366d"
+    },
+    {
+      "path": "f32-cross-f16-replayed-draws.u32",
+      "bytes": 8,
+      "sha256": "6ee050e78fa24adc2b9636a62be2a0e071df9d0bbfbb5efd4b552b82b804a067"
+    },
+    {
+      "path": "f32-cross-f32-replayed-draws.u32",
+      "bytes": 8,
+      "sha256": "ad0a502b2bf44616705073beeb26ae488f9fd59f24c03b15aae5abbf6079eda0"
+    },
+    {
+      "path": "f32-cross-f16-observer-input.f32",
+      "bytes": 16448,
+      "sha256": "d4e77e43c116d7ad8840820ab0d84f30aba67ae8b6f1afdc552de95903a0d355"
+    },
+    {
+      "path": "f32-cross-f32-observer-input.f32",
+      "bytes": 16448,
+      "sha256": "18592d28a226a98ab60f62a9b4fa9e484282bcf306d1c682e546321db558477e"
+    }
+  ]
+}

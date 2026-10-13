@@ -1,5 +1,12 @@
 # CrispASR — Performance benchmarks
 
+Ascend checkpoint (2026-10-13): physical ARM64/310P3, SDK 9.1.0,
+ACL graphs off, has operator-level float correctness evidence. Broad ADD and
+MUL_MAT abort on unsupported BF16 inputs. No model-throughput or speech-quality
+claim is established; operator elapsed times are not model benchmarks. See
+[the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
+
+
 Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
@@ -3200,3 +3207,29 @@ Measure on the deployment machine. Receipt: `docs/mel-projection-2026-10-08.json
 
 The independent projection change retains KokerZhou's original authorship
 from PR #492; its separate MiMo/CANN changes are not included here.
+
+
+Completed fixed-cache control (GH 38357576078, source 2205d920d): all three
+F16/F32/F16-repeat arms pass 40/40 canonical stages, but all six CLI/C ABI
+speech controls remain empty/WER 1. OFF/repeat inputs, logits and PCM match
+exactly. Actual cross-cache vectors double from 11,501,568 to 23,003,136 bytes;
+F32 extends shared input history from 865 to 979 steps and reduces maximum
+aligned logit norm error from 2.40e-5 to 5.01e-6. At step 978/head 2, tiny neural
+changes include token 904 across the nucleus boundary; original/native filters
+agree on identical logits and reproduce the recorded draws. This is a rejected
+speech control, with no sampling-policy or quality-gate waiver.
+The 114 additional matching input steps are in the canonical original's quiet
+leading region and do not establish an audible matching prefix. No speed gain
+is claimed from this experiment. CUDA compilation/dependency closure passes;
+actual CUDA speech validation remains in flight. See
+[the cache receipt](docs/dia-cross-cache-hosted-2026-10-13.json),
+[the exact boundary replay](docs/dia-cross-cache-boundary-2026-10-13.json) and
+[the delivered CUDA package audit](docs/dia-cuda-package-2026-10-13.json).
+
+
+Rotary precision diagnostic (2026-10-13): actual original Float32 timescales
+with ggml's existing frequency-factor input reduce position-978 coefficient
+maximum error from 1.2040138e-4 to 5.9604645e-8. This is a tiny weight-free
+primitive comparison, not inference speed or model-quality acceptance. The
+full source-timescale OFF/ON/OFF control is queued on GH `38382524080`.
+[Complete coefficient/source/negative receipt](docs/dia-rotary-coefficients-2026-10-13.json).
