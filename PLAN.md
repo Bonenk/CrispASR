@@ -6,7 +6,23 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Dia final normalization and decoder input alignment
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
+`/mnt/storage/crispasr/dia-norm-embed-probe-20261013`. Output-head isolation shows
+that step-978 draw changes follow hidden states rather than the head kernel.
+Fetch only original final-norm and nine embedding tensors by validated pinned
+ranges, checking every complete tensor against the existing physical audit.
+Replay actual Torch2.6 weighted final RMSNorm and actual native graph helper on
+verified retained layer-17 inputs. Check the actual original decoder's embedding
+entry against the actual native helper on fixed retained feedback tokens.
+Retain exact-shape/repeat/negative controls and source/file hashes. No local
+full-model run, reconstructed neural reference, seed/filter change or speech
+acceptance. Record completed final-main CANN compile run `38401026881` alongside
+its exact source and unchanged physical-operator scope.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
