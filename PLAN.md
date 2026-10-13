@@ -6929,3 +6929,14 @@ receipt: `docs/dia-attention-cuda-driver-repair-2026-10-13.json`.
 Next verify actual preflight/GPU ASR and capture execution, then full terminal
 OFF/ON/OFF arrays and remaining neural boundaries. Native speech/Q4 remain
 unaccepted; no runtime/default/model/release promotion.
+
+## CLAIMED 2026-10-13 — Salvage complete CUDA captures; repair shape serialization
+
+Version 5 completed actual T4 preflight, GPU ASR, three normal replays,
+OFF/ON/OFF equality and negatives, then failed serializing a NumPy uint64
+GGUF shape dimension in the metrics receipt. All 232 outputs and full terminal
+logs are preserved. Independently audit existing GPU tensors and controls on
+storage, keeping original terminal ERROR/receipt unchanged; do not repeat
+expensive GPU work solely for metadata. Convert dimension values explicitly
+to Python int, prove JSON roundtrip with actual NumPy uint64 shapes and scale
+negative, and require atomic receipts. Native free speech/Q4 stay unaccepted.
