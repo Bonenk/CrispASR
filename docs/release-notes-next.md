@@ -196,3 +196,21 @@ still pending and the production ggml pin remains unchanged. The first Dia T4
 attempt is retained as a rejected validation path (CPU diff, zero observed GPU
 allocation/splits); a device-request repair is being validated. Neither result
 establishes full-model NPU/CUDA speech or speed acceptance.
+
+
+A source-faithful rotary-timescale candidate is now under fixed OFF/ON/OFF
+validation. Actual-source tiny coefficients at the remaining late boundary
+improve from maximum error 1.20e-4 to 5.96e-8 through existing ggml frequency
+factors; neural and speech acceptance remain pending. The auxiliary table is
+physically audited and existing coefficient bytes are preserved. Original and
+native late-step capture is tested for transparency; the first hosted attempt
+is retained as a logging/count rejection, with complete failed evidence and a
+corrected retry. These experiments remain unmerged and do not change release
+model pins, native quality gates or GPU defaults.
+
+
+The subsequent physical Ascend310P3/SDK9.1 candidate rerun is verified: all
+five broad operator suites complete with 924/924 executed cases passing,
+unsupported cases retained, and both previous BF16 aborts resolved. Exact
+source/compiler/archive/log provenance is recorded; full composed CI precedes
+integration. Operator correctness does not establish model-quality or speed.

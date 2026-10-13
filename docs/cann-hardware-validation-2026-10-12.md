@@ -120,3 +120,16 @@ archive; do not overwrite it or filter BF16 out through `--params` to obtain a
 pass. A passing candidate must finish both broad operators under the unchanged
 upstream tolerances. Full-model diff, decoded ASR and scheduler fallback still
 need separate validation before any NPU model or speed claim.
+
+
+## Verified physical candidate rerun
+
+[Contributor follow-up 6143426863](https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6143426863)
+returns the exact immutable candidate on the same 310P3/SDK9.1 environment.
+The [complete verified receipt](cann-310p3-bf16-physical-2026-10-13.json) retains
+all member/log hashes, source revisions, actual compiler flags and unsupported
+cases. All five broad operators finish: ADD 103/103, RMS_NORM 51/51,
+SOFT_MAX 107/107, ROPE 109/109, MUL_MAT 554/554. Thus 924 executed cases pass;
+2,241 unsupported cases remain visible. Both prior BF16 aborts are resolved.
+Full composed CI and integration are next; full-model inference, quantized
+speech and performance still require separate proof.

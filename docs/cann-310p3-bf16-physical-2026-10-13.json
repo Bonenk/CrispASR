@@ -1,0 +1,228 @@
+{
+  "scope": "Verified physical ARM64 Ascend310P3 SDK9.1 ACL-graph-off broad operator suite; 924 executed passing cases; unsupported cases retained. No model, quantized quality or performance acceptance.",
+  "comment": "https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6143426863",
+  "archive_url": "https://github.com/user-attachments/files/33379816/crispasr-cann-310p3-bf16-candidate-2026-10-13.tar.gz",
+  "archive_sha256": "58e1af7a55edbad81c93f83645e279f538b3910b7c87f7fd25ece6a51f1df9e1",
+  "archive_bytes": 28549,
+  "receipt": {
+    "harness_source": "bfb4943ac1e4488e377257a47163a0edcea7d6cd",
+    "checkout_ggml_source": "21acf3162beeb4e51260f0f86deda80995423712",
+    "binary_sha256": "b06c8aebe04774cb6142b6506a3ea0d1a44922533ae42cdb59c58e59958c510f",
+    "system": "Linux",
+    "architecture": "aarch64",
+    "backend": "CANN0",
+    "scope": "Existing ggml operator correctness against CPU reference",
+    "model_inference_validated": false,
+    "quantized_model_quality_validated": false,
+    "performance_validated": false,
+    "runs": [
+      {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 103,
+        "cases_run": 103,
+        "observed_operator_cases": 103,
+        "unsupported_cases": 51,
+        "pass": true,
+        "operator": "ADD",
+        "command": [
+          "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/bin/test-backend-ops",
+          "test",
+          "-b",
+          "CANN0",
+          "-o",
+          "ADD",
+          "-j",
+          "1"
+        ],
+        "log_sha256": "00a198447f06942e55554b35e860401b87df418ace4afe88e0fb7b6fa55def87",
+        "elapsed_seconds": 12.680456459987909
+      },
+      {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 51,
+        "cases_run": 51,
+        "observed_operator_cases": 51,
+        "unsupported_cases": 0,
+        "pass": true,
+        "operator": "RMS_NORM",
+        "command": [
+          "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/bin/test-backend-ops",
+          "test",
+          "-b",
+          "CANN0",
+          "-o",
+          "RMS_NORM",
+          "-j",
+          "1"
+        ],
+        "log_sha256": "264d2b03fd80059704cc152e8203f25dd36665457c39e92eea07ae2b6e31b80f",
+        "elapsed_seconds": 7.023489800048992
+      },
+      {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 107,
+        "cases_run": 107,
+        "observed_operator_cases": 107,
+        "unsupported_cases": 107,
+        "pass": true,
+        "operator": "SOFT_MAX",
+        "command": [
+          "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/bin/test-backend-ops",
+          "test",
+          "-b",
+          "CANN0",
+          "-o",
+          "SOFT_MAX",
+          "-j",
+          "1"
+        ],
+        "log_sha256": "c0b434d8356fef1a7076f2e162f19183697474f871a25600d7b4146fc7d89869",
+        "elapsed_seconds": 10.979538450017571
+      },
+      {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 109,
+        "cases_run": 109,
+        "observed_operator_cases": 109,
+        "unsupported_cases": 361,
+        "pass": true,
+        "operator": "ROPE",
+        "command": [
+          "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/bin/test-backend-ops",
+          "test",
+          "-b",
+          "CANN0",
+          "-o",
+          "ROPE",
+          "-j",
+          "1"
+        ],
+        "log_sha256": "6ae9d86f6294f51418624a4f88ac17c36edb2633983e065a2bcaba80ebc47c4e",
+        "elapsed_seconds": 7.027364269946702
+      },
+      {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 554,
+        "cases_run": 554,
+        "observed_operator_cases": 554,
+        "unsupported_cases": 1722,
+        "pass": true,
+        "operator": "MUL_MAT",
+        "command": [
+          "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/bin/test-backend-ops",
+          "test",
+          "-b",
+          "CANN0",
+          "-o",
+          "MUL_MAT",
+          "-j",
+          "1"
+        ],
+        "log_sha256": "674948c135f09cb30156edb219cec78e67fa07accb0615191ed5d5b1d031445f",
+        "elapsed_seconds": 23.00883474992588
+      }
+    ],
+    "pass": true
+  },
+  "executed_cases": 924,
+  "unsupported_cases": 2241,
+  "compile_command": {
+    "directory": "/workspace/new/CrispASR-cann-bf16-proof/build-cann-ops/src/ggml-cann",
+    "command": "/usr/bin/c++ -DASCEND_310P -DGGML_BACKEND_BUILD -DGGML_BACKEND_SHARED -DGGML_SCHED_MAX_COPIES=4 -DGGML_SHARED -D_GNU_SOURCE -D_XOPEN_SOURCE=600 -Dggml_cann_EXPORTS -I/workspace/new/CrispASR-cann-bf16-proof/ggml/src/ggml-cann/.. -I/usr/local/Ascend/cann-9.1.0/include -I/usr/local/Ascend/cann-9.1.0/include/aclnn -I/usr/local/Ascend/cann-9.1.0/acllib/include -I/workspace/new/CrispASR-cann-bf16-proof/ggml/src/../include -O3 -DNDEBUG -fPIC -Wmissing-declarations -Wmissing-noreturn -Wall -Wextra -Wpedantic -Wcast-qual -Wno-unused-function -Wno-array-bounds -Wextra-semi -std=gnu++17 -o CMakeFiles/ggml-cann.dir/ggml-cann.cpp.o -c /workspace/new/CrispASR-cann-bf16-proof/ggml/src/ggml-cann/ggml-cann.cpp",
+    "file": "/workspace/new/CrispASR-cann-bf16-proof/ggml/src/ggml-cann/ggml-cann.cpp"
+  },
+  "files": [
+    {
+      "path": "cann-bf16-candidate-evidence/CMakeCache.txt",
+      "bytes": 30616,
+      "sha256": "007911c40c88c2e56b41f6700451d5a6bdd9ecc3040772a2625befc9e9c55c34"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/build-config.txt",
+      "bytes": 144,
+      "sha256": "fbb3eaa30ab5039ea35f508acfb7b94b7f570bdba46a69b8ebf3dac8e59099bd"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/build.log",
+      "bytes": 11080,
+      "sha256": "609671b11f8d6ffc99de041ca6c295a6338080286d293125e25220a85fc03ccc"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/add.log",
+      "bytes": 14158,
+      "sha256": "00a198447f06942e55554b35e860401b87df418ace4afe88e0fb7b6fa55def87"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/mul_mat.log",
+      "bytes": 320790,
+      "sha256": "674948c135f09cb30156edb219cec78e67fa07accb0615191ed5d5b1d031445f"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/receipt.json",
+      "bytes": 3474,
+      "sha256": "fe982505975ca8cbc6f8d809f3fbf48179607878f11cd000e508d16214268de2"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/rms_norm.log",
+      "bytes": 4279,
+      "sha256": "264d2b03fd80059704cc152e8203f25dd36665457c39e92eea07ae2b6e31b80f"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/rope.log",
+      "bytes": 70422,
+      "sha256": "6ae9d86f6294f51418624a4f88ac17c36edb2633983e065a2bcaba80ebc47c4e"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-bf16-candidate-proof/soft_max.log",
+      "bytes": 29635,
+      "sha256": "c0b434d8356fef1a7076f2e162f19183697474f871a25600d7b4146fc7d89869"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/cann-sdk-versions.txt",
+      "bytes": 792,
+      "sha256": "a8a860541ea7d8ec8bce3dd19fc96dca9faa0d102b3194c2c112cc3077feaac9"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/compile_commands.json",
+      "bytes": 37515,
+      "sha256": "a98e4714b375e21ae458391074caaeeca2c68573285b3124b4a87370f624ecfd"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/configure.log",
+      "bytes": 3292,
+      "sha256": "5022c8025e7ea33d4eb883c8ee42af742a7b140e13c5674d92d397eec2224d47"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/crispasr-revision.txt",
+      "bytes": 41,
+      "sha256": "9382db488384a05a6936b8b88d15938d423eff93bd50446950d426fc34a77879"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/device-info.txt",
+      "bytes": 1819,
+      "sha256": "6010e3c8f1f5d030ad2a092692b77e54986538a72566c2b75e2c88965e757bac"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/ggml-revision.txt",
+      "bytes": 41,
+      "sha256": "36c036c604ae70742d516136d1aee4e12bbcde38c73508b4d2a31e0fe6c699a9"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/routing-test.log",
+      "bytes": 174,
+      "sha256": "cbca65022646f1470ad08c646be9ad79f2d10ee4f2e3be9df5a0b595f969d994"
+    },
+    {
+      "path": "cann-bf16-candidate-evidence/validation.log",
+      "bytes": 178,
+      "sha256": "3fdbaee16130c3b89f7139afc42204777a9e4d9a95a28bbb1b76e2c3179898b0"
+    }
+  ],
+  "model_inference_validated": false,
+  "performance_validated": false
+}

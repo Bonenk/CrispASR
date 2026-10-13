@@ -3225,3 +3225,11 @@ actual CUDA speech validation remains in flight. See
 [the cache receipt](docs/dia-cross-cache-hosted-2026-10-13.json),
 [the exact boundary replay](docs/dia-cross-cache-boundary-2026-10-13.json) and
 [the delivered CUDA package audit](docs/dia-cuda-package-2026-10-13.json).
+
+
+Rotary precision diagnostic (2026-10-13): actual original Float32 timescales
+with ggml's existing frequency-factor input reduce position-978 coefficient
+maximum error from 1.2040138e-4 to 5.9604645e-8. This is a tiny weight-free
+primitive comparison, not inference speed or model-quality acceptance. The
+full source-timescale OFF/ON/OFF control is queued on GH `38382524080`.
+[Complete coefficient/source/negative receipt](docs/dia-rotary-coefficients-2026-10-13.json).

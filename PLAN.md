@@ -6340,3 +6340,58 @@ its pulled rendered source matches byte-for-byte. Compiler-cache provenance is
 separate; immutable downloaded blobs inside this run's scratch are released
 only after exact audited export to make room for models and outputs.
 No GPU model/quality claim precedes the actual allocation/stage/speech results.
+
+
+## UPDATE 2026-10-13 — Original timescale candidate and corrected late-stage controls
+
+Primitive coefficient receipt `docs/dia-rotary-coefficients-2026-10-13.json`
+retains actual original module and compiled actual ggml cache helper outputs.
+At position 978, default maximum coefficient error is 1.2040138e-4; original
+F32 timescales/base-one factors give 5.9604645e-8. Position zero is exact in both
+arms; the doubled-timescale negative has cosine .261437 at 978. This motivates
+an experiment and does not accept native model speech.
+
+Candidate `ead5a5d5dab77e8d2e2c22a4fbb7450d44abc492` is pushed in the claimed
+storage worktree. It adds an audited actual-original auxiliary F32 timescale
+tensor and uses existing ggml frequency factors at all six rotary sites behind
+`CRISPASR_DIA_SOURCE_ROPE=1`. Default RoPE is unchanged; neural/codec coefficients
+are preserved. Seven tiny physical export/source-buffer checks, ten actual
+original capture controls, two compiled index/retention controls and one
+compiled op-dispatch control pass. Native source syntax/clang18 and all four
+secret checks pass without skips (46.810s). Real GGUF size/alignment overhead
+and model quality remain pending. Full fixed F32/cross-F32 rotary OFF/ON/OFF
+stage plus CLI/C-ABI/ASR control: GH `38382524080`. Corrected late-layer
+canonical/late/canonical replay and negatives: GH `38382527357`.
+
+Earlier late-layer run `38372751566` is retained as FAILURE. Actual original
+input/code grids match canonical and original ASR is WER 0. Both observed
+comparison calls return success with all 40 numerical rows; stderr inserts its
+known decoder marker inside one PASS tag, causing the worker to count 39.
+All 121 files and every worker log hash are verified. No repeat or negatives
+were executed, so no full late-capture acceptance is inferred. Receipt:
+`docs/dia-late-stage-first-attempt-2026-10-13.json`. The producer now flushes
+stdout before codec replay, and old-marker parsing preserves original raw logs
+and all numerical/failure fields. Retry uses the new fixed source without
+turning the rotary gate on for the baseline capture control.
+
+Corrected CUDA package `38374792784` is SUCCESS at `35945f527`; actual T4
+version 2 remains in progress after compiling. Its source has been pulled and
+verified exactly; no CUDA stage or decoded-speech acceptance is claimed yet.
+CANN compilation success was answered on #544 in comment `6142714932`; the
+physical candidate rerun remains outstanding. No new release tag or production
+model/default/shared-ggml pin is promoted by these diagnostics.
+
+
+## UPDATE 2026-10-13 — Physical Ascend BF16 capability candidate fully verified
+
+Contributor #544 comment `6143426863` returns exact candidate `bfb4943ac` /
+shared ggml `21acf3162` on physical ARM64/310P3, SDK9.1, ACL graph off.
+Archive SHA-256 `58e1af7a55edbad81c93f83645e279f538b3910b7c87f7fd25ece6a51f1df9e1`
+verifies; all member/log hashes and unchanged-wrapper assessments match.
+Actual compiler commands define ASCEND_310P and omit ACL graphs. All five
+broad suites complete: ADD103, RMS_NORM51, SOFT_MAX107, ROPE109, MUL_MAT554,
+924 executed cases all pass; 2,241 unsupported cases remain explicitly logged.
+Both previous BF16 aborts are resolved for the tested operators. Receipt:
+`docs/cann-310p3-bf16-physical-2026-10-13.json`. Compose validated current main
+into the isolated CANN branch and run full general CI before advancing the
+production submodule pin. No full-model or quantized speech/speed claim follows.
