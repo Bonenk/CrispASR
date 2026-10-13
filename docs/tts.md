@@ -2301,3 +2301,12 @@ Dia cache precision checkpoint (2026-10-13): full F32 weights and F32 cross
 caches still reject the unchanged short seed-42 control through CLI and C ABI
 (empty transcript/WER 1), despite 40/40 canonical stage passes. No default or
 model pin was promoted; see [the complete OFF/ON/OFF receipt](dia-cross-cache-hosted-2026-10-13.json).
+
+
+Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
+replay stages pass with real scheduler splits and sampled process GPU memory
+8,528–8,734 MiB. All six native CLI/C-ABI speech checks still reject with empty
+transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
+and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
+match exactly. These are correctness diagnostics, not accepted native speech
+or performance measurements. [Complete physical CUDA proof](dia-cuda-cache-physical-2026-10-13.json).

@@ -11,6 +11,27 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Actual-GPU original-timescale control preparation
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-rope-cuda-20261013`, branch
+`prepare/dia-rope-cuda-20261013`. The completed actual T4 cache v2 reaches the
+same step-978/head-2 divergence as CPU; its full terminal logs/output are saved
+and durably public before any replacement. Compose the immutable original-RoPE
+CPU source `ead5a5d5d` with validated explicit CUDA request `35945f527` and
+actual GPU orchestration. Verify default math and all six gated rotary sites
+are preserved, and retain source-compiled capture/device/dispatch controls.
+Prepare the same fixed F32/cross-F32 rotary OFF/ON/OFF actual-GPU experiment.
+Reuse the original Torch2.6-generated timescale bytes from the fully verified
+public primitive archive, with source/head/dtype/size/SHA provenance and
+physical auxiliary/original-weight audits; do not regenerate with Kaggle's
+Torch version or reinstall Torch. Use existing private compiler cache only.
+All three arms use one immutable source/model/ref/seed/filter and unchanged
+CLI/C-ABI ASR gates. Actual allocation and scheduler splits are required;
+retain complete arrays, repeats, negatives and all failures. This is parallel
+correctness triage, not broad acceptance, profiling, a model/default promotion
+or a reason to alter the running CPU controls.
+
 ## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
@@ -6395,3 +6416,73 @@ Both previous BF16 aborts are resolved for the tested operators. Receipt:
 `docs/cann-310p3-bf16-physical-2026-10-13.json`. Compose validated current main
 into the isolated CANN branch and run full general CI before advancing the
 production submodule pin. No full-model or quantized speech/speed claim follows.
+
+## UPDATE 2026-10-13 — Actual T4 cache controls completed and rejected
+
+Corrected immutable device source `35945f527` completes all three actual CUDA
+arms. All 120 canonical stage rows pass; nine native diff/C-ABI/CLI executions
+show actual CUDA scheduler splits and sampled process allocation 8,528–8,734
+MiB. All six speech checks remain quiet, empty/WER 1. OFF/repeat complete inputs,
+logits and both PCM arrays are byte-identical. F16 cache shares 353 original
+input steps, first differing draw 352/head 6; F32 cache shares 979, first draw
+978/head 2 (original 877/native 904), matching the CPU remaining boundary.
+F32 shared-prefix minimum cosine is 0.9999999999747301 and maximum norm error
+5.15412e-6. Complete source/log/381-neural/134-codec/file hashes and all failures:
+`docs/dia-cuda-cache-physical-2026-10-13.json`. This proves the corrected GPU
+request and bounded replay execution, not native speech quality or speed.
+
+Verified retained step-978 teacher snapshots separately give worst decoder
+layer cosine 0.9999999999929721 (layer 3) and max layer row-norm error
+4.16887e-7 (layer 17). Hidden max absolute error is 1.27554e-5; head-2 logit
+max absolute errors are 3.71933e-5 unconditional and 4.00543e-5 conditional.
+These remain partial-run diagnostics; full capture repeat/negatives and the
+original-timescale OFF/ON/OFF controls continue on GH. High-precision complete
+layer ledger: `docs/dia-late-layer-metrics-2026-10-13.json`.
+
+Current open issues and PR heads were rechecked: no new issue or changed PR
+source since the last audit. Ascend integration CI `38383864169` has passed
+unit/macOS/iOS/Opus checks; the remaining queued/running gates still precede
+production integration. No release tag or model/default promotion.
+
+The exact corrected-device CUDA package from GH `38374792784` is also fully
+verified: inner archive size/SHA, all 27 members/contained aliases, all source
+files and complete hosted log. Receipt: `docs/dia-cuda-package-v2-2026-10-13.json`.
+Package compilation/closure is distinct from the actual Kaggle build and does
+not supply speech acceptance.
+
+## UPDATE 2026-10-13 — Complete public cache and late-layer proofs verified
+
+The prepublication claim in `b8d2694e7` is complete. Five public archives in
+`cstr/crispasr-regression-fixtures/dia-20261013-cache`, immutable revision
+`13cfd81146f17b746a47ce154013603aeabef658`, preserve 261 payload files and 1,268,517,339
+compressed bytes. ZIP CRC, complete member/payload SHA and every full anonymous
+remote size/SHA check pass. Public logs replace only the account identifier;
+original/delivered size/SHA and replacement count are explicit, with private
+originals untouched. A boundary-ledger field mismatch stopped the initial
+publisher before upload; corrected resume reverified the same four existing
+ZIPs and added the fifth. Receipt: `docs/dia-cache-public-proof-2026-10-13.json`.
+No model, speech quality, speed, GPU-quality or Q4 promotion follows.
+
+
+## UPDATE 2026-10-13 — Rotary CPU rejection and complete late-capture acceptance
+
+Both exact-source jobs at `ead5a5d5d` are terminal. Original-timescale control
+`38382524080` rejects speech: all 120 canonical stages pass, but all six native
+CLI/C-ABI outputs remain empty/WER 1. ON changes logits yet all three full input
+histories and both PCM arrays are byte-identical; the shared prefix remains 979,
+first differing draw 978/head 2 (original 877/native 904). Prefix minimum cosine
+changes from 0.9999999999769706 to 0.999999999978797; maximum norm error changes
+from 5.01010e-6 to 6.06699e-6. The physical auxiliary model is 6,444,669,600 bytes,
+SHA `9a2c0df72586b3f325bbbf42473e2156140870f48ce57474f2c577943008e9b1`:
++608 bytes over the full-F32 model, including the actual 256-byte table.
+All 381 learned tensors and 134 codec tensors remain audited. Full 54-file
+ledger and complete rejected log: `docs/dia-original-rope-hosted-2026-10-13.json`.
+The coefficient primitive improvement does not fix native speech.
+
+Corrected late capture `38382527357` succeeds as a diagnostic: all 120 stage
+rows pass, default/978/default full logits, feedback and decoded PCM are byte
+exact, and scaled-hidden, negative-index and out-of-history references all
+reject. Original free generation still matches canonical codes/inputs and
+passes actual ASR. All 170 files and the complete hosted log are hashed in
+`docs/dia-late-stage-hosted-2026-10-13.json`. This accepts bounded capture and
+teacher-replay transparency, not native free speech, GPU or Q4 quality.

@@ -277,3 +277,27 @@ five broad operator suites complete with 924/924 executed cases passing,
 unsupported cases retained, and both previous BF16 aborts resolved. Exact
 source/compiler/archive/log provenance is recorded; full composed CI precedes
 integration. Operator correctness does not establish model-quality or speed.
+
+
+Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
+replay stages pass with real scheduler splits and sampled process GPU memory
+8,528–8,734 MiB. All six native CLI/C-ABI speech checks still reject with empty
+transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
+and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
+match exactly. These are correctness diagnostics, not accepted native speech
+or performance measurements. [Complete physical CUDA proof](docs/dia-cuda-cache-physical-2026-10-13.json).
+
+
+The complete CPU/CUDA cache, partial late-layer and causal diagnostic proofs
+are preserved as five immutable public archives. All payload and full anonymous
+remote size/SHA checks pass; rejected speech remains rejected. [Publication
+receipt](docs/dia-cache-public-proof-2026-10-13.json).
+
+
+The completed original-timescale CPU control passes 120 replay rows but does
+not change generated token histories or PCM; all six speech checks remain
+empty/WER 1. The +608-byte auxiliary model is a rejected control. The corrected
+late-capture experiment independently passes default/978/default complete-array
+identity and all three rejection controls. These establish diagnostic fidelity,
+not accepted native speech or speed.
+[Rotary control](docs/dia-original-rope-hosted-2026-10-13.json), [complete late capture](docs/dia-late-stage-hosted-2026-10-13.json).

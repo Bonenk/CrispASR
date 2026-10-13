@@ -45,3 +45,23 @@ pass for both ZIPs (245,203,012 bytes combined). The
 pinned download URLs and complete per-file manifests. The neural archive
 retains both 40/40 stage passes and all four rejected free-speech results; the
 tiny probe establishes cache-rounding effects only.
+
+
+## Cache and late-layer controls
+
+These five supplemental archives use their own immutable revision. The original
+retrieval-helper aliases keep their existing pins. Every full ZIP has passed
+anonymous size/SHA verification; each includes its tracked evidence and payload
+manifest. Public account placeholders have explicit original/public hashes;
+private originals remain preserved. These diagnostic scopes do not accept native
+speech or performance.
+
+| Archive | Scope |
+| --- | --- |
+| [cpu-cross-cache-rejection.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/13cfd81146f17b746a47ce154013603aeabef658/dia-20261013-cache/cpu-cross-cache-rejection.zip) | Complete CPU F16/F32/F16-repeat cache controls: 120 replay stages pass, six speech checks fail empty/WER 1; exact OFF/repeat arrays. |
+| [cuda-cross-cache-rejection.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/13cfd81146f17b746a47ce154013603aeabef658/dia-20261013-cache/cuda-cross-cache-rejection.zip) | Complete actual T4 v2 cache controls: actual CUDA allocation/splits, 120 replay stages pass, six speech checks fail empty/WER 1; no speed/model acceptance. |
+| [late-layer-partial-rejection.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/13cfd81146f17b746a47ce154013603aeabef658/dia-20261013-cache/late-layer-partial-rejection.zip) | Partial hosted teacher replay at step 978: original speech passes, two comparisons pass; logging counter rejects and repeat/negative controls not executed. |
+| [rotary-coefficient-probe.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/13cfd81146f17b746a47ce154013603aeabef658/dia-20261013-cache/rotary-coefficient-probe.zip) | Tiny actual-source rotary cache coefficient controls including negative; no full graph/model/GPU/speech acceptance. |
+| [cache-first-draw-boundary.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/13cfd81146f17b746a47ce154013603aeabef658/dia-20261013-cache/cache-first-draw-boundary.zip) | Weight-free actual-original/native filter replay from retained logits and unchanged portable noise; identical-logit supports agree, neural differences change nucleus membership. |
+
+[Complete publication and per-file verification receipt](dia-cache-public-proof-2026-10-13.json).
