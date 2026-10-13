@@ -11,6 +11,27 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Actual-GPU original-timescale control preparation
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-rope-cuda-20261013`, branch
+`prepare/dia-rope-cuda-20261013`. The completed actual T4 cache v2 reaches the
+same step-978/head-2 divergence as CPU; its full terminal logs/output are saved
+and durably public before any replacement. Compose the immutable original-RoPE
+CPU source `ead5a5d5d` with validated explicit CUDA request `35945f527` and
+actual GPU orchestration. Verify default math and all six gated rotary sites
+are preserved, and retain source-compiled capture/device/dispatch controls.
+Prepare the same fixed F32/cross-F32 rotary OFF/ON/OFF actual-GPU experiment.
+Reuse the original Torch2.6-generated timescale bytes from the fully verified
+public primitive archive, with source/head/dtype/size/SHA provenance and
+physical auxiliary/original-weight audits; do not regenerate with Kaggle's
+Torch version or reinstall Torch. Use existing private compiler cache only.
+All three arms use one immutable source/model/ref/seed/filter and unchanged
+CLI/C-ABI ASR gates. Actual allocation and scheduler splits are required;
+retain complete arrays, repeats, negatives and all failures. This is parallel
+correctness triage, not broad acceptance, profiling, a model/default promotion
+or a reason to alter the running CPU controls.
+
 ## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
