@@ -72,3 +72,5 @@ executes seven tiny actual-original-module/CLI contracts and the real pinned
 conversion, requiring the exact validated GGUF bytes and all 134 tensor-audit
 rows. Its worker is `tools/ci-heavy/dia_dac_converter_validate.py`; results and
 logs are retained as an Actions artifact.
+
+The complete converter and related original/negative proof artifacts are retained in [pinned public proof archives](dia-proof-archives.md), with a verified anonymous retrieval helper.

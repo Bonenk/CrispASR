@@ -5958,3 +5958,26 @@ unsafe archive negatives before accepting any extraction. Use it for future
 Dia control inputs instead of expiring GitHub run downloads. Do not modify or
 cancel the currently executing precision run 38343667254, pinned at `5a8fe578e`.
 The public negative native F16 speech remains WER 1, not accepted or superseded.
+
+### 2026-10-13 verified public proof retrieval ready for integration
+
+Main claim `7ec0e8362` precedes the storage worktree `dia-proof-retrieval-20261013`.
+The new stdlib-only helper pins the public revision/size/SHA, downloads without
+an HF SDK/token/session, checks archive path/type/duplicate/coverage guards and
+every inner payload before placing a new proof folder. Existing paths are
+rejected before replacement; private temporary downloads are removed. Eight
+corruption/missing/unsafe/coverage/payload/old-path contracts pass in 1.626 s.
+The real anonymous 82,612,394-byte RNG archive retrieves and verifies all 11
+source files; the previously anonymously verified 270,894,795-byte canonical
+archive also extracts and verifies its distinct 21-file layout. Both preserve
+original `heavy-<run>` paths, arrays and metadata. No local neural inference.
+
+`docs/dia-proof-archives.md` documents the executed commands and positive/negative
+scopes. A path-filtered stdlib-only CI workflow guards the helper/index/contracts
+and actual full anonymous RNG retrieval. Actionlint's initial job-env context
+error was corrected to step-level runner contexts; final workflow validation
+must pass before integration. Both submodules initialize at existing pins.
+Integrate this independent tooling by fast-forward after staged secret/doc checks;
+then use it for future Dia control inputs while the exact `5a8fe578e` neural
+precision job 38343667254 continues unchanged. No runtime/default/model-pin or
+native speech/Q4/GPU acceptance is inferred from successful archive retrieval.
