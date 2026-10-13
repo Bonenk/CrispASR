@@ -347,3 +347,11 @@ A pinned delivered-runtime/original-reference GPU worker passes 16 input/source
 guards and keeps all six native runtime files unchanged. CPU capture completed;
 artifact audit and actual GPU execution remain pending. Native free speech/Q4
 remain unaccepted. No default or release change.
+
+### Verified Dia late-history diagnostics
+
+Complete late CPU capture and same-input replay cover all 18 decoder layers;
+native attention reproduces exactly from captured native inputs. Package/source
+audits pass, and actual GPU version 4 is submitted with public verified inputs.
+Native free speech remains rejected; no production default/model change or
+Q4/performance/release acceptance.

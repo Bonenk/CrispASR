@@ -405,3 +405,12 @@ Prepared a pinned delivered-runtime/original-reference GPU observation worker
 with 16 input/source guards and unchanged native runtime bytes. CPU capture
 completed; independent artifact audit and actual CUDA execution remain pending.
 This establishes no native free-speech, Q4 or performance acceptance.
+
+### Dia diagnostic evidence and pending hardware follow-up
+
+Independent late-history CPU capture and same-input replay now exclude a large
+cache-layout/GQA/attention defect at the observed step across all 18 layers.
+Complete source/trajectory/package audits pass; pinned actual GPU version 4 is
+submitted using anonymously verified public inputs. Native free speech remains
+rejected. These diagnostics change no production default or model and establish
+no Q4/performance acceptance; GPU results and release gates remain pending.

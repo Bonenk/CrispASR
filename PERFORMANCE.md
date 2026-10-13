@@ -3360,3 +3360,14 @@ audit. CUDA observation worker bf895ecd6 passes 16 small input/source guards
 with unchanged runtime bytes, but has not executed on a GPU. CUDA package
 38446095504 is still compiling. No performance or native speech/Q4 acceptance
 follows from these preparation/capture results.
+
+### Dia full late-history CPU attention exclusion, 2026-10-13
+
+At step 978, native same-input attention reproduces every captured native layer
+byte-for-byte at one and four threads. Against the actual original attention
+call on identical inputs, maximum relative L2 is 4.850572647357973e-7, minimum
+row cosine 0.99999999999744 and maximum row norm error 6.882499823390731e-7.
+Compact/3072-slot original cache outputs are identical. These are correctness
+diagnostics, not performance results or native free-speech acceptance. Actual
+GPU version 4 has been submitted against verified/public/pinned inputs; hardware
+results remain pending. See `docs/dia-attention-history-results-2026-10-13.md`.

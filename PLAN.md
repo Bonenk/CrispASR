@@ -6861,3 +6861,34 @@ audit and same-input replay, verify the package, publish pinned inputs to the
 existing public fixture dataset, preserve prior terminal Kaggle receipts and
 then submit the actual GPU controls. Native free speech remains rejected; no
 production runtime/default/model change, Q4 acceptance or release tag.
+
+## UPDATE 2026-10-13 — Dia late CPU attention proved; actual GPU version 4 submitted
+
+Both hosted jobs completed and full delivered ZIPs match GH digests. Independent
+CPU audit verifies all 72 snapshots, canonical input/code grids, complete
+original/native OFF/ON/OFF trajectories and all three 40/40 normal diff arms.
+Original audio ASR is WER 0; unchanged scale/index/history negatives fail.
+Same-input replay retains 216 rows: all 18 native attention outputs reproduce
+byte-for-byte at BOTH one and four CPU threads. All 36 compact versus 3072-slot
+original cache comparisons are exact; maximum same-input original/native
+relative L2 is 4.850572647357973e-7. Hosted versus local original arithmetic is
+measured, not presumed identical. This excludes a large CPU cache-layout/GQA/
+attention defect at step 978; native free speech remains rejected.
+
+Independent CUDA package audit verifies 27 members/aliases, seven source files
+and six runtime files identical to CPU capture. Public inputs at fixture
+revision 61eafbd6901d5f8fe72025acf8c86eb078ff5bf9 are anonymously hash-verified.
+Kaggle accepted version 4, script `2026-10-13.dia-cuda-attention.4`, source
+bf895ecd652a90ed18ff095c09596f7a27dd4f36, rendered script SHA
+b4817824f86d779f0521c6a6b15d9e25ed32260468fd3202594800d707c40aac.
+All 61 previous terminal output files and full raw/decoded logs were verified
+before repush. Track the returned attention-control slug; Kaggle renamed it
+when the title changed. Exact current submission/state, complete 72/120/216
+comparison rows and source/file ledgers:
+`docs/dia-attention-history-results-2026-10-13.md` and `.json`.
+
+Next collect complete GPU terminal logs/artifacts even on failure, verify both
+source/delivery halves and actual allocation/scheduler work, then interpret
+OFF/ON/OFF and same-input GPU attention. Only after that choose remaining
+decoder boundaries/candidates. No native speech, Q4, performance, model/default
+or release promotion. Main production code remains unchanged.

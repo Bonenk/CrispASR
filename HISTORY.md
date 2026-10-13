@@ -24070,3 +24070,14 @@ bootstrap requires immutable verified inputs before launch and reuses the
 audited DAC export. CUDA package 38446095504 remains compiling; no new GPU,
 speech, quantization or release acceptance. See
 `docs/dia-attention-cuda-worker-2026-10-13.md`.
+
+## 2026-10-13 — Independent Dia late attention/package audits; GPU version 4
+
+Verified complete CPU/GH artifacts, all 72 late attention arrays, 120 normal
+stage rows and 216 same-input replay rows. Native attention reproduces exactly
+from native inputs across all 18 layers at one and four CPU threads. CUDA
+compile package passes all 27 member/source checks. GPU inputs are public and
+anonymously verified; actual Kaggle version 4 is submitted with immutable
+source/input/script pins and preserved prior terminal output. Native free speech
+remains rejected; no default/model/release change. Full evidence:
+`docs/dia-attention-history-results-2026-10-13.md` and `.json`.
