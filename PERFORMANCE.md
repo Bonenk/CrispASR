@@ -3273,3 +3273,10 @@ files match their immutable controls. Nine TTS executions show actual CUDA
 splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
 candidate; it establishes no native speech, Q4 or speed acceptance.
 [Complete physical rotary proof](docs/dia-original-rope-cuda-physical-2026-10-13.json).
+
+
+The exact-source CUDA v3 bundle is fully audited (27 members and seven source
+files); its actual T4 speech rejection is retained separately. A weight-free
+RMSNorm audit on all retained decoder boundaries isolates F32 versus double-sum
+rounding in nine of 36 comparisons, with no runtime/default change or speed
+claim. [CUDA package](docs/dia-cuda-package-v3-2026-10-13.json), [RMSNorm primitive](docs/dia-rmsnorm-primitive-2026-10-13.json).

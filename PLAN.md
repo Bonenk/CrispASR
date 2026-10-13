@@ -6,20 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Actual RMSNorm primitive audit on retained Dia inputs
-
-Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded weight-free probe in
-`/mnt/storage/crispasr/dia-rmsnorm-probe-20261013`. Both CPU and actual T4
-rotary controls reject speech; actual original/native filters agree on identical
-logits. Compare actual Torch2.6 RMSNorm and existing ggml RMSNorm on verified
-retained decoder inputs, with default/negative controls and magnitude errors.
-Do not infer learned scales, load full weights locally, change sampling policy,
-or introduce a runtime candidate before a causal primitive result. Separately
-verify the completed exact-source CUDA package `38394649538`. Archive all
-results, including evidence against this hypothesis; no speech/speed promotion.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6499,3 +6486,30 @@ across the nucleus boundary at step 978; source-RoPE excludes original token 55
 at step 864. Each has two neural support differences. This isolates neural
 numerical differences rather than a filter-policy defect; replay/source/file
 hashes are part of the physical rotary receipt. No sampling policy is changed.
+
+
+## UPDATE 2026-10-13 — RMSNorm arithmetic isolated; CUDA package v3 verified
+
+All 36 weight-free comparisons use verified retained step-978 outputs from all
+18 decoder layers, original and native, as the SAME isolated unweighted norm
+input. Actual Torch2.6 RMSNorm and actual packaged ggml CPU RMSNorm match byte
+exactly in 27 comparisons; nine differ, maximum absolute error 1.9073486e-6 and
+row-norm error 1.3025239e-7. Every native repeat is exact and every doubled-output
+negative rejects. Actual Torch F32-mean/rsqrt arithmetic reproduces 36/36 original
+outputs; double-sum/rounded-mean/rsqrt arithmetic reproduces 36/36 ggml outputs.
+This isolates a reduction-precision difference on these inputs. It does not
+identify a causal whole-model fix, learned-scale behavior or GPU parity; no
+runtime/default is changed. Full input/source/library/output/isolation ledger:
+`docs/dia-rmsnorm-primitive-2026-10-13.json`.
+
+Exact-source CUDA package `38394649538` succeeds. Complete delivered archive,
+all 27 members/contained aliases, dependency closure, full hosted log and all
+seven saved source files are verified; the latter also match immutable git
+`2954c5a7c`. Receipt: `docs/dia-cuda-package-v3-2026-10-13.json`. Package success
+remains distinct from the completed actual T4 speech rejection. Neither permits
+a release-quality or speed claim. The rotary evidence is integrated on main;
+no internal review branch remains necessary. Latest final-main gates still queue.
+
+Next: causal numerical isolation at matching-history boundaries before another
+full-model candidate. A more accurate or different reduction alone is not proof
+of better decoded speech; keep the unchanged seed/filter/quality controls.

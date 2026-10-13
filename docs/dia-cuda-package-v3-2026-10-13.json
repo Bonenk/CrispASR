@@ -1,0 +1,366 @@
+{
+  "scope": "Exact-source CUDA12.4 SM60/75 compilation and runtime dependency closure; verified complete delivered archive and sources; no local/device model execution",
+  "hosted_run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38394649538",
+  "artifact_id": 11815726921,
+  "artifact_zip_bytes": 488137017,
+  "receipt": {
+    "source": "2954c5a7c0b120d7aec8ae3d76b3ca283c0ba4f8",
+    "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "cuda": "12.4.1",
+    "architectures": [
+      60,
+      75
+    ],
+    "cpu_control_source": "2205d920d879108b73651ebb9f3eb9499da4e5f5",
+    "cpu_control_run": 38357576078,
+    "cpu_control_accepted": false,
+    "scope": "CUDA compilation/closure of source-RoPE CPU candidate plus explicit GPU request; all model diagnostics remain unaccepted",
+    "cpu_rope_source": "ead5a5d5dab77e8d2e2c22a4fbb7450d44abc492",
+    "cpu_rope_run": 38382524080,
+    "cpu_diff_dispatch_sha256": "d2b5d639f35f4c9b5e5430f881692c90268812a0eee7b25f7b25f57de2701f2e",
+    "diff_device_dispatch_changed": true,
+    "build_complete": true,
+    "gpu_executed": false,
+    "model_acceptance": false,
+    "tracked_worktree_dirty": false,
+    "nvcc_version": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2024 NVIDIA Corporation\nBuilt on Thu_Mar_28_02:18:24_PDT_2024\nCuda compilation tools, release 12.4, V12.4.131\nBuild cuda_12.4.r12.4/compiler.34097967_0",
+    "runtime_source_sha256": {
+      "src/dia_tts.cpp": "b403a704ac8ce15c2f81c80c1e1b6e808359435682bff00c31d93d826d084a17",
+      "src/dia_sampling.h": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf",
+      "src/dia_exponential_rng.h": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e",
+      "examples/cli/crispasr_dia_diff.h": "0f1da1ae457bf5bb7e85f275fcca1cf9cc076bcf211683a0fa4d95e238663b2e"
+    },
+    "source_files": {
+      "examples/cli/crispasr_dia_diff.h": {
+        "sha256": "0f1da1ae457bf5bb7e85f275fcca1cf9cc076bcf211683a0fa4d95e238663b2e",
+        "bytes": 13359
+      },
+      "src/dia_tts.cpp": {
+        "sha256": "b403a704ac8ce15c2f81c80c1e1b6e808359435682bff00c31d93d826d084a17",
+        "bytes": 109132
+      },
+      "src/dia_exponential_rng.h": {
+        "sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e",
+        "bytes": 1709
+      },
+      "src/dia_sampling.h": {
+        "sha256": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf",
+        "bytes": 3542
+      },
+      "src/crispasr_c_api.cpp": {
+        "sha256": "632c98246d014548f2c8f5abc75cf084426e3141a0997b5c084cfcaa60b77d95",
+        "bytes": 585434
+      },
+      "python/crispasr/_binding.py": {
+        "sha256": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade",
+        "bytes": 231540
+      },
+      "tools/ci-heavy/dia_cuda_bundle.py": {
+        "sha256": "95c492a5b5399960d02d0d10529f322a6335d031a862f66f9b8b552fa4af4764",
+        "bytes": 7661
+      }
+    },
+    "files": {
+      "libblas.so.3": {
+        "sha256": "3c6c6a97e7aafe31de18cde8bd5066860d08591e71e6f2b6f750ef488df61c6d",
+        "bytes": 682336
+      },
+      "libcublas.so.12": {
+        "sha256": "4cc45526449a95d3985389785e985b7832460ea3db178bc9e9963be2111fbee8",
+        "bytes": 109604768
+      },
+      "libcrispasr.so.1": {
+        "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495",
+        "bytes": 24930520
+      },
+      "libggml-cpu.so": {
+        "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452",
+        "bytes": 1446416
+      },
+      "LICENSE": {
+        "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e",
+        "bytes": 1184
+      },
+      "crispasr-quantize": {
+        "sha256": "7142f22d5f4423a5ac895d8cd916a4b54c550b6ae643a2d4175e983a7e2db9c0",
+        "bytes": 1058112
+      },
+      "libwhisper.so": {
+        "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495",
+        "bytes": 24930520
+      },
+      "libcublasLt.so.12": {
+        "sha256": "44a813aa2da08830f9083f81d0eb73f1ae4052a4d9b0b0de480a8f6cd9eb3078",
+        "bytes": 441938896
+      },
+      "crispasr": {
+        "sha256": "e01e57def98b9b42871f32b2aac413271c9a4a544737b11c4fcdf7a349053d77",
+        "bytes": 5047872
+      },
+      "libcrispasr.so": {
+        "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495",
+        "bytes": 24930520
+      },
+      "libggml.so.0.26.0": {
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07",
+        "bytes": 55184
+      },
+      "libggml-base.so.0.26.0": {
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01",
+        "bytes": 983808
+      },
+      "libcudart.so.12": {
+        "sha256": "c34dd252e33d950b1490719866a8699ed83330c443c523eb842f326df80ae0a0",
+        "bytes": 724992
+      },
+      "libgomp.so.1": {
+        "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f",
+        "bytes": 317376
+      },
+      "THIRD_PARTY_NOTICES.txt": {
+        "sha256": "b18795c8fcad3f8d7cdc192f7f65cd819129f7b423dd1b17690001624b7af6ce",
+        "bytes": 33850
+      },
+      "libcrispasr.so.0.8.43": {
+        "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495",
+        "bytes": 24930520
+      },
+      "libggml.so.0": {
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07",
+        "bytes": 55184
+      },
+      "libggml.so": {
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07",
+        "bytes": 55184
+      },
+      "libggml-base.so": {
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01",
+        "bytes": 983808
+      },
+      "crispasr-diff": {
+        "sha256": "59bb37a66fd5b7523f1196a8a695c062dbefc4260c54f85ffc6975842dd36b24",
+        "bytes": 1647112
+      },
+      "libggml-base.so.0": {
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01",
+        "bytes": 983808
+      },
+      "libggml-cuda.so": {
+        "sha256": "474256e45549b43b7ef59e782bf3a315afc72268ebad69bb5b1ee5b13be2511b",
+        "bytes": 309456264
+      },
+      "crispasr-server": {
+        "sha256": "25105d0f550e98f31d8c944ca44fd95b18ec10176aa2230ade5e5daaab57d8f5",
+        "bytes": 1533752
+      },
+      "python/crispasr/_helpers.c": {
+        "sha256": "93ae4c10e8e02d7812ef27cac63bdc0b33efac7e7664fbcdad1d2ff4942d6273",
+        "bytes": 740
+      },
+      "python/crispasr/__init__.py": {
+        "sha256": "e272dabf57582801e3a7112dc4379989663e08543bcfd266d4731e815d49bcd0",
+        "bytes": 1789
+      },
+      "python/crispasr/_binding.py": {
+        "sha256": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade",
+        "bytes": 231540
+      }
+    },
+    "archive": {
+      "name": "dia-cuda-speech-validation.tar.gz",
+      "sha256": "fe15bca5d916e385e89e95bb91b37f2d8f15144d7285691d31985b56d4590777",
+      "bytes": 489762472
+    }
+  },
+  "verified_bundle_members": {
+    "LICENSE": {
+      "bytes": 1184,
+      "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e"
+    },
+    "THIRD_PARTY_NOTICES.txt": {
+      "bytes": 33850,
+      "sha256": "b18795c8fcad3f8d7cdc192f7f65cd819129f7b423dd1b17690001624b7af6ce"
+    },
+    "crispasr": {
+      "bytes": 5047872,
+      "sha256": "e01e57def98b9b42871f32b2aac413271c9a4a544737b11c4fcdf7a349053d77"
+    },
+    "crispasr-diff": {
+      "bytes": 1647112,
+      "sha256": "59bb37a66fd5b7523f1196a8a695c062dbefc4260c54f85ffc6975842dd36b24"
+    },
+    "crispasr-quantize": {
+      "bytes": 1058112,
+      "sha256": "7142f22d5f4423a5ac895d8cd916a4b54c550b6ae643a2d4175e983a7e2db9c0"
+    },
+    "crispasr-server": {
+      "bytes": 1533752,
+      "sha256": "25105d0f550e98f31d8c944ca44fd95b18ec10176aa2230ade5e5daaab57d8f5"
+    },
+    "libblas.so.3": {
+      "bytes": 682336,
+      "sha256": "3c6c6a97e7aafe31de18cde8bd5066860d08591e71e6f2b6f750ef488df61c6d"
+    },
+    "libcrispasr.so.1": {
+      "bytes": 24930520,
+      "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495"
+    },
+    "libcublas.so.12": {
+      "bytes": 109604768,
+      "sha256": "4cc45526449a95d3985389785e985b7832460ea3db178bc9e9963be2111fbee8"
+    },
+    "libcublasLt.so.12": {
+      "bytes": 441938896,
+      "sha256": "44a813aa2da08830f9083f81d0eb73f1ae4052a4d9b0b0de480a8f6cd9eb3078"
+    },
+    "libcudart.so.12": {
+      "bytes": 724992,
+      "sha256": "c34dd252e33d950b1490719866a8699ed83330c443c523eb842f326df80ae0a0"
+    },
+    "libggml-base.so.0": {
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    "libggml-cpu.so": {
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    "libggml-cuda.so": {
+      "bytes": 309456264,
+      "sha256": "474256e45549b43b7ef59e782bf3a315afc72268ebad69bb5b1ee5b13be2511b"
+    },
+    "libggml.so.0": {
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    "libgomp.so.1": {
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    },
+    "provenance.json": {
+      "bytes": 6150,
+      "sha256": "89ad43975a5bb06ea33422d7c82f40b4ebd0a5716aaa32c27b75e8b93b581bfb"
+    },
+    "python/crispasr/__init__.py": {
+      "bytes": 1789,
+      "sha256": "e272dabf57582801e3a7112dc4379989663e08543bcfd266d4731e815d49bcd0"
+    },
+    "python/crispasr/_binding.py": {
+      "bytes": 231540,
+      "sha256": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade"
+    },
+    "python/crispasr/_helpers.c": {
+      "bytes": 740,
+      "sha256": "93ae4c10e8e02d7812ef27cac63bdc0b33efac7e7664fbcdad1d2ff4942d6273"
+    },
+    "libcrispasr.so": {
+      "bytes": 24930520,
+      "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495"
+    },
+    "libcrispasr.so.0.8.43": {
+      "bytes": 24930520,
+      "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495"
+    },
+    "libggml-base.so": {
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    "libggml-base.so.0.26.0": {
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    "libggml.so": {
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    "libggml.so.0.26.0": {
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    "libwhisper.so": {
+      "bytes": 24930520,
+      "sha256": "82bb3cd1ac0651b2603e800b284874732eac353357860f449fb723fc780c0495"
+    }
+  },
+  "verified_bundle_aliases": {
+    "libcrispasr.so": "libcrispasr.so.1",
+    "libcrispasr.so.0.8.43": "libcrispasr.so.1",
+    "libggml-base.so": "libggml-base.so.0",
+    "libggml-base.so.0.26.0": "libggml-base.so.0",
+    "libggml.so": "libggml.so.0",
+    "libggml.so.0.26.0": "libggml.so.0",
+    "libwhisper.so": "libcrispasr.so.1"
+  },
+  "files": [
+    {
+      "path": "build.log",
+      "bytes": 456467,
+      "sha256": "d673c10ca0163fb3a8e431f513bf1a9be0ee98bb5cbf4639191e6dd5df14fc20"
+    },
+    {
+      "path": "configure.log",
+      "bytes": 3666,
+      "sha256": "4ed71bcbcdce4e1d042bfe11cc5d33efbc9af154b29ae388d1ca9c82a410f10a"
+    },
+    {
+      "path": "dependency-check.log",
+      "bytes": 1268,
+      "sha256": "51a69a9068dd6f25d3f95134da0a49bc91f331ef0f4196bc04a294767ca4a837"
+    },
+    {
+      "path": "dia-cuda-speech-validation.tar.gz",
+      "bytes": 489762472,
+      "sha256": "fe15bca5d916e385e89e95bb91b37f2d8f15144d7285691d31985b56d4590777"
+    },
+    {
+      "path": "runtime-closure.log",
+      "bytes": 913,
+      "sha256": "abf12dd60468818dd95165c84a91ab17ad51c1ee986b4ed7f6f806d83dd9c081"
+    },
+    {
+      "path": "sources/examples/cli/crispasr_dia_diff.h",
+      "bytes": 13359,
+      "sha256": "0f1da1ae457bf5bb7e85f275fcca1cf9cc076bcf211683a0fa4d95e238663b2e"
+    },
+    {
+      "path": "sources/python/crispasr/_binding.py",
+      "bytes": 231540,
+      "sha256": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade"
+    },
+    {
+      "path": "sources/src/crispasr_c_api.cpp",
+      "bytes": 585434,
+      "sha256": "632c98246d014548f2c8f5abc75cf084426e3141a0997b5c084cfcaa60b77d95"
+    },
+    {
+      "path": "sources/src/dia_exponential_rng.h",
+      "bytes": 1709,
+      "sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e"
+    },
+    {
+      "path": "sources/src/dia_sampling.h",
+      "bytes": 3542,
+      "sha256": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf"
+    },
+    {
+      "path": "sources/src/dia_tts.cpp",
+      "bytes": 109132,
+      "sha256": "b403a704ac8ce15c2f81c80c1e1b6e808359435682bff00c31d93d826d084a17"
+    },
+    {
+      "path": "sources/tools/ci-heavy/dia_cuda_bundle.py",
+      "bytes": 7661,
+      "sha256": "95c492a5b5399960d02d0d10529f322a6335d031a862f66f9b8b552fa4af4764"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 6324,
+      "sha256": "3d9037d2464d3ceff8c7271b861453174c7dfcd0b026af7029fe4a47a134b37b"
+    }
+  ],
+  "complete_hosted_log": {
+    "bytes": 86857,
+    "sha256": "aaf9ed787db38b930bf02ae985becc861fb735cc8af1a35694f4d37b8b7a40d9"
+  },
+  "downloaded_source_files_equal_immutable_git": true
+}

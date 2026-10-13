@@ -23796,3 +23796,37 @@ correctness triage, not broad acceptance, profiling, a model/default promotion
 or a reason to alter the running CPU controls.
 
 </details>
+
+
+## 2026-10-13 — Dia RMSNorm primitive and CUDA package audits
+
+Actual Torch2.6 and packaged ggml CPU RMSNorm were compared on verified retained
+outputs from all 18 decoder layers, on both original/native inputs. Of 36
+isolated unweighted norm comparisons, 27 are byte-exact; nine show reduction
+rounding differences (max absolute 1.90735e-6, row-norm error 1.30252e-7).
+F32 mean reproduces the actual Torch output in 36/36 cases; double sum and a
+rounded mean reproduce actual ggml in 36/36. Repeats and scaled-output negatives
+pass. This is primitive arithmetic isolation, not a causal model fix or speech
+acceptance. [Full ledger](docs/dia-rmsnorm-primitive-2026-10-13.json).
+
+The exact-source CUDA v3 archive also passes complete member/source/hash and
+closure audits; [package ledger](docs/dia-cuda-package-v3-2026-10-13.json).
+Its source was tested on actual T4, where native speech remains rejected.
+
+<details>
+<summary>Completed RMSNorm audit claim</summary>
+
+## CLAIMED 2026-10-13 — Actual RMSNorm primitive audit on retained Dia inputs
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded weight-free probe in
+`/mnt/storage/crispasr/dia-rmsnorm-probe-20261013`. Both CPU and actual T4
+rotary controls reject speech; actual original/native filters agree on identical
+logits. Compare actual Torch2.6 RMSNorm and existing ggml RMSNorm on verified
+retained decoder inputs, with default/negative controls and magnitude errors.
+Do not infer learned scales, load full weights locally, change sampling policy,
+or introduce a runtime candidate before a causal primitive result. Separately
+verify the completed exact-source CUDA package `38394649538`. Archive all
+results, including evidence against this hypothesis; no speech/speed promotion.
+
+</details>

@@ -255,3 +255,10 @@ The GPU rotary ON arm shortens matching original input history from 979 to
 Canonical original audio passes the same GPU recognizer at WER 0. Complete
 terminal logs and 61 output files are retained and hashed; the experiment stays
 unmerged. [Physical rotary receipt](dia-original-rope-cuda-physical-2026-10-13.json).
+
+
+The exact-source CUDA v3 bundle is fully audited (27 members and seven source
+files); its actual T4 speech rejection is retained separately. A weight-free
+RMSNorm audit on all retained decoder boundaries isolates F32 versus double-sum
+rounding in nine of 36 comparisons, with no runtime/default change or speed
+claim. [CUDA package](dia-cuda-package-v3-2026-10-13.json), [RMSNorm primitive](dia-rmsnorm-primitive-2026-10-13.json).

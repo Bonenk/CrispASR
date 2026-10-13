@@ -1,0 +1,2133 @@
+{
+  "scope": "Weight-free actual Torch2.6 unweighted RMSNorm versus actual packaged ggml CPU RMSNorm on verified retained step978 layer outputs. Isolated primitive only: no learned scales, full-model inference, GPU, speech acceptance or causal runtime-fix claim.",
+  "torch_version": "2.6.0+cpu",
+  "original_layers_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "actual_torch_forward_sha256": "bbae46ce5ceaebb7e54f6dc8d602852a0aad5194e47a3bee1dc56d54cef496da",
+  "native_package_source": "35945f527c70377e00bf00808235337e130e11fd",
+  "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "verified_inputs": [
+    {
+      "path": "original-step978-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "995a1d248725d101af7000546f9cc8c4566b7c8c0b585f56bcdbce59656bf510"
+    },
+    {
+      "path": "late/cpp_decoder_layer_0.f32",
+      "bytes": 16384,
+      "sha256": "9ef27b99502f18e398ebd7b8affcc47510168d0bb56e957c028467379ae4c057"
+    },
+    {
+      "path": "late/cpp_decoder_layer_1.f32",
+      "bytes": 16384,
+      "sha256": "9e75ec1b4b7b1b8a777b87f327499fd484aa6b16044c00baa876fab1978899e2"
+    },
+    {
+      "path": "late/cpp_decoder_layer_2.f32",
+      "bytes": 16384,
+      "sha256": "7e719dc1186fba201d0901835d9e5c78850d8f178dc72ca9b9d84e03f0485149"
+    },
+    {
+      "path": "late/cpp_decoder_layer_3.f32",
+      "bytes": 16384,
+      "sha256": "cdbd5c16ca5110d9a81c92aeeca101de2b8432233b232b22a72cd366222ad226"
+    },
+    {
+      "path": "late/cpp_decoder_layer_4.f32",
+      "bytes": 16384,
+      "sha256": "e618d8188a0b64cf85a07f99e556ff06fd7879f0e38d0cc589d31984bca183b3"
+    },
+    {
+      "path": "late/cpp_decoder_layer_5.f32",
+      "bytes": 16384,
+      "sha256": "a1c9ea1b5b85bf380934bba3bead9d66c33368429be57df84e1a887bae8d2cc0"
+    },
+    {
+      "path": "late/cpp_decoder_layer_6.f32",
+      "bytes": 16384,
+      "sha256": "bc20bc11cef8f70a5dec200a20537094cd0d186f4e522689d3e048c6eea3d73d"
+    },
+    {
+      "path": "late/cpp_decoder_layer_7.f32",
+      "bytes": 16384,
+      "sha256": "15fb0e15b0d505bf813ddf518abf170538378782b2fee64c7bef82085028dff4"
+    },
+    {
+      "path": "late/cpp_decoder_layer_8.f32",
+      "bytes": 16384,
+      "sha256": "014f251e33924a4505658362e1e9809f25c9208032aa96658e2bff885dce4af5"
+    },
+    {
+      "path": "late/cpp_decoder_layer_9.f32",
+      "bytes": 16384,
+      "sha256": "23e024be7d09f7896834689f850950d9b151562c9cc3c144934ccc60699aeaaa"
+    },
+    {
+      "path": "late/cpp_decoder_layer_10.f32",
+      "bytes": 16384,
+      "sha256": "b910bf23da5225f4de1b72dcccd89fecfc559b9c6b21c115615a882b22060cb7"
+    },
+    {
+      "path": "late/cpp_decoder_layer_11.f32",
+      "bytes": 16384,
+      "sha256": "ca0dbb5694ccdc256d625da8e9210d323f4ba2daaebcd221ac3f7e18dd60dc7c"
+    },
+    {
+      "path": "late/cpp_decoder_layer_12.f32",
+      "bytes": 16384,
+      "sha256": "e1f1d11a71d42897034ffa1217bfd9601b0fd122820ff15ddb99234c14859974"
+    },
+    {
+      "path": "late/cpp_decoder_layer_13.f32",
+      "bytes": 16384,
+      "sha256": "04e390f4ce8e56216410309c83bacb7bc2a651ff8a68936fc8c1b016220ed6b0"
+    },
+    {
+      "path": "late/cpp_decoder_layer_14.f32",
+      "bytes": 16384,
+      "sha256": "0903df503fa7fc551049809096f86a102a700222765b35be6589117fbf8c1303"
+    },
+    {
+      "path": "late/cpp_decoder_layer_15.f32",
+      "bytes": 16384,
+      "sha256": "62a7d7261ae4efc212d950f5f8a075cb62b1ccd6d668149ca4c3c49ae90dc5ec"
+    },
+    {
+      "path": "late/cpp_decoder_layer_16.f32",
+      "bytes": 16384,
+      "sha256": "3772ea025b01b02507db44ee74575b166d68b90a86297ad0649c534cd97018e2"
+    },
+    {
+      "path": "late/cpp_decoder_layer_17.f32",
+      "bytes": 16384,
+      "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+    }
+  ],
+  "rows": [
+    {
+      "stage": "decoder_layer_0",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_0",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_1",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_1",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_2",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 2048,
+      "values": 4096,
+      "cosine_min": 0.9999999999999993,
+      "max_row_norm_error": 1.2882945998882178e-07,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 9.429845333190927e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.00000025765892
+    },
+    {
+      "stage": "decoder_layer_2",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_3",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_3",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_4",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_4",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 1902,
+      "values": 4096,
+      "cosine_min": 0.9999999999999994,
+      "max_row_norm_error": 8.602686607517285e-08,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 6.413770946840216e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_5",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_5",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_6",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_6",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 1954,
+      "values": 4096,
+      "cosine_min": 0.9999999999999996,
+      "max_row_norm_error": 9.686314017542941e-08,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 7.14240649914848e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0000001937262804
+    },
+    {
+      "stage": "decoder_layer_7",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 2023,
+      "values": 4096,
+      "cosine_min": 0.9999999999999997,
+      "max_row_norm_error": 1.0338077438554194e-07,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 7.584853429955369e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0000002067615488
+    },
+    {
+      "stage": "decoder_layer_7",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_8",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 2048,
+      "values": 4096,
+      "cosine_min": 0.9999999999999994,
+      "max_row_norm_error": 1.3025238843056286e-07,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 9.494819018156886e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0000002605047769
+    },
+    {
+      "stage": "decoder_layer_8",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_9",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_9",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_10",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_10",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_11",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_11",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 2007,
+      "values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0801954730688124e-07,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 7.873471105047647e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_12",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 2045,
+      "values": 4096,
+      "cosine_min": 0.9999999999999994,
+      "max_row_norm_error": 1.0929724802988261e-07,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 8.04694313981269e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_12",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_13",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_13",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_14",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_14",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_15",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 1912,
+      "values": 4096,
+      "cosine_min": 0.9999999999999992,
+      "max_row_norm_error": 8.040847987444977e-08,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 6.472019263861487e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0000001608169597
+    },
+    {
+      "stage": "decoder_layer_15",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_16",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 2024,
+      "values": 4096,
+      "cosine_min": 0.9999999999999994,
+      "max_row_norm_error": 1.129250006837168e-07,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 8.255783245205265e-08,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_16",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_17",
+      "arm": "original-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    },
+    {
+      "stage": "decoder_layer_17",
+      "arm": "native-retained-input",
+      "width": 2048,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0,
+      "repeat_exact": true,
+      "scaled_output_negative_norm_error": 1.0
+    }
+  ],
+  "files": [
+    {
+      "path": "bridge",
+      "bytes": 16512,
+      "sha256": "47a4886830c462ce80e3ae9126408311e8c1024b0b4045fc1afd30a6c841964d"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 879,
+      "sha256": "d9bb1d1c81a98579745706438bbd10813e2a7018337716b62a6ee63a5956f326"
+    },
+    {
+      "path": "decoder_layer_0-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "8f632f1f352698208628d2606b107a1605e1fbd22fd5c74740362fda7fe939f0"
+    },
+    {
+      "path": "decoder_layer_0-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "627391409c091fca121f323068f3e8bea49663440ab8616a556827e40c697b40"
+    },
+    {
+      "path": "decoder_layer_0-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "9ef27b99502f18e398ebd7b8affcc47510168d0bb56e957c028467379ae4c057"
+    },
+    {
+      "path": "decoder_layer_0-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "bf2fcf5d34bdbb9711ea59a60dc772cab85534bbcd69e9d7c6e0b6a1c970b085"
+    },
+    {
+      "path": "decoder_layer_0-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "2860f4dbd591e1cde977773f7a6d0d427b6072925cd7a3715dd2a010441a0573"
+    },
+    {
+      "path": "decoder_layer_0-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "49a8ce294fa9a251e05142e3cba55a60cdb21f8f14a48180de44d308c4215111"
+    },
+    {
+      "path": "decoder_layer_1-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "c5624a29d33ddf7a66b61ffc97de470406a67764f3010e9e1843d4e26353d157"
+    },
+    {
+      "path": "decoder_layer_1-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "7dbad4dfb1a98ba7c779c82099b0ef54bf2042709e82fa5564bf2d3ed5d603a5"
+    },
+    {
+      "path": "decoder_layer_1-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "9e75ec1b4b7b1b8a777b87f327499fd484aa6b16044c00baa876fab1978899e2"
+    },
+    {
+      "path": "decoder_layer_1-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "b4c32061afd6c4ae7f7a53471e7dea77e07cdff0ce312e0e1c5d6ebee9a57859"
+    },
+    {
+      "path": "decoder_layer_1-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "1544a9743f6319471ae75ca0097138b0845089906e387a7d757c868d7e4794df"
+    },
+    {
+      "path": "decoder_layer_1-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "5aef47076b5c2760da1116aa7ada98ecb21eb7b67bf1f7c4f5467844136ca3be"
+    },
+    {
+      "path": "decoder_layer_10-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "86e2f5d9bc2229c23bd20443ef6a1e68337f9346db6d79450f38620002c4fbb8"
+    },
+    {
+      "path": "decoder_layer_10-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "ea9e4340a9392cf702edc09097f53a5990fe72dd22dd9f89b0d7f6fa0ccebe30"
+    },
+    {
+      "path": "decoder_layer_10-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "b910bf23da5225f4de1b72dcccd89fecfc559b9c6b21c115615a882b22060cb7"
+    },
+    {
+      "path": "decoder_layer_10-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "f08bf704c5486a89c0c2187c45c4395e335d3a456f05a6744609eff7d1519506"
+    },
+    {
+      "path": "decoder_layer_10-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "fda204729fcae48f69383f6de8d42e6eb49ea996401fde517cc5d274faa7a046"
+    },
+    {
+      "path": "decoder_layer_10-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "45f75a65b207f1ea03f9c401c27e068b9099a2b7e960fae598113b3d2137c7f3"
+    },
+    {
+      "path": "decoder_layer_11-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "663da664136cb20fc81e1baa468bef24251fb4918d39acc2796b99b6d43fa476"
+    },
+    {
+      "path": "decoder_layer_11-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "471a3747ae354b3292c303a1758d4e7cc2db02102d4a4deb61df265b754038d2"
+    },
+    {
+      "path": "decoder_layer_11-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "ca0dbb5694ccdc256d625da8e9210d323f4ba2daaebcd221ac3f7e18dd60dc7c"
+    },
+    {
+      "path": "decoder_layer_11-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "7f8be899abed2ea4f637ffaca02681f7d8a5dd51faeb98df8d1b87d204a6ac85"
+    },
+    {
+      "path": "decoder_layer_11-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "d6872c8c4bec50c0639311a0776ffa9712d0ee90ddb6894d42d0b94be66af782"
+    },
+    {
+      "path": "decoder_layer_11-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "4732dbd797d2b7e17f3626200f012789133a6162df46dd2d8d6eadfd62c451dd"
+    },
+    {
+      "path": "decoder_layer_12-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "1a49ee83622c84ca653b71261aae83a90ee8708ae20f3b08d6dc396cf29333d5"
+    },
+    {
+      "path": "decoder_layer_12-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "c8a16a7c113bb7dab8cb360c6973aa9d01cdaa5135280b2e93c67f9d004af026"
+    },
+    {
+      "path": "decoder_layer_12-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "e1f1d11a71d42897034ffa1217bfd9601b0fd122820ff15ddb99234c14859974"
+    },
+    {
+      "path": "decoder_layer_12-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "e17c4bee696a7f3fc5869ab1736b4336979d14f2995b1261bf3a4bad7717df77"
+    },
+    {
+      "path": "decoder_layer_12-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "7fe6bca04e1488a1e3e7e08f891e6a09a6a97f8a015b3c1578275eac7bf1f957"
+    },
+    {
+      "path": "decoder_layer_12-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "705a62e21b7fcc821fbbc6a8624ef9a3422300189a86e3508114e6c340bbaabe"
+    },
+    {
+      "path": "decoder_layer_13-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "89f01672cd01bafdfae89020e47500cc7bcec0c280765a01bf4e43df61ea070c"
+    },
+    {
+      "path": "decoder_layer_13-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "15b68e6ed61f8ae5f3e0e7e34dab77055f851590f806d03b9bff1e26e95b8ef7"
+    },
+    {
+      "path": "decoder_layer_13-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "04e390f4ce8e56216410309c83bacb7bc2a651ff8a68936fc8c1b016220ed6b0"
+    },
+    {
+      "path": "decoder_layer_13-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "f3e64a6e50a27b79b5f65a6a6707723efecd3fabd532a2205de39bac7db82143"
+    },
+    {
+      "path": "decoder_layer_13-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "9ace5082878bf0652f132e997daf7c1d9f994024d160a16893721fee0896ac0c"
+    },
+    {
+      "path": "decoder_layer_13-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "a0a51e5b579e334f4bc3b059b865750501b927810d343f828e3ff131e6408b11"
+    },
+    {
+      "path": "decoder_layer_14-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "d2e9fcac549abc1c857535450de97d5d1b2b6a21e44b591f9a47b162be758397"
+    },
+    {
+      "path": "decoder_layer_14-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "d9de04a32ea70460e0a380aa0241b525ec2c0ca34b1b9f1f02e9194f87bca49b"
+    },
+    {
+      "path": "decoder_layer_14-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "0903df503fa7fc551049809096f86a102a700222765b35be6589117fbf8c1303"
+    },
+    {
+      "path": "decoder_layer_14-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "cb5080da6ead9933474a3d8c6a12b2d2865aa53f5133ab5ef3cec6e39ce38c21"
+    },
+    {
+      "path": "decoder_layer_14-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "01d071bc5b3308427af53008250c5913ea1e150136d61d4e43002e4331db6e39"
+    },
+    {
+      "path": "decoder_layer_14-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "93eb3aedd6f7e0aa046ec3db0fd07001bf3dddba98f930d012fe5cffc23028c5"
+    },
+    {
+      "path": "decoder_layer_15-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "201b6888c6add521edd3f279329dae39cc81cb7bb89fa602ffe9a3d9d09ffe56"
+    },
+    {
+      "path": "decoder_layer_15-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "6732de0f383ee5efcf0364619f93bb5dbee6f46f6c8a96ef56bd11d53bd0a63c"
+    },
+    {
+      "path": "decoder_layer_15-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "62a7d7261ae4efc212d950f5f8a075cb62b1ccd6d668149ca4c3c49ae90dc5ec"
+    },
+    {
+      "path": "decoder_layer_15-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "993c247ce1fff9e27ee08eaece08d55c75f191443932613f0319ffa9b7a7d648"
+    },
+    {
+      "path": "decoder_layer_15-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "1b0f7a2e9db548c208e6dc4023af56cd7269f869c72d7dc1c6b6be972f5ba8aa"
+    },
+    {
+      "path": "decoder_layer_15-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "d40df3e2bc32d511db079ba7149fbb1a06e266a1acfc2e1e646ce548d958f001"
+    },
+    {
+      "path": "decoder_layer_16-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "b0c3eab4e551814289eec7be1934142300799012362621ccb3689b320fab33cd"
+    },
+    {
+      "path": "decoder_layer_16-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "78e3b72e085b8708d1464af24cedf998838342491271f958523e519a3b1dedf4"
+    },
+    {
+      "path": "decoder_layer_16-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "3772ea025b01b02507db44ee74575b166d68b90a86297ad0649c534cd97018e2"
+    },
+    {
+      "path": "decoder_layer_16-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "cab30e878ea2f1c7ad9f8e675a41a340b8db9c52b02821a71ab2c11784930063"
+    },
+    {
+      "path": "decoder_layer_16-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "581ec2586b4dea46fa1890fc284df32b5fdac1239609c52d6e2ecaf2e9ffd7b4"
+    },
+    {
+      "path": "decoder_layer_16-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "6d2e5425a3727a353e272f688c803ddca38846284423dfaf5805eebf83c14914"
+    },
+    {
+      "path": "decoder_layer_17-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "2b84f0273c67b7a0cdca39cf7b1b99841fda2276ac5f8f166fa38857a078b0f4"
+    },
+    {
+      "path": "decoder_layer_17-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "b7857cbe5ed7415fcb513edf1fb1322269862a4521a5202d3d7d79eadd7af702"
+    },
+    {
+      "path": "decoder_layer_17-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+    },
+    {
+      "path": "decoder_layer_17-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "6de4e196ea214915cba1d520e3100b06ad66bf4548fc1488229210c893a5510b"
+    },
+    {
+      "path": "decoder_layer_17-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "c7635ebff8124a2d867efed739ecf3241a22390c721ea050841807ffe662f57e"
+    },
+    {
+      "path": "decoder_layer_17-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "7cb2ea592011bfe15663eec528b9bde1769fecef866835a5797dba7bd30f1bb9"
+    },
+    {
+      "path": "decoder_layer_2-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "e951d72f4abe3b4dab10a951c9bd07839901b05a9374bac7056aa88b536ca21d"
+    },
+    {
+      "path": "decoder_layer_2-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "336c661d4bf197bd06babf34ec765a7fdb59aca7e3f47e9c29c5173867d56e7a"
+    },
+    {
+      "path": "decoder_layer_2-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "7e719dc1186fba201d0901835d9e5c78850d8f178dc72ca9b9d84e03f0485149"
+    },
+    {
+      "path": "decoder_layer_2-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "d0623664de2891161ef624c262848bee370a6a597f298c43e114f7969e185d21"
+    },
+    {
+      "path": "decoder_layer_2-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "5af1ac1fb18294800becd9ab62eb6531de6f6bb41684aaa8de9a87f373a76dfc"
+    },
+    {
+      "path": "decoder_layer_2-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "8bd09b45fcd3756e0e68a89ee6ddbed313dcf1dcac60311161c67e7fdae665ae"
+    },
+    {
+      "path": "decoder_layer_3-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "712a5a972a5f5e59585e211bf41fdccb51607787e2c4e63e679565379cd79fe1"
+    },
+    {
+      "path": "decoder_layer_3-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "d2bd8f623425275cd34e2523978f89b8b5c5ff9f2c66e20166e7bdd1e80af95a"
+    },
+    {
+      "path": "decoder_layer_3-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "cdbd5c16ca5110d9a81c92aeeca101de2b8432233b232b22a72cd366222ad226"
+    },
+    {
+      "path": "decoder_layer_3-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "ce6f0660249f0d1a232967c64413dbde729f11e0906a582ef3f2b6cac7c1afd8"
+    },
+    {
+      "path": "decoder_layer_3-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "ef97bd215d2d81482d90bbe9c26c37155bcfaa65f8ad2037542100d96924af6c"
+    },
+    {
+      "path": "decoder_layer_3-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "fe1e66ce8f906b4265454f5ce09fa617be067a926489be98febdc2583f5f2f41"
+    },
+    {
+      "path": "decoder_layer_4-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "fc5bb8d0ac2049ad18b70d35c3a2d5c6b9f17878fc29b0793bd5e85bdbc1a165"
+    },
+    {
+      "path": "decoder_layer_4-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "0981cf060704a1865a532e158cabdf47d37b54373176b5855cc56fed8bdf12d2"
+    },
+    {
+      "path": "decoder_layer_4-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "e618d8188a0b64cf85a07f99e556ff06fd7879f0e38d0cc589d31984bca183b3"
+    },
+    {
+      "path": "decoder_layer_4-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "a2d59a1ebc5b9d1b0a8a0be17711eb6326da83943bf5941b3470d63412a7da0f"
+    },
+    {
+      "path": "decoder_layer_4-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "c12dd57c6870c7754a02068f772361fcaa4dea7604585837a79aa7e9582863bc"
+    },
+    {
+      "path": "decoder_layer_4-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "71b65ec476f880d766278a8fef116468d451f5ef9336235f8dd54b3a84954d83"
+    },
+    {
+      "path": "decoder_layer_5-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "2b2db0b24c796526d97f6469bf8c515ec56d03dfab67cec915b8715f27b22dbb"
+    },
+    {
+      "path": "decoder_layer_5-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "d38857799e2f7d6a1e6565c783b46b286f9e722a973114536a19ef910733c46a"
+    },
+    {
+      "path": "decoder_layer_5-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "a1c9ea1b5b85bf380934bba3bead9d66c33368429be57df84e1a887bae8d2cc0"
+    },
+    {
+      "path": "decoder_layer_5-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "90dbcbb0a28d6753b99ec664be13c81a48b7542190bed05e09cf18130dd1291c"
+    },
+    {
+      "path": "decoder_layer_5-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "b1127d9e621ac2f5133737012f7defb5109e8570d05f03669b279299fe08a63d"
+    },
+    {
+      "path": "decoder_layer_5-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "3b2c88c0bd87ff121b1bf6f41459336e58b07895afa04577d12668cd269f879d"
+    },
+    {
+      "path": "decoder_layer_6-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "c23b8aaaecea444b04bc055b8e53578e90030e0903fd8f836ee08c26cf1021db"
+    },
+    {
+      "path": "decoder_layer_6-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "39be48da0701663a22e500f36914fa5e7462405a4ee83412ec642136c5e2b209"
+    },
+    {
+      "path": "decoder_layer_6-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "bc20bc11cef8f70a5dec200a20537094cd0d186f4e522689d3e048c6eea3d73d"
+    },
+    {
+      "path": "decoder_layer_6-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "7f75d133387760e4307b82bf2a139b944b9f7ef72b55ab8a09aad00dff32ff03"
+    },
+    {
+      "path": "decoder_layer_6-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "135cee41e5e6d1a79c10dc261491ab89a59c2344dab118414627ed9bef299361"
+    },
+    {
+      "path": "decoder_layer_6-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "8b38a4109b6bce93f85229188d2d5f5eb5c891ac4628b07d562520960941b5dd"
+    },
+    {
+      "path": "decoder_layer_7-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "b908a85f861b097fc6b3d0d104a21ba1b1f355bec075845c9368a42a03106fcf"
+    },
+    {
+      "path": "decoder_layer_7-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "5197809296d86404476f2aa029a623c3bd17fae0572bd1bf3bb4e81b68c65ae4"
+    },
+    {
+      "path": "decoder_layer_7-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "15fb0e15b0d505bf813ddf518abf170538378782b2fee64c7bef82085028dff4"
+    },
+    {
+      "path": "decoder_layer_7-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "b846f73d734456a538483351e5f894d044fa625e8627fd152dc11ff264cf8b44"
+    },
+    {
+      "path": "decoder_layer_7-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "a8a8d18e59e05cb49609c86ca125674c4def4eb935262a033ee229cb5205953c"
+    },
+    {
+      "path": "decoder_layer_7-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "93980eda1109c5a410f176805d601a97462741d8eca795de530bb502e69949af"
+    },
+    {
+      "path": "decoder_layer_8-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "da7ce375d813a20b4bb5aa8af0a04d720cf8244477d10f32982f767380a801e8"
+    },
+    {
+      "path": "decoder_layer_8-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "926a0818e964782e1ce0e4d60e0918e7f33a2156c9b6460c29a1acacf1608690"
+    },
+    {
+      "path": "decoder_layer_8-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "014f251e33924a4505658362e1e9809f25c9208032aa96658e2bff885dce4af5"
+    },
+    {
+      "path": "decoder_layer_8-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "9a57a5c7eaef8d4794b94549af141682c3ae8ecd17264a9a56c26c841aa83b30"
+    },
+    {
+      "path": "decoder_layer_8-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "d41c64ac407d39e4befb0b3c2f53dd06436138d5fa331c5518bab966bbbc3292"
+    },
+    {
+      "path": "decoder_layer_8-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "13afa1444b5214416548d4ae58881a339e414dc600bd284e058590b663cc430a"
+    },
+    {
+      "path": "decoder_layer_9-native-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "23f359dacc7dd296d73f79bceca0cbbe95d4ff9c3c2f44b9fee3047ece7d6da6"
+    },
+    {
+      "path": "decoder_layer_9-native-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "1013744b76b2a58dabcbbfa72f15004db8622f83b39fa22202d205cbeda99cdc"
+    },
+    {
+      "path": "decoder_layer_9-native-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "23e024be7d09f7896834689f850950d9b151562c9cc3c144934ccc60699aeaaa"
+    },
+    {
+      "path": "decoder_layer_9-original-retained-input-ggml.f32",
+      "bytes": 16384,
+      "sha256": "6b0348a419afee11cdb8c03ad9e247f0a1925217d242af55cd30392f2bf29d79"
+    },
+    {
+      "path": "decoder_layer_9-original-retained-input-torch.npy",
+      "bytes": 16512,
+      "sha256": "6ff97d0f6c904026fad348d7d491981ac52aaae56120f4a7598f0802011fc2ca"
+    },
+    {
+      "path": "decoder_layer_9-original-retained-input.f32",
+      "bytes": 16384,
+      "sha256": "db5a8182dc4d9dda17d42d27dfeb0679e762cdb6c734f11eb1cb2f3078680a02"
+    },
+    {
+      "path": "isolate.py",
+      "bytes": 2184,
+      "sha256": "b110e03e7dab4949448957a90454ba7c4bf119b6c99f6a21fd0c2f65d8e5fcf2"
+    },
+    {
+      "path": "libs/libggml-base.so",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "libs/libggml-base.so.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "libs/libggml-base.so.0.26.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "libs/libggml-cpu.so",
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    {
+      "path": "libs/libggml.so",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "libs/libggml.so.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "libs/libggml.so.0.26.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "libs/libgomp.so.1",
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    },
+    {
+      "path": "probe.log",
+      "bytes": 12221,
+      "sha256": "ba9155947ff617421eeb6add8cf0fd71dc6042dc6b4321ee7f6942bad8f0f998"
+    },
+    {
+      "path": "probe.py",
+      "bytes": 3610,
+      "sha256": "3a05b9e34347f9b7f4b39aad27b37dc34cd95ed1eddb9ea48c4e400eef905515"
+    }
+  ],
+  "operation_isolation": {
+    "scope": "Arithmetic isolation only, actual Torch RMSNorm remains the oracle. These expressions are not runtime candidates and do not establish neural or speech acceptance.",
+    "rows": [
+      {
+        "stage": "decoder_layer_0",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_0",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_1",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_1",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_2",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2048,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2048,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2048,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2048,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_2",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_3",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_3",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_4",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_4",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1902,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1902,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 1902,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 1902,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_5",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_5",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_6",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_6",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1954,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1954,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 1954,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 1954,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_7",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2023,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2023,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2023,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2023,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_7",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_8",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2048,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2048,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2048,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2048,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_8",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_9",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_9",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_10",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_10",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_11",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_11",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2007,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2007,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2007,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2007,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_12",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2045,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2045,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2045,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2045,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_12",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_13",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_13",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_14",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_14",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_15",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1912,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 1912,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 1912,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 1912,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_15",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_16",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2024,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 2024,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 2024,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 2024,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 1.9073486328125e-06
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_16",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_17",
+        "arm": "original-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          }
+        }
+      },
+      {
+        "stage": "decoder_layer_17",
+        "arm": "native-retained-input",
+        "variants": {
+          "torch-f32-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f32-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 1992,
+            "changed_vs_actual_ggml": 1992,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          },
+          "torch-f64-sum-rounded-mean-rsqrt": {
+            "changed_vs_actual_torch": 0,
+            "changed_vs_actual_ggml": 0,
+            "max_abs_vs_actual_torch": 0.0
+          },
+          "torch-f64-sum-rounded-mean-reciprocal-sqrt": {
+            "changed_vs_actual_torch": 1992,
+            "changed_vs_actual_ggml": 1992,
+            "max_abs_vs_actual_torch": 9.5367431640625e-07
+          }
+        }
+      }
+    ]
+  },
+  "summary": {
+    "comparisons": 36,
+    "byte_exact_comparisons": 27,
+    "changed_comparisons": 9,
+    "max_abs": 1.9073486328125e-06,
+    "max_row_norm_error": 1.3025238843056286e-07,
+    "all_repeats_exact": true,
+    "all_scaled_output_negatives_rejected": true,
+    "causal_full_model_proof": false
+  }
+}
