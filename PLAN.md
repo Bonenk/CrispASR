@@ -6,22 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia rotary replay on audited block-zero Q/K
-
-Owner: this maintainer session. Tiny storage probe directory
-`/mnt/storage/crispasr/dia-block0-rope-probe-20261013`; controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`. Resume pending numerical
-triage using verified block-zero projections at steps 0/76/864/978. Compare
-actual original RotaryEmbedding with the actual packaged ggml CPU NEOX RoPE
-operator on identical original/native Q/K inputs, then measure projection plus
-rotation separately. Preserve source/layout/positions, repeats and negative
-controls. Include default geometric and original-timescale diagnostic paths;
-prior full-model source-timescale control remains rejected. No local full
-model/heavy build, reference/sampler/threshold changes, default promotion or
-speech/GPU acceptance. Latest main 921ddd8fa has green secret/Ruby checks;
-general CI/lint remain queued. Open issue updates and PR heads are unchanged.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6601,6 +6586,29 @@ unchanged. Complete source/tensor/shape/input/output ledger:
 `docs/dia-block0-projection-isolation-2026-10-13.json`.
 Next numerical triage must distinguish projection, rotary and attention/cache
 error with actual original intermediate inputs before another full-model A/B.
+
+## UPDATE 2026-10-13 — Audited Q/K rotary primitive replay complete
+
+Actual original RotaryEmbedding and literal native helper replay use audited
+block-0 Q/K projections at steps 0/76/864/978, matching the real 128-by-heads-
+by-1-by-2 native shape and original Float32 positions. All 48 same-input and
+composed comparisons, exact repeats and eight wrong-position/magnitude negative
+controls are retained. Native source matches immutable 2954c5a7c; packaged CPU
+libraries and exact ggml header/operator sources are audited. At step 978,
+combined Q relative L2 drops from 5.37020e-5 to 1.57296e-7 and K from
+3.55324e-5 to 2.28756e-7 using original timescales. Position zero is unchanged.
+This demonstrates local rotary error on real projections, not a causal speech
+repair: the existing CPU/T4 full-model source-timescale controls still reject
+speech. No runtime/default/reference/quality gate changes. Full ledger:
+`docs/dia-block0-rotary-isolation-2026-10-13.json`.
+
+Next: capture actual original and native post-rotation K/V history and attention
+inputs/outputs on identical feedback, separating cache storage/layout, GQA and
+attention arithmetic before another full-model candidate. Do not replace this
+with reconstructed attention references or repeat the already-rejected rotary
+full-model run. All large work remains on storage; heavy inference uses GH or
+actual Kaggle GPU per the usage guide. Final-main general CI remains pending;
+no release tag or model promotion.
 
 ## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 

@@ -290,3 +290,12 @@ worsen relative L2 in all 12 controlled cases, so no runtime candidate is
 introduced. Repeats and a magnitude negative pass. This is primitive isolation,
 with native speech still unaccepted.
 [Block-0 audit](dia-block0-projection-isolation-2026-10-13.json).
+
+
+The actual Q/K rotary replay confirms local error on audited first-block
+projections. At step 978, composed relative L2 falls from 5.37020e-5 to
+1.57296e-7 for Q and 3.55324e-5 to 2.28756e-7 for K using original timescales.
+All 48 comparisons, repeats and eight negative controls are retained. This is
+CPU primitive evidence; full-model source-timescale speech remains rejected,
+with no runtime/default promotion or performance claim.
+[Rotary audit](dia-block0-rotary-isolation-2026-10-13.json).

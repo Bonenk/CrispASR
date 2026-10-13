@@ -23925,3 +23925,33 @@ and input errors before any runtime candidate or full-model run. Preserve
 repeats, negative controls and every result; no quality/seed/filter waiver.
 
 </details>
+
+
+## 2026-10-13 — Dia actual-projection rotary isolation
+
+All 48 original/native Q/K RoPE comparisons and eight negative controls pass
+repeat/provenance validation. At step 978, original-timescale factors reduce
+composed Q error 5.37020e-5 → 1.57296e-7 and K 3.55324e-5 → 2.28756e-7.
+This isolated numerical improvement does not override the already-rejected
+full-model speech controls; production defaults remain unchanged.
+[Full ledger](docs/dia-block0-rotary-isolation-2026-10-13.json).
+
+<details>
+<summary>Completed actual-projection rotary claim</summary>
+
+## CLAIMED 2026-10-13 — Dia rotary replay on audited block-zero Q/K
+
+Owner: this maintainer session. Tiny storage probe directory
+`/mnt/storage/crispasr/dia-block0-rope-probe-20261013`; controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`. Resume pending numerical
+triage using verified block-zero projections at steps 0/76/864/978. Compare
+actual original RotaryEmbedding with the actual packaged ggml CPU NEOX RoPE
+operator on identical original/native Q/K inputs, then measure projection plus
+rotation separately. Preserve source/layout/positions, repeats and negative
+controls. Include default geometric and original-timescale diagnostic paths;
+prior full-model source-timescale control remains rejected. No local full
+model/heavy build, reference/sampler/threshold changes, default promotion or
+speech/GPU acceptance. Latest main 921ddd8fa has green secret/Ruby checks;
+general CI/lint remain queued. Open issue updates and PR heads are unchanged.
+
+</details>
