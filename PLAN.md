@@ -5922,3 +5922,19 @@ recorded; candidate remains unmerged and opt-in. The new hosted control is not
 a result, and no production model pin, Q4/GPU gate or release tag is promoted.
 Current main CI is running after the result/claim checkpoint; previous main
 80b2b8340 was fully green. Open outside issue/PR heads remain unchanged.
+
+### 2026-10-13 CLAIM durable public Dia proof archives
+
+While precision run 38343667254 remains queued at unchanged `5a8fe578e`, retain
+current complete canonical original, portable RNG replay, rejected native speech
+and freshly accepted DAC-converter proof folders in the existing public dataset
+`cstr/crispasr-regression-fixtures`. Do not upload credentials/account names,
+alter reference arrays or relabel negative results. Verify each source file
+against its tracked receipt, scan artifact text using the existing credential
+patterns and account guard, build complete per-file SHA manifests, then publish
+four independent ZIPs and a concise scoped index. Re-read every public ZIP
+anonymously at the returned immutable revision and require full byte count/SHA.
+This prevents 14-day GitHub artifact expiry from losing reproducibility; no new
+neural inference, production model pins or speech/Q4/GPU acceptance is involved.
+All temporary/package data stays under storage. Record only actually published
+and verified revisions. Current outside issue/PR heads remain unchanged.
