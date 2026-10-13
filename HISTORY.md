@@ -24059,3 +24059,14 @@ Syntax checks pass and the old CUDA package is correctly rejected by its source
 pin. CPU 38438623888 and CUDA package 38446095504 are still running; no new
 artifact, speech, GPU or release acceptance. Preparation ledger:
 `docs/dia-attention-delivery-audit-preparation-2026-10-13.json`.
+
+## 2026-10-13 — Dia CPU capture finished; actual CUDA worker prepared
+
+CPU capture 38438623888 is successful; the complete 1.56 GB delivered artifact
+is downloading for independent audit. Prepared diagnostic worker/kernel
+bf895ecd6 passes 16 input/source guards and all four secret checks, with six
+runtime files identical to the CPU capture and CUDA compile package. The
+bootstrap requires immutable verified inputs before launch and reuses the
+audited DAC export. CUDA package 38446095504 remains compiling; no new GPU,
+speech, quantization or release acceptance. See
+`docs/dia-attention-cuda-worker-2026-10-13.md`.

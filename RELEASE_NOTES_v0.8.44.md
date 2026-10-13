@@ -398,3 +398,10 @@ The matching CUDA 12.4 SM60/75 capture package is queued on GH at source
 is now running. Both hosted results and actual GPU/model acceptance remain
 pending; production main receives tracking only.
 [CUDA package protocol](docs/dia-attention-cuda-package-2026-10-13.md).
+
+### Pending Dia CUDA attention observation
+
+Prepared a pinned delivered-runtime/original-reference GPU observation worker
+with 16 input/source guards and unchanged native runtime bytes. CPU capture
+completed; independent artifact audit and actual CUDA execution remain pending.
+This establishes no native free-speech, Q4 or performance acceptance.

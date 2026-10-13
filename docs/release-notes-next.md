@@ -340,3 +340,10 @@ pending; production main receives tracking only.
 Independent delivery/source/trajectory audit tools are prepared; the older CUDA
 package is rejected by its source pin. CPU capture and matching CUDA build are
 still running. This preparation establishes no new native speech/GPU/Q4 result.
+
+### Prepared actual Dia CUDA attention observation
+
+A pinned delivered-runtime/original-reference GPU worker passes 16 input/source
+guards and keeps all six native runtime files unchanged. CPU capture completed;
+artifact audit and actual GPU execution remain pending. Native free speech/Q4
+remain unaccepted. No default or release change.

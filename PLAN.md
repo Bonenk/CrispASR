@@ -6837,3 +6837,27 @@ fully verified and pinned before launch. Existing terminal Kaggle logs/output
 must remain preserved. No Torch reinstall, runtime/default or release changes.
 CPU capture 38438623888 and CUDA package 38446095504 are still running; this
 claim authorizes preparation only until their complete artifacts pass audit.
+
+## UPDATE 2026-10-13 — CPU capture completed; CUDA worker prepared
+
+CPU run 38438623888 completed successfully at capture source 42b111c5e. Its
+full log reports original/native OFF/ON/OFF transparency, 40/40 native stages
+in all three arms, retained strict negatives and original ASR WER 0. The
+1,563,044,041-byte artifact 11841560122 is being preserved under storage;
+independent complete ZIP/source/tensor verification is still pending.
+
+Prepared GPU worker/kernel source bf895ecd652a90ed18ff095c09596f7a27dd4f36
+on `diag/dia-attention-gpu-20261013` passes 16 input/actual-source guards and
+all four unskipped secret checks. Six runtime files are byte-identical to
+CPU source 42b111c5e and package source 2328f15ce. The kernel fails before
+hardware/downloads until immutable input pins are rendered. It reuses the
+verified DAC proof and performs no Torch/DAC install, native build or original
+CPU generation on Kaggle. Exact procedure/check ledger:
+`docs/dia-attention-cuda-worker-2026-10-13.md` and
+`docs/dia-attention-cuda-worker-checks-2026-10-13.json`.
+
+CUDA package 38446095504 remains compiling. Next finish complete CPU delivery
+audit and same-input replay, verify the package, publish pinned inputs to the
+existing public fixture dataset, preserve prior terminal Kaggle receipts and
+then submit the actual GPU controls. Native free speech remains rejected; no
+production runtime/default/model change, Q4 acceptance or release tag.

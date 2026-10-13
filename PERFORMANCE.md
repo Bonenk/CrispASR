@@ -3352,3 +3352,11 @@ The matching CUDA 12.4 SM60/75 capture package is queued on GH at source
 is now running. Both hosted results and actual GPU/model acceptance remain
 pending; production main receives tracking only.
 [CUDA package protocol](docs/dia-attention-cuda-package-2026-10-13.md).
+
+### Dia late-attention worker preparation, 2026-10-13
+
+CPU capture 38438623888 completed; delivered tensors are awaiting independent
+audit. CUDA observation worker bf895ecd6 passes 16 small input/source guards
+with unchanged runtime bytes, but has not executed on a GPU. CUDA package
+38446095504 is still compiling. No performance or native speech/Q4 acceptance
+follows from these preparation/capture results.
