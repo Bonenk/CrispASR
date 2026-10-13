@@ -6,22 +6,20 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Prepare same-input Dia attention history replay
+`## CLAIMED 2026-10-13 — Matching CUDA package for late-history capture
 
-Owner: this maintainer session. Storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded replay probe directory
-`/mnt/storage/crispasr/dia-attention-input-replay-20261013`. GH late-history
-capture 38438623888 remains queued at frozen source 42b111c5e; leave its source
-and reference unchanged. Prepare a weight-free consumer of post-rotation Q and
-complete K/V history: execute the actual original attention call extracted from
-the pinned blueprint and literal native GQA/attention code. Bind source/library
-hashes, true batch/head/time layout and production-cache stride. Validate the
-consumer on the already audited contiguous 0–3 original captures, with repeats
-and scale/GQA negatives, before trusting any future step-978 input decomposition.
-This is tiny isolated CPU evidence, not a full model/heavy build or speech/GPU
-acceptance. Do not attribute input drift to attention math without same-input
-controls; report cross-host/library limitations explicitly. All artifacts stay
-under storage. No model/default/reference/quality-gate changes or release tag.
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-attention-cuda-20261013`, branch
+`prepare/dia-attention-cuda-20261013`, based on immutable capture source
+42b111c5e. While GH CPU capture 38438623888 queues, prepare the existing CUDA
+12.4 SM60/75 bundle with exact hashes of this already syntax/test-validated
+native capture implementation. Update only compile-package guards/provenance;
+require runtime bytes identical to the frozen CPU capture source, unchanged
+sampler/caches and complete dependency closure. Run source guard/index/device
+contracts before GH compilation. This is a compile-only hardware prerequisite;
+no CUDA execution, model, speech, Q4 or default acceptance. Actual Kaggle work
+requires the verified delivered bundle and preserved prior terminal receipts.
+No local heavy build/model; all files/artifacts live on storage.
 
 ## CLAIMED 2026-10-13 — Dia late-history self-attention capture on GH
 
@@ -6710,6 +6708,32 @@ tracking/protocol only. Next collect this run and locate the first large
 query/cache/attention difference before proposing a runtime candidate or
 matching CUDA package. Full native speech remains rejected, and latest main
 CI remains queued. No model/default promotion or release tag.
+
+## UPDATE 2026-10-13 — Same-input attention history consumer verified
+
+The source-based weight-free replay consumer executes the exact original
+Attention.forward SDPA/transpose AST and literal native GQA/attention graph
+from frozen source 42b111c5e. All audited original prefix 0–3 outputs reproduce
+byte-for-byte through the original call with both compact and production-size
+3072-slot caches. Native outputs reproduce the retained original-input native
+snapshots byte-for-byte at BOTH one and four CPU threads. All 24 comparison
+rows, exact repeats and 12 GQA/scaling/magnitude negatives are retained; each
+negative family exceeds relative L2 0.1 at a measured prefix point. An initial
+include conflict from an archived header is preserved and corrected by keeping
+archived headers outside the include search path. No neural/reference changes.
+
+The future hosted mode refuses captures without a verification file ledger,
+hashes every consumed reference/receipt/native snapshot, and requires completed
+original/native capture-transparency controls before replay. Its separately
+verified CPU package may differ from hosted hardware/build; report comparisons
+without presuming cross-host byte identity or native speech acceptance. Exact
+source/library/input/output ledger:
+`docs/dia-attention-input-replay-2026-10-13.json`.
+
+GH CPU capture 38438623888 remains queued. Prepare its matching native CUDA
+compile package independently, so actual Kaggle GPU validation can proceed once
+capture and package artifacts are available. Do not repush any Kaggle kernel
+before preserving its prior terminal logs/outputs; no CPU inference on Kaggle.
 
 ## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 

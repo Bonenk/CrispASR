@@ -24006,3 +24006,37 @@ main checkpoint records the protocol and source; runtime changes are not merged.
 queues full original/native OFF/ON/OFF and 72 layer/history snapshots at step 978.
 Full-model, GPU and speech acceptance are pending; rejected controls remain binding.
 [Submission ledger](docs/dia-attention-history-submission-2026-10-13.json).
+
+
+## 2026-10-13 — Same-input attention replay consumer verified
+
+Audited prefix 0–3 original attention outputs reproduce byte-for-byte using the
+actual original SDPA/transpose source with compact/3072-slot cache stride. Actual
+native source replay reproduces all original-input native snapshots at one and
+four threads. Twenty-four comparison rows, 12 strong negatives, exact repeats
+and the initial archived-header compile rejection are retained. Hosted inputs
+require a verified file ledger and completed capture-transparency controls;
+cross-host/build arithmetic identity is measured, not assumed.
+[Full ledger](docs/dia-attention-input-replay-2026-10-13.json).
+
+<details>
+<summary>Completed same-input attention claim</summary>
+
+## CLAIMED 2026-10-13 — Prepare same-input Dia attention history replay
+
+Owner: this maintainer session. Storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded replay probe directory
+`/mnt/storage/crispasr/dia-attention-input-replay-20261013`. GH late-history
+capture 38438623888 remains queued at frozen source 42b111c5e; leave its source
+and reference unchanged. Prepare a weight-free consumer of post-rotation Q and
+complete K/V history: execute the actual original attention call extracted from
+the pinned blueprint and literal native GQA/attention code. Bind source/library
+hashes, true batch/head/time layout and production-cache stride. Validate the
+consumer on the already audited contiguous 0–3 original captures, with repeats
+and scale/GQA negatives, before trusting any future step-978 input decomposition.
+This is tiny isolated CPU evidence, not a full model/heavy build or speech/GPU
+acceptance. Do not attribute input drift to attention math without same-input
+controls; report cross-host/library limitations explicitly. All artifacts stay
+under storage. No model/default/reference/quality-gate changes or release tag.
+
+</details>

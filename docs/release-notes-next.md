@@ -320,3 +320,10 @@ Late-history self-attention capture tooling is implemented on diagnostic source
 for all 18 layers. Production main receives tracking only. This is pending
 numerical evidence, not a runtime fix, speech acceptance or performance result.
 [Capture protocol](dia-attention-history-capture-2026-10-13.md).
+
+The weight-free same-input attention consumer reproduces audited prefix 0–3
+original snapshots with production cache stride and native snapshots at one/four
+CPU threads, byte-for-byte. Its 24 comparison rows and 12 strong negatives are
+retained. Hosted snapshots require verified file hashes and capture transparency;
+late-history results, cross-host identity and native speech remain unaccepted.
+[Same-input replay audit](dia-attention-input-replay-2026-10-13.json).
