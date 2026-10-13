@@ -11,6 +11,46 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
+
+Owner: this maintainer session. Controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; Dia runtime worktree
+`/mnt/storage/crispasr/dia-short-20261012/reference-worktree`, branch
+`fix/dia-pinned-diff`. User authorizes the following order and corresponding
+Markdown updates; each acceptance gate precedes the dependent step.
+
+1. Collect complete fixed Dia neural precision controls. DONE as an experiment:
+   GH `38343667254`, exact clean source `5a8fe578e`, retains all 41 files and
+   both 381-tensor audits. Both arms pass 40/40 replay stages; both native CLI
+   and C ABI arms reject speech with empty transcripts/WER 1. Full F32 extends
+   shared original input history to 865 steps versus 77 for heads-only F32;
+   first differing draw is step 864/head 6, original 55/native 938. These are
+   rejected speech controls, not an accepted runtime fix. Receipt:
+   `docs/dia-neural-precision-hosted-2026-10-13.json`.
+2. NOW CLAIMED: preserve F32 cross-attention caches behind an opt-in gate,
+   keeping the existing F16 path/default. The actual pinned original preserves
+   F32 projections; the tiny original F32/rounded/F32-repeat control is retained.
+   Audit the full actual native projection/readback/graph-input/upload path.
+   Compare fixed full-F32 neural weights with cache OFF/ON, strict canonical
+   cosine/magnitude and actual free CLI/C-ABI ASR. Retain complete raw inputs,
+   logits, PCM and physical audits. Do not alter reference/seed/top-k/top-p or
+   quality thresholds. Measure actual cache bytes; no GPU/model-pin promotion.
+3. After fixed-prompt success, validate multiple prompts, speakers, lengths and
+   reused sessions; actual DAC/ASR and CUDA hardware must pass before acceptance.
+4. Only after correctness, profile graph construction, cache traffic, scheduler
+   and attention; A/B each gated optimization at identical load and quality.
+5. Review full current #492/#521 threads; salvage validated work without enabling
+   slower or quality-rejected paths. Keep contributor history and scoped proof.
+6. Revisit Echo/Nemotron Q4 and remaining reporter/hardware/asset constraints.
+   Distinguish doable code repairs from unprovided clips, physical hardware and
+   missing licensed assets. Use GH/Kaggle for heavy work, storage for artifacts.
+7. Integrate only accepted changes, update all affected Markdown and complete
+   final-main CI/package validation; release through `scripts/bump-version.sh`.
+   No release tag until that final gate passes.
+
+Public archive-retrieval CI `38346489272` is SUCCESS at `bff87788e`.
+The ordered roadmap is not a claim that pending models, PRs or hardware pass.
+
 ## Release preparation checkpoint 2026-10-09
 
 Comprehensive `RELEASE_NOTES_v0.8.43.md` is committed before any version bump.

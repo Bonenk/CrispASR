@@ -7,6 +7,21 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## DONE 2026-10-13 — Durable Dia component and negative proofs
+
+Main `bff87788e` adds strict anonymous retrieval of four immutable public proof
+archives, preserving all 77 recorded source files and original paths/arrays.
+Eight local contracts and actual retrieval pass; dedicated hosted CI
+`38346489272` is SUCCESS. Archive/payload hash and extraction guards prevent
+accepting corrupt or incomplete inputs. Future diagnostic transport reproduces
+all 11,034 original draws and 1,210 frames with unchanged negative controls.
+This completes reproducibility tooling, not Dia native speech acceptance.
+The separate neural precision experiment `38343667254` retains two rejected
+free-speech arms despite both passing all 40 replay stages; investigation stays
+in PLAN.md. Receipts: `docs/dia-public-proof-archives-2026-10-13.json`,
+`docs/dia-public-input-replay-2026-10-13.json` and
+`docs/dia-neural-precision-hosted-2026-10-13.json`.
+
 ## DONE 2026-10-12 — CANN CLI routing and opt-in compile coverage
 
 PR #544 merged as `a86e366043f4a23251f10b67d982778cd89f83dd` after 46
