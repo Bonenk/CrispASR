@@ -5862,3 +5862,34 @@ CLI, C-ABI/server and bindings without a new backend/registry/CMake/schema or
 quantization entry. Actual free speech, GPU and Q4 acceptance remain pending.
 Dedicated converter run 38314778401 is still queued; final-main CI is pending,
 so no 0.8.44 release tag is created. Current outside issues/PR heads are unchanged.
+
+### 2026-10-13 Dia hosted results and neural-precision diagnostic CLAIM
+
+Exact `3ba3a317a`: portable replay 38317325099 PASS, but actual speech control
+38317327337 FAIL. Original neural/DAC with the compiled portable sampler matches
+all canonical codes and the original 619,520 PCM samples (same RMS .0735338613,
+verbatim ASR, WER 0). Native C ABI and CLI both produce 12.98 s quiet audio,
+empty transcripts and WER 1. Shared input history lasts 77 steps, prefix cosine
+min .9999989197 and norm error max .0008548312. First draw differs at step 76,
+head 5: original 606 vs native 843. Actual original-filter replay shows token
+606 probability .0117816888 on original logits but zero on native logits; the
+original winning exponential score is 1.10231, not a near tie with .398579.
+Discrete support changes despite close neural logits. Preserve failed output.
+Full receipts/all file hashes are in `docs/dia-portable-speech-hosted-2026-10-13.json`
+and `docs/dia-portable-random-hosted-2026-10-13.json`.
+
+Main converter integration 38314778401 PASS: actual original export is byte-exact,
+all 134 physical tensors agree and seven contracts pass. Complete receipt/audit
+is in `docs/dia-dac-converter-hosted-2026-10-13.json`. Current main 80b2b8340 CI,
+lint, Ruby, secrets and Pages all pass; no new outside issue/PR update.
+
+CLAIM: isolate the remaining precision/support boundary with two fixed native
+controls, first original F32 output heads (+37.9 MB over published F16), then
+full original F32 neural weights as a diagnostic. Read actual converter mapping
+and pinned original inference before implementing streaming original exports.
+Audit every promoted tensor against original checkpoint and preserve unrelated
+payloads. Run strict canonical stage diff plus native free CLI/C-ABI ASR on GH
+CPU, sequential contexts. Existing portable sampler remains opt-in, original
+seed/top-k/top-p/reference and quality gates stay unchanged. This is not a native
+speech/Q4/GPU acceptance claim or a promotion of new model pins; runtime remains
+unmerged. A precision control must explain the failure before any default change.
