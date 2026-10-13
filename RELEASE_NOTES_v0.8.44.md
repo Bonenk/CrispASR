@@ -414,3 +414,11 @@ Complete source/trajectory/package audits pass; pinned actual GPU version 4 is
 submitted using anonymously verified public inputs. Native free speech remains
 rejected. These diagnostics change no production default or model and establish
 no Q4/performance acceptance; GPU results and release gates remain pending.
+
+### Pending Dia delivered-runtime hardware validation
+
+Corrected the diagnostic worker to preserve NVIDIA driver search paths and
+fail early on unavailable drivers/plugins. A real ELF loader regression
+reproduces the prior failure and passes the repair. Actual GPU version 5 is
+submitted with unchanged runtime/model/reference bytes. Hardware capture and
+native speech acceptance remain pending; no production default changes.

@@ -24081,3 +24081,14 @@ anonymously verified; actual Kaggle version 4 is submitted with immutable
 source/input/script pins and preserved prior terminal output. Native free speech
 remains rejected; no default/model/release change. Full evidence:
 `docs/dia-attention-history-results-2026-10-13.md` and `.json`.
+
+## 2026-10-13 — Repair delivered Dia CUDA driver lookup
+
+Actual T4 version 4 failed because the worker discarded inherited driver
+library paths. Original ASR fell back to CPU; its strict CUDA guard rejected
+the run. Complete output/log evidence is preserved. Repair 6e1a8bb10 retains
+host driver lookup, adds preflight before weights and passes nine input guards,
+including real ELF negative/positive loading. Package/runtime/model/reference
+bytes and acceptance thresholds are unchanged. Actual GPU version 5 is
+submitted; no hardware acceptance yet. See
+`docs/dia-attention-cuda-driver-repair-2026-10-13.json`.

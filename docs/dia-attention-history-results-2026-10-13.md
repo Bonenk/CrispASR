@@ -34,3 +34,9 @@ The weight-free consumer runs the actual original SDPA/transpose expression and 
 The separately packaged CPU bridge and hosted original hardware/build differ: original-input Torch replay versus saved original attention has maximum relative L2 9.09885957456676e-7, rather than byte identity. Native outputs do reproduce exactly from native inputs. This excludes a large CPU cache-layout/GQA/attention defect at this observed boundary; it does not establish every graph boundary, free-running speech or CUDA arithmetic. Do not promote the already-rejected original-RoPE path on the basis of these diagnostic numbers.
 
 The CUDA package independently passes archive/member/alias/provenance checks for all 27 members. Its seven source files match immutable package source, and all six runtime files match CPU capture source. Prepared GPU worker bf895ecd6 passes 16 guards, reuses these inputs and keeps runtime bytes unchanged. Inputs are published and anonymously verified at public fixture revision `61eafbd6901d5f8fe72025acf8c86eb078ff5bf9`. Kaggle accepted script version `2026-10-13.dia-cuda-attention.4` (kernel version 4), with pinned rendered script SHA `b4817824f86d779f0521c6a6b15d9e25ed32260468fd3202594800d707c40aac`. All previous 61 terminal outputs and complete raw/decoded logs remain verified; the returned kernel slug is tracked. GPU results are pending. Actual GPU observation, then remaining decoder boundaries, precede any runtime/default/model/release promotion.
+
+GPU follow-up: version 4 failed before Dia capture because the worker hid
+the host driver library path. CPU ASR fallback was correctly rejected by
+the CUDA witness. The repair preserves that path, adds preflight and passes
+a real ELF dependency regression; actual version 5 is submitted. See
+`dia-attention-cuda-driver-repair-2026-10-13.json`.

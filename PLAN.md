@@ -6903,3 +6903,29 @@ Preserve inherited driver paths, add a real ELF dependency regression and
 fail-fast actual driver/plugin preflight before model downloads. Runtime/model/
 reference bytes and existing quality/device gates remain unchanged. Repush only
 after complete preservation, source checks and required secret scans.
+
+## UPDATE 2026-10-13 — Driver lookup fixed; actual CUDA version 5 submitted
+
+Version 4 terminated ERROR on 2x T4 before Dia capture. The bundle-only
+LD_LIBRARY_PATH hid libcuda.so.1; original audio ASR was WER 0 on CPU and
+the unchanged CUDA witness correctly rejected it. All 18 outputs, complete
+raw/decoded terminal logs and source hashes are preserved. No GPU execution
+or neural conclusion can be inferred from that failed setup.
+
+Repair source 6e1a8bb1074c8dc20952a5e0d1a3cc1e0b1b0bc2 preserves inherited
+driver search paths and adds actual driver initialization/device-count/plugin
+load checks before model downloads. A real ELF dependency fixture fails on
+the old path and passes on the repaired path; all nine input guards pass.
+Six native runtime files, compiled package, model/reference/sampling bytes
+and quality/device thresholds remain unchanged. All four unskipped secret
+checks pass before each source/kernel push.
+
+Kaggle version 5 is submitted, script `2026-10-13.dia-cuda-attention.5`,
+rendered SHA 530a11fb5f06ca7d39265c92be17109c629e96183a0dd8d9d4b112e47686536a.
+Input manifest revision 8badb32fd919f3087d2e97ee73f309cf66ed135b is anonymously
+verified and binds the repair source; all large payload LFS hashes match
+the previously anonymously verified inputs. Exact failure/repair/submission
+receipt: `docs/dia-attention-cuda-driver-repair-2026-10-13.json`.
+Next verify actual preflight/GPU ASR and capture execution, then full terminal
+OFF/ON/OFF arrays and remaining neural boundaries. Native speech/Q4 remain
+unaccepted; no runtime/default/model/release promotion.

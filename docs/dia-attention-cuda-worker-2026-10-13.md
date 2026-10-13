@@ -47,7 +47,15 @@ small-fixture environment; no checks were skipped or thresholds changed.
 Models and delivered artifacts remain on storage/hosted scratch. The prepared
 bootstrap and full worker still require end-to-end hardware validation.
 
-Prepared source is `bf895ecd652a90ed18ff095c09596f7a27dd4f36` on
-`diag/dia-attention-gpu-20261013`. CPU run 38438623888 subsequently completed
-successfully; complete delivered-artifact audit is in progress. CUDA package
-38446095504 is still compiling. No Kaggle submission or hardware acceptance.
+## Driver lookup repair after actual version 4
+
+The T4 run failed before Dia capture: the worker replaced inherited
+LD_LIBRARY_PATH, hiding libcuda.so.1. ASR produced WER 0 through CPU fallback;
+the strict CUDA witness correctly rejected it. All 18 terminal outputs and
+complete raw/decoded logs remain preserved. Version 5 prepends bundle libraries
+while retaining inherited driver paths and checks actual driver initialization,
+device count and CUDA plugin loading before model downloads. A real ELF
+dependency fixture fails with the old path and passes with the repaired path;
+all nine input guards pass. No runtime/reference/package bytes or thresholds
+change. Metadata now follows the returned attention-control slug. Actual GPU
+retest remains required.

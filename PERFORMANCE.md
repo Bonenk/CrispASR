@@ -3371,3 +3371,12 @@ Compact/3072-slot original cache outputs are identical. These are correctness
 diagnostics, not performance results or native free-speech acceptance. Actual
 GPU version 4 has been submitted against verified/public/pinned inputs; hardware
 results remain pending. See `docs/dia-attention-history-results-2026-10-13.md`.
+
+### Dia CUDA delivery setup rejection and repair, 2026-10-13
+
+Version 4 ran original ASR on CPU after the worker hid libcuda.so.1; the
+strict GPU witness failed before Dia capture. No GPU speed or neural parity
+conclusion applies. Repair 6e1a8bb10 preserves host library paths and checks
+driver/plugin loading before weights. A real ELF regression passes; actual
+version 5 is submitted. Runtime/package bytes are unchanged and physical
+confirmation remains pending.

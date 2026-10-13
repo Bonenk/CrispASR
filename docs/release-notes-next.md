@@ -355,3 +355,10 @@ native attention reproduces exactly from captured native inputs. Package/source
 audits pass, and actual GPU version 4 is submitted with public verified inputs.
 Native free speech remains rejected; no production default/model change or
 Q4/performance/release acceptance.
+
+### Dia CUDA validation worker driver lookup
+
+The diagnostic worker now retains inherited NVIDIA driver paths and checks
+driver/plugin loading before weights. Nine input guards pass, including a
+real ELF loader regression. Version 4 is retained as a failed setup control;
+actual version 5 is submitted. Native speech/Q4 remain unaccepted.
