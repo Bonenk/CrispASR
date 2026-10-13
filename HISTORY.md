@@ -23686,3 +23686,13 @@ and prior immutable archives remain intact. Complete CPU/CUDA failures, partial
 late-stage replay, rotary primitive and first-draw boundary controls are
 preserved without accepting native speech or changing defaults. [Publication
 receipt](docs/dia-cache-public-proof-2026-10-13.json).
+
+
+## 2026-10-13 — Completed bounded late-layer replay diagnostic
+
+Corrected hosted job `38382527357` at `ead5a5d5d` passes all 120 stage rows,
+default/978/default complete-array identity and scaled-hidden/negative-index/
+out-of-history rejection controls. All 170 files and full log are verified.
+The earlier logging failure stays retained. The separate original-timescale
+experiment rejects speech and leaves complete generated tokens/PCM unchanged;
+no runtime/model/default promotion follows. [Late capture receipt](docs/dia-late-stage-hosted-2026-10-13.json).

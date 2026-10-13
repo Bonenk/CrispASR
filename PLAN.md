@@ -6462,3 +6462,27 @@ originals untouched. A boundary-ledger field mismatch stopped the initial
 publisher before upload; corrected resume reverified the same four existing
 ZIPs and added the fifth. Receipt: `docs/dia-cache-public-proof-2026-10-13.json`.
 No model, speech quality, speed, GPU-quality or Q4 promotion follows.
+
+
+## UPDATE 2026-10-13 — Rotary CPU rejection and complete late-capture acceptance
+
+Both exact-source jobs at `ead5a5d5d` are terminal. Original-timescale control
+`38382524080` rejects speech: all 120 canonical stages pass, but all six native
+CLI/C-ABI outputs remain empty/WER 1. ON changes logits yet all three full input
+histories and both PCM arrays are byte-identical; the shared prefix remains 979,
+first differing draw 978/head 2 (original 877/native 904). Prefix minimum cosine
+changes from 0.9999999999769706 to 0.999999999978797; maximum norm error changes
+from 5.01010e-6 to 6.06699e-6. The physical auxiliary model is 6,444,669,600 bytes,
+SHA `9a2c0df72586b3f325bbbf42473e2156140870f48ce57474f2c577943008e9b1`:
++608 bytes over the full-F32 model, including the actual 256-byte table.
+All 381 learned tensors and 134 codec tensors remain audited. Full 54-file
+ledger and complete rejected log: `docs/dia-original-rope-hosted-2026-10-13.json`.
+The coefficient primitive improvement does not fix native speech.
+
+Corrected late capture `38382527357` succeeds as a diagnostic: all 120 stage
+rows pass, default/978/default full logits, feedback and decoded PCM are byte
+exact, and scaled-hidden, negative-index and out-of-history references all
+reject. Original free generation still matches canonical codes/inputs and
+passes actual ASR. All 170 files and the complete hosted log are hashed in
+`docs/dia-late-stage-hosted-2026-10-13.json`. This accepts bounded capture and
+teacher-replay transparency, not native free speech, GPU or Q4 quality.

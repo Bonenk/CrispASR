@@ -3242,3 +3242,12 @@ transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
 and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
 match exactly. These are correctness diagnostics, not accepted native speech
 or performance measurements. [Complete physical CUDA proof](docs/dia-cuda-cache-physical-2026-10-13.json).
+
+
+The completed original-timescale CPU control passes 120 replay rows but does
+not change generated token histories or PCM; all six speech checks remain
+empty/WER 1. The +608-byte auxiliary model is a rejected control. The corrected
+late-capture experiment independently passes default/978/default complete-array
+identity and all three rejection controls. These establish diagnostic fidelity,
+not accepted native speech or speed.
+[Rotary control](docs/dia-original-rope-hosted-2026-10-13.json), [complete late capture](docs/dia-late-stage-hosted-2026-10-13.json).

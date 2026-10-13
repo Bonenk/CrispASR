@@ -292,3 +292,12 @@ The complete CPU/CUDA cache, partial late-layer and causal diagnostic proofs
 are preserved as five immutable public archives. All payload and full anonymous
 remote size/SHA checks pass; rejected speech remains rejected. [Publication
 receipt](docs/dia-cache-public-proof-2026-10-13.json).
+
+
+The completed original-timescale CPU control passes 120 replay rows but does
+not change generated token histories or PCM; all six speech checks remain
+empty/WER 1. The +608-byte auxiliary model is a rejected control. The corrected
+late-capture experiment independently passes default/978/default complete-array
+identity and all three rejection controls. These establish diagnostic fidelity,
+not accepted native speech or speed.
+[Rotary control](docs/dia-original-rope-hosted-2026-10-13.json), [complete late capture](docs/dia-late-stage-hosted-2026-10-13.json).
