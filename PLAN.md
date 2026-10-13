@@ -11,6 +11,22 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Correct explicit Dia CUDA diff device request
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-cuda-device-20261013`, branch
+`fix/dia-cuda-replay-device-20261013`, based on composed CUDA source `3595fa25b`.
+The submitted v1 worker requires actual CUDA allocation/scheduler splits, but
+inspection shows the diff Environment guard clears TTS_GPU and params force
+CPU. Preserve terminal v1 logs/output before any resubmission; do not count its
+CPU stages as CUDA evidence. Capture the explicit GPU request before clearing
+debug variables and pass it through context params, keeping default CPU replay
+and environment restoration. Add source-compiled device/alias/isolation controls
+and update the compile package's exact source guards/provenance for the solely
+changed diff dispatcher. No native model math/cache/sampler change. After tests,
+submit one immutable-source actual GPU replacement; keep all v1 failures and
+fixed CPU rejection. This is validation plumbing, not a speech fix.
+
 ## CLAIMED 2026-10-13 — Dia decoder stage capture at the first remaining divergence
 
 Owner: this maintainer session. New storage worktree
