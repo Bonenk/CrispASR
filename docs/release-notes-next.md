@@ -223,3 +223,9 @@ transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
 and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
 match exactly. These are correctness diagnostics, not accepted native speech
 or performance measurements. [Complete physical CUDA proof](dia-cuda-cache-physical-2026-10-13.json).
+
+
+The complete CPU/CUDA cache, partial late-layer and causal diagnostic proofs
+are preserved as five immutable public archives. All payload and full anonymous
+remote size/SHA checks pass; rejected speech remains rejected. [Publication
+receipt](dia-cache-public-proof-2026-10-13.json).

@@ -23674,3 +23674,15 @@ arrays match exactly; F32 cache reaches the CPU step-978/head-2 boundary.
 The prior CPU-routing failure remains retained. Full terminal logs, all 56
 outputs and physical tensor audits are verified in
 [the physical control ledger](docs/dia-cuda-cache-physical-2026-10-13.json).
+
+
+## 2026-10-13 — Public cache, late-layer and causal diagnostics preserved
+
+Five complete proof archives (261 files, 1,268,517,339 compressed bytes) are public
+at immutable regression-dataset revision `13cfd81146f17b746a47ce154013603aeabef658`.
+Every full archive is anonymously re-read with exact size/SHA. Account-only
+public log substitutions have explicit original/delivered hashes; originals
+and prior immutable archives remain intact. Complete CPU/CUDA failures, partial
+late-stage replay, rotary primitive and first-draw boundary controls are
+preserved without accepting native speech or changing defaults. [Publication
+receipt](docs/dia-cache-public-proof-2026-10-13.json).

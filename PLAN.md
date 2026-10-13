@@ -11,21 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-13 — Preserve terminal CUDA/cache and late-layer diagnostic proofs
-
-Owner: this maintainer session. Storage controller and private publisher under
-`/mnt/storage/crispasr/dia-short-20261012/public-cache-proof-20261013`.
-Actual T4 version 2 is terminal and all 56 output files plus the complete
-4,769-entry log are preserved. Hash checks, actual CUDA scheduler/memory guards,
-120 stage metrics and OFF/repeat arrays are verified; all six speech checks
-reject. Preserve complete CPU/cache, CUDA/cache and partial late-layer artifacts
-in the existing public regression dataset, including raw logs and failures.
-Audit every source member, scan textual payloads, stream/fsync archives on
-storage and require anonymous full remote size/SHA verification. Include the
-bounded original-source rotary probe and high-precision retained-layer analysis.
-No new model publication, fresh local model run, acceptance waiver or runtime
-promotion. Keep previous source paths and existing immutable proof revisions.
-
 ## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
@@ -6437,3 +6422,22 @@ Current open issues and PR heads were rechecked: no new issue or changed PR
 source since the last audit. Ascend integration CI `38383864169` has passed
 unit/macOS/iOS/Opus checks; the remaining queued/running gates still precede
 production integration. No release tag or model/default promotion.
+
+The exact corrected-device CUDA package from GH `38374792784` is also fully
+verified: inner archive size/SHA, all 27 members/contained aliases, all source
+files and complete hosted log. Receipt: `docs/dia-cuda-package-v2-2026-10-13.json`.
+Package compilation/closure is distinct from the actual Kaggle build and does
+not supply speech acceptance.
+
+## UPDATE 2026-10-13 — Complete public cache and late-layer proofs verified
+
+The prepublication claim in `b8d2694e7` is complete. Five public archives in
+`cstr/crispasr-regression-fixtures/dia-20261013-cache`, immutable revision
+`13cfd81146f17b746a47ce154013603aeabef658`, preserve 261 payload files and 1,268,517,339
+compressed bytes. ZIP CRC, complete member/payload SHA and every full anonymous
+remote size/SHA check pass. Public logs replace only the account identifier;
+original/delivered size/SHA and replacement count are explicit, with private
+originals untouched. A boundary-ledger field mismatch stopped the initial
+publisher before upload; corrected resume reverified the same four existing
+ZIPs and added the fifth. Receipt: `docs/dia-cache-public-proof-2026-10-13.json`.
+No model, speech quality, speed, GPU-quality or Q4 promotion follows.
