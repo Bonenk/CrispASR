@@ -6974,3 +6974,14 @@ actual source shapes/masks and use full transparency controls for additional
 hooks. Do not retry already-rejected RoPE/default candidates or start perf
 before decoded speech passes. Issues/PR heads unchanged; latest main secret
 CI passed, broad CI/lint remain queued. No release/model/default promotion.
+
+## CLAIMED 2026-10-13 — Isolate block-zero cross-cache projection inputs
+
+Read pinned original DecoderLayer, DenseGeneral, RotaryEmbedding and cross-cache
+producer before probing. Reuse retained actual CPU/T4 encoder and cross-K/V
+snapshots. Fetch only block-zero original cross-K/V weights with immutable
+HTTP ranges and match converter layouts to the full physical F32 audit. Execute
+actual original DenseGeneral/RotaryEmbedding on each owned encoder input; report
+cosine and magnitudes separately for original input drift and native output.
+No new full-model/GPU run, threshold changes or speech acceptance. Then choose
+self-output/cross-attention/MLP boundary hooks from the measured evidence.
