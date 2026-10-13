@@ -6125,3 +6125,22 @@ PCM confirms the canonical recognized prompt is quiet in complete seconds
 leading frames, not an accepted native speech prefix. No audio/reference/gate
 change. Cache control 38357576078 remains pending; later ordered phases await
 its actual result. No runtime merge, version bump or release tag.
+
+## CLAIMED 2026-10-13 — Kaggle native CUDA cache diagnostics
+
+User explicitly requests Kaggle use before waiting hours for GH. CPU control
+38357576078 is executing unchanged at 2205d920d. Extend the composed CUDA
+worktree with a real-GPU F16/F32/F16-repeat cache diagnostic, preserving the
+original model/source/ref/seed/filter/ASR gates. This is additional stage-2
+cache triage while CPU runs, not broad acceptance or profiling.
+
+Follow the fully read sibling Kaggle guide: one account, placeholder metadata,
+actual device/compiler preflight, shared harness/toolchain/CUDA/cache/heartbeat
+helpers, no Torch reinstall, sequential contexts, large scratch off working,
+complete artifacts/progress and source verification. The kernel must run real
+CUDA stages and actual CLI/C-ABI speech with native GPU allocation/scheduler
+evidence. No GPU-only build farm or CPU-only Kaggle job. GPU F16 speech is an
+observed control, not a presumed failing CPU negative; F32 must pass strict
+stages and ASR, and OFF repeats must agree. Failed/inconclusive runs retain
+all evidence and never waive CPU/main-composition/full-model/Q4 gates.
+Do not change the candidate’s C++ math or the executing CPU source.
