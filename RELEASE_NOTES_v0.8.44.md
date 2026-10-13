@@ -411,7 +411,9 @@ Same-input actual-original attention and block-zero cross-K/V replays now
 show relative L2 differences below 7.21e-7 on retained CPU/T4 outputs;
 scale and layout negatives remain effective. The original GPU job remains
 ERROR, and the original reference operators in these bounded replays run CPU.
-Native free-running speech and Q4 remain unaccepted. No production default,
-model or release promotion follows. Decoder residual/cross-Q/MLP boundaries
-are the next correctness investigation; see
-`docs/dia-cross-cache-input-replay-2026-10-13.md`.
+Native free-running speech and Q4 remain unaccepted. Opt-in decoder
+residual/cross-Q/fused-MLP observation is now implemented on diagnostic source
+8d0ad886; full hosted transparency and boundary metrics are pending in GH
+38472367538. No production default, model or release promotion follows. See
+`docs/dia-cross-cache-input-replay-2026-10-13.md` and
+`docs/dia-decoder-boundary-capture-2026-10-13.md`.

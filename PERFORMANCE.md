@@ -3401,3 +3401,10 @@ All repeats and eight scale/head-order negatives verify. Upstream encoder
 input drift also contributes to recorded cache differences. No timing, full
 cross-attention, free-speech or Q4 acceptance follows. See
 `docs/dia-cross-cache-input-replay-2026-10-13.md`.
+
+### Dia decoder boundary observation prepared, 2026-10-13
+
+Opt-in observation preserves native decoder arithmetic; full OFF/ON/OFF
+transparency and original-reference boundary metrics are pending in GH
+38472367538. This establishes no timing, memory improvement or native speech
+acceptance. See `docs/dia-decoder-boundary-capture-2026-10-13.md`.

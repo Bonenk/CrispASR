@@ -7020,3 +7020,26 @@ interrupted the local secret scan with a working-directory error. Source-only
 worktrees temporarily use /mnt/volume1/crispasr-dia-decoder-boundary-20261013
 and /mnt/volume1/crispasr-decoder-boundary-tracking-20261013; weights, builds
 and captures stay on storage/GH CI. Shared main checkout remains untouched.
+
+## UPDATE 2026-10-13 — Decoder boundary observation coded; hosted replay queued
+
+Diagnostic source 8d0ad8862d2cad5d305a48a57f2a99b5024bc39a adds 16 opt-in
+block-zero boundaries at step 978: actual residual/norm inputs, self/cross
+pre/output projections, cross-Q and original fused MLP gate/up/hidden/output.
+Native arithmetic body remains byte-exact after removing observation calls;
+existing tensor pointers are retained without renaming/adding arithmetic.
+Three native guards, two syntax checks, Python compilation, doc anchors and
+all four unskipped secret tests pass. Actual-original tiny-model tests were
+blocked locally by CIFS I/O; they are required before hosted model inference.
+
+GH heavy replay 38472367538 is queued at this exact source. It requires full
+original/native OFF/ON/OFF logits/feedback/PCM equality, canonical original
+histories, 120 ordinary stage passes, 16 ON-only snapshots, quality/index
+negatives and scale-aware boundary metrics. Complete partial artifacts always
+upload. No boundary measurements or native speech/Q4/performance acceptance
+are claimed yet. Source-only local worktrees bypass unreliable CIFS; weights,
+builds and large captures remain storage/CI. Shared main checkout untouched.
+Evidence: `docs/dia-decoder-boundary-capture-2026-10-13.md` and
+`docs/dia-decoder-boundary-submission-2026-10-13.json`. Next collect complete
+job artifacts/logs and audit transparency before replaying the first remaining
+operator on owned inputs. No speculative math/default or release change.

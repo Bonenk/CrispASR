@@ -24117,3 +24117,12 @@ drift contributes to the observed caches; no large cache projection/layout
 defect is demonstrated here. Reference operators run CPU, observed T4 outputs
 are actual GPU. No new hardware run or math/default change. Evidence:
 `docs/dia-cross-cache-input-replay-2026-10-13.md` and `.json`.
+
+## 2026-10-13 — Prepare source-owned decoder boundary observation
+
+Source 8d0ad886 adds 16 opt-in block-zero norm/residual/cross/MLP snapshots
+without changing native arithmetic. Three native guards, two syntax checks
+and secret/doc checks pass; original hook tests remain mandatory on the
+hosted worker after local CIFS I/O blocked them. GH 38472367538 is queued;
+full-model transparency/metrics and native speech acceptance remain pending.
+See `docs/dia-decoder-boundary-capture-2026-10-13.md`.
