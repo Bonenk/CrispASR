@@ -6,7 +6,22 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Dia rotary replay on audited block-zero Q/K
+
+Owner: this maintainer session. Tiny storage probe directory
+`/mnt/storage/crispasr/dia-block0-rope-probe-20261013`; controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`. Resume pending numerical
+triage using verified block-zero projections at steps 0/76/864/978. Compare
+actual original RotaryEmbedding with the actual packaged ggml CPU NEOX RoPE
+operator on identical original/native Q/K inputs, then measure projection plus
+rotation separately. Preserve source/layout/positions, repeats and negative
+controls. Include default geometric and original-timescale diagnostic paths;
+prior full-model source-timescale control remains rejected. No local full
+model/heavy build, reference/sampler/threshold changes, default promotion or
+speech/GPU acceptance. Latest main 921ddd8fa has green secret/Ruby checks;
+general CI/lint remain queued. Open issue updates and PR heads are unchanged.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6587,15 +6602,51 @@ unchanged. Complete source/tensor/shape/input/output ledger:
 Next numerical triage must distinguish projection, rotary and attention/cache
 error with actual original intermediate inputs before another full-model A/B.
 
-## Pending — EmbeddingGemma 2 speech reader feasibility (2026-10-13)
+## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 
-User requested the approach demonstrated at https://eg2.haku.sh/.
-Google base is Apache-2.0 and upstream llama.cpp already supplies model support
-and GGUFs. A faithful ASR port additionally needs the trained reader, exact
-word bank and decoding blueprint; those assets were not located during this
-public-source check. The author's Neural Engine speed is not a ggml benchmark.
-Record: `docs/embeddinggemma2-asr-feasibility-2026-10-13.md`. Reuse audited
-CrispEmbed text/model components where applicable, add temporal audio features
-and a CrispASR reader only after their source/weights are pinned. Do not assume
-our typed-decision backend already supplies an audio encoder or speech reader.
-This is a backlog feasibility item, not implemented support or a release claim.
+User requested a concrete task for an independently trained reader, word bank
+and reproducible decoder. This is a research backlog task, not implemented
+support or a claim to reproduce the author's unpublished reader. Feasibility:
+`docs/embeddinggemma2-asr-feasibility-2026-10-13.md`.
+
+1. Pin and read the official encoder implementation and preprocessing. Compare
+   temporal audio-tower features with features after the shared backbone; do
+   not substitute pooled recording embeddings for time-resolved features.
+2. Freeze the encoder and train a small temporal CTC reader. Compare ordinary
+   subword CTC with embedding-matching word CTC on the same features/data so
+   the shared word space's contribution is measurable. CTC is our proposed
+   recipe, not an assertion about Shahir's implementation.
+3. Build a licensed, versioned word bank with normalization, stable IDs and
+   pinned text embeddings. Start around 30–50k words; define handling for
+   names/numbers/unseen words. Exclude held-out evaluation transcripts from
+   vocabulary construction. A 229k-by-768 FP16 bank alone is 351,744,000 bytes;
+   measure dense scoring cost before choosing compression or approximate search.
+4. Specify the exact decoding contract: sample rate, feature layer, chunking,
+   overlap, score normalization/temperature, blank score, CTC repeat/blank
+   handling, boundary merging and optional beam search. Begin with greedy CTC;
+   keep punctuation separate from the initial acoustic-quality experiment.
+5. Pilot on LibriSpeech train-clean-100 with separate development/evaluation
+   sets, then expand training only after measurable held-out progress. Report
+   WER on clean/other speech, silence and out-of-vocabulary behavior, memory
+   and feature-extraction/training throughput. Do not promise the author's
+   ~5% WER, 288x speed or eight-H100 training time on a Kaggle GPU.
+6. Use Kaggle for heavy encoder extraction/training and GH CI for conversion,
+   reproducibility and integration checks. Keep datasets/features/checkpoints
+   under `/mnt/storage`; checkpoint produced artifacts before later risky work.
+7. After a useful Python prototype, port via convert → reference dump → stage
+   diff with cosine AND magnitudes → decoded transcripts. Establish F32/BF16
+   and Q8 baselines before lower quants; validate CPU/Metal/actual CUDA and all
+   `docs/contributing.md` integration points, including C ABI and bindings.
+   Reuse audited CrispEmbed components where applicable; its typed-decision
+   backend is not already a temporal audio encoder or speech reader.
+
+Planning estimate, not a delivery promise: 1–2 engineering weeks for a research
+prototype, then several more for training iterations and a validated ggml port.
+First decision gate: useful held-out transcripts from a small frozen-feature
+reader versus its subword baseline. Reader/checkpoint/bank provenance and
+redistribution terms must be documented. Matching advertised quality/speed is
+an experimental target, not a release acceptance assumption.
+Sources: https://arxiv.org/abs/2306.11473,
+https://huggingface.co/google/embeddinggemma-2/blob/main/config.json,
+https://www.openslr.org/12. Upstream ggml support and base Apache-2.0 weights
+already exist; the app's own reader assets were not located in our source check.
