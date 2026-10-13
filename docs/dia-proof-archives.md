@@ -34,4 +34,14 @@ retrieves the full public RNG proof in CI.
 These archives preserve the original references and negative controls. They do
 not establish native free-speech, Q4 or GPU acceptance. The current neural
 precision investigation is tracked in `PLAN.md` and the
-[precision-control receipt](dia-neural-precision-controls-2026-10-13.json).
+[completed precision-control receipt](dia-neural-precision-hosted-2026-10-13.json).
+
+Two supplementary archives at public revision
+`68873c45c08a36372667fa6b62e746072b9bf1f5`, folder `dia-20261013-neural`,
+preserve the 41-file neural precision artifact plus its complete hosted log
+and all four original tiny-cache probe files. Full anonymous size/SHA checks
+pass for both ZIPs (245,203,012 bytes combined). The
+[supplementary public receipt](dia-neural-public-proof-2026-10-13.json) provides
+pinned download URLs and complete per-file manifests. The neural archive
+retains both 40/40 stage passes and all four rejected free-speech results; the
+tiny probe establishes cache-rounding effects only.

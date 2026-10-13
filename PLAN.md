@@ -6090,3 +6090,23 @@ the existing public regression dataset. Verify all source sizes/hashes, scan
 text for credentials/account names, record per-file ZIP manifests, and require
 full anonymous remote size/SHA verification. Preserve old source paths and
 negative acceptance scopes. No fresh local real-model work or model publication.
+
+### 2026-10-13 durable neural proof published; user docs reconciled
+
+Main claim `67b505c27` precedes publication. Complete neural artifact (41 files
+plus full hosted log) and tiny original probe (four files) are public in the
+existing regression dataset at revision `68873c45c08a36372667fa6b62e746072b9bf1f5`.
+All 46 source files/278,408,243 bytes match per-file hashes; ZIP CRC/payload
+checks pass and both full ZIPs/245,203,012 bytes are anonymously re-read with
+exact size/SHA. Old source paths and all failures are preserved. Receipt:
+`docs/dia-neural-public-proof-2026-10-13.json`. The standalone helper's original
+four archive aliases remain at their original immutable revision.
+
+`docs/tts.md` now links the actual rejected short-prompt result and pending
+cache control. `docs/architecture.md` corrects the old-checkpoint CFG equation
+to actual original/native `cond + scale*(cond-uncond)`. Inspection of retained
+PCM confirms the canonical recognized prompt is quiet in complete seconds
+0–11 and speaks near its end; the 865-step shared history is mostly quiet
+leading frames, not an accepted native speech prefix. No audio/reference/gate
+change. Cache control 38357576078 remains pending; later ordered phases await
+its actual result. No runtime merge, version bump or release tag.

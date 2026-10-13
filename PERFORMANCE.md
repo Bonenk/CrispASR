@@ -13,7 +13,9 @@ exports pass 40/40 canonical replay stages but fail free CLI/C-ABI ASR with
 empty transcripts/WER 1. Full F32 reaches 865 exact shared-input steps before
 branching, versus 77 for heads-only F32. Aligned full-F32 logit minimum cosine
 is 0.9999999992869937 and maximum relative norm error 2.40027e-5; this does not
-establish recognizable output. These sizes are diagnostic exports, not new
+establish recognizable output. The canonical prompt has quiet leading complete
+seconds 0–11, so a long matched input prefix alone is not speech acceptance.
+These sizes are diagnostic exports, not new
 recommended downloads; no speedup or production model-pin change is claimed.
 [Complete original coefficients, stage/norm rows and speech receipts](docs/dia-neural-precision-hosted-2026-10-13.json).
 

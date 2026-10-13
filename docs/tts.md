@@ -140,7 +140,12 @@ All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/banan
 Dia's explicit [DAC companion conversion](dia-dac-conversion.md) preserves
 critical original F32 output weights with a 1,312-byte size increase. Its
 numerical reference checks pass; native short-speech and Q4 acceptance remain
-failed, so the published companion remains the registry default.
+failed, so the published companion remains the registry default. The
+[completed heads-only/full-F32 controls](dia-neural-precision-hosted-2026-10-13.json)
+pass 40/40 replay stages but produce empty CLI/C-ABI ASR transcripts for
+`[S1] We are committed to making it secure.` (seed 42, temperature 1.2).
+The [cache precision control](dia-cross-cache-controls-2026-10-13.json) remains
+an unmerged experiment; changing model precision alone did not repair this case.
 
 ## dots.tts — voice cloning and performance
 
