@@ -24104,3 +24104,16 @@ Repair 36c4bbdff provides explicit integer dimensions/atomic receipts; eleven
 input tests pass. Complete 261-payload proof is public and anonymously verified.
 No redundant hardware rerun, native speech/Q4 acceptance or release change.
 See `docs/dia-attention-cuda-postmortem-2026-10-13.md` and `.json`.
+
+## 2026-10-13 — Owned-input block-zero cross-K/V replay completed
+
+Actual original DenseGeneral/RotaryEmbedding/KVCache/cross-cache producer now
+runs on retained CPU/T4 encoder inputs. Both original weight ranges match
+physical F32 export hashes; sources match immutable original Git objects.
+Sixteen metric rows, exact repeats and eight scale/head-order negatives are
+retained. Same-input maximum relative L2 is 3.392e-7 CPU K, 2.754e-7 CPU V,
+7.201e-7 actual T4 K and 5.554e-7 actual T4 V. Original-vs-native encoder input
+drift contributes to the observed caches; no large cache projection/layout
+defect is demonstrated here. Reference operators run CPU, observed T4 outputs
+are actual GPU. No new hardware run or math/default change. Evidence:
+`docs/dia-cross-cache-input-replay-2026-10-13.md` and `.json`.

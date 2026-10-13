@@ -3392,3 +3392,12 @@ gives minimum row cosine 0.9999999999974468, maximum row norm error
 Serialization is repaired; original terminal ERROR is preserved. These are
 correctness/allocation witnesses, not performance or native speech acceptance.
 Public complete proof: `docs/dia-attention-cuda-postmortem-2026-10-13.md`.
+
+### Dia owned-input cross-cache exclusion, 2026-10-13
+
+Block-zero cross-K/V on matching inputs differs from the actual original CPU
+producer by maximum relative L2 3.392e-7 on CPU and 7.201e-7 on actual T4.
+All repeats and eight scale/head-order negatives verify. Upstream encoder
+input drift also contributes to recorded cache differences. No timing, full
+cross-attention, free-speech or Q4 acceptance follows. See
+`docs/dia-cross-cache-input-replay-2026-10-13.md`.

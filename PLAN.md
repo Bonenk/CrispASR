@@ -6985,3 +6985,22 @@ actual original DenseGeneral/RotaryEmbedding on each owned encoder input; report
 cosine and magnitudes separately for original input drift and native output.
 No new full-model/GPU run, threshold changes or speech acceptance. Then choose
 self-output/cross-attention/MLP boundary hooks from the measured evidence.
+
+## UPDATE 2026-10-13 — Owned-input block-zero cross-K/V replay completed
+
+Actual original DenseGeneral/RotaryEmbedding/KVCache/cross-cache producer now
+runs on retained CPU/T4 encoder inputs. Both original weight ranges match
+physical F32 export hashes; sources match immutable original Git objects.
+Sixteen metric rows, exact repeats and eight scale/head-order negatives are
+retained. Same-input maximum relative L2 is 3.392e-7 CPU K, 2.754e-7 CPU V,
+7.201e-7 actual T4 K and 5.554e-7 actual T4 V. Original-vs-native encoder input
+drift contributes to the observed caches; no large cache projection/layout
+defect is demonstrated here. Reference operators run CPU, observed T4 outputs
+are actual GPU. No new hardware run or math/default change. Evidence:
+`docs/dia-cross-cache-input-replay-2026-10-13.md` and `.json`.
+
+Next add transparent late decoder boundary captures for self-output/residual,
+pre-cross norm/Q, cross-attention/output, pre-MLP and fused gate/up/SiLU/down.
+Use actual fused original operator and audited native split layouts. Verify
+full OFF/ON/OFF trajectories before interpreting snapshots; heavy runs go to
+GH CI/Kaggle per protocol. Native speech/Q4 and release remain unaccepted.

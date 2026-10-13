@@ -399,37 +399,19 @@ is now running. Both hosted results and actual GPU/model acceptance remain
 pending; production main receives tracking only.
 [CUDA package protocol](docs/dia-attention-cuda-package-2026-10-13.md).
 
-### Pending Dia CUDA attention observation
+### Dia diagnostics: retained CPU/T4 evidence and receipt repair
 
-Prepared a pinned delivered-runtime/original-reference GPU observation worker
-with 16 input/source guards and unchanged native runtime bytes. CPU capture
-completed; independent artifact audit and actual CUDA execution remain pending.
-This establishes no native free-speech, Q4 or performance acceptance.
+Preserved and independently verified completed GPU work after a diagnostic
+receipt serialization failure: 120 stage comparisons, 72 late self-attention
+snapshots, complete OFF/ON/OFF capture transparency and original-audio GPU
+ASR WER 0. Fixed integer shape serialization and atomic checkpoint writes;
+eleven diagnostic worker guards pass. Complete evidence is public.
 
-### Dia diagnostic evidence and pending hardware follow-up
-
-Independent late-history CPU capture and same-input replay now exclude a large
-cache-layout/GQA/attention defect at the observed step across all 18 layers.
-Complete source/trajectory/package audits pass; pinned actual GPU version 4 is
-submitted using anonymously verified public inputs. Native free speech remains
-rejected. These diagnostics change no production default or model and establish
-no Q4/performance acceptance; GPU results and release gates remain pending.
-
-### Pending Dia delivered-runtime hardware validation
-
-Corrected the diagnostic worker to preserve NVIDIA driver search paths and
-fail early on unavailable drivers/plugins. A real ELF loader regression
-reproduces the prior failure and passes the repair. Actual GPU version 5 is
-submitted with unchanged runtime/model/reference bytes. Hardware capture and
-native speech acceptance remain pending; no production default changes.
-
-### Dia capture receipt repair and independently verified T4 diagnostics
-
-Fixed NumPy GGUF dimension serialization and made diagnostic receipts atomic,
-with eleven input guards including scale and failure-preservation controls.
-The completed actual T4 computations were recovered from a failed worker:
-120 stage comparisons, 72 snapshots, complete capture transparency and an
-original-audio GPU ASR positive all verify independently. Same-input attention
-now agrees with the actual original operator within relative L2 4.82e-7 on
-CPU/T4. Complete proof is publicly retrievable. Native free-running speech/Q4
-remain unaccepted; no default/model/release promotion follows from diagnostics.
+Same-input actual-original attention and block-zero cross-K/V replays now
+show relative L2 differences below 7.21e-7 on retained CPU/T4 outputs;
+scale and layout negatives remain effective. The original GPU job remains
+ERROR, and the original reference operators in these bounded replays run CPU.
+Native free-running speech and Q4 remain unaccepted. No production default,
+model or release promotion follows. Decoder residual/cross-Q/MLP boundaries
+are the next correctness investigation; see
+`docs/dia-cross-cache-input-replay-2026-10-13.md`.
