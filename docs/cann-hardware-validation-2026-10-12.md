@@ -14,7 +14,8 @@ binary exits zero for all three, while the wrapper rejects each. See
 
 For the contributor hardware experiment, use a CANN-enabled `test-backend-ops`
 binary built against this repository's ggml revision
-`c36dab89b662838f0f5d4826c399198c0b90bbfc`. The wrapper requires only Python's
+`21acf3162beeb4e51260f0f86deda80995423712`. This is the physically validated
+310P BF16 repair. The wrapper requires only Python's
 standard library. Start with the same bounded case exercised on CPU:
 
 ```bash
@@ -36,7 +37,8 @@ Return the complete output directories, device/chip model, SDK version and
 whether ACL graphs were enabled in the binary. Operation failures/timeouts
 retain logs and receipts and produce a failing process exit. The command
 interface and empty-test guards are verified on CPU; the contributor returned physical Ascend 310P3 execution on 2026-10-13.
-The broad suite fails; see the verified results below. Passing operator tests alone
+The original broad suite failed; the exact repair rerun passes all 924 executed
+cases. Both original failures and the passing rerun are retained below. Passing operator tests alone
 cannot establish full-model inference, quantized-model speech quality or speed.
 
 
@@ -89,7 +91,8 @@ Thirteen isolated routing cases pass under each chip configuration; the old
 passes ARM64/310P (ACL graphs off) and x86_64/910B (ACL graphs on), including
 CLI, shared ABI, diff, quantizer and `test-backend-ops`. See
 [the complete compile receipt](cann-310p-bf16-compile-2026-10-13.json).
-The physical candidate rerun remains pending.
+The physical candidate rerun now passes 924/924 executed cases; source and
+compiler evidence are verified below. The exact repair is integrated.
 See [the candidate receipt](cann-310p-bf16-candidate-2026-10-13.json).
 
 Use a fresh directory and the same activated CANN SDK 9.1.0 environment as the
@@ -131,5 +134,6 @@ all member/log hashes, source revisions, actual compiler flags and unsupported
 cases. All five broad operators finish: ADD 103/103, RMS_NORM 51/51,
 SOFT_MAX 107/107, ROPE 109/109, MUL_MAT 554/554. Thus 924 executed cases pass;
 2,241 unsupported cases remain visible. Both prior BF16 aborts are resolved.
-Full composed CI and integration are next; full-model inference, quantized
-speech and performance still require separate proof.
+Both SDK compilation architectures and all 13 composed general CI jobs pass;
+the exact candidate is integrated. [Integration ledger](cann-310p-bf16-integration-2026-10-13.json).
+Full-model inference, quantized speech and performance still require separate proof.

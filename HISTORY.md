@@ -23696,3 +23696,61 @@ out-of-history rejection controls. All 170 files and full log are verified.
 The earlier logging failure stays retained. The separate original-timescale
 experiment rejects speech and leaves complete generated tokens/PCM unchanged;
 no runtime/model/default promotion follows. [Late capture receipt](docs/dia-late-stage-hosted-2026-10-13.json).
+
+
+## 2026-10-13 — Ascend 310P BF16 capability repair integrated
+
+The exact ggml `21acf3162` repair rejects unsupported BF16 ADD operands/output
+and MUL_MAT activations on 310P, preserving 910B routing. Physical 310P3/SDK9.1
+rerun passes 924/924 executed cases; 2,241 unsupported cases remain explicit.
+Both SDK9.2 compile architectures and all 13 composed general CI jobs pass.
+Chip-specific predicate controls and the real operator binary are included in
+the SDK workflow. Shared fork merge `985ba50d8` preserves contributor history
+with an identical source tree; CrispASR pins the physical candidate itself.
+Original aborts stay retained. This accepts the operator capability repair,
+not full-model/quantized speech or speed. [Integration receipt](docs/cann-310p-bf16-integration-2026-10-13.json).
+
+<details>
+<summary>Completed CANN task claims (historical preimplementation records)</summary>
+
+## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`. Read the complete PR discussion,
+including new contributor comment `6140622935` and its complete attached archive.
+Verify archive/member/log hashes and recompute operator acceptance with the
+unchanged wrapper. Preserve both successful scoped controls and broad-suite
+aborts; inspect pinned ggml source before proposing a repair or bounded device
+follow-up. Update hardware documentation and release notes and answer the PR.
+No full-model, quantization or performance claim follows from operator tests.
+Audit completed: all 17 archived files hashed; all five receipt/log assessments
+match the unchanged wrapper. Restricted float controls and RMS_NORM/SOFT_MAX/
+ROPE pass; broad ADD and MUL_MAT abort. Complete receipt:
+`docs/cann-310p3-hardware-2026-10-13.json`. Candidate isolated routing test
+passes 13 cases under each of 310P/910B; the unchanged 310P predicate fails six
+of the same cases. No device execution follows from that source-only test.
+The attached complete logs identify rejected BF16 inputs: ADD advertises them
+unconditionally, while MUL_MAT guards weights but not the activation input on
+310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
+on the existing two-architecture GH CANN matrix. Keep the production submodule
+pin unchanged until physical rerun and required validation accept the repair.
+Candidate pushed: shared ggml `21acf3162` and CrispASR `bfb4943ac` in
+`/mnt/storage/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
+Two-architecture SDK matrix `38365667723` is submitted, including the real
+`test-backend-ops` target and actual predicate controls. No production pin
+changed. The bounded physical rerun procedure is documented beside the verified
+original receipt. Candidate secret scans pass all four checks without skips.
+
+
+## CLAIMED 2026-10-12 — Review and validate PR #544 CANN selection/build coverage
+
+Whole PR description, comments and three contributor commits read at head
+`b80272710ab378c6fd821c3c7142dceabc65a131`. Use the separate storage worktree
+`/mnt/storage/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
+check requested CANN device selection with production-source controls, and run
+the opt-in x86_64/910B and arm64/310P container compile jobs on GitHub. Preserve
+contributor history; compilation is not Ascend hardware/model acceptance.
+
+
+
+</details>

@@ -105,8 +105,10 @@ full logs, hashes and incremental receipts. [The hosted wrapper receipt](docs/ca
 has returned physical 310P3 results (SDK 9.1.0, ARM64, ACL graphs off).
 RMS_NORM 51/51, SOFT_MAX 107/107 and ROPE 109/109 pass, with unsupported
 cases retained. Restricted F32 ADD and F32/F16-weight matrix controls pass;
-broad ADD/MUL_MAT abort on unsupported BF16 inputs. The capability repair and
-physical rerun remain pending. Full-model speech and speed are unvalidated.
+the original broad ADD/MUL_MAT suites aborted on unsupported BF16 inputs.
+The integrated repair rerun passes all 924 executed cases with unsupported
+cases retained; both SDK architectures and all 13 general CI jobs pass.
+Full-model speech and speed are unvalidated.
 See [the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
 
 ## Dia: reproducible DAC precision conversion
@@ -234,7 +236,7 @@ Those controls are documented in
 [the full-inference receipt](docs/breeze-guided-full-inference-arithmetic-2026-10-12.json)
 and do not replace canonical fixtures or waive the recorded diagnostic.
 
-Dia's unmerged [portable sampler replay](docs/dia-portable-random-hosted-2026-10-13.json) reproduces all 11,034 original draws and 1,210 codec frames with native filtering. In the [real speech control](docs/dia-portable-speech-hosted-2026-10-13.json), the original neural model with this sampler produces byte-identical canonical PCM and WER 0, while native F16 CLI/C-ABI speech still fails with empty transcripts. The first differing draw follows a nucleus-support boundary change despite close logits. [Completed original-head/full-F32 controls](docs/dia-neural-precision-hosted-2026-10-13.json) both pass 40/40 replay stages but reject real CLI/C-ABI speech with empty transcripts and WER 1. Full F32 extends exact shared input history to 865 steps; [Opt-in cross-cache precision control](docs/dia-cross-cache-controls-2026-10-13.json) is queued with fixed F32 weights and same-host OFF/ON/OFF guards. The runtime stays opt-in and unmerged; production defaults/model pins and speech/Q4/GPU gates remain unchanged.
+Dia's unmerged [portable sampler replay](docs/dia-portable-random-hosted-2026-10-13.json) reproduces all 11,034 original draws and 1,210 codec frames with native filtering. In the [real speech control](docs/dia-portable-speech-hosted-2026-10-13.json), the original neural model with this sampler produces byte-identical canonical PCM and WER 0, while native F16 CLI/C-ABI speech still fails with empty transcripts. The first differing draw follows a nucleus-support boundary change despite close logits. [Completed original-head/full-F32 controls](docs/dia-neural-precision-hosted-2026-10-13.json) both pass 40/40 replay stages but reject real CLI/C-ABI speech with empty transcripts and WER 1. Full F32 extends exact shared input history to 865 steps; [Opt-in cross-cache precision control](docs/dia-cross-cache-controls-2026-10-13.json) is complete and rejected, preserving fixed F32 weights and same-host OFF/ON/OFF guards. The runtime stays opt-in and unmerged; production defaults/model pins and speech/Q4/GPU gates remain unchanged.
 
 [Durable Dia proof retrieval](docs/dia-proof-archives.md) preserves all 77 canonical/component/converter/rejected-speech files in immutable public archives. The stdlib helper verifies full archive and payload hashes, rejects invalid extraction and preserves existing paths; eight contracts and real archive retrieval pass. Future validation input transport also passes complete [original/native-filter replay](docs/dia-public-input-replay-2026-10-13.json). These are reproducibility fixes, with native speech still rejected and cache precision under investigation.
 
@@ -254,29 +256,30 @@ Complete [cache controls](docs/dia-cross-cache-hosted-2026-10-13.json) and [firs
 
 
 The scoped 310P BF16 capability candidate also passes both SDK9.2 compile
-architectures, including the upstream operator binary; its physical rerun is
-still pending and the production ggml pin remains unchanged. The first Dia T4
-attempt is retained as a rejected validation path (CPU diff, zero observed GPU
-allocation/splits); a device-request repair is being validated. Neither result
+architectures, including the upstream operator binary. Its physical rerun
+passes 924 cases and the production pin uses the exact validated repair after
+all 13 composed CI jobs passed. The first Dia T4 attempt remains retained as a
+CPU-routing rejection; the device-request repair is proven by actual version-2
+CUDA allocation/splits and all three completed cache controls. Neither result
 establishes full-model NPU/CUDA speech or speed acceptance.
 
 
-A source-faithful rotary-timescale candidate is now under fixed OFF/ON/OFF
-validation. Actual-source tiny coefficients at the remaining late boundary
+The source-faithful rotary-timescale CPU OFF/ON/OFF control is complete and
+rejects native speech; the separate actual-GPU control is running. Actual-source tiny coefficients at the remaining late boundary
 improve from maximum error 1.20e-4 to 5.96e-8 through existing ggml frequency
-factors; neural and speech acceptance remain pending. The auxiliary table is
+factors; native speech remains rejected on CPU, with actual-GPU results pending. The auxiliary table is
 physically audited and existing coefficient bytes are preserved. Original and
 native late-step capture is tested for transparency; the first hosted attempt
 is retained as a logging/count rejection, with complete failed evidence and a
-corrected retry. These experiments remain unmerged and do not change release
+corrected retry now passes all repeat/negative diagnostic controls.
+The runtime experiments remain unmerged and do not change release
 model pins, native quality gates or GPU defaults.
 
 
 The subsequent physical Ascend310P3/SDK9.1 candidate rerun is verified: all
 five broad operator suites complete with 924/924 executed cases passing,
 unsupported cases retained, and both previous BF16 aborts resolved. Exact
-source/compiler/archive/log provenance is recorded; full composed CI precedes
-integration. Operator correctness does not establish model-quality or speed.
+source/compiler/archive/log provenance is recorded; all 13 composed CI jobs pass and the exact repair is integrated. Operator correctness does not establish model-quality or speed.
 
 
 Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
@@ -301,3 +304,11 @@ late-capture experiment independently passes default/978/default complete-array
 identity and all three rejection controls. These establish diagnostic fidelity,
 not accepted native speech or speed.
 [Rotary control](docs/dia-original-rope-hosted-2026-10-13.json), [complete late capture](docs/dia-late-stage-hosted-2026-10-13.json).
+
+
+The scoped Ascend310P BF16 capability repair is integrated at the exact
+physically tested ggml revision. It resolves both broad ADD/MUL_MAT aborts;
+924/924 executed physical operator cases pass, with unsupported cases retained.
+Both SDK compile architectures and all 13 composed general CI jobs pass.
+The shared fork retains contributor history. Full NPU model quality and speed
+remain separate validation. [Integration receipt](docs/cann-310p-bf16-integration-2026-10-13.json).

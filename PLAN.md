@@ -99,34 +99,6 @@ original inputs/logits/PCM and mark teacher replay as diagnostic only. Do not
 alter neural math, sampler, source/model/seed/filter/quality gates or claim
 free-speech acceptance. Actual T4 model controls continue unchanged.
 
-## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
-
-Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`. Read the complete PR discussion,
-including new contributor comment `6140622935` and its complete attached archive.
-Verify archive/member/log hashes and recompute operator acceptance with the
-unchanged wrapper. Preserve both successful scoped controls and broad-suite
-aborts; inspect pinned ggml source before proposing a repair or bounded device
-follow-up. Update hardware documentation and release notes and answer the PR.
-No full-model, quantization or performance claim follows from operator tests.
-Audit completed: all 17 archived files hashed; all five receipt/log assessments
-match the unchanged wrapper. Restricted float controls and RMS_NORM/SOFT_MAX/
-ROPE pass; broad ADD and MUL_MAT abort. Complete receipt:
-`docs/cann-310p3-hardware-2026-10-13.json`. Candidate isolated routing test
-passes 13 cases under each of 310P/910B; the unchanged 310P predicate fails six
-of the same cases. No device execution follows from that source-only test.
-The attached complete logs identify rejected BF16 inputs: ADD advertises them
-unconditionally, while MUL_MAT guards weights but not the activation input on
-310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
-on the existing two-architecture GH CANN matrix. Keep the production submodule
-pin unchanged until physical rerun and required validation accept the repair.
-Candidate pushed: shared ggml `21acf3162` and CrispASR `bfb4943ac` in
-`/mnt/storage/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
-Two-architecture SDK matrix `38365667723` is submitted, including the real
-`test-backend-ops` target and actual predicate controls. No production pin
-changed. The bounded physical rerun procedure is documented beside the verified
-original receipt. Candidate secret scans pass all four checks without skips.
-
 ## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
 Owner: this maintainer session. Controller worktree
@@ -5333,16 +5305,6 @@ No arithmetic, quantization, recipe or default change to force exact AR codes.
 Keep unrelated model quality reports separately pending.
 
 
-## CLAIMED 2026-10-12 — Review and validate PR #544 CANN selection/build coverage
-
-Whole PR description, comments and three contributor commits read at head
-`b80272710ab378c6fd821c3c7142dceabc65a131`. Use the separate storage worktree
-`/mnt/storage/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
-check requested CANN device selection with production-source controls, and run
-the opt-in x86_64/910B and arm64/310P container compile jobs on GitHub. Preserve
-contributor history; compilation is not Ascend hardware/model acceptance.
-
-
 ## UPDATE 2026-10-12 — Refreshed integration proof and CANN review
 
 PR #531 head `d9fa1574e` corrects the unit job's native-only roster mismatch by
@@ -6486,3 +6448,25 @@ reject. Original free generation still matches canonical codes/inputs and
 passes actual ASR. All 170 files and the complete hosted log are hashed in
 `docs/dia-late-stage-hosted-2026-10-13.json`. This accepts bounded capture and
 teacher-replay transparency, not native free speech, GPU or Q4 quality.
+
+## UPDATE 2026-10-13 — Validated Ascend BF16 repair integrated
+
+All 13 general CI jobs at `ba9f801f8` pass, in addition to both SDK9.2 builds
+and the physical 310P3/SDK9.1 924/924 operator rerun. The production ggml pin
+advances to the exact physically tested `21acf3162`; chip-specific routing
+controls and the upstream operator target are wired into the SDK workflow.
+The shared fork preserves its newer merge history through `985ba50d8`, whose
+source tree is exactly the tested candidate. Main composition adds only
+subsequent documentation; code outside docs matches the green CI source.
+Original failed BF16 controls and unsupported cases remain retained. Complete
+integration ledger: `docs/cann-310p-bf16-integration-2026-10-13.json`.
+Full NPU model inference, quantized speech and speed still need physical proof;
+no such claim or new release tag follows from operator acceptance.
+
+Parallel actual-GPU original-timescale source `2954c5a7c` is submitted as
+Kaggle version 3. Pulled deployed code matches the immutable source; its
+kernel/source receipt is `docs/dia-original-rope-cuda-submission-2026-10-13.json`.
+Its full model must equal the CPU auxiliary model SHA, and canonical original
+CUDA ASR must pass before judging native speech. No Torch reinstall, fresh
+private model repo, seed/filter change or quality waiver. Actual execution and
+quality gates remain pending; the completed CPU rejection is preserved.

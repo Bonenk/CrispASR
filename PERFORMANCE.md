@@ -3251,3 +3251,11 @@ late-capture experiment independently passes default/978/default complete-array
 identity and all three rejection controls. These establish diagnostic fidelity,
 not accepted native speech or speed.
 [Rotary control](docs/dia-original-rope-hosted-2026-10-13.json), [complete late capture](docs/dia-late-stage-hosted-2026-10-13.json).
+
+
+The scoped Ascend310P BF16 capability repair is integrated at the exact
+physically tested ggml revision. It resolves both broad ADD/MUL_MAT aborts;
+924/924 executed physical operator cases pass, with unsupported cases retained.
+Both SDK compile architectures and all 13 composed general CI jobs pass.
+The shared fork retains contributor history. Full NPU model quality and speed
+remain separate validation. [Integration receipt](docs/cann-310p-bf16-integration-2026-10-13.json).

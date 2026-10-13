@@ -1,0 +1,7 @@
+{
+  "source": "2954c5a7c0b120d7aec8ae3d76b3ca283c0ba4f8",
+  "version": 3,
+  "kernel_sha256": "79af89db6843a6bd65b1a95f7be64f1c52b7eaa1cc21bf48730b0dcecf76a4c2",
+  "status_at_verification": "RUNNING",
+  "scope": "Submitted and pulled code exact; actual GPU allocation/splits, original-ASR positive and model-stage/speech gates remain pending"
+}
