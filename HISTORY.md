@@ -23994,3 +23994,15 @@ checks queue; Ruby/pages are running. No runtime/default/quality gate changes.
 The pinned-config 3072-slot original cache also reproduces all short-prefix
 Q/K/V/attention outputs and cache history bytes exactly, with exact repeats.
 This checks production cache stride, without claiming late-history acceptance.
+
+
+## 2026-10-13 — Late-history Dia capture tooling and submission checkpoint
+
+Diagnostic source 42b111c5e adds opt-in original/native self-attention snapshots.
+Thirteen actual-original tiny tests with two decoder layers, three compiled
+replay/environment contracts and both runtime/header syntax checks pass. The
+main checkpoint records the protocol and source; runtime changes are not merged.
+[Heavy CPU run 38438623888](https://github.com/CrispStrobe/CrispASR/actions/runs/38438623888)
+queues full original/native OFF/ON/OFF and 72 layer/history snapshots at step 978.
+Full-model, GPU and speech acceptance are pending; rejected controls remain binding.
+[Submission ledger](docs/dia-attention-history-submission-2026-10-13.json).

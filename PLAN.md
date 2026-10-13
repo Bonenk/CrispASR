@@ -6667,6 +6667,33 @@ No speculative reorder/GQA/scaling repair, runtime/default/model promotion or
 release tag. Latest main CI remains queued; use GH for heavy CPU and Kaggle
 only for actual GPU follow-up per the usage guide.
 
+## UPDATE 2026-10-13 — Late-history attention capture implemented; GH queued
+
+Diagnostic source 42b111c5e on `diag/dia-attention-capture-20261013` adds opt-in
+original/native Q, complete K/V history and pre-output-projection attention
+snapshots. No neural compute math or production default changes. All 13 tiny
+actual-original hook tests pass with TWO decoder layers, including different
+conditional/unconditional second-layer inputs. OFF/ON/OFF complete trajectories,
+independent snapshot equality, owned arrays and inner-failure cleanup pass.
+Three source-compiled device/index/scratch contracts and actual runtime/header
+syntax checks also pass; clang-format 18, Python compile, anchors and all four
+unskipped secret tests pass before the source branch push.
+
+GH heavy-cpu `38438623888` is queued at exact immutable source 42b111c5e. It
+requires full original and native OFF/ON/OFF equality before recording 72
+step-978 snapshots across all 18 layers. Canonical reference input/code grids,
+physical F32 tensor audits, original ASR positive, existing 40/40 stages and
+negative captures stay strict. Preserve complete logs/output and every failed
+control; do not interpret snapshots if observing them changes the trajectory.
+Protocol: `docs/dia-attention-history-capture-2026-10-13.md`; exact source/local
+checks/submission ledger: `docs/dia-attention-history-submission-2026-10-13.json`.
+
+The source changes remain diagnostic until hosted validation; main receives
+tracking/protocol only. Next collect this run and locate the first large
+query/cache/attention difference before proposing a runtime candidate or
+matching CUDA package. Full native speech remains rejected, and latest main
+CI remains queued. No model/default promotion or release tag.
+
 ## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 
 User requested a concrete task for an independently trained reader, word bank

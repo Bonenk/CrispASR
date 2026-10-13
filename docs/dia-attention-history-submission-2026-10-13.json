@@ -1,0 +1,113 @@
+{
+  "scope": "Submission/local observability controls only. Full-model hosted evidence is pending; no native speech, GPU, Q4, runtime default or release acceptance.",
+  "source": "42b111c5e6006e7dcc82afff2b1b43da7c15861c",
+  "parent": "2954c5a7c0b120d7aec8ae3d76b3ca283c0ba4f8",
+  "branch": "diag/dia-attention-capture-20261013",
+  "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "job": {
+    "id": "38438623888",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38438623888",
+    "observed_status": "queued"
+  },
+  "step": 978,
+  "layers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17
+  ],
+  "parts": [
+    "q",
+    "k",
+    "v",
+    "attention"
+  ],
+  "local_checks": {
+    "actual_original_hook_tests": 13,
+    "tiny_decoder_layers": 2,
+    "conditional_branches_differ_in_second_layer": true,
+    "actual_environment_parser_and_owned_scratch_tests": 3,
+    "native_runtime_and_diff_header_syntax_checks": 2,
+    "python_compile_checks": true,
+    "clang_format_version": "18.1.3",
+    "documentation_anchors_pass": true,
+    "secret_tests": 4,
+    "secret_tests_skipped": 0
+  },
+  "original": {
+    "source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "model": "257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd",
+    "torch": "2.6.0+cpu",
+    "seed": 42,
+    "capacity": 3072,
+    "temperature": 1.2,
+    "top_p": 0.95,
+    "top_k": 45,
+    "cfg_scale": 3.0
+  },
+  "required_hosted_controls": [
+    "Original canonical input/code grids unchanged",
+    "Original capture OFF/ON/OFF all common arrays byte-identical",
+    "Original ASR positive",
+    "Native 40/40 existing stages in all arms",
+    "Exactly 72 added snapshots only in native ON arm",
+    "Native complete feedback/logits/PCM OFF/ON/OFF byte-identical",
+    "Scaled-hidden and malformed/out-of-history indices reject",
+    "Record all actual snapshot shapes, cosine and magnitudes with payload hashes"
+  ],
+  "files": [
+    {
+      "path": "src/dia_tts.cpp",
+      "bytes": 111490,
+      "sha256": "9c7b837e1e08a22eb08d8ebecb5eb03a9dac3ec9dfd86944c1ba58ca5f4781f3"
+    },
+    {
+      "path": "examples/cli/crispasr_dia_diff.h",
+      "bytes": 13685,
+      "sha256": "08f7d4e54569b15b90f1465d275e80ec1f3bade259aa30b7d757a3a839607b44"
+    },
+    {
+      "path": "tools/dia_attention_capture.py",
+      "bytes": 4286,
+      "sha256": "fe7fbc125ec7f980d4a5a892c1636fc05c234ac1b182f40b5a20a16fb18207ff"
+    },
+    {
+      "path": "tools/reference_backends/dia_tts_reference.py",
+      "bytes": 16153,
+      "sha256": "1226ea7d2d2a59a31f75b974e12eba2866ed926849e76203ee2b785a70afc696"
+    },
+    {
+      "path": "tools/ci-heavy/dia_attention_history_control.py",
+      "bytes": 13187,
+      "sha256": "34ec615507595a3606b65d5aa7843cca7a7150ea7a75bc5b297fe717db0c7194"
+    },
+    {
+      "path": "tests/test_dia_reference_capture.py",
+      "bytes": 15953,
+      "sha256": "c39c378fc8aad4b6959b5d91d22eb3774cabb64cf664d0655ea3dcb67ab47cbf"
+    },
+    {
+      "path": "tests/test_dia_diff_device.py",
+      "bytes": 3008,
+      "sha256": "aec5cce06da03cf355a7f2d8f4041a0af5b118c468ee23ac7fecd2c77e4cab1f"
+    }
+  ],
+  "local_original_test_log": {
+    "bytes": 2046,
+    "sha256": "bb98182bf0ec46572e1728c082bf1171b067470ce86bdeff0556d09288c751cd"
+  }
+}

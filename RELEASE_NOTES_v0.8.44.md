@@ -377,3 +377,10 @@ GPU or full speech acceptance; production defaults remain unchanged.
 The pinned-config 3072-slot original cache also reproduces all short-prefix
 Q/K/V/attention outputs and cache history bytes exactly, with exact repeats.
 This checks production cache stride, without claiming late-history acceptance.
+
+Late-history self-attention capture tooling is implemented on diagnostic source
+42b111c5e. Tiny actual-original two-layer and compiled replay guards pass; GH
+38438623888 queues full-model capture-transparency controls and step-978 snapshots
+for all 18 layers. Production main receives tracking only. This is pending
+numerical evidence, not a runtime fix, speech acceptance or performance result.
+[Capture protocol](docs/dia-attention-history-capture-2026-10-13.md).
