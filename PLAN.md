@@ -6892,3 +6892,14 @@ source/delivery halves and actual allocation/scheduler work, then interpret
 OFF/ON/OFF and same-input GPU attention. Only after that choose remaining
 decoder boundaries/candidates. No native speech, Q4, performance, model/default
 or release promotion. Main production code remains unchanged.
+
+## CLAIMED 2026-10-13 — Repair delivered-runtime CUDA driver lookup
+
+Kaggle attention version 4 failed before Dia replay: replacing inherited
+LD_LIBRARY_PATH with the bundle directory hid libcuda.so.1. Original audio
+ASR stayed WER 0 but ran only CPU; the strict CUDA guard correctly failed.
+All 18 outputs and complete raw/decoded terminal logs are preserved in storage.
+Preserve inherited driver paths, add a real ELF dependency regression and
+fail-fast actual driver/plugin preflight before model downloads. Runtime/model/
+reference bytes and existing quality/device gates remain unchanged. Repush only
+after complete preservation, source checks and required secret scans.
