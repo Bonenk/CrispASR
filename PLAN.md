@@ -6,7 +6,22 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Dia output projection isolation on identical hidden states
+
+Owner: this maintainer session, controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
+`/mnt/storage/crispasr/dia-head-probe-20261013`. Fetch only the pinned original
+output-head tensor by validated HTTP ranges, requiring every mapped F32 head
+hash to match the existing full physical export audit. Compare the actual
+original Torch2.6 DenseGeneral and actual packaged ggml CPU projections on
+verified retained original/native step-978 hidden states, holding weights,
+inputs and output layout fixed. Test split versus combined projection, repeats
+and a deliberately incorrect layout/scale. No full checkpoint or large model
+runs locally; heavy full-model/GPU follow-ups remain hosted. Preserve all
+results before considering a gated runtime candidate. No seed/filter/quality
+change or speech/speed acceptance follows from an isolated projection.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
