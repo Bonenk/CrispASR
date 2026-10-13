@@ -11,6 +11,17 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`. Read the complete PR discussion,
+including new contributor comment `6140622935` and its complete attached archive.
+Verify archive/member/log hashes and recompute operator acceptance with the
+unchanged wrapper. Preserve both successful scoped controls and broad-suite
+aborts; inspect pinned ggml source before proposing a repair or bounded device
+follow-up. Update hardware documentation and release notes and answer the PR.
+No full-model, quantization or performance claim follows from operator tests.
+
 ## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
 Owner: this maintainer session. Controller worktree
@@ -64,7 +75,9 @@ using the existing validated Breeze bundle/closure pattern, including CLI,
 shared C ABI, diff, quantizer and same-source Python bindings. Record exact
 runtime/source/submodule/ELF hashes and keep the driver outside the package.
 This prepares the next ordered hardware step and does not accept model speech.
-No Kaggle model test or profiling starts until the CPU speech gate passes.
+The user subsequently requested Kaggle in parallel: fixed CUDA cache diagnostics
+may run alongside the CPU control; broad acceptance and profiling remain gated
+on correctness. See the later parallel CUDA claim.
 Keep all large artifacts under storage; no local CUDA/heavy model build.
 
 ## Release preparation checkpoint 2026-10-09
