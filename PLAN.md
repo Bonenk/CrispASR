@@ -6,7 +6,24 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia late-history self-attention capture on GH
+`## CLAIMED 2026-10-13 — Prepare same-input Dia attention history replay
+
+Owner: this maintainer session. Storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded replay probe directory
+`/mnt/storage/crispasr/dia-attention-input-replay-20261013`. GH late-history
+capture 38438623888 remains queued at frozen source 42b111c5e; leave its source
+and reference unchanged. Prepare a weight-free consumer of post-rotation Q and
+complete K/V history: execute the actual original attention call extracted from
+the pinned blueprint and literal native GQA/attention code. Bind source/library
+hashes, true batch/head/time layout and production-cache stride. Validate the
+consumer on the already audited contiguous 0–3 original captures, with repeats
+and scale/GQA negatives, before trusting any future step-978 input decomposition.
+This is tiny isolated CPU evidence, not a full model/heavy build or speech/GPU
+acceptance. Do not attribute input drift to attention math without same-input
+controls; report cross-host/library limitations explicitly. All artifacts stay
+under storage. No model/default/reference/quality-gate changes or release tag.
+
+## CLAIMED 2026-10-13 — Dia late-history self-attention capture on GH
 
 Owner: this maintainer session. Controller worktree
 `/mnt/storage/crispasr/triage-20261007/worktree`; new diagnostic worktree
