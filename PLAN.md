@@ -6735,6 +6735,30 @@ compile package independently, so actual Kaggle GPU validation can proceed once
 capture and package artifacts are available. Do not repush any Kaggle kernel
 before preserving its prior terminal logs/outputs; no CPU inference on Kaggle.
 
+## UPDATE 2026-10-13 — CPU capture running; matching CUDA package queued
+
+GH CPU capture 38438623888 has started its heavy worker after successful
+checkout, scratch setup, Python setup and dependency installation. Exact capture
+source remains 42b111c5e; no results or transparency/speech acceptance yet.
+
+Matching CUDA compile package source 2328f15ce on
+`prepare/dia-attention-cuda-20261013` changes only builder guards/provenance,
+guard tests and package procedure. All six native runtime/dispatcher/sampler/
+RNG/C ABI/binding files are byte-identical to frozen CPU capture source 42b111c5e.
+Eight actual-source guard tests pass, including new unconditional-capture
+mutation rejection; all four unskipped secret tests pass before pushing.
+CUDA 12.4 SM60/75 build 38446095504 is queued. Protocol:
+`docs/dia-attention-cuda-package-2026-10-13.md`; exact source/runtime/submission
+ledger: `docs/dia-attention-cuda-submission-2026-10-13.json`.
+
+Next collect the CPU capture and delivered CUDA bundle, verify complete
+artifacts/source/member/closure hashes, run the prepared same-input attention
+consumer on actual late snapshots, then perform actual GPU capture controls
+with preserved prior Kaggle terminal receipts. A package build accepts neither
+CUDA execution nor model speech/Q4/performance. Keep the original positive and
+all existing negative/trajectory/quality gates; no runtime/default/model or
+release promotion. Main receives documentation only while diagnostics run.
+
 ## Pending — Train our own EmbeddingGemma 2 speech reader (2026-10-13)
 
 User requested a concrete task for an independently trained reader, word bank

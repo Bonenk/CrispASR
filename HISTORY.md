@@ -24040,3 +24040,13 @@ controls; report cross-host/library limitations explicitly. All artifacts stay
 under storage. No model/default/reference/quality-gate changes or release tag.
 
 </details>
+
+
+## 2026-10-13 — Matching late-attention CUDA bundle submission
+
+Package source 2328f15ce preserves all six native runtime/ABI/binding bytes
+from CPU capture source 42b111c5e. Eight source guards and all four unskipped
+secret tests pass. [CUDA build 38446095504](https://github.com/CrispStrobe/CrispASR/actions/runs/38446095504)
+is queued; CPU capture 38438623888 is running. Runtime changes remain on the
+diagnostic branches, with no speech, GPU, Q4 or release acceptance.
+[Submission ledger](docs/dia-attention-cuda-submission-2026-10-13.json).

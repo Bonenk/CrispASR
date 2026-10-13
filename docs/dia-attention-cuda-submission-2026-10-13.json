@@ -1,0 +1,71 @@
+{
+  "scope": "Compile-only CUDA package submission. No GPU execution, model/speech/Q4/performance/default acceptance.",
+  "source": "2328f15ce6f73c05c8aab44fa629a49e2d42c44d",
+  "runtime_bytes_source": "42b111c5e6006e7dcc82afff2b1b43da7c15861c",
+  "runtime_bytes_equal_to_cpu_capture": true,
+  "branch": "prepare/dia-attention-cuda-20261013",
+  "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "cuda": "12.4.1",
+  "architectures": [
+    60,
+    75
+  ],
+  "job": {
+    "id": "38446095504",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38446095504",
+    "observed_status": "queued"
+  },
+  "cpu_capture_job": {
+    "id": "38438623888",
+    "observed_status": "in_progress"
+  },
+  "local_guard_tests": {
+    "runtime_pin": 4,
+    "device_environment": 1,
+    "index_owned_scratch": 2,
+    "rotary_dispatch": 1,
+    "secret_tests": 4,
+    "secret_skips": 0
+  },
+  "runtime_files": [
+    {
+      "path": "src/dia_tts.cpp",
+      "bytes": 111490,
+      "sha256": "9c7b837e1e08a22eb08d8ebecb5eb03a9dac3ec9dfd86944c1ba58ca5f4781f3"
+    },
+    {
+      "path": "src/dia_sampling.h",
+      "bytes": 3542,
+      "sha256": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf"
+    },
+    {
+      "path": "src/dia_exponential_rng.h",
+      "bytes": 1709,
+      "sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e"
+    },
+    {
+      "path": "examples/cli/crispasr_dia_diff.h",
+      "bytes": 13685,
+      "sha256": "08f7d4e54569b15b90f1465d275e80ec1f3bade259aa30b7d757a3a839607b44"
+    },
+    {
+      "path": "src/crispasr_c_api.cpp",
+      "bytes": 585434,
+      "sha256": "632c98246d014548f2c8f5abc75cf084426e3141a0997b5c084cfcaa60b77d95"
+    },
+    {
+      "path": "python/crispasr/_binding.py",
+      "bytes": 231540,
+      "sha256": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade"
+    }
+  ],
+  "builder_sha256": "a8806696c03f24d873f34e3d6abf23cf1eb0ae5418d8df89abf48c888799a8cf",
+  "required_artifact_validation": [
+    "Whole delivered archive hash and member CRCs",
+    "Every contained payload and alias matches builder receipt",
+    "Immutable source files and all six runtime guards match CPU capture source",
+    "ELF dependency closure; external driver excluded",
+    "Original/native capture transparency before interpreting snapshots",
+    "Actual GPU allocation/scheduler and speech gates before hardware/model acceptance"
+  ]
+}

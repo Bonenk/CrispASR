@@ -391,3 +391,10 @@ CPU threads, byte-for-byte. Its 24 comparison rows and 12 strong negatives are
 retained. Hosted snapshots require verified file hashes and capture transparency;
 late-history results, cross-host identity and native speech remain unaccepted.
 [Same-input replay audit](docs/dia-attention-input-replay-2026-10-13.json).
+
+The matching CUDA 12.4 SM60/75 capture package is queued on GH at source
+2328f15ce; all six native runtime/ABI/binding files match CPU capture source
+42b111c5e byte-for-byte. Eight source guard tests pass. The CPU capture worker
+is now running. Both hosted results and actual GPU/model acceptance remain
+pending; production main receives tracking only.
+[CUDA package protocol](docs/dia-attention-cuda-package-2026-10-13.md).
