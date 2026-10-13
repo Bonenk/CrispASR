@@ -33,6 +33,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Check chip-specific float routing
+        run: python3 tests/test_cann_bf16_routing.py -v
+
       - name: Free disk space
         uses: ggml-org/free-disk-space@v1.3.1
         with:
@@ -58,12 +61,13 @@ jobs:
               cmake -S . -B build-cann \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DGGML_CANN=ON \
+                -DGGML_BUILD_TESTS=ON \
                 -DSOC_TYPE="${SOC_TYPE}" \
                 -DUSE_ACL_GRAPH="${USE_ACL_GRAPH}" \
                 -DCRISPASR_BUILD_TESTS=OFF \
                 -DCRISPASR_BUILD_SERVER=OFF
               cmake --build build-cann \
-                --target crispasr-cli crispasr-lib crispasr-diff crispasr-quantize \
+                --target crispasr-cli crispasr-lib crispasr-diff crispasr-quantize test-backend-ops \
                 -j "$(nproc)"
               chown -R '"${HOST_UID}"':'"${HOST_GID}"' /workspace/build-cann
             '
