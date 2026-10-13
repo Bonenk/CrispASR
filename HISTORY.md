@@ -23754,3 +23754,45 @@ contributor history; compilation is not Ascend hardware/model acceptance.
 
 
 </details>
+
+
+## 2026-10-13 — Actual GPU rotary candidate rejected
+
+Actual T4 original-timescale OFF/ON/OFF control (2026-10-13) is complete
+and rejects speech. All 120 stage rows pass and all six CLI/C-ABI speech checks
+remain empty/WER 1. Canonical original audio passes the same GPU ASR at WER 0
+with 25 actual CUDA splits, separating the recognition control from native TTS.
+OFF/repeat full arrays match exactly. ON changes input histories, logits and
+both PCM arrays, but shortens the original shared input prefix from 979 to 865
+steps: first differing draw moves from 978/head 2 to 864/head 6. The model SHA
+matches the CPU auxiliary model; complete physical audits and downloaded source
+files match their immutable controls. Nine TTS executions show actual CUDA
+splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
+candidate; it establishes no native speech, Q4 or speed acceptance.
+[Complete receipt](docs/dia-original-rope-cuda-physical-2026-10-13.json).
+
+<details>
+<summary>Completed GPU rotary preparation claim</summary>
+
+## CLAIMED 2026-10-13 — Actual-GPU original-timescale control preparation
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-rope-cuda-20261013`, branch
+`prepare/dia-rope-cuda-20261013`. The completed actual T4 cache v2 reaches the
+same step-978/head-2 divergence as CPU; its full terminal logs/output are saved
+and durably public before any replacement. Compose the immutable original-RoPE
+CPU source `ead5a5d5d` with validated explicit CUDA request `35945f527` and
+actual GPU orchestration. Verify default math and all six gated rotary sites
+are preserved, and retain source-compiled capture/device/dispatch controls.
+Prepare the same fixed F32/cross-F32 rotary OFF/ON/OFF actual-GPU experiment.
+Reuse the original Torch2.6-generated timescale bytes from the fully verified
+public primitive archive, with source/head/dtype/size/SHA provenance and
+physical auxiliary/original-weight audits; do not regenerate with Kaggle's
+Torch version or reinstall Torch. Use existing private compiler cache only.
+All three arms use one immutable source/model/ref/seed/filter and unchanged
+CLI/C-ABI ASR gates. Actual allocation and scheduler splits are required;
+retain complete arrays, repeats, negatives and all failures. This is parallel
+correctness triage, not broad acceptance, profiling, a model/default promotion
+or a reason to alter the running CPU controls.
+
+</details>

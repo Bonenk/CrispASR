@@ -3221,7 +3221,7 @@ speech control, with no sampling-policy or quality-gate waiver.
 The 114 additional matching input steps are in the canonical original's quiet
 leading region and do not establish an audible matching prefix. No speed gain
 is claimed from this experiment. CUDA compilation/dependency closure passes;
-actual CUDA speech validation remains in flight. See
+actual CUDA cache and rotary speech controls are complete and reject. See
 [the cache receipt](docs/dia-cross-cache-hosted-2026-10-13.json),
 [the exact boundary replay](docs/dia-cross-cache-boundary-2026-10-13.json) and
 [the delivered CUDA package audit](docs/dia-cuda-package-2026-10-13.json).
@@ -3231,7 +3231,7 @@ Rotary precision diagnostic (2026-10-13): actual original Float32 timescales
 with ggml's existing frequency-factor input reduce position-978 coefficient
 maximum error from 1.2040138e-4 to 5.9604645e-8. This is a tiny weight-free
 primitive comparison, not inference speed or model-quality acceptance. The
-full source-timescale OFF/ON/OFF control is queued on GH `38382524080`.
+full source-timescale controls now reject on both hosted CPU and actual T4.
 [Complete coefficient/source/negative receipt](docs/dia-rotary-coefficients-2026-10-13.json).
 
 
@@ -3259,3 +3259,17 @@ physically tested ggml revision. It resolves both broad ADD/MUL_MAT aborts;
 Both SDK compile architectures and all 13 composed general CI jobs pass.
 The shared fork retains contributor history. Full NPU model quality and speed
 remain separate validation. [Integration receipt](docs/cann-310p-bf16-integration-2026-10-13.json).
+
+
+Actual T4 original-timescale OFF/ON/OFF control (2026-10-13) is complete
+and rejects speech. All 120 stage rows pass and all six CLI/C-ABI speech checks
+remain empty/WER 1. Canonical original audio passes the same GPU ASR at WER 0
+with 25 actual CUDA splits, separating the recognition control from native TTS.
+OFF/repeat full arrays match exactly. ON changes input histories, logits and
+both PCM arrays, but shortens the original shared input prefix from 979 to 865
+steps: first differing draw moves from 978/head 2 to 864/head 6. The model SHA
+matches the CPU auxiliary model; complete physical audits and downloaded source
+files match their immutable controls. Nine TTS executions show actual CUDA
+splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
+candidate; it establishes no native speech, Q4 or speed acceptance.
+[Complete physical rotary proof](docs/dia-original-rope-cuda-physical-2026-10-13.json).

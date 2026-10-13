@@ -201,9 +201,9 @@ Neither result establishes full-model NPU/CUDA speech or speed acceptance.
 
 
 The source-faithful rotary-timescale CPU OFF/ON/OFF control is complete and
-rejects native speech; the separate actual-GPU control is running. Actual-source tiny coefficients at the remaining late boundary
+rejects native speech; the separate actual-GPU control also completes and rejects. Actual-source tiny coefficients at the remaining late boundary
 improve from maximum error 1.20e-4 to 5.96e-8 through existing ggml frequency
-factors; native speech remains rejected on CPU, with actual-GPU results pending. The auxiliary table is
+factors; native speech remains rejected on CPU and actual T4. The auxiliary table is
 physically audited and existing coefficient bytes are preserved. Original and
 native late-step capture is tested for transparency; the first hosted attempt
 is retained as a logging/count rejection, with complete failed evidence and a
@@ -248,3 +248,10 @@ physically tested ggml revision. It resolves both broad ADD/MUL_MAT aborts;
 Both SDK compile architectures and all 13 composed general CI jobs pass.
 The shared fork retains contributor history. Full NPU model quality and speed
 remain separate validation. [Integration receipt](cann-310p-bf16-integration-2026-10-13.json).
+
+
+The GPU rotary ON arm shortens matching original input history from 979 to
+865 steps; all six speech checks remain WER 1 despite 120 passing replay rows.
+Canonical original audio passes the same GPU recognizer at WER 0. Complete
+terminal logs and 61 output files are retained and hashed; the experiment stays
+unmerged. [Physical rotary receipt](dia-original-rope-cuda-physical-2026-10-13.json).

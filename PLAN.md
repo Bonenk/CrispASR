@@ -11,27 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-13 — Actual-GPU original-timescale control preparation
-
-Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-rope-cuda-20261013`, branch
-`prepare/dia-rope-cuda-20261013`. The completed actual T4 cache v2 reaches the
-same step-978/head-2 divergence as CPU; its full terminal logs/output are saved
-and durably public before any replacement. Compose the immutable original-RoPE
-CPU source `ead5a5d5d` with validated explicit CUDA request `35945f527` and
-actual GPU orchestration. Verify default math and all six gated rotary sites
-are preserved, and retain source-compiled capture/device/dispatch controls.
-Prepare the same fixed F32/cross-F32 rotary OFF/ON/OFF actual-GPU experiment.
-Reuse the original Torch2.6-generated timescale bytes from the fully verified
-public primitive archive, with source/head/dtype/size/SHA provenance and
-physical auxiliary/original-weight audits; do not regenerate with Kaggle's
-Torch version or reinstall Torch. Use existing private compiler cache only.
-All three arms use one immutable source/model/ref/seed/filter and unchanged
-CLI/C-ABI ASR gates. Actual allocation and scheduler splits are required;
-retain complete arrays, repeats, negatives and all failures. This is parallel
-correctness triage, not broad acceptance, profiling, a model/default promotion
-or a reason to alter the running CPU controls.
-
 ## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
@@ -6469,4 +6448,41 @@ kernel/source receipt is `docs/dia-original-rope-cuda-submission-2026-10-13.json
 Its full model must equal the CPU auxiliary model SHA, and canonical original
 CUDA ASR must pass before judging native speech. No Torch reinstall, fresh
 private model repo, seed/filter change or quality waiver. Actual execution and
-quality gates remain pending; the completed CPU rejection is preserved.
+quality gates are complete and reject; the completed CPU rejection is preserved.
+
+
+## UPDATE 2026-10-13 — Actual GPU rotary rejection verified
+
+Actual T4 original-timescale OFF/ON/OFF control (2026-10-13) is complete
+and rejects speech. All 120 stage rows pass and all six CLI/C-ABI speech checks
+remain empty/WER 1. Canonical original audio passes the same GPU ASR at WER 0
+with 25 actual CUDA splits, separating the recognition control from native TTS.
+OFF/repeat full arrays match exactly. ON changes input histories, logits and
+both PCM arrays, but shortens the original shared input prefix from 979 to 865
+steps: first differing draw moves from 978/head 2 to 864/head 6. The model SHA
+matches the CPU auxiliary model; complete physical audits and downloaded source
+files match their immutable controls. Nine TTS executions show actual CUDA
+splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
+candidate; it establishes no native speech, Q4 or speed acceptance.
+Complete terminal log (4,751 entries), all 61 outputs, source files, every
+worker log SHA, full physical audits, exact OFF/repeat arrays and retained-array
+prefix metrics are verified in `docs/dia-original-rope-cuda-physical-2026-10-13.json`.
+The source-RoPE gate must remain OFF; do not retry this candidate unchanged or
+weaken seed, filter, stage or speech gates. Next correctness work should isolate
+upstream/native numerical operations at the retained first differing boundary
+before preparing another full-model experiment. Broad matrices and profiling
+remain after accepted speech correctness.
+
+Production `cfceeb752` is unchanged. Final-main general CI and lint/secret/Ruby
+checks are queued; Vulkan replay is green. Two-architecture final-main CANN
+compilation is explicitly dispatched as `38401026881`. The separate source
+`2954c5a7c` CUDA package job `38394649538` is still building. No release tag.
+
+Both first-draw boundaries are reproduced with the actual pinned Torch2.6
+original decoder/filter and compiled actual native filter, using the unchanged
+portable batch noise. On identical logits their support sets agree and both
+reproduce the recorded original/native draws. Legacy includes native token 904
+across the nucleus boundary at step 978; source-RoPE excludes original token 55
+at step 864. Each has two neural support differences. This isolates neural
+numerical differences rather than a filter-policy defect; replay/source/file
+hashes are part of the physical rotary receipt. No sampling policy is changed.

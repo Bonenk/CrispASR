@@ -2310,3 +2310,17 @@ transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
 and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
 match exactly. These are correctness diagnostics, not accepted native speech
 or performance measurements. [Complete physical CUDA proof](dia-cuda-cache-physical-2026-10-13.json).
+
+
+Actual T4 original-timescale OFF/ON/OFF control (2026-10-13) is complete
+and rejects speech. All 120 stage rows pass and all six CLI/C-ABI speech checks
+remain empty/WER 1. Canonical original audio passes the same GPU ASR at WER 0
+with 25 actual CUDA splits, separating the recognition control from native TTS.
+OFF/repeat full arrays match exactly. ON changes input histories, logits and
+both PCM arrays, but shortens the original shared input prefix from 979 to 865
+steps: first differing draw moves from 978/head 2 to 864/head 6. The model SHA
+matches the CPU auxiliary model; complete physical audits and downloaded source
+files match their immutable controls. Nine TTS executions show actual CUDA
+splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
+candidate; it establishes no native speech, Q4 or speed acceptance.
+[Complete physical rotary proof](dia-original-rope-cuda-physical-2026-10-13.json).
