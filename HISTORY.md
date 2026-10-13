@@ -23663,3 +23663,14 @@ CTC argmax/raw text and matching automatic sessions; all 128 saved arrays
 independently verified. See [full proof](docs/dolphin-noncausal-2026-10-12.json).
 Issue #540 closed by the fix. Published v0.8.43 remains unchanged; reporter
 private clip/Kylin/GCC9 and GPU validation were not reproduced.
+
+
+## 2026-10-13 — Terminal Dia actual-CUDA cache diagnostic retained
+
+Version 2 at immutable source `35945f527` proves actual T4 scheduler execution
+and passes 120 replay-stage comparisons. All six free CLI/C-ABI speech checks
+remain empty/WER 1, so no runtime/model/default promotion follows. OFF/repeat
+arrays match exactly; F32 cache reaches the CPU step-978/head-2 boundary.
+The prior CPU-routing failure remains retained. Full terminal logs, all 56
+outputs and physical tensor audits are verified in
+[the physical control ledger](docs/dia-cuda-cache-physical-2026-10-13.json).

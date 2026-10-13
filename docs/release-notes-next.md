@@ -191,11 +191,11 @@ Complete [cache controls](dia-cross-cache-hosted-2026-10-13.json) and [first-dra
 
 
 The scoped 310P BF16 capability candidate also passes both SDK9.2 compile
-architectures, including the upstream operator binary; its physical rerun is
-still pending and the production ggml pin remains unchanged. The first Dia T4
-attempt is retained as a rejected validation path (CPU diff, zero observed GPU
-allocation/splits); a device-request repair is being validated. Neither result
-establishes full-model NPU/CUDA speech or speed acceptance.
+architectures, including the upstream operator binary; its physical rerun now
+passes all 924 executed cases and the production ggml pin awaits the composed CI gate. The first Dia T4 attempt is retained as a
+rejected validation path (CPU diff, zero observed GPU allocation/splits); the
+corrected request is proven by the complete version-2 actual GPU controls.
+Neither result establishes full-model NPU/CUDA speech or speed acceptance.
 
 
 A source-faithful rotary-timescale candidate is now under fixed OFF/ON/OFF
@@ -214,3 +214,12 @@ five broad operator suites complete with 924/924 executed cases passing,
 unsupported cases retained, and both previous BF16 aborts resolved. Exact
 source/compiler/archive/log provenance is recorded; full composed CI precedes
 integration. Operator correctness does not establish model-quality or speed.
+
+
+Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
+replay stages pass with real scheduler splits and sampled process GPU memory
+8,528–8,734 MiB. All six native CLI/C-ABI speech checks still reject with empty
+transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
+and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
+match exactly. These are correctness diagnostics, not accepted native speech
+or performance measurements. [Complete physical CUDA proof](dia-cuda-cache-physical-2026-10-13.json).

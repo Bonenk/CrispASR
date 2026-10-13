@@ -11,6 +11,21 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Preserve terminal CUDA/cache and late-layer diagnostic proofs
+
+Owner: this maintainer session. Storage controller and private publisher under
+`/mnt/storage/crispasr/dia-short-20261012/public-cache-proof-20261013`.
+Actual T4 version 2 is terminal and all 56 output files plus the complete
+4,769-entry log are preserved. Hash checks, actual CUDA scheduler/memory guards,
+120 stage metrics and OFF/repeat arrays are verified; all six speech checks
+reject. Preserve complete CPU/cache, CUDA/cache and partial late-layer artifacts
+in the existing public regression dataset, including raw logs and failures.
+Audit every source member, scan textual payloads, stream/fsync archives on
+storage and require anonymous full remote size/SHA verification. Include the
+bounded original-source rotary probe and high-precision retained-layer analysis.
+No new model publication, fresh local model run, acceptance waiver or runtime
+promotion. Keep previous source paths and existing immutable proof revisions.
+
 ## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
@@ -6395,3 +6410,30 @@ Both previous BF16 aborts are resolved for the tested operators. Receipt:
 `docs/cann-310p3-bf16-physical-2026-10-13.json`. Compose validated current main
 into the isolated CANN branch and run full general CI before advancing the
 production submodule pin. No full-model or quantized speech/speed claim follows.
+
+## UPDATE 2026-10-13 — Actual T4 cache controls completed and rejected
+
+Corrected immutable device source `35945f527` completes all three actual CUDA
+arms. All 120 canonical stage rows pass; nine native diff/C-ABI/CLI executions
+show actual CUDA scheduler splits and sampled process allocation 8,528–8,734
+MiB. All six speech checks remain quiet, empty/WER 1. OFF/repeat complete inputs,
+logits and both PCM arrays are byte-identical. F16 cache shares 353 original
+input steps, first differing draw 352/head 6; F32 cache shares 979, first draw
+978/head 2 (original 877/native 904), matching the CPU remaining boundary.
+F32 shared-prefix minimum cosine is 0.9999999999747301 and maximum norm error
+5.15412e-6. Complete source/log/381-neural/134-codec/file hashes and all failures:
+`docs/dia-cuda-cache-physical-2026-10-13.json`. This proves the corrected GPU
+request and bounded replay execution, not native speech quality or speed.
+
+Verified retained step-978 teacher snapshots separately give worst decoder
+layer cosine 0.9999999999929721 (layer 3) and max layer row-norm error
+4.16887e-7 (layer 17). Hidden max absolute error is 1.27554e-5; head-2 logit
+max absolute errors are 3.71933e-5 unconditional and 4.00543e-5 conditional.
+These remain partial-run diagnostics; full capture repeat/negatives and the
+original-timescale OFF/ON/OFF controls continue on GH. High-precision complete
+layer ledger: `docs/dia-late-layer-metrics-2026-10-13.json`.
+
+Current open issues and PR heads were rechecked: no new issue or changed PR
+source since the last audit. Ascend integration CI `38383864169` has passed
+unit/macOS/iOS/Opus checks; the remaining queued/running gates still precede
+production integration. No release tag or model/default promotion.

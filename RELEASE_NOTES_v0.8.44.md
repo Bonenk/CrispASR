@@ -277,3 +277,12 @@ five broad operator suites complete with 924/924 executed cases passing,
 unsupported cases retained, and both previous BF16 aborts resolved. Exact
 source/compiler/archive/log provenance is recorded; full composed CI precedes
 integration. Operator correctness does not establish model-quality or speed.
+
+
+Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
+replay stages pass with real scheduler splits and sampled process GPU memory
+8,528–8,734 MiB. All six native CLI/C-ABI speech checks still reject with empty
+transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
+and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
+match exactly. These are correctness diagnostics, not accepted native speech
+or performance measurements. [Complete physical CUDA proof](docs/dia-cuda-cache-physical-2026-10-13.json).
