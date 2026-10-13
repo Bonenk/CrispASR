@@ -27,7 +27,8 @@ Markdown updates; each acceptance gate precedes the dependent step.
    first differing draw is step 864/head 6, original 55/native 938. These are
    rejected speech controls, not an accepted runtime fix. Receipt:
    `docs/dia-neural-precision-hosted-2026-10-13.json`.
-2. NOW CLAIMED: preserve F32 cross-attention caches behind an opt-in gate,
+2. NOW IN FLIGHT: candidate `2205d920d`, GH `38357576078` (queued).
+   Preserve F32 cross-attention caches behind an opt-in gate,
    keeping the existing F16 path/default. The actual pinned original preserves
    F32 projections; the tiny original F32/rounded/F32-repeat control is retained.
    Audit the full actual native projection/readback/graph-input/upload path.
@@ -6068,3 +6069,24 @@ hashes and all comparisons are in
 job 38343667254 is unchanged. No runtime graph/default or model-pin change.
 If its F32 arm rejects speech, separately claim the F32 cross-cache isolation
 before implementation and retain unchanged stage, C ABI/CLI and ASR gates.
+
+### 2026-10-13 F32 cache isolation queued and durable result archive CLAIM
+
+Preimplementation main claim `873b1254e` precedes runtime source `2205d920d`.
+GH `38357576078` uses exactly that source with `--cross-cache-control`; queued
+at this checkpoint. OFF/ON/OFF uses one fixed all-original-F32 model and the
+same binary/host, strict 40-stage cosine/magnitude and CLI/C-ABI ASR gates.
+The candidate retains the F16 default, original seed/filter/reference and model
+pins. Local source-only compilation, clang18, Python syntax, six actual sampler
+contracts (14.178 s) and four staged secret tests (73.480 s, zero skips) pass.
+The first sampler invocation lacked its required bridge environment; the
+corrected invocation uses a freshly compiled actual header bridge and passes.
+Complete candidate checks and pending scopes are in
+`docs/dia-cross-cache-controls-2026-10-13.json`. No runtime merge or release tag.
+
+CLAIM next while hosted results are pending: durably publish the complete
+41-file rejected neural precision proof and the tiny original cache probe in
+the existing public regression dataset. Verify all source sizes/hashes, scan
+text for credentials/account names, record per-file ZIP manifests, and require
+full anonymous remote size/SHA verification. Preserve old source paths and
+negative acceptance scopes. No fresh local real-model work or model publication.
