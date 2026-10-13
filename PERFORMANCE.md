@@ -3290,3 +3290,12 @@ with native hidden states. The cause at this boundary precedes the output
 head. This is isolated numerical evidence, not accepted speech or speed; the
 local original projection is not byte-identical to the hosted original one.
 [Projection audit](docs/dia-head-projection-isolation-2026-10-13.json).
+
+
+The learned final norm is byte-identical on retained original/native layer-17
+inputs and reproduces both saved hidden states exactly. Decoder embedding
+captures also match exactly at four checkpoints, including step 978. Repeats
+and changed-feedback/scaled-output negatives pass. The remaining hidden
+variation is inside the decoder blocks or their attention inputs; these
+isolated controls do not accept native speech, Q4 or speed.
+[Norm/input audit](docs/dia-norm-embedding-isolation-2026-10-13.json).

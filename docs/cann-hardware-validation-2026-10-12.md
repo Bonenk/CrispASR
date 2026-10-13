@@ -137,3 +137,9 @@ SOFT_MAX 107/107, ROPE 109/109, MUL_MAT 554/554. Thus 924 executed cases pass;
 Both SDK compilation architectures and all 13 composed general CI jobs pass;
 the exact candidate is integrated. [Integration ledger](cann-310p-bf16-integration-2026-10-13.json).
 Full-model inference, quantized speech and performance still require separate proof.
+
+
+Final-main SDK revalidation at `cfceeb752` passes both architecture jobs in
+run `38401026881`, including the actual operator build target and routing
+guards. [Complete source/job/log receipt](cann-final-main-sdk-2026-10-13.json).
+Full model and quantized speech/speed still require separate physical proof.

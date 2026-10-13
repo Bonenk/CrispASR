@@ -1,0 +1,147 @@
+{
+  "conclusion": "success",
+  "headSha": "cfceeb75296b749df7c3e2e07930dfb82792e144",
+  "jobs": [
+    {
+      "completedAt": "2026-10-13T14:12:38Z",
+      "conclusion": "success",
+      "databaseId": 115308393503,
+      "name": "linux-cann (ubuntu-24.04, 910b, on)",
+      "startedAt": "2026-10-13T13:46:32Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-13T13:46:34Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-13T13:46:32Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:46:41Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 2,
+          "startedAt": "2026-10-13T13:46:34Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:46:43Z",
+          "conclusion": "success",
+          "name": "Check chip-specific float routing",
+          "number": 3,
+          "startedAt": "2026-10-13T13:46:41Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:50:03Z",
+          "conclusion": "success",
+          "name": "Free disk space",
+          "number": 4,
+          "startedAt": "2026-10-13T13:46:43Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:12:35Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 5,
+          "startedAt": "2026-10-13T13:50:03Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:12:36Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 10,
+          "startedAt": "2026-10-13T14:12:35Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:12:36Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-10-13T14:12:36Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38401026881/job/115308393503"
+    },
+    {
+      "completedAt": "2026-10-13T14:07:22Z",
+      "conclusion": "success",
+      "databaseId": 115308393897,
+      "name": "linux-cann (ubuntu-24.04-arm, 310p, off)",
+      "startedAt": "2026-10-13T13:45:21Z",
+      "status": "completed",
+      "steps": [
+        {
+          "completedAt": "2026-10-13T13:45:23Z",
+          "conclusion": "success",
+          "name": "Set up job",
+          "number": 1,
+          "startedAt": "2026-10-13T13:45:22Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:45:30Z",
+          "conclusion": "success",
+          "name": "Run actions/checkout@v6",
+          "number": 2,
+          "startedAt": "2026-10-13T13:45:23Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:45:31Z",
+          "conclusion": "success",
+          "name": "Check chip-specific float routing",
+          "number": 3,
+          "startedAt": "2026-10-13T13:45:30Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T13:46:51Z",
+          "conclusion": "success",
+          "name": "Free disk space",
+          "number": 4,
+          "startedAt": "2026-10-13T13:45:31Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:07:19Z",
+          "conclusion": "success",
+          "name": "Build",
+          "number": 5,
+          "startedAt": "2026-10-13T13:46:51Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:07:19Z",
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v6",
+          "number": 10,
+          "startedAt": "2026-10-13T14:07:19Z",
+          "status": "completed"
+        },
+        {
+          "completedAt": "2026-10-13T14:07:19Z",
+          "conclusion": "success",
+          "name": "Complete job",
+          "number": 11,
+          "startedAt": "2026-10-13T14:07:19Z",
+          "status": "completed"
+        }
+      ],
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38401026881/job/115308393897"
+    }
+  ],
+  "status": "completed",
+  "scope": "Both final-main official SDK compilation jobs pass; builds the actual operator target and checks chip-specific predicates. Hosted runners have no NPU: physical/full-model speech or speed acceptance is separate.",
+  "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38401026881",
+  "complete_hosted_log": {
+    "bytes": 1958551,
+    "sha256": "22310ee0575419763dba3e8d068c029e16c9193a3d3c83de35a7e694a3fe5c13"
+  }
+}

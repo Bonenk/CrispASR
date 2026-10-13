@@ -6,21 +6,18 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia final normalization and decoder input alignment
+`## CLAIMED 2026-10-13 — Dia first decoder normalization and QKV primitive isolation
 
 Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
-`/mnt/storage/crispasr/dia-norm-embed-probe-20261013`. Output-head isolation shows
-that step-978 draw changes follow hidden states rather than the head kernel.
-Fetch only original final-norm and nine embedding tensors by validated pinned
-ranges, checking every complete tensor against the existing physical audit.
-Replay actual Torch2.6 weighted final RMSNorm and actual native graph helper on
-verified retained layer-17 inputs. Check the actual original decoder's embedding
-entry against the actual native helper on fixed retained feedback tokens.
-Retain exact-shape/repeat/negative controls and source/file hashes. No local
-full-model run, reconstructed neural reference, seed/filter change or speech
-acceptance. Record completed final-main CANN compile run `38401026881` alongside
-its exact source and unchanged physical-operator scope.
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded next probe directory
+`/mnt/storage/crispasr/dia-block0-probe-20261013`. Verified decoder embedding and
+learned final norm are byte-exact on matching inputs, while hidden direction
+already changes the output-head draw. Fetch only audited first pre-SA norm and
+Q/K/V weights by pinned validated ranges. Run actual Torch2.6 modules and actual
+native ggml primitives on identical verified embedding captures, with correct
+batch shape and explicit split/flattened controls. Separate norm, projection
+and input errors before any runtime candidate or full-model run. Preserve
+repeats, negative controls and every result; no quality/seed/filter waiver.
 
 ## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
@@ -6560,3 +6557,26 @@ gate changes. Next isolate final normalization and then earlier decoder
 operations using actual reference inputs; do not spend a full-model run on head
 fusion as a speech repair. Both final-main CANN compile jobs are now running;
 final general CI is still queued. No release tag.
+
+
+## UPDATE 2026-10-13 — Learned final norm and decoder embedding are exact
+
+Ten complete original tensors (75,800,576 bytes) are fetched by strictly
+validated immutable ranges and all hashes match the full physical F32 export.
+Actual Torch2.6 weighted final RMSNorm and the actual native helper produce
+byte-identical outputs on original/native retained layer-17 inputs. Both
+reproduce their respective hosted hidden captures byte-for-byte. This excludes
+final normalization as the step-978 hidden difference's source on these inputs.
+Actual original decoder entry embedding capture and the actual native helper
+match byte-for-byte at steps 0/76/864/978. Repeats are exact; doubled norm output
+and changed channel-0 feedback reject. This checks the input alignment before
+trusting block-level differences, with no reconstructed embedding inference.
+Full source/range/tensor/input/output/negative ledger:
+`docs/dia-norm-embedding-isolation-2026-10-13.json`.
+
+Both final-main CANN compile jobs `38401026881` pass at exact source `cfceeb752`,
+including real operator-target compilation and chip-specific routing guards.
+Complete job/log ledger: `docs/cann-final-main-sdk-2026-10-13.json`. This remains
+SDK compilation, alongside separately verified physical 924-case operator
+acceptance; it does not establish full-model NPU speech or performance.
+Latest general CI still queues; no new release tag or numerical runtime change.

@@ -23862,3 +23862,37 @@ results before considering a gated runtime candidate. No seed/filter/quality
 change or speech/speed acceptance follows from an isolated projection.
 
 </details>
+
+
+## 2026-10-13 — Dia final norm/input alignment and final-main CANN SDK gates
+
+The learned final norm is byte-identical on retained original/native layer-17
+inputs and reproduces both saved hidden states exactly. Decoder embedding
+captures also match exactly at four checkpoints, including step 978. Repeats
+and changed-feedback/scaled-output negatives pass. The remaining hidden
+variation is inside the decoder blocks or their attention inputs; these
+isolated controls do not accept native speech, Q4 or speed.
+[Full isolation ledger](docs/dia-norm-embedding-isolation-2026-10-13.json).
+
+Both final-main SDK compile architectures pass; [complete job/log receipt](docs/cann-final-main-sdk-2026-10-13.json).
+
+<details>
+<summary>Completed weighted norm and embedding claim</summary>
+
+## CLAIMED 2026-10-13 — Dia final normalization and decoder input alignment
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
+`/mnt/storage/crispasr/dia-norm-embed-probe-20261013`. Output-head isolation shows
+that step-978 draw changes follow hidden states rather than the head kernel.
+Fetch only original final-norm and nine embedding tensors by validated pinned
+ranges, checking every complete tensor against the existing physical audit.
+Replay actual Torch2.6 weighted final RMSNorm and actual native graph helper on
+verified retained layer-17 inputs. Check the actual original decoder's embedding
+entry against the actual native helper on fixed retained feedback tokens.
+Retain exact-shape/repeat/negative controls and source/file hashes. No local
+full-model run, reconstructed neural reference, seed/filter change or speech
+acceptance. Record completed final-main CANN compile run `38401026881` alongside
+its exact source and unchanged physical-operator scope.
+
+</details>
