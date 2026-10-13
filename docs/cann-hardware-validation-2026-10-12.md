@@ -74,3 +74,46 @@ be compiled and rerun on the device. Production ggml remains pinned to the
 reported version. Partial case counts and successful restricted suites do not
 turn the broad suite into a pass. Full-model diff/ASR, quantized quality and
 performance remain unvalidated on this NPU.
+
+
+## BF16 capability candidate: physical rerun
+
+Diagnostic CrispASR source
+`bfb4943ac1e4488e377257a47163a0edcea7d6cd` pins shared ggml candidate
+`21acf3162beeb4e51260f0f86deda80995423712`. Only 310P capability routing
+changes: BF16 ADD input/output and BF16 MUL_MAT activation inputs are rejected
+so the scheduler can use a supported backend. The 910B predicate is unchanged.
+Thirteen isolated routing cases pass under each chip configuration; the old
+310P predicate fails six. This does not prove a running model's CPU fallback.
+[SDK matrix 38365667723](https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723)
+is submitted; compilation and the physical candidate rerun remain pending.
+See [the candidate receipt](cann-310p-bf16-candidate-2026-10-13.json).
+
+Use a fresh directory and the same activated CANN SDK 9.1.0 environment as the
+reported run. The following builds only the upstream operator test binary:
+
+```bash
+git clone --no-checkout https://github.com/CrispStrobe/CrispASR.git CrispASR-cann-bf16-proof
+cd CrispASR-cann-bf16-proof
+git checkout --detach bfb4943ac1e4488e377257a47163a0edcea7d6cd
+git submodule update --init --recursive
+python3 tests/test_cann_bf16_routing.py -v
+cmake -S ggml -B build-cann-ops \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DGGML_CANN=ON -DCANN_INSTALL_DIR="$ASCEND_TOOLKIT_HOME" \
+  -DSOC_TYPE=Ascend310P -DUSE_ACL_GRAPH=OFF \
+  -DGGML_BUILD_TESTS=ON -DGGML_BUILD_EXAMPLES=OFF
+cmake --build build-cann-ops --target test-backend-ops -j4
+python3 tools/validate_backend_ops.py \
+  --binary build-cann-ops/bin/test-backend-ops --backend CANN0 \
+  --ops ADD,RMS_NORM,SOFT_MAX,ROPE,MUL_MAT --out cann-bf16-candidate-proof
+```
+
+Return the complete fresh proof directory and configure/build stdout/stderr,
+`build-cann-ops/CMakeCache.txt`, `build-cann-ops/compile_commands.json`, device
+information and SDK versions. This tests the broad suite that previously
+aborted, retaining unsupported BF16 cases explicitly. Keep the original failed
+archive; do not overwrite it or filter BF16 out through `--params` to obtain a
+pass. A passing candidate must finish both broad operators under the unchanged
+upstream tolerances. Full-model diff, decoded ASR and scheduler fallback still
+need separate validation before any NPU model or speed claim.

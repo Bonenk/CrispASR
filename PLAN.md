@@ -32,6 +32,12 @@ unconditionally, while MUL_MAT guards weights but not the activation input on
 310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
 on the existing two-architecture GH CANN matrix. Keep the production submodule
 pin unchanged until physical rerun and required validation accept the repair.
+Candidate pushed: shared ggml `21acf3162` and CrispASR `bfb4943ac` in
+`/mnt/storage/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
+Two-architecture SDK matrix `38365667723` is submitted, including the real
+`test-backend-ops` target and actual predicate controls. No production pin
+changed. The bounded physical rerun procedure is documented beside the verified
+original receipt. Candidate secret scans pass all four checks without skips.
 
 ## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
@@ -6168,3 +6174,18 @@ observed control, not a presumed failing CPU negative; F32 must pass strict
 stages and ASR, and OFF repeats must agree. Failed/inconclusive runs retain
 all evidence and never waive CPU/main-composition/full-model/Q4 gates.
 Do not change the candidate’s C++ math or the executing CPU source.
+
+
+## UPDATE 2026-10-13 — Parallel Dia CUDA source and actual allocation
+
+Per the user's explicit Kaggle steering, diagnostic version 1 is running exact
+composed source `3595fa25b0bc40d3f32176b477005ddcd3280e28`. Pulled submitted
+kernel matches the rendered template byte-for-byte (SHA-256
+`aab5a983c22a47a5414a698bb516bc5269ad9cfb57bfb6136d8ecfc5f7dba74d`).
+The progress mirror records two physical Tesla T4 devices, SM75, 15,360 MiB
+per device, driver 580.178.04; native CUDA compilation is in progress, not yet
+model inference. GH CUDA package `38361713994` builds exact source `989e212f`.
+The fixed GH CPU cache control `38357576078` at `2205d920d` is unchanged and
+running since 07:00 UTC. No correctness/default/performance acceptance follows
+from allocation or compilation. Broad GPU acceptance and profiling stay gated
+on the fixed controls; complete failed results will be retained.
