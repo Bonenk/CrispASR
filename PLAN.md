@@ -11,6 +11,21 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Tiny actual-source rotary coefficient diagnostic
+
+Owner: this maintainer session. Private storage probe directory
+`/mnt/storage/crispasr/dia-short-20261012/rotary-coefficient-probe`.
+While late-layer GH and corrected actual-GPU controls run, compare the pinned
+original Float32 RotaryEmbedding with the actual pinned ggml CPU rotary-cache
+helper at positions 0/38/864/978/1225. Use the source helper itself, not a
+reconstructed neural reference. Test the existing operator's explicit frequency
+factors with the original module's actual timescales and base one against the
+default geometric recurrence. This is tiny weight-free primitive evidence;
+no local full model/build, neural math change, reference substitution, sampler
+change, model promotion, GPU or speech claim follows. Preserve coefficients,
+source excerpts/hashes and negative/default controls before deciding any next
+convert/dump/diff A/B experiment.
+
 ## CLAIMED 2026-10-13 — Correct explicit Dia CUDA diff device request
 
 Owner: this maintainer session. New storage worktree
