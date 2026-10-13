@@ -1,0 +1,350 @@
+{
+  "scope": "Terminal actual-T4 allocation and successful CUDA compilation; diff accidentally CPU and physical execution guard correctly rejects. No CUDA model execution/quality acceptance.",
+  "status": "ERROR",
+  "source": "3595fa25b0bc40d3f32176b477005ddcd3280e28",
+  "kernel_version": 1,
+  "receipt": {
+    "source": "3595fa25b0bc40d3f32176b477005ddcd3280e28",
+    "source_worktree_dirty": false,
+    "worker_sha256": "95d60417777ace685e3c8593afce1c1bf11ea49be274b31b80df0f3134d7bfb1",
+    "export_helper_sha256": "2d2bbda8ea5d8c807e8393a7ffe6368a70e831196f8fa0263bb9227b7d1e5507",
+    "production_defaults_changed": false,
+    "production_model_pins_changed": false,
+    "full_model_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "cross_cache_control": true,
+    "cuda_control": true,
+    "runs": [
+      {
+        "name": "canonical-download",
+        "exit": 0,
+        "log_sha256": "57f0646a9934c360480cab57d6df36f4df251f41ab8da8d1a6481d3020434964"
+      },
+      {
+        "name": "rejected-download",
+        "exit": 0,
+        "log_sha256": "732b7b6293e70115baee6589308a4f62b89828b11228c09e2ca6b92124952d3b"
+      },
+      {
+        "name": "source-clone",
+        "exit": 0,
+        "log_sha256": "1915ddd2915646b8b478ded0c91ed0c1faf16610237b42d0410432799f824bfd"
+      },
+      {
+        "name": "source-pin",
+        "exit": 0,
+        "log_sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+      },
+      {
+        "name": "tiny-neural-export-contracts",
+        "exit": 0,
+        "log_sha256": "885aa8b742823d9e4711728f7e69bbcf63e34027e02921d8bd57e1ce25989470"
+      },
+      {
+        "name": "verified-codec-download",
+        "exit": 0,
+        "log_sha256": "5078921babebf0e70fa5454918ea8f24d52ed8fe079cfcb4c6e713eac5f170af"
+      },
+      {
+        "name": "f32-export",
+        "exit": 0,
+        "log_sha256": "f3e2cb14be1b8824838a82e4bd1477e352ef5c054269dfa59b021082a4dbb8db"
+      },
+      {
+        "name": "f32-cross-f16-strict-diff",
+        "exit": 0,
+        "log_sha256": "8b71eeab2c672df130b2b1f3c5b4967e1eda2dd8908eac8c3ba950844d02b67b",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      }
+    ],
+    "arms": [],
+    "rejected_control": {
+      "source": "3ba3a317ab5d2996adfde1efef2c23811fc9e049",
+      "source_worktree_dirty": false,
+      "worker_sha256": "fc950aff43ba25cc38fdfbd901592b12ce2fe274f3af3c25a142b23e53660a61",
+      "candidate_header_sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e",
+      "runtime_sha256": "500849c53e786b5490d5e08d8fac0e304d065d1893b1489428e6165b822c5158",
+      "control_mode": "original-neural-with-gated-portable-candidate-sampler",
+      "canonical_original_run": 38285566623,
+      "production_defaults_changed": false,
+      "full_speech_acceptance": false,
+      "runs": [
+        {
+          "name": "canonical-download",
+          "exit": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "source-clone",
+          "exit": 0,
+          "log_sha256": "571a93ec73f7315903ea1fa9fabbefc82c4cb76b0161250b9b50c148629b3628"
+        },
+        {
+          "name": "source-pin",
+          "exit": 0,
+          "log_sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+        },
+        {
+          "name": "compile-actual-sampler",
+          "exit": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "name": "tiny-sampler-contracts",
+          "exit": 0,
+          "log_sha256": "50b0656c60fef2ce6ecbbdede50810a8b7bc71bb985389c32375be744847982b"
+        },
+        {
+          "name": "original-native-sampler-generation",
+          "exit": 0,
+          "log_sha256": "29bf085c0a3648035fa1fc11c66ba04129f31c8121172633fa1fee208f71dd3b"
+        },
+        {
+          "name": "configure",
+          "exit": 0,
+          "log_sha256": "2291d79280314f00ee437744f9f9e2778ff4d427c4b31892ab3d3dda961497f5"
+        },
+        {
+          "name": "build",
+          "exit": 0,
+          "log_sha256": "46de8d437cc5989248c05a57d2c67a265e10f74ebd3e97ce077200e01920d6c9"
+        },
+        {
+          "name": "candidate-codec-export",
+          "exit": 0,
+          "log_sha256": "5e8986143eb5d51da28cb39cb725dad16c0e3ffa4644aab4699a0880ba220ca6"
+        },
+        {
+          "name": "native-free-generation",
+          "exit": 0,
+          "log_sha256": "ea08774afb86ac35d53ba8da9f51f9a60c1a77666c086963dd5b0b28cda42dc1"
+        },
+        {
+          "name": "native-cli-generation",
+          "exit": 0,
+          "log_sha256": "fb4c82225f3548218037832e933735fd012c966e8cad72a319a4a147bcceb9d8"
+        },
+        {
+          "name": "canonical-original-asr",
+          "exit": 0,
+          "log_sha256": "8415be37ca8674e30f051983c0323d04f63e622ff99d691be2a4d673d8188a0d"
+        },
+        {
+          "name": "original-native-sampler-asr",
+          "exit": 0,
+          "log_sha256": "f10604740e9f7b0118a0f9fe92426808d52d1a31e7846c961fabdce4c0a641af"
+        },
+        {
+          "name": "native-free-asr",
+          "exit": 1,
+          "log_sha256": "16eeefc990b60488d227c076c920633afe59df1625de01371fdf6e6981ce1525"
+        },
+        {
+          "name": "native-cli-asr",
+          "exit": 1,
+          "log_sha256": "82513acfb44c63f4dfd524e4fab95e6075d14097161e3e2f83d456fcaf262128"
+        }
+      ],
+      "original_candidate_codes_exact": true,
+      "native_library_sha256": "0c17d9fde57b3129d42d513f175103d1f18456b511e2a56d60696c381e3430bf",
+      "native_cli_sha256": "eddbe8ab199d5a0c8fa836a9381654271401786ca444ed27a7286050bcbfcc55",
+      "canonical-original": {
+        "phrase": "We are committed to making it secure.",
+        "source_pin": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+        "model_pin": "257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd",
+        "seed": 42,
+        "capacity": 3072,
+        "audio_seconds": 14.048072562358277,
+        "rms": 0.07353386128903242,
+        "finite": true,
+        "scope": "Actual original generate and real DAC",
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "original-native-sampler": {
+        "phrase": "We are committed to making it secure.",
+        "seed": 42,
+        "capacity": 3072,
+        "audio_seconds": 14.048072562358277,
+        "rms": 0.07353386128903242,
+        "finite": true,
+        "scope": "original-neural-with-gated-portable-candidate-sampler",
+        "source_pin": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+        "model_pin": "257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd",
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "native-free": {
+        "phrase": "We are committed to making it secure.",
+        "seed": 42,
+        "capacity": 3072,
+        "audio_seconds": 12.979954648526077,
+        "rms": 0.00015620221962711443,
+        "finite": true,
+        "scope": "Actual native C ABI free generation",
+        "transcript": "",
+        "wer": 1.0
+      },
+      "native-cli": {
+        "phrase": "We are committed to making it secure.",
+        "seed": 42,
+        "capacity": 3072,
+        "audio_seconds": 12.979954648526077,
+        "rms": 0.00015641841993880253,
+        "finite": true,
+        "scope": "Actual native CLI free generation with gated portable sampler",
+        "transcript": "",
+        "wer": 1.0
+      },
+      "paired_generation": {
+        "original_control_steps": 1226,
+        "native_steps": 1133,
+        "aligned_input_prefix_steps": 77,
+        "first_input_divergence": {
+          "step": 77,
+          "codebook": 5,
+          "original_control": 606,
+          "native": 843
+        },
+        "minimum_prefix_cosine": 0.9999989197073994,
+        "maximum_prefix_norm_error": 0.000854831188613514,
+        "aligned_prefix_neural_pass": true,
+        "complete_input_histories_equal": false,
+        "first_pre_override_sample_divergence": {
+          "step": 76,
+          "codebook": 5,
+          "original_control": 606,
+          "native": 843,
+          "shared_input_history": true
+        },
+        "complete_pre_override_samples_equal": false
+      },
+      "failures": [
+        "native-free-speech",
+        "native-cli-speech"
+      ],
+      "sampler_diagnostic_pass": false,
+      "scope": "Single fixed short prompt: canonical Torch, original with actual native sampler, and actual native C ABI and CLI free generation with the gated portable sampler; not complete model or GPU acceptance."
+    },
+    "template_sha256": "f1de7c6583871519615f3ae340eb6fdd244f2aac7e576ff19f0af2b4ac2d7379",
+    "original_weights_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "codec_sha256": "6db51da2333868918b6d476008d92036a53400bc816ff7e1d2b1e973499e4135",
+    "canonical_reference_sha256": "3db6f8923abffd612e6c83d7036debebd10ed28b77c3eb9ec3d91fec1ce1a542",
+    "native_library_sha256": "2cb9f147388ad67196d89ccb1a25adddf615a7e35be85e8d3f2f1ff887e6fae3",
+    "native_cli_sha256": "32be4a47a61567dde715a1c3f115434847bfb4e86f3be6b992190d2299976cba",
+    "native_diff_sha256": "134a67ef7ed95ae12ab977197d7b4a5e6736ead7390d98989faeb2a52c78500a"
+  },
+  "hardware_preflight": {
+    "version": "2026-10-13.dia-cuda-cache.1",
+    "source": "3595fa25b0bc40d3f32176b477005ddcd3280e28",
+    "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+    "nvcc": "nvcc: NVIDIA (R) Cuda compiler driver\nCopyright (c) 2005-2025 NVIDIA Corporation\nBuilt on Fri_Feb_21_20:23:50_PST_2025\nCuda compilation tools, release 12.8, V12.8.93\nBuild cuda_12.8.r12.8/compiler.35583870_0",
+    "torch_reinstalled": false,
+    "gpu_executed": false,
+    "model_acceptance": false,
+    "kernel_sha256": "aab5a983c22a47a5414a698bb516bc5269ad9cfb57bfb6136d8ecfc5f7dba74d",
+    "worker_sha256": "95d60417777ace685e3c8593afce1c1bf11ea49be274b31b80df0f3134d7bfb1",
+    "fixed_prompt_control_pass": false
+  },
+  "files": [
+    {
+      "path": "canonical-download.log",
+      "bytes": 54,
+      "sha256": "57f0646a9934c360480cab57d6df36f4df251f41ab8da8d1a6481d3020434964"
+    },
+    {
+      "path": "canonical-ref.gguf",
+      "bytes": 99392768,
+      "sha256": "3db6f8923abffd612e6c83d7036debebd10ed28b77c3eb9ec3d91fec1ce1a542"
+    },
+    {
+      "path": "crispasr-dia-cuda-cache-control.log",
+      "bytes": 725136,
+      "sha256": "f4563935657ca8ce95be72489a888058f60df95af2497cc4a9c4c085393e864f"
+    },
+    {
+      "path": "dia_model_precision.py",
+      "bytes": 7102,
+      "sha256": "2d2bbda8ea5d8c807e8393a7ffe6368a70e831196f8fa0263bb9227b7d1e5507"
+    },
+    {
+      "path": "dia_neural_precision_control.py",
+      "bytes": 16537,
+      "sha256": "95d60417777ace685e3c8593afce1c1bf11ea49be274b31b80df0f3134d7bfb1"
+    },
+    {
+      "path": "dia_tts.cpp",
+      "bytes": 106245,
+      "sha256": "fc91490e1f4e9c842e208f07ed7335e10cfa18d43d4eef67cf697652088d973d"
+    },
+    {
+      "path": "executed-kernel.py",
+      "bytes": 5613,
+      "sha256": "aab5a983c22a47a5414a698bb516bc5269ad9cfb57bfb6136d8ecfc5f7dba74d"
+    },
+    {
+      "path": "f32-cross-f16-strict-diff.log",
+      "bytes": 41434,
+      "sha256": "8b71eeab2c672df130b2b1f3c5b4967e1eda2dd8908eac8c3ba950844d02b67b"
+    },
+    {
+      "path": "f32-export.log",
+      "bytes": 531,
+      "sha256": "f3e2cb14be1b8824838a82e4bd1477e352ef5c054269dfa59b021082a4dbb8db"
+    },
+    {
+      "path": "hardware-preflight.json",
+      "bytes": 716,
+      "sha256": "b3f4e8bf73733e90bb8113a26013ebb8de0d8355fb5b4300c2a4f5c6d9114ea2"
+    },
+    {
+      "path": "neural-f32-physical-audit.json",
+      "bytes": 99324,
+      "sha256": "dadd2c11b1437c146c0bda7ecaa8e8a2573b09318210cc5ae00d1dcc98bf3932"
+    },
+    {
+      "path": "physical-codec-audit.json",
+      "bytes": 36108,
+      "sha256": "8832b98c4bb0ec036accd3bd5a6ca151c1ffa04f1465b72b4f6af3a8c8e9970a"
+    },
+    {
+      "path": "progress.jsonl",
+      "bytes": 25172,
+      "sha256": "8a4990fae82f655587dad3d11f946ed8c5955891f05480f57934c4ffa8a2fffb"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 8512,
+      "sha256": "10a0d328eb803428a6ac84675e2cc318073b923081970fad259c0b4c875758bc"
+    },
+    {
+      "path": "rejected-download.log",
+      "bytes": 53,
+      "sha256": "732b7b6293e70115baee6589308a4f62b89828b11228c09e2ca6b92124952d3b"
+    },
+    {
+      "path": "source-clone.log",
+      "bytes": 51,
+      "sha256": "1915ddd2915646b8b478ded0c91ed0c1faf16610237b42d0410432799f824bfd"
+    },
+    {
+      "path": "source-pin.log",
+      "bytes": 69,
+      "sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+    },
+    {
+      "path": "tiny-neural-export-contracts.log",
+      "bytes": 804,
+      "sha256": "885aa8b742823d9e4711728f7e69bbcf63e34027e02921d8bd57e1ce25989470"
+    },
+    {
+      "path": "verified-codec-download.log",
+      "bytes": 59,
+      "sha256": "5078921babebf0e70fa5454918ea8f24d52ed8fe079cfcb4c6e713eac5f170af"
+    }
+  ],
+  "complete_log_entries": 4514,
+  "complete_log_sha256": "f08db80a5acf0de960510e773c0d29d5348cd13a8bf92a3eb061081086bd1543"
+}

@@ -188,3 +188,11 @@ changes include token 904 across the nucleus boundary; original/native filters
 agree on identical logits and reproduce the recorded draws. This is a rejected
 speech control, with no sampling-policy or quality-gate waiver.
 Complete [cache controls](dia-cross-cache-hosted-2026-10-13.json) and [first-draw replay](dia-cross-cache-boundary-2026-10-13.json).
+
+
+The scoped 310P BF16 capability candidate also passes both SDK9.2 compile
+architectures, including the upstream operator binary; its physical rerun is
+still pending and the production ggml pin remains unchanged. The first Dia T4
+attempt is retained as a rejected validation path (CPU diff, zero observed GPU
+allocation/splits); a device-request repair is being validated. Neither result
+establishes full-model NPU/CUDA speech or speed acceptance.

@@ -6263,3 +6263,46 @@ PR #544 follow-up was answered in comment `6141026980`, linking the complete
 verified physical receipt, failed BF16 cases and immutable candidate procedure.
 The candidate SDK matrix `38365667723` is now in progress. Production ggml is
 unchanged pending the physical rerun and required acceptance.
+
+
+## UPDATE 2026-10-13 — Ascend candidate compilation, late-layer job and CUDA v1 rejection
+
+CANN matrix `38365667723` is SUCCESS at `bfb4943ac`: both SDK9.2 architecture
+builds include CLI/shared/diff/quantizer/operator test, and both chip-specific
+routing-control steps pass. Complete log/source receipt:
+`docs/cann-310p-bf16-compile-2026-10-13.json`. The actual SDK9.1/310P3 rerun
+requested in #544 remains pending; production shared-ggml pin is unchanged.
+
+Late-layer candidate `b14fd8a4c725fa2aa1509e0fbde139531e719cc0` is pushed.
+Ten tiny actual-original capture/ownership/validation controls pass (8.880s);
+two compiled parser/environment/retention controls pass; full native source
+and actual diff-header syntax checks pass. GH `38372751566` is queued with
+Torch2.6 CPU and unchanged source/model/generation pins. Complete native arrays
+are retained in new directories; default/late/default must reproduce identical
+full logits, feedback and decoded PCM before interpreting the late snapshots.
+
+Actual-T4 Kaggle v1 at `3595fa25b` is terminal ERROR. Full 4,514-entry log and
+all 19 output files are saved under storage and worker log hashes verify.
+It compiles successfully and passes the CPU diff, but observes zero process GPU
+allocation and zero CUDA splits; the hardware-execution guard correctly rejects.
+No CUDA generation/quality acceptance follows. Complete receipt:
+`docs/dia-cuda-first-attempt-2026-10-13.json`. The explicit device-request repair
+and source-compiled guard tests are ready; replacement will use one fixed new
+source after all terminal v1 output is preserved. Existing guide-approved HF
+compiler cache is warmed/refreshed separately from public model proofs.
+
+
+## UPDATE 2026-10-13 — Corrected GPU version submitted after preserving v1
+
+Explicit GPU routing candidate `35945f527c70377e00bf00808235337e130e11fd` is
+pushed as `fix/dia-cuda-replay-device-20261013` and fast-forwards the unmerged
+CUDA preparation branch. Three native neural/cache/sampler files remain
+byte-identical to `2205d920d`; only the diff request handoff changes. The new
+diff header SHA-256 is `d8e896fe52982107da26fa1fb8d857bd312113417484e6475172ca6d0249d364`.
+Four compiled request/source-pin controls pass, actual diff-header syntax and
+workflow lint pass, and all four secret checks pass without skips (46.570s).
+Kaggle version 2 was submitted only after complete terminal v1 preservation;
+its pulled rendered source matches byte-for-byte. Compiler-cache provenance is
+separate; immutable downloaded blobs inside this run's scratch are released
+only after exact audited export to make room for models and outputs.
+No GPU model/quality claim precedes the actual allocation/stage/speech results.

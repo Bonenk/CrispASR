@@ -86,7 +86,10 @@ so the scheduler can use a supported backend. The 910B predicate is unchanged.
 Thirteen isolated routing cases pass under each chip configuration; the old
 310P predicate fails six. This does not prove a running model's CPU fallback.
 [SDK matrix 38365667723](https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723)
-is submitted; compilation and the physical candidate rerun remain pending.
+passes ARM64/310P (ACL graphs off) and x86_64/910B (ACL graphs on), including
+CLI, shared ABI, diff, quantizer and `test-backend-ops`. See
+[the complete compile receipt](cann-310p-bf16-compile-2026-10-13.json).
+The physical candidate rerun remains pending.
 See [the candidate receipt](cann-310p-bf16-candidate-2026-10-13.json).
 
 Use a fresh directory and the same activated CANN SDK 9.1.0 environment as the
