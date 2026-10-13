@@ -24050,3 +24050,12 @@ secret tests pass. [CUDA build 38446095504](https://github.com/CrispStrobe/Crisp
 is queued; CPU capture 38438623888 is running. Runtime changes remain on the
 diagnostic branches, with no speech, GPU, Q4 or release acceptance.
 [Submission ledger](docs/dia-attention-cuda-submission-2026-10-13.json).
+
+## 2026-10-13 — Prepared independent Dia capture/package delivery audits
+
+Retained storage tools for complete terminal GH log/ZIP collection, independent
+CPU trajectory/source/snapshot checks and CUDA member/alias/source integrity.
+Syntax checks pass and the old CUDA package is correctly rejected by its source
+pin. CPU 38438623888 and CUDA package 38446095504 are still running; no new
+artifact, speech, GPU or release acceptance. Preparation ledger:
+`docs/dia-attention-delivery-audit-preparation-2026-10-13.json`.

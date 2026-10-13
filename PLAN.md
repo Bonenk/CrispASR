@@ -6807,3 +6807,19 @@ Sources: https://arxiv.org/abs/2306.11473,
 https://huggingface.co/google/embeddinggemma-2/blob/main/config.json,
 https://www.openslr.org/12. Upstream ggml support and base Apache-2.0 weights
 already exist; the app's own reader assets were not located in our source check.
+
+## UPDATE 2026-10-13 — Prepare independent late-capture delivery audits
+
+CPU capture 38438623888 and matching CUDA package 38446095504 remain running.
+The package source guards passed; compilation is still in progress. Three
+private storage tools now preserve terminal run logs and complete artifact ZIPs,
+verify source/trajectory/snapshot capture controls, and audit every CUDA archive
+member, alias and exact runtime source. The CUDA audit rejects the old v3 package
+at the source pin before reading payloads. Syntax checks pass; these are prepared
+audits, not completed new-artifact verification. Exact scripts/checks/observed
+job-state ledger: `docs/dia-attention-delivery-audit-preparation-2026-10-13.json`.
+
+Collect both terminal jobs, including failures, then run independent audits and
+the existing same-input consumer. Preserve previous terminal Kaggle results
+before actual GPU follow-up. Issues/PR heads are unchanged; latest main CI is
+still queued/running. Native speech remains rejected; no release/default change.
