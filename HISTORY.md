@@ -23830,3 +23830,35 @@ verify the completed exact-source CUDA package `38394649538`. Archive all
 results, including evidence against this hypothesis; no speech/speed promotion.
 
 </details>
+
+
+## 2026-10-13 — Dia output-head cause isolated
+
+The exact-shape output-head probe reproduces every retained native step-978
+logit byte-for-byte. Combining the heads changes nothing; flattening batch
+shape changes rounding but does not restore the differing draw. All 16
+original-filter controls choose token 877 with original hidden states and 904
+with native hidden states. The cause at this boundary precedes the output
+head. This is isolated numerical evidence, not accepted speech or speed; the
+local original projection is not byte-identical to the hosted original one.
+[Full ledger](docs/dia-head-projection-isolation-2026-10-13.json).
+
+<details>
+<summary>Completed output projection claim</summary>
+
+## CLAIMED 2026-10-13 — Dia output projection isolation on identical hidden states
+
+Owner: this maintainer session, controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
+`/mnt/storage/crispasr/dia-head-probe-20261013`. Fetch only the pinned original
+output-head tensor by validated HTTP ranges, requiring every mapped F32 head
+hash to match the existing full physical export audit. Compare the actual
+original Torch2.6 DenseGeneral and actual packaged ggml CPU projections on
+verified retained original/native step-978 hidden states, holding weights,
+inputs and output layout fixed. Test split versus combined projection, repeats
+and a deliberately incorrect layout/scale. No full checkpoint or large model
+runs locally; heavy full-model/GPU follow-ups remain hosted. Preserve all
+results before considering a gated runtime candidate. No seed/filter/quality
+change or speech/speed acceptance follows from an isolated projection.
+
+</details>

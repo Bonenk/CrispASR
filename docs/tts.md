@@ -2324,3 +2324,13 @@ files match their immutable controls. Nine TTS executions show actual CUDA
 splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
 candidate; it establishes no native speech, Q4 or speed acceptance.
 [Complete physical rotary proof](dia-original-rope-cuda-physical-2026-10-13.json).
+
+
+The exact-shape output-head probe reproduces every retained native step-978
+logit byte-for-byte. Combining the heads changes nothing; flattening batch
+shape changes rounding but does not restore the differing draw. All 16
+original-filter controls choose token 877 with original hidden states and 904
+with native hidden states. The cause at this boundary precedes the output
+head. This is isolated numerical evidence, not accepted speech or speed; the
+local original projection is not byte-identical to the hosted original one.
+[Projection audit](dia-head-projection-isolation-2026-10-13.json).

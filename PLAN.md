@@ -6,22 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia output projection isolation on identical hidden states
-
-Owner: this maintainer session, controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
-`/mnt/storage/crispasr/dia-head-probe-20261013`. Fetch only the pinned original
-output-head tensor by validated HTTP ranges, requiring every mapped F32 head
-hash to match the existing full physical export audit. Compare the actual
-original Torch2.6 DenseGeneral and actual packaged ggml CPU projections on
-verified retained original/native step-978 hidden states, holding weights,
-inputs and output layout fixed. Test split versus combined projection, repeats
-and a deliberately incorrect layout/scale. No full checkpoint or large model
-runs locally; heavy full-model/GPU follow-ups remain hosted. Preserve all
-results before considering a gated runtime candidate. No seed/filter/quality
-change or speech/speed acceptance follows from an isolated projection.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6528,3 +6513,34 @@ no internal review branch remains necessary. Latest final-main gates still queue
 Next: causal numerical isolation at matching-history boundaries before another
 full-model candidate. A more accurate or different reduction alone is not proof
 of better decoded speech; keep the unchanged seed/filter/quality controls.
+
+
+## UPDATE 2026-10-13 — Output projection is not the step-978 draw cause
+
+The bounded head probe fetches only 75,832,928 bytes by strict pinned HTTP
+ranges (75,792,384 head bytes); all nine F32 head hashes match the prior full
+physical export audit. The initial two-column probe did not reproduce native
+batch layout and is retained. Exact `(2048,1,2)` ggml split-head replay now
+reproduces every saved native step-978 logit byte-for-byte. Combined and split
+heads are byte-identical for both original/native inputs in both 3D and 2D
+controls. Flattening changes numeric values but does not restore the draw.
+
+All 16 unchanged-noise/original-filter controls select head-2 token 877 on
+original hidden states and 904 on native hidden states, including actual
+Torch2.6 DenseGeneral, split Torch, original four-thread projection, and all
+ggml shape variants. The output-head implementation does not cause this draw
+boundary; the relevant differences already exist in the hidden states.
+Float64 attribution through the exact original coefficients reverses the
+904-minus-46 margin from -1.970866e-5 to +2.748825e-5. The hidden-error direction
+component contributes +4.744539e-5; the parallel scale component -2.484763e-7.
+This does not exclude earlier normalization contributing directional errors.
+
+All projection repeats and the doubled-output magnitude negative pass. The
+local original projection is not byte-identical to hosted original logits,
+even with the original four-thread setting; this limitation is explicit.
+Full source/weights/range/input/output/library/initial-attempt and draw ledgers:
+`docs/dia-head-projection-isolation-2026-10-13.json`. No runtime/default or quality
+gate changes. Next isolate final normalization and then earlier decoder
+operations using actual reference inputs; do not spend a full-model run on head
+fusion as a speech repair. Both final-main CANN compile jobs are now running;
+final general CI is still queued. No release tag.

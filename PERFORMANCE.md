@@ -3280,3 +3280,13 @@ files); its actual T4 speech rejection is retained separately. A weight-free
 RMSNorm audit on all retained decoder boundaries isolates F32 versus double-sum
 rounding in nine of 36 comparisons, with no runtime/default change or speed
 claim. [CUDA package](docs/dia-cuda-package-v3-2026-10-13.json), [RMSNorm primitive](docs/dia-rmsnorm-primitive-2026-10-13.json).
+
+
+The exact-shape output-head probe reproduces every retained native step-978
+logit byte-for-byte. Combining the heads changes nothing; flattening batch
+shape changes rounding but does not restore the differing draw. All 16
+original-filter controls choose token 877 with original hidden states and 904
+with native hidden states. The cause at this boundary precedes the output
+head. This is isolated numerical evidence, not accepted speech or speed; the
+local original projection is not byte-identical to the hosted original one.
+[Projection audit](docs/dia-head-projection-isolation-2026-10-13.json).
