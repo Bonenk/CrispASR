@@ -3299,3 +3299,12 @@ and changed-feedback/scaled-output negatives pass. The remaining hidden
 variation is inside the decoder blocks or their attention inputs; these
 isolated controls do not accept native speech, Q4 or speed.
 [Norm/input audit](docs/dia-norm-embedding-isolation-2026-10-13.json).
+
+
+Block-0 pre-attention norm is byte-identical on all four verified embedding
+inputs. Q/K/V projections introduce small rounding differences (minimum cosine
+0.9999999999999603, maximum row-norm error 9.19345e-8). Flattened branch batches
+worsen relative L2 in all 12 controlled cases, so no runtime candidate is
+introduced. Repeats and a magnitude negative pass. This is primitive isolation,
+with native speech still unaccepted.
+[Block-0 audit](docs/dia-block0-projection-isolation-2026-10-13.json).

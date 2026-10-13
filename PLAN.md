@@ -6,20 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-13 — Dia first decoder normalization and QKV primitive isolation
-
-Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded next probe directory
-`/mnt/storage/crispasr/dia-block0-probe-20261013`. Verified decoder embedding and
-learned final norm are byte-exact on matching inputs, while hidden direction
-already changes the output-head draw. Fetch only audited first pre-SA norm and
-Q/K/V weights by pinned validated ranges. Run actual Torch2.6 modules and actual
-native ggml primitives on identical verified embedding captures, with correct
-batch shape and explicit split/flattened controls. Separate norm, projection
-and input errors before any runtime candidate or full-model run. Preserve
-repeats, negative controls and every result; no quality/seed/filter waiver.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
@@ -6580,3 +6567,35 @@ Complete job/log ledger: `docs/cann-final-main-sdk-2026-10-13.json`. This remain
 SDK compilation, alongside separately verified physical 924-case operator
 acceptance; it does not establish full-model NPU speech or performance.
 Latest general CI still queues; no new release tag or numerical runtime change.
+
+
+## UPDATE 2026-10-13 — First decoder norm exact; flattened QKV rejected
+
+Four complete original block-0 tensors (25,174,016 bytes) are audited against
+the full physical F32 export. Initial fetch stopped on a missing self_ audit
+prefix before trusting Q; corrected resume uses the actual converter mapping
+and rehashes retained bytes. First pre-SA norm is byte-identical at all four
+verified embedding checkpoints. The first measured primitive differences are
+Q/K/V projection rounding on identical normalized inputs: baseline minimum
+head cosine 0.9999999999999603, maximum row-norm error 9.19345e-8 and maximum
+absolute error 2.38419e-6. All 72 comparison rows, repeats and scaled-output
+negative are retained. Flattening the branch batch worsens relative L2 error
+in all 12 Q/K/V/step cases; do not launch a full-model run for this idea alone.
+This isolates arithmetic, not a causal speech fix. Runtime/defaults remain
+unchanged. Complete source/tensor/shape/input/output ledger:
+`docs/dia-block0-projection-isolation-2026-10-13.json`.
+Next numerical triage must distinguish projection, rotary and attention/cache
+error with actual original intermediate inputs before another full-model A/B.
+
+## Pending — EmbeddingGemma 2 speech reader feasibility (2026-10-13)
+
+User requested the approach demonstrated at https://eg2.haku.sh/.
+Google base is Apache-2.0 and upstream llama.cpp already supplies model support
+and GGUFs. A faithful ASR port additionally needs the trained reader, exact
+word bank and decoding blueprint; those assets were not located during this
+public-source check. The author's Neural Engine speed is not a ggml benchmark.
+Record: `docs/embeddinggemma2-asr-feasibility-2026-10-13.md`. Reuse audited
+CrispEmbed text/model components where applicable, add temporal audio features
+and a CrispASR reader only after their source/weights are pinned. Do not assume
+our typed-decision backend already supplies an audio encoder or speech reader.
+This is a backlog feasibility item, not implemented support or a release claim.

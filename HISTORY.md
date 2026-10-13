@@ -23896,3 +23896,32 @@ acceptance. Record completed final-main CANN compile run `38401026881` alongside
 its exact source and unchanged physical-operator scope.
 
 </details>
+
+
+## 2026-10-13 — First decoder normalization and QKV isolation
+
+Block-0 pre-attention norm is byte-identical on all four verified embedding
+inputs. Q/K/V projections introduce small rounding differences (minimum cosine
+0.9999999999999603, maximum row-norm error 9.19345e-8). Flattened branch batches
+worsen relative L2 in all 12 controlled cases, so no runtime candidate is
+introduced. Repeats and a magnitude negative pass. This is primitive isolation,
+with native speech still unaccepted.
+[Full ledger](docs/dia-block0-projection-isolation-2026-10-13.json).
+
+<details>
+<summary>Completed first-block primitive claim</summary>
+
+## CLAIMED 2026-10-13 — Dia first decoder normalization and QKV primitive isolation
+
+Owner: this maintainer session, storage controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`; bounded next probe directory
+`/mnt/storage/crispasr/dia-block0-probe-20261013`. Verified decoder embedding and
+learned final norm are byte-exact on matching inputs, while hidden direction
+already changes the output-head draw. Fetch only audited first pre-SA norm and
+Q/K/V weights by pinned validated ranges. Run actual Torch2.6 modules and actual
+native ggml primitives on identical verified embedding captures, with correct
+batch shape and explicit split/flattened controls. Separate norm, projection
+and input errors before any runtime candidate or full-model run. Preserve
+repeats, negative controls and every result; no quality/seed/filter waiver.
+
+</details>
