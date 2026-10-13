@@ -52,6 +52,21 @@ Markdown updates; each acceptance gate precedes the dependent step.
 Public archive-retrieval CI `38346489272` is SUCCESS at `bff87788e`.
 The ordered roadmap is not a claim that pending models, PRs or hardware pass.
 
+## CLAIMED 2026-10-13 — Prepare Dia CUDA package while CPU control is queued
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-cuda-prep-20261013`, branch
+`prepare/dia-cuda-20261013`, based on runtime candidate `2205d920d`.
+CPU OFF/ON/OFF job `38357576078` remains unchanged and awaits a GH runner.
+The fully read Kaggle guide reserves Kaggle for actual GPU work; the CPU
+control stays on GH. Prepare a compile-only CUDA 12.4 SM60/SM75 package on GH
+using the existing validated Breeze bundle/closure pattern, including CLI,
+shared C ABI, diff, quantizer and same-source Python bindings. Record exact
+runtime/source/submodule/ELF hashes and keep the driver outside the package.
+This prepares the next ordered hardware step and does not accept model speech.
+No Kaggle model test or profiling starts until the CPU speech gate passes.
+Keep all large artifacts under storage; no local CUDA/heavy model build.
+
 ## Release preparation checkpoint 2026-10-09
 
 Comprehensive `RELEASE_NOTES_v0.8.43.md` is committed before any version bump.
