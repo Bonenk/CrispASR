@@ -6,7 +6,24 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED 2026-10-13 — Dia bounded block-zero cache and attention replay
+
+Owner: this maintainer session, controller worktree
+`/mnt/storage/crispasr/triage-20261007/worktree`, tiny probe directory
+`/mnt/storage/crispasr/dia-block0-attention-probe-20261013`. Use audited original
+feedback for contiguous steps 0–3 and the already audited embedding/pre-SA/QKV
+weights. Execute actual original decoder embedding entry, Attention.forward
+and KVCache.update; capture before the output projection. Compare literal native
+cache reorder, GQA interleave and ggml attention operations on identical inputs,
+then composed native projection/rotation inputs. Preserve original scale=1,
+positions/branch shape, cache dtype, repeats and layout/scaling negatives. This
+is a bounded CPU boundary probe, not a full decoder/free-speech or CUDA claim.
+Do not reconstruct the original attention reference or run a local full model.
+If short-prefix primitives pass, late-history attention needs an actual hosted
+capture/replay; do not infer it from four steps. Main 3386096f2 CI/lint/secret
+checks queue; Ruby/pages are running. No runtime/default/quality gate changes.
+
+## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
