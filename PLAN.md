@@ -21,6 +21,11 @@ unchanged wrapper. Preserve both successful scoped controls and broad-suite
 aborts; inspect pinned ggml source before proposing a repair or bounded device
 follow-up. Update hardware documentation and release notes and answer the PR.
 No full-model, quantization or performance claim follows from operator tests.
+The attached complete logs identify rejected BF16 inputs: ADD advertises them
+unconditionally, while MUL_MAT guards weights but not the activation input on
+310P. Prepare a narrowly scoped shared-ggml candidate in storage and compile it
+on the existing two-architecture GH CANN matrix. Keep the production submodule
+pin unchanged until physical rerun and required validation accept the repair.
 
 ## CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
