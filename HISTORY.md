@@ -24092,3 +24092,15 @@ including real ELF negative/positive loading. Package/runtime/model/reference
 bytes and acceptance thresholds are unchanged. Actual GPU version 5 is
 submitted; no hardware acceptance yet. See
 `docs/dia-attention-cuda-driver-repair-2026-10-13.json`.
+
+## 2026-10-13 — Retain T4 receipt failure; independently validate completed work
+
+Version 5 performed real CUDA execution and all three 40/40 replays, then
+failed on NumPy shape JSON serialization. Complete preserved outputs prove
+OFF/ON/OFF identity, 72 snapshots, 11,037 CUDA splits/8,736 MiB per native
+arm and original GPU ASR WER 0. Same-input actual-original/T4 attention differs
+by at most relative L2 4.813245892395258e-7. The original job remains ERROR.
+Repair 36c4bbdff provides explicit integer dimensions/atomic receipts; eleven
+input tests pass. Complete 261-payload proof is public and anonymously verified.
+No redundant hardware rerun, native speech/Q4 acceptance or release change.
+See `docs/dia-attention-cuda-postmortem-2026-10-13.md` and `.json`.

@@ -362,3 +362,12 @@ The diagnostic worker now retains inherited NVIDIA driver paths and checks
 driver/plugin loading before weights. Nine input guards pass, including a
 real ELF loader regression. Version 4 is retained as a failed setup control;
 actual version 5 is submitted. Native speech/Q4 remain unaccepted.
+
+### Dia diagnostic receipt repair; actual T4 results retained
+
+Explicit integer dimensions and atomic receipts fix the post-computation
+serialization failure. Eleven input guards pass. Complete saved T4 work
+independently verifies all 120 normal stages, 72 snapshots and capture
+transparency; same-input actual-original/T4 attention differs by less than
+relative L2 4.82e-7. Public complete evidence retains the original failed
+terminal state. Native speech/Q4 remain unaccepted; defaults/models unchanged.

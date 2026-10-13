@@ -6940,3 +6940,37 @@ storage, keeping original terminal ERROR/receipt unchanged; do not repeat
 expensive GPU work solely for metadata. Convert dimension values explicitly
 to Python int, prove JSON roundtrip with actual NumPy uint64 shapes and scale
 negative, and require atomic receipts. Native free speech/Q4 stay unaccepted.
+
+## UPDATE 2026-10-13 — T4 computations verified; receipt bug repaired without rerun
+
+Kaggle version 5 remains terminal ERROR from NumPy uint64 shape serialization.
+All 232 outputs/full logs are retained; its original receipt is unchanged.
+Independent audit proves driver/plugin preflight, original GPU ASR WER 0 with
+25 CUDA splits, 120/120 normal stage rows, three 11,037-split native captures
+at 8,736 MiB, full OFF/ON/OFF array identity and all 72 snapshots. Existing
+scale/index/history negatives reject. Model/source/physical audit hashes match.
+
+On identical captured GPU Q/K/V inputs, actual original Torch 2.6 CPU attention
+versus actual T4 output has minimum row cosine 0.9999999999974468, maximum
+row norm error 7.674099771204368e-7 and maximum relative L2
+4.813245892395258e-7 across all 18 layers. Repeats and compact/3072-slot cache
+comparisons are exact; all 18 uniform-scale negatives expose magnitude error.
+This excludes a large self-attention cache/GQA/operator defect at this boundary,
+without accepting native free speech or pretending the failed job turned green.
+
+Repair source 36c4bbdff71552a4fc2c143c5ac727bc56bea851 converts dimensions to
+Python int and writes atomic checkpoints. Eleven input tests pass, including
+exact shape-failure/JSON-roundtrip and prior-receipt preservation. All four
+secret checks pass before pushing; runtime/model/reference/gates unchanged.
+No extra GPU inference was run merely to regenerate metadata. Complete public
+proof is anonymously verified at fixture revision
+39a4e7652a3007778501bf01fd47e18dd0aba8c7: 261 payloads, 403,853,797-byte ZIP.
+Full evidence: `docs/dia-attention-cuda-postmortem-2026-10-13.md` and `.json`.
+
+Next isolate self-output projection, cross-attention and feed-forward
+norm/gating/output on matching inputs. Existing encoder output, cross-K/V
+and layer-zero cross-attention snapshots can narrow the next capture; read
+actual source shapes/masks and use full transparency controls for additional
+hooks. Do not retry already-rejected RoPE/default candidates or start perf
+before decoded speech passes. Issues/PR heads unchanged; latest main secret
+CI passed, broad CI/lint remain queued. No release/model/default promotion.

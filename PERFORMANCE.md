@@ -3380,3 +3380,15 @@ conclusion applies. Repair 6e1a8bb10 preserves host library paths and checks
 driver/plugin loading before weights. A real ELF regression passes; actual
 version 5 is submitted. Runtime/package bytes are unchanged and physical
 confirmation remains pending.
+
+### Dia actual T4 same-input attention exclusion, 2026-10-13
+
+The failed version-5 receipt retained completed CUDA work: three 40/40 native
+replays with 11,037 CUDA splits and 8,736 MiB peak allocation each, exact
+complete OFF/ON/OFF arrays, and original GPU ASR WER 0. Independent auditing
+of 72 snapshots and actual-original CPU attention on the SAME GPU inputs
+gives minimum row cosine 0.9999999999974468, maximum row norm error
+7.674099771204368e-7 and maximum relative L2 4.813245892395258e-7.
+Serialization is repaired; original terminal ERROR is preserved. These are
+correctness/allocation witnesses, not performance or native speech acceptance.
+Public complete proof: `docs/dia-attention-cuda-postmortem-2026-10-13.md`.

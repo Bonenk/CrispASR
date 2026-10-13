@@ -422,3 +422,14 @@ fail early on unavailable drivers/plugins. A real ELF loader regression
 reproduces the prior failure and passes the repair. Actual GPU version 5 is
 submitted with unchanged runtime/model/reference bytes. Hardware capture and
 native speech acceptance remain pending; no production default changes.
+
+### Dia capture receipt repair and independently verified T4 diagnostics
+
+Fixed NumPy GGUF dimension serialization and made diagnostic receipts atomic,
+with eleven input guards including scale and failure-preservation controls.
+The completed actual T4 computations were recovered from a failed worker:
+120 stage comparisons, 72 snapshots, complete capture transparency and an
+original-audio GPU ASR positive all verify independently. Same-input attention
+now agrees with the actual original operator within relative L2 4.82e-7 on
+CPU/T4. Complete proof is publicly retrievable. Native free-running speech/Q4
+remain unaccepted; no default/model/release promotion follows from diagnostics.
