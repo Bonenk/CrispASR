@@ -5893,3 +5893,32 @@ CPU, sequential contexts. Existing portable sampler remains opt-in, original
 seed/top-k/top-p/reference and quality gates stay unchanged. This is not a native
 speech/Q4/GPU acceptance claim or a promotion of new model pins; runtime remains
 unmerged. A precision control must explain the failure before any default change.
+
+### 2026-10-13 precision controls `5a8fe578e` queued, evidence checkpoint
+
+[38343667254](https://github.com/CrispStrobe/CrispASR/actions/runs/38343667254)
+is queued at exact clean source `5a8fe578e6a7d16b68cbb3de3398f3c704191cd4`.
+Two fixed controls promote nine original F32 heads (+37,896,192 bytes), then all
+original neural coefficients to F32. Streaming export requires the original
+checkpoint SHA, all 381 mapped template tensors/rounded original coefficients,
+metadata/shape/order preservation and complete physical byte/type audits. Each
+arm gets strict original stage diff plus real native C ABI/CLI generation and
+ASR. Native contexts/exporter children run sequentially; hosted build uses
+Ninja/ccache. No large neural model is exported or loaded locally.
+
+Five tiny actual original-module contracts pass (36.010 s); source syntax and
+diff checks pass, and both staged source pushes pass all four no-secrets tests
+without skips (80.219 / 51.262 s). Full source and log hashes plus the actual
+boundary analysis are in `docs/dia-neural-precision-controls-2026-10-13.json`.
+Original token 606 has rank 41 and preceding cumulative probability .944279015,
+so the original shifted top-p mask keeps it as the crossing token. Native
+ranking moves it to 42 after token 594; preceding cumulative .955503702 exceeds
+.95, so it is removed. Both retain top-k=45; no cutoff/seed/reference was changed.
+Original-model portable-sampler PCM is independently confirmed byte-identical
+to canonical PCM. This local boundary analysis does not accept native speech.
+
+Existing native F16 C ABI/CLI rejection (empty transcripts, WER 1) remains
+recorded; candidate remains unmerged and opt-in. The new hosted control is not
+a result, and no production model pin, Q4/GPU gate or release tag is promoted.
+Current main CI is running after the result/claim checkpoint; previous main
+80b2b8340 was fully green. Open outside issue/PR heads remain unchanged.

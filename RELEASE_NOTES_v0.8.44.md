@@ -122,8 +122,7 @@ audit row whenever the converter changes.
 
 This tooling is independent of the unmerged Dia runtime investigation. Native
 short-speech and Q4 gates remain failed, and registry companion pins are
-unchanged. Fresh integration CI remains a separate pending check until its
-hosted result is recorded.
+unchanged. Fresh [integration CI](docs/dia-dac-converter-hosted-2026-10-13.json) also passes real conversion, exact candidate bytes and all 134 physical tensor rows.
 
 ## Backend discovery and CI coverage
 
@@ -230,10 +229,4 @@ Those controls are documented in
 [the full-inference receipt](docs/breeze-guided-full-inference-arithmetic-2026-10-12.json)
 and do not replace canonical fixtures or waive the recorded diagnostic.
 
-Dia diagnostic follow-up: [standalone codec export](docs/dia-dac-standalone-export-2026-10-12.json) now passes fresh 48/48 startup and 40/40 full-history comparisons with byte-identical validated conversion and complete physical tensor audit (+1,312 bytes). [Pinned Torch 2.6 probability replay](docs/dia-sampling-probability-hosted-2026-10-12.json) confirms matching support on both 333-row arms and max probability error below 3.61e-7. Random-stream compatibility and free-running short speech remain unaccepted; production pins/defaults are unchanged.
-
-Pinned Dia RNG witness: [hosted and isolated local Torch 2.6 replay](docs/dia-canonical-random-hosted-2026-10-12.json) reproduce all 1,226 original decoder transitions and 1,210 codec frames. The row-split negative differs on 9,090 draws. Cross-host F32 exponential noise is not byte-identical, while discrete draws and MT states agree. This component result does not establish a native sampler fix or free-running speech acceptance.
-
-The [portable Dia sampler candidate](docs/dia-portable-sampler-candidate-2026-10-12.json) now matches every original draw with native filtering over the complete retained history. It is gated off by default and remains on the unmerged validation branch. Hosted actual-neural, native CLI/C-ABI and ASR checks are queued; no free-speech, GPU or Q4 acceptance is inferred from the component result.
-
-Hosted Dia results: [converter integration](docs/dia-dac-converter-hosted-2026-10-13.json) and [portable sampler replay](docs/dia-portable-random-hosted-2026-10-13.json) pass. The [actual speech control](docs/dia-portable-speech-hosted-2026-10-13.json) preserves original-model codes and recognized speech exactly, but native F16 CLI/C-ABI speech still fails with empty transcripts. The runtime remains unmerged and gated; neural precision/filter-support controls are next.
+Dia's unmerged [portable sampler replay](docs/dia-portable-random-hosted-2026-10-13.json) reproduces all 11,034 original draws and 1,210 codec frames with native filtering. In the [real speech control](docs/dia-portable-speech-hosted-2026-10-13.json), the original neural model with this sampler produces byte-identical canonical PCM and WER 0, while native F16 CLI/C-ABI speech still fails with empty transcripts. The first differing draw follows a nucleus-support boundary change despite close logits. [Original-head/full-F32 controls](docs/dia-neural-precision-controls-2026-10-13.json) are queued to isolate the remaining precision effect. The runtime stays opt-in and unmerged; production defaults/model pins and speech/Q4/GPU gates remain unchanged.
