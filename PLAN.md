@@ -5981,3 +5981,32 @@ Integrate this independent tooling by fast-forward after staged secret/doc check
 then use it for future Dia control inputs while the exact `5a8fe578e` neural
 precision job 38343667254 continues unchanged. No runtime/default/model-pin or
 native speech/Q4/GPU acceptance is inferred from successful archive retrieval.
+
+### 2026-10-13 public retrieval integrated and future input replay proven
+
+Main `bff87788e` integrates only verified archive retrieval/docs/CI; no runtime
+math or default changes. Eight negative/positive contracts pass (1.626 s),
+actual anonymous RNG download validates 11 files, canonical extraction validates
+its 21-file layout, actionlint and 227 anchors pass, both submodules use existing
+pins and all four staged secrets checks pass without skips (81.453 s).
+Dedicated CI [38346489272](https://github.com/CrispStrobe/CrispASR/actions/runs/38346489272)
+is queued at this checkpoint; local checks are not presented as hosted success.
+
+Future validation branch `9b6870bf4` replaces current canonical/rejected-control
+GH artifact downloads with the same immutable anonymous helper. Canonical/
+portable RNG, original/native sampler speech and neural-precision workers now
+retain exact pinned input bytes without GH-token/retention dependencies. Old
+historical startup/probability inputs outside the four current archives remain
+unchanged. Default-path local retained-logit replay actually downloads the
+public canonical ZIP and then reproduces all 11,034 draws, 1,226 transitions and
+1,210 frames, with the unchanged 9,090-draw row-split negative. Exact executed
+worker/helper/index, full receipt and array hashes are retained in
+`docs/dia-public-input-replay-2026-10-13.json`. All four staged branch no-secrets
+tests pass without skips (54.699 s). No neural weights are loaded locally.
+
+Original precision job 38343667254 remains executing at `5a8fe578e`; future
+transport changes do not modify/cancel that run or qualify as a model result.
+Native F16 quiet speech/WER 1 remains unaccepted until actual precision controls
+return. Production model pins/defaults, original seed/reference and Q4/GPU gates
+remain unchanged. Main release notes distinguish durable tooling from the
+unmerged runtime investigation; no release tag is created.
