@@ -11,6 +11,25 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
+
+Owner: this maintainer session. New storage worktree
+`/mnt/storage/crispasr/dia-original-rope-20261013`, branch
+`fix/dia-original-rope-20261013`, based on late-capture candidate `b14fd8a4c`.
+The tiny actual-source probe shows position-978 rotary coefficient error drops
+from 1.2040138e-4 to 5.9604645e-8 using the original timescales with existing
+ggml frequency factors and base one; default position zero is exact and the
+wrong-timescale control strongly rejects. This motivates, but does not accept,
+a full-model experiment. Preserve the pinned original module's generated F32
+timescale buffer as a separately audited auxiliary GGUF tensor. Route existing
+RoPE ops through their frequency-factor parameter behind an opt-in gate, with
+no new custom backend kernel and unchanged default path. Audit every existing
+neural/codec coefficient, then fixed F32/cross-cache source-RoPE OFF/ON/OFF
+canonical and late-stage diff plus real CLI/C-ABI speech on GH. Retain negative
+controls, complete trajectories and all failures. No seed/filter/reference/
+threshold change, performance claim or model/default promotion. Actual T4 v2
+and unmodified late-layer job continue independently.
+
 ## CLAIMED 2026-10-13 — Tiny actual-source rotary coefficient diagnostic
 
 Owner: this maintainer session. Private storage probe directory
