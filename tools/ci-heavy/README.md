@@ -74,3 +74,11 @@ transcript using pinned logits/vocabulary/sample hashes, rejects four broken
 provenance/target controls, then runs the actual Q4 CLI and F16 stage regression.
 Zero-WER upstream parity remains hard; the original model's 4.55% human WER
 is reported separately. Run with `-f pip="numpy gguf huggingface_hub"`.
+
+`cann_model_strict.py` reuses the full Moonshine CPU producer, then runs the
+opt-in exact-device path through diff, CLI and auto/explicit C ABI Sessions.
+It records allocated encoder backend/op counts and successful computation,
+and rejects scaled/nonfinite/wrong-shape/missing-stage reference archives,
+changed input PCM, missing CANN and invalid/unavailable device ordinals.
+Use the same dependency pins as `cann_model_fixture.py`. Hosted proof pending;
+these CPU controls cannot establish physical NPU work or ACL capture/replay.

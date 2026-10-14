@@ -34,6 +34,7 @@
 #include <cmath>
 
 #include "crispasr_diff.h"
+#include "core/backend_validation.h"
 #include "gguf.h"
 
 #include "voxtral.h"
@@ -5597,7 +5598,41 @@ int main(int argc, char** argv) {
         auto enc_r = parakeet_encoder_r(ctx, samples.data(), (int)samples.size());
         if (enc_r.ok) {
             auto rep = ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size());
-            print_row("encoder_output", rep, COS_THRESHOLD);
+            auto expected = ref.get_f32("encoder_output");
+            const auto expected_shape = ref.shape("encoder_output");
+            bool magnitude_ok = expected.first && expected.second == enc_r.data.size() &&
+                                expected_shape == std::vector<int64_t>{enc_r.shape[1], enc_r.shape[0]};
+            double max_row_norm_error = 0.0, squared_error = 0.0, squared_reference = 0.0;
+            if (magnitude_ok) {
+                const size_t dim = (size_t)enc_r.shape[1];
+                for (size_t row = 0; row < enc_r.data.size() / dim; ++row) {
+                    double mine = 0.0, original = 0.0;
+                    for (size_t col = 0; col < dim; ++col) {
+                        const size_t i = row * dim + col;
+                        const double a = enc_r.data[i], b = expected.first[i];
+                        mine += a * a;
+                        original += b * b;
+                        squared_error += (a - b) * (a - b);
+                    }
+                    squared_reference += original;
+                    if (!(mine > 0.0) || !(original > 0.0))
+                        magnitude_ok = false;
+                    else
+                        max_row_norm_error = std::max(max_row_norm_error, std::abs(std::sqrt(mine / original) - 1.0));
+                }
+            }
+            const double relative_l2 =
+                squared_reference > 0.0 ? std::sqrt(squared_error / squared_reference) : INFINITY;
+            magnitude_ok = magnitude_ok && std::isfinite(max_row_norm_error) && std::isfinite(relative_l2) &&
+                           max_row_norm_error <= .01 && relative_l2 <= .01;
+            char detail[256];
+            std::snprintf(detail, sizeof(detail), "|mine|/|ref|=%.9g row_norm_error=%.9g relative_l2=%.9g magnitude=%s",
+                          rep.norm_ratio, max_row_norm_error, relative_l2, magnitude_ok ? "PASS" : "FAIL");
+            if (!magnitude_ok) {
+                rep.cos_min = -1.0f; // Fail the existing summary as well as the printed stage.
+                rep.cos_mean = -1.0f;
+            }
+            print_row("encoder_output", rep, COS_THRESHOLD, detail);
             record(rep);
         } else {
             printf("[ERR ] encoder_output          %s\n", enc_r.note.c_str());
@@ -6684,6 +6719,19 @@ int main(int argc, char** argv) {
         mp.model_path = model_path.c_str();
         mp.tokenizer_path = nullptr;
         mp.n_threads = 4;
+        const core_backend_validation::Request required(std::getenv("CRISPASR_MOONSHINE_REQUIRE_BACKEND"),
+                                                        std::getenv("CRISPASR_MOONSHINE_REQUIRE_DEVICE"));
+        mp.use_gpu = required.active() && !required.cpu();
+        auto input = ref.get_f32("raw_audio");
+        if (!input.first || input.second != samples.size() ||
+            !std::equal(samples.begin(), samples.end(), input.first)) {
+            fprintf(stderr, "moonshine: reference input PCM differs; refusing stage comparison\n");
+            return 4;
+        }
+        if (!ref.get_f32("encoder_output").first) {
+            fprintf(stderr, "moonshine: required encoder reference missing or empty; refusing stage comparison\n");
+            return 4;
+        }
         moonshine_context* ctx = moonshine_init_with_params(mp);
         if (!ctx) {
             fprintf(stderr, "failed to load moonshine model '%s'\n", model_path.c_str());
