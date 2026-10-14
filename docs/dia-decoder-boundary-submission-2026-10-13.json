@@ -114,5 +114,6 @@
     "reason": "CIFS intermittent unavailability; original controller secret scan failed with missing working-directory error and was retried without weakening tests",
     "shared_main_checkout_changed": false
   },
-  "delivery_audit": "active; not yet independently verified"
+  "delivery_audit": "passed; complete public proof anonymously verified",
+  "results": "docs/dia-decoder-boundary-results-2026-10-14.json"
 }

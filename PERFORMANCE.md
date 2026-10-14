@@ -3408,3 +3408,11 @@ Opt-in observation preserves native decoder arithmetic; full OFF/ON/OFF
 transparency and original-reference boundary metrics are pending in GH
 38472367538. This establishes no timing, memory improvement or native speech
 acceptance. See `docs/dia-decoder-boundary-capture-2026-10-13.md`.
+
+### Dia decoder boundary controls verified, 2026-10-14
+
+All 120 ordinary stages, original hook tests and complete OFF/ON/OFF
+trajectories pass in GH 38472367538 and verify independently. Maximum
+block-zero boundary relative L2 is 5.204e-6; same-input operator separation
+is still required. No timing or native speech/Q4 acceptance follows. Complete
+public evidence: `docs/dia-decoder-boundary-results-2026-10-14.md`.

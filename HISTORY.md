@@ -24126,3 +24126,13 @@ and secret/doc checks pass; original hook tests remain mandatory on the
 hosted worker after local CIFS I/O blocked them. GH 38472367538 is queued;
 full-model transparency/metrics and native speech acceptance remain pending.
 See `docs/dia-decoder-boundary-capture-2026-10-13.md`.
+
+## 2026-10-14 — Independently verify and preserve decoder boundary capture
+
+GH 38472367538/source 8d0ad886 passes all sixteen original hook tests, 120
+ordinary stages, exact original/native OFF/ON/OFF trajectories and sixteen
+ON-only snapshots. Quality/index/scale negatives remain effective. Complete
+public raw/audit proof is anonymously hash-verified. Input and pre-SA norm
+are exact; maximum boundary relative L2 is 5.204e-6 at cross-Q. These rows
+include input drift and do not accept native speech/Q4/performance/release.
+See `docs/dia-decoder-boundary-results-2026-10-14.md`.

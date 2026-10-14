@@ -7055,3 +7055,37 @@ Storage paths are available again. Independently verify source/runtime/model
 provenance, all original hook tests, complete OFF/ON/OFF trajectories, ordinary
 stages, sixteen boundary snapshots and unchanged negatives before interpreting
 metrics. No boundary diagnosis or native speech/Q4/release acceptance yet.
+
+## UPDATE 2026-10-14 — Full decoder capture independently verified
+
+GH 38472367538 source 8d0ad886 succeeded. Complete 890,528,559-byte raw ZIP
+SHA matches GH; full extraction/CRC/source/input ledgers verify. All sixteen
+actual-original hook tests pass, original ASR is WER 0, all 120 ordinary
+stage comparisons pass, and complete original/native OFF/ON/OFF arrays are
+byte-identical. Exactly sixteen ON-only native snapshots and all old quality/
+index negatives verify; sixteen scale-invisible magnitude negatives reject.
+All 381 neural/134 DAC physical audit entries and pinned export/source hashes
+are consistent. Original and native block-zero input/pre-SA norm are exact.
+Largest boundary relative L2 is 5.204e-6 cross-Q, 4.711e-6 pre-SA-output
+attention; MLP output is 1.614e-6, final layer output 1.436e-6. These include
+input drift, not isolated same-input operators. No large block-zero defect
+is demonstrated and native free-running speech/Q4 remain unaccepted.
+Complete evidence is being published publicly; current independent result:
+`docs/dia-decoder-boundary-results-2026-10-14.json`.
+
+## CLAIMED 2026-10-14 — Same-input fused original MLP versus native split graph
+
+Read actual original DenseGeneral/MlpBlock and native expression. Fetch only
+the two complete block-zero original F32 wi_fused/wo weights (201,326,592
+bytes) via strict immutable ranges and match original splits/transposes to
+physical F32 export hashes. Run actual original module on owned original and
+native pre-MLP-normalized inputs; compare gate/up/actual hidden/down outputs.
+Use the literal native ggml MLP expression and byte-verified CPU libraries
+for a bounded primitive replay. Separate local-vs-hosted original/native
+differences, same-input operator differences and input drift; include repeat,
+scale and wrong-split negatives. No full-model local load, new seed/filter/
+threshold, speculative numerical repair, performance or speech acceptance.
+
+Complete raw/audit proof is now public and anonymously SHA-verified at fixture
+revision `4a625f2472c3208a355691a1fda171c70042c4e6`. Decoder results and full acceptance scope:
+`docs/dia-decoder-boundary-results-2026-10-14.md` and `.json`.

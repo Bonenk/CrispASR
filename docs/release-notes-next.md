@@ -348,8 +348,11 @@ show relative L2 differences below 7.21e-7 on retained CPU/T4 outputs;
 scale and layout negatives remain effective. The original GPU job remains
 ERROR, and the original reference operators in these bounded replays run CPU.
 Native free-running speech and Q4 remain unaccepted. Opt-in decoder
-residual/cross-Q/fused-MLP observation is now implemented on diagnostic source
-8d0ad886; full hosted transparency and boundary metrics are pending in GH
-38472367538. No production default, model or release promotion follows. See
+residual/cross-Q/fused-MLP observation on diagnostic source 8d0ad886 now passes
+full hosted capture transparency, sixteen actual-original hook tests and 120
+ordinary stages in GH 38472367538. Independently verified boundary differences
+are small (maximum relative L2 5.204e-6), and complete proof is public. These
+rows include input drift; isolated operator checks continue. No production
+default, model or release promotion follows. See
 `docs/dia-cross-cache-input-replay-2026-10-13.md` and
-`docs/dia-decoder-boundary-capture-2026-10-13.md`.
+`docs/dia-decoder-boundary-results-2026-10-14.md`.
