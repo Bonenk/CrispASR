@@ -7570,3 +7570,19 @@ Evidence: docs/moonshine-hosted-cpu-fixture-2026-10-14.md and .json.
 Next: strict CANN model-stage selection, reject missing devices/CPU fallback,
 retain actual scheduler/NPU execution traces; prove failure controls before
 publishing physical hardware commands. Dia full speech remains rejected.
+
+## CLAIMED 2026-10-14 — Strict Moonshine device validation
+
+Owner: current maintainer session, separate worktree
+/mnt/volume1/crispasr-cann-model-fixture-20261014, branch
+diag/cann-model-strict-20261014. Heavy build/run/evidence files remain
+/mnt/storage/crispasr/cann-model-strict-20261014 or GH hosted scratch.
+Add opt-in exact backend/device selection shared by Moonshine CLI/C ABI/stage
+entry points, rejecting unavailable devices and contradictory CPU requests.
+Validate allocated encoder graph assignments and successful computation without
+adding eval callbacks or altering the graph. Keep existing normal dispatch
+available. Wire the Moonshine diff entry to the requested backend, verify exact
+reference PCM, and enforce scale-sensitive encoder gates. Prove real CPU
+positive/missing-device/invalid-index controls, then hosted full CLI/Session/diff
+checks. No NPU/ACL/performance claim from CPU controls, and no unexecuted hardware
+procedure published.
