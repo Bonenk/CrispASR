@@ -7213,3 +7213,15 @@ or hardware acceptance is claimed. After Dia transparency passes, reproduce
 this allocation defect before fixing it, compile the scoped shared-ggml
 candidate on both SDK architectures and request the full physical rerun
 under unchanged operator tolerances. Record: docs/cann-910b3-hardware-2026-10-14.json.
+
+## CLAIMED 2026-10-14 — Bounded pre-fix CANN cache-capacity regression
+
+While the existing Dia full run executes, prepare a CPU-only safety regression
+of the literal tested CANN sin/cos allocation block and actual cache metadata
+class. Instrument allocator byte capacities only; no RoPE math/reference or
+NPU execution is simulated. Exercise the reported constant-512-position
+width sequence plus growing-width/shrinking-position and ordinary position
+growth controls. Observe the old-source failure before any repair. Keep
+this test in the owned Dia diagnostic worktree and all compiled fixtures/
+logs under /mnt/storage. Production pin/runtime stay unchanged; shared-ggml
+repair/SDK/device rerun follow the Dia transparency gate as requested.
