@@ -7245,3 +7245,29 @@ repair, prove the pre-fix test now passes, retain the old failing controls,
 compile both SDK architectures and arrange the immutable physical rerun.
 No device/full-model/performance/release acceptance is inferred from this
 CPU allocation proof.
+
+## UPDATE 2026-10-14 — Dia full control succeeded; independent audit active
+
+Run38527734866 completed successfully at08:21:57UTC on diagnostic source
+eb94d724. Artifact11878953458 is478,636,694 bytes, official ZIP SHA256
+`ae9626d4020f45125bca0741c166e5e59f73d39781e4f6ea80250fbe6a5bf24e`.
+Single collector has verified the download digest and is extracting/hash-
+checking the complete delivery. Producer claims complete ten-arm PCM and
+logged CLI/C-ABI histories exact. Baseline speech remains rejected: both
+ASR transcripts empty, WER1.0. Independent audit must confirm those claims
+before marking transparency verified. No speech/release acceptance.
+
+## CLAIMED 2026-10-14 — Scoped CANN rotary allocated-byte capacity candidate
+
+After the active Dia independent transparency audit passes, repair the
+confirmed requested-capacity defect in an owned shared-ggml worktree at
+/mnt/volume1/crispasr-cann-rope-ggml-20261014, exact tested base21acf3162.
+Track actual sin/cos allocated bytes independently of last-call dimensions;
+leave rotary arithmetic/tolerances/routing unchanged. Re-run the unchanged
+pre-fix regression against candidate source and preserve both old failures.
+Prepare SDK validation in separate source-only CrispASR worktree
+/mnt/volume1/crispasr-cann-rope-sdk-20261014; all compiled fixtures/artifacts
+remain /mnt/storage or GH. Compile both existing SDK architectures, preserve
+310P BF16 routing, and provide immutable fresh-directory physical rerun
+commands to PR544. Production ggml pin advances only after required physical
+proof and composed CI; no NPU model/quality/performance claim from CPU tests.
