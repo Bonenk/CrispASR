@@ -7352,3 +7352,25 @@ run composed general CI. SDK run38536737288 remains active on both runners;
 its single collector retains complete terminal logs. Production pin stays
 21acf3162 until both SDK and composed CI pass. Full model/Q4/speed follow-ups
 remain distinct. All build artifacts stay on GH or /mnt/storage.
+
+## UPDATE 2026-10-14 — Physical repair replied; composed CI submitted
+
+PR544 reply6165132300 links the independent physical receipt and confirms
+1691/1691 broad plus452/452 repeat. Composed source
+1a36c871d76b162dcf0512a0fec450ce61ed4840 pins the exact tested0a8620765;
+13-job general CI run38541851377 is submitted. All four secret tests pass
+on this composition and docs227anchors/102files pass. Production remains
+21acf3162. Existing SDK38536737288 still builds both architectures.
+
+Shared-fork merge ea526e120deff8333fc42decc315137d7e297fca is prepared
+locally in /mnt/volume1/crispasr-cann-rope-integration-ggml-20261014.
+Its complete tree46e7c06208ed32f6bcf825afe9e0ed09dc712883 is identical
+to physically tested0a8620765, preserving shared-fork985ba50 history.
+It is not yet pushed to the production fork branch. A shallow boundary
+was deepened before merging; no unrelated-history override was used.
+
+One terminal collector per run retains complete logs/metadata:
+/mnt/storage/crispasr/cann-rope-sdk-20261014 and
+/mnt/storage/crispasr/cann-rope-integration-20261014. No new heavy local
+build or model run is active. Audit terminal evidence, then integrate after
+all required gates pass; full NPU model/Q4/performance remain follow-ups.
