@@ -1,0 +1,109 @@
+{
+  "candidate_source": "168384d47ba462ae72858042ffc13188b143cca1",
+  "candidate_branch": "diag/cann-model-validator-20261014",
+  "flag_controls": {
+    "passed": true,
+    "runs": [
+      {
+        "label": "cpu-false",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "/mnt/volume1/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cpu-false"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "cpu-true",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "/mnt/volume1/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cpu-true",
+          "--use-gpu"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "cann-false",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "/mnt/volume1/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cann-false"
+        ],
+        "exit": 1,
+        "expected": 1,
+        "passed": true
+      },
+      {
+        "label": "cann-true",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "/mnt/volume1/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "/mnt/storage/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cann-true",
+          "--use-gpu"
+        ],
+        "exit": 1,
+        "expected": 1,
+        "passed": true
+      }
+    ],
+    "encoder_cpu_flags_byte_exact_to_accepted_fixture": true,
+    "scope": "Actual GPU flag forwarding and CPU encoder-only capture; shared probe omits Session/CLI. No full validator or NPU acceptance."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-validator/complete-native-gpu-flag-controls.zip",
+    "bytes": 2208646,
+    "sha256": "de8965041d6e8cf88659c75ff676b243f09581fe31adc698b7e03defdaa0a7ea",
+    "payloads": 30,
+    "revision": "8b16f924c00fc285001f12060b7a24945708d9b8",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8b16f924c00fc285001f12060b7a24945708d9b8/cann-20261014-model-validator/complete-native-gpu-flag-controls.zip",
+    "anonymous_verified": true
+  },
+  "unit_guards": 8,
+  "full_validator_acceptance": "pending",
+  "hosted_model_run": 38602252235,
+  "ci_run": 38602256898,
+  "sdk_run": 38598516003,
+  "scope": "Actual bounded public encoder GPU argument controls and safe validation wrapper scaffolding. Full CLI/C ABI runner and physical NPU acceptance are pending."
+}

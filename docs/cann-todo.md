@@ -8,7 +8,7 @@ all thirteen general CI gates pass.
 
 The maintainer owns these follow-ups. Contributor hardware help is optional;
 there is no outstanding rerun request for the now-passing rotary candidate.
-A final integration result will be posted on PR544. Contributors can
+The rotary integration result is posted on PR544. Contributors can
 unsubscribe from the merged PR; this document is the durable follow-up list.
 
 | Order | Task | Current state / acceptance | Owner / hardware need |
@@ -38,3 +38,5 @@ upstream tolerances. Passing operator suites alone cannot accept a model.
 [Completed full CPU fixture proof](moonshine-hosted-cpu-fixture-2026-10-14.md).
 
 [Strict device validation candidate and bounded controls](moonshine-strict-device-validation-2026-10-14.md).
+
+[Portable full-model validator preparation and live GPU-argument controls](cann-model-validator-preparation-2026-10-14.md); hosted interface proof remains pending.

@@ -7650,3 +7650,27 @@ Prove the command interface and unavailable-CANN failure on CPU before publishin
 hardware instructions. No new tolerance, quant, ACL or NPU acceptance inferred
 from these controls. Heavy outputs/builds remain storage or GH scratch; physical
 Ascend success still requires actual hardware. SDK run38598516003 remains queued.
+
+## Full-model validator candidate submitted — 2026-10-14
+
+Candidate168384d47ba462ae72858042ffc13188b143cca1 is pushed on
+diag/cann-model-validator-20261014. Eight non-vacuous parser/archive/argument
+guards pass and are wired into standard Linux CI. Actual bounded public encoder
+GPU=false/true controls pass: CPU arrays exact to accepted fixture; CANN false
+rejects GPU-disabled, true reaches and rejects absent registry. The forced-CPU
+encoder capture gap is repaired behind explicit diagnostic flags; normal defaults
+are preserved. Complete30-payload proof is public and anonymously SHA verified.
+Full exact runner interface/model controls38602252235 and CI38602256898 are
+queued; audit returned binaries/arrays/output before integration or publishing
+hardware commands. One raw collector owns the model run under
+/mnt/storage/crispasr/cann-model-validator-20261014/hosted (execsession13785).
+SDK38598516003 has started both architecture jobs; its separate collector remains
+the sole owner. Physical NPU success is still unvalidated, and no release is cut.
+Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.
+
+SDK progress:38598516003 ARM64/310P job completes successfully; x86_64/910B
+is still building. Audit complete logs before accepting the matrix. The current
+SDK workflow does not export compilation commands or upload build metadata;
+add CMAKE_EXPORT_COMPILE_COMMANDS and retain cache/commands even on failed builds
+in the validator worktree. This is evidence retention, with unchanged C++ and
+inference behavior. Existing queued model/CI runs still exercise the same runner.
