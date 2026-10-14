@@ -7,8 +7,9 @@
   "job": {
     "id": 38472367538,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38472367538",
-    "observed_status": "queued",
-    "head_sha": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a"
+    "observed_status": "completed",
+    "head_sha": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "conclusion": "success"
   },
   "step": 978,
   "layers": [
@@ -112,5 +113,6 @@
     "large_weights_builds_captures": "storage or GH CI only",
     "reason": "CIFS intermittent unavailability; original controller secret scan failed with missing working-directory error and was retried without weakening tests",
     "shared_main_checkout_changed": false
-  }
+  },
+  "delivery_audit": "active; not yet independently verified"
 }

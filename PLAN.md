@@ -7043,3 +7043,15 @@ Evidence: `docs/dia-decoder-boundary-capture-2026-10-13.md` and
 `docs/dia-decoder-boundary-submission-2026-10-13.json`. Next collect complete
 job artifacts/logs and audit transparency before replaying the first remaining
 operator on owned inputs. No speculative math/default or release change.
+
+## UPDATE 2026-10-14 — Hosted decoder boundary job succeeded; delivery audit active
+
+GH 38472367538 completed SUCCESS at pinned source
+8d0ad8862d2cad5d305a48a57f2a99b5024bc39a. Full logs and artifact
+11858752399 (890,528,559 bytes; GH SHA256
+de7187841db0a43da0d3462e4d72f50b7283d3876e366d50745ee0be99058e26)
+are being preserved under /mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014.
+Storage paths are available again. Independently verify source/runtime/model
+provenance, all original hook tests, complete OFF/ON/OFF trajectories, ordinary
+stages, sixteen boundary snapshots and unchanged negatives before interpreting
+metrics. No boundary diagnosis or native speech/Q4/release acceptance yet.
