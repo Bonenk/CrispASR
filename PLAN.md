@@ -7191,3 +7191,25 @@ UTC) with a new physical 910B3 archive, SHA256
 claiming clean main cacd697 and ggml21acf3162. Audit the actual archive and
 all provenance/operator/model results after the Dia transparency gate works.
 This hardware follow-up is unverified; earlier 310P receipts are separate.
+
+## UPDATE 2026-10-14 — Dia terminal collector active; Ascend evidence retained
+
+Dia run38527734866 remains executing. Single automatic collector is active
+in /mnt/storage/crispasr/dia-free-capture-delivery-20261014, exec session23984
+(collector-state.json records PID). It polls the existing run, never submits
+another model job, then buffers whole official ZIP/log retrieval, checks
+digest/CRC/safe extraction and runs independent source/PCM/full-history/
+selected-dump/WER audit on success. Failed runs are retained without an
+acceptance claim. Do not start a second writer to the same artifact path.
+Collection/audit helpers are syntax-checked; actual result remains pending.
+
+Read-only preparation of PR544 evidence is complete: all seven unchanged
+wrapper assessments verify against all 25 complete member/log hashes.
+Current-main 910B3/SDK9.1/ACL-graph-on RoPE fails 450/452 twice, while
+other broad suites and bounded ADD/routing pass. The final four cases grow
+rotary width at fixed 512 positions; current sin/cos allocation guards only
+position growth. Exact tested operator source blob is verified. No repair
+or hardware acceptance is claimed. After Dia transparency passes, reproduce
+this allocation defect before fixing it, compile the scoped shared-ggml
+candidate on both SDK architectures and request the full physical rerun
+under unchanged operator tolerances. Record: docs/cann-910b3-hardware-2026-10-14.json.

@@ -143,3 +143,46 @@ Final-main SDK revalidation at `cfceeb752` passes both architecture jobs in
 run `38401026881`, including the actual operator build target and routing
 guards. [Complete source/job/log receipt](cann-final-main-sdk-2026-10-13.json).
 Full model and quantized speech/speed still require separate physical proof.
+
+## Physical Ascend 910B3 follow-up — 2026-10-14
+
+[Contributor comment 6162885815](https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6162885815)
+returns a [complete 25-member archive](https://github.com/user-attachments/files/33421861/crispasr-cann-910b3-official-validation-2026-10-14.tar.gz),
+33,052 bytes, SHA256
+`d191c69b564ad8b47d8e92e15b0c993bc589359ffa39d1683b20143a45d94ef5`.
+All member/log hashes and all seven assessments are recomputed using the
+unchanged original wrapper. [Complete verified receipt](cann-910b3-hardware-2026-10-14.json).
+
+Native Git receipts record clean tracked main `cacd697e37d3aa002d996509ba4de60865003a6a`
+and ggml `21acf3162beeb4e51260f0f86deda80995423712`. Device output identifies
+910B3; the actual compiler command defines `ASCEND_910B` and `USE_ACL_GRAPH`.
+SDK runtime is 9.1.0, ARM64. The binary itself is not included: its SHA256
+is a producer receipt, not an independently rehashed executable.
+
+| Broad operator | Executed cases | Unsupported cases retained |
+| --- | ---: | ---: |
+| ADD | 154/154 pass | 0 |
+| RMS_NORM | 51/51 pass | 0 |
+| SOFT_MAX | 107/107 pass | 107 |
+| ROPE | **450/452 fail** | 18 |
+| MUL_MAT | 927/927 pass | 1,349 |
+
+Bounded ADD 1/1 and routing controls pass. A separate complete RoPE rerun
+again fails the same two cases under the unchanged 1e-7 error tolerance:
+F32 NEOX `[256,8,512,1]`, rotary width 256, no frequency factors; and
+F32 NEOX `[512,8,512,1]`, rotary width 128, frequency factors enabled.
+Reported errors are about .5109/.0975, repeated at .5103/.0981. Thus the
+910B3 broad suite is not a pass. The earlier passing 310P3 evidence remains
+scoped to that chip and its supported cases. No full-model/quantized speech
+or performance acceptance follows.
+
+Source review identifies a candidate allocation defect: sin/cos cache resize
+is gated only by position-length growth, while required bytes also grow
+with rotary width. The final four observed cases keep 512 positions and
+change rotary width 64,64,256,128. Required bytes per sin/cos buffer change
+131,072,131,072,524,288,262,144. The last two fail. The reviewed operator
+source matches the exact tested revision (Git blob
+`902d2eda693837c7ea636840facb6725ab0f7746`). This is a hypothesis awaiting
+a pre-fix regression and physical candidate rerun, not a claimed repair.
+Per the requested task order, runtime work resumes after the active Dia
+free-running capture-transparency control passes.

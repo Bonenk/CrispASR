@@ -24165,3 +24165,17 @@ verify invariance only, not original unretained padded caches. Complete
 40-payload proof is public and anonymously verified. No runtime math change,
 full speech, GPU, Q4, speed or release acceptance. Evidence:
 `docs/dia-cross-owned-input-results-2026-10-14.md` and `.json`.
+
+## Ascend 910B3 physical follow-up — 2026-10-14
+
+New current-main/ggml21acf3162 physical 910B3, ARM64, SDK9.1, ACL-graph-on
+archive is retained; all 25 member hashes and seven unchanged-wrapper
+assessments verify. Broad ADD154, RMS_NORM51, SOFT_MAX107 and MUL_MAT927
+pass. RoPE fails 450/452 and repeats the same two F32 NEOX failures.
+This is not broad 910B acceptance and does not change the earlier scoped
+310P result. Native Git/compiler provenance verifies; the binary hash is
+producer-reported because no executable is included. No full-model,
+quantized speech or performance proof. Cache-width allocation is a candidate
+explanation awaiting regression/device proof. Evidence and next step:
+`docs/cann-hardware-validation-2026-10-12.md` and
+`docs/cann-910b3-hardware-2026-10-14.json`.
