@@ -24265,3 +24265,12 @@ text; real blueprint dumper captures original PCM/encoder byte-exact.
 Complete26-payload public proof is anonymously verified. Native CLI/Session
 and NPU acceptance remain pending. See
 docs/moonshine-original-fixture-audit-2026-10-14.md.
+
+## 2026-10-14 — Moonshine actual CPU backend stage/speech proof
+
+The unchanged backend and core loader on verified CPU libraries reproduce
+original encoder with relativeL2 2.107e-6 and row-norm error5.324e-6;
+encoder repeats byte-exact and both native transcripts equal original
+byte-exact. Complete33-payload public proof is anonymously verified.
+Full hosted CLI/Session wiring and NPU checks remain pending. See
+docs/moonshine-native-backend-fixture-2026-10-14.md.

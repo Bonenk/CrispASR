@@ -14,7 +14,7 @@ unsubscribe from the merged PR; this document is the durable follow-up list.
 | Order | Task | Current state / acceptance | Owner / hardware need |
 |---:|---|---|---|
 | 0 | Integrate rotary byte-capacity repair | Physical 910B3/SDK9.1:1691/1691 broad plus452/452 repeat. Both SDK9.2 builds pass. All thirteen general CI jobs pass; exact tested pin0a8620765 is integrated. | Maintainer; no further device rerun currently requested |
-| 1 | Prepare a small full-model ASR validation bundle | Moonshine Tiny producer submitted in GH run38555394740, sourcea149749. Four local guards pass; hosted conversion/reference/diff/CLI/Session results pending. Prove CPU controls before publishing hardware commands. | Maintainer prepares; optional 310P3/910B3 execution afterward |
+| 1 | Prepare a small full-model ASR validation bundle | Moonshine Tiny producer submitted in GH run38555394740, sourcea149749. Independent full coefficient/original-dumper audit and actual CPU backend stage/exact transcript proof pass. Hosted full diff/CLI/Session checks running; NPU remains pending. Prove CPU controls before publishing hardware commands. | Maintainer prepares; optional 310P3/910B3 execution afterward |
 | 2 | Prove NPU full-model parity and decoded output | Same model/input/config on CPU and CANN; crispasr-diff stages include magnitude/error as well as cosine. Actual CLI and Python Session transcripts must pass declared quality gates. Preserve scheduler/device traces to prove real NPU work. Not yet validated. | Maintainer audits; physical NPU needed |
 | 3 | Verify actual scheduler fallback for rejected 310P BF16 cases | Current predicate/operator proof excludes unsupported cases; demonstrate supported CANN plus rejected CPU operations in a composed graph with correct output. Not yet validated. | Maintainer prepares CPU controls; physical 310P needed |
 | 4 | Verify ACL graph execution and reuse | Current 910B build enables ACL graphs; operator logs do not establish executed capture/replay. Fixed-output graph-on/off comparison, repeated calls and growing/changing shapes; retain capture/replay evidence. Not yet validated. | Maintainer prepares; physical 910B needed |
@@ -32,3 +32,5 @@ upstream tolerances. Passing operator suites alone cannot accept a model.
 [Completed rotary integration receipt](cann-rope-integration-2026-10-14.md).
 
 [Active CPU fixture submission](cann-model-fixture-preparation-2026-10-14.md).
+
+[Actual native CPU backend proof](moonshine-native-backend-fixture-2026-10-14.md).

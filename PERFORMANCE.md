@@ -3525,3 +3525,14 @@ transcript or numerical thresholds. Header proof is in
 docs/moonshine-tiny-regression-dtype-2026-10-14.json. This corrects scope;
 it supplies no new speed/quantization result. A CPU fixture producer with
 fresh F32 conversion is submitted; hosted numerical checks remain pending.
+
+### 2026-10-14 — Moonshine F32 CPU correctness baseline
+
+Complete original/published160tensor coefficient identity, exact original
+recipe transcript and blueprint-dumper capture pass. Actual unchanged native
+backend matches original encoder with minrowcos0.99999999973,
+maxrownormerror5.324e-6 and relativeL2 2.107e-6; both transcripts are exactly
+original and repeatable. These are correctness results, not speed or F16/Q4
+measurements. Full CLI/C ABI wiring and NPU performance remain pending.
+Evidence: docs/moonshine-original-fixture-audit-2026-10-14.md and
+docs/moonshine-native-backend-fixture-2026-10-14.md.

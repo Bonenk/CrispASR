@@ -7533,3 +7533,26 @@ and native backend transcript on pinned original PCM/model; compare complete
 arrays/norms and decoded text, retaining source/build/closure/raw evidence.
 All artifacts stay on /mnt/storage. This is bounded CPU backend proof;
 full CLI/Session wiring stays with GH, no GPU or performance claim.
+
+## Moonshine actual native CPU backend proved — 2026-10-14
+
+Bounded actual backend/tokenizer/core-loader replay succeeds atsourcea149749,
+using rehashed existing CPU ggml libraries. Their CPU/core source matches
+current0a8620765; only three CANN files differ fromc36. Initial link/include
+errors are retained; final ELF symbols/closure and successful execution verify.
+No runtime graph or model change. Encoder[457,288] matches original:
+mincos0.9999999997296947, maxrownormerror5.323259081535525e-6,
+relL2 2.1074627915260832e-6, maxabs4.9054622650146484e-5.
+Encoder repeats byte-exact; both native transcripts equal original byte-exact.
+Actual guard rejects double-scale/nonfinite/wrong-shape arrays.
+
+Complete33-payload native proof revision5afafd2e40d3941b49979c41a3960b175bfe71a4
+anonymously verifies3649899bytes/SHA5b99d8ca092ac86db19b0c652d7ba5323e90052974dacfd49052c1f2a1f6613c.
+All artifacts remain /mnt/storage/crispasr/cann-model-fixture-native-backend-20261014.
+Full receipt: docs/moonshine-native-backend-fixture-2026-10-14.md and .json.
+
+GH38555394740 has started; its single collector still watches sourcea149749.
+Full CLI/Session wiring and real crispasr-diff driver execution remain pending.
+This bounded backend replay does not substitute for those or prove NPU/quant/
+performance. Continue from the hosted results, then prepare strict CANN stage
+selection and actual offload evidence before a new device procedure.
