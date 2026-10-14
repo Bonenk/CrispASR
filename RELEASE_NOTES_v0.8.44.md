@@ -416,7 +416,11 @@ residual/cross-Q/fused-MLP observation on diagnostic source 8d0ad886 now passes
 full hosted capture transparency, sixteen actual-original hook tests and 120
 ordinary stages in GH 38472367538. Independently verified boundary differences
 are small (maximum relative L2 5.204e-6), and complete proof is public. These
-rows include input drift; isolated operator checks continue. No production
-default, model or release promotion follows. See
+rows include input drift. Actual fused-original/split-native MLP replay now
+reproduces hosted native stages exactly and differs on matching inputs by at
+most relative L2 2.399e-7, with scale/wrong-split controls rejecting. Native
+speech/Q4 remain unaccepted. No production default, model or release promotion
+follows. See
 `docs/dia-cross-cache-input-replay-2026-10-13.md` and
-`docs/dia-decoder-boundary-results-2026-10-14.md`.
+`docs/dia-decoder-boundary-results-2026-10-14.md` and
+`docs/dia-mlp-owned-input-results-2026-10-14.md`.

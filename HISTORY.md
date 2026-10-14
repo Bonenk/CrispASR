@@ -24136,3 +24136,18 @@ public raw/audit proof is anonymously hash-verified. Input and pre-SA norm
 are exact; maximum boundary relative L2 is 5.204e-6 at cross-Q. These rows
 include input drift and do not accept native speech/Q4/performance/release.
 See `docs/dia-decoder-boundary-results-2026-10-14.md`.
+
+## 2026-10-14 — Original fused MLP versus native split graph verified
+
+Two complete original block-zero F32 tensors and all three mapped hashes
+match the physical export audit. Actual original fused DenseGeneral/MlpBlock
+on original/native owned inputs versus the literal native graph gives twenty
+metric rows and ten rejecting scale/wrong-split controls. Native gate/up/
+hidden/output all reproduce hosted native values bit-for-bit; repeats and
+one/four threads are exact. Maximum same-input relative L2 is 2.399e-7
+hidden and 1.911e-7 output, minimum cosine 0.9999999999999182 and maximum
+row norm error 4.313e-7. Local-original/hosted-original output differs by
+1.432e-6 on identical original input; input-only output drift is 8.269e-7.
+Those differences must not be mislabeled a native same-input operator bug.
+Complete 40-payload proof is public and anonymously verified. Evidence:
+`docs/dia-mlp-owned-input-results-2026-10-14.md` and `.json`.

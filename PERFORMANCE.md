@@ -3416,3 +3416,12 @@ trajectories pass in GH 38472367538 and verify independently. Maximum
 block-zero boundary relative L2 is 5.204e-6; same-input operator separation
 is still required. No timing or native speech/Q4 acceptance follows. Complete
 public evidence: `docs/dia-decoder-boundary-results-2026-10-14.md`.
+
+### Dia actual fused/split MLP correctness exclusion, 2026-10-14
+
+Same-input original fused MLP versus literal native split graph differs by
+maximum relative L2 2.399e-7; native replay reproduces every hosted native
+MLP stage exactly. Cross-host original differences and upstream input drift
+are measured separately. Twenty rows and ten negatives verify. This is a
+bounded correctness test, not full-model performance or speech acceptance.
+See `docs/dia-mlp-owned-input-results-2026-10-14.md`.
