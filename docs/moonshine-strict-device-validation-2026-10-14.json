@@ -896,5 +896,10 @@
     "revision": "c49233c8753f682cbf3621a5cb2c801fa5eeab1d",
     "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/c49233c8753f682cbf3621a5cb2c801fa5eeab1d/cann-20261014-model-strict/complete-cosine-report-controls.zip",
     "anonymous_verified": true
+  },
+  "sdk_followup": {
+    "run": 38598516003,
+    "source": "11176e18240bb67b543f06e536f9ed4d88945901",
+    "acceptance": "pending; official SDK compile only"
   }
 }

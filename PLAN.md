@@ -7621,3 +7621,17 @@ and full diff syntax check pass again; unchanged inference runtime. No NPU,
 ACL, quantized-model or performance acceptance. Current composition CI and new
 SDK compilation remain release gates. Physical NPU full-model work is next.
 Evidence: docs/moonshine-strict-device-validation-2026-10-14.md and .json.
+
+## Official CANN SDK follow-up launched — 2026-10-14
+
+Run38598516003, source11176e18240bb67b543f06e536f9ed4d88945901, compiles the
+integrated strict-routing runtime and final diff reporting through official
+SDK9.2beta2: x86_64/910B ACL graphs on and ARM64/310P ACL graphs off. Targets
+include CLI, shared library, diff, quantizer and test-backend-ops. Current main
+CI38598459749 and lint38598459828 are queued on this composition; candidate
+runtime CI remains independently accepted as documented above. One SDK raw
+collector owns /mnt/storage/crispasr/cann-model-strict-20261014/sdk.
+Retain and audit both SDK target/flag receipts when terminal. This is compilation
+coverage, not physical NPU inference. Strict diagnostics are integrated on main;
+the merged feature branch is deleted and its separate worktree remains detached
+with source paths preserved. No physical rerun request or release tag is issued.

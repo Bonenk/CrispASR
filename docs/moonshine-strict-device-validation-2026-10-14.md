@@ -98,3 +98,5 @@ Current composition CI still must settle before any release tag.
 [Complete complete-hosted-strict-fixture-audit.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9cf29ec347a91d7a96177cfdc048bb235f8c3289/cann-20261014-model-strict/complete-hosted-strict-fixture-audit.zip): 4,301,226 bytes, anonymously verified SHA256 `b257ca3e737ef9bc52b5c36194c161f1a02922f961afadf0722bb9e71f668b09`.
 
 [Complete post-hosted cosine/reporting controls](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/c49233c8753f682cbf3621a5cb2c801fa5eeab1d/cann-20261014-model-strict/complete-cosine-report-controls.zip): 4,337,883 bytes, anonymously verified SHA256 `de5a6448242882c038305caa58d3a409b2b25c51c2625055ad340211d7134a3e`. Includes actual extracted source, executable, references, full logs, method and per-file ledger.
+
+[Official SDK follow-up38598516003](https://github.com/CrispStrobe/CrispASR/actions/runs/38598516003) compiles this composition for x86_64/910B (ACL graphs on) and ARM64/310P (graphs off). Its result is pending; it cannot validate physical NPU work.
