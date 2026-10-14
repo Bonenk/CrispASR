@@ -24235,3 +24235,14 @@ All capacity/routing controls pass. Complete logs, native metadata, container
 digests and target/link evidence are retained in docs/cann-rope-sdk-2026-10-14.json.
 General integration CI remains active. Contributor follow-ups are tracked
 with ownership and acceptance in docs/cann-todo.md.
+
+## 2026-10-14 — Integrate physically verified CANN rotary-capacity repair
+
+Production pins exact tested ggml0a8620765 after all thirteen composed CI
+jobs pass, both SDK architectures pass and physical910B3/SDK9.1 passes
+1691/1691 broad plus452/452 full RoPE repeat. Shared-fork mergeea526e120
+preserves newer history with an identical source tree. Four lightweight
+capacity regressions remain wired into both manual CANN SDK jobs.
+Original failures, unsupported cases and complete immutable proof remain
+retained. See docs/cann-rope-integration-2026-10-14.md and .json.
+Full model speech/Q4/ACL replay/performance claims remain pending.

@@ -205,3 +205,12 @@ pass. [Exact candidate/proof/device commands](cann-rope-capacity-candidate-2026-
 pin CrispASRca4c12c4 and ggml0a8620765 in fresh directories. SDK
 run38536737288 is submitted on both compilation architectures. Its result
 and the physical 910B3 rerun are pending; production pin remains21acf3162.
+
+## Rotary-capacity repair integrated — October14
+
+Exact physically tested ggml0a8620765 is now the production pin after all
+thirteen composed CI jobs and both SDK builds pass. Physical910B3/SDK9.1
+passes1691/1691 broad cases and452/452 full RoPE repeat; unsupported cases
+and original failures remain retained. [Final integration proof](cann-rope-integration-2026-10-14.md).
+No further rotary-candidate rerun is requested. [Remaining tasks](cann-todo.md)
+are maintainer-owned; future full-model/device help is optional.

@@ -435,3 +435,9 @@ proof; native speech still fails. See dia-query-owned-input-results-2026-10-14.m
 Both rotary candidate SDK9.2 architecture builds are independently verified
 with complete logs and actual target/link evidence. General integration CI
 remains active. See cann-rope-sdk-2026-10-14.md and cann-todo.md.
+
+Rotary byte-capacity repair is integrated at exact tested ggml0a8620765:
+all13general CI jobs, both SDK architectures and physical1691/1691 broad
+plus452/452 full RoPE repeat pass. Regression remains wired into both manual
+SDK jobs. See cann-rope-integration-2026-10-14.md. Full model/quantized speech,
+actual ACL replay and performance remain future validation.

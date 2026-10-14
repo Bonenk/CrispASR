@@ -7419,3 +7419,25 @@ the bounded volume1 scan produced no eligible over512MiB candidates before
 termination. Package runtimes/toolchains and other active project state were
 left untouched. This was a partial volume audit, not a claim that the disks
 are cleared. All new SDK/model proof artifacts remain on /mnt/storage.
+
+## COMPLETE 2026-10-14 — CANN rotary capacity repair integration gates passed
+
+All thirteen composed CI38541851377 jobs pass, including2020unit tests,
+121audio sanitizer assertions and42Windows speaker cases. Independent audit
+verifies142complete log members, each checkout/build/required step and final
+source composition. Complete1918837-byte logZIP SHA
+bc685989ebcba300c1bdc6c3e383d7b69f65f18de7d3bba3bebf9688f24e1fd8
+is retained with native metadata/audit methods under /mnt/storage.
+
+Both SDK architecture builds and physical1691/1691 broad plus452/452 repeat
+already pass. Shared-forkea526e120 is pushed, preserving newer history with
+candidate-identical tree46e7c0620. Production advances to exact physically
+and SDK-tested0a8620765; the final composition f693bfe differs from tested
+1a36c871 only in Markdown/JSON documentation. Regression remains in tests
+and both manual SDK jobs. Full ledger: docs/cann-rope-integration-2026-10-14.md
+and .json. Update PR544 with final integration after publishing main.
+
+Next maintainer task is docs/cann-todo.md row1: CPU-proved small-model
+reference/fixture bundle. Full NPU model parity/speech, scheduler fallback,
+actual ACL capture/reuse, quants and speed remain separate. Dia speech
+remains rejected; bounded primitive results are not port acceptance.

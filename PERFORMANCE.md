@@ -3507,3 +3507,11 @@ Both SDK9.2 architecture builds pass with actual six-target link/completion
 proof and capacity/routing controls. Physical operator acceptance is separate;
 model speech, actual ACL capture/replay and performance are still unvalidated.
 See docs/cann-rope-sdk-2026-10-14.md and docs/cann-todo.md.
+
+### 2026-10-14 — Rotary-capacity repair integrated after all gates
+
+Exact physically tested ggml0a8620765 is production after13/13general CI,
+both SDK architecture builds and physical1691/1691 broad plus452/452 repeat.
+This repairs undersized rotary buffers; it is not a measured speed change.
+Full NPU model, quantized speech and actual ACL replay remain unvalidated.
+See docs/cann-rope-integration-2026-10-14.md and docs/cann-todo.md.

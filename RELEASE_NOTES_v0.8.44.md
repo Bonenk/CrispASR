@@ -503,3 +503,15 @@ fresh-directory commands and public candidate proof:
   architecture builds, including CLI, shared ABI, diff, quantizer and actual
   operator target. General integration CI remains active; production pin
   unchanged. Remaining hardware/model/performance tasks are in docs/cann-todo.md.
+
+### Integrated CANN rotary buffer repair
+
+Fix rotary sin/cos cache allocation when rotation width grows without an
+increase in position count, including width growth with fewer positions.
+Allocated byte capacity is tracked independently of logical cache shape.
+The exact tested ggml pin is integrated after13/13general CI, both official
+SDK builds and physical910B3/SDK9.1:1691/1691 broad plus452/452 repeat.
+Both prior F32NEOX failures pass at unchanged tolerances. Lightweight
+capacity regression runs in both manual SDK jobs. Original failures and
+unsupported cases remain retained. Full NPU model/quantized speech,
+executed ACL capture/replay and performance require separate proof.
