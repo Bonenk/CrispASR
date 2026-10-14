@@ -63,6 +63,7 @@ jobs:
               export LD_LIBRARY_PATH="${ASCEND_TOOLKIT_HOME}/lib64:${ASCEND_TOOLKIT_HOME}/$(uname -m)-linux/devlib:${LD_LIBRARY_PATH:-}"
               cmake -S . -B build-cann \
                 -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
                 -DGGML_CANN=ON \
                 -DGGML_BUILD_TESTS=ON \
                 -DSOC_TYPE="${SOC_TYPE}" \
@@ -75,3 +76,13 @@ jobs:
               chown -R '"${HOST_UID}"':'"${HOST_GID}"' /workspace/build-cann
             '
 
+
+      - name: Retain actual SDK cache and compiler commands
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cann-build-${{ runner.arch }}-${{ matrix.chip }}-acl-${{ matrix.acl_graph }}
+          path: |
+            build-cann/CMakeCache.txt
+            build-cann/compile_commands.json
+          if-no-files-found: warn
