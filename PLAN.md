@@ -7111,3 +7111,18 @@ versus debug-marked graph transparency: teacher forcing alone does not prove
 the latter. No large block-zero MLP defect is demonstrated; native speech/
 Q4/performance/release remain unaccepted. No seed/filter/threshold/default
 or numerical change and no redundant whole-model run followed this probe.
+
+## CLAIMED 2026-10-14 — Same-input self-output and cross-attention primitives
+
+Continue in the isolated Dia diagnostic worktree at source 8d0ad886, with all
+weights, builds and owned captures under /mnt/storage. Fetch only block-zero
+self/cross output coefficients, verify original immutable ranges and native
+mapped hashes against the physical export audit. Run actual original
+DenseGeneral and attention expressions on both original/native owned inputs,
+using the original padding-mask/cache construction. Compare literal native
+ggml CPU expressions with verified libraries, cosine and row magnitudes,
+repeat/thread controls and rejecting scale/mask controls. Separate same-input
+operator differences from upstream and cross-host drift. Then test default
+versus debug-marked free-running CLI/C-ABI transparency. No speech, Q4, GPU,
+performance or release acceptance is implied. Previous main cacd697 CI, lint,
+secret scan, Ruby bindings and Pages all completed successfully.
