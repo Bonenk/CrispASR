@@ -7311,3 +7311,19 @@ run/job metadata and buffered ZIP/logs under
 second collector/model/build was launched. SDK results and the contributor
 physical candidate rerun remain pending. Keep production pin21acf3162
 until required physical and composed-integration gates pass.
+
+## CLAIMED 2026-10-14 — Dia query projection and rotary owned-input isolation
+
+After the full CPU free-running transparency audit, isolate block-zero self
+and cross query projection plus the original rotary transform at step978.
+Use the pinned original DenseGeneral/RotaryEmbedding implementations and
+literal native expressions on each producer's own captured pre-norm outputs.
+Verify immutable tensor ranges against the physical F32 export, native replay
+against hosted snapshots, scale-sensitive metrics, repeat/thread controls and
+negative controls. All coefficients, compiled fixtures and raw evidence stay
+under /mnt/storage/crispasr/dia-query-owned-replay-20261014. This is bounded
+CPU numerical diagnosis; speech remains rejected and no defaults change.
+
+CANN SDK run38536737288 is now building on both runners; capacity and
+chip-routing controls passed on each. The existing terminal collector remains
+the only writer. Physical 910B3 candidate results are still pending.
