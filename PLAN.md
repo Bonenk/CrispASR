@@ -7586,3 +7586,22 @@ reference PCM, and enforce scale-sensitive encoder gates. Prove real CPU
 positive/missing-device/invalid-index controls, then hosted full CLI/Session/diff
 checks. No NPU/ACL/performance claim from CPU controls, and no unexecuted hardware
 procedure published.
+
+## Strict Moonshine candidate submitted — 2026-10-14
+
+Candidate9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d pushed on
+diag/cann-model-strict-20261014. Actual bounded normal/strict CPU full encoder
+and transcript arms pass byte exact against accepted backend evidence;13
+selector/scheduler controls pass and full diff source syntax check passes.
+Hosted full model+bad-reference/device controls:38575701613. General CI:
+38575706459; lint:38575711575. Audit their actual logs/artifacts before integrating.
+No NPU or ACL acceptance yet. Evidence/protocol scope:
+docs/moonshine-strict-device-validation-2026-10-14.md. Heavy files remain storage.
+
+Actual bounded Moonshine diff dispatch controls also pass: good reference0,
+scale/NaN/wrong-shape6, changed PCM/missing encoder4. Scope-placement defect
+observed and fixed before any queued hosted model work; before/failure logs
+retained. Complete67-payload public bundle anonymously hash verified; see strict
+validation .md/.json. One hosted collector owns run38575701613 under
+/mnt/storage/crispasr/cann-model-strict-20261014/hosted (execsession25445).
+Audit terminal artifact before integration; general CI/lint remain pending.

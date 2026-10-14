@@ -1,0 +1,185 @@
+{
+  "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+  "source_files": [
+    {
+      "path": "src/core/backend_validation.h",
+      "bytes": 4099,
+      "sha256": "5a941f80905a8261fc10f0caffff6ef16e6dda092bba2e6a6044aa3c2901a2c3"
+    },
+    {
+      "path": "src/core/ggml_cpu_backend.h",
+      "bytes": 13201,
+      "sha256": "aa2d261fac1414fad06829dcfbfc38627e9b55b5e07095b7b7abba5307b7e389"
+    },
+    {
+      "path": "src/core/gpu_backend_pref.h",
+      "bytes": 10893,
+      "sha256": "b1fd43cdabf3e74d0eca27215b4fd01dc1b227db5f0fd44c8433b9ed8c9bd792"
+    },
+    {
+      "path": "src/core/sched_prof.h",
+      "bytes": 4077,
+      "sha256": "f6650d09e3fa8664ee5c5328e88abc6585387c7e6393bc0dc63c1902f78c924f"
+    },
+    {
+      "path": "src/core/gguf_loader.h",
+      "bytes": 18586,
+      "sha256": "bfb2a8b5cac51326429ee37789eac8c92b19f56a5536bcb590ed6db88455fbc5"
+    },
+    {
+      "path": "src/core/gguf_loader.cpp",
+      "bytes": 73196,
+      "sha256": "c26f21f34f88875a6900722d6c5c90176b8a71bcbc9b0a5603dc5c1a56dd6fd5"
+    },
+    {
+      "path": "src/moonshine.cpp",
+      "bytes": 68852,
+      "sha256": "c318d146e4c1f0cc9c20889a5b0b2b9ea99fc857c6b9bb35d990db486aac8397"
+    },
+    {
+      "path": "src/moonshine.h",
+      "bytes": 3959,
+      "sha256": "e4c3f4be18a88d6320999e82a05b4d73683d052c1059e358f13978568c61918d"
+    },
+    {
+      "path": "src/moonshine-impl.h",
+      "bytes": 4167,
+      "sha256": "6252091ce5efeb3634f6ee737ba9998c541c2befa10f08adff2b20ae7ed9fb4e"
+    },
+    {
+      "path": "src/moonshine-tokenizer.cpp",
+      "bytes": 5116,
+      "sha256": "fffe6b9a20194b53b0f9e4942a2f7f36f0756abd77006615509982c8b175e375"
+    },
+    {
+      "path": "src/moonshine-tokenizer.h",
+      "bytes": 665,
+      "sha256": "c04fef497c088fdf178fb1b645fb380cb153ab16ceccdd0929e94859f2f06360"
+    },
+    {
+      "path": "examples/cli/crispasr_diff_main.cpp",
+      "bytes": 485963,
+      "sha256": "daf11d3680b75fc7c544ad49e75a2365f66d47837e32b3b0e4ed15c9fbbdc5f0"
+    },
+    {
+      "path": "examples/cli/crispasr_diff.cpp",
+      "bytes": 12913,
+      "sha256": "4706bc1b79181f04ab2b878eaa116868367497877463ecd903b6e40afa2da466"
+    },
+    {
+      "path": "examples/cli/crispasr_diff.h",
+      "bytes": 8329,
+      "sha256": "6ed5307b613dad49bc89878f9404fb5e0035aa1082e11e9b9650daefc45cb023"
+    },
+    {
+      "path": "tests/test-gpu-backend-pref.cpp",
+      "bytes": 5935,
+      "sha256": "098a748cff25c7e23f89baf49b9a84561d04b9b9acc68293a8617cec420556dd"
+    },
+    {
+      "path": "tools/ci-heavy/cann_model_strict.py",
+      "bytes": 5863,
+      "sha256": "d89a5d84fb16b6d82113078621b3d272421cbdccba623e0d1640ef4d23c298b0"
+    }
+  ],
+  "local_native": {
+    "passed": true,
+    "arms": [
+      {
+        "arm": "normal",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "arm": "strict-cpu",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "arm": "missing-gpu",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      },
+      {
+        "arm": "invalid-index",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      },
+      {
+        "arm": "missing-cpu",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      }
+    ],
+    "normal_and_strict_cpu_arrays_transcripts_byte_exact_to_accepted_backend": true,
+    "scope": "Actual bounded Moonshine CPU backend and strict rejection controls. No full CLI/C ABI/diff or physical NPU claim."
+  },
+  "stage_controls": {
+    "passed": true,
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "controls": [
+      {
+        "control": "good",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "control": "scale",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "nonfinite",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "wrong-shape",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "changed-pcm",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "control": "missing-stage",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      }
+    ],
+    "scope": "Verbatim actual Moonshine diff dispatch + Ref + native backend; bounded raw PCM loader. Full CLI/C ABI and NPU are not proven by this probe."
+  },
+  "helper_assertions": 13,
+  "builds": "Actual final probe/helper/stage executable builds. CPU libraries reused from the previously independently verified backend proof.",
+  "scope": "Bounded actual backend and verbatim diff-branch proof; full CLI/C ABI and physical NPU acceptance remain pending.",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-strict/complete-local-strict-validation.zip",
+    "bytes": 6572420,
+    "sha256": "686cc4333f2bd3671846a384c79d0aa2d46b9f4551df15a86b38801e996ff0f0",
+    "payloads": 67,
+    "anonymous_verified": true,
+    "revision": "1caca74803027ac1b249250b213617970612b061",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1caca74803027ac1b249250b213617970612b061/cann-20261014-model-strict/complete-local-strict-validation.zip"
+  },
+  "hosted": {
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "model_controls": 38575701613,
+    "ci": 38575706459,
+    "lint": 38575711575,
+    "acceptance": "pending"
+  }
+}
