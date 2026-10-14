@@ -24179,3 +24179,15 @@ quantized speech or performance proof. Cache-width allocation is a candidate
 explanation awaiting regression/device proof. Evidence and next step:
 `docs/cann-hardware-validation-2026-10-12.md` and
 `docs/cann-910b3-hardware-2026-10-14.json`.
+
+## CANN rotary requested-capacity defect reproduced — 2026-10-14
+
+A bounded pre-fix regression compiles the actual tested allocation block
+and cache metadata. Constant-512-position widths64/64/256/128 leave
+131,072-byte sin/cos requests when 524,288 and 262,144 bytes are required.
+Width growth with fewer positions also fails. Four tests: two expected
+failures, two positive controls, complete logs retained. This is allocation
+coverage only, not RoPE math/device validation or a repair. Immutable test
+source7b77e0b remains diagnostic; production pin/runtime unchanged.
+Public 14-payload proof is anonymously verified. Evidence:
+`docs/cann-rope-capacity-2026-10-14.md` and `.json`.

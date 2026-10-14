@@ -7225,3 +7225,23 @@ growth controls. Observe the old-source failure before any repair. Keep
 this test in the owned Dia diagnostic worktree and all compiled fixtures/
 logs under /mnt/storage. Production pin/runtime stay unchanged; shared-ggml
 repair/SDK/device rerun follow the Dia transparency gate as requested.
+
+## CANN rotary requested-capacity defect reproduced — 2026-10-14
+
+A bounded pre-fix regression compiles the actual tested allocation block
+and cache metadata. Constant-512-position widths64/64/256/128 leave
+131,072-byte sin/cos requests when 524,288 and 262,144 bytes are required.
+Width growth with fewer positions also fails. Four tests: two expected
+failures, two positive controls, complete logs retained. This is allocation
+coverage only, not RoPE math/device validation or a repair. Immutable test
+source7b77e0b remains diagnostic; production pin/runtime unchanged.
+Public 14-payload proof is anonymously verified. Evidence:
+`docs/cann-rope-capacity-2026-10-14.md` and `.json`.
+
+Dia run38527734866 still executes; single collector session23984/PID730654
+remains watching. Do not start another artifact writer or model rerun.
+After the transparency gate passes, apply a scoped shared-ggml allocation
+repair, prove the pre-fix test now passes, retain the old failing controls,
+compile both SDK architectures and arrange the immutable physical rerun.
+No device/full-model/performance/release acceptance is inferred from this
+CPU allocation proof.

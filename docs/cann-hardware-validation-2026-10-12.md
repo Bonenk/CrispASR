@@ -186,3 +186,13 @@ source matches the exact tested revision (Git blob
 a pre-fix regression and physical candidate rerun, not a claimed repair.
 Per the requested task order, runtime work resumes after the active Dia
 free-running capture-transparency control passes.
+
+### Pre-fix allocation regression now reproduced
+
+[Complete method and proof](cann-rope-capacity-2026-10-14.md) compiles the
+literal original allocation block and cache class. The two observed failing
+widths retain 131,072-byte requests where 524,288/262,144 bytes are needed;
+width growth with shrinking positions also fails. Four original-source
+capacity tests yield two expected failures and two passing controls. This
+confirms the requested-capacity defect, not a physical device repair.
+The failing test is retained in the diagnostic branch; production is unchanged.
