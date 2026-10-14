@@ -7635,3 +7635,18 @@ Retain and audit both SDK target/flag receipts when terminal. This is compilatio
 coverage, not physical NPU inference. Strict diagnostics are integrated on main;
 the merged feature branch is deleted and its separate worktree remains detached
 with source paths preserved. No physical rerun request or release tag is issued.
+
+## CLAIMED 2026-10-14 — Full-model CANN validation runner
+
+Owner: maintainer session; separate fixture worktree, branch
+diag/cann-model-validator-20261014. Implement a reproducible runner consuming
+the already hash-accepted immutable Moonshine F32 fixture and a supplied build.
+Run explicit CPU control before requested CANN inference, repeated original-
+reference encoder checks, real diff/CLI and automatic/explicit C ABI Sessions.
+Retain exact binary/library/source/build hashes and complete device/placement
+logs, fail on fallback/missing/invalid devices or any output gate, and retain
+partial evidence on failure. Keep diagnostic inference in fresh subprocesses.
+Prove the command interface and unavailable-CANN failure on CPU before publishing
+hardware instructions. No new tolerance, quant, ACL or NPU acceptance inferred
+from these controls. Heavy outputs/builds remain storage or GH scratch; physical
+Ascend success still requires actual hardware. SDK run38598516003 remains queued.
