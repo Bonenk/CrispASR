@@ -7456,3 +7456,18 @@ validation branch after verifying main contains its source commits.
 Final PR544 reply6166761733 confirms main integration, all13general CI
 passes, both SDK builds and full physical proof; no new device request.
 https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6166761733
+
+## CLAIMED 2026-10-14 — CPU-proved Moonshine Tiny CANN fixture bundle
+
+Prepare a pinned small-model bundle in a separate owned worktree. Start from
+Moonshine Tiny’s existing F16 model/reference regression, independently pin
+original Python weights/config/driving implementation, run original generation
+and dump_reference, then actual crispasr-diff plus CLI/Python Session checks
+through auto and explicit C ABI dispatch. Retain complete hashes/logs and
+negative controls. GH heavy CPU performs builds/reference/model work; all local
+artifacts remain /mnt/storage/crispasr/cann-model-fixture-20261014.
+
+The current Moonshine diff driver is CPU-only; its scope must be explicit.
+Do not call CPU diff NPU proof. After CPU bundle works, prepare explicit
+CANN stage routing and actual offload evidence, then execute hosted controls
+before publishing any new hardware procedure. No new device request now.
