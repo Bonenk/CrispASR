@@ -7694,3 +7694,46 @@ cache/command artifacts; it is in progress, with unique collector under
 /mnt/storage/crispasr/cann-model-validator-20261014/sdk-metadata (session51495).
 Physical NPU model/ACL/quant/performance remain pending. No release tag.
 Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.
+
+## QUEUED 2026-10-14 — Drama 3 feasibility and parity port (issue #545)
+
+Owner: maintainer; full issue read (no comments at triage). Metadata-only
+inspection pinned fishaudio/drama-3 at
+`e0a9218aa48888270f06ef1ed9ea67622c0e17d2`. Config, complete license and model
+card are retained with hashes under /mnt/storage/crispasr/drama3-triage-20261014.
+No weights downloaded, backend implemented or inference accepted.
+
+The config declares FishOmniModel/fish_omni: 40 text layers (three linear
+attention layers then one full-attention layer), 256 experts with eight selected
+per token, shared gated experts, partial RoPE, zero-centered normalization and
+attention output gates. The separate four-layer codebook-MTP decoder emits ten
+codebooks. Published expert weights use block-scaled FP8 with BF16 elsewhere.
+A new backend must also reproduce the reference codec and speech template;
+relabeling this as an existing Qwen TTS backend cannot establish parity.
+
+1. Locate and pin executable original Python inference, tokenizer/template,
+   codec checkpoint and its license. Inventory actual tensors, FP8 scales,
+   recurrent state/KV rules, ten-codebook ordering, EOS and chunk behavior.
+2. Build original dumpers before native code: embeddings, linear-attention
+   state updates, full attention, router selections/shared experts, text hidden
+   states/logits, decoder logits/codes and codec PCM. Retain exact inputs and
+   coefficient hashes. Test repeats and chunked/unbroken execution.
+3. Implement conversion and the floating-point ggml graph, scheduler/cache
+   support and backend detection through the C ABI, following every applicable
+   docs/contributing.md checklist item. Diff stages include magnitude/error,
+   norms and discrete selections; teacher-forced agreement alone is insufficient.
+4. Require original/native decoded speech and TTS-ASR roundtrips on consenting
+   reference fixtures, multi-speaker and expressive inputs before quantization.
+   Measure actual storage/RAM/VRAM; three billion active parameters do not imply
+   only three billion resident parameters. Use storage/GH/Kaggle hardware fitting
+   the measured footprint rather than assuming a single T4 suffices.
+5. Only after floating-point output acceptance, evaluate Q8/Q4_K sensitivity
+   with critical tensors preserved where measured necessary; then profile.
+
+Model weights carry Fish Audio Community License v1.0, with distribution,
+commercial/hosting and output-use terms; preserve the actual license/notice
+when evaluating a derivative. This is separate from CrispASR's code license.
+Published H200 serving figures are upstream results, not ggml/on-device proof.
+Queue behind the current Dia correctness and CANN hardware follow-ups.
+Sources: https://github.com/CrispStrobe/CrispASR/issues/545 and the pinned
+https://huggingface.co/fishaudio/drama-3/tree/e0a9218aa48888270f06ef1ed9ea67622c0e17d2
