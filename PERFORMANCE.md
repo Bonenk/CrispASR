@@ -3500,3 +3500,10 @@ self/cross source-RoPE-off rotary shows5.371e-5/5.167e-6. No timing verdict
 or promotion follows; native speech still fails. Full receipts:
 docs/cann-910b3-rope-physical-2026-10-14.md and
 docs/dia-query-owned-input-results-2026-10-14.md.
+
+### 2026-10-14 — Rotary candidate official SDK compilation verified
+
+Both SDK9.2 architecture builds pass with actual six-target link/completion
+proof and capacity/routing controls. Physical operator acceptance is separate;
+model speech, actual ACL capture/replay and performance are still unvalidated.
+See docs/cann-rope-sdk-2026-10-14.md and docs/cann-todo.md.

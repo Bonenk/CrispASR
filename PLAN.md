@@ -7374,3 +7374,20 @@ One terminal collector per run retains complete logs/metadata:
 /mnt/storage/crispasr/cann-rope-integration-20261014. No new heavy local
 build or model run is active. Audit terminal evidence, then integrate after
 all required gates pass; full NPU model/Q4/performance remain follow-ups.
+
+## UPDATE 2026-10-14 — Both rotary SDK builds independently verified
+
+SDK38536737288 completedsuccess at09:30:19UTC. Complete385361-byte log ZIP
+hash6c9add26bf34c4e51ddd6d34a690eb4b6b41f25e3ab942192c68442669464af6
+and terminal native metadata are retained. Both runners actually built all
+six targets and passed capacity/routing controls. Sourceca4c12c4/ggml0a8620765
+matches physical proof. General composed CI38541851377 remains active:
+macOS has passed; remaining jobs pending/running. No production pin change.
+Receipt: docs/cann-rope-sdk-2026-10-14.md and .json.
+
+Contributor follow-up6165441184 asks about remaining work/unsubscribing.
+docs/cann-todo.md assigns maintainer ownership, marks no outstanding rotary
+hardware rerun request, and lists integration, CPU-proved model fixture,
+full NPU parity/speech, scheduler fallback, actual ACL capture/reuse,
+quants and profiling in that order. Prepare runnable new hardware procedures
+only after executing their CPU/hosted controls. No new device request now.
