@@ -957,8 +957,9 @@ static StageResult moonshine_encoder_r(moonshine_context* ctx, const float* samp
 } // namespace
 
 
-static void print_row(const char* name, const crispasr_diff::Report& r, float cos_threshold, const char* extra = "") {
-    const char* tag = r.found ? (r.is_pass(cos_threshold) ? "[PASS]" : "[FAIL]") : "[SKIP]";
+static void print_row(const char* name, const crispasr_diff::Report& r, float cos_threshold, const char* extra = "",
+                      bool additional_pass = true) {
+    const char* tag = r.found ? ((r.is_pass(cos_threshold) && additional_pass) ? "[PASS]" : "[FAIL]") : "[SKIP]";
     std::string shape_str = "[";
     for (size_t i = 0; i < r.shape.size(); i++) {
         shape_str += std::to_string(r.shape[i]);
@@ -981,7 +982,7 @@ static void print_row(const char* name, const crispasr_diff::Report& r, float co
     // Where the worst row is, and whether it is a near-silent (tiny-norm) row
     // whose cosine is ill-conditioned or a real divergence. FAIL rows only, so
     // passing output keeps its format.
-    if (!r.is_pass(cos_threshold) && r.cos_min_row >= 0)
+    if ((!r.is_pass(cos_threshold) || !additional_pass) && r.cos_min_row >= 0)
         printf("       worst row %lld of %lld: |cpp|=%.4g |ref|=%.4g\n", (long long)r.cos_min_row, (long long)r.n_rows,
                r.cos_min_norm_cpp, r.cos_min_norm_ref);
 }
@@ -6706,7 +6707,8 @@ int main(int argc, char** argv) {
 
         auto enc_r = moonshine_encoder_r(ctx, samples.data(), (int)samples.size());
         if (enc_r.ok) {
-            auto rep = ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size());
+            auto rep =
+                ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size(), crispasr_diff::Ref::COS_FIRST_DIM);
             auto expected = ref.get_f32("encoder_output");
             const auto expected_shape = ref.shape("encoder_output");
             bool magnitude_ok = expected.first && expected.second == enc_r.data.size() &&
@@ -6737,12 +6739,11 @@ int main(int argc, char** argv) {
             char detail[256];
             std::snprintf(detail, sizeof(detail), "|mine|/|ref|=%.9g row_norm_error=%.9g relative_l2=%.9g magnitude=%s",
                           rep.norm_ratio, max_row_norm_error, relative_l2, magnitude_ok ? "PASS" : "FAIL");
-            if (!magnitude_ok) {
-                rep.cos_min = -1.0f; // Fail the existing summary as well as the printed stage.
-                rep.cos_mean = -1.0f;
-            }
-            print_row("encoder_output", rep, COS_THRESHOLD, detail);
-            record(rep);
+            print_row("encoder_output", rep, COS_THRESHOLD, detail, magnitude_ok);
+            if (magnitude_ok)
+                record(rep);
+            else
+                n_fail++;
         } else {
             printf("[ERR ] encoder_output          %s\n", enc_r.note.c_str());
             n_fail++;
