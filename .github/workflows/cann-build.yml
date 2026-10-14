@@ -36,6 +36,9 @@ jobs:
       - name: Check chip-specific float routing
         run: python3 tests/test_cann_bf16_routing.py -v
 
+      - name: CANN rotary cache-capacity controls
+        run: python3 tests/test_cann_rope_capacity.py -v
+
       - name: Free disk space
         uses: ggml-org/free-disk-space@v1.3.1
         with:
