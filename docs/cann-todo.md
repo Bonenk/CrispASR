@@ -39,4 +39,4 @@ upstream tolerances. Passing operator suites alone cannot accept a model.
 
 [Strict device validation candidate and bounded controls](moonshine-strict-device-validation-2026-10-14.md).
 
-[Portable full-model validator preparation and live GPU-argument controls](cann-model-validator-preparation-2026-10-14.md); hosted interface proof remains pending.
+[Portable full-model validator preparation and live GPU-argument controls](cann-model-validator-preparation-2026-10-14.md); hosted interface and actual binary-snapshot proof pass and are integrated; physical NPU success remains pending.

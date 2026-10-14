@@ -3566,3 +3566,15 @@ and full diff syntax check pass again; unchanged inference runtime. No NPU,
 ACL, quantized-model or performance acceptance. Current composition CI and new
 SDK compilation remain release gates. Physical NPU full-model work is next.
 Evidence: docs/moonshine-strict-device-validation-2026-10-14.md and .json.
+
+## Portable CANN model validator CPU interface — 2026-10-14
+
+Exact full CPU command and unavailable-CANN controls38602252235 pass;8 new
+false-success/archive/argument guards execute. Actual CLI/shared API/diff/ggml
+ELF snapshots and all171 returned payloads are independently rehashed; four
+Session transcripts and two CLI outputs per CPU control match original words.
+Diagnostic encoder capture now forwards the explicitly requested GPU flag.
+Rebase/ff8f6aaca integrates the unchanged tested runner. Both official SDK builds
+38598516003 link all6 requested targets; compiler-metadata retention follow-up
+38605386237 remains in progress. No physical NPU, quant, ACL replay or speed
+acceptance. Evidence: docs/cann-model-validator-preparation-2026-10-14.md/.json.

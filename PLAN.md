@@ -7636,7 +7636,7 @@ coverage, not physical NPU inference. Strict diagnostics are integrated on main;
 the merged feature branch is deleted and its separate worktree remains detached
 with source paths preserved. No physical rerun request or release tag is issued.
 
-## CLAIMED 2026-10-14 — Full-model CANN validation runner
+## COMPLETE 2026-10-14 — Full-model CANN validation runner CPU interface
 
 Owner: maintainer session; separate fixture worktree, branch
 diag/cann-model-validator-20261014. Implement a reproducible runner consuming
@@ -7674,3 +7674,23 @@ SDK workflow does not export compilation commands or upload build metadata;
 add CMAKE_EXPORT_COMPILE_COMMANDS and retain cache/commands even on failed builds
 in the validator worktree. This is evidence retention, with unchanged C++ and
 inference behavior. Existing queued model/CI runs still exercise the same runner.
+
+## Portable validator CPU interface accepted and integrated — 2026-10-14
+
+Run38602252235 at168384d47ba462ae72858042ffc13188b143cca1 passes the exact
+portable command on CPU, runs successful CPU controls before correctly rejecting
+uncompiled CANN, and proves true GPU argument forwarding independently. Eight
+unit guards execute. Returned171 payloads, all original coefficients/PCM,
+encoder arrays, transcripts and actual ELF snapshots are independently audited.
+Complete raw350,235,628-byte archive and audit are public and anonymously SHA
+verified. All8 Session transcripts across two portable CPU controls are original-
+exact; repeated encoders agree with accepted native arrays. Rebase/ff integration
+8f6aaca14f36bb2ba58e090b189f8f8a10bf2d01 keeps runner code identical to tested
+168384d. No C++ inference change. General CI38602256898 remains queued.
+SDK38598516003 passes both official chip builds; full logs establish all6 target
+links per chip. No actual compiler definitions inferred from missing metadata.
+Follow-up38605386237 on230d7e4 adds exported compiler commands and retained
+cache/command artifacts; it is in progress, with unique collector under
+/mnt/storage/crispasr/cann-model-validator-20261014/sdk-metadata (session51495).
+Physical NPU model/ACL/quant/performance remain pending. No release tag.
+Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.

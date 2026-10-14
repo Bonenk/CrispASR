@@ -529,3 +529,18 @@ failure controls pass; all13 general CI jobs and2,024 unit tests pass on the
 runtime candidate. The final diagnostic row/reporting correction also passes
 bounded real-reference controls. Physical NPU, ACL replay, quantized model
 quality and performance remain pending; no release is cut by this result.
+
+### Portable full-model CANN validation interface
+
+A standalone F32 Moonshine fixture runner verifies immutable model/reference
+bytes, runs genuine CPU controls before requested CANN, and requires repeated
+encoder, diff, CLI and auto/explicit C ABI Session output with real selected-
+device work. It retains incremental failure receipts and actual binary/library
+snapshots. The complete CPU interface and unavailable-CANN/GPU-argument controls
+pass in hosted run38602252235, with all171 returned payloads independently audited.
+Eight false-success/archive/argument guards are wired into Linux CI. Diagnostic
+encoder capture now explicitly forwards GPU selection; defaults preserve CPU.
+Both official SDK architectures link all6 requested targets in38598516003.
+Compiler cache/command artifact retention is added; its execution follow-up is
+pending. These results establish preparation and CPU controls; physical NPU,
+ACL replay, quantized-model quality and performance remain separate gates.

@@ -89,5 +89,6 @@ builds the original/native CPU fixture, then exercises `validate_cann_model.py`
 with the immutable accepted archive through diff, repeated CLI and automatic/
 explicit Sessions. It must reject a CANN request on the CPU build after CPU
 controls, and checks the real public encoder GPU=true forwarding independently.
-Use the same dependency pins as `cann_model_fixture.py`. Validation pending;
-no contributor hardware commands are published until this interface is proven.
+Use the same dependency pins as `cann_model_fixture.py`. Hosted run38602252235 passes the full interface;
+[complete acceptance and binary-snapshot proof](../../docs/cann-model-validator-preparation-2026-10-14.md).
+Actual physical CANN model acceptance remains pending.
