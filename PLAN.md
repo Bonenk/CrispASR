@@ -7391,3 +7391,31 @@ hardware rerun request, and lists integration, CPU-proved model fixture,
 full NPU parity/speech, scheduler fallback, actual ACL capture/reuse,
 quants and profiling in that order. Prepare runnable new hardware procedures
 only after executing their CPU/hosted controls. No new device request now.
+
+## UPDATE 2026-10-14 — Contributor TODO answered; remaining integration CI active
+
+Reply6165613971 answers contributor6165441184 with the durable
+maintainer-owned TODO table, explains that PR544 is merged and no rotary
+hardware rerun remains requested, and confirms they can unsubscribe.
+https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6165613971
+
+Composed CI38541851377 has passed macOS, iOS and Linux unit jobs; remaining
+jobs are queued/running without a terminal verdict. Keep the tested source
+1a36c871 and existing single collector; do not resubmit/cancel this matrix
+or update production before the remaining gates pass. Both independently
+audited SDK builds and physical rotary proof already pass. Current main
+contains documentation updates only beyond this tested composition.
+
+SDK complete nine-payload proof is publicly retained and anonymously verified
+at dataset revision2b1a7c30a1ed50a6147ca141715d81b4fe6e5ba7; archive824796bytes,
+SHA2f2709468f2ffc7a083f51e8977e33c4789a29cf430a5e87e45c6df1c7916832.
+Windows now also passes composed CI (four completed passes); remaining jobs
+are queued/running. Root/volume1 capacity checks trigger a cold-file audit
+under existing user-authorized checksum/symlink storage migration rules.
+
+Bounded storage audit completed without moving files. The finished home
+scan found no cold files over256MiB outside active agent/runtime trees;
+the bounded volume1 scan produced no eligible over512MiB candidates before
+termination. Package runtimes/toolchains and other active project state were
+left untouched. This was a partial volume audit, not a claim that the disks
+are cleared. All new SDK/model proof artifacts remain on /mnt/storage.

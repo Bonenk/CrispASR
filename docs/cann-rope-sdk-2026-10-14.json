@@ -71,5 +71,14 @@
       "build_log_sha256": "d3243b6b90c1a603f55ab7e9cd532c89b0616c06ddeac7ff5b994c61fa9df079"
     }
   ],
-  "scope": "SDK9.2 beta2 compilation and source regression controls only; physical SDK9.1 operator proof is separate, model/quantized speech/performance remain unvalidated."
+  "scope": "SDK9.2 beta2 compilation and source regression controls only; physical SDK9.1 operator proof is separate, model/quantized speech/performance remain unvalidated.",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-rope-capacity/complete-sdk-proof.zip",
+    "bytes": 824796,
+    "sha256": "2f2709468f2ffc7a083f51e8977e33c4789a29cf430a5e87e45c6df1c7916832",
+    "payloads": 9,
+    "anonymous_verified": true,
+    "revision": "2b1a7c30a1ed50a6147ca141715d81b4fe6e5ba7"
+  }
 }

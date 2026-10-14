@@ -23,3 +23,9 @@ passes1691/1691 broad operator cases plus452/452 full RoPE repeat.
 is still active. Production remains at ggml21acf3162 until that gate passes.
 Compilation does not establish full-model NPU inference, quantized speech,
 executed ACL graph capture or performance. [Remaining work](cann-todo.md).
+
+[Complete public SDK proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2b1a7c30a1ed50a6147ca141715d81b4fe6e5ba7/cann-20261014-rope-capacity/complete-sdk-proof.zip)
+contains all native run/job metadata, full raw ZIP/logs, independent target
+receipt and the exact executed workflow/control sources. All nine payloads
+were hashed and ZIP-verified; anonymous full download confirms SHA-256
+`2f2709468f2ffc7a083f51e8977e33c4789a29cf430a5e87e45c6df1c7916832`, 824,796 bytes.
