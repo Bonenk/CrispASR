@@ -7505,3 +7505,31 @@ and all four secret checks pass again. A separate single collector watches
 that run under /mnt/storage/crispasr/cann-model-fixture-20261014-v2; old
 cancellation evidence stays in the original directory. Hosted numerical/
 transcript result remains pending; no NPU/quant/speed acceptance.
+
+## Moonshine independent original fixture verified — 2026-10-14
+
+Local bounded audit rehashes both complete108MB original/GGUF files and
+verifies160/160 mapped tensors/27092736F32 values byte-exact. Five source
+config/card/tokenizer Git blobs verify. Actual original torch2.6 CPU/
+transformers4.57.6 card recipe reproduces exact JFK text, max_length71.
+An initial incompatible torchvision import was retained; isolated CPU0.21
+repair changes environment only. No shared environment changes.
+
+Actual dump_reference.py captures raw_audio[176000] and encoder[457,288]
+byte-exact against independently owned original arrays. ReferenceSHA
+8084853dff68e8d7f9bbfca2a1c91f3554fc7b27d49dbfec88dee9393df03fd0.
+Complete26-payload public proof revision8d3500c572ce6f32bf0934357a45eb2934c4b320
+anonymously verifies2395093bytes/SHAcc84efd19a97c276118bcf3f3750bca46d045e13f3c55c430e67a9535df7cba5.
+Hosted38555394740 still queues; its single collector remains active.
+Evidence: docs/moonshine-original-fixture-audit-2026-10-14.md and .json.
+
+## CLAIMED 2026-10-14 — Bounded actual native Moonshine backend replay
+
+While the full hosted CLI/Session build queues, compile only the unchanged
+actual Moonshine backend/tokenizer with hash-verified existing CPU ggml
+libraries. Verify CPU/core source identity: current ggml differs from the
+library’s c36 source only in three CANN files. Capture actual public encoder
+and native backend transcript on pinned original PCM/model; compare complete
+arrays/norms and decoded text, retaining source/build/closure/raw evidence.
+All artifacts stay on /mnt/storage. This is bounded CPU backend proof;
+full CLI/Session wiring stays with GH, no GPU or performance claim.

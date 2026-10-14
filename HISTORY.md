@@ -24256,3 +24256,12 @@ transcript or numerical thresholds. Header proof is in
 docs/moonshine-tiny-regression-dtype-2026-10-14.json. This corrects scope;
 it supplies no new speed/quantization result. A CPU fixture producer with
 fresh F32 conversion is submitted; hosted numerical checks remain pending.
+
+## 2026-10-14 — Moonshine original fixture independently verified
+
+All160published F32 tensors match original byte for byte; both108MB files
+are fully rehashed. Actual original card generation reproduces exact JFK
+text; real blueprint dumper captures original PCM/encoder byte-exact.
+Complete26-payload public proof is anonymously verified. Native CLI/Session
+and NPU acceptance remain pending. See
+docs/moonshine-original-fixture-audit-2026-10-14.md.

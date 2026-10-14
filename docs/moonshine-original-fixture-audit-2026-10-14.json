@@ -1,0 +1,1979 @@
+{
+  "coefficients": {
+    "all_coefficients_byte_exact": true,
+    "source": "a149749ee492c4ea9fa80b682d0248090f9bb6af",
+    "converter_sha256": "ca09bca9287bc094505045f7b33602f8f8c5214574fc9939c5e0e227d29f185f",
+    "original_revision": "390624ed33d594443aa4aa221f5b9f283b545b5a",
+    "published_revision": "28281de882bac021e9241e640f44a9a289607e03",
+    "files": [
+      {
+        "path": "original.safetensors",
+        "url": "https://huggingface.co/UsefulSensors/moonshine-tiny/resolve/390624ed33d594443aa4aa221f5b9f283b545b5a/model.safetensors",
+        "bytes": 108389192,
+        "sha256": "867cd2215804859c55aa972d740bd5002be149b4e7526328c895d2408848c736"
+      },
+      {
+        "path": "published.gguf",
+        "url": "https://huggingface.co/cstr/moonshine-tiny-GGUF/resolve/28281de882bac021e9241e640f44a9a289607e03/moonshine-tiny.gguf",
+        "bytes": 108383136,
+        "sha256": "64518aaf5535085075b081c8c1c89532e7cb5160efe90272c73937f179cf5f78"
+      }
+    ],
+    "tensor_count": 160,
+    "tensors": [
+      {
+        "original_name": "model.decoder.embed_tokens.weight",
+        "gguf_name": "decoder.embed_tokens.weight",
+        "shape": [
+          32768,
+          288
+        ],
+        "values": 9437184,
+        "dtype": "F32",
+        "sha256": "7b28c9c6680ce573e05821ff489855e8086be11e4c3b8bdfaab496f463386b20",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.0.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "55b2c23638e7651ef1ca99c08343490cfdfc34ce6c653e65c4b656e1cd706a78",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.0.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "883ac2eb388e2c2c6687dfe23c1542df0f26c0e58b2ac4bcba5750a8853e9904",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.0.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "61fc665be5618f020b65deed50d320c9c27836f1dd88447de56fd85129b34d46",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.0.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "69bf2ccc2839c2103cf019a75ff78b7d0a808ee53b584176f4ba8ca5c638092b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.final_layernorm.weight",
+        "gguf_name": "decoder.layers.0.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "7726ee1c2075ca2a6c84dd8e686bcf7773f8877886ec03ad0334fc2adc6b106f",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.input_layernorm.weight",
+        "gguf_name": "decoder.layers.0.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "da3b88d0c51851b4156f702d240551906d36c68017b90e60b25cc1953f9c4768",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.0.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "a3dd5b609e0b8d6c46fa9934ee88f43ef2a34f912e72cf543e5c71e64b780356",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.0.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "e9c186083de412057adee0732ea5dae11c15b40c69c403e3999d90e6c50efa19",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.0.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "ed32de6615349f9360a9ae7ebd6bb01496d5a1823936e25b9df84048faf73bef",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.0.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "6d29e67e5810d97dbaef85abc96b8f6426a568d6d78f344c192a773c18a40b80",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.0.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "be0c3f7ae7a3f8c33e931ea7e168a93e3a33ff384b504e4691b251a425cdf05e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.0.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "e553f77973343edc326eb35036cabf240b68bf2411805483491f9d28d0995976",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.0.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "9d7a517d43bbe56b7b9e4e627556f2106edfcb7d8e332d75935b2cbccd496ca1",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.0.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "427d58c004148e82c61a323518ee765fb5855693cbe95336f6a60a79f5f5f624",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.0.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.0.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "d120d2553cf334b3e932bf2c9d27caeb098a80c7cd6ab59094734f4ba8364226",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.1.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "6f1173f175e23b4b9b8a9a9884b4fce32d4dcdf331b9ee9b9dab7ea53835c893",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.1.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "3a2da3fb7f4155acbf4cae5c8885008bdacb01db2daf86e97c4faa06fd1f30fc",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.1.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "ec2fb4185d19b1cf235b6ef07bccc21b37575583d0733dbeef6da0c2cc4deee7",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.1.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "e7fad13111b6f2370de9678914282e6798097cf84de94fec0b977bde942bf474",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.final_layernorm.weight",
+        "gguf_name": "decoder.layers.1.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "158a2bc1b554c657b0e6265e11f0106eaa9817cdaa2efac406aa78cc5dfd0f31",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.input_layernorm.weight",
+        "gguf_name": "decoder.layers.1.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "4f8090e82645f0a464fdd241aebd205ab2252d600aa8958f22b4a0401b46f94c",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.1.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "d2fbde9b9953c03ef911f72ac91e7ccc557c21e888e48d99efa005f84eada0f9",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.1.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "aa98a617bc2acb0e4ed64b2e310d83267bc6e3d47f5f0c7a57f08fa9d56e379e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.1.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "3c1f355e6d99ece24de3a3cb1b854d8e3cde42a70480041c6fe1e0a97ab13751",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.1.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "f48b7c9ef9a9c0c9d9beb1a6c28ff1bb6adb5bb41b226a675d3fb35a5e689c56",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.1.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "67a61b5c66c2210e3dc6731ff756d0de09c3507b0385a4e11b4a14265142d5db",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.1.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "5499983cbf703beac4c78dcff44323a2b00383cd8273cc5a00dde5bdc8420918",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.1.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "33364c27d7def916ad1e85fbe525047dc96bdd7f005fdd04592249026ef3c273",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.1.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "7f71e1e5fd7d8b39d94596bc85fa1b81b05d7f204e94f1254a1222108cd54c51",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.1.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.1.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "78ab3f03954a54a64fd00a736962a8508544a1390111c77af9a28fd24d87c54e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.2.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "4a196d3dc0ed3f3cb3e996217cb0f8e44695c0bfdf87f6f0ae5911a749592df8",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.2.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "faefb0ee90102d6d2a1f1d64dd634645b05359382e77077cd1f3e949d8792fc3",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.2.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "8b281c6b3e6a0578952d95a2707233bb6707665caad6ea0b3c93b4ad5e7f7703",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.2.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "5609bc613d4bf4a614ac7b9b45f597099953a9db1c1a6073a8afe067cc5c319b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.final_layernorm.weight",
+        "gguf_name": "decoder.layers.2.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "9c5b4fd0206e270948a561179eb9f9c96cf1be65ffc0d51701a194f9a05fc012",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.input_layernorm.weight",
+        "gguf_name": "decoder.layers.2.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "8b454fa60265ee002ce1a3115871e42ea346ee303d33c6d240616f20ad5a5f76",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.2.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "4dbff0eda54427ecec323d8b9399da5e7b5739b8e3ca39a3ac3d39adf41f69e0",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.2.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "8c43808d620533be857872f4eebe92fa73c423e305047f99ed4deef6bf633dbf",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.2.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "93cd96246984f7a602b5e23b23af5720e2671cb9fb534607fb04f389ca63ff6e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.2.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "7e3b2a7478bc4e14d5660bf52de9b6abae561acd2cac50db8913e433ea911231",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.2.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "13dde05649056b076d54b6c375d9ea0e719c505bafd1e9e3446389689659ff51",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.2.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "7557a6865bfda3a72b38369b32bc6034d447a35080f5d4ac1cdaca288fc3c989",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.2.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "97ec5eb0c85bdb44ef966af687fb7597bd3bf5f7fd1bf474c6c94851b205cc98",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.2.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "7cfbc4f0cfae4a8338cfddba03fd058ea596243d756896199766f48859468b8a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.2.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.2.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "dc26602a986a1c8d848958e70f0d51bcb5ba793d2f9e4b9553899752cbce7160",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.3.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "48a7ea4be564ee6bc939b034a2644be55e3dbc9ee9374fc50604bb1374de27fa",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.3.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "49fcb31f0a45b18c739481e394c0a56ea3a65cfea9f105711b78b4d5f9163c5a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.3.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "d8478430472448b82b44c89475a5c0a70dc398327a0ec92d759fa679e4cfbaab",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.3.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "468f67a628122a214a424053a95d17e67755d228c45c4f451b2ddab2351ca157",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.final_layernorm.weight",
+        "gguf_name": "decoder.layers.3.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "bc7d2ff2779da8d8246638765aa5512973ed67727ec8e28f19a26f88b9e2171d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.input_layernorm.weight",
+        "gguf_name": "decoder.layers.3.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "dd5ecc22c3ed0c9edca4e746735e496ff23d97d59ec36d01471c13b25151c43d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.3.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "4e272b5485bc6c1ab91829af2b328b35bd2fb14e60a764ff3792614d872a39ec",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.3.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "ffe21b4f0673ffe521a6c5709589ae6d7009125209066433c2725d1970ade6e7",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.3.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "45f2e8a537f92d0b20cee19d7967973212f03cc74365bb73fa8fd4325e99400c",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.3.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "1b0e0653add1b01bed5b5c8cf0c777cc721ace6d2e9bbe2d60300266e829a2e3",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.3.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "1196c490f4f8cc17026208bee02e4a79e558306e354e7ba492f17aa7b8954eec",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.3.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "649d63389e5b09b17c1d7e63818c2be0c933740a6e8a230aea3fe0e733b95d67",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.3.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "28ced3cab21bc26e3ab1788d899ca49723da04c8cc1900660f159cf434894c36",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.3.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "e9adcebf1425a1642b45e1d277a914a1e017e08166374dbb5c4d1dafe259b661",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.3.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.3.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "839e8c613c1f66b1283f2cee7eddcdc7798c7c0ed72c9f45469c6d1626eb8640",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.4.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "008ac1383f6f80e4746a31f3c5c0300c335c233fffe772fa1975f6f0ed1b193b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.4.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "daed15b1721d638c952cfcbe692c8f45755403ebe75fe9cb618b103678326690",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.4.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "875bd856ea74853dcb4e141c0b0895e7261f3f9eaeaba1edc36b03b40a2e6936",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.4.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "bb95d2be83ddb2c2bd9d107dac206b07d345854404f739ed2853dcbf683d05c8",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.final_layernorm.weight",
+        "gguf_name": "decoder.layers.4.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "f2ce11be73157fab55a3e62bf83668b5085ae1ee1466095dee2e499924be8ca1",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.input_layernorm.weight",
+        "gguf_name": "decoder.layers.4.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "14bde24a72fc38c1597a76a8a089d219111b47544ee770403376ad77c1122893",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.4.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "51d812daf1b08e68a4b1089d3d251beaaa7566c7aa44499df3a6d2ed412128f8",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.4.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "080b15b8fd407706ca542035cd9867121fa6ddc8fc6a87a9e03f47a77050689f",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.4.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "e3e186d83aa0f7a929e6c68c638d4f026ca9b7f07981dd0f1b7f5e6470d18882",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.4.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "e45990a14b43b3683692b14188cef19ed4811ef14f89db75c2968788e2107a62",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.4.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "4fb8079470d10d16cf8b2faba24aacf319146f5dcab2d5c02d4fabd1887f1058",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.4.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "26c972a75fff1218c3d47d157922577e708e4baf3e9c7e759a6a7e2aadd46019",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.4.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "c41c562caeab0e0a508551f7e7fa2027876b34ec61cd14b0206291fd60416ec2",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.4.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "37ecbe8997c66b70dae6d4e38a59767b2ed4b0c53b6ad2a2bc3cdec2dc1adc5a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.4.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.4.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "40ab7c8e6d14ea90e0f46dd51642d269a9fe4d620f84fc76d35dcfd89d48b9f8",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.encoder_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.5.cross_attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "76c24ff7372501a876bcd0f5e202b4b398adc1c1f9e32a268c54ba28458d39a5",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.encoder_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.5.cross_attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "ab6b80ca40fea3aad793ccef676c0aba131bee0935386262ee0d59ef2313ec6d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.encoder_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.5.cross_attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "5d6d42f1229516a32de3a23896420a6a39ca0689f62db2c07691bf731ddddab5",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.encoder_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.5.cross_attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "03a0e41719a63567480c4ff39986eba469144539cfada41bc08c95fc6c5fb462",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.final_layernorm.weight",
+        "gguf_name": "decoder.layers.5.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "aa4b8bef757ff1a3eb03f28dc3391bf578ef6ea7105253da928f6998ef522d6a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.input_layernorm.weight",
+        "gguf_name": "decoder.layers.5.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "c9f38ad7ce2f4abad08d172f93f46c9bf30b44b1497a9aa79d2650d9d64d4c02",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.mlp.fc1.bias",
+        "gguf_name": "decoder.layers.5.ffn.fc1.bias",
+        "shape": [
+          2304
+        ],
+        "values": 2304,
+        "dtype": "F32",
+        "sha256": "f67fab99bbbb1f0926668e1a862d354a8d2f13319d7d53c6e33f7ade6711035c",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.mlp.fc1.weight",
+        "gguf_name": "decoder.layers.5.ffn.fc1.weight",
+        "shape": [
+          2304,
+          288
+        ],
+        "values": 663552,
+        "dtype": "F32",
+        "sha256": "053b990f92035ca5f4738e7b46443bdeb18b01d1cdc0285abb2e0f3878e201fe",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.mlp.fc2.bias",
+        "gguf_name": "decoder.layers.5.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "ca82a1a5b833d0930c3f9ec734da60d87e5ab0ebc06baa0bd72a5f2e7f9a2a44",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.mlp.fc2.weight",
+        "gguf_name": "decoder.layers.5.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "0fd0c946692794ed17281766848e84ce2b4571569011d3de10751cb5d9415c6c",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.post_attention_layernorm.weight",
+        "gguf_name": "decoder.layers.5.cross_attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "656a3a8e45090af43e2c08b44098e790287c0b2f26d61df8f7c37a2d6cdc8a2b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.self_attn.k_proj.weight",
+        "gguf_name": "decoder.layers.5.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "2049f6475c4623496c361e1ece1e4efbdb8ea36b954d2b740b887e31491a1140",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.self_attn.o_proj.weight",
+        "gguf_name": "decoder.layers.5.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "79831d0ae5e8ffb76d18c6e4e20ee5008589bab29a5a0b30cd934c88ffa33b17",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.self_attn.q_proj.weight",
+        "gguf_name": "decoder.layers.5.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "a94b8e6909923790e70eef5d8ad8df39f6bd51bd342b43b61d433ad7d4fea3c9",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.layers.5.self_attn.v_proj.weight",
+        "gguf_name": "decoder.layers.5.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "f54bb5bc304267cd59d42cc17ac6b4a92e3a02e35b7ac48a2a28830cc7838536",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.decoder.norm.weight",
+        "gguf_name": "decoder.output_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "8baea129e43ab302b11628d7aea478a70f1b70715041a5231440b53095b91c2b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.conv1.weight",
+        "gguf_name": "encoder.conv1.weight",
+        "shape": [
+          288,
+          1,
+          127
+        ],
+        "values": 36576,
+        "dtype": "F32",
+        "sha256": "e58755fce11f3987b36be7f73c2f4546a2f71ac1735a23f6324c85f7692845a0",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.conv2.bias",
+        "gguf_name": "encoder.conv2.bias",
+        "shape": [
+          576
+        ],
+        "values": 576,
+        "dtype": "F32",
+        "sha256": "ad4f9485445de0dc9fa78217bc3775e1d91274b99377173d67ada7a4e49da03a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.conv2.weight",
+        "gguf_name": "encoder.conv2.weight",
+        "shape": [
+          576,
+          288,
+          7
+        ],
+        "values": 1161216,
+        "dtype": "F32",
+        "sha256": "24a7b1a0a55394aa219d10455f52b00bbbc3ff5a804546912de0284f2c6ddeb2",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.conv3.bias",
+        "gguf_name": "encoder.conv3.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "b68a6082492bc05566c60cf358dac3994120462814d482ed3c1ec684e0b38948",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.conv3.weight",
+        "gguf_name": "encoder.conv3.weight",
+        "shape": [
+          288,
+          576,
+          3
+        ],
+        "values": 497664,
+        "dtype": "F32",
+        "sha256": "af17eb343220c9ebd3820e7d5ba88e4241877e1fc911ec3e3ea288c53a238717",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.groupnorm.bias",
+        "gguf_name": "encoder.groupnorm.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "e506578cf9070046fc775854458194946a8215c7c6ff549193dd5c5741146c80",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.groupnorm.weight",
+        "gguf_name": "encoder.groupnorm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "3d97c640e118d69db72e8596b1607c146c899b24b618c0a8714221bcd0885bc7",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layer_norm.weight",
+        "gguf_name": "encoder.output_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "377035f465ffd2d47a0565e4ad684fe97ebf46e91e1f664cafef945c52da3b86",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.input_layernorm.weight",
+        "gguf_name": "encoder.layers.0.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "c72662dcc1aeff4f0631100f28b8e059c89f027139b244ac6d4fd9b1a7815530",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.0.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "2b57a4a71216232cc975c14617f7da76b760116f5f08cbd8ff5ef5d4d50e1adb",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.0.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "d2bfe19678741c79d0b677fc646ba50a71064e393f5a76a9446d51799d9f9753",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.0.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "7c40b9a86098ce57f53d3ff31ceba82521e1b2a65b1fc1bd1cb97a9f02f615e3",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.0.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "ceb86f848e2b7a5f696c3947146d724db410c4bf83ed8235daef0150b16b4539",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.0.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "764143f384620dbed0eb2c7ed1bf4d0bd2eb64c61bcb47206bc26e16d1c94e40",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.0.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "9557b790407c3a066e8d16a60895e653fc310125406b56381c2e3a916165145f",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.0.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "eb9e07a31af573addd56cb6e10986e979a90ed138a44eddbb69522d4300a44fa",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.0.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "9f1a029bbec31e6741b33feb2b95d0f3e0f37fd38d7c605c28e4e720e3eb5420",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.0.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.0.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "c02f7ccb57b4d3df2b5ecd95dbfca2d2434b11962fcdcda5ab277f4e58d8f1ed",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.input_layernorm.weight",
+        "gguf_name": "encoder.layers.1.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "a259d5292c25e7a04be74e7d07dd5ad7cc8653817a9291fee4a52eb3d521257f",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.1.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "966144fb26973a214563fe3804abc8f26738a45b1cd03ff73b065f1908953d69",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.1.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "9dc99f731f4439e44a2a710c2f0b9d4e8826f15b4c57fa9c3dad62e4017b3544",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.1.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "a381cd6d5b6e7cf771eec2f5a3764aaa23d313f99ccc2832b09750b2e67c1a57",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.1.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "9d9f989a11f9bb5029aa32d0f4745b9272e8975222c9ed92226f693857155939",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.1.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "302e14cf08375bd78f7b0133b5edbdd7071ea4d7f5aeb2210a19f0a333f3125e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.1.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "f453f131760bbd59dca91b07019c7b049074c8828905d8e987c54afce87e1121",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.1.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "98eee9d5d492d7d813dcf6b3fef409affe4fd7f54136f595c280941d814c8267",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.1.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "321fd38a4520cdc3d727ab4680a485b620bdde7fd16a92bd4a50c6a12b56a6b8",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.1.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.1.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "f2e82f857be9b41116cee48bf918a2f42e862e54081d3c3f35356f6341538725",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.input_layernorm.weight",
+        "gguf_name": "encoder.layers.2.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "087d9e555fb3f207e9b6a20e3eb689784556c626c0596747467b8275227fde06",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.2.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "561576d5ecc2fc6df0a710745846bae8e591d0ffdd54f06039dda42564cf491d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.2.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "d1d83effaceb8311a0affcc2f02221ab43c444e68fff6fcce427e390d76647be",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.2.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "703e6e9b9c3a8610ea3c0df18d6717f40c8bdb793186386187a089069049e83e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.2.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "f6c53d8365ce2753fc99efd8052fdc9a3a506f65880e6c53d1591f2705af075c",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.2.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "ae0f60a6e354701c25813ba08a210bfc7a9acc890573b6210fc535530bff693d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.2.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "b3067b7e14fbf798ff679033f840db0cfa5329c7effd1a83ad0367558e45622d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.2.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "e095fe95e1d16bfb4eebc61d8072fd109a5d5c6ecac8de6b34e5156142f2cb7e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.2.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "b1b6863bfaab33151a50704af09e6cbbeb131a142ec4f7554caaf959d76d3d11",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.2.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.2.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "ac7418aba1578e62fa031f93aa65982049117219282dc97ffd8c8500bab247ef",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.input_layernorm.weight",
+        "gguf_name": "encoder.layers.3.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "b538697905a6e7fc005190c9b66ba1d5092f69b11d450e719200a2b7d7da4c15",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.3.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "2bc8adf70615fcf07c3ea3c3cb5605939a543ffb7be1b00ad49ab0094dbac547",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.3.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "7b29872acd1aff8e1de33ea00bf2b477c71e85bb8eb9e2c6a8e51fa1e0217dfc",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.3.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "8236d6fa2c481851bfdc41c0a45ed03c5dca2b16f2685f4e876e3312cb9317cd",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.3.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "4906677ca8905faab00b3881d71f45fb77cbe561ed53c02847764f917d0a0fd9",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.3.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "26506ee49356461d40abda4a8d3f7c2dcc2a24704804d652aa10b16ecb49a4b6",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.3.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "d106bd463e8106894a640743ea227d0d584cfa2e2101e2bbee60ba2a3ac06afc",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.3.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "524b05f003f74e48f2b0e8d277919ccf2b4a664160fe5dc1c8c28be075dc9144",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.3.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "d84096ff6f052c3bd3b7b18b26b0469cce83f4199280d76f7064b83eaaa4e571",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.3.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.3.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "21f86780f6efbcafba7498127bcbe34b1b0c9d7feed89b56efc617e6832b4553",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.input_layernorm.weight",
+        "gguf_name": "encoder.layers.4.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "db228c42a3599a8ad0c5603e0663351a4e20f891d648ca525388c1e1e2764bf7",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.4.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "fa664daff3322f20193fbe8869fad525591129d19cf4c8eab9aa55ded7e67860",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.4.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "fda222a875796a5ace871bceb3b9a1765a2b6269ccbb2ef1cc4790b57ced007b",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.4.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "78b5d5e408e821933bf22759a06ecf221d1c1be33438c00c245e61837273e036",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.4.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "e7a45276591094d4ab2551127751ff80cff76e62591c210dd25286e220992e16",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.4.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "70d920a196023471fcfa6993f9a9952292730887a3f35b33a12da091ea0e45ac",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.4.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "20eb3a95a1216e83e1932fb6528760409b3e98dd1c12cdd9279fdcd6dd885e2a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.4.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "26b482342f8ea5f59ff0caa71a76ab3a7aa5efd8db9fc8d85bd121c6d556a8dd",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.4.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "987c40044276f8b3383325fc3cca849a25d728b0356aa62920a2dfddcf4b1d93",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.4.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.4.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "eb4cf361760c4098283dfc90ff363435cf54a9e86f1e98efb35593acd219d5f5",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.input_layernorm.weight",
+        "gguf_name": "encoder.layers.5.attn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "38c79d9db89edd638e8f1689afe1879b272627e4413b5b436b49efb878e22ab3",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.mlp.fc1.bias",
+        "gguf_name": "encoder.layers.5.ffn.fc1.bias",
+        "shape": [
+          1152
+        ],
+        "values": 1152,
+        "dtype": "F32",
+        "sha256": "2a845e594353179fdf8b5ed40f4cfbf57b92dd90de2aaba334bbbb0f82e60577",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.mlp.fc1.weight",
+        "gguf_name": "encoder.layers.5.ffn.fc1.weight",
+        "shape": [
+          1152,
+          288
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "657501033ad0f7a4a8cbc9f3b119caac2398e87369235356dbab9b54e591c41a",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.mlp.fc2.bias",
+        "gguf_name": "encoder.layers.5.ffn.fc2.bias",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "be819a83bf0b8da4387c97a2bd339b24dc1754914de308d571d88d7f2d1e8f1e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.mlp.fc2.weight",
+        "gguf_name": "encoder.layers.5.ffn.fc2.weight",
+        "shape": [
+          288,
+          1152
+        ],
+        "values": 331776,
+        "dtype": "F32",
+        "sha256": "daad5e54423d35a3d2946a6faedba698e696153497f9ea57524960e74ece7a6e",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.post_attention_layernorm.weight",
+        "gguf_name": "encoder.layers.5.ffn_norm.weight",
+        "shape": [
+          288
+        ],
+        "values": 288,
+        "dtype": "F32",
+        "sha256": "d9b557a7d3dd104084daffff649d4f52a9066f24c833f56eec2768070bff5d8f",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.self_attn.k_proj.weight",
+        "gguf_name": "encoder.layers.5.attn.k.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "7f192f8069c51a77ca04826a3b43a51b8ebf4c3f86d93609cc1523a28e9445e1",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.self_attn.o_proj.weight",
+        "gguf_name": "encoder.layers.5.attn.o.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "d33845829de16751291aca1460046e3d5c9a99f2a30127298d07ee296e3a3d1d",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.self_attn.q_proj.weight",
+        "gguf_name": "encoder.layers.5.attn.q.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "71a27bfac54a98f3bae142363147b2833e55fb2aafd59c95d8c6b8b9f1a49841",
+        "byte_exact": true
+      },
+      {
+        "original_name": "model.encoder.layers.5.self_attn.v_proj.weight",
+        "gguf_name": "encoder.layers.5.attn.v.weight",
+        "shape": [
+          288,
+          288
+        ],
+        "values": 82944,
+        "dtype": "F32",
+        "sha256": "a7f8c8aa755a20d3ea203dbb9fa8357058cbb9b8685f36c99054ffb2b8fa7b4f",
+        "byte_exact": true
+      }
+    ],
+    "scope": "Complete original/published F32 coefficient identity, whole-model hashes and actual converter mapping. No model inference, transcript, NPU, quant or performance acceptance."
+  },
+  "original_forward": {
+    "original_recipe_pass": true,
+    "scope": "Actual pinned Python generation and owned encoder/PCM capture only. No native stage/transcript or NPU/quant/performance acceptance.",
+    "torch": "2.6.0+cpu",
+    "transformers": "4.57.6",
+    "original_revision": "390624ed33d594443aa4aa221f5b9f283b545b5a",
+    "sample_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+    "processor_input_exact": true,
+    "all_valid_mask": true,
+    "max_length": 71,
+    "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+    "expected_transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+    "normalized_zero_wer": true,
+    "token_ids": [
+      [
+        1,
+        1126,
+        577,
+        590,
+        10404,
+        23035,
+        2244,
+        451,
+        825,
+        596,
+        4234,
+        508,
+        437,
+        363,
+        366,
+        29892,
+        2244,
+        825,
+        366,
+        508,
+        437,
+        363,
+        596,
+        4234,
+        29889,
+        2
+      ]
+    ],
+    "encoder_shape": [
+      457,
+      288
+    ],
+    "encoder_norm": 200.93036392366048,
+    "encoder_sha256": "aa06b3c49465e6d6ecb1f1bf64a52a8c5c932c5f38799282cbe297d04204ee3c",
+    "actual_modeling_sha256": "d0db54cd4982c984a8c06bdf67d2dc28775ef885bc81ffec027e0fe0ddf63af5",
+    "seconds_informational": 2.568967703729868
+  },
+  "dumper": {
+    "actual_blueprint_dumper_matches_owned_capture": true,
+    "source": "a149749ee492c4ea9fa80b682d0248090f9bb6af",
+    "reference_bytes": 1231136,
+    "reference_sha256": "8084853dff68e8d7f9bbfca2a1c91f3554fc7b27d49dbfec88dee9393df03fd0",
+    "stages": [
+      {
+        "name": "raw_audio",
+        "shape": [
+          176000
+        ],
+        "dtype": "F32",
+        "byte_exact": true,
+        "sha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0"
+      },
+      {
+        "name": "encoder_output",
+        "shape": [
+          457,
+          288
+        ],
+        "dtype": "F32",
+        "byte_exact": true,
+        "sha256": "aa06b3c49465e6d6ecb1f1bf64a52a8c5c932c5f38799282cbe297d04204ee3c"
+      }
+    ],
+    "scope": "Pinned original Python dumper and independently captured original encoder/PCM agree byte for byte. No native stage/CLI/Session or NPU acceptance."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-fixture/complete-original-moonshine-audit.zip",
+    "bytes": 2395093,
+    "sha256": "cc84efd19a97c276118bcf3f3750bca46d045e13f3c55c430e67a9535df7cba5",
+    "payloads": 26,
+    "anonymous_verified": true,
+    "revision": "8d3500c572ce6f32bf0934357a45eb2934c4b320"
+  }
+}
