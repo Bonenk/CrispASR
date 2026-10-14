@@ -80,5 +80,6 @@ opt-in exact-device path through diff, CLI and auto/explicit C ABI Sessions.
 It records allocated encoder backend/op counts and successful computation,
 and rejects scaled/nonfinite/wrong-shape/missing-stage reference archives,
 changed input PCM, missing CANN and invalid/unavailable device ordinals.
-Use the same dependency pins as `cann_model_fixture.py`. Hosted proof pending;
-these CPU controls cannot establish physical NPU work or ACL capture/replay.
+Use the same dependency pins as `cann_model_fixture.py`. Hosted run38575701613 passes all13 controls with independently audited raw
+archives; [acceptance proof](../../docs/moonshine-strict-device-validation-2026-10-14.md).
+These CPU controls cannot establish physical NPU work or ACL capture/replay.

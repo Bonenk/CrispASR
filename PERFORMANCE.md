@@ -3550,3 +3550,19 @@ Evidence: docs/moonshine-hosted-cpu-fixture-2026-10-14.md and .json.
 Next: strict CANN model-stage selection, reject missing devices/CPU fallback,
 retain actual scheduler/NPU execution traces; prove failure controls before
 publishing physical hardware commands. Dia full speech remains rejected.
+
+## Strict Moonshine validation integrated — 2026-10-14
+
+Tested source9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d is rebased/fast-forwarded
+at1f71367bbfd1c8768e8e0eae6035362dfda2daf8. Hosted model run38575701613 passes
+13 strict CLI/C ABI/diff/device/bad-reference controls; returned49 payloads,
+all160 coefficients, full arrays and8 original-exact Session transcripts are
+independently audited. All13 general CI jobs38575706459, ten lint jobs38575711575
+and secret scan pass;2,024 unit tests execute, including four new selectors.
+Public raw archive and complete audit/CI logs are anonymously hash verified.
+The post-hosted reporting fixb1cd47f preserves true cosine on magnitude failure
+and uses canonical encoder rows. Actual bounded good+five bad reference controls
+and full diff syntax check pass again; unchanged inference runtime. No NPU,
+ACL, quantized-model or performance acceptance. Current composition CI and new
+SDK compilation remain release gates. Physical NPU full-model work is next.
+Evidence: docs/moonshine-strict-device-validation-2026-10-14.md and .json.

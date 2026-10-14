@@ -441,3 +441,17 @@ all13general CI jobs, both SDK architectures and physical1691/1691 broad
 plus452/452 full RoPE repeat pass. Regression remains wired into both manual
 SDK jobs. See cann-rope-integration-2026-10-14.md. Full model/quantized speech,
 actual ACL replay and performance remain future validation.
+
+### Strict Moonshine device validation
+
+Opt-in exact backend/device requirements reject missing or invalid devices and
+GPU-disabled contradictions instead of silently running on another backend.
+Encoder scheduler assignments and successful computation are recorded without
+altering the graph. Moonshine diff verifies exact reference PCM, complete
+shape/count, row magnitude and relative error alongside cosine, and refuses
+missing encoder references. Magnitude failures preserve the actual measured
+cosine. Full hosted CPU CLI/auto+explicit C ABI Session checks and13 deliberate
+failure controls pass; all13 general CI jobs and2,024 unit tests pass on the
+runtime candidate. The final diagnostic row/reporting correction also passes
+bounded real-reference controls. Physical NPU, ACL replay, quantized model
+quality and performance remain pending; no release is cut by this result.
