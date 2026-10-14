@@ -7441,3 +7441,18 @@ Next maintainer task is docs/cann-todo.md row1: CPU-proved small-model
 reference/fixture bundle. Full NPU model parity/speech, scheduler fallback,
 actual ACL capture/reuse, quants and speed remain separate. Dia speech
 remains rejected; bounded primitive results are not port acceptance.
+
+## UPDATE 2026-10-14 — Rotary repair published on main
+
+Main integration d17c5d8b90fe941ed823580b3bf9234610347b59 pins exact tested
+0a8620765; shared-forkea526e120 preserves newer history. Both composed CI
+and its separate Secret scan pass. Complete nine-payload CI proof is public
+at805706c285182f008b04207e4e93ef9ae689fc34; all4069034bytes anonymously
+verify SHA536f1c7ef82412b46febbf4c54f869b800432fee01207d6fd8c00fce9452b657.
+The integration ledger/TODO table is current. Post the final PR544 result;
+no new device experiment or release tag is implied. Remove merged remote
+validation branch after verifying main contains its source commits.
+
+Final PR544 reply6166761733 confirms main integration, all13general CI
+passes, both SDK builds and full physical proof; no new device request.
+https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6166761733

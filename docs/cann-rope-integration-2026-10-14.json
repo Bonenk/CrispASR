@@ -1435,5 +1435,15 @@
   "physical_broad_passed": 1691,
   "physical_broad_unsupported": 1474,
   "physical_repeat_passed": 452,
-  "physical_repeat_unsupported": 18
+  "physical_repeat_unsupported": 18,
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-rope-capacity/complete-integration-proof.zip",
+    "bytes": 4069034,
+    "sha256": "536f1c7ef82412b46febbf4c54f869b800432fee01207d6fd8c00fce9452b657",
+    "payloads": 9,
+    "anonymous_verified": true,
+    "revision": "805706c285182f008b04207e4e93ef9ae689fc34"
+  },
+  "main_integration_commit": "d17c5d8b90fe941ed823580b3bf9234610347b59"
 }

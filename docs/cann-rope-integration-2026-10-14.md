@@ -40,3 +40,10 @@ and CrispASR changes. Original failed controls and device archives remain retain
 Full NPU model inference, quantized speech quality, actual captured ACL graph
 execution and performance remain separate follow-ups in [the TODO table](cann-todo.md).
 No release tag is cut by this integration.
+
+Integrated on main in [d17c5d8](https://github.com/CrispStrobe/CrispASR/commit/d17c5d8b90fe941ed823580b3bf9234610347b59).
+[Complete public integration CI proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/805706c285182f008b04207e4e93ef9ae689fc34/cann-20261014-rope-capacity/complete-integration-proof.zip)
+retains nine payloads: native run/job metadata, full raw ZIP and logs,
+all 142 log hashes, independent audit and collector/publication methods.
+Full anonymous download verifies `536f1c7ef82412b46febbf4c54f869b800432fee01207d6fd8c00fce9452b657`,
+4,069,034 bytes.
