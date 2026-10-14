@@ -487,3 +487,14 @@ remain pending. Production ggml21acf3162 is unchanged; no numerical
 NPU/model/quantized quality/speed or release acceptance. Immutable
 fresh-directory commands and public candidate proof:
 `docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+### Additional validation checkpoint — October14
+
+- Physical910B3/SDK9.1 rotary-capacity candidate passes1691/1691 broad
+  operator cases and452/452 independent RoPE repeat. Both previously failing
+  F32NEOX cases pass, with unchanged tolerances and unsupported cases retained.
+  SDK/composed integration gates are pending; candidate is not yet production.
+- Dia query/rotary owned-input replay retains14rows/16negative controls and
+  complete public proof. Query projections agree closely; native cross query
+  reproduces the hosted snapshot exactly. Native speech still fails WER1;
+  this diagnosis does not establish speech/Q4/performance acceptance.

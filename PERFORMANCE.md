@@ -3488,3 +3488,15 @@ remain pending. Production ggml21acf3162 is unchanged; no numerical
 NPU/model/quantized quality/speed or release acceptance. Immutable
 fresh-directory commands and public candidate proof:
 `docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+### 2026-10-14 — CANN candidate physical correctness; Dia query isolation
+
+Physical910B3/SDK9.1 capacity candidate passes1691/1691 broad cases plus
+452/452 RoPE repeat, with unsupported cases retained. This is operator
+correctness; model speech, captured-graph execution and speed remain unproved.
+SDK/composed CI are pending; production pin is unchanged.
+Dia owned-input query projections show max relative L2 1.481e-7;
+self/cross source-RoPE-off rotary shows5.371e-5/5.167e-6. No timing verdict
+or promotion follows; native speech still fails. Full receipts:
+docs/cann-910b3-rope-physical-2026-10-14.md and
+docs/dia-query-owned-input-results-2026-10-14.md.

@@ -24214,3 +24214,15 @@ remain pending. Production ggml21acf3162 is unchanged; no numerical
 NPU/model/quantized quality/speed or release acceptance. Immutable
 fresh-directory commands and public candidate proof:
 `docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+## 2026-10-14 — Physical 910B3 rotary candidate and Dia query diagnosis
+
+Candidate ggml0a8620765 passes independently audited physical910B3/SDK9.1
+broad1691/1691 operator cases and452/452 fresh RoPE repeat. All1474 broad
+unsupported cases and18repeat unsupported cases remain recorded; both prior
+F32NEOX failures pass. SDK and integration gates remain pending.
+See docs/cann-910b3-rope-physical-2026-10-14.md.
+Dia matching-input query projection/rotary replay publishes complete43-payload
+proof with14rows/16negative controls. Native cross query reproduces hosted
+output exactly; speech remains WER1. See
+docs/dia-query-owned-input-results-2026-10-14.md.

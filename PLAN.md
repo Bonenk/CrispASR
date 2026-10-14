@@ -7327,3 +7327,28 @@ CPU numerical diagnosis; speech remains rejected and no defaults change.
 CANN SDK run38536737288 is now building on both runners; capacity and
 chip-routing controls passed on each. The existing terminal collector remains
 the only writer. Physical 910B3 candidate results are still pending.
+
+## Dia query isolation and physical CANN candidate verified — 2026-10-14
+
+Dia owned-input query replay completes 14 metric rows/16 negative controls;
+independent recalculation passes. Query projection max relative L2 is1.481e-7;
+self rotary5.371e-5/cross rotary5.167e-6. Native cross query reproduces the
+hosted snapshot exactly; threads/repeats are exact. Complete43-payload public
+proof is anonymously verified. No speech/default acceptance; WER1 remains.
+Evidence: docs/dia-query-owned-input-results-2026-10-14.md and .json.
+
+New PR544 contributor comment6164970290 is independently audited: all20
+archive members and six complete operator assessments verified. Physical
+910B3/SDK9.1/ACL-graph-on candidate0a8620765 passes1691/1691 broad cases,
+1474unsupported, plus452/452 independent RoPE repeat/18unsupported. Both
+previously failing shapes pass unchanged. Evidence:
+docs/cann-910b3-rope-physical-2026-10-14.md and .json.
+
+## CLAIMED 2026-10-14 — Compose physically tested CANN capacity repair
+
+Preserve newer shared-fork history with candidate-identical source, compose
+candidate sourceca4c12c4 with current main in the owned SDK worktree, then
+run composed general CI. SDK run38536737288 remains active on both runners;
+its single collector retains complete terminal logs. Production pin stays
+21acf3162 until both SDK and composed CI pass. Full model/Q4/speed follow-ups
+remain distinct. All build artifacts stay on GH or /mnt/storage.

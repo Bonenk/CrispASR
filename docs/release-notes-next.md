@@ -423,3 +423,11 @@ remain pending. Production ggml21acf3162 is unchanged; no numerical
 NPU/model/quantized quality/speed or release acceptance. Immutable
 fresh-directory commands and public candidate proof:
 `docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+### October14 physical candidate and query-isolation checkpoint
+
+Physical910B3/SDK9.1 capacity candidate passes1691/1691 broad cases plus
+452/452 RoPE repeat, preserving unsupported cases and original failures.
+SDK/composed CI remain pending. See cann-910b3-rope-physical-2026-10-14.md.
+Dia query/rotary diagnosis adds14rows/16negative controls and public complete
+proof; native speech still fails. See dia-query-owned-input-results-2026-10-14.md.
