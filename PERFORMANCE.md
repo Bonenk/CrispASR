@@ -3593,3 +3593,26 @@ speech later; the native ASR failure is not cleared. Complete independently
 audited public proofs and scopes are in docs/dia-self-kv-owned-input-results-
 2026-10-14.md and docs/dia-f32-first-divergence-2026-10-14.md. No runtime, filter,
 seed, default or quality-gate change; no performance or release acceptance.
+
+
+## Dia complete layer17 diagnosis — 2026-10-14
+
+Whole original/native layer17 replay passes39 metric rows and32 scale controls;
+eight inherited-input/cache interventions and two real wrong-cache controls
+are independently audited. Native output and one/four-thread results reproduce
+hosted bytes exactly. Matching-input output relative L2 is6.590e-7; inherited
+hidden-input drift has the largest measured individual effect in this block.
+Complete coefficients, sources, arrays, methods and binary proof are public:
+docs/dia-layer17-owned-input-results-2026-10-14.md and .json. Native speech
+remains rejected; no Q4/GPU/performance/default or release acceptance.
+
+
+## Prepared Dia top-k correctness repair — not integrated
+
+A separate header candidate selects exactly k temperature-scaled logit indices
+instead of a rounded-probability threshold. The actual old header loses a
+unique top-k1 maximum in34/64 trials; the candidate loses0/64 and matches four
+pinned original Python corner fixtures. All18,288 captured probability/sample
+rows remain byte-exact to baseline. Candidate CI is queued; no speech repair,
+Q4/GPU/performance or release acceptance is inferred. Details and public proof:
+[Dia top-k selection](docs/dia-topk-selection-2026-10-14.md).
