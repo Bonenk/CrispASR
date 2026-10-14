@@ -24226,3 +24226,12 @@ Dia matching-input query projection/rotary replay publishes complete43-payload
 proof with14rows/16negative controls. Native cross query reproduces hosted
 output exactly; speech remains WER1. See
 docs/dia-query-owned-input-results-2026-10-14.md.
+
+## 2026-10-14 — Rotary SDK candidate builds pass
+
+Both official SDK9.2 beta2 architectures compiled actual CANN, CLI, shared
+ABI, diff, quantizer and operator targets on tested sourceca4c12c4/ggml0a8620765.
+All capacity/routing controls pass. Complete logs, native metadata, container
+digests and target/link evidence are retained in docs/cann-rope-sdk-2026-10-14.json.
+General integration CI remains active. Contributor follow-ups are tracked
+with ownership and acceptance in docs/cann-todo.md.

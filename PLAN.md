@@ -7352,3 +7352,70 @@ run composed general CI. SDK run38536737288 remains active on both runners;
 its single collector retains complete terminal logs. Production pin stays
 21acf3162 until both SDK and composed CI pass. Full model/Q4/speed follow-ups
 remain distinct. All build artifacts stay on GH or /mnt/storage.
+
+## UPDATE 2026-10-14 — Physical repair replied; composed CI submitted
+
+PR544 reply6165132300 links the independent physical receipt and confirms
+1691/1691 broad plus452/452 repeat. Composed source
+1a36c871d76b162dcf0512a0fec450ce61ed4840 pins the exact tested0a8620765;
+13-job general CI run38541851377 is submitted. All four secret tests pass
+on this composition and docs227anchors/102files pass. Production remains
+21acf3162. Existing SDK38536737288 still builds both architectures.
+
+Shared-fork merge ea526e120deff8333fc42decc315137d7e297fca is prepared
+locally in /mnt/volume1/crispasr-cann-rope-integration-ggml-20261014.
+Its complete tree46e7c06208ed32f6bcf825afe9e0ed09dc712883 is identical
+to physically tested0a8620765, preserving shared-fork985ba50 history.
+It is not yet pushed to the production fork branch. A shallow boundary
+was deepened before merging; no unrelated-history override was used.
+
+One terminal collector per run retains complete logs/metadata:
+/mnt/storage/crispasr/cann-rope-sdk-20261014 and
+/mnt/storage/crispasr/cann-rope-integration-20261014. No new heavy local
+build or model run is active. Audit terminal evidence, then integrate after
+all required gates pass; full NPU model/Q4/performance remain follow-ups.
+
+## UPDATE 2026-10-14 — Both rotary SDK builds independently verified
+
+SDK38536737288 completedsuccess at09:30:19UTC. Complete385361-byte log ZIP
+hash6c9add26bf34c4e51ddd6d34a690eb4b6b41f25e3ab942192c68442669464af6
+and terminal native metadata are retained. Both runners actually built all
+six targets and passed capacity/routing controls. Sourceca4c12c4/ggml0a8620765
+matches physical proof. General composed CI38541851377 remains active:
+macOS has passed; remaining jobs pending/running. No production pin change.
+Receipt: docs/cann-rope-sdk-2026-10-14.md and .json.
+
+Contributor follow-up6165441184 asks about remaining work/unsubscribing.
+docs/cann-todo.md assigns maintainer ownership, marks no outstanding rotary
+hardware rerun request, and lists integration, CPU-proved model fixture,
+full NPU parity/speech, scheduler fallback, actual ACL capture/reuse,
+quants and profiling in that order. Prepare runnable new hardware procedures
+only after executing their CPU/hosted controls. No new device request now.
+
+## UPDATE 2026-10-14 — Contributor TODO answered; remaining integration CI active
+
+Reply6165613971 answers contributor6165441184 with the durable
+maintainer-owned TODO table, explains that PR544 is merged and no rotary
+hardware rerun remains requested, and confirms they can unsubscribe.
+https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6165613971
+
+Composed CI38541851377 has passed macOS, iOS and Linux unit jobs; remaining
+jobs are queued/running without a terminal verdict. Keep the tested source
+1a36c871 and existing single collector; do not resubmit/cancel this matrix
+or update production before the remaining gates pass. Both independently
+audited SDK builds and physical rotary proof already pass. Current main
+contains documentation updates only beyond this tested composition.
+
+SDK complete nine-payload proof is publicly retained and anonymously verified
+at dataset revision2b1a7c30a1ed50a6147ca141715d81b4fe6e5ba7; archive824796bytes,
+SHA2f2709468f2ffc7a083f51e8977e33c4789a29cf430a5e87e45c6df1c7916832.
+Windows now also passes composed CI (four completed passes); remaining jobs
+are queued/running. Root/volume1 capacity checks trigger a cold-file audit
+under existing user-authorized checksum/symlink storage migration rules.
+
+Bounded storage audit completed without moving files. The finished home
+scan found no cold files over256MiB outside active agent/runtime trees;
+the bounded volume1 scan produced no eligible over512MiB candidates before
+termination. Package runtimes/toolchains and other active project state were
+left untouched. This was a partial volume audit, not a claim that the disks
+are cleared. All new SDK/model proof artifacts remain on /mnt/storage.

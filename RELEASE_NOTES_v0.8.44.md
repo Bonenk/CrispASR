@@ -498,3 +498,8 @@ fresh-directory commands and public candidate proof:
   complete public proof. Query projections agree closely; native cross query
   reproduces the hosted snapshot exactly. Native speech still fails WER1;
   this diagnosis does not establish speech/Q4/performance acceptance.
+
+- Rotary-capacity candidate now also passes both official SDK9.2 beta2
+  architecture builds, including CLI, shared ABI, diff, quantizer and actual
+  operator target. General integration CI remains active; production pin
+  unchanged. Remaining hardware/model/performance tasks are in docs/cann-todo.md.

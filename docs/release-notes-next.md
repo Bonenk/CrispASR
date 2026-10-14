@@ -431,3 +431,7 @@ Physical910B3/SDK9.1 capacity candidate passes1691/1691 broad cases plus
 SDK/composed CI remain pending. See cann-910b3-rope-physical-2026-10-14.md.
 Dia query/rotary diagnosis adds14rows/16negative controls and public complete
 proof; native speech still fails. See dia-query-owned-input-results-2026-10-14.md.
+
+Both rotary candidate SDK9.2 architecture builds are independently verified
+with complete logs and actual target/link evidence. General integration CI
+remains active. See cann-rope-sdk-2026-10-14.md and cann-todo.md.
