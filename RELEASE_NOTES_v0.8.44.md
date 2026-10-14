@@ -541,6 +541,6 @@ pass in hosted run38602252235, with all171 returned payloads independently audit
 Eight false-success/archive/argument guards are wired into Linux CI. Diagnostic
 encoder capture now explicitly forwards GPU selection; defaults preserve CPU.
 Both official SDK architectures link all6 requested targets in38598516003.
-Compiler cache/command artifact retention is added; its execution follow-up is
-pending. These results establish preparation and CPU controls; physical NPU,
+Compiler cache/command artifact retention is added; execution follow-up38605386237 passes both chips; actual
+compiler chip/ACL definitions and all six links per chip are independently audited. These results establish preparation and CPU controls; physical NPU,
 ACL replay, quantized-model quality and performance remain separate gates.

@@ -59,7 +59,8 @@ rehashed. General CI remains queued; no C++ inference runtime changes are made.
 passes both architectures with all six requested target links audited in full
 logs. The legacy workflow retained no cache/compiler-command artifacts, so
 actual final compiler definitions are not independently claimed from it. Metadata
-retention is added and SDK follow-up38605386237 is in progress. Physical
+retention is added and SDK follow-up38605386237 passes both chips with
+actual compiler definitions independently audited. Physical
 NPU, quantized speech quality, ACL capture/replay and performance remain
 unvalidated. All heavy local files stay under
 `/mnt/storage/crispasr/cann-model-validator-20261014`.
@@ -87,3 +88,22 @@ pinned F32 JFK fixture, not a general corpus or quantized model.
 [Complete complete-hosted-portable-validator-audit.zip](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e53a3693849d07ba0d3d234f2a6b9345dd8cbbfa/cann-20261014-model-validator/complete-hosted-portable-validator-audit.zip): 34,743 bytes, anonymously verified SHA256 `3b86ca79e573e34693e551f3954cae32fe49e011c85e5cc781306d6bf7978f84`.
 
 [Complete two-chip SDK target-link evidence](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1c6a10cf554a54344294c6e734d313cf93ae3b1d/cann-20261014-model-validator/complete-strict-routing-sdk-logs.zip): 401,056 bytes, anonymously verified SHA256 `49b201145a16c7b8ff96b4366e75823d1b0de82d37462eeb94a3a4173c88b6a3`. No NPU execution or missing compiler metadata is inferred from these logs.
+
+
+## Compiler metadata follow-up accepted
+
+[Official SDK run38605386237](https://github.com/CrispStrobe/CrispASR/actions/runs/38605386237)
+passes at source `230d7e490b243e1ecd47606467782e47bd254fe3` on both architectures. Independent inspection
+of each retained CMake cache and all566 compile commands confirms all three
+CANN translation units carry `ASCEND_310P` without `USE_ACL_GRAPH` on ARM64,
+and `ASCEND_910B` with `USE_ACL_GRAPH` on x86_64. Complete checkout/job logs
+confirm source identity, all six target links per chip, and actual routing/
+rotary CPU controls. Both metadata archives match official GitHub SHA256/size
+and pass CRC, safe-member and complete per-file hash checks. Two positive and
+sixteen rejecting synthetic audit controls also pass.
+
+[Complete SDK metadata and independent audit proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dc70b6f1abc67addaf0fae824cbcd2872ab39809/cann-20261014-model-validator/complete-sdk-compiler-metadata-proof.zip):
+455,549 bytes, anonymously verified SHA256 `0eaa653ab99d7eb47101b17dfeaa2038cae4e86563e1aa27e24da943b7c2e42c`.
+Includes both raw official metadata archives and complete job logs. This
+closes the compiler-definition evidence gap; it retains no SDK ELF bytes and
+does not establish physical NPU inference, ACL execution, quant quality or speed.

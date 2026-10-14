@@ -7737,3 +7737,16 @@ Published H200 serving figures are upstream results, not ggml/on-device proof.
 Queue behind the current Dia correctness and CANN hardware follow-ups.
 Sources: https://github.com/CrispStrobe/CrispASR/issues/545 and the pinned
 https://huggingface.co/fishaudio/drama-3/tree/e0a9218aa48888270f06ef1ed9ea67622c0e17d2
+
+
+## Official CANN compiler metadata accepted — 2026-10-14
+
+Run38605386237 succeeds on both chips at230d7e490b243e1ecd47606467782e47bd254fe3.
+Independent raw-artifact audit reads566 compiler commands per chip and all
+three CANN translation units: ARM64 ASCEND_310P/ACL off, x86_64 ASCEND_910B/
+ACL on. Full logs prove all6 actual links per chip and CPU guard execution.
+Both official archive hashes/sizes, CRC and every member are verified;2
+positive/16 negative audit controls pass. Complete public proof is anonymously
+SHA verified. Compiler metadata gap is closed; no retained SDK ELF, physical
+NPU model, ACL replay, quant or performance acceptance. Details:
+docs/cann-model-validator-preparation-2026-10-14.md and .json.

@@ -368,6 +368,113 @@
   "metadata_followup": {
     "run": 38605386237,
     "source": "230d7e490b243e1ecd47606467782e47bd254fe3",
-    "state": "in progress"
+    "state": "success; independently audited",
+    "jobs": [
+      {
+        "chip": "310p",
+        "arch": "ARM64",
+        "compiler": {
+          "cann_translation_units": [
+            "/workspace/ggml/src/ggml-cann/acl_tensor.cpp",
+            "/workspace/ggml/src/ggml-cann/aclnn_ops.cpp",
+            "/workspace/ggml/src/ggml-cann/ggml-cann.cpp"
+          ],
+          "total_compile_commands": 566,
+          "chip_definition": "ASCEND_310P",
+          "acl_graph_definition": false
+        },
+        "cache_flags": {
+          "GGML_CANN": "ON",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "SOC_TYPE": "ascend310p",
+          "USE_ACL_GRAPH": "off"
+        },
+        "linked_targets": [
+          "libggml-cann.so",
+          "libcrispasr.so",
+          "bin/crispasr",
+          "bin/crispasr-diff",
+          "bin/crispasr-quantize",
+          "bin/test-backend-ops"
+        ],
+        "artifact": {
+          "path": "artifact-11917192488.zip",
+          "bytes": 25050,
+          "sha256": "ce272afecbb9154ff507105a120b0636a9cb85404bc81d27c0a3a63a4edb1895",
+          "payloads": [
+            {
+              "path": "CMakeCache.txt",
+              "bytes": 43902,
+              "sha256": "f8f294f9e6521e45d271c5f9c332e8eaa1aa87cc36cba0cf9c49a86a0e68a4b1"
+            },
+            {
+              "path": "compile_commands.json",
+              "bytes": 448499,
+              "sha256": "365563cc5e26462f90a71ef6963e92b899243a7db127fc8113727858b0030a22"
+            }
+          ]
+        }
+      },
+      {
+        "chip": "910b",
+        "arch": "X64",
+        "compiler": {
+          "cann_translation_units": [
+            "/workspace/ggml/src/ggml-cann/acl_tensor.cpp",
+            "/workspace/ggml/src/ggml-cann/aclnn_ops.cpp",
+            "/workspace/ggml/src/ggml-cann/ggml-cann.cpp"
+          ],
+          "total_compile_commands": 566,
+          "chip_definition": "ASCEND_910B",
+          "acl_graph_definition": true
+        },
+        "cache_flags": {
+          "GGML_CANN": "ON",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "SOC_TYPE": "ascend910b",
+          "USE_ACL_GRAPH": "on"
+        },
+        "linked_targets": [
+          "libggml-cann.so",
+          "libcrispasr.so",
+          "bin/crispasr",
+          "bin/crispasr-diff",
+          "bin/crispasr-quantize",
+          "bin/test-backend-ops"
+        ],
+        "artifact": {
+          "path": "artifact-11918115506.zip",
+          "bytes": 24778,
+          "sha256": "534dae0209967ac7aaf057f52c735249c62c91ba405a881bca40abafd299ba04",
+          "payloads": [
+            {
+              "path": "CMakeCache.txt",
+              "bytes": 42575,
+              "sha256": "7f4cbf31a117c196274618c295440e3c2393a2278eb4496d20e8a0fa87005015"
+            },
+            {
+              "path": "compile_commands.json",
+              "bytes": 446694,
+              "sha256": "f0f610905b9e933192cf2d07588b9286af0cf91a6bac43cf67784315cbd9b27d"
+            }
+          ]
+        }
+      }
+    ],
+    "audit_controls": {
+      "positive": 2,
+      "negative": 16,
+      "scope": "Synthetic controls only"
+    },
+    "scope": "Actual SDK compiler chip/ACL definitions and six successful links per chip, plus CPU routing/capacity controls. Metadata and complete logs only: no retained ELF bytes, NPU inference, ACL execution, quant or performance acceptance.",
+    "publication": {
+      "revision": "dc70b6f1abc67addaf0fae824cbcd2872ab39809",
+      "path": "cann-20261014-model-validator/complete-sdk-compiler-metadata-proof.zip",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dc70b6f1abc67addaf0fae824cbcd2872ab39809/cann-20261014-model-validator/complete-sdk-compiler-metadata-proof.zip",
+      "bytes": 455549,
+      "sha256": "0eaa653ab99d7eb47101b17dfeaa2038cae4e86563e1aa27e24da943b7c2e42c",
+      "anonymous_verified": true,
+      "payloads": 14
+    }
   }
 }
