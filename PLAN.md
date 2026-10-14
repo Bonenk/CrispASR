@@ -7294,3 +7294,20 @@ remain pending. Production ggml21acf3162 is unchanged; no numerical
 NPU/model/quantized quality/speed or release acceptance. Immutable
 fresh-directory commands and public candidate proof:
 `docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+## UPDATE 2026-10-14 — PR544 replied; SDK terminal collector active
+
+Owner reply6164617603 records the verified repeated failures, candidate
+0a8620765, sourceca4c12c4, public pre/post proofs and exact fresh-directory
+physical rerun commands. It requests the broad five-operator suite plus a
+fresh-process full RoPE repeat under original SDK9.1/910B3/ACL-graph-on
+conditions, with complete provenance and unchanged tolerances.
+https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6164617603
+
+SDK run38536737288 remains queued on both architectures. Single collector
+exec session33397 watches this existing run and retains complete terminal
+run/job metadata and buffered ZIP/logs under
+/mnt/storage/crispasr/cann-rope-sdk-20261014. State file records PID; no
+second collector/model/build was launched. SDK results and the contributor
+physical candidate rerun remain pending. Keep production pin21acf3162
+until required physical and composed-integration gates pass.
