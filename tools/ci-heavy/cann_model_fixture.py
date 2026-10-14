@@ -58,14 +58,15 @@ def audio(path):
 def native_case(args):
     import numpy as np
     sys.path.insert(0, str(ROOT/'python'))
-    from crispasr import Session
     pcm = audio(args.audio)
     outputs = {}
-    for backend in (None, 'moonshine'):
-        label = 'auto' if backend is None else 'explicit'
-        with Session(args.model, lib_path=args.lib, backend=backend, n_threads=4) as session:
-            assert session.backend == 'moonshine'
-            outputs[label] = [' '.join(s.text for s in session.transcribe(pcm)) for _ in range(2)]
+    if not getattr(args, 'encoder_only', False):
+        from crispasr import Session
+        for backend in (None, 'moonshine'):
+            label = 'auto' if backend is None else 'explicit'
+            with Session(args.model, lib_path=args.lib, backend=backend, n_threads=4) as session:
+                assert session.backend == 'moonshine'
+                outputs[label] = [' '.join(s.text for s in session.transcribe(pcm)) for _ in range(2)]
     lib = ctypes.CDLL(args.lib)
     class Params(ctypes.Structure):
         _fields_ = [('model', ctypes.c_char_p), ('tokenizer', ctypes.c_char_p),
@@ -78,7 +79,7 @@ def native_case(args):
     lib.moonshine_encode.restype = ctypes.c_int
     lib.moonshine_free.argtypes = [ctypes.c_void_p]
     libc = ctypes.CDLL(None); libc.free.argtypes = [ctypes.c_void_p]
-    ctx = lib.moonshine_init_with_params(Params(args.model.encode(), None, 4, False))
+    ctx = lib.moonshine_init_with_params(Params(args.model.encode(), None, 4, getattr(args, 'use_gpu', False)))
     assert ctx
     try:
         for i in range(2):
@@ -99,9 +100,15 @@ def native_case(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--native', action='store_true')
+    parser.add_argument('--use-gpu', action='store_true')
+    parser.add_argument('--encoder-only', action='store_true')
     for name in ('model','lib','audio','output'):
         parser.add_argument('--'+name)
     args = parser.parse_args()
+    if (args.use_gpu or args.encoder_only) and not args.native:
+        parser.error('GPU/encoder-only flags require --native')
+    if args.native and not all((args.model, args.lib, args.audio, args.output)):
+        parser.error('--native requires --model, --lib, --audio and --output')
     if args.native:
         native_case(args); return
     import numpy as np

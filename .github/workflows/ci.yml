@@ -167,6 +167,9 @@ jobs:
       - name: Check production GPU backend/device selection without hardware
         run: python3 tests/test_gpu_backend_selection.py -v
 
+      - name: CANN model validator false-success and archive controls
+        run: python3 tests/test_cann_model_validator.py -v
+
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
       - name: Breeze guided acceptance deletion controls

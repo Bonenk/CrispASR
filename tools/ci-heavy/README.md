@@ -83,3 +83,11 @@ changed input PCM, missing CANN and invalid/unavailable device ordinals.
 Use the same dependency pins as `cann_model_fixture.py`. Hosted run38575701613 passes all13 controls with independently audited raw
 archives; [acceptance proof](../../docs/moonshine-strict-device-validation-2026-10-14.md).
 These CPU controls cannot establish physical NPU work or ACL capture/replay.
+
+`cann_model_validator.py` is the full portable model-runner control job. It
+builds the original/native CPU fixture, then exercises `validate_cann_model.py`
+with the immutable accepted archive through diff, repeated CLI and automatic/
+explicit Sessions. It must reject a CANN request on the CPU build after CPU
+controls, and checks the real public encoder GPU=true forwarding independently.
+Use the same dependency pins as `cann_model_fixture.py`. Validation pending;
+no contributor hardware commands are published until this interface is proven.
