@@ -360,3 +360,17 @@ follows. See
 `docs/dia-cross-cache-input-replay-2026-10-13.md` and
 `docs/dia-decoder-boundary-results-2026-10-14.md` and
 `docs/dia-mlp-owned-input-results-2026-10-14.md`.
+
+## UPDATE 2026-10-14 — Owned self-output and cross-attention verified
+
+Actual original projections and SDPA/mask/cache expressions versus literal
+native CPU graph yield 24 rows and 12 rejecting scale/missing-mask controls.
+Minimum same-input cosine 0.9999999999998742, maximum row norm error
+3.122e-7, maximum relative L2 2.580e-7. All four native outputs exactly
+reproduce hosted native snapshots; repeat/thread controls are exact. Actual
+mask is conditional-derived for BOTH CFG branches and permits the 39-token
+prefix of the 1,024-token source context. Synthetic finite masked tails
+verify invariance only, not original unretained padded caches. Complete
+40-payload proof is public and anonymously verified. No runtime math change,
+full speech, GPU, Q4, speed or release acceptance. Evidence:
+`docs/dia-cross-owned-input-results-2026-10-14.md` and `.json`.

@@ -7126,3 +7126,30 @@ operator differences from upstream and cross-host drift. Then test default
 versus debug-marked free-running CLI/C-ABI transparency. No speech, Q4, GPU,
 performance or release acceptance is implied. Previous main cacd697 CI, lint,
 secret scan, Ruby bindings and Pages all completed successfully.
+
+## UPDATE 2026-10-14 — Owned self-output and cross-attention verified
+
+Actual original projections and SDPA/mask/cache expressions versus literal
+native CPU graph yield 24 rows and 12 rejecting scale/missing-mask controls.
+Minimum same-input cosine 0.9999999999998742, maximum row norm error
+3.122e-7, maximum relative L2 2.580e-7. All four native outputs exactly
+reproduce hosted native snapshots; repeat/thread controls are exact. Actual
+mask is conditional-derived for BOTH CFG branches and permits the 39-token
+prefix of the 1,024-token source context. Synthetic finite masked tails
+verify invariance only, not original unretained padded caches. Complete
+40-payload proof is public and anonymously verified. No runtime math change,
+full speech, GPU, Q4, speed or release acceptance. Evidence:
+`docs/dia-cross-owned-input-results-2026-10-14.md` and `.json`.
+
+## CLAIMED 2026-10-14 — Unmarked versus marked full free-running control
+
+Use GH heavy CPU on the active Dia diagnostic source, fixed pinned F32
+weights/critical DAC, unchanged F32-cross/portable-RNG/source-RoPE-off recipe.
+Run the short reported phrase through CLI and C ABI with no teacher forcing:
+plain baseline, logging-only (no graph marks), common capture, extended
+block-zero capture at step978, and plain repeat. Compare complete PCM within
+each surface; logging/marked arms also compare full logits, input history and
+sampled token history, and check exact capture counts. Run independent ASR
+on baseline speech and preserve failures without turning diagnostic equality
+into speech acceptance. Record source/model/codec/binary hashes. This tests
+capture transparency under the fixed diagnostic recipe, not a new default.
