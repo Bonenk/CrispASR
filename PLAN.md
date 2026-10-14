@@ -7153,3 +7153,24 @@ sampled token history, and check exact capture counts. Run independent ASR
 on baseline speech and preserve failures without turning diagnostic equality
 into speech acceptance. Record source/model/codec/binary hashes. This tests
 capture transparency under the fixed diagnostic recipe, not a new default.
+
+## UPDATE 2026-10-14 — Free-running capture control dispatched
+
+GH heavy CPU run **38527734866**, diagnostic source
+`eb94d724bc26b7643b5474456dc4fdd1e0200602`, worker
+`tools/ci-heavy/dia_free_capture_control.py`, ggml c36dab89.
+Five arms per CLI/C-ABI surface use no forcing: plain, logging, common
+step978 marks, extended block-zero marks, plain repeat. Complete PCM equality
+and logged full history equality are assertions; original/native primitive
+results do not predeclare this result. Scope remains the fixed F32-cross/
+portable-RNG/source-RoPE-off diagnostic recipe. Baseline ASR results are
+retained independently and cannot be waived by capture equality. Worker
+plan/syntax and all four unskipped secret tests passed before pushes.
+C-ABI Session is quiet; only CLI requires the verbose capacity line.
+Preserve complete terminal outputs/logs and independently audit before
+reporting transparency. No release/default or performance change.
+
+**User-ordered next:** after this control works, return to PR #544. Read the
+full current body, all comments/reviews, linked issuecomment-6128212082 and
+latest follow-ups/CI before coding. Resume Ascend gaps from current code and
+physical hardware evidence, not stale plan prose.
