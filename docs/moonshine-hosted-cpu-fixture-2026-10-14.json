@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "source": "a149749ee492c4ea9fa80b682d0248090f9bb6af",
+  "run": 38555394740,
+  "artifact_sha256": "b912d7138ff36c87ee250e5e2cde59d3deb63225ae6df5bb6e3312e591901ff5",
+  "payloads": 26,
+  "all_160_original_coefficients_byte_exact": true,
+  "encoder_metrics": {
+    "cosine_min": 0.9999999997168613,
+    "max_row_norm_error": 5.519607124693238e-06,
+    "relative_l2": 2.025471488361104e-06,
+    "max_abs": 5.054473876953125e-05
+  },
+  "encoder_repeats_byte_exact": true,
+  "session_transcripts_byte_exact": true,
+  "cli_normalized_words_exact": true,
+  "negative_controls_rejected": 3,
+  "scope": "Full CPU fixture, original dumper, native encoder, crispasr-diff, CLI and C ABI auto/explicit Sessions. No NPU, quant or performance acceptance.",
+  "library_hash_scope": "Producer receipts only: shared-library ELF bytes are absent from this artifact.",
+  "cross_host_original_metrics": {
+    "cosine_min": 0.9999999999804139,
+    "max_row_norm_error": 7.679621899514544e-07,
+    "relative_l2": 6.7663161488964e-07,
+    "max_abs": 1.5497207641601562e-05
+  },
+  "cross_host_original_byte_exact": false,
+  "publication": {
+    "revision": "b5ec8e8a229bd388194237bf216ae086024212a6",
+    "files": [
+      {
+        "path": "cann-20261014-model-fixture/complete-hosted-cpu-fixture.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/b5ec8e8a229bd388194237bf216ae086024212a6/cann-20261014-model-fixture/complete-hosted-cpu-fixture.zip",
+        "bytes": 103535813,
+        "sha256": "b912d7138ff36c87ee250e5e2cde59d3deb63225ae6df5bb6e3312e591901ff5",
+        "anonymous_verified": true
+      },
+      {
+        "path": "cann-20261014-model-fixture/complete-hosted-cpu-fixture-audit.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/b5ec8e8a229bd388194237bf216ae086024212a6/cann-20261014-model-fixture/complete-hosted-cpu-fixture-audit.zip",
+        "bytes": 32063,
+        "sha256": "88c2d8cb0e72888e76fd4170747e04bc56c02abd8375a13ed486c9e0a4efd811",
+        "anonymous_verified": true
+      }
+    ]
+  }
+}

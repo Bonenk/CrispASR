@@ -36,7 +36,7 @@ All compiled fixtures and heavy artifacts stay under
 
 This is actual CPU backend stage and decoded-output proof. It does not replace
 full CLI/C ABI dispatch checks. [Hosted run38555394740](https://github.com/CrispStrobe/CrispASR/actions/runs/38555394740)
-has started and will run fresh conversion, original dumper/generation,
-crispasr-diff, CLI and repeated auto/explicit Python Session checks through the
-freshly built shared library. Its result remains pending. NPU, quantized model,
+passes fresh conversion, original dumper/generation, crispasr-diff, CLI and
+repeated auto/explicit Python Session checks through the freshly built shared
+library. [Its returned artifact is independently accepted](moonshine-hosted-cpu-fixture-2026-10-14.md). NPU, quantized model,
 actual ACL replay and performance acceptance remain separate gates.

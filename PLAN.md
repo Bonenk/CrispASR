@@ -7556,3 +7556,17 @@ Full CLI/Session wiring and real crispasr-diff driver execution remain pending.
 This bounded backend replay does not substitute for those or prove NPU/quant/
 performance. Continue from the hosted results, then prepare strict CANN stage
 selection and actual offload evidence before a new device procedure.
+
+## Moonshine full CPU fixture accepted — 2026-10-14
+
+Hosted run38555394740 at a149749 passes original conversion/dumper/generation,
+full encoder diff, CLI and repeated automatic/explicit C ABI Python Sessions.
+Independent returned-artifact audit verifies26 payloads, all160 F32 tensors,
+complete encoder arrays, magnitude controls and transcripts. Encoder minimum
+cosine0.9999999997168613, relative L2 error2.025471488361104e-6; four Session
+transcripts are byte exact to the original. The tested producer and its four
+non-vacuous guards are integrated unchanged. No NPU, quant or speed claim.
+Evidence: docs/moonshine-hosted-cpu-fixture-2026-10-14.md and .json.
+Next: strict CANN model-stage selection, reject missing devices/CPU fallback,
+retain actual scheduler/NPU execution traces; prove failure controls before
+publishing physical hardware commands. Dia full speech remains rejected.

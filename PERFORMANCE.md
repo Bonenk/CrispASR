@@ -3536,3 +3536,17 @@ original and repeatable. These are correctness results, not speed or F16/Q4
 measurements. Full CLI/C ABI wiring and NPU performance remain pending.
 Evidence: docs/moonshine-original-fixture-audit-2026-10-14.md and
 docs/moonshine-native-backend-fixture-2026-10-14.md.
+
+## Moonshine full CPU fixture accepted — 2026-10-14
+
+Hosted run38555394740 at a149749 passes original conversion/dumper/generation,
+full encoder diff, CLI and repeated automatic/explicit C ABI Python Sessions.
+Independent returned-artifact audit verifies26 payloads, all160 F32 tensors,
+complete encoder arrays, magnitude controls and transcripts. Encoder minimum
+cosine0.9999999997168613, relative L2 error2.025471488361104e-6; four Session
+transcripts are byte exact to the original. The tested producer and its four
+non-vacuous guards are integrated unchanged. No NPU, quant or speed claim.
+Evidence: docs/moonshine-hosted-cpu-fixture-2026-10-14.md and .json.
+Next: strict CANN model-stage selection, reject missing devices/CPU fallback,
+retain actual scheduler/NPU execution traces; prove failure controls before
+publishing physical hardware commands. Dia full speech remains rejected.
