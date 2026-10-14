@@ -7271,3 +7271,84 @@ remain /mnt/storage or GH. Compile both existing SDK architectures, preserve
 310P BF16 routing, and provide immutable fresh-directory physical rerun
 commands to PR544. Production ggml pin advances only after required physical
 proof and composed CI; no NPU model/quality/performance claim from CPU tests.
+
+## Dia full free-running transparency verified — 2026-10-14
+
+Run38527734866 completes; independent whole-delivery/source/history/PCM/WER
+audit passes. Ten unforced arms match full PCM within CLI/C ABI and all
+1,115-step logged model histories match across surfaces. Common/extended
+step978 marks are transparent for the fixed CPU F32 diagnostic recipe.
+Baseline speech remains rejected on both surfaces: empty ASR, WER1.0.
+Public raw262-payload and complete audit archives are anonymously verified.
+No speech/Q4/GPU/performance/default or release acceptance follows.
+Evidence: docs/dia-free-capture-results-2026-10-14.md and .json.
+
+## CANN rotary allocation candidate prepared — 2026-10-14
+
+Shared ggml0a8620765 records sin/cos allocated bytes independently of
+last-call dimensions. Four unchanged capacity regressions now pass; old
+two failing controls remain public. Thirteen BF16 routing cases per chip
+pass. SDK sourceca4c12c4 pins the candidate; run38536737288 is submitted
+on 910B/graph-on and 310P/graph-off. SDK result and physical 910B3 rerun
+remain pending. Production ggml21acf3162 is unchanged; no numerical
+NPU/model/quantized quality/speed or release acceptance. Immutable
+fresh-directory commands and public candidate proof:
+`docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.
+
+## UPDATE 2026-10-14 — PR544 replied; SDK terminal collector active
+
+Owner reply6164617603 records the verified repeated failures, candidate
+0a8620765, sourceca4c12c4, public pre/post proofs and exact fresh-directory
+physical rerun commands. It requests the broad five-operator suite plus a
+fresh-process full RoPE repeat under original SDK9.1/910B3/ACL-graph-on
+conditions, with complete provenance and unchanged tolerances.
+https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6164617603
+
+SDK run38536737288 remains queued on both architectures. Single collector
+exec session33397 watches this existing run and retains complete terminal
+run/job metadata and buffered ZIP/logs under
+/mnt/storage/crispasr/cann-rope-sdk-20261014. State file records PID; no
+second collector/model/build was launched. SDK results and the contributor
+physical candidate rerun remain pending. Keep production pin21acf3162
+until required physical and composed-integration gates pass.
+
+## CLAIMED 2026-10-14 — Dia query projection and rotary owned-input isolation
+
+After the full CPU free-running transparency audit, isolate block-zero self
+and cross query projection plus the original rotary transform at step978.
+Use the pinned original DenseGeneral/RotaryEmbedding implementations and
+literal native expressions on each producer's own captured pre-norm outputs.
+Verify immutable tensor ranges against the physical F32 export, native replay
+against hosted snapshots, scale-sensitive metrics, repeat/thread controls and
+negative controls. All coefficients, compiled fixtures and raw evidence stay
+under /mnt/storage/crispasr/dia-query-owned-replay-20261014. This is bounded
+CPU numerical diagnosis; speech remains rejected and no defaults change.
+
+CANN SDK run38536737288 is now building on both runners; capacity and
+chip-routing controls passed on each. The existing terminal collector remains
+the only writer. Physical 910B3 candidate results are still pending.
+
+## Dia query isolation and physical CANN candidate verified — 2026-10-14
+
+Dia owned-input query replay completes 14 metric rows/16 negative controls;
+independent recalculation passes. Query projection max relative L2 is1.481e-7;
+self rotary5.371e-5/cross rotary5.167e-6. Native cross query reproduces the
+hosted snapshot exactly; threads/repeats are exact. Complete43-payload public
+proof is anonymously verified. No speech/default acceptance; WER1 remains.
+Evidence: docs/dia-query-owned-input-results-2026-10-14.md and .json.
+
+New PR544 contributor comment6164970290 is independently audited: all20
+archive members and six complete operator assessments verified. Physical
+910B3/SDK9.1/ACL-graph-on candidate0a8620765 passes1691/1691 broad cases,
+1474unsupported, plus452/452 independent RoPE repeat/18unsupported. Both
+previously failing shapes pass unchanged. Evidence:
+docs/cann-910b3-rope-physical-2026-10-14.md and .json.
+
+## CLAIMED 2026-10-14 — Compose physically tested CANN capacity repair
+
+Preserve newer shared-fork history with candidate-identical source, compose
+candidate sourceca4c12c4 with current main in the owned SDK worktree, then
+run composed general CI. SDK run38536737288 remains active on both runners;
+its single collector retains complete terminal logs. Production pin stays
+21acf3162 until both SDK and composed CI pass. Full model/Q4/speed follow-ups
+remain distinct. All build artifacts stay on GH or /mnt/storage.
