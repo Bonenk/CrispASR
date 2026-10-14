@@ -7839,3 +7839,14 @@ All three candidate CI runs remain queued. Keep the repair separate from the
 quiet-speech diagnosis and do not integrate before source CI is audited.
 See docs/dia-topk-selection-2026-10-14.md/.json. Current main ad46e17 passes all
 13 native CI jobs, lint, secret scan, Ruby and Pages. No release tag.
+## CLAIMED 2026-10-14 — Dia top-k selection before probability rounding
+
+Investigate a separate sampler recipe gap in an isolated top-k worktree.
+Original Torch selects exactly k indices from temperature-scaled logits; the
+native sampler selects by a rounded-probability threshold, which can retain
+extra ties and erase a unique logit ordering. First prove this on actual native
+header and pinned original Python, then repair only selection/membership with
+non-vacuous regressions and actual preserved canonical probability/sample
+controls. Do not conflate this with the observed F32 nucleus swap at rank32/33,
+which occurs below top-k45. No claimed quiet-speech repair, sampling default
+change, performance promotion or release acceptance. Artifacts remain storage.
