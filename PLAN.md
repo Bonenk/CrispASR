@@ -7471,3 +7471,37 @@ The current Moonshine diff driver is CPU-only; its scope must be explicit.
 Do not call CPU diff NPU proof. After CPU bundle works, prepare explicit
 CANN stage routing and actual offload evidence, then execute hosted controls
 before publishing any new hardware procedure. No new device request now.
+
+## SUBMITTED 2026-10-14 — Moonshine CPU fixture producer
+
+Sourcef64d9a3f630416fa916b9db36e2b3f686f558ae9 on owned branch
+ diag/cann-model-fixture-20261014 passes four scale/input guard tests and
+all four secret tests. GH heavy CPU38554714421 is submitted (queued), pinned
+original390624ed/torch2.6/transformers4.57.6, original card generation cap,
+fresh F16 conversion/coefficient audit, blueprint dump, exact PCM/mask gate,
+encoder cosine+norm+L2 checks, actual diff and CLI/auto-explicit Session.
+
+Single collector exec84578 preserves terminal success or failure, official
+archive SHA/CRC, complete metadata/logs and per-payload hashes under
+/mnt/storage/crispasr/cann-model-fixture-20261014. No second build/model run
+or GPU task was launched. Source worktree is
+/mnt/volume1/crispasr-cann-model-fixture-20261014; heavy files stay on GH/storage.
+Hosted model result remains pending. No NPU procedure or device request yet.
+Evidence and scope: docs/cann-model-fixture-preparation-2026-10-14.md.
+
+## CORRECTION 2026-10-14 — Published Moonshine regression is F32
+
+Immutable GGUF header inspection disproves the manifest’s F16 description:
+all160tensors are F32. Linked model108383136bytes/SHA64518aaf5535085075b081c8c1c89532e7cb5160efe90272c73937f179cf5f78;
+header range65536bytes is retained and hashed. Correct only manifest prose;
+weights, expected transcript and0.999stage threshold remain unchanged.
+First run38554714421 was cancelled while queued before any steps/model work;
+terminal cancelled metadata and zero artifacts are preserved. No model
+measurement is discarded or called a failure/pass.
+
+Corrected sourcea149749ee492c4ea9fa80b682d0248090f9bb6af uses fresh F32
+coefficient identity and is submitted as GH38555394740. Four local guards
+and all four secret checks pass again. A separate single collector watches
+that run under /mnt/storage/crispasr/cann-model-fixture-20261014-v2; old
+cancellation evidence stays in the original directory. Hosted numerical/
+transcript result remains pending; no NPU/quant/speed acceptance.

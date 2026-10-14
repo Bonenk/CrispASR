@@ -24246,3 +24246,13 @@ capacity regressions remain wired into both manual CANN SDK jobs.
 Original failures, unsupported cases and complete immutable proof remain
 retained. See docs/cann-rope-integration-2026-10-14.md and .json.
 Full model speech/Q4/ACL replay/performance claims remain pending.
+
+### 2026-10-14 — Correct Moonshine Tiny regression dtype description
+
+The pinned regression file at cstr/moonshine-tiny-GGUF revision28281de8
+physically contains160F32 tensors; its old F16 note was incorrect. The
+manifest description is corrected without changing model, reference,
+transcript or numerical thresholds. Header proof is in
+docs/moonshine-tiny-regression-dtype-2026-10-14.json. This corrects scope;
+it supplies no new speed/quantization result. A CPU fixture producer with
+fresh F32 conversion is submitted; hosted numerical checks remain pending.
