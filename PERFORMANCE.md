@@ -3465,3 +3465,26 @@ coverage only, not RoPE math/device validation or a repair. Immutable test
 source7b77e0b remains diagnostic; production pin/runtime unchanged.
 Public 14-payload proof is anonymously verified. Evidence:
 `docs/cann-rope-capacity-2026-10-14.md` and `.json`.
+
+## Dia full free-running transparency verified — 2026-10-14
+
+Run38527734866 completes; independent whole-delivery/source/history/PCM/WER
+audit passes. Ten unforced arms match full PCM within CLI/C ABI and all
+1,115-step logged model histories match across surfaces. Common/extended
+step978 marks are transparent for the fixed CPU F32 diagnostic recipe.
+Baseline speech remains rejected on both surfaces: empty ASR, WER1.0.
+Public raw262-payload and complete audit archives are anonymously verified.
+No speech/Q4/GPU/performance/default or release acceptance follows.
+Evidence: docs/dia-free-capture-results-2026-10-14.md and .json.
+
+## CANN rotary allocation candidate prepared — 2026-10-14
+
+Shared ggml0a8620765 records sin/cos allocated bytes independently of
+last-call dimensions. Four unchanged capacity regressions now pass; old
+two failing controls remain public. Thirteen BF16 routing cases per chip
+pass. SDK sourceca4c12c4 pins the candidate; run38536737288 is submitted
+on 910B/graph-on and 310P/graph-off. SDK result and physical 910B3 rerun
+remain pending. Production ggml21acf3162 is unchanged; no numerical
+NPU/model/quantized quality/speed or release acceptance. Immutable
+fresh-directory commands and public candidate proof:
+`docs/cann-rope-capacity-candidate-2026-10-14.md` and .json.

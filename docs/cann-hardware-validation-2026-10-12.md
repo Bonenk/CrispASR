@@ -196,3 +196,12 @@ width growth with shrinking positions also fails. Four original-source
 capacity tests yield two expected failures and two passing controls. This
 confirms the requested-capacity defect, not a physical device repair.
 The failing test is retained in the diagnostic branch; production is unchanged.
+
+### Scoped capacity candidate and physical rerun
+
+Candidate ggml0a8620765 now passes all four unchanged CPU byte-capacity
+regressions; the old failures remain public. Both chip routing controls
+pass. [Exact candidate/proof/device commands](cann-rope-capacity-candidate-2026-10-14.md)
+pin CrispASRca4c12c4 and ggml0a8620765 in fresh directories. SDK
+run38536737288 is submitted on both compilation architectures. Its result
+and the physical 910B3 rerun are pending; production pin remains21acf3162.
