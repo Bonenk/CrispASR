@@ -24329,3 +24329,18 @@ positive/16 negative audit controls pass. Complete public proof is anonymously
 SHA verified. Compiler metadata gap is closed; no retained SDK ELF, physical
 NPU model, ACL replay, quant or performance acceptance. Details:
 docs/cann-model-validator-preparation-2026-10-14.md and .json.
+
+
+## Dia F32 sampling boundary diagnosed — 2026-10-14
+
+Late block-zero self K/V replay passes10 metric rows and14 controls; native
+last cache slots match hosted values exactly. The complete unforced F32
+trajectory matches original inputs through979 steps, then the step978/head2
+nucleus support swaps tokens46/904, causing original877/native904. Actual
+original filtering with both retained noise streams reproduces that difference.
+All963 aligned prefix code frames agree; both PCM prefixes are nearly silent
+and agree at cosine0.999963626/norm ratio0.996749141. The original only reaches
+speech later; the native ASR failure is not cleared. Complete independently
+audited public proofs and scopes are in docs/dia-self-kv-owned-input-results-
+2026-10-14.md and docs/dia-f32-first-divergence-2026-10-14.md. No runtime, filter,
+seed, default or quality-gate change; no performance or release acceptance.

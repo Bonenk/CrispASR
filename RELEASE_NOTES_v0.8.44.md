@@ -544,3 +544,18 @@ Both official SDK architectures link all6 requested targets in38598516003.
 Compiler cache/command artifact retention is added; execution follow-up38605386237 passes both chips; actual
 compiler chip/ACL definitions and all six links per chip are independently audited. These results establish preparation and CPU controls; physical NPU,
 ACL replay, quantized-model quality and performance remain separate gates.
+
+
+## Dia F32 sampling boundary diagnosed — 2026-10-14
+
+Late block-zero self K/V replay passes10 metric rows and14 controls; native
+last cache slots match hosted values exactly. The complete unforced F32
+trajectory matches original inputs through979 steps, then the step978/head2
+nucleus support swaps tokens46/904, causing original877/native904. Actual
+original filtering with both retained noise streams reproduces that difference.
+All963 aligned prefix code frames agree; both PCM prefixes are nearly silent
+and agree at cosine0.999963626/norm ratio0.996749141. The original only reaches
+speech later; the native ASR failure is not cleared. Complete independently
+audited public proofs and scopes are in docs/dia-self-kv-owned-input-results-
+2026-10-14.md and docs/dia-f32-first-divergence-2026-10-14.md. No runtime, filter,
+seed, default or quality-gate change; no performance or release acceptance.

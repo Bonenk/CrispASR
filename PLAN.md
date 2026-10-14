@@ -7750,3 +7750,54 @@ positive/16 negative audit controls pass. Complete public proof is anonymously
 SHA verified. Compiler metadata gap is closed; no retained SDK ELF, physical
 NPU model, ACL replay, quant or performance acceptance. Details:
 docs/cann-model-validator-preparation-2026-10-14.md and .json.
+
+## COMPLETE 2026-10-14 — Dia late owned self-key/value producer replay
+
+Resume correctness after CANN compiler metadata acceptance. In the isolated
+Dia diagnostic worktree, retain bounded replay under
+/mnt/storage/crispasr/dia-self-kv-owned-replay-20261014. Verify original block-zero
+self K/V coefficients and their native mappings against the physical F32 audit.
+Execute actual original DenseGeneral/RotaryEmbedding/KVCache and the literal
+native K/V projection, rotary, concatenation and host cache reorder expressions
+on owned pre-self-norm inputs. Include repeat/thread and rejecting scale,
+position, omitted reorder and wrong batch/head controls. Distinguish synthetic
+cache-layout fixtures from actual captured late-step caches; no reconstructed
+history, full-model or speech acceptance from a primitive replay. No numerical
+repair/default change until an actual defect is demonstrated. All heavy files
+remain storage; current tip CI is pending, secret scan passes.
+
+Scope refinement: earlier accepted prefix and all-18-layer late-attention
+proofs already cover native reorder/GQA/cache consumption. Do not rerun those
+fixtures. This probe isolates only the still-unmeasured late-step self K/V
+producer on captured block-zero pre-norm inputs; compare its last key/value
+to independently retained late-cache snapshots if source/input hashes match.
+No new cache-layout study or redundant heavy inference is needed.
+
+## COMPLETE 2026-10-14 — First F32 free-running discrete divergence
+
+Use the already accepted complete unforced CLI/C-ABI logging streams from
+38527734866 and original canonical step logits/input history from38472367538.
+Verify each full input against its immutable delivery ledger. Locate the first
+input/token difference, then compare complete original/native logits only on
+the shared-history prefix, including per-row magnitudes and relative L2.
+Keep this distinct from the earlier F16 step76/nucleus analysis; no model load,
+new generation, seed/filter/default change or performance run. The first F32
+sampling boundary will select the next numerical diagnostic. Heavy arrays and
+method remain /mnt/storage/crispasr/dia-f32-first-divergence-20261014.
+
+Both new diagnostics are independently audited and complete public archives
+are anonymously SHA-verified. Late K/V:10 metric rows/14 rejecting controls;
+native last cache slots and repeated one/four-thread replays are byte-exact.
+F32 free generation shares979 inputs; the step978/codebook2 nucleus support
+swaps46/904, producing original877/native904 with either noise stream.
+All963 aligned prefix frames are exact. The original's own first roughly
+eleven seconds are also nearly silent; no broad prefix codec fault is found.
+No runtime/default change or speech acceptance. Evidence: the new
+dia-self-kv-owned-input-results and dia-f32-first-divergence2026-10-14 .md/.json.
+
+NEXT: isolate whole later decoder layers on owned inputs and self-cache
+prefixes, reconstruct and compare the actual cross-cache producer, and
+separate same-input arithmetic from inherited drift at the two-token CFG
+margin. Prefer bounded single-layer coefficient replay under storage over
+another full-model/GPU run without a localized hypothesis. Keep the failing
+reported phrase and original recipe; do not select a new seed or waive gates.

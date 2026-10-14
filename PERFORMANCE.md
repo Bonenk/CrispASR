@@ -3578,3 +3578,18 @@ Rebase/ff8f6aaca integrates the unchanged tested runner. Both official SDK build
 38598516003 link all6 requested targets; compiler-metadata follow-up
 38605386237 passes, with all actual chip/ACL definitions independently audited. No physical NPU, quant, ACL replay or speed
 acceptance. Evidence: docs/cann-model-validator-preparation-2026-10-14.md/.json.
+
+
+## Dia F32 sampling boundary diagnosed — 2026-10-14
+
+Late block-zero self K/V replay passes10 metric rows and14 controls; native
+last cache slots match hosted values exactly. The complete unforced F32
+trajectory matches original inputs through979 steps, then the step978/head2
+nucleus support swaps tokens46/904, causing original877/native904. Actual
+original filtering with both retained noise streams reproduces that difference.
+All963 aligned prefix code frames agree; both PCM prefixes are nearly silent
+and agree at cosine0.999963626/norm ratio0.996749141. The original only reaches
+speech later; the native ASR failure is not cleared. Complete independently
+audited public proofs and scopes are in docs/dia-self-kv-owned-input-results-
+2026-10-14.md and docs/dia-f32-first-divergence-2026-10-14.md. No runtime, filter,
+seed, default or quality-gate change; no performance or release acceptance.
