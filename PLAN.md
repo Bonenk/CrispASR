@@ -7174,3 +7174,20 @@ reporting transparency. No release/default or performance change.
 full current body, all comments/reviews, linked issuecomment-6128212082 and
 latest follow-ups/CI before coding. Resume Ascend gaps from current code and
 physical hardware evidence, not stale plan prose.
+
+## UPDATE 2026-10-14 — Dia full free-running worker active
+
+Run 38527734866 started 07:27:15 UTC; checkout, disk preparation and pinned
+CPU dependency installation passed. The actual worker began 07:30:21 UTC
+and is still running. Main 16a2858 secret scan passed; remaining general
+CI is pending. Independent whole-artifact/source/PCM/full-history/dump/WER
+audit helpers are prepared under /mnt/storage/crispasr/
+dia-free-capture-delivery-20261014 and syntax-checked only; no result is
+predeclared and no redundant model/GPU job was launched.
+
+Read-only PR544 preparation found reporter comment 6162885815 (07:06:17
+UTC) with a new physical 910B3 archive, SHA256
+`d191c69b564ad8b47d8e92e15b0c993bc589359ffa39d1683b20143a45d94ef5`,
+claiming clean main cacd697 and ggml21acf3162. Audit the actual archive and
+all provenance/operator/model results after the Dia transparency gate works.
+This hardware follow-up is unverified; earlier 310P receipts are separate.
