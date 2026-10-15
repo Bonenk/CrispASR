@@ -42,6 +42,19 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — Superseded secret-scan queue cancellation
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-secret-scan-queue-20261015, branch
+fix/secret-scan-concurrency-20261015; evidence under
+/mnt/storage/crispasr/secret-scan-queue-20261015. Add branch/PR-scoped
+concurrency to the full tracked-tree secret workflow. Retain all triggers,
+permissions, timeout, credential patterns and all four unskipped tests.
+Validate workflow syntax/run blocks and run all four guards before every
+push. Use two committed branch checkpoints to prove the earlier queued scan
+is cancelled and the newest remains scheduled, without waiting for a runner.
+Only then integrate this metadata change; report latest hosted scan separately.
+
 ## CLAIMED 2026-10-15 — Immutable accepted-source package preflight
 
 Owner: maintainer session. Owned worktree
@@ -59,6 +72,13 @@ frozen Python tree and actual shared bundle, with packaged-library discovery
 from an unrelated directory. Version remains0.8.43; do not label these artifacts
 v0.8.44 or claim actual model/GPU acceptance. Audit fresh artifacts before any
 release decision; unmerged Dia intervention/OmniVoice runtime scopes excluded.
+Frozen-source CLI38742749435 and library38742753167 dry runs are submitted
+and queued. All11 local workflow tests, both real ELF bundler guards,21 portable
+CPU job checks and Glint freshness pass on exact frozen script bytes. Four
+obsolete secret scans are terminal-cancelled; current gates remain queued.
+Fresh archive/wheel validation is still pending. See the
+[preflight receipt](docs/release-preflight-2026-10-15.md).
+
 
 ## CLAIMED 2026-10-15 — OmniVoice PR521 standalone utility salvage
 

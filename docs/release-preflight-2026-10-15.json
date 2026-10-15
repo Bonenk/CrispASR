@@ -1,0 +1,110 @@
+{
+  "frozen_source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+  "version": "0.8.43",
+  "final_release_freeze": false,
+  "source_branch": "diag/release-preflight-source-20261015",
+  "cli_run": 38742749435,
+  "library_run": 38742753167,
+  "status": "queued: fresh artifacts not yet validated",
+  "no_tag_or_publication_requested": true,
+  "v0844_tag_exists": false,
+  "native_artifact_acceptance": false,
+  "wheel_built": false,
+  "model_inference_acceptance": false,
+  "gpu_acceptance": false,
+  "full_platform_matrix": false,
+  "local_guard_files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "ef1a68991cedf1d3fdb35f33278cce4dcc0e9b9c9e7300d1ff5d616261bf4238",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test_release_workflow.py",
+      "sha256": "08e5a8afc7322fd008f83fd2fcc876b681a674b12329ede246f49223e88775b8",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test-bundle-linux-runtime.sh",
+      "sha256": "a66be2d857f3e63819d495df42b03d7cb6c2486ae50270cf66cdd88dd4b4acec",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test-package-lib-bundle.sh",
+      "sha256": "13e6fb361575f45eaea1e2ef1cd9ba76fa7125039bd0bb92d6c7dad014d5815f",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "scripts/bundle-linux-runtime.sh",
+      "sha256": "24032bd53dce9b5526f046f6503b3db7e0f7a529f71e355a8b0ffb5587e5bf19",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "scripts/check-bundled-deps.py",
+      "sha256": "08d99c3b39ed1eb822d3f668611be880f72eb5ab803d08d2043aa3a3d4a4a346",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/package-lib-bundle.sh",
+      "sha256": "36a492353b7ea7e3ac4fda087bcb990ad75a34f5dfd25a08b63dcd6719acf3b7",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/verify-lib-bundle.sh",
+      "sha256": "5f243ce3eac318db841bc7e5c86712a750e2067eaaaf127fe770763c9a6818aa",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/check-release-portable-cpu.py",
+      "sha256": "c0ad6d0dfbe0933d37f562697ea0bb537a44e31850f6fcddb691ef9e9a8efaa1",
+      "frozen_source_exact": true
+    }
+  ],
+  "local_guard_outputs": {
+    "workflow.log": "test_gpu_artifacts_keep_optimized_cpu_and_legacy_stays_portable (__main__.TestReleaseWorkflow.test_gpu_artifacts_keep_optimized_cpu_and_legacy_stays_portable)\n#302's atomic ggml fix must not slow every prebuilt GPU artifact. ... ok\ntest_linux_arm64_jobs_target_ubuntu_22_04 (__main__.TestReleaseWorkflow.test_linux_arm64_jobs_target_ubuntu_22_04)\nAll Linux ARM64 jobs must use ubuntu-22.04-arm. ... ok\ntest_linux_jobs_target_ubuntu_22_04 (__main__.TestReleaseWorkflow.test_linux_jobs_target_ubuntu_22_04)\nAll Linux x86_64 jobs must use ubuntu-22.04, not ubuntu-latest or 24.04. ... ok\ntest_no_ubuntu_latest_in_linux_jobs (__main__.TestReleaseWorkflow.test_no_ubuntu_latest_in_linux_jobs)\nNo Linux release job should use 'ubuntu-latest' (pins to 24.04). ... ok\ntest_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch (__main__.TestReleaseWorkflow.test_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch) ... ok\ntest_vulkan_linux_job_enables_vulkan (__main__.TestReleaseWorkflow.test_vulkan_linux_job_enables_vulkan)\nThe Vulkan job must pass -DGGML_VULKAN=ON. ... ok\ntest_vulkan_linux_job_exists (__main__.TestReleaseWorkflow.test_vulkan_linux_job_exists)\nA linux-vulkan release job must exist. ... ok\ntest_vulkan_linux_job_produces_tarball (__main__.TestReleaseWorkflow.test_vulkan_linux_job_produces_tarball)\nThe Vulkan job must produce a .tar.gz artifact. ... ok\ntest_windows_cuda_publishes_complete_and_split_assets (__main__.TestReleaseWorkflow.test_windows_cuda_publishes_complete_and_split_assets)\nWindows CUDA releases must support both install styles (#342). ... ok\ntest_yaml_exists (__main__.TestReleaseWorkflow.test_yaml_exists) ... ok\ntest_yaml_parses (__main__.TestReleaseWorkflow.test_yaml_parses)\nrelease.yml must be valid YAML. ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.423s\n\nOK\n",
+    "runtime-bundle.log": "  ok: RUNPATH-only dependency bundled, and the relocated binary runs\n  ok: an unresolvable dependency fails the bundler, by name\n  ok: an absent host-provided runtime is tolerated and not bundled\n  ok: an already-staged dependency is not missing, and resolves once $ORIGIN is set\n  ok: host-toolkit dependency left out of the archive and still resolvable\nPASS: bundle-linux-runtime\n",
+    "library-bundle.log": "  ok: relocated bundle dlopens and calls through to the bundled dependency\n  ok: the host-toolkit RUNPATH survives the bundle's own rpath rewrite\nPASS: package-lib-bundle\n",
+    "portable-cpu.log": "RESULT: PASS \u2014 21 redistributable x86_64 job(s) pin a portable CPU baseline\n"
+  },
+  "glint_fresh": {
+    "source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+    "sync_marker": "77738f3ed9b15f627196cc5bbd7f6406814ba2fb",
+    "upstream_main": "77738f3ed9b15f627196cc5bbd7f6406814ba2fb",
+    "passed": true
+  },
+  "cancelled_superseded_scans": [
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38738121486,
+      "headBranch": "main",
+      "headSha": "f28109efb352c391758c3b001d6bb64dd3b5fd11",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38738584503,
+      "headBranch": "main",
+      "headSha": "b16167fa5d77b006e1502a209888d854e8ac449c",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38739138163,
+      "headBranch": "main",
+      "headSha": "4140c4ad67f40d463976096426b883f488252707",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38739874212,
+      "headBranch": "fix/omnivoice-utility-split-20261015",
+      "headSha": "a479139977210766cf93860f77fa8fdf99118d38",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    }
+  ],
+  "scope": "Small existing workflow/bundler guards and bounded empty-tag native Release dispatches only; no fresh package/wheel/source promotion."
+}

@@ -1,5 +1,15 @@
 # CrispASR — Port history
 
+## Bounded release preflight preparation — 2026-10-15
+
+Frozen accepted source998f8d18 for empty-tag Linux CLI/library Release runs
+38742749435/38742753167. Existing guards pass on exact frozen bytes:11 workflow
+tests, real ELF dependency/relocation and symlink controls,21 portable CPU jobs,
+and current Glint sync. Four superseded scans are terminal-cancelled. These
+preparation/control actions are complete; actual package/wheel validation is
+pending in PLAN.md. No version bump, tag, publication or model/GPU acceptance.
+[Receipt](docs/release-preflight-2026-10-15.md).
+
 ## OmniVoice standalone utility proof completed — 2026-10-15
 
 Prepared a PR521 utility-only split with original author/source preserved.
