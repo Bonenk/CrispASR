@@ -26,6 +26,12 @@ gh run watch "$(gh run list -w heavy-cpu.yml -L 1 --json databaseId -q '.[0].dat
 gh run download <run-id>           # the $HEAVY_OUT artifact
 ```
 
+`dia_key_history.py` and [its native producer](dia-key-history/README.md)
+reconstruct original layer0 keys over979 retained shared steps with only the
+required F32 coefficients. Original cache reconstruction gates native analysis;
+full stage arrays, batched/one-step distinctions and rejecting controls remain
+retained. This component diagnosis does not establish model or speech parity.
+
 ## Script contract
 
 `cann_model_fixture.py` prepares a CPU-only Moonshine Tiny fixture for future
