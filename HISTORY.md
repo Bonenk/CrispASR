@@ -1,5 +1,17 @@
 # CrispASR — Port history
 
+## Dia hosted codec import dependency corrected — 2026-10-15
+
+Initial hosted38710473906 fails before original reference inference because
+huggingface_hub is missing; native replay/source pinning pass. Complete raw
+artifact digest/CRC/path checks and full failure logs are preserved in an
+anonymously SHA-verified public archive. Corrected dispatch38716091962 pins
+huggingface_hub1.10.1 without changing worker math. README command repair87a11e3d
+is pushed on the diagnostic branch. Hosted numerical verification remains
+pending; the independently accepted local diagnosis is unaffected.
+[Receipt](docs/dia-full-codec-preparation-2026-10-15.md).
+
+
 ## Dia complete original-DAC diagnosis and CANN probe integration — 2026-10-15
 
 The exact codec worker7b42071f completed locally while hosted jobs were queued,

@@ -67,8 +67,11 @@ CI38713471171 and lint38713474686 remain queued. Actual retained CLI/C-ABI
 predictions also match all1115 feedback/1114 returned rows/1099 codec frames
 against the original. Codec/ASR diagnosis is complete locally with strict
 original positive controls: both native-code variants still fail WER1.
-The unchanged hosted duplicate38710473906 remains queued. Audit fresh CI before
-integration; the diagnostic worker7b42071f is still on its separate branch. Completed local
+Hosted duplicate38710473906 failed on the omitted huggingface_hub import
+dependency before original inference; complete rejected evidence is preserved.
+Corrected dispatch38716091962 adds huggingface_hub1.10.1 and is queued. The
+worker math remains unchanged at7b42071f; README command repair87a11e3d is
+pushed on its separate branch. Audit fresh CI before runtime integration. Completed local
 regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
 full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 

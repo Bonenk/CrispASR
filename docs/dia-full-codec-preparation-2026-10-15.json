@@ -262,6 +262,35 @@
     ],
     "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
   },
-  "hosted_run_status": "queued; identical worker independently completed locally",
-  "diagnosis_complete": true
+  "hosted_run_status": "initial run failed missing huggingface_hub before original reference inference; corrected dispatch38716091962 queued",
+  "diagnosis_complete": true,
+  "hosted_failed_attempt": {
+    "passed": true,
+    "source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "failure": "Hosted dispatch omitted huggingface_hub; original source import fails before protocol replay, DAC or ASR",
+    "artifacts": [
+      {
+        "artifact": 11962046723,
+        "sha256": "a13b5dd6a3c78472f8d23c82917ac128775188651feff2d2d3cdee42031f7709",
+        "bytes": 10351853
+      }
+    ]
+  },
+  "hosted_failed_attempt_publication": {
+    "revision": "f972cead2a3695c421e14cef9032292d92c3c2ea",
+    "file": "dia-20261015-full-codec/complete-hosted-dependency-failure-v1.zip",
+    "bytes": 10326196,
+    "sha256": "2683740004fa6c32093f4f4edd6b9642c094cc9b46744cf91063d332737706bc",
+    "payloads": 10,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/f972cead2a3695c421e14cef9032292d92c3c2ea/dia-20261015-full-codec/complete-hosted-dependency-failure-v1.zip"
+  },
+  "corrected_hosted_dispatch": {
+    "run": 38716091962,
+    "source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "added_dependency": "huggingface_hub==1.10.1",
+    "status": "queued",
+    "worker_code_changed": false,
+    "readme_command_repair": "87a11e3dace40c5b2da5d19f44c053c630f07c50"
+  }
 }

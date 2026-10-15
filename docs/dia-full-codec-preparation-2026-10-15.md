@@ -3,7 +3,8 @@
 The final emitted native row is now recoverable from retained raw sampler
 predictions and the actual producer stopping/BOS logic. Complete CLI/C-ABI
 code grids agree. Original-DAC decoding/ASR and independent audit are now
-complete locally. Native speech still fails; the unchanged hosted job is queued.
+complete locally. Native speech still fails. Initial hosted dependency failure
+is preserved; its corrected dispatch remains queued.
 
 ## Complete reconstruction
 
@@ -66,7 +67,7 @@ The local metric controls reject scale/order/shape/nonfinite/zero-norm errors.
 The unchanged worker at7b42071f completed on the local VPS with isolated
 Torch2.6.0+cpu, DAC1.0.0, audiotools0.7.2 and Whisper20250625. All models,
 installed reference dependencies and outputs are under /mnt/storage. This is a
-local CPU result; the queued hosted job is not represented as completed.
+local CPU result; hosted numerical/reference success is not claimed.
 
 | Codes decoded by actual original DAC | Samples | RMS | ASR WER |
 | --- | ---: | ---: | ---: |
@@ -106,6 +107,24 @@ PCM and WAVs, ASR inputs/results, source, raw logs, method/environment setup,
 independent audit, actual protocol executable and all retained arrays. The
 [pinned upstream Dia license](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/949b03fd276ecf968ba589e336c2788f80a4e445/dia-20261015-full-codec/Dia-LICENSE)
 accompanies the proof alongside the included DAC/CrispASR notices.
+
+## Hosted dependency failure and corrected dispatch
+
+Initial hosted38710473906 passes installation, source pinning and native replay,
+then fails importing the original model before reference inference because its
+package list omitted huggingface_hub. This is separate from the complete local
+numerical diagnosis. The raw10,351,853-byte artifact matches GitHub SHA256
+`a13b5dd6a3c78472f8d23c82917ac128775188651feff2d2d3cdee42031f7709`;
+its CRC/safe unique members and the full job log are verified and preserved.
+[Complete failed-attempt proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/f972cead2a3695c421e14cef9032292d92c3c2ea/dia-20261015-full-codec/complete-hosted-dependency-failure-v1.zip)
+is10,326,196 bytes, SHA256
+`2683740004fa6c32093f4f4edd6b9642c094cc9b46744cf91063d332737706bc`,
+fully anonymously downloaded/rehashed.
+
+[Corrected hosted dispatch38716091962](https://github.com/CrispStrobe/CrispASR/actions/runs/38716091962)
+adds huggingface_hub1.10.1, matching the successful local environment. Worker
+source/math remain unchanged at7b42071f; a separate README command correction
+is pushed as87a11e3d. The corrected hosted result is still pending.
 
 ## Public preparation proof
 
