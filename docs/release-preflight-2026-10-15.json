@@ -5,7 +5,7 @@
   "source_branch": "diag/release-preflight-source-20261015",
   "cli_run": 38742749435,
   "library_run": 38742753167,
-  "status": "queued: fresh artifacts not yet validated",
+  "status": "CLI artifact audited; shared library job and wheel validation pending",
   "no_tag_or_publication_requested": true,
   "v0844_tag_exists": false,
   "native_artifact_acceptance": false,
@@ -106,5 +106,32 @@
       "workflowName": "Secret scan"
     }
   ],
-  "scope": "Small existing workflow/bundler guards and bounded empty-tag native Release dispatches only; no fresh package/wheel/source promotion."
+  "scope": "Small existing workflow/bundler guards and bounded empty-tag native Release dispatches only; no fresh package/wheel/source promotion.",
+  "cli_artifact_acceptance": true,
+  "cli_audit": {
+    "passed": true,
+    "source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+    "run": 38742749435,
+    "artifact_id": 11980941526,
+    "raw_sha256": "f47b77bcac00e282df49ff575a659089d27a5b7539032364c889300825c3caa3",
+    "archive_sha256": "86235a699fe085545d0601b590ad77db9a0cac58fb832fec699843e2b81ed924",
+    "safe_unique_members": 10,
+    "relocated_startup": [
+      {
+        "binary": "crispasr",
+        "exit": 0,
+        "output": "=== build info ===\n  version       : 0.8.43\n  git sha       : 998f8d18\n  git date      : 2026-10-15T13:10:03Z\n  git subject   : docs-_checkpoint_independently_audited_OmniVoice_utility_split_and_queued_checks\n  build date    : 2026-10-15T14:13:10Z\n  build type    : Release\n  compiler      : gcc 11.4.0\n  os            : linux\n  arch          : x86_64\n  ggml backends : cpu\n\n",
+        "sha256": "47092e1b8603626289bf937b4c42610ae9a9893d2e41b1f9e7fc1a80773df465"
+      },
+      {
+        "binary": "crispasr-quantize",
+        "exit": 1,
+        "output": "usage: /mnt/akademie_storage/crispasr/release-preflight-20261015/cli-38742749435/relocated/crispasr-linux-x86_64/crispasr-quantize model-f16.gguf model-quant.gguf type [--imatrix <file>]\n             [--tensor-type <regex>=<type> ...]\n  input may be F16/F32 OR an already-quantized (e.g. q8_0) GGUF \u2014 a\n  quantized source is dequantized then re-quantized to the target.\n  --imatrix <f>  use an importance-matrix GGUF to steer k-quant/IQ\n                 precision (improves quality, esp. for iq4_* / low-bit).\n  --tensor-type <regex>=<type>  per-tensor precision override (repeatable,\n                 first match wins, overrides the built-in arch guards).\n                 e.g. --tensor-type 'output\\.weight=q8_0' --tensor-type '\\.ffn=q6_k'\n  type = \"iq4_nl\" or 19\n  type = \"iq4_xs\" or 22\n  type = \"q2_k\" or 10\n  type = \"q3_k\" or 11\n  type = \"q4_0\" or 2\n  type = \"q4_1\" or 3\n  type = \"q4_k\" or 12\n  type = \"q5_0\" or 8\n  type = \"q5_1\" or 9\n  type = \"q5_k\" or 13\n  type = \"q6_k\" or 14\n  type = \"q8_0\" or 7\n",
+        "sha256": "e1f2a1c7d9d13607fc215fd7008e2f3fdb0fc6f16b483ef563ddc9fc82d830b4"
+      }
+    ],
+    "dependency_check": "  [ ok ] crispasr  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] crispasr-quantize  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libc2pa_c.so  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgfortran.so.5  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgomp.so.1  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libopenblas.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libquadmath.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.23 GLIBCXX<=-\n\nscanned 7 ELF file(s); highest glibc requirement: 2.34 (from crispasr)\nOK: every non-system dependency is bundled.\n",
+    "publication_steps_skipped": true,
+    "scope": "Linux CLI packaging preflight only; no model/GPU/full-platform or final release acceptance."
+  }
 }

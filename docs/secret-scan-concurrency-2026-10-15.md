@@ -23,5 +23,5 @@ latest scan is not a hosted test pass.
 
 Fast-forward integration 3afaf4ae787baae3deb37c55781154393db993d9 preserves the
 tested workflow bytes. The JSON receipt records parsed workflow equality
-apart from concurrency and both official run identities. Latest main's full
-hosted scan remains a separate gate; the local four-test guard passed unskipped.
+apart from concurrency and both official run identities. Main scan38745123181 at51891e04 subsequently passes the full hosted guard.
+The local four-test guard also passed unskipped; future tips need their own scan.

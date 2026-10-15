@@ -23,11 +23,12 @@ closure. Scale and reversed-sample controls accompany the raw/unprocessed
 negative witness. These are utility gates only, never model speech acceptance.
 
 The unchanged original oracle already passes738/18 on Python3.12, NumPy1.26.4
-and pydub0.25.1. Fresh full-array proof, independent audit and applicable hosted
-checks are in preparation. All large outputs and isolated reference dependencies
+and pydub0.25.1. Full-array proof and an independent replay of all hosted arrays pass, as do the
+heavy run and all 10 lint checks. See the
+[integration receipt](omnivoice-utility-split-proof-2026-10-15.md). All large outputs and isolated reference dependencies
 are under /mnt/storage/crispasr/omnivoice-utility-split-20261015.
 
-GH dispatch recipe (prepared, no hosted success claimed):
+GH reproduction recipe (the validated source is recorded in the receipt):
 
 ```sh
 gh workflow run heavy-cpu.yml --ref fix/omnivoice-utility-split-20261015 \

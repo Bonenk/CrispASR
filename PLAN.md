@@ -59,36 +59,14 @@ frozen Python tree and actual shared bundle, with packaged-library discovery
 from an unrelated directory. Version remains0.8.43; do not label these artifacts
 v0.8.44 or claim actual model/GPU acceptance. Audit fresh artifacts before any
 release decision; unmerged Dia intervention/OmniVoice runtime scopes excluded.
-Frozen-source CLI38742749435 and library38742753167 dry runs are submitted
-and queued. All11 local workflow tests, both real ELF bundler guards,21 portable
+Frozen-source CLI38742749435 and library38742753167 dry runs are submitted. The CLI run passes: raw digest/CRC/safe paths, relocated exact
+source/version startup, both executable loader paths and all seven ELF dependency
+closures pass. The library job and actual wheel validation remain pending.
+All11 local workflow tests, both real ELF bundler guards,21 portable
 CPU job checks and Glint freshness pass on exact frozen script bytes. Four
-obsolete secret scans are terminal-cancelled; current gates remain queued.
-Fresh archive/wheel validation is still pending. See the
+obsolete secret scans are terminal-cancelled. Shared archive/wheel validation
+is still pending. See the
 [preflight receipt](docs/release-preflight-2026-10-15.md).
-
-
-## CLAIMED 2026-10-15 — OmniVoice PR521 standalone utility salvage
-
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-omnivoice-utility-split-20261015, branch
-fix/omnivoice-utility-split-20261015; evidence under
-/mnt/storage/crispasr/omnivoice-utility-split-20261015. Full PR521, issue518,
-review comments and linked upstream256 follow-ups are read. Split only the
-existing standalone audio/text utility header, probe and pinned original oracle
-with original authorship and commit provenance. No production include/caller,
-reference preprocessing, output default, setter ABI or full-PR acceptance.
-Re-run all738 waveform and18 text original-function cases, retain full inputs
-and expected/actual arrays plus source/compiler/binary hashes, independently
-audit them and require applicable CI before integration. Keep the unchanged
-clone WER gate and upstream abrupt-reference/onset finding explicit; fade is
-not a proven click-removal repair. Full runtime PR remains a draft.
-Candidate69d9eac4 is pushed, with actual tested helper/probe/oracle bytes
-unchanged froma4791399. The inherited oracle and independent actual ELF/original
-replay pass all738 waveform and18 text calls; all1601 arrays are retained in
-an anonymously full-SHA-verified public proof. Heavy38739872601 and
-lint38739877120 are queued. Audit terminal checks before rebase/ff integration;
-keep full runtime/default/clone acceptance excluded. See the
-[proof receipt](docs/omnivoice-utility-split-proof-2026-10-15.md).
 
 
 ## CLAIMED 2026-10-15 — Dia full-decoder layer0 key intervention
@@ -114,7 +92,9 @@ proof is anonymously full-SHA verified. Repairfc8f652f skips only that
 unused upload and retains the renamed input pointer. A tiny graph reproduces
 both old missing lookups and proves corrected values on the actual failed-run
 ggml libraries/headers. Heavy retry38738218813 and lint38738222779 are
-submitted; both exact native controls remain mandatory before interpretation.
+terminal-successful; all10 lint checks pass. The complete raw artifact is
+downloaded for independent audit. Both exact native controls remain mandatory
+before interpretation.
 Local actual file-reader/axis
 guards, full patched-runtime syntax and pinned Torch2.6 sampling-observer
 checks pass. Original/native supports and46/904 ranks reproduce exactly.
@@ -187,9 +167,10 @@ commands: [CANN TODO](docs/cann-todo.md) and
   complete latest thread before proposing any further split or merge.
 - **Issue518 / draft PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
-  Decide whether independently accepted utilities can be split under the
-  contributing protocol; do not call the upstream model error repaired or
-  relax the full PR's gate. Preserve original controls and contributor history.
+  The standalone utilities are integrated with complete original/native array
+  replay and hosted checks; see HISTORY.md. The full runtime PR remains a draft.
+  Do not call the onset repaired or relax the clone gate. Preserve controls and
+  contributor history.
 - **Breeze:** accepted guided/voice/server fixes are merged. Investigate canonical
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
   model-quality reports from merged contributor PR530 only with a new hypothesis.

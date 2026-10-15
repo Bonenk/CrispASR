@@ -10,7 +10,8 @@ as version 0.8.43; these are not v0.8.44 assets or the final release freeze.
 and [library run38742753167](https://github.com/CrispStrobe/CrispASR/actions/runs/38742753167)
 use the existing Release workflow's empty-tag dry run, selecting only
 `build-linux` and `build-libs-linux-x86_64`. Both event metadata records match
-the frozen SHA and validation branch, and both runs remain queued. No tag or
+the frozen SHA and validation branch. The CLI run passes; the library job is
+still queued. No tag or
 publication was requested. The v0.8.44 tag is absent.
 
 Existing local guards pass against byte-identical frozen scripts:
@@ -30,9 +31,16 @@ science/lint jobs remain intact. All evidence is under
 `/mnt/storage/crispasr/release-preflight-20261015`; tiny symlink-dependent test
 fixtures used local temporary storage and were removed by their own traps.
 
-Fresh native packages and the wheel have not been validated. After the jobs
-finish, verify complete raw hashes, source identity, CRCs and archive paths;
-check actual relocated CLI/C-ABI loading and dependency closure; then stage,
+The CLI artifact11980941526 passes its complete official SHA256, CRC and ten
+unique safe tar-member checks. Relocated startup reports0.8.43 and998f8d18.
+The quantizer has no version switch; its documented usage path executes with
+exit1. Actual ldd resolves bundled libraries beside both executables, and the
+dependency checker accepts all seven ELF files with `$ORIGIN` RUNPATHs.
+All release attachment, creation and notes steps are terminal-skipped.
+
+The library archive and wheel have not been validated. After that job
+finishes, verify its raw hash, source, CRC and archive paths, actual relocated
+C-ABI loading and dependency closure; then stage,
 build and install a wheel from the same frozen Python tree and actual library
 bundle. Library discovery must resolve inside the installed package from an
 unrelated directory without loader-path overrides. Confirm all publication

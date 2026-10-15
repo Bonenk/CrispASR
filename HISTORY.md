@@ -1,5 +1,17 @@
 # CrispASR — Port history
 
+## OmniVoice standalone utilities integrated — 2026-10-15
+
+Integration `5d582d75b71f5e7a29f6728dcdc93aa091ba6dd8` retains the PR521 standalone header, probe and
+pinned original-function oracle with original authorship and exact tested bytes.
+Hosted38739872601 and all 10 lint38739877120 jobs pass. Independent replay
+checks every one of 1,601 hosted arrays: 369 cleanup and 18 text cases are exact;
+369 fade/pad cases have maximum error0. Complete raw artifact, terminal logs,
+auditor and notices are public and anonymously full-SHA verified. No production
+caller, preprocessing/output default or setter ABI changes. Full PR521 remains
+a draft; original/native clone controls still fail2/9 WER. See the
+[integration proof](docs/omnivoice-utility-split-proof-2026-10-15.md).
+
 ## Full-tree secret-scan queue supersession integrated — 2026-10-15
 
 Integration 3afaf4ae adds per-branch/PR concurrency to Secret scan. Parsed YAML

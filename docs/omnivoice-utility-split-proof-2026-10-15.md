@@ -1,4 +1,4 @@
-# OmniVoice standalone utility proof and pending integration
+# OmniVoice standalone utility proof and integration
 
 The utility header, standalone probe and original-function oracle have been
 split from [draft PR521](https://github.com/CrispStrobe/CrispASR/pull/521).
@@ -49,10 +49,22 @@ or private speech are required for this utility diagnostic.
 
 [Hosted utility run38739872601](https://github.com/CrispStrobe/CrispASR/actions/runs/38739872601)
 and [lint38739877120](https://github.com/CrispStrobe/CrispASR/actions/runs/38739877120)
-are submitted on the exact tested source and remain queued. Do not call those
-checks green or integrate the split before applicable terminal checks pass.
-Afterward, rebase/ff only this scope, verify tested bytes and preserve original
-authorship. No full-PR, cloned-speech, click-removal, GPU or default promotion.
+both pass on the exact tested source, including all 10 lint jobs. The full raw
+artifact11980620391 is 36,669,267 bytes, SHA256
+`135b5b6681c32260414305a6eef8d7cabfc4f1b61b83ecfa64cb39d041c4ed65`.
+Independent replay of its actual ELF and original Python functions verifies all
+1,601 arrays, 369 exact cleanup calls, 369 zero-error fade/pad calls and 18 exact
+text cases. Source, array, original-function and actual ELF hashes all match.
+
+The [complete hosted proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/71ef6bdbea06e77f26b2fb2951ea8f371fb5b63f/omnivoice/utility-split-20261015/complete-hosted-utility-split-v1.zip) retains the raw artifact,
+terminal API/logs, independent auditor/result, manifest and license notices:
+32488123 bytes, SHA256 `3a60926485cb4354ec0763e829a92fc2ea54558db64ae37cc4fbaef220a30139`.
+An anonymous full download matches that digest.
+
+Integration `5d582d75b71f5e7a29f6728dcdc93aa091ba6dd8` preserves all tested helper/probe/oracle bytes and
+original commit authorship after rebase/fast-forward. This accepts the standalone
+utilities only. The complete runtime PR, clone quality, onset repair, GPU and
+production defaults remain excluded.
 
 The [candidate method](https://github.com/CrispStrobe/CrispASR/blob/69d9eac4b10e1cc857e4e2e90b1101fd40983b6b/docs/omnivoice-utility-split-2026-10-15.md)
 records reproduction details. All large arrays, isolated dependencies and proof

@@ -246,7 +246,11 @@ tensors passes all 48 canonical startup comparisons and adds only 1,312 bytes.
 variants, rejected published results, four negative controls and 47 artifact
 hashes. Standalone conversion now reproduces the validated bytes and passes fresh startup/full-history comparisons. Native free speech remains excluded from release acceptance; production codec pins are unchanged.
 
-MiMo PR #492 and OmniVoice draft PR #521 remain unmerged. MiMo's diagnostic
+The complete MiMo PR #492 and OmniVoice draft PR #521 remain unmerged.
+Independent MiMo mel/cached-decode pieces and OmniVoice standalone audio/text
+utilities are integrated. OmniVoice utility replay checks all 1,601 hosted
+arrays, 738 waveform calls and 18 text cases, with terminal heavy/lint checks
+passing; no production caller, preprocessing/output default or setter ABI changes. MiMo's diagnostic
 F32 precision path reproduces the original codes and decoded speech but is
 slower than its baseline; this does not justify a default change or complete
 CANN acceptance. OmniVoice's fixed clone control also fails on the original
