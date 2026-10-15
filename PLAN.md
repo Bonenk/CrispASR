@@ -64,6 +64,16 @@ artifacts and retain public proof before integration. No full model on VPS,
 unchanged source-RoPE speech rerun, production graph/default change or speech/GPU
 acceptance from this conditional diagnostic. Claim covers producer preparation
 and bounded hosted diagnostic; successful speech remains a separate gate.
+Original-module producer proof now passes: retained component stages exact,
+full-reference self-attention/output relative errors9.53e-7/1.08e-6, strict
+2e-6 reconstruction gates unchanged. Native versus replayed-original Q differs
+by5.37e-5. Independent49-payload audit and complete59-payload public proof pass;
+both full anonymous downloads verify. This is replay Q, not a previously
+captured full-model query. Candidateff7e07c0 is pushed; heavy38764924112 and
+lint38764928533 are submitted. Actual compiled file/axis guards, full patched
+runtime syntax and actual hosted-ggml paired-input graph guard pass. Audit the
+complete native controls and all hosted arms before interpreting or integrating.
+See the [preparation receipt](docs/dia-query-key-preparation-2026-10-15.md).
 
 ## Dia correctness — early probe complete, full speech still open
 

@@ -1,5 +1,18 @@
 # CrispASR — Port history
 
+## Dia original-module self-query proof completed — 2026-10-15
+
+The scoped original-module producer at candidateff7e07c0 captures actual Q
+before/after RoPE with41,951,232 bytes of physically verified F32 coefficients.
+All retained standalone stages reproduce exactly; separate full-model SA/output
+reconstruction errors9.53e-7/1.08e-6 pass the unchanged2e-6 gate. Full-model stages
+are not byte-exact and no prior full-model self-Q capture exists. Independent
+raw-input audit checks49 payloads and replays every baseline/negative attention
+array exactly. Complete59-payload public proof and compact runtime inputs pass
+anonymous full hashes. This completes producer preparation only; the five-arm
+full-model Q/K diagnostic and code integration remain active in PLAN.md. See the
+[provenance and gates](docs/dia-query-key-preparation-2026-10-15.md).
+
 ## Dia full-decoder layer0 key intervention completed — 2026-10-15
 
 Integration `e34d551b186cbd07fb07d9d81ae166adc30b0ce7` retains tested diagnostic code fromfc8f652f.
