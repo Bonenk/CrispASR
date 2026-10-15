@@ -3,7 +3,7 @@
   "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
   "heavy_run": 38726696058,
   "lint_run": 38726699171,
-  "hosted_status": "queued",
+  "hosted_status": "failed: baseline exact; native-control missing tensor upload; original-key arms not run",
   "local_preparation": {
     "axis_ownership_pass": true,
     "compiled_file_loader_pass": true,
@@ -23,5 +23,6 @@
   },
   "speech_acceptance": false,
   "gpu_acceptance": false,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "repair_pending": "Skip only pruned layer0 past-key upload at intervention step, retain new tensor pointer across capture rename; prove on a small actual ggml graph."
 }

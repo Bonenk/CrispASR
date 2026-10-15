@@ -57,8 +57,13 @@ head2 CFG46/904 margin/ranks/support. Validate actual file/axis provenance and
 reject malformed inputs. Key-only results are conditional; they do not prove
 joint Q/K causality or model speech acceptance. No production default change,
 full-model VPS execution, seed/filter workaround or unchanged speech rerun.
-Candidate2f04f4e6 is pushed. Heavy38726696058 and lint38726699171 are submitted
-and queued; no hosted numerical result yet. Local actual file-reader/axis
+Candidate2f04f4e6 heavy38726696058 failed after all979 baseline logit rows
+reproduced exactly. The native replacement aborts at a missing tensor upload: a
+replaced full-key graph prunes its unused past-key leaf; the new input also
+needs pointer retention across capture renaming. Repair only the diagnostic
+upload/lookup and prove both cases with a small real-ggml graph before retry.
+No original-key arm ran. Full failed artifact/log retention is in progress.
+Lint38726699171 remains pending. Local actual file-reader/axis
 guards, full patched-runtime syntax and pinned Torch2.6 sampling-observer
 checks pass. Original/native supports and46/904 ranks reproduce exactly.
 The immutable31-payload input
@@ -76,7 +81,8 @@ original-DAC/ASR diagnosis is independently complete: original WER0, both native
 code variants WER1. Hosted first missing-hub and second missing-ffmpeg failures
 are preserved in complete public SHA-verified archives; the second also passes
 independent partial PCM audit. Prerequisite-only candidatea40755b7 is pushed;
-hosted38723274160 has started, with unchanged model/source and PCM/ASR gates.
+hosted38723274160 completed successfully at a40755b7. Full raw artifact
+11967984300, source, PCM and ASR audit are in progress with unchanged gates.
 Audit the terminal hosted result and integrate diagnostic worker/README only
 after applicable checks. The separate production output-protocol repair is
 already integrated as6503408c after13 general/10 lint jobs; no speech promotion.

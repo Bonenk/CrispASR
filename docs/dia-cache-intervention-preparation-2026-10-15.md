@@ -7,7 +7,13 @@ runtime `8d0ad8862d2cad5d305a48a57f2a99b5024bc39a`.
 
 The [GH full-model run38726696058](https://github.com/CrispStrobe/CrispASR/actions/runs/38726696058)
 and [lint38726699171](https://github.com/CrispStrobe/CrispASR/actions/runs/38726699171)
-are submitted and queued. No numerical intervention result is available yet.
+have been submitted. Heavy38726696058 failed after byte-exact reproduction
+of all979 baseline logit rows. The native replacement control aborts on a
+missing tensor upload: its new full-key input prunes the unused past-key leaf.
+The new input also needs a retained pointer across capture renaming. No
+original-key arm ran, so there is no valid intervention result. Repair the
+diagnostic plumbing, prove both cases on a small actual ggml graph, then retry.
+Lint remains pending. The failed raw artifact and logs are being retained.
 The [method](https://github.com/CrispStrobe/CrispASR/blob/2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea/tools/ci-heavy/dia-cache-intervention/README.md)
 records the exact dispatch and predefined gates.
 

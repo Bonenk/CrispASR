@@ -262,7 +262,7 @@
     ],
     "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
   },
-  "hosted_run_status": "first run missing huggingface_hub; second run strict PCM passed but ffmpeg missing before ASR; prerequisite-repaired run38723274160 in progress, terminal audit pending",
+  "hosted_run_status": "run38723274160 succeeded at a40755b7; independent terminal artifact/PCM/ASR audit in progress",
   "diagnosis_complete": true,
   "hosted_failed_attempt": {
     "passed": true,
@@ -347,8 +347,9 @@
   "hosted_prerequisite_repair": {
     "source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
     "run": 38723274160,
-    "status": "in_progress",
-    "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes"
+    "status": "completed-success: full artifact audit in progress",
+    "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes",
+    "artifact": 11967984300
   },
   "protocol_runtime_integration": {
     "source": "6503408cb95d42e80ad84bee513ae58a67e616c5",
