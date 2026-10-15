@@ -56,6 +56,12 @@ compile against official SDKs and preserve metadata. Physical execution remains
 pending. This does not establish ACL capture/replay, model speech, quantization
 or speed; no backend default/kernel changes are intended.
 
+Candidate81d8e279 is submitted; hosted CPU/SDK workflow38698323227, general
+CI38698330667, lint38698334091 and secret scan38698323280 await completion.
+Audit terminal results and integrate only after applicable checks pass.
+Completed local CPU evidence is in HISTORY.md and
+[the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:

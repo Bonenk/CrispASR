@@ -49,3 +49,8 @@ above remain open. See the portable validator evidence linked above.
 Current priorities and maintainer claims are in [PLAN.md](../PLAN.md).
 Completed preparation/compiler/operator work is historical evidence; the
 remaining tasks above require full-model or composed-graph device validation.
+
+[Composed graph CPU preparation](cann-composed-preparation-2026-10-15.md) is
+complete locally and its full proof is public. Candidate81d8e279 awaits hosted
+CPU/SDK and general CI before integration. The physical composed-fallback
+acceptance task in the table remains open.

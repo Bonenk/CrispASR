@@ -32322,3 +32322,16 @@ Evidence to consult, not redo:
   recipe defect,18,288 captured probability/sample rows unchanged; not a speech fix.
 - Completed cache/GQA/attention, MLP, query/RoPE, codec-precision and capture
   transparency proofs are indexed in the archived plan and docs.
+
+## CANN composed graph CPU controls completed — 2026-10-15
+
+Candidate81d8e279 adds actual F32→BF16 ADD→F32 scheduler work, exact requested
+registry/device checks and a dedicated immutable CPU/official SDK workflow.
+The fresh local CPU binary passes five contracts,18 computes/three shapes,
+12,288 independently recalculated intermediate and12,288 final values. False
+CANN/device/fallback/evidence-overwrite requests reject. All inputs, outputs,
+tested ELF, source/compiler metadata and logs are public in an anonymously
+SHA-verified128-payload proof. This is completed CPU preparation; candidate
+integration awaits hosted CI/SDK checks. Physical fallback, ACL execution,
+model/quantization and timing tasks remain in PLAN.md and docs/cann-todo.md.
+Details: docs/cann-composed-preparation-2026-10-15.md/.json.

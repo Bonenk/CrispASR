@@ -1,0 +1,40 @@
+{
+  "candidate_source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+  "integrated": false,
+  "cpu_source": {
+    "probe_source_sha256": "5a5265c9097a5f4e106843bad5d6f83cb76840e09675da38191545c39ad37b39",
+    "actual_binary_sha256": "51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf",
+    "ggml_source": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "scope": "Actual local CPU compile/control; commit binding is verified separately after candidate commit. No physical CANN execution.",
+    "candidate_source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "committed_source_matches_tested_source": true
+  },
+  "independent_cpu_audit": {
+    "passed": true,
+    "actual_computes": 18,
+    "independently_recalculated_final_values": 12288,
+    "independently_recalculated_matrix_values": 12288,
+    "scope": "CPU graph only; no CANN execution, fallback or ACL capture/replay acceptance"
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261015-composed/complete-cpu-composed-proof.zip",
+    "bytes": 877822,
+    "sha256": "ae34420e8060f414cc015a68ce93e18ae1d880dd4b844ba56156e3038a94ed74",
+    "payloads": 128,
+    "anonymous_verified": true,
+    "revision": "2eff34171877cea00d35fe867de55d16892e218a",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2eff34171877cea00d35fe867de55d16892e218a/cann-20261015-composed/complete-cpu-composed-proof.zip"
+  },
+  "ci": {
+    "composed_cpu_and_sdk": 38698323227,
+    "general": 38698330667,
+    "lint": 38698334091,
+    "secret": 38698323280,
+    "status": "queued"
+  },
+  "physical_cann_execution": false,
+  "acl_capture_replay_acceptance": false,
+  "model_speech_acceptance": false,
+  "performance_acceptance": false
+}
