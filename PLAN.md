@@ -42,19 +42,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Superseded secret-scan queue cancellation
-
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-secret-scan-queue-20261015, branch
-fix/secret-scan-concurrency-20261015; evidence under
-/mnt/storage/crispasr/secret-scan-queue-20261015. Add branch/PR-scoped
-concurrency to the full tracked-tree secret workflow. Retain all triggers,
-permissions, timeout, credential patterns and all four unskipped tests.
-Validate workflow syntax/run blocks and run all four guards before every
-push. Use two committed branch checkpoints to prove the earlier queued scan
-is cancelled and the newest remains scheduled, without waiting for a runner.
-Only then integrate this metadata change; report latest hosted scan separately.
-
 ## CLAIMED 2026-10-15 — Immutable accepted-source package preflight
 
 Owner: maintainer session. Owned worktree

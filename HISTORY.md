@@ -1,5 +1,17 @@
 # CrispASR — Port history
 
+## Full-tree secret-scan queue supersession integrated — 2026-10-15
+
+Integration 3afaf4ae adds per-branch/PR concurrency to Secret scan. Parsed YAML
+is otherwise identical: all triggers, read permissions, timeout, patterns and
+four tests remain. Both local unskipped four-test runs and the 437-step shell
+workflow parser pass. Actual push 38744331967 automatically cancels the earlier
+queued 38744186281 while keeping the newer scan queued; no manual cancellation
+was called on that proof run. This accepts scheduling metadata, not a hosted
+secret-test pass. Latest main still requires its own scan. Active packaging and
+science/lint gates remain in PLAN.md. See the
+[proof receipt](docs/secret-scan-concurrency-2026-10-15.md).
+
 ## Bounded release preflight preparation — 2026-10-15
 
 Frozen accepted source998f8d18 for empty-tag Linux CLI/library Release runs
@@ -57,7 +69,7 @@ exact pinned-source patch application and patched-runtime C++ syntax. The actual
 worker sampling observer also reproduces both retained support sets and the
 46/904 rank reversal on pinned Torch2.6.0+cpu. Published
 and anonymously SHA-verified the31-payload fixed979-step input bundle. These
-preparation actions are complete; run38726696058 later reproduced the baseline
+preparation actions are complete; run 38726696058 later reproduced the baseline
 exactly but failed its native-control tensor upload. The diagnostic repair and
 lint38726699171 remain tracked in PLAN.md. No numerical,
 speech or GPU acceptance. See the
@@ -184,7 +196,7 @@ by an independently audited local run; the scoped protocol repair is now integra
 
 ## MiMo existing F32 cache-read hypothesis rejected — 2026-10-15
 
-Hosted run38703457282 completes all four fresh CPU processes but correctly
+Hosted run 38703457282 completes all four fresh CPU processes but correctly
 fails the numerical gate. F16→F32 reads move eager/flash hidden relative L2
 6.05%→5.73% and logit relative L2 4.01%→5.13%, both outside0.5%. All three
 input stages stay exact; all five flash stages are exact across read choices.
