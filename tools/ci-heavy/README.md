@@ -34,6 +34,14 @@ retained. This component diagnosis does not establish model or speech parity.
 
 ## Script contract
 
+`dia_attention_arithmetic.py` uses tiny analytic fixtures and exact recorded
+original/native Q/K/V to split dot products, softmax and weighted-value arithmetic.
+It requires exact native hosted and actual original-module attention controls.
+Independent raw-array auditing and a one-output-scalar reduction distinguish
+kernel shape/reduction effects from full-model behavior. `dia_cfg_margin.py`
+explains the actual four-logit CFG rank margin without running inference.
+See the [attention arithmetic method](dia-attention-arithmetic/README.md).
+
 `omnivoice_audio_parity.py` is the standalone utility split from draft PR521.
 It executes hash-pinned original numpy/pydub functions against the preserved C++
 helper/probe on738 waveform and18 text cases, retaining full inputs and both
