@@ -7,6 +7,18 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## MiMo Q4 projection amplification isolated — 2026-10-15
+
+The bounded real CPU Q4_K gate experiment is complete: dynamic Q8_K activation
+rounding amplifies the retained flash/eager difference by5.3714× relative to
+the same-weight floating-input projection.486 activation codes change; actual
+outputs match the independent Q8-shadow mathematical oracle within7.87e-8
+relative L2. Native/GGUF weights and explicit reference/direct-dot controls are
+exact; NumPy independently confirms the Torch oracle. Failed initial methods
+and their raw arrays are preserved. This is a mechanism diagnosis, not whole
+PR492, original-model, speech or performance acceptance. No defaults changed.
+[Full measured result and limitations](docs/mimo-q4-projection-2026-10-15.md).
+
 ## DONE 2026-10-13 — Durable Dia component and negative proofs
 
 Main `bff87788e` adds strict anonymous retrieval of four immutable public proof

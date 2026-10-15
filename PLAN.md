@@ -105,26 +105,24 @@ further rerun of the already accepted rotary repair is requested. Details and
 commands: [CANN TODO](docs/cann-todo.md) and
 [portable validator](docs/cann-model-validator-preparation-2026-10-14.md).
 
-## CLAIMED 2026-10-15 — MiMo Q4 common-input projection amplification
+## CLAIMED 2026-10-15 — MiMo existing F32 cache-read A/B
 
-Owner: maintainer session; controller worktree
-/mnt/volume1/crispasr-decoder-boundary-tracking-20261013, with existing owned
-LM diagnostic source47b661df1 consulted read-only. All execution and artifacts:
-/mnt/storage/crispasr/mimo-lm-projection-20261015. Whole PR492/521 discussions,
-issue518 and linked upstream256 follow-ups have been read. Safe runtime pieces
-are already merged; do not force acceptance of their remaining failed gates.
+Owner: maintainer session. Owned worktree planned at
+/mnt/volume1/crispasr-mimo-kvread-20261015, branch
+diag/mimo-kvread-20261015. Builds, downloads and evidence under
+/mnt/storage/crispasr/mimo-kvread-20261015; heavy execution on hosted GH CPU.
+The completed bounded Q4 projection diagnosis is archived in HISTORY.md and
+[its receipt](docs/mimo-q4-projection-2026-10-15.md).
 
-Reuse the immutable seven-layer study's captured layer0 FFN-normalized flash/
-eager inputs, verifying archive/member hashes. Fetch only a single Q4_K gate
-projection from the pinned GGUF with checked immutable range/shape/type; no
-full-model download. Compare actual CPU matmul against same-weight floating
-and actual Q8_K activation-shadow oracles to test whether dynamic activation
-rounding explains amplified output differences. Retain quantized/dequantized
-inputs, outputs, coefficient/source hashes and rejecting scale/layout controls.
-Do not repeat the old whole-LM BLAS experiment, recover original checkpoint
-precision by dequantization, change defaults/gates or claim original full-model,
-PR, speech or speed acceptance from a matrix diagnostic. Use the result to
-choose a targeted precision experiment, only if it supports that hypothesis.
+Test the existing CRISPASR_KV_READ_F32 OFF/ON against the existing core eager
+attention override, four fresh CPU processes on the same immutable Q4 model
+and original five-stage reference. Preserve arrays, exact ELF/source/config,
+input/model hashes, failed arms and scale/shape controls. Verify original
+stage cosines AND norms/errors; compare nonflash to its matching flash arm
+with the existing .9999 cosine/.005 relative-L2 gate. Do not add a runtime
+flag, modify graph math/defaults, repeat BLAS sweeps, or claim speech/performance
+acceptance. This experiment can reject the cache-read hypothesis. Any promising
+result still needs full fixed-recipe CLI/C-ABI speech and actual GPU validation.
 
 ## Remaining PRs — scoped salvage and acceptance
 
