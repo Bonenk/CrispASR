@@ -154,3 +154,12 @@ references/current-row deltas. Run with
 `-f pip="numpy==1.26.4 torch==2.6.0 huggingface_hub==0.36.0 safetensors==0.5.3 gguf"`.
 [Method and reconstruction](dia-suffix-replay/README.md). CPU diagnostic only;
 skipping the prefix does not reproduce sampler RNG or establish speech parity.
+
+`dia_terminal_replay.py` extends the accepted one-step suffix replay with a
+separately owned post-final-norm hidden input before all9 output heads. Baseline,
+native layer17 and native hidden controls must remain byte-exact; original
+layer17 must reproduce the accepted anchor before actual original final hidden
+is injected. All earlier stages/caches, computed/consumed hidden, raw logits
+and original filter margin/ranks/support are retained. Run with
+`-f pip="numpy==1.26.4 torch==2.6.0 huggingface_hub==0.36.0 safetensors==0.5.3 gguf"`.
+[Method](dia-terminal-replay/README.md). CPU diagnostic, no speech/GPU acceptance.
