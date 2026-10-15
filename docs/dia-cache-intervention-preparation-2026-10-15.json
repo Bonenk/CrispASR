@@ -1,9 +1,9 @@
 {
-  "candidate_source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+  "candidate_source": "fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4",
   "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
-  "heavy_run": 38726696058,
-  "lint_run": 38726699171,
-  "hosted_status": "failed: baseline exact; native-control missing tensor upload; original-key arms not run",
+  "heavy_run": 38738218813,
+  "lint_run": 38738222779,
+  "hosted_status": "repair submitted; numerical retry pending",
   "local_preparation": {
     "axis_ownership_pass": true,
     "compiled_file_loader_pass": true,
@@ -24,5 +24,39 @@
   "speech_acceptance": false,
   "gpu_acceptance": false,
   "production_defaults_changed": false,
-  "repair_pending": "Skip only pruned layer0 past-key upload at intervention step, retain new tensor pointer across capture rename; prove on a small actual ggml graph."
+  "initial_candidate_source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+  "initial_failed_run": {
+    "run": 38726696058,
+    "source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+    "artifact": 11973635349,
+    "bytes": 428224673,
+    "sha256": "196a86087fc6df6d7037d7991f6cc23c67c6cbad727bc5a5aed529d9552e37ac",
+    "independent_audit": {
+      "independent_partial_audit_pass": true,
+      "full_model_intervention_complete": false,
+      "baseline_all979_inputs_logits_and_captured_keys_byte_exact": true,
+      "native_control_pre_boundary_exact_steps": 978,
+      "original_key_arms_ran": false,
+      "actual_runner_sha256": "dbbf9fba971b669f27e8813320a52dbc7da6abc505100c4b8cb67485ca5ef12b",
+      "scope": "Failed diagnostic native-control plumbing. No original-key causal result, speech, GPU or default acceptance."
+    }
+  },
+  "repair_completed": "Skip only pruned layer0 past-key upload at intervention step and retain input pointer across capture rename; actual hosted-ggml weight-free guard passes.",
+  "actual_hosted_ggml_graph_guard": {
+    "passed": true,
+    "scope": "Small actual hosted ggml graph; old pruned-leaf/name lookups absent and retained-pointer output exact. No weighted model replay.",
+    "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "binary_sha256": "04d67514fa242981a2fcd2c15faf5820e7c1acae65f66ee4e4c62db33f3d3288",
+    "source_sha256": "cd0bd2d4ed347395ae093d0f1ba95e52e6f765064086ab8d51957a9d3951fdd3",
+    "actual_shared_libraries": "Raw failed artifact libs/; independently matched against producer receipt"
+  },
+  "failed_attempt_publication": {
+    "revision": "26b52aa34bafd3b50b22c0e62cedda6231f40fdc",
+    "file": "dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip",
+    "bytes": 428154431,
+    "sha256": "f94ffdd5b3379bf553ef24a5d980c7d473845c2fc3cda1a8ee018a9313ce680a",
+    "payloads": 15,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/26b52aa34bafd3b50b22c0e62cedda6231f40fdc/dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip"
+  }
 }

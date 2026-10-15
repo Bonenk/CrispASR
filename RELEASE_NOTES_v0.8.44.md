@@ -133,6 +133,15 @@ This scoped repair does not establish Dia speech acceptance. Complete original-
 DAC cross-decode gives original-code WER0 and both native-code variants WER1;
 neural generation, CUDA, Q4 and performance remain separate open gates.
 
+The original-DAC cross-decoder and layer0 key-history diagnostic tools are now
+integrated with pinned inputs and complete public proof. Hosted original-DAC
+validation reproduces the original speech at WER0; both native-code variants
+remain near-silent at WER1. Key-history component controls and all10 lint jobs
+pass. These tools make the remaining investigation reproducible; they do not
+establish native Dia speech, quantization or GPU acceptance. Details are in the
+[codec](docs/dia-full-codec-preparation-2026-10-15.md) and
+[key-history](docs/dia-key-history-producer-2026-10-15.md) receipts.
+
 ## Dia: reproducible DAC precision conversion
 
 The explicit `models/convert-dia-dac-to-gguf.py` tool exports the critical

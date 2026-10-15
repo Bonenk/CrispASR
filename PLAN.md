@@ -57,13 +57,16 @@ head2 CFG46/904 margin/ranks/support. Validate actual file/axis provenance and
 reject malformed inputs. Key-only results are conditional; they do not prove
 joint Q/K causality or model speech acceptance. No production default change,
 full-model VPS execution, seed/filter workaround or unchanged speech rerun.
-Candidate2f04f4e6 heavy38726696058 failed after all979 baseline logit rows
-reproduced exactly. The native replacement aborts at a missing tensor upload: a
-replaced full-key graph prunes its unused past-key leaf; the new input also
-needs pointer retention across capture renaming. Repair only the diagnostic
-upload/lookup and prove both cases with a small real-ggml graph before retry.
-No original-key arm ran. Full failed artifact/log retention is in progress.
-Lint38726699171 remains pending. Local actual file-reader/axis
+Initial run38726696058 reproduces all979 baseline logit rows exactly, then
+aborts on a pruned past-key tensor upload in the native control; original-key
+arms never run. The full raw artifact11973635349 is SHA/CRC verified and its
+baseline/partial outputs independently audited. Complete public failed-run
+proof is anonymously full-SHA verified. Repairfc8f652f skips only that
+unused upload and retains the renamed input pointer. A tiny graph reproduces
+both old missing lookups and proves corrected values on the actual failed-run
+ggml libraries/headers. Heavy retry38738218813 and lint38738222779 are
+submitted; both exact native controls remain mandatory before interpretation.
+Local actual file-reader/axis
 guards, full patched-runtime syntax and pinned Torch2.6 sampling-observer
 checks pass. Original/native supports and46/904 ranks reproduce exactly.
 The immutable31-payload input

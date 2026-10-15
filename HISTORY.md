@@ -1,5 +1,18 @@
 # CrispASR — Port history
 
+## Dia first full-decoder intervention control audited — 2026-10-15
+
+Run38726696058 at2f04f4e6 reproduces all979 native baseline inputs/logits and
+layer0 keys byte-for-byte; the native substitution control aborts before the
+step978 computation on a pruned past-key upload. No original-key arm ran.
+Independent audit verifies actual executable/libraries, all input hashes,
+18 endpoint metrics and978 exact pre-boundary control logit rows. Complete
+428154431-byte public failed-run proof is anonymously SHA-verified. A small
+actual hosted-ggml graph reproduces both missing old lookups and passes using
+the retained pointer/skipped unused upload. These scoped audit/guard actions
+are complete; repaired full-model retry38738218813 remains in PLAN.md. See the
+[receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
+
 ## Dia key-history and original-DAC diagnostic tools integrated — 2026-10-15
 
 Key-history tooling lands asc1be3022 with tested producer/README bytes unchanged
