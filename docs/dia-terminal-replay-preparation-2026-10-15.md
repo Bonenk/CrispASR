@@ -38,3 +38,31 @@ recipes. Independent artifact audit is mandatory before interpreting results.
 No production/default change, sampled trajectory, speech, Q4, GPU, speed or
 release acceptance is established. Original full-model self-Q provenance remains
 a separate follow-up; unchanged local late-layer/norm/head probes are not rerun.
+
+## Independent auditor preparation
+
+[Auditor63468e54](https://github.com/CrispStrobe/CrispASR/blob/63468e54/tools/ci-heavy/dia-terminal-replay/audit.py)
+is prepared separately from the unchanged submitted worker85be03e3. It requires
+official terminal run/archive proof, all payload/source hashes, exact composed
+scratch patch, actual ELF/library identities and a fresh retained ggml guard.
+All five arms, both exact native controls and the complete accepted original
+layer17 anchor must pass. It reconstructs every logical capture and checks
+computed/consumed hidden, all upstream stages, split logits,90 layer metric
+rows, hidden/logit errors and the actual pinned original filter.
+
+Separate observed F32 CFG and exact-input F64 CFG sequences retain all four raw
+logits. Baseline→original post17→original final hidden→original logits receives
+signed conditional differences; those must telescope exactly. These are not
+global additive causal percentages. Unknown hosted values are not filled from
+local component reconstructions.
+
+Local and Torch2.6 reference checks pass the existing24 calibrated reconstruction/
+metric negatives and12 new activation/hash/nonfinite negatives. Signed binary
+fractions have hand-derived exact differences. Two accepted actual native/
+original layer17 captures validate the ownership checks, the composed runtime
+patch reproduces exact preflight bytes, and three real prior CFG cases agree
+with exact rational arithmetic. [Calibration receipt](dia-terminal-auditor-calibration-2026-10-15.json).
+Raw receipts remain under
+`/mnt/storage/crispasr/dia-terminal-20261015/auditor-calibration-v1/` and
+`auditor-calibration-v2/`. No new terminal hidden-state or speech result follows;
+both GH numerical and lint jobs remain queued at this checkpoint.

@@ -1,0 +1,50 @@
+{
+  "calibration_pass": true,
+  "auditor_sha256": "51735374549db7d41a46c317a38ee35d1bf7b8c1d625d66741422034f8b9a619",
+  "prior_worker_source": "70f2d9de678b31f6b55f957e3a721aa91bf0af88",
+  "activation_calibrations": [
+    {
+      "arm": "native-layer-17",
+      "activation_check_pass": true,
+      "computed_sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323",
+      "consumed_sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+    },
+    {
+      "arm": "original-layer-17",
+      "activation_check_pass": true,
+      "computed_sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323",
+      "consumed_sha256": "5f602a8624210f1a1b1d8fe2a6169abb7c27f16a6a5da69d80b38d2bdb48fa68"
+    }
+  ],
+  "cfg_fraction_checks": [
+    {
+      "arm": "baseline",
+      "exact_fraction": "-7/262144",
+      "c46": 6.647006511688232,
+      "c904": 6.406050682067871,
+      "u46": 6.59880256652832,
+      "u904": 6.277519226074219,
+      "float64_cfg_margin": -2.6702880859375e-05
+    },
+    {
+      "arm": "original-layer-17",
+      "exact_fraction": "11/524288",
+      "c46": 6.647005081176758,
+      "c904": 6.406040191650391,
+      "u46": 6.598801612854004,
+      "u904": 6.277522087097168,
+      "float64_cfg_margin": 2.09808349609375e-05
+    },
+    {
+      "arm": "original",
+      "exact_fraction": "97/2097152",
+      "c46": 6.647009372711182,
+      "c904": 6.406039237976074,
+      "u46": 6.598802089691162,
+      "u904": 6.277523994445801,
+      "float64_cfg_margin": 4.6253204345703125e-05
+    }
+  ],
+  "terminal_hidden_result": false,
+  "speech_acceptance": false
+}

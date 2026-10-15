@@ -77,6 +77,19 @@ Next inspect terminal jobs, independently audit complete artifacts, then decide
 whether the measured final-norm/head effects justify any new arithmetic probe.
 [Method and submission](docs/dia-terminal-replay-preparation-2026-10-15.md).
 
+Independent auditor63468e54 is prepared on the same feature branch while the
+submitted worker stays byte-identical to85be03e3. It checks all5 arms, all127
+logical captures, both native controls, the accepted original-layer17 anchor,
+computed/consumed hidden,90 layer metric rows and actual original-filter output.
+It records separate F32 and exact-input F64 CFG margin sequences, with signed
+conditional differences required to telescope exactly. Existing24 calibrated
+byte/metric controls and12 new corruption/nonfinite controls pass. Two actual
+accepted activation captures, the composed scratch patch and3 exact rational
+CFG cases also calibrate successfully. [Receipt](docs/dia-terminal-auditor-calibration-2026-10-15.json).
+This is auditor preparation only; both submitted GH jobs remain queued and no
+terminal hidden-state result is accepted. Raw calibration receipts stay under
+/mnt/storage/crispasr/dia-terminal-20261015/auditor-calibration-v1 and-v2.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:

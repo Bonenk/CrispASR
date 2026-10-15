@@ -1,5 +1,16 @@
 # CrispASR — Port history
 
+## Dia terminal artifact auditor prepared — 2026-10-15
+
+Candidate63468e54 adds independent five-arm source/archive/capture validation
+and F32/F64 conditional margin accounting. Existing24 reconstruction/metric
+controls and12 new terminal negatives pass. Two actual accepted post-layer17
+captures and the exact composed patch calibrate; three prior real CFG cases
+match exact rational arithmetic. [Receipt](docs/dia-terminal-auditor-calibration-2026-10-15.json).
+This completes auditor preparation only. Submitted worker85be03e3 is unchanged;
+heavy38805728288 and lint38805731957 remain queued. Pending numerical validation
+and integration stay in PLAN.md; no new terminal/speech acceptance is established.
+
 ## Dia37-arm one-step suffix replay integrated — 2026-10-15
 
 Integration63deb517 preserves tested worker70f2d9de and audited method5cb83887
