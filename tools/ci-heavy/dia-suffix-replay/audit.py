@@ -266,10 +266,12 @@ def main():
             for key in stages:
                 match = re.fullmatch(r'cpp_decoder_sa(\d+)_(q|k|v|attention)\.f32', key)
                 earlier = re.fullmatch(r'cpp_decoder_layer_(\d+)\.f32', key)
-                if key.startswith(('cpp_encoder_', 'cpp_cross_', 'cpp_ca0_')) or (match and int(match[1]) <= layer) or (earlier and int(earlier[1]) < layer):
+                if key.startswith(('cpp_encoder_', 'cpp_cross_', 'cpp_ca0_')) or (key.startswith('cpp_decoder_block0_') and (layer > 0 or key != 'cpp_decoder_block0_output.f32')) or (match and int(match[1]) <= layer) or (earlier and int(earlier[1]) < layer):
                     assert actual[key] == baseline_bytes(baseline/key), (name, key)
         logits = np.fromfile(arm/'logits.f32', dtype='<f4').reshape(2, 9, 1028)
         assert np.isfinite(logits).all() and sha(arm/'logits.f32') == row['logits_sha256']
+        assert actual['cpp_step978_uncond.f32'] == logits[0].tobytes()
+        assert actual['cpp_step978_cond.f32'] == logits[1].tobytes()
         if name == 'baseline' or name.startswith('native-'):
             assert logits.tobytes() == native_logits[-1].tobytes()
             assert all(actual[key] == baseline_bytes(baseline/key) for key in stages)
