@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -106,6 +107,16 @@ def main():
         assert digest(path) == expected, path.name
 
     checkpoint()
+    # Whisper's reference load_audio calls the real ffmpeg executable. Hosted
+    # images do not guarantee it is installed; check before expensive decoding.
+    if not shutil.which('ffmpeg'):
+        assert sys.platform == 'linux' and os.environ.get('GITHUB_ACTIONS') == 'true', (
+            'ffmpeg is required; install it before running this local reference')
+        run(['sudo', 'bash', ROOT/'tools/ci-apt.sh', 'update'], 'ffmpeg-apt-update')
+        run(['sudo', 'bash', ROOT/'tools/ci-apt.sh', 'install', '-y', 'ffmpeg'], 'ffmpeg-apt-install')
+    assert shutil.which('ffmpeg'), 'ffmpeg unavailable after prerequisite setup'
+    report['ffmpeg_executable'] = shutil.which('ffmpeg')
+    run(['ffmpeg', '-version'], 'ffmpeg-version')
     archive = out/'retained-inputs-v1.zip'
     download(INPUT_URL, archive, INPUT_SHA)
     inputs = out/'inputs'
