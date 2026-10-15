@@ -1,7 +1,7 @@
 # Dia top-k index selection: integrated correctness repair
 
-Candidate `e97546f546f8e9e3afcd078e67d86efc8756d7c5` on
-`fix/dia-topk-index-selection-20261014` repairs a separate original-recipe bug.
+Tested candidate `e97546f546f8e9e3afcd078e67d86efc8756d7c5`, now rebased
+and integrated into main, repairs a separate original-recipe bug.
 The old sampler selected a probability threshold after softmax, retaining
 extra tied probabilities even when the input logits were distinct. With
 logits0/1e-8 and top-k1, the actual old header picks the lower logit in34/64

@@ -7843,3 +7843,34 @@ non-vacuous regressions and actual preserved canonical probability/sample
 controls. Do not conflate this with the observed F32 nucleus swap at rank32/33,
 which occurs below top-k45. No claimed quiet-speech repair, sampling default
 change, performance promotion or release acceptance. Artifacts remain storage.
+
+## COMPLETE 2026-10-15 — Dia layer16 inherited hidden-state drift
+
+Maintainer session: extend the accepted bounded layer17 method to layer16,
+using actual captured layer15 outputs and layer16 self-cache prefixes at the
+first F32 divergence step978. Keep identical pinned blueprint, literal native
+expressions, original recipe and magnitude gates. Fetch only this layer's
+coefficients under /mnt/storage/crispasr/dia-layer16-owned-replay-20261015,
+verify all mappings against physical F32 export hashes, then compare matching
+inputs/caches and native output against the independent hosted observation.
+No redundant full-model generation, performance test, default change or speech
+acceptance. Use the result to choose the next earlier boundary.
+
+Layer16 follow-up: use the same verified hosted step978 reference and capture
+for a weight-free all-layer hidden-output drift scan. Retain all compared
+arrays and recompute cosine, row norms and relative L2 to choose an earlier
+boundary. These are cumulative drift measurements, not causal per-layer errors.
+
+Layer16 and all-layer scan are independently audited and public with anonymous
+full SHA verification. Native hosted output is byte-exact; same-input final
+relative L2 is3.636e-7, all39 rows/32 scale controls/8 current contexts/2 real
+wrong-cache controls are recalculated. Original cross-process exactness remains
+unresolved after an initial9.029e-8 relative-L2 difference; failed logs and the
+missing initial-context-array limitation are explicitly retained in the report.
+The all18-layer scan peaks at layer3 relative L2 3.806e-6; it measures cumulative
+drift, not same-input causal errors. No runtime repair or speech acceptance.
+NEXT: an early-layer owned-input replay around layers0–3; preserve the fixed
+recipe, compare embedding/hidden inputs and actual self-prefix separately.
+Do not load the full model or rerun accepted late-layer probes. Results:
+docs/dia-layer16-owned-input-results-2026-10-15.md/.json. Main integration
+source e07d7363 has secret scan and Docker green; other applicable CI pending.

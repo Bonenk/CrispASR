@@ -3617,3 +3617,15 @@ rows remain byte-exact to baseline. All13 candidate CI jobs,10 lint checks and t
 testing passes2,026 tests. Header/test bytes are unchanged after rebase. No speech repair,
 Q4/GPU/performance or release acceptance is inferred. Details and public proof:
 [Dia top-k selection](docs/dia-topk-selection-2026-10-14.md).
+
+## Dia layer16 and earlier hidden-state drift (2026-10-15)
+
+Bounded original/native layer16 replay reproduces the hosted native output
+byte-exact, with same-input final relative L2 3.636e-7. Independent audit covers
+39 rows,32 scale negatives,8 current context interventions and2 real cache
+negatives. The report retains an unresolved original cross-process exactness
+failure and the initial-array retention limitation. Both complete component
+and all18-layer scan archives are public and anonymously SHA-verified.
+Cumulative drift peaks earlier at layer3 (3.806e-6); no layer16 repair,
+full-speech/Q4/GPU/performance or release acceptance is inferred. Details:
+[Dia layer16 and scan](docs/dia-layer16-owned-input-results-2026-10-15.md).
