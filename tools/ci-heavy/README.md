@@ -34,6 +34,13 @@ retained. This component diagnosis does not establish model or speech parity.
 
 ## Script contract
 
+`omnivoice_audio_parity.py` is the standalone utility split from draft PR521.
+It executes hash-pinned original numpy/pydub functions against the preserved C++
+helper/probe on738 waveform and18 text cases, retaining full inputs and both
+output arrays, compiler/actual ELF and per-file hashes. It changes no native
+speech funnel or default. Run with `-f pip="numpy==1.26.4 pydub==0.25.1"` on
+Linux Python3.12. Details: [standalone utility scope](../../docs/omnivoice-utility-split-2026-10-15.md).
+
 `dia_full_codec_crossdecode.py` replays retained native stopping/BOS/delay
 records, verifies every feedback row and complete code/PCM frame count, then
 runs the actual pinned original DAC on the native codes and original-code
