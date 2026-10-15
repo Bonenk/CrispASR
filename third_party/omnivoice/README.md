@@ -40,3 +40,11 @@ then update the hashes and dates in the table above, and re-read the diff. New
 languages and new accents are additions we want; a *changed* id for an existing
 language, or a *renamed* instruct item, silently alters (or invalidates) what
 callers already send.
+
+## Standalone audio/text utility attribution
+
+The separate `src/core/omnivoice_audio.h` port follows audio/text utilities at
+upstream `08be0b4ccbac3e13e374e86fbfead4b4cac343e2`; the diagnostic oracle
+executes hash-pinned original functions and retains their source headers.
+The upstream Apache-2.0 text is included as `LICENSE` here. This utility split
+has no production speech caller and does not accept the full draft PR521.
