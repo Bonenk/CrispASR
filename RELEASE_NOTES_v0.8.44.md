@@ -98,6 +98,13 @@ merged as `a86e366043f4a23251f10b67d982778cd89f83dd` after 46 passing
 checks and one intentional skip. See [the merge receipt](docs/cann-merge-2026-10-12.json).
 Hosted compilation cannot establish Ascend inference or speed.
 
+The standalone composed-graph probe is now integrated. Its actual CPU graph
+passes18 computations over three shapes against an independent integer oracle;
+both official310P/910B SDK final executable links,13 general CI jobs and10 lint
+checks pass. The standalone static-link repair forwards the configured SDK
+library directories. Physical mixed CANN/CPU fallback and ACL execution remain
+open. [Complete source-bound proof](docs/cann-composed-preparation-2026-10-15.md).
+
 The operator-validation wrapper is merged on main. Hosted ARM CPU runs one
 real positive ADD case and rejects three actual upstream false-success cases:
 missing backend, empty parameter selection and unknown operator. It preserves

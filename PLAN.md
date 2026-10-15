@@ -41,73 +41,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — CANN composed fallback probe preparation
-
-Owner: maintainer session. New owned worktree:
-/mnt/volume1/crispasr-cann-composed-20261015, branch
-prepare/cann-composed-probe-20261015. Builds/artifacts under
-/mnt/storage/crispasr/cann-composed-20261015. Prepare a small actual ggml graph
-with supported F32 matrix work, a BF16 ADD boundary and supported F32 work after
-it. Require exact CANN registry/device identity and genuine CANN/CPU placements
-for a310P fallback claim. Validate the mathematical output against an independent
-integer oracle, changed inputs, repeats and shape changes. First prove the CPU
-control and missing-CANN/wrong-device rejection without simulating an NPU; then
-compile against official SDKs and preserve metadata. Physical execution remains
-pending. This does not establish ACL capture/replay, model speech, quantization
-or speed; no backend default/kernel changes are intended.
-
-Original81d8e279 passes hosted CPU but both SDK jobs fail the final executable
-link; full rejected logs and both raw digest-verified artifacts are retained.
-The probe-only consumer repair is rebased onto current main at candidate
-f19d41698eccf951c7aade9769d44f9bd263146a. Fresh local CPU passes all five
-contracts and independent12,288 matrix/12,288 final values. The original/fixed
-CMake-generation control confirms only the repaired final command includes the
-configured SDK library directory, without claiming an installed SDK or NPU.
-The complete146-payload repair proof is public and anonymously SHA-verified.
-
-New composed CPU/SDK workflow38706162449, general CI38706180793,
-lint38706184333 and secret scan38706162315 target that exact source. The new
-hosted CPU artifact is independently audited and fully published/anonymous-SHA
-verified. Both official SDK final links now pass and are independently audited;
-all13 general CI jobs pass and lint remains pending. Audit remaining terminal
-results and integrate only after applicable checks pass.
-Physical composed fallback/model/ACL/performance acceptance remains open.
-Completed CPU/configuration work and rejected first SDK attempts are in
-HISTORY.md and [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
-
-## CLAIMED 2026-10-15 — Dia retained native codes through original DAC
-
-Owner: maintainer session. Owned source worktree:
-/mnt/volume1/crispasr-dia-full-codec-20261015, branch
-diag/dia-full-codec-20261015. All models/builds/payloads under
-/mnt/storage/crispasr/dia-full-codec-crossdecode-20261015; heavy CPU reference
-execution on GH. Read the actual pinned original generation/output/audio/DAC
-source and delivered native stopping/delay code before implementing the probe.
-
-Verify immutable delivered native input/raw-sample/PCM and original-code ledgers.
-Replay literal native stopping/BOS/delay logic from raw samples and require every
-known feedback row to match, plus actual final stopping/PCM frame counts. Only
-then use a reconstructed final row; if that cannot be established, retain only
-the proven prefix and explicitly exclude the unknown row. Compare literal native
-alignment to the actual pinned original delay reversal. Decode the same codes
-with the actual original DAC/checkpoint, alongside original-code positive control,
-checking complete PCM, norms/RMS and ASR. Preserve sources, metadata, raw arrays,
-input/output hashes and rejecting offset/scale controls in fresh directories.
-No new neural generation, seed/recipe change, GPU/speed/default/whole-port
-acceptance follows; this localizes whether silence is codec or generated-code
-content. Do not rerun the already rejected source-RoPE/full-LM cache-read arms.
-
-Preparation is complete and publicly verified: literal native replay matches all
-1115 observed feedback rows and reconstructs all1100 code frames, including the
-final stopping row. Actual original Torch2.6 protocol replay matches all feedback
-but returns1114 rather than1115 delayed rows: native has one extra tail row.
-After auditing the codec result, fix that return-slice mismatch under a separate
-runtime claim with EOS/capacity/short-run/forced-path controls. No silence repair
-or whole-model acceptance is established by this11.61ms tail difference.
-Candidate7b42071f41e5814f957d7397d8c73615b2cd7c9a and hosted original-DAC/ASR
-workflow38710473906 are submitted; audit their actual terminal arrays/receipts.
-[Preparation and protocol proof](docs/dia-full-codec-preparation-2026-10-15.md).
-
 ## CLAIMED 2026-10-15 — Dia original output protocol regression
 
 Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-output-protocol-20261015,
@@ -123,14 +56,19 @@ original zeros invalid entries. Preserve original source hashes, exact witnesses
 raw failures and complete successful receipts. Apply only demonstrated shared
 runtime repairs, run fresh CI and full-code original-DAC crosschecks; no speech,
 CUDA, quantization or performance acceptance follows from protocol correctness.
-Do not integrate a production repair before the codec diagnosis is audited.
+The complete-code original-DAC diagnosis is now independently audited; fresh
+applicable CI remains required before integrating the production candidate.
 
 Candidate fc1b05c922edfeece675a32f1b7855f588276968 is pushed. Actual original
 Torch2.6 witnesses regenerate byte-exact; old source fails12/16 cases, repaired
 source passes16/16, and restoring each of three defects independently rejects.
 Complete50-payload proof is public and anonymously SHA-verified. General
-CI38713471171 and lint38713474686 are submitted. Audit those results and the
-separate original-DAC workflow38710473906 before integration. Completed local
+CI38713471171 and lint38713474686 remain queued. Actual retained CLI/C-ABI
+predictions also match all1115 feedback/1114 returned rows/1099 codec frames
+against the original. Codec/ASR diagnosis is complete locally with strict
+original positive controls: both native-code variants still fail WER1.
+The unchanged hosted duplicate38710473906 remains queued. Audit fresh CI before
+integration; the diagnostic worker7b42071f is still on its separate branch. Completed local
 regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
 full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 
@@ -143,13 +81,17 @@ a larger context effect than values/cross-cache. No new runtime defect is
 established, and old source-RoPE speech failures remain rejected. Do not replay
 all remaining layers or rerun the unchanged source-RoPE candidate blindly.
 
-The complete-code original-DAC experiment is now claimed above. After its
-result, choose a specific key-producer/history arithmetic hypothesis if needed. Keep that cross-decode diagnostic distinct from a
-complete free-generation success; never invent a missing stopping row. Preserve
-all original/native inputs, source pins and full payloads in separate process
-directories. After any demonstrated repair, require actual fixed-recipe
-CLI/C-ABI speech, more prompts/speakers/lengths/session reuse, original diff,
-DAC/ASR and actual CUDA; Q4/profiling follow output acceptance.
+The [complete-code original-DAC diagnosis](docs/dia-full-codec-preparation-2026-10-15.md)
+is complete, with original positive PCM relative L2 5.572e-7 and WER0. Both native
+full-code and original-return-slice variants remain near-silent with WER1 through
+the original DAC. Do not repeat that unchanged cross-decode or treat the scoped
+protocol fix as a speech repair. Next select a specific key-producer/history
+arithmetic mechanism using the retained owned-input evidence and measured
+46/904 CFG margin. Do not substitute seed/filter changes or another all-layer
+sweep. After a demonstrated repair, require actual fixed-recipe CLI/C-ABI
+speech, predetermined additional prompts/speakers/lengths/session reuse,
+original intermediate diff, DAC/ASR and actual CUDA. Q4/profiling follow speech
+acceptance. Completed diagnostic work is in HISTORY.md.
 
 Evidence to consult, not redo:
 - [First F32 divergence](docs/dia-f32-first-divergence-2026-10-14.md):979 shared

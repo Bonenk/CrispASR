@@ -87,8 +87,11 @@ the910B x86_64 executable is `77886718b6350b3569ca12ea16363da7778125cc3b6b244bfa
 Driver resolution uses the SDK devlib stub; no physical NPU executes.
 [Complete SDK proof manifest](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8f846da635184017792d9b9d3df7f8b4c930637c/cann-20261015-composed/hosted-repaired-sdk-38706162449/sdk-payload-manifest.json)
 retains both raw artifacts, full logs and independent audit. All12 payloads were
-anonymously downloaded and SHA256 verified. All13 general CI jobs pass; lint remains pending. The candidate is not
-integrated; CPU success cannot establish CANN device execution.
+anonymously downloaded and SHA256 verified. All13 general CI jobs, all10 lint jobs and the secret scan pass. The
+candidate is rebased and integrated as `5e3145f93fd8f5655f235c7d09810a09b92d4b71`;
+all tested workflow and probe files remain byte-identical. Rebase conflicts
+were restricted to stale planning/preparation prose. Main-tip CI runs
+separately. CPU/SDK success cannot establish CANN device execution.
 
 Physical310P composed fallback, full-model NPU speech,910B ACL capture/replay,
 quantization and performance remain open. An ACL build flag or repeated output

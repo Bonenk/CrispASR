@@ -57,7 +57,7 @@
   "ci": {
     "general": 38713471171,
     "lint": 38713474686,
-    "status": "submitted"
+    "status": "queued"
   },
   "separate_original_dac_run": 38710473906,
   "full_model_execution": false,
@@ -65,5 +65,44 @@
   "speech_acceptance": false,
   "cuda_acceptance": false,
   "quantization_acceptance": false,
-  "performance_acceptance": false
+  "performance_acceptance": false,
+  "retained_native_protocol": {
+    "passed": true,
+    "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "actual_extracted_protocol_elf_sha256": "2e3559eeda1d7c934d7759326770b8091884e6cf18bc827a9fcc90c8247d7350",
+    "native_source_sha256": "db15655ddcc1dd8075762daf9280d2a001b153e2b11470666d9e984e4b939da5",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "surfaces": [
+      {
+        "surface": "cabi",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      },
+      {
+        "surface": "cli",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      }
+    ],
+    "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
+  },
+  "retained_protocol_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "668196e7450b1ce35bded6355ec58464235deb1e",
+    "file": "dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip",
+    "bytes": 23699070,
+    "sha256": "9ff7dda447d1d8cbd75dcbbbb2316db70d6ad84ba9ad0cc12fed88a74db2862c",
+    "payloads": 117,
+    "anonymous_full_sha256_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip"
+  },
+  "codec_diagnosis_complete": true,
+  "codec_restores_native_speech": false
 }

@@ -1,6 +1,6 @@
 {
   "candidate_source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
-  "integrated": false,
+  "integrated": true,
   "cpu_source": {
     "probe_source_sha256": "5a5265c9097a5f4e106843bad5d6f83cb76840e09675da38191545c39ad37b39",
     "actual_binary_sha256": "51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf",
@@ -69,7 +69,7 @@
   },
   "repair": {
     "candidate_source": "f19d41698eccf951c7aade9769d44f9bd263146a",
-    "integrated": false,
+    "integrated": true,
     "scope": "Only standalone consumer CMake SDK search directories, retained link commands and documentation. No production/kernel/default changes.",
     "independent_local_cpu_audit": {
       "passed": true,
@@ -139,7 +139,7 @@
       "general": 38706180793,
       "lint": 38706184333,
       "secret": 38706162315,
-      "status": "cpu-both-official-sdk-final-links-and-all13-general-jobs-passed-lint-pending"
+      "status": "all3-composed-jobs-all13-general-jobs-all10-lint-jobs-and-secret-pass"
     },
     "hosted_cpu_audit": {
       "independent_hosted_cpu_audit_pass": true,
@@ -207,6 +207,9 @@
       "files": 12,
       "all_files_anonymous_sha256_verified": true,
       "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8f846da635184017792d9b9d3df7f8b4c930637c/cann-20261015-composed/hosted-repaired-sdk-38706162449/sdk-payload-manifest.json"
-    }
-  }
+    },
+    "integrated_source": "5e3145f93fd8f5655f235c7d09810a09b92d4b71",
+    "tested_workflow_and_probe_files_byte_unchanged_after_rebase": true
+  },
+  "integrated_source": "5e3145f93fd8f5655f235c7d09810a09b92d4b71"
 }

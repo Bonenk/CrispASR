@@ -158,5 +158,110 @@
   "hosted_run": 38710473906,
   "hosted_codec_status": "submitted-not-yet-accepted",
   "production_changes": false,
-  "model_speech_acceptance": false
+  "model_speech_acceptance": false,
+  "local_original_dac_diagnosis": {
+    "independent_audit_pass": true,
+    "execution_location": "local VPS CPU; actual unchanged hosted worker, GH still queued",
+    "worker_source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "verified_raw_payloads": 77,
+    "torch_version": "2.6.0+cpu",
+    "original_positive_pcm": {
+      "cosine": 0.9999999999998493,
+      "relative_l2": 5.572414191420105e-07,
+      "norm_error": 9.646688758913058e-08,
+      "mine_norm": 57.878208379921595,
+      "ref_norm": 57.878202796591516,
+      "max_abs": 1.0281801223754883e-06
+    },
+    "same_native_codes_original_vs_native_pcm": {
+      "cosine": 0.9999649845707721,
+      "relative_l2": 0.008929457910565085,
+      "norm_error": 0.0030803635461189582,
+      "mine_norm": 0.1171831111846523,
+      "ref_norm": 0.11682325309448102,
+      "max_abs": 7.190275937318802e-06
+    },
+    "pcm": {
+      "original-codes": {
+        "samples": 619520,
+        "rms": 0.07353386838261514,
+        "peak": 0.9937424659729004
+      },
+      "native-complete-codes": {
+        "samples": 563200,
+        "rms": 0.00015614702030842249,
+        "peak": 0.008120466023683548
+      },
+      "native-original-return-slice": {
+        "samples": 562688,
+        "rms": 0.00015765062414028555,
+        "peak": 0.009593318216502666
+      }
+    },
+    "asr": {
+      "original-codes": {
+        "text": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "native-complete-codes": {
+        "text": "You",
+        "wer": 1.0
+      },
+      "native-original-return-slice": {
+        "text": "You",
+        "wer": 1.0
+      }
+    },
+    "shared_code_prefix_frames": 965,
+    "shared_code_prefix_seconds": 11.203628117913832,
+    "original_energy_fraction_after_prefix": 0.9999965666573893,
+    "original_dac_rescues_native_speech": false,
+    "whole_model_accepted": false
+  },
+  "local_diagnosis_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "668196e7450b1ce35bded6355ec58464235deb1e",
+    "file": "dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip",
+    "bytes": 23699070,
+    "sha256": "9ff7dda447d1d8cbd75dcbbbb2316db70d6ad84ba9ad0cc12fed88a74db2862c",
+    "payloads": 117,
+    "anonymous_full_sha256_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip"
+  },
+  "upstream_license_publication": {
+    "revision": "949b03fd276ecf968ba589e336c2788f80a4e445",
+    "file": "dia-20261015-full-codec/Dia-LICENSE",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/949b03fd276ecf968ba589e336c2788f80a4e445/dia-20261015-full-codec/Dia-LICENSE",
+    "sha256": "34c1659a3495220f85dffebd4d3a930bcbfd9f216f8a3c5f880a1d4a59a5358d",
+    "anonymous_verified": true
+  },
+  "repaired_retained_protocol": {
+    "passed": true,
+    "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "actual_extracted_protocol_elf_sha256": "2e3559eeda1d7c934d7759326770b8091884e6cf18bc827a9fcc90c8247d7350",
+    "native_source_sha256": "db15655ddcc1dd8075762daf9280d2a001b153e2b11470666d9e984e4b939da5",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "surfaces": [
+      {
+        "surface": "cabi",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      },
+      {
+        "surface": "cli",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      }
+    ],
+    "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
+  },
+  "hosted_run_status": "queued; identical worker independently completed locally",
+  "diagnosis_complete": true
 }

@@ -50,8 +50,13 @@ actual production source hash independently of commit and compiler identity.
 Candidate `fc1b05c922edfeece675a32f1b7855f588276968` is pushed.
 [Fresh general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/38713471171)
 and [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/38713474686)
-are submitted. The guard is wired into general CI. Integration requires its fresh applicable
-CI and the separately queued [complete-code original-DAC diagnosis](dia-full-codec-preparation-2026-10-15.md).
+are submitted. The guard is wired into general CI. The
+[complete-code original-DAC diagnosis](dia-full-codec-preparation-2026-10-15.md)
+is independently complete locally: original WER0, both native-code variants
+WER1. The same repaired protocol also matches all1115 feedback/1114 returned
+rows/1099 codec frames on both real CLI/C-ABI captures. That complete proof is
+linked in the codec receipt. Fresh general CI/lint remain queued and are
+required before integration.
 No neural arithmetic, sampler or default is changed. Full free-generation,
 CLI/C-ABI speech, original intermediate diff, CUDA, Q4 and speed remain separate
 gates. Current-source output must be measured rather than inferring its PCM

@@ -50,10 +50,11 @@ Current priorities and maintainer claims are in [PLAN.md](../PLAN.md).
 Completed preparation/compiler/operator work is historical evidence; the
 remaining tasks above require full-model or composed-graph device validation.
 
-[Composed graph CPU preparation](cann-composed-preparation-2026-10-15.md) is
-complete locally and independently accepted on hosted CPU. Both initial SDK
-attempts fail the final static executable link; rejected logs/artifacts remain
-preserved. Rebased candidate f19d4169 repairs only the standalone consumer's
-SDK library search directories, with fresh CPU/configuration controls and a
-public complete proof. New official SDK and applicable CI checks are submitted;
-integration and physical composed-fallback acceptance remain pending.
+[Composed graph preparation](cann-composed-preparation-2026-10-15.md) is
+integrated after independently audited hosted CPU and both official SDK final
+executable links,13 general CI jobs,10 lint checks and the secret scan. The
+[actual mixed-graph probe](../tools/ci-heavy/cann-composed/README.md) checks18
+computes over three shapes and rejects false backend/device/fallback claims.
+The static consumer SDK search-directory repair is included; initial failed
+links and complete public proofs remain retained. Physical310P composed
+fallback and910B ACL capture/replay remain unvalidated.

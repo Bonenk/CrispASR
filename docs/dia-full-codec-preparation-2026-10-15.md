@@ -2,7 +2,8 @@
 
 The final emitted native row is now recoverable from retained raw sampler
 predictions and the actual producer stopping/BOS logic. Complete CLI/C-ABI
-code grids agree. Original DAC decoding and ASR are submitted, not accepted.
+code grids agree. Original-DAC decoding/ASR and independent audit are now
+complete locally. Native speech still fails; the unchanged hosted job is queued.
 
 ## Complete reconstruction
 
@@ -59,6 +60,52 @@ the original-code positive control must retain zero WER. Complete arrays,
 float WAVs, ASR inputs/results, source, binaries and receipts survive failures.
 No generation seed, top-p/top-k, model/default, GPU or timing promotion follows.
 The local metric controls reject scale/order/shape/nonfinite/zero-norm errors.
+
+## Complete original-DAC diagnosis
+
+The unchanged worker at7b42071f completed on the local VPS with isolated
+Torch2.6.0+cpu, DAC1.0.0, audiotools0.7.2 and Whisper20250625. All models,
+installed reference dependencies and outputs are under /mnt/storage. This is a
+local CPU result; the queued hosted job is not represented as completed.
+
+| Codes decoded by actual original DAC | Samples | RMS | ASR WER |
+| --- | ---: | ---: | ---: |
+| Original positive | 619520 | 0.0735338684 | 0 |
+| Native complete | 563200 | 0.0001561470 | 1 |
+| Native with original return slice | 562688 | 0.0001576506 | 1 |
+
+Original positive PCM matches the retained original waveform at cosine
+0.9999999999998493, relative L2 5.572414e-7 and norm error9.646689e-8, passing
+all unchanged strict gates. Its ASR is exactly "We are committed to making it
+secure." Both native-code variants transcribe as "You", WER1. The original DAC
+does not restore speech from these native codes. Native-complete PCM through
+the original versus native DAC has cosine0.999964985, relative L2 0.008929458
+and norm error0.003080364; native-code RMS is0.00212347 times the positive RMS.
+This localizes the missing speech to generated code content in this fixture,
+without claiming that every codec implementation or precision choice is exact.
+
+An independent auditor rehashes all77 raw worker payloads, both checkpoint
+files and the input bundle; recomputes PCM/magnitude metrics and WER; verifies
+float WAV/array equality and actual ffmpeg resampling against all retained ASR
+inputs; checks source identity, recipe and raw segments.
+The first965 aligned code frames match original exactly (11.203628s), and
+99.9996567% of original waveform energy follows that prefix. A matched mostly
+silent prefix therefore does not establish successful spoken output.
+
+The repaired production protocol is also compiled/replayed on both real retained
+CLI/C-ABI sampler captures. All1115 feedback rows,1114 returned rows and1099
+aligned codec frames match actual original methods exactly. This establishes
+protocol correctness on those captures, without a new neural generation or
+speech acceptance. The runtime candidate remains pending applicable CI.
+
+[Complete117-payload diagnosis and retained-protocol proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip)
+is23,699,070 bytes, SHA256
+`9ff7dda447d1d8cbd75dcbbbb2316db70d6ad84ba9ad0cc12fed88a74db2862c`,
+fully anonymously downloaded and rehashed. It includes original/native complete
+PCM and WAVs, ASR inputs/results, source, raw logs, method/environment setup,
+independent audit, actual protocol executable and all retained arrays. The
+[pinned upstream Dia license](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/949b03fd276ecf968ba589e336c2788f80a4e445/dia-20261015-full-codec/Dia-LICENSE)
+accompanies the proof alongside the included DAC/CrispASR notices.
 
 ## Public preparation proof
 

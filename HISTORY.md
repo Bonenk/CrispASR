@@ -1,5 +1,26 @@
 # CrispASR — Port history
 
+## Dia complete original-DAC diagnosis and CANN probe integration — 2026-10-15
+
+The exact codec worker7b42071f completed locally while hosted jobs were queued,
+using isolated Torch2.6 CPU and pinned DAC/Whisper. Original-code PCM passes
+strict cosine/norm/error controls (relative L2 5.572e-7), and original ASR WER
+is0. Both retained native-code variants remain near-silent with WER1 through
+the original DAC. Independent full-payload/checkpoint/PCM/WAV/ASR-input/WER
+verification passes. Complete117-payload proof is public and anonymously
+SHA256 verified. Real CLI/C-ABI sampler captures also pass repaired production
+protocol replay:1115 feedback,1114 returned rows,1099 frames, all exact. This
+completes cross-decode diagnosis and excludes a codec swap/tail correction as a
+speech repair for the fixture. [Receipt](docs/dia-full-codec-preparation-2026-10-15.md).
+
+CANN candidatef19d4169 passes all3 CPU/SDK jobs,13 general CI jobs,10 lint checks
+and the secret scan. Rebased integration5e3145f93fd8f5655f235c7d09810a09b92d4b71
+preserves all tested workflow/probe files byte-for-byte; conflicts only reconcile
+stale planning prose. Standalone probe/static SDK consumer repair are integrated;
+production kernels/defaults are unchanged. Physical fallback/ACL/model/speed
+remain open. [Receipt](docs/cann-composed-preparation-2026-10-15.md).
+
+
 ## Dia original output protocol: regression and candidate prepared — 2026-10-15
 
 Actual original Torch2.6 generation/output methods produced16 synthetic protocol
@@ -8,8 +29,8 @@ candidate fc1b05c922edfeece675a32f1b7855f588276968 passes all16 and rejects each
 individually restored stopping/return-slice/invalid-frame defect. All50 proof
 payloads, including actual extracted native executable and old failures, are
 public with anonymous full SHA verification. Fresh general CI/lint are submitted;
-the production candidate remains unintegrated pending those and original-DAC
-diagnosis. This completes regression preparation, not full speech acceptance.
+the production candidate remains unintegrated pending CI. Original-DAC
+diagnosis is now independently completed locally. This completes regression preparation, not full speech acceptance.
 [Receipt](docs/dia-output-protocol-2026-10-15.md).
 
 
@@ -20,8 +41,8 @@ workflow38706162449: actual CPU control and official SDK310P ARM64/910B x86_64
 final executable links. Independent raw-artifact, ELF, chip/ACL flags, final
 SDK search directory and dynamic-dependency audits pass. All12 SDK proof files
 are public and anonymously SHA256 verified; original failed links remain retained.
-All13 general CI jobs pass; lint is pending, so the candidate remains
-unintegrated. This completes
+All13 general CI jobs and10 lint checks pass; the candidate is now rebased and
+integrated as5e3145f9. This completes
 SDK preparation only; physical fallback, ACL execution, model speech and speed
 remain unproven. [Receipt](docs/cann-composed-preparation-2026-10-15.md).
 
@@ -44,7 +65,8 @@ one extra native tail row, not a repaired silence/whole-port gate. Selected inpu
 ledgers and full original GGUF hash verify; original1210-frame/619520-sample
 speech controls are retained. Full native/protocol preparation proof is public,
 anonymously rehashed and includes all raw inputs, literal sources and notices.
-Original DAC/ASR workflow38710473906 and a scoped tail repair remain pending.
+The queued hosted duplicate38710473906 is superseded as the primary diagnosis
+by an independently audited local run; the scoped protocol repair awaits CI.
 [Detailed proof and scope](docs/dia-full-codec-preparation-2026-10-15.md).
 
 ## MiMo existing F32 cache-read hypothesis rejected — 2026-10-15
