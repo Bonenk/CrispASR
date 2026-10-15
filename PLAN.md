@@ -44,60 +44,25 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia one-step decoder suffix and margin localization
+## CLAIMED 2026-10-15 — Dia hosted terminal hidden-state intervention
 
 Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-suffix-20261015, branch diag/dia-suffix-20261015;
-large inputs, builds and evidence under /mnt/storage/crispasr/dia-suffix-20261015.
-Prepare a scratch-only patch of pinned runtime8d0ad886 that imports the audited
-native18-layer self-cache prefix and executes only step978. Preserve original
-encoder/cross-cache construction, actual graph expressions and forced token row.
-Require that one-step baseline reproduces every retained native stage and final
-logit exactly. Then replace one decoder-layer output with its captured native
-value as a byte-exact control before using actual captured original outputs.
-Retain calculated and consumed activation arrays, all18 layer stages, final
-hidden/logits/norms and original sampler46/904 margin/ranks/support. Keep other
-caches, inputs and recipe fixed. Preserve pruned graph intermediates explicitly
-and use owned pointers for renamed replacement leaves. Tiny tests must exercise
-prefix layout/last-position exclusion, malformed-file rejection and actual ggml
-graph ownership. Local preparation is bounded to those tests and full-source
-syntax checking against pinned headers; full F32 execution belongs on GH.
-Skipping prefix inference does not reproduce the original RNG stream and cannot
-prove sampled trajectory/speech. No production graph/default/model pin change,
-unchanged full-speech replay or acceptance from component/rank improvements.
-Close simultaneous original full-model self-Q provenance as a separate follow-up.
-
-**Checkpoint:** candidate70f2d9de678b31f6b55f957e3a721aa91bf0af88 pushed on
-`diag/dia-suffix-20261015`. [Heavy38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943)
-and [lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203)
-both completed successfully: heavy37 arms and lint10/10. Official artifact12002981832 is328,470,169bytes, SHA162e4e25317e60b5b9ee703feb51aa7112c8e73e0ba89a49c55da493c56aeb61. Download and independent audit are in progress; do not interpret the worker receipt as accepted proof yet. The actual ggml prefix/ownership guard,
-finite-file/path/integrity/lossless-reconstruction controls, full patched-source
-syntax against pinnedC36 headers, format18 and all4 unskipped secret tests pass
-locally. The hosted worker requires all127 captured baseline stages/logits and
-all18 native clamps exact before18 original activation clamps. It additionally
-captures all18 cross K/V pairs and verifies every arm identical. Cache captures
-use reconstruction-verified baseline references/current-row deltas, retaining
-complete byte hashes and actual current rows. [Preparation](docs/dia-suffix-replay-preparation-2026-10-15.md).
-Next: inspect terminal jobs, independently audit the complete artifact including
-lossless reconstruction and original Torch2.6 sampling, then integrate accepted
-method bytes and choose the first controlled suffix/within-layer experiment.
-Do not resubmit unchanged jobs while queued or send this CPU task to Kaggle.
-
-Independent auditor preparation is complete at5cb83887 on the same feature
-branch; the submitted numerical worker remains unchanged at70f2d9de. All3 raw/
-baseline/current-row encodings reconstruct exactly by independent byte slicing;
-24 corrupt-evidence controls and hand-derived3-4-5 metric checks pass in both
-local and Torch2.6 reference environments. Actual original-filter calibration
-reproduces the prior original/native margins, ranks and support exactly; this
-is old-fixture calibration, not a new suffix result. Evidence is retained under
-/mnt/storage/crispasr/dia-suffix-20261015/auditor-calibration-v2. The auditor also
-requires official archive/source/method/ELF/library proof, fresh ggml guard,
-all666 layer metric rows, prefix/current controls and split-logit consistency.
-Run it against the complete hosted artifact before integration or interpretation.
-Its independent numerical paths now also reproduce90 actual prior layer rows,
-five hidden and five logit comparisons; all3 encodings reconstruct actual
-native/query-intervention captures exactly. [Auditor calibration receipt](docs/dia-suffix-auditor-calibration-2026-10-15.json).
-This validates the auditor only; new suffix results await independent full-artifact audit.
+/mnt/volume1/crispasr-dia-terminal-20261015, branch diag/dia-terminal-20261015;
+large scratch/evidence under /mnt/storage/crispasr/dia-terminal-20261015.
+Extend the accepted scratch-only one-step8d0ad886/C36 replay with a separately
+owned replacement leaf after final RMSNorm and before all9 output heads.
+Retain computed and consumed hidden by pointer and preserve the discarded
+producer as a graph root. Native baseline, native layer17 and native hidden
+controls must reproduce all127 stages/logits exactly; the original-layer17
+anchor must reproduce accepted38793672943 bytes. Then inject the actual full
+original final-hidden capture, require all upstream stages/caches unchanged,
+and measure every logit plus the actual original-filter margin/ranks/support.
+No simultaneous layer/hidden clamp, source model/default change or tolerance
+relaxation. Tiny ownership/file controls and full-source syntax are local;
+full F32 model execution belongs on GH. Interpret differences as conditional
+terminal-stage effects, not a speech fix or additive global causal shares.
+Do not repeat local norm/head/late-layer probes unchanged. Complete simultaneous
+original full-model self-Q provenance remains a separate follow-up.
 
 ## Dia correctness — early probe complete, full speech still open
 
@@ -127,33 +92,26 @@ substitution is insufficient. All diagnostic tooling is integrated; complete
 raw hosted and25-row block0 proofs are public and anonymously verified.
 Do not rerun these unchanged arms or all-layer source-RoPE speech controls.
 
+The [one-step suffix replay](docs/dia-suffix-replay-results-2026-10-15.md)
+is complete:37 arms,1,323 independently verified payloads,666 layer rows and
+all18 exact native controls. Original outputs10/11/12/14/17 restore reference
+support non-monotonically. Original output17 leaves final-hidden error7.38e-8
+and margin+2.0981e-5 versus original+4.6253e-5. No unique bad layer or speech
+repair follows; no unchanged37-arm or late-layer owned-input repeats.
+
 Next bounded task, requiring a new claim before implementation:
 
-1. Prepare a one-step native suffix replay on the retained shared-prefix state,
-   holding token history, native self-prefixes, cross caches and recipe fixed.
-   Require the full native baseline and native activation substitutions exact.
-2. Substitute actual original captured decoder-layer outputs at selected
-   boundaries and measure final CFG46/904 margin/support, not only cosine.
-   Reuse the prefix rather than running979 steps for every arm. Use GH for the
-   full F32 model; local work remains tiny or one-layer owned-input diagnostics.
-3. Close missing simultaneous full-model original self-Q provenance using
+1. Use the accepted one-step baseline for native/original final-hidden clamps
+   inside the actual pinned hosted runtime, with native control exact. Retain
+   both computed and consumed hidden, all upstream stages, head logits and
+   actual original-filter margin/ranks/support. Crosscheck the accepted native
+   and original-layer17 anchors exactly. This distinguishes terminal norm/head
+   effects in the hosted path from prior local component reconstruction.
+2. Close missing simultaneous full-model original self-Q provenance using
    unchanged-blueprint hooks and OFF/ON/OFF transparency controls. Separate
-   original full-model capture from qualified module replay and shadow arrays.
-
-Do not change the seed/filter, promote a component pass to speech acceptance,
-or interpret nonlinear intervention effects as additive causal percentages.
-After a demonstrated repair, require actual fixed-recipe CLI/C-ABI
-speech, predetermined additional prompts/speakers/lengths/session reuse,
-original intermediate diff, DAC/ASR and actual CUDA. Q4/profiling follow speech
-acceptance. Completed diagnostic work is in HISTORY.md.
-
-Evidence to consult, not redo:
-- [First F32 divergence](docs/dia-f32-first-divergence-2026-10-14.md):979 shared
-  inputs, first differing draw step978/head2, nucleus membership46/904.
-- [Layer16 and cumulative scan](docs/dia-layer16-owned-input-results-2026-10-15.md)
-  and [layer17](docs/dia-layer17-owned-input-results-2026-10-14.md).
-- [Integrated top-k repair](docs/dia-topk-selection-2026-10-14.md): separate
-  recipe defect,18,288 captured probability/sample rows unchanged; not a speech fix.
+   full-model capture from qualified module replay and shadow arrays.
+3. Only a new demonstrated runtime defect justifies a production candidate;
+   then rerun full decoded speech before performance, Q4 or GPU promotion.
 
 ## CANN — hardware follow-ups after merged PR544
 

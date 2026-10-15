@@ -1,5 +1,19 @@
 # CrispASR — Port history
 
+## Dia37-arm one-step suffix replay integrated — 2026-10-15
+
+Integration63deb517 preserves tested worker70f2d9de and audited method5cb83887
+bytes after rebase. Heavy38793672943 and all10 lint checks pass. Independent
+audit verifies1,323 payloads, all18 exact native controls,666 layer rows, every
+lossless capture reconstruction and actual original-filter margins/support.
+Original outputs10/11/12/14/17 restore support; the effect is non-monotonic.
+Original output17 leaves hidden error7.38e-8 and margin+2.0981e-5; terminal
+norm/head effects remain to separate in the actual hosted graph. Complete raw
+proof is public; all15 files pass full anonymous SHA/size verification.
+[Results and all18 boundary rows](docs/dia-suffix-replay-results-2026-10-15.md).
+No production/default change or speech/Q4/GPU/speed acceptance. Pending actions
+stay in PLAN.md; unchanged probes must not be repeated.
+
 ## Dia one-step replay preparation completed — 2026-10-15
 
 Independent artifact auditor5cb83887 is also prepared: all3 capture encodings,

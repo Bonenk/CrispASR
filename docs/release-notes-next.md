@@ -542,3 +542,13 @@ applicable hosted/lint gates. Joint replacement improves early attention but
 does not restore original token ordering or support. Full public proof and
 independent audits are retained; no speech/GPU/Q4/default promotion follows.
 See [the complete result](dia-query-key-results-2026-10-15.md).
+
+## Dia one-step diagnostic replay
+
+A validated one-step replay reproduces all127 native stages and logits, then
+all18 native replacement controls exactly. Independent audit checks1,323
+payloads,37 arms,666 layer metric rows and the actual original sampling filter.
+Five original-output substitutions restore the reference support with
+non-monotonic layer sensitivity. Complete raw proof and lossless reconstruction
+methods are public. This adds diagnostic tooling, not a native speech repair,
+new default, Q4/GPU acceptance or performance gain. [Results](dia-suffix-replay-results-2026-10-15.md).
