@@ -75,6 +75,23 @@ pushed on its separate branch. Audit fresh CI before runtime integration. Comple
 regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
 full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 
+## CLAIMED 2026-10-15 — Dia layer0 key producer across retained history
+
+Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-key-history-20261015,
+branch diag/dia-key-history-20261015. Models, builds and evidence under
+/mnt/storage/crispasr/dia-key-history-20261015. Read actual original embedding,
+normalization, key projection, RoPE and cache update before implementation.
+Reconstruct layer0 keys from retained shared input-token history using only the
+required physically hash-verified F32 coefficients. Compare actual captured
+original/native cache rows, pre/post-RoPE arithmetic and exact position/input
+alignment. Gate original reconstruction first; preserve any failed producer
+reconstruction rather than attributing it to native arithmetic. Use cosine,
+norms, relative error, and rejecting scale/position/head/input controls. Keep
+repeated and batched versus original one-step computation distinct. No full
+model load or unchanged source-RoPE/full-speech rerun; no seed/filter/default,
+model/speech/CUDA/Q4/performance promotion. This tests the larger measured
+self-key history effect rather than blindly replaying more decoder layers.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
