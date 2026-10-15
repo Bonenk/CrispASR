@@ -1,4 +1,4 @@
-# Dia top-k index selection: tested candidate
+# Dia top-k index selection: integrated correctness repair
 
 Candidate `e97546f546f8e9e3afcd078e67d86efc8756d7c5` on
 `fix/dia-topk-index-selection-20261014` repairs a separate original-recipe bug.
@@ -39,8 +39,11 @@ hash matches the one tested.
 [General CI38637379126](https://github.com/CrispStrobe/CrispASR/actions/runs/38637379126),
 [lint38637383035](https://github.com/CrispStrobe/CrispASR/actions/runs/38637383035),
 and [secret scan38636413855](https://github.com/CrispStrobe/CrispASR/actions/runs/38636413855)
-are queued on the exact candidate. No internal PR is created. Integrate only
-after full applicable CI is audited. Current main `ad46e17` has all13 general
-CI jobs, lint, secret scan and Ruby tests green; that does not validate this
-new runtime candidate. Native speech/Q4/GPU/performance and release acceptance
-remain separate gates. [Structured receipt](dia-topk-selection-2026-10-14.json).
+all passed on the exact candidate: 13 general jobs, 10 lint checks and the
+secret scan. Linux unit testing passed 2,026 tests, including the two new
+regressions. The runtime repair was rebased as
+`bd9c9a2d38a00c39032654a6d2448ac572652f78`; header and test source remain byte-identical
+to the tested candidate. It is integrated into main; main-tip CI is checked
+separately. No internal PR is created. Native speech/Q4/GPU/performance and
+release acceptance remain separate gates.
+[Structured receipt](dia-topk-selection-2026-10-14.json).

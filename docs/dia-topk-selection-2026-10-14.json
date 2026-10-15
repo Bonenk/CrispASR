@@ -189,8 +189,17 @@
     "general": 38637379126,
     "lint": 38637383035,
     "secret": 38636413855,
-    "status": "queued"
+    "status": "success",
+    "general_jobs": 13,
+    "lint_checks": 10,
+    "linux_unit_tests": 2026
   },
-  "integrated": false,
-  "speech_acceptance": false
+  "integrated": true,
+  "speech_acceptance": false,
+  "integration": {
+    "runtime_commit": "bd9c9a2d38a00c39032654a6d2448ac572652f78",
+    "tested_source_unchanged": true,
+    "date": "2026-10-15",
+    "scope": "Source and unit-test bytes match the exact tested candidate after rebase; documentation-only conflicts resolved. Main-tip CI is a separate run."
+  }
 }

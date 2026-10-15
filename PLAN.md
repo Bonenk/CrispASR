@@ -7824,22 +7824,15 @@ Same-input final-output relative L2 is6.590e-7. Hidden-only inherited drift has
 Complete127-payload public archive is anonymously SHA-verified. No numerical
 repair or speech acceptance. docs/dia-layer17-owned-input-results-2026-10-14.md/.json.
 
-Separate actual top-k bug is prepared on fix/dia-topk-index-selection-20261014
-at e97546f546f8e9e3afcd078e67d86efc8756d7c5. Unique maximum with k1 is chosen
-incorrectly34/64 before and0/64 after; four original Python oracle fixtures
-pass after the fix. All18,288 captured rows preserve native probabilities and
-sampled IDs byte-exact, including both full F32 shared-history prefixes.
-CI38637379126 and lint38637383035 are dispatched; independent secret scan is
-38636413855. This corrects logit-index selection, not the rank32/33 nucleus
-change or quiet-speech failure. Audit full CI before integration; no release.
+The separate top-k repair is integrated on2026-10-15 after all13 candidate CI
+jobs,10 lint checks and the secret scan passed. Linux unit testing passed2,026
+tests. Rebased runtime commit bd9c9a2d preserves tested header and unit-test
+bytes from e97546f5. Four original oracle fixtures pass and18,288 captured
+probability/sample rows remain byte-exact. This fixes selection membership,
+not the observed rank32/33 nucleus swap or quiet-speech failure. Public proof:
+docs/dia-topk-selection-2026-10-14.md/.json. No release tag.
 
-Top-k candidate proof is now public and independently audited: four actual
-original-oracle corner fixtures and18,288 byte-exact preserved corpus rows.
-All three candidate CI runs remain queued. Keep the repair separate from the
-quiet-speech diagnosis and do not integrate before source CI is audited.
-See docs/dia-topk-selection-2026-10-14.md/.json. Current main ad46e17 passes all
-13 native CI jobs, lint, secret scan, Ruby and Pages. No release tag.
-## CLAIMED 2026-10-14 — Dia top-k selection before probability rounding
+## COMPLETE 2026-10-15 — Dia top-k selection before probability rounding
 
 Investigate a separate sampler recipe gap in an isolated top-k worktree.
 Original Torch selects exactly k indices from temperature-scaled logits; the

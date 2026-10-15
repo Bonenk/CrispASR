@@ -573,12 +573,13 @@ docs/dia-layer17-owned-input-results-2026-10-14.md and .json. Native speech
 remains rejected; no Q4/GPU/performance/default or release acceptance.
 
 
-## Prepared Dia top-k correctness repair — not integrated
+## Integrated Dia top-k correctness repair (2026-10-15)
 
-A separate header candidate selects exactly k temperature-scaled logit indices
+The shared sampler now selects exactly k temperature-scaled logit indices
 instead of a rounded-probability threshold. The actual old header loses a
-unique top-k1 maximum in34/64 trials; the candidate loses0/64 and matches four
+unique top-k1 maximum in34/64 trials; the corrected sampler loses0/64 and matches four
 pinned original Python corner fixtures. All18,288 captured probability/sample
-rows remain byte-exact to baseline. Candidate CI is queued; no speech repair,
+rows remain byte-exact to baseline. All13 candidate CI jobs,10 lint checks and the secret scan pass; Linux unit
+testing passes2,026 tests. Header/test bytes are unchanged after rebase. No speech repair,
 Q4/GPU/performance or release acceptance is inferred. Details and public proof:
 [Dia top-k selection](docs/dia-topk-selection-2026-10-14.md).
