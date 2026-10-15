@@ -143,3 +143,14 @@ controls, and checks the real public encoder GPU=true forwarding independently.
 Use the same dependency pins as `cann_model_fixture.py`. Hosted run38602252235 passes the full interface;
 [complete acceptance and binary-snapshot proof](../../docs/cann-model-validator-preparation-2026-10-14.md).
 Actual physical CANN model acceptance remains pending.
+
+`dia_suffix_replay.py` imports the audited native self-cache prefix and runs
+only position978. All127 baseline stages and final logits, then all18 native
+post-layer controls, must be byte-exact before18 captured-original post-layer
+activation interventions run. It retains computed/consumed activations, all18
+cross-cache invariants, all18 layer metrics and the actual original sampler's
+margin/ranks/support. Large unchanged captures use SHA-verified lossless baseline
+references/current-row deltas. Run with
+`-f pip="numpy==1.26.4 torch==2.6.0 huggingface_hub==0.36.0 safetensors==0.5.3 gguf"`.
+[Method and reconstruction](dia-suffix-replay/README.md). CPU diagnostic only;
+skipping the prefix does not reproduce sampler RNG or establish speech parity.
