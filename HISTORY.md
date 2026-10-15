@@ -1,5 +1,17 @@
 # CrispASR — Port history
 
+## CANN composed probe: both official SDK final links verified — 2026-10-15
+
+Candidate f19d41698eccf951c7aade9769d44f9bd263146a passes all three jobs in
+workflow38706162449: actual CPU control and official SDK310P ARM64/910B x86_64
+final executable links. Independent raw-artifact, ELF, chip/ACL flags, final
+SDK search directory and dynamic-dependency audits pass. All12 SDK proof files
+are public and anonymously SHA256 verified; original failed links remain retained.
+General/lint are pending, so the candidate remains unintegrated. This completes
+SDK preparation only; physical fallback, ACL execution, model speech and speed
+remain unproven. [Receipt](docs/cann-composed-preparation-2026-10-15.md).
+
+
 Condensed chronology of the ports that built this repo. Kept for
 context, not for day-to-day reference. Live work is in `PLAN.md`;
 technical deep-dives are in `LEARNINGS.md`.

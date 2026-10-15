@@ -68,7 +68,8 @@ The complete146-payload repair proof is public and anonymously SHA-verified.
 New composed CPU/SDK workflow38706162449, general CI38706180793,
 lint38706184333 and secret scan38706162315 target that exact source. The new
 hosted CPU artifact is independently audited and fully published/anonymous-SHA
-verified; both SDK jobs and general/lint remain pending. Audit remaining terminal
+verified. Both official SDK final links now pass and are independently audited;
+general/lint remain pending. Audit remaining terminal
 results and integrate only after applicable checks pass.
 Physical composed fallback/model/ACL/performance acceptance remains open.
 Completed CPU/configuration work and rejected first SDK attempts are in
@@ -106,6 +107,23 @@ or whole-model acceptance is established by this11.61ms tail difference.
 Candidate7b42071f41e5814f957d7397d8c73615b2cd7c9a and hosted original-DAC/ASR
 workflow38710473906 are submitted; audit their actual terminal arrays/receipts.
 [Preparation and protocol proof](docs/dia-full-codec-preparation-2026-10-15.md).
+
+## CLAIMED 2026-10-15 — Dia original output protocol regression
+
+Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-output-protocol-20261015,
+branch fix/dia-output-protocol-20261015; build/proof data under
+/mnt/storage/crispasr/dia-output-protocol-20261015. Independently replay the actual
+pinned original Python generation/output methods with synthetic decoder draws,
+then compile the current native stopping/BOS/emission/reversal bodies unchanged
+and compare their complete outputs. Cover natural EOS, capacity stops, tiny caps,
+invalid codec indices and forced diagnostic paths. Observe failing guards before
+any runtime repair. The retained producer has an extra final row; audit the
+current source as well, whose reversal currently drops invalid frames while the
+original zeros invalid entries. Preserve original source hashes, exact witnesses,
+raw failures and complete successful receipts. Apply only demonstrated shared
+runtime repairs, run fresh CI and full-code original-DAC crosschecks; no speech,
+CUDA, quantization or performance acceptance follows from protocol correctness.
+Do not integrate a production repair before the codec diagnosis is audited.
 
 ## Dia correctness — early probe complete, full speech still open
 

@@ -78,7 +78,16 @@ requests. The actual hosted ELF SHA is
 [Raw hosted artifact](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/cpu-artifact.zip) is827,670 bytes, SHA256
 `67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4`, matching GitHub's digest. All11 published payloads, including the
 [independent audit/metadata manifest](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/payload-manifest.json), are anonymously downloaded and
-rehashed. Both SDK jobs and general/lint remain pending. The candidate is not
+rehashed. Both official SDK jobs now pass the final executable link. An
+independent audit checks GitHub archive digests/CRC/safe paths, actual ELF
+architecture and hashes, chip/ACL compile flags, static backend linkage, the
+repaired SDK library directory and all resolved dynamic dependencies. The
+310P ARM64 executable SHA256 is `d886cf931f25d61573e14ed36c6a51a7894f488f06add88df4552a787b8fe369`;
+the910B x86_64 executable is `77886718b6350b3569ca12ea16363da7778125cc3b6b244bfa6611945851575a`.
+Driver resolution uses the SDK devlib stub; no physical NPU executes.
+[Complete SDK proof manifest](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8f846da635184017792d9b9d3df7f8b4c930637c/cann-20261015-composed/hosted-repaired-sdk-38706162449/sdk-payload-manifest.json)
+retains both raw artifacts, full logs and independent audit. All12 payloads were
+anonymously downloaded and SHA256 verified. General/lint remain pending. The candidate is not
 integrated; CPU success cannot establish CANN device execution.
 
 Physical310P composed fallback, full-model NPU speech,910B ACL capture/replay,
