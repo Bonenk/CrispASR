@@ -74,6 +74,28 @@ Physical composed fallback/model/ACL/performance acceptance remains open.
 Completed CPU/configuration work and rejected first SDK attempts are in
 HISTORY.md and [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
 
+## CLAIMED 2026-10-15 — Dia retained native codes through original DAC
+
+Owner: maintainer session. Owned source worktree planned at
+/mnt/volume1/crispasr-dia-full-codec-20261015, branch
+diag/dia-full-codec-20261015. All models/builds/payloads under
+/mnt/storage/crispasr/dia-full-codec-crossdecode-20261015; heavy CPU reference
+execution on GH. Read the actual pinned original generation/output/audio/DAC
+source and delivered native stopping/delay code before implementing the probe.
+
+Verify immutable delivered native input/raw-sample/PCM and original-code ledgers.
+Replay literal native stopping/BOS/delay logic from raw samples and require every
+known feedback row to match, plus actual final stopping/PCM frame counts. Only
+then use a reconstructed final row; if that cannot be established, retain only
+the proven prefix and explicitly exclude the unknown row. Compare literal native
+alignment to the actual pinned original delay reversal. Decode the same codes
+with the actual original DAC/checkpoint, alongside original-code positive control,
+checking complete PCM, norms/RMS and ASR. Preserve sources, metadata, raw arrays,
+input/output hashes and rejecting offset/scale controls in fresh directories.
+No new neural generation, seed/recipe change, GPU/speed/default/whole-port
+acceptance follows; this localizes whether silence is codec or generated-code
+content. Do not rerun the already rejected source-RoPE/full-LM cache-read arms.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
