@@ -46,3 +46,41 @@ norm/head probes do not guarantee full-runtime/hosted byte reproducibility. A
 sequential intervention difference is conditional, not an additive global causal
 percentage. Skipping the prefix does not reproduce its RNG progression. No
 sampled trajectory, speech repair, Q4, GPU, speed or release acceptance follows.
+
+## Independent audit
+
+`audit.py` verifies official terminal run/artifact metadata, archive SHA/size/CRC,
+unique safe paths, root receipt and every payload, then immutable method git
+objects, the exact composed scratch patch, ELF/library identities and a fresh
+actual ggml guard. It uses the separately calibrated suffix auditor's byte
+reconstruction and numerical helpers, never worker comparison results.
+
+Run in the original Torch2.6 CPU reference environment:
+
+```sh
+python audit.py --bundle /storage/hosted-terminal-run \
+  --repo /path/to/CrispASR --prior-out /storage/audited-suffix/out \
+  --original-repo /path/to/original-dia \
+  --output /storage/hosted-terminal-run/independent-audit-v1.json
+```
+
+The prior37-arm bundle must already have its own independent audit. All five
+arms and both native controls are mandatory. All upstream stages remain exact;
+original layer17 must reconstruct the complete accepted prior anchor. Computed
+and consumed activations, logical full captures and all raw logits are checked
+independently, including both conditional/unconditional branches. Original
+final-hidden consumption must be byte-identical to the actual original capture.
+The audit recalculates all90 layer metric rows, hidden/logit errors and actual
+original-filter margin/ranks/support, and retains the four raw CFG operands.
+
+Both the actual F32 CFG margins and F64 CFG evaluations from the four raw
+logits receive separate ledgers, so propagated CFG roundoff is visible.
+The margin ledger records baseline→original post17→original final hidden→
+original logits. Its signed differences must telescope exactly; this is
+conditional accounting along those interventions, not global additive causal
+percentages. No unknown hosted margin is filled from a local reconstruction.
+`audit_selftest.py` retains the calibrated24 reconstruction/numerical controls
+and adds12 terminal corruption/nonfinite controls plus hand-derived signed
+binary-fraction accounting. Actual accepted native/original layer17 activation
+captures also calibrate the ownership checks. These preparations are not a new
+terminal hidden-state result or speech acceptance.
