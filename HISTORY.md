@@ -32335,3 +32335,14 @@ SHA-verified128-payload proof. This is completed CPU preparation; candidate
 integration awaits hosted CI/SDK checks. Physical fallback, ACL execution,
 model/quantization and timing tasks remain in PLAN.md and docs/cann-todo.md.
 Details: docs/cann-composed-preparation-2026-10-15.md/.json.
+
+## CANN composed hosted CPU proof audited — 2026-10-15
+
+Exact candidate81d8e279 CPU job116300113396 in workflow38698323227 passes.
+Complete raw artifact11954289341 is retained and its827,670-byte SHA256 matches
+GitHub's digest. Independent reconstruction verifies12,288 matrix and12,288
+final values,18 scale-negative controls and8 rejected backend/device/evidence
+requests, all manifest entries, unchanged-shape/repeat arrays and actual ELF
+bytes. Workflow logs attest exact source and ggml checkout0a8620765. SDKs and
+remaining candidate CI are pending; no physical NPU, mixed fallback, ACL,
+model speech, quantization, performance or integration acceptance follows.

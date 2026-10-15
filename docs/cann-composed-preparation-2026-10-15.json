@@ -31,10 +31,24 @@
     "general": 38698330667,
     "lint": 38698334091,
     "secret": 38698323280,
-    "status": "queued"
+    "status": "hosted-cpu-success-sdk-queued-general-lint-pending"
   },
   "physical_cann_execution": false,
   "acl_capture_replay_acceptance": false,
   "model_speech_acceptance": false,
-  "performance_acceptance": false
+  "performance_acceptance": false,
+  "hosted_cpu_audit": {
+    "independent_hosted_cpu_audit_pass": true,
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "raw_artifact_bytes": 827670,
+    "raw_artifact_sha256": "6d97f14420389221bfa4703f83cf2cefb9fa47d7d340455376da775fe21e56ce",
+    "github_artifact_digest_matches": true,
+    "actual_computes": 18,
+    "independent_matrix_values": 12288,
+    "independent_final_values": 12288,
+    "scale_negative_controls": 18,
+    "rejected_invalid_requests": 8,
+    "tested_elf_sha256": "5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4",
+    "scope": "Complete hosted CPU raw arrays/executable/negative-request audit; no SDK/NPU/fallback/ACL/model/performance acceptance"
+  }
 }

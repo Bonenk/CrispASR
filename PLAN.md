@@ -58,6 +58,7 @@ or speed; no backend default/kernel changes are intended.
 
 Candidate81d8e279 is submitted; hosted CPU/SDK workflow38698323227, general
 CI38698330667, lint38698334091 and secret scan38698323280 await completion.
+Hosted CPU is now independently audited; both official SDK builds remain queued.
 Audit terminal results and integrate only after applicable checks pass.
 Completed local CPU evidence is in HISTORY.md and
 [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
@@ -103,6 +104,27 @@ Maintainer owns the preparation; contributor hardware help is optional. No
 further rerun of the already accepted rotary repair is requested. Details and
 commands: [CANN TODO](docs/cann-todo.md) and
 [portable validator](docs/cann-model-validator-preparation-2026-10-14.md).
+
+## CLAIMED 2026-10-15 — MiMo Q4 common-input projection amplification
+
+Owner: maintainer session; controller worktree
+/mnt/volume1/crispasr-decoder-boundary-tracking-20261013, with existing owned
+LM diagnostic source47b661df1 consulted read-only. All execution and artifacts:
+/mnt/storage/crispasr/mimo-lm-projection-20261015. Whole PR492/521 discussions,
+issue518 and linked upstream256 follow-ups have been read. Safe runtime pieces
+are already merged; do not force acceptance of their remaining failed gates.
+
+Reuse the immutable seven-layer study's captured layer0 FFN-normalized flash/
+eager inputs, verifying archive/member hashes. Fetch only a single Q4_K gate
+projection from the pinned GGUF with checked immutable range/shape/type; no
+full-model download. Compare actual CPU matmul against same-weight floating
+and actual Q8_K activation-shadow oracles to test whether dynamic activation
+rounding explains amplified output differences. Retain quantized/dequantized
+inputs, outputs, coefficient/source hashes and rejecting scale/layout controls.
+Do not repeat the old whole-LM BLAS experiment, recover original checkpoint
+precision by dequantization, change defaults/gates or claim original full-model,
+PR, speech or speed acceptance from a matrix diagnostic. Use the result to
+choose a targeted precision experiment, only if it supports that hypothesis.
 
 ## Remaining PRs — scoped salvage and acceptance
 

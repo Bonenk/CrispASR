@@ -34,7 +34,14 @@ inference about a supplied binary's source from its hash alone.
 [general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/38698330667),
 [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/38698334091) and
 [secret scan](https://github.com/CrispStrobe/CrispASR/actions/runs/38698323280)
-are queued on this exact candidate. SDK jobs retain actual executables, compiler
+target this exact candidate. Hosted CPU now passes all five contracts. An
+independent audit recalculates all12,288 matrix and12,288 final values from the
+complete returned arrays, verifies18 scale negatives and8 rejected requests,
+and hashes the actual returned ELF. Raw artifact827,670 bytes has SHA256
+`6d97f14420389221bfa4703f83cf2cefb9fa47d7d340455376da775fe21e56ce`,
+matching GitHub's artifact digest exactly. The full raw ZIP and job log are
+retained under storage. Both SDK jobs are queued; general/lint/secret gates
+remain pending. SDK jobs retain actual executables, compiler
 metadata and loader reports; hosted runners cannot execute the NPU path.
 The candidate is not integrated pending those checks.
 
