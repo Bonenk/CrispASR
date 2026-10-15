@@ -52,6 +52,14 @@ separate unaccepted model gate. No production graph/default changes.
 Run with `-f pip="numpy==1.26.4 torch==2.6.0 torchaudio==2.6.0 torchvision==0.21.0 pydantic==2.11.3 descript-audio-codec==1.0.0 descript-audiotools==0.7.2 openai-whisper==20250625 huggingface_hub==1.10.1"`.
 Use `--self-test` for scale/order/shape/nonfinite/zero-norm rejection controls.
 
+`dia_cache_intervention.py` prepares a conditional full-decoder layer0 key
+intervention at the first shared-history Dia divergence. All979 baseline logits
+and the native substitution control must be byte-exact before original-prefix,
+current-key and combined arms are interpreted. Actual attention inputs, all
+layers, original filtering support and CFG46/904 margins are retained. This is
+CPU diagnostic work, not speech/GPU acceptance. See the
+[method and dispatch recipe](dia-cache-intervention/README.md).
+
 `cann_model_fixture.py` prepares a CPU-only Moonshine Tiny fixture for future
 CANN model validation. It freshly converts immutable original weights, checks
 every converted coefficient against the physically F32 regression model, uses the
