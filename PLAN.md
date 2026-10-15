@@ -42,6 +42,22 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — OmniVoice PR521 standalone utility salvage
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-omnivoice-utility-split-20261015, branch
+fix/omnivoice-utility-split-20261015; evidence under
+/mnt/storage/crispasr/omnivoice-utility-split-20261015. Full PR521, issue518,
+review comments and linked upstream256 follow-ups are read. Split only the
+existing standalone audio/text utility header, probe and pinned original oracle
+with original authorship and commit provenance. No production include/caller,
+reference preprocessing, output default, setter ABI or full-PR acceptance.
+Re-run all738 waveform and18 text original-function cases, retain full inputs
+and expected/actual arrays plus source/compiler/binary hashes, independently
+audit them and require applicable CI before integration. Keep the unchanged
+clone WER gate and upstream abrupt-reference/onset finding explicit; fade is
+not a proven click-removal repair. Full runtime PR remains a draft.
+
 ## CLAIMED 2026-10-15 — Dia full-decoder layer0 key intervention
 
 Owner: maintainer session. Owned worktree
