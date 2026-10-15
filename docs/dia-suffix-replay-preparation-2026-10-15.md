@@ -69,3 +69,11 @@ verifies native controls, prefixes, computed/consumed activations, earlier block
 boundaries and split logits, and recalculates all666 layer metrics, hidden/logit
 errors and the actual pinned filter. Calibration logs/receipt remain under
 `/mnt/storage/crispasr/dia-suffix-20261015/auditor-calibration-v2/`.
+
+The independent numerical auditor additionally reproduces90 actual layer rows,
+five hidden-state rows and five logit rows from the completed Q/K factorial,
+and all3 encodings reconstruct exact real native/query-intervention captures.
+[Full calibration receipt](dia-suffix-auditor-calibration-2026-10-15.json).
+The already audited input source isff7e07c0; these checks validate the auditor,
+not the running suffix experiment. Raw calibration data/receipt remain in
+`/mnt/storage/crispasr/dia-suffix-20261015/auditor-real-calibration-v1/`.

@@ -5,8 +5,11 @@
 Independent artifact auditor5cb83887 is also prepared: all3 capture encodings,
 24 corrupted-evidence controls and hand-derived metric values pass in local and
 Torch2.6 environments; actual original-filter calibration exactly reproduces
-prior audited original/native logits' margins, ranks and support. The numerical
-job has started; this preparation establishes no new suffix/speech result.
+prior audited original/native logits' margins, ranks and support. Independent
+numerical paths also match90 actual prior layer rows, five hidden and five
+logit comparisons; all3 encodings reconstruct real captures exactly.
+[Calibration receipt](docs/dia-suffix-auditor-calibration-2026-10-15.json).
+The numerical job has started; preparation establishes no new suffix/speech result.
 
 Candidate70f2d9de is prepared on its owned diagnostic worktree. Tiny actual ggml
 cache-prefix/renamed-input/producer-root guards, exact finite activation loader,

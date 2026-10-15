@@ -94,6 +94,10 @@ is old-fixture calibration, not a new suffix result. Evidence is retained under
 requires official archive/source/method/ELF/library proof, fresh ggml guard,
 all666 layer metric rows, prefix/current controls and split-logit consistency.
 Run it against the complete hosted artifact before integration or interpretation.
+Its independent numerical paths now also reproduce90 actual prior layer rows,
+five hidden and five logit comparisons; all3 encodings reconstruct actual
+native/query-intervention captures exactly. [Auditor calibration receipt](docs/dia-suffix-auditor-calibration-2026-10-15.json).
+This validates the auditor only; new suffix results remain pending.
 
 ## Dia correctness — early probe complete, full speech still open
 
