@@ -58,7 +58,12 @@ or speed; no backend default/kernel changes are intended.
 
 Candidate81d8e279 is submitted; hosted CPU/SDK workflow38698323227, general
 CI38698330667, lint38698334091 and secret scan38698323280 await completion.
-Hosted CPU is now independently audited; both official SDK builds remain queued.
+Hosted CPU is independently audited. The310P SDK compile reaches final linking
+but fails because static ggml-cann private SDK link directories do not propagate
+to the standalone executable. Failed source81d8e279/log/artifact are retained.
+Repair the probe consumer CMake linkage without production/kernel changes;
+revalidate CPU and both official SDK configurations on a new candidate.
+The910B job remains in progress; MiMo workflow38703457282 remains queued.
 Audit terminal results and integrate only after applicable checks pass.
 Completed local CPU evidence is in HISTORY.md and
 [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).

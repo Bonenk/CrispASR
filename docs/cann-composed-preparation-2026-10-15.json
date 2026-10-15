@@ -31,7 +31,7 @@
     "general": 38698330667,
     "lint": 38698334091,
     "secret": 38698323280,
-    "status": "hosted-cpu-success-sdk-queued-general-lint-pending"
+    "status": "hosted-cpu-accepted-310p-final-link-failed-910b-in-progress"
   },
   "physical_cann_execution": false,
   "acl_capture_replay_acceptance": false,
@@ -50,5 +50,13 @@
     "rejected_invalid_requests": 8,
     "tested_elf_sha256": "5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4",
     "scope": "Complete hosted CPU raw arrays/executable/negative-request audit; no SDK/NPU/fallback/ACL/model/performance acceptance"
+  },
+  "sdk310p_failed_attempt": {
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "job": 116303015565,
+    "artifact": 11957981850,
+    "artifact_sha256": "c3ceb8cd15476fdb4633201b0618e1a6030b592b56bda9f5d6548eb6d3ca0efc",
+    "failure": "CANN source libraries compiled; standalone static executable linker cannot find ascendcl, nnopbase, opapi and acl_op_compiler. Private ggml-cann SDK link directories do not propagate to the consumer.",
+    "accepted": false
   }
 }
