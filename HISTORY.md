@@ -1,5 +1,18 @@
 # CrispASR — Port history
 
+## OmniVoice standalone utility proof completed — 2026-10-15
+
+Prepared a PR521 utility-only split with original author/source preserved.
+The unchanged inherited oracle passes738 waveform and18 text calls; the
+extended proof retains1601 full arrays. Independent original-function and actual
+native-ELF replay passes all calls:369 silence-cleanup and369 fade/pad outputs
+are byte-exact on the isolated pinned environment, plus18 exact text cases.
+Scale/order/unprocessed witnesses reject. Complete public proof is anonymously
+SHA-verified. These scoped validation actions are complete; candidate69d9eac4
+and hosted38739872601/lint38739877120 remain pending in PLAN.md. No production
+speech caller/default or full draft-PR acceptance. See the
+[proof receipt](docs/omnivoice-utility-split-proof-2026-10-15.md).
+
 ## Dia first full-decoder intervention control audited — 2026-10-15
 
 Run38726696058 at2f04f4e6 reproduces all979 native baseline inputs/logits and

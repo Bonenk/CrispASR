@@ -57,6 +57,14 @@ and expected/actual arrays plus source/compiler/binary hashes, independently
 audit them and require applicable CI before integration. Keep the unchanged
 clone WER gate and upstream abrupt-reference/onset finding explicit; fade is
 not a proven click-removal repair. Full runtime PR remains a draft.
+Candidate69d9eac4 is pushed, with actual tested helper/probe/oracle bytes
+unchanged froma4791399. The inherited oracle and independent actual ELF/original
+replay pass all738 waveform and18 text calls; all1601 arrays are retained in
+an anonymously full-SHA-verified public proof. Heavy38739872601 and
+lint38739877120 are queued. Audit terminal checks before rebase/ff integration;
+keep full runtime/default/clone acceptance excluded. See the
+[proof receipt](docs/omnivoice-utility-split-proof-2026-10-15.md).
+
 
 ## CLAIMED 2026-10-15 — Dia full-decoder layer0 key intervention
 
