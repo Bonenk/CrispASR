@@ -70,7 +70,7 @@ Close simultaneous original full-model self-Q provenance as a separate follow-up
 **Checkpoint:** candidate70f2d9de678b31f6b55f957e3a721aa91bf0af88 pushed on
 `diag/dia-suffix-20261015`. [Heavy38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943)
 and [lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203)
-has started (heavy) and remains in progress/queued (lint); no terminal numerical result. The actual ggml prefix/ownership guard,
+both completed successfully: heavy37 arms and lint10/10. Official artifact12002981832 is328,470,169bytes, SHA162e4e25317e60b5b9ee703feb51aa7112c8e73e0ba89a49c55da493c56aeb61. Download and independent audit are in progress; do not interpret the worker receipt as accepted proof yet. The actual ggml prefix/ownership guard,
 finite-file/path/integrity/lossless-reconstruction controls, full patched-source
 syntax against pinnedC36 headers, format18 and all4 unskipped secret tests pass
 locally. The hosted worker requires all127 captured baseline stages/logits and
@@ -97,7 +97,7 @@ Run it against the complete hosted artifact before integration or interpretation
 Its independent numerical paths now also reproduce90 actual prior layer rows,
 five hidden and five logit comparisons; all3 encodings reconstruct actual
 native/query-intervention captures exactly. [Auditor calibration receipt](docs/dia-suffix-auditor-calibration-2026-10-15.json).
-This validates the auditor only; new suffix results remain pending.
+This validates the auditor only; new suffix results await independent full-artifact audit.
 
 ## Dia correctness — early probe complete, full speech still open
 

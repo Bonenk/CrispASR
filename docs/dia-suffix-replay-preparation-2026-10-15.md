@@ -5,8 +5,8 @@ No production runtime or default changes are proposed by this diagnostic.
 
 - Immutable candidate: [70f2d9de678b31f6b55f957e3a721aa91bf0af88](https://github.com/CrispStrobe/CrispASR/commit/70f2d9de678b31f6b55f957e3a721aa91bf0af88).
 - [Full worker/method](https://github.com/CrispStrobe/CrispASR/blob/70f2d9de678b31f6b55f957e3a721aa91bf0af88/tools/ci-heavy/dia-suffix-replay/README.md).
-- [Hosted numerical job38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943): started; terminal numerical result pending.
-- [Lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203): in progress/queued; terminal lint result pending.
+- [Hosted numerical job38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943): completed successfully; independent artifact audit pending.
+- [Lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203): completed successfully, all10 jobs.
 
 The pinned runtime8d0ad886/ggmlC36 imports native self-cache positions0..977
 from the independently audited full-decoder Q/K artifact. It computes only
