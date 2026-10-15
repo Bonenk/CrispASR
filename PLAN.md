@@ -64,6 +64,19 @@ terminal-stage effects, not a speech fix or additive global causal shares.
 Do not repeat local norm/head/late-layer probes unchanged. Complete simultaneous
 original full-model self-Q provenance remains a separate follow-up.
 
+**Checkpoint:** candidate85be03e353cd2aa4da5529acfc41585eecf87116 is pushed on
+`diag/dia-terminal-20261015`. [Heavy38805728288](https://github.com/CrispStrobe/CrispASR/actions/runs/38805728288)
+and [lint38805731957](https://github.com/CrispStrobe/CrispASR/actions/runs/38805731957)
+are queued. Full patched source passes C++17 syntax against exactC36 headers;
+accepted finite-loader/prefix controls, single-use terminal patch checks and
+all4 unskipped secret guards pass locally. Five arms retain every logit and
+stage, and validate the prior original-layer17 anchor before interpreting the
+actual original-hidden replacement. No new terminal numerical result yet.
+Local receipt: /mnt/storage/crispasr/dia-terminal-20261015/local-v1/preflight.json.
+Next inspect terminal jobs, independently audit complete artifacts, then decide
+whether the measured final-norm/head effects justify any new arithmetic probe.
+[Method and submission](docs/dia-terminal-replay-preparation-2026-10-15.md).
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
