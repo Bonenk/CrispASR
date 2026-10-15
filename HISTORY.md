@@ -1,5 +1,18 @@
 # CrispASR — Port history
 
+## Dia key-history and original-DAC diagnostic tools integrated — 2026-10-15
+
+Key-history tooling lands asc1be3022 with tested producer/README bytes unchanged
+after all10 lint jobs in38723508075. The original-DAC diagnostic worker lands
+as7a9345b4 with tested bytes unchanged after hosted38723274160 and all five
+rejecting local metric controls. Independent full hosted audit passes80 raw
+payloads, strict original PCM relative L2 5.5702501e-7, WAV/ASR inputs and WER:
+original0, both native variants1. Complete SHA-verified public proof preserves
+all raw outputs and both earlier dependency failures. These scoped tooling tasks
+are complete; the full Dia speech repair remains in PLAN.md. See the
+[key-history](docs/dia-key-history-producer-2026-10-15.md) and
+[codec](docs/dia-full-codec-preparation-2026-10-15.md) receipts.
+
 ## Dia full-decoder key intervention preparation — 2026-10-15
 
 Prepared the bounded diagnostic worker at2f04f4e6 and verified local axis
@@ -8,8 +21,9 @@ exact pinned-source patch application and patched-runtime C++ syntax. The actual
 worker sampling observer also reproduces both retained support sets and the
 46/904 rank reversal on pinned Torch2.6.0+cpu. Published
 and anonymously SHA-verified the31-payload fixed979-step input bundle. These
-preparation actions are complete; full-model intervention and lint remain
-queued in38726696058/38726699171 and are tracked in PLAN.md. No numerical,
+preparation actions are complete; run38726696058 later reproduced the baseline
+exactly but failed its native-control tensor upload. The diagnostic repair and
+lint38726699171 remain tracked in PLAN.md. No numerical,
 speech or GPU acceptance. See the
 [preparation receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
 

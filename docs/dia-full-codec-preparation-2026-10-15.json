@@ -156,7 +156,7 @@
   },
   "candidate_source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
   "hosted_run": 38710473906,
-  "hosted_codec_status": "submitted-not-yet-accepted",
+  "hosted_codec_status": "completed: independently audited, diagnostic worker integrated",
   "production_changes": false,
   "model_speech_acceptance": false,
   "local_original_dac_diagnosis": {
@@ -262,7 +262,7 @@
     ],
     "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
   },
-  "hosted_run_status": "run38723274160 succeeded at a40755b7; independent terminal artifact/PCM/ASR audit in progress",
+  "hosted_run_status": "run38723274160 succeeded; independent80-payload PCM/ASR audit passes; original WER0, both native WER1",
   "diagnosis_complete": true,
   "hosted_failed_attempt": {
     "passed": true,
@@ -347,7 +347,7 @@
   "hosted_prerequisite_repair": {
     "source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
     "run": 38723274160,
-    "status": "completed-success: full artifact audit in progress",
+    "status": "completed-success: independently audited",
     "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes",
     "artifact": 11967984300
   },
@@ -357,5 +357,79 @@
     "all13_general_and10_lint_pass": true,
     "tested_source_byte_unchanged": true,
     "speech_acceptance": false
+  },
+  "hosted_independent_audit": {
+    "independent_audit_pass": true,
+    "execution_location": "GH hosted CPU run38723274160; full raw artifact digest/CRC verified separately",
+    "worker_source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "verified_raw_payloads": 80,
+    "torch_version": "2.6.0+cpu",
+    "original_positive_pcm": {
+      "cosine": 0.9999999999998496,
+      "relative_l2": 5.570250055146055e-07,
+      "norm_error": 9.63364354955587e-08,
+      "mine_norm": 57.87820837237126,
+      "ref_norm": 57.878202796591516,
+      "max_abs": 1.0281801223754883e-06
+    },
+    "same_native_codes_original_vs_native_pcm": {
+      "cosine": 0.9999649845293928,
+      "relative_l2": 0.008929464390920282,
+      "norm_error": 0.0030803687972749128,
+      "mine_norm": 0.11718311179810942,
+      "ref_norm": 0.11682325309448102,
+      "max_abs": 7.190275937318802e-06
+    },
+    "pcm": {
+      "original-codes": {
+        "samples": 619520,
+        "rms": 0.07353386837302249,
+        "peak": 0.9937424659729004
+      },
+      "native-complete-codes": {
+        "samples": 563200,
+        "rms": 0.00015614702112585685,
+        "peak": 0.008120466023683548
+      },
+      "native-original-return-slice": {
+        "samples": 562688,
+        "rms": 0.00015765062388326632,
+        "peak": 0.009593318216502666
+      }
+    },
+    "asr": {
+      "original-codes": {
+        "text": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "native-complete-codes": {
+        "text": "You",
+        "wer": 1.0
+      },
+      "native-original-return-slice": {
+        "text": "You",
+        "wer": 1.0
+      }
+    },
+    "shared_code_prefix_frames": 965,
+    "shared_code_prefix_seconds": 11.203628117913832,
+    "original_energy_fraction_after_prefix": 0.9999965666573766,
+    "original_dac_rescues_native_speech": false,
+    "whole_model_accepted": false
+  },
+  "hosted_complete_publication": {
+    "revision": "6ac1bbd6072c031d546a07354c9b79c832406162",
+    "file": "dia-20261015-full-codec/complete-hosted-codec-diagnosis-v1.zip",
+    "bytes": 23296826,
+    "sha256": "3a01150147bfad341d8383600dcd5a68379d4d100851b85ae85c67150ef604d9",
+    "payloads": 11,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6ac1bbd6072c031d546a07354c9b79c832406162/dia-20261015-full-codec/complete-hosted-codec-diagnosis-v1.zip"
+  },
+  "worker_integration": {
+    "source": "7a9345b442708f4dbe84784a536736c7a674cc50",
+    "tested_candidate": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "tested_worker_bytes_unchanged": true,
+    "scope": "diagnostic worker and README only; production runtime unchanged"
   }
 }

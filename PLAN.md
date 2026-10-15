@@ -72,35 +72,6 @@ then all conditional arms; retain failures and update the
 [preparation receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
 
 
-## CLAIMED 2026-10-15 — Dia hosted codec prerequisite completion
-
-Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-full-codec-20261015,
-branch diag/dia-full-codec-20261015; evidence under
-/mnt/storage/crispasr/dia-full-codec-crossdecode-20261015. Local complete-code
-original-DAC/ASR diagnosis is independently complete: original WER0, both native
-code variants WER1. Hosted first missing-hub and second missing-ffmpeg failures
-are preserved in complete public SHA-verified archives; the second also passes
-independent partial PCM audit. Prerequisite-only candidatea40755b7 is pushed;
-hosted38723274160 completed successfully at a40755b7. Full raw artifact
-11967984300, source, PCM and ASR audit are in progress with unchanged gates.
-Audit the terminal hosted result and integrate diagnostic worker/README only
-after applicable checks. The separate production output-protocol repair is
-already integrated as6503408c after13 general/10 lint jobs; no speech promotion.
-
-## CLAIMED 2026-10-15 — Dia key-history diagnostic tooling integration
-
-Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-key-history-20261015,
-branch diag/dia-key-history-20261015; evidence under
-/mnt/storage/crispasr/dia-key-history-20261015. Candidate
-c4a9a78e643df6ee59bdc95fe36bae39e06adccd is pushed; lint38723508075 is submitted.
-Original/native producer diagnosis, independent full-array/physical-coefficient
-and rejecting-control audit are complete, with public anonymous SHA verification
-of all98 proof payloads. Source matches the actual tested/published bytes.
-Audit applicable terminal checks, rebase/ff tools only and remove the branch once
-accepted. No production/kernel/default or model/speech promotion is proposed.
-Completed results are in HISTORY.md and
-[the receipt](docs/dia-key-history-producer-2026-10-15.md).
-
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:

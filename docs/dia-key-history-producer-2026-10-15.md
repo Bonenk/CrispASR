@@ -72,3 +72,13 @@ prefix/current-key controls, measuring the46/904 CFG margin. It must first
 reproduce baseline input/logit hashes and preserve all failed arms.
 
 [Structured receipt](dia-key-history-producer-2026-10-15.json).
+
+## Diagnostic tool integration
+
+The [lint run38723508075](https://github.com/CrispStrobe/CrispASR/actions/runs/38723508075)
+passes all10 jobs on c4a9a78e643df6ee59bdc95fe36bae39e06adccd. Rebased/ff
+integrationc1be30229bcd180753ef6923077f4423a1287e89 preserves both tested
+producer sources and the reproduction README byte-for-byte. The full independent
+component proof predates integration and remains public. This accepts the
+component diagnostic tools only; production math/defaults and speech status do
+not change.

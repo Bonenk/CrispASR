@@ -1,6 +1,6 @@
 {
   "candidate_source": "c4a9a78e643df6ee59bdc95fe36bae39e06adccd",
-  "integrated": false,
+  "integrated": true,
   "source_content_matches_tested_and_published": true,
   "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
   "native_runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
@@ -725,5 +725,8 @@
     "status": "submitted"
   },
   "runtime_change": false,
-  "speech_acceptance": false
+  "speech_acceptance": false,
+  "integration_source": "c1be30229bcd180753ef6923077f4423a1287e89",
+  "lint_run": 38723508075,
+  "all10_lint_jobs_pass": true
 }

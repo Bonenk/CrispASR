@@ -4,8 +4,8 @@ The final emitted native row is now recoverable from retained raw sampler
 predictions and the actual producer stopping/BOS logic. Complete CLI/C-ABI
 code grids agree. Original-DAC decoding/ASR and independent audit are now
 complete locally. Native speech still fails. Initial hosted dependency failure
-is preserved; the prerequisite-corrected hosted retry38723274160 has started.
-Its terminal numerical/ASR audit is still pending.
+is preserved. Hosted retry38723274160 now passes, with independent full
+artifact/PCM/ASR audit. The diagnostic worker is integrated as7a9345b4.
 
 ## Complete reconstruction
 
@@ -151,3 +151,26 @@ all native reconstruction inputs/adapter/source, positive waveform/code controls
 parent hashes and notices. The input bundle is5,220,208 bytes, SHA256
 `b711e33d4bb60f6c421397a3ca2eaf8600facd196a23c03e2bce20bafbee6126`.
 [Machine receipt](dia-full-codec-preparation-2026-10-15.json).
+
+## Hosted completion and tool integration
+
+[Hosted38723274160](https://github.com/CrispStrobe/CrispASR/actions/runs/38723274160)
+at a40755b7 succeeds after the ffmpeg prerequisite repair. Raw artifact11967984300
+is23318376 bytes, SHA256
+`6601d0b809eaa022e11fe1ddff74dc285b38a593bac1477393cdedc60c96ba06`;
+full digest, CRCs, unique safe paths and80 payload hashes pass. Independent audit
+recomputes every PCM/WAV equality, ffmpeg ASR input, WER/segments, strict original
+PCM gate and native/original waveform metrics. Original positive relative L2 is
+5.5702501e-7, WER0; both native variants still have WER1. The diagnosis is complete,
+and native speech remains rejected.
+
+The [complete hosted proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6ac1bbd6072c031d546a07354c9b79c832406162/dia-20261015-full-codec/complete-hosted-codec-diagnosis-v1.zip) is
+23296826 bytes, SHA256
+`3a01150147bfad341d8383600dcd5a68379d4d100851b85ae85c67150ef604d9`,
+anonymously full-SHA verified. It includes the complete raw artifact, API/logs,
+auditor, full result and notices. Both earlier dependency failures remain public.
+
+Rebased/ff integration7a9345b442708f4dbe84784a536736c7a674cc50 preserves the
+tested worker bytes. Its five scale/order/shape/nonfinite/zero-norm rejecting
+controls pass after rebase. This integrates diagnostic tooling and documentation;
+production protocol repair and full speech acceptance are separate.
