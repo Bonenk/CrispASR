@@ -163,3 +163,12 @@ is injected. All earlier stages/caches, computed/consumed hidden, raw logits
 and original filter margin/ranks/support are retained. Run with
 `-f pip="numpy==1.26.4 torch==2.6.0 huggingface_hub==0.36.0 safetensors==0.5.3 gguf"`.
 [Method](dia-terminal-replay/README.md). CPU diagnostic, no speech/GPU acceptance.
+
+`dia_original_trace.py` captures simultaneous actual full-original self Q/K/V,
+pre-RoPE projections, decoder boundaries and valid cross-cache prefixes in all18
+layers. Complete OFF/ON/OFF arrays/trajectories/PCM and RNG must be byte-exact,
+canonical inputs/codes exact and original TTS→ASR WER0 before a single sampled
+step978/codebook2 decision is replaced877→904. The fork preserves RNG and all
+earlier inputs/logits; its ensuing speech quality is reported honestly.
+[Method, dependency pins and lossless array reconstruction](dia-original-trace/README.md).
+This original-only diagnostic changes no native arithmetic/default.
