@@ -139,7 +139,7 @@
       "general": 38706180793,
       "lint": 38706184333,
       "secret": 38706162315,
-      "status": "cpu-and-both-official-sdk-final-links-independently-accepted-general-lint-pending"
+      "status": "cpu-both-official-sdk-final-links-and-all13-general-jobs-passed-lint-pending"
     },
     "hosted_cpu_audit": {
       "independent_hosted_cpu_audit_pass": true,

@@ -69,7 +69,7 @@ New composed CPU/SDK workflow38706162449, general CI38706180793,
 lint38706184333 and secret scan38706162315 target that exact source. The new
 hosted CPU artifact is independently audited and fully published/anonymous-SHA
 verified. Both official SDK final links now pass and are independently audited;
-general/lint remain pending. Audit remaining terminal
+all13 general CI jobs pass and lint remains pending. Audit remaining terminal
 results and integrate only after applicable checks pass.
 Physical composed fallback/model/ACL/performance acceptance remains open.
 Completed CPU/configuration work and rejected first SDK attempts are in
@@ -124,6 +124,15 @@ raw failures and complete successful receipts. Apply only demonstrated shared
 runtime repairs, run fresh CI and full-code original-DAC crosschecks; no speech,
 CUDA, quantization or performance acceptance follows from protocol correctness.
 Do not integrate a production repair before the codec diagnosis is audited.
+
+Candidate fc1b05c922edfeece675a32f1b7855f588276968 is pushed. Actual original
+Torch2.6 witnesses regenerate byte-exact; old source fails12/16 cases, repaired
+source passes16/16, and restoring each of three defects independently rejects.
+Complete50-payload proof is public and anonymously SHA-verified. General
+CI38713471171 and lint38713474686 are submitted. Audit those results and the
+separate original-DAC workflow38710473906 before integration. Completed local
+regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
+full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 
 ## Dia correctness — early probe complete, full speech still open
 
