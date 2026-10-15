@@ -42,6 +42,29 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — Dia original self-query and joint Q/K intervention
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-dia-query-key-20261015, branch
+diag/dia-query-key-20261015; all coefficients, arrays, builds and evidence under
+/mnt/storage/crispasr/dia-query-key-20261015. First capture actual original
+layer0 self-attention Q before/after RoPE at step978, using pinned original
+Python classes and physically verified F32 coefficients/owned inputs. Require
+reproduction of retained original self-attention output, exact fresh repeats,
+correct axes/dtype/position and scale/head-order rejection controls. The retained
+cross-Q is not a self-Q fixture. Preserve any failure in a distinct run folder.
+Only after that gate passes, publish a complete reproducible input fixture and
+prepare a scratch-only joint intervention on pinned runtime8d0ad886: baseline,
+native Q/K control, original-Q only, original-K only and original-Q plus keys.
+Require all979 baseline/native-control logits and actual consumed tensors exact;
+keep earlier978 logits, V/other caches/inputs/recipe unchanged. Compare all18
+layers, final logits/norms/errors and original sampler46/904 margins/support.
+Use GH for the full model and applicable lint, then independently audit full raw
+artifacts and retain public proof before integration. No full model on VPS,
+unchanged source-RoPE speech rerun, production graph/default change or speech/GPU
+acceptance from this conditional diagnostic. Claim covers producer preparation
+and bounded hosted diagnostic; successful speech remains a separate gate.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
