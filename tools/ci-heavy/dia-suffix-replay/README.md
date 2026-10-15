@@ -55,3 +55,29 @@ and run logs. Retain partial artifacts on any failure; do not weaken exact gates
 The sampler is observed before multinomial drawing. Skipping978 steps does not
 advance the original RNG state; no sampled trajectory, speech, Q4, speed or GPU
 acceptance is claimed. Full original self-Q capture remains a separate follow-up.
+
+## Independent artifact audit
+
+`audit.py` accepts the official `run.json`, `artifacts.json` and `raw.zip` in a
+bundle directory, the separately audited prior Q/K `out/`, and local CrispASR
+and original Dia repository checkouts. Run in the original Torch2.6 CPU/NumPy
+reference environment:
+
+```sh
+python audit.py --bundle /storage/hosted-suffix-run \
+  --repo /path/to/CrispASR --prior-out /storage/audited-query-key/out \
+  --original-repo /path/to/original-dia \
+  --output /storage/hosted-suffix-run/independent-audit-v1.json
+```
+
+It verifies the official archive digest/size/CRC/safe unique paths, extracted
+root receipt, full payload closure and hashes, immutable git method objects,
+reproduced scratch patch, actual ELF/library identities and fresh compiled ggml
+guard execution. It reconstructs all compacted files using independent per-batch
+byte slicing, checks every native control and held cache/input invariant, then
+recalculates all666 layer metric rows, hidden/logits errors and the actual pinned
+original filter. It requires all37 arms and terminal numerical completion; a
+partial or queued run cannot pass. Prior captures must already have their own
+independent official-artifact audit. `audit_selftest.py` checks all3 encodings,
+24 corrupted-evidence controls and hand-derived3-4-5 numerical values without
+loading a model. Calibrating against previous logits is preparation only.
