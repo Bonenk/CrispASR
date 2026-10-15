@@ -136,7 +136,10 @@ def main():
          '-DBUILD_SHARED_LIBS=ON', '-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
          '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF',
          '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF', '-DCRISPASR_OPUS=OFF', '-DCRISPASR_AMR=OFF'], 'configure')
-    run(['cmake', '--build', build, '--target', 'dia-key-intervention', '-j4'], 'build')
+    run(['cmake', '--build', build, '--target', 'dia-key-intervention', 'dia-key-graph-guard', '-j4'], 'build')
+    guard = next(p for p in build.rglob('dia-key-graph-guard') if p.is_file() and os.access(p, os.X_OK))
+    run([guard], 'actual-ggml-graph-guard')
+    shutil.copyfile(guard, out / 'method/actual-dia-key-graph-guard')
     runner = next(p for p in build.rglob('dia-key-intervention') if p.is_file() and os.access(p, os.X_OK))
     report['runner_sha256'] = digest(runner)
     run(['ldd', runner], 'actual-runner-ldd')

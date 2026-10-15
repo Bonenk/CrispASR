@@ -56,3 +56,13 @@ trajectory. Every arm, source, patch, actual executable and linked-library
 hash survives a failure. A key-only result is conditional: correlated Q/K
 phase errors are outside this intervention. No arm establishes speech, Q4,
 GPU or performance acceptance.
+
+The first hosted attempt38726696058 reproduces all979 baseline logits and keys
+exactly but aborts in the native control before any original-key arm runs. Its
+full artifact remains retained. The scratch patch now skips only the pruned
+layer0 past-key upload at step978 and retains the replacement tensor pointer
+across the existing capture rename. The new weight-free `dia-key-graph-guard`
+reproduces both missing old lookups and verifies the corrected consumed values.
+It passes locally against the actual failed-run ggml libraries and exact
+c36dab89 headers; the worker runs it before downloading full model weights.
+The repaired full native control is still mandatory before interpreting arms.
