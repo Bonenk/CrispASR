@@ -50,9 +50,13 @@ Both anonymous full downloads match. Their immutable revision is
 ## Hosted factorial and controls
 
 The [heavy run38764924112](https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112)
-and [lint38764928533](https://github.com/CrispStrobe/CrispASR/actions/runs/38764928533)
-are submitted at the exact candidate source. Both are queued at this checkpoint;
-no hosted numerical pass or integration is claimed.
+remains queued at the exact candidate source. Latest
+[lint38767820341](https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341)
+is submitted at `b1de56284867dfcd45bc90289aadbb34a189f4e2`, superseding the earlier
+manual lint38764928533. This commit adds the completed
+[native query-producer isolation](dia-native-query-producer-2026-10-15.md);
+the full-model worker, patch, selftest and original-query producer are unchanged.
+No hosted numerical pass or integration is claimed.
 
 The arms are baseline, native Q/K substitution, replayed-original Q/native K,
 native Q/captured-original K, and replayed-original Q/captured-original K.

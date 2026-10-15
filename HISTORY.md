@@ -1,5 +1,20 @@
 # CrispASR — Port history
 
+## Dia native self-query arithmetic isolation completed — 2026-10-15
+
+Candidateb1de5628 reproduces the captured native step978 query byte-for-byte
+using only the physically verified16 MiB Q matrix and exact hosted ggml
+libraries. Native-owned input control and fresh one/four-thread repeats are
+exact; actual scale/head-order controls reject. Projection relative L2 is
+1.48096e-7; original pre-Q through native RoPE retains5.37147e-5 error, versus
+5.37020e-5 for native projection plus RoPE. This isolates operator arithmetic
+at this boundary without establishing sampling or speech causality. Independent
+audit verifies87 raw payloads and freshly reruns both ELF modes exactly.
+Complete98-payload public proof passes full anonymous hash verification.
+See the [native producer receipt](docs/dia-native-query-producer-2026-10-15.md).
+The diagnostic code is unmerged; hosted Q/K factorial, newest lint and
+integration remain active in PLAN.md.
+
 ## Dia original-module self-query proof completed — 2026-10-15
 
 The scoped original-module producer at candidateff7e07c0 captures actual Q

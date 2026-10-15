@@ -69,17 +69,22 @@ full-reference self-attention/output relative errors9.53e-7/1.08e-6, strict
 2e-6 reconstruction gates unchanged. Native versus replayed-original Q differs
 by5.37e-5. Independent49-payload audit and complete59-payload public proof pass;
 both full anonymous downloads verify. This is replay Q, not a previously
-captured full-model query. Candidateff7e07c0 is pushed; heavy38764924112 and
-lint38764928533 are submitted. Actual compiled file/axis guards, full patched
+captured full-model query. Hosted workerff7e07c0 is pushed; heavy38764924112 remains queued.
+Candidateb1de5628 adds the completed native producer; lint38767820341 is
+submitted on that source, superseding the earlier manual lint38764928533. Actual compiled file/axis guards, full patched
 runtime syntax and actual hosted-ggml paired-input graph guard pass. Audit the
 complete native controls and all hosted arms before interpreting or integrating.
 See the [preparation receipt](docs/dia-query-key-preparation-2026-10-15.md).
-While the hosted factorial is queued, prepare a one-step native query-producer
-probe using exact pinned C++/ggml source and the physically audited Q matrix.
-Require reproduction of the captured native query byte-for-byte before comparing
-projection and RoPE on identical owned inputs. Preserve one/four-thread repeats,
-scale/head-order rejection controls, full arrays and actual binary/library hashes.
-This bounded component probe does not repeat full speech or replace hosted gates.
+The bounded native query-producer probe is complete: captured query and native
+owned-input control byte-exact; one/four-thread repeats exact; scale/head-order
+controls reject. Independent87-payload audit and full98-payload anonymous proof
+pass, including a fresh public extraction and actual binary replay.
+Projection relative L2 is1.48e-7; original pre-Q through native RoPE still
+has5.37e-5 error. See the [native producer receipt](docs/dia-native-query-producer-2026-10-15.md)
+and HISTORY.md. Remaining: hosted factorial and newest lint terminal results,
+independent complete raw-array audit, then integration only if their gates pass.
+The hosted worker/patch/selftest bytes are unchanged fromff7e07c0; do not restart
+the full model solely for this standalone component addition.
 
 ## Dia correctness — early probe complete, full speech still open
 
