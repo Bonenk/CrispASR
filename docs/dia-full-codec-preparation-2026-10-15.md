@@ -124,7 +124,21 @@ fully anonymously downloaded/rehashed.
 [Corrected hosted dispatch38716091962](https://github.com/CrispStrobe/CrispASR/actions/runs/38716091962)
 adds huggingface_hub1.10.1, matching the successful local environment. Worker
 source/math remain unchanged at7b42071f; a separate README command correction
-is pushed as87a11e3d. The corrected hosted result is still pending.
+is pushed as87a11e3d. That rerun passed strict positive PCM (relative L2
+5.571705e-7) and produced all three complete decoded waveforms, then failed
+before ASR because ffmpeg was absent. Independent partial PCM/WAV/array audit
+passes; hosted ASR did not run. Its raw artifact22,828,110 bytes matches SHA256
+`e74d6a025bf0a89fcdcf4e1bfe1544fc9443ae87f538a77a70bca61657fa6bb0`.
+[Complete failed ffmpeg-attempt proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/0c3be77b4ed30830bce1f949d7f71dc014e0b2cf/dia-20261015-full-codec/complete-hosted-ffmpeg-failure-v1.zip)
+is22,807,538 bytes, SHA256
+`2e5afdfbe19754de03ac18b7e4e0791bb74fe8c594c61b0f1ba21cc0ded87761`,
+anonymously downloaded/rehashed with the raw log, artifact and partial audit.
+
+Prerequisite-only sourcea40755b7 now checks ffmpeg before expensive decoding
+and explicitly installs it only on GitHub-hosted Linux if missing.
+[Fresh hosted38723274160](https://github.com/CrispStrobe/CrispASR/actions/runs/38723274160)
+is submitted with the same pinned packages, actual model/source checks and
+unchanged strict PCM/ASR gates. It has no hosted success claim yet.
 
 ## Public preparation proof
 

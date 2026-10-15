@@ -262,7 +262,7 @@
     ],
     "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
   },
-  "hosted_run_status": "initial run failed missing huggingface_hub before original reference inference; corrected dispatch38716091962 queued",
+  "hosted_run_status": "first run missing huggingface_hub; second run strict PCM passed but ffmpeg missing before ASR; prerequisite-repaired run38723274160 submitted",
   "diagnosis_complete": true,
   "hosted_failed_attempt": {
     "passed": true,
@@ -292,5 +292,62 @@
     "status": "queued",
     "worker_code_changed": false,
     "readme_command_repair": "87a11e3dace40c5b2da5d19f44c053c630f07c50"
+  },
+  "second_hosted_failed_attempt": {
+    "raw_artifacts_verified": true,
+    "job": 116359021574,
+    "run": 38716091962,
+    "failure": "ffmpeg missing before ASR; strict original positive PCM passed",
+    "asr_ran": false,
+    "artifacts": [
+      {
+        "id": 11966906249,
+        "bytes": 22828110,
+        "sha256": "e74d6a025bf0a89fcdcf4e1bfe1544fc9443ae87f538a77a70bca61657fa6bb0"
+      }
+    ]
+  },
+  "second_hosted_partial_pcm_audit": {
+    "independent_partial_pcm_audit_pass": true,
+    "original_positive": {
+      "cosine": 0.9999999999998495,
+      "relative_l2": 5.571704739253249e-07,
+      "norm_error": 9.64232058642267e-08
+    },
+    "pcm": [
+      {
+        "name": "original-codes",
+        "samples": 619520,
+        "rms": 0.07353386837940307
+      },
+      {
+        "name": "native-complete-codes",
+        "samples": 563200,
+        "rms": 0.00015614702051855393
+      },
+      {
+        "name": "native-original-return-slice",
+        "samples": 562688,
+        "rms": 0.00015765062395714174
+      }
+    ],
+    "asr_ran": false,
+    "diagnosis_complete": false,
+    "whole_model_acceptance": false
+  },
+  "second_hosted_failure_publication": {
+    "revision": "0c3be77b4ed30830bce1f949d7f71dc014e0b2cf",
+    "file": "dia-20261015-full-codec/complete-hosted-ffmpeg-failure-v1.zip",
+    "bytes": 22807538,
+    "sha256": "2e5afdfbe19754de03ac18b7e4e0791bb74fe8c594c61b0f1ba21cc0ded87761",
+    "payloads": 13,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/0c3be77b4ed30830bce1f949d7f71dc014e0b2cf/dia-20261015-full-codec/complete-hosted-ffmpeg-failure-v1.zip"
+  },
+  "hosted_prerequisite_repair": {
+    "source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "run": 38723274160,
+    "status": "queued",
+    "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes"
   }
 }

@@ -1,5 +1,28 @@
 # CrispASR — Port history
 
+## Dia key-history producer diagnosis complete — 2026-10-15
+
+Actual original layer0 producer reconstructs979 captured steps within its fixed
+2e-6 gate (7.721e-7 measured); all11 required F32 coefficient mappings verify.
+The native producer reproduces its entire captured cache byte-exact, including
+1/4-thread controls. Error grows from2.240e-7 before RoPE to1.571e-5 after;
+feeding original pre-RoPE keys through native RoPE leaves1.571e-5. Independent
+full-array/coefficient/control audit passes. All98 proof payloads are public and
+anonymously SHA verified. Earlier source-RoPE free-speech failure stays rejected.
+Reusable tooling candidatec4a9a78e awaits lint/integration; no production change
+or speech acceptance. [Receipt](docs/dia-key-history-producer-2026-10-15.md).
+
+## Dia hosted ffmpeg prerequisite repair submitted — 2026-10-15
+
+Hosted38716091962 passes strict original PCM and decodes all3 complete arrays,
+then fails before ASR because ffmpeg is absent. Complete digest/CRC/path-verified
+raw artifact/logs and an independent partial PCM audit are publicly retained.
+Sourcea40755b7 checks ffmpeg before expensive decoding and installs it explicitly
+only on GitHub-hosted Linux. Hosted38723274160 is submitted with unchanged
+PCM/ASR gates; local complete diagnosis remains accepted. Neither failed hosted
+attempt establishes ASR success. [Receipt](docs/dia-full-codec-preparation-2026-10-15.md).
+
+
 ## Dia hosted codec import dependency corrected — 2026-10-15
 
 Initial hosted38710473906 fails before original reference inference because

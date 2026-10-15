@@ -63,7 +63,8 @@ Candidate fc1b05c922edfeece675a32f1b7855f588276968 is pushed. Actual original
 Torch2.6 witnesses regenerate byte-exact; old source fails12/16 cases, repaired
 source passes16/16, and restoring each of three defects independently rejects.
 Complete50-payload proof is public and anonymously SHA-verified. General
-CI38713471171 and lint38713474686 remain queued. Actual retained CLI/C-ABI
+CI38713471171 passes all13 jobs, including the real new protocol guard;
+lint38713474686 remains queued. Actual retained CLI/C-ABI
 predictions also match all1115 feedback/1114 returned rows/1099 codec frames
 against the original. Codec/ASR diagnosis is complete locally with strict
 original positive controls: both native-code variants still fail WER1.
@@ -75,36 +76,26 @@ pushed on its separate branch. Corrected hosted38716091962 passed strict PCM
 controls but failed before ASR because ffmpeg is absent. Maintainer now claims
 the scoped prerequisite check/bootstrap in the existing owned full-codec
 worktree/branch; preserve the complete second failed artifact/log, keep all
-numerical/ASR thresholds unchanged and resubmit exact fixed source. Audit fresh
-CI before runtime integration. Completed local
+numerical/ASR thresholds unchanged. Prerequisite-only source a40755b7 is pushed;
+fresh hosted38723274160 is queued. Independent partial hosted PCM audit passes
+while ASR did not run in the failed attempt. Complete raw failure proof is
+public/anonymous-SHA verified. Audit fresh CI before runtime integration. Completed local
 regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
 full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 
-## CLAIMED 2026-10-15 — Dia layer0 key producer across retained history
+## CLAIMED 2026-10-15 — Dia key-history diagnostic tooling integration
 
 Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-key-history-20261015,
-branch diag/dia-key-history-20261015. Models, builds and evidence under
-/mnt/storage/crispasr/dia-key-history-20261015. Read actual original embedding,
-normalization, key projection, RoPE and cache update before implementation.
-Reconstruct layer0 keys from retained shared input-token history using only the
-required physically hash-verified F32 coefficients. Compare actual captured
-original/native cache rows, pre/post-RoPE arithmetic and exact position/input
-alignment. Gate original reconstruction first; preserve any failed producer
-reconstruction rather than attributing it to native arithmetic. Use cosine,
-norms, relative error, and rejecting scale/position/head/input controls. Keep
-repeated and batched versus original one-step computation distinct. No full
-model load or unchanged source-RoPE/full-speech rerun; no seed/filter/default,
-model/speech/CUDA/Q4/performance promotion. This tests the larger measured
-self-key history effect rather than blindly replaying more decoder layers.
-
-Preparation verifies11 original F32 tensors, about80MB, and all979 shared token
-rows. Original one-step reconstruction passes at relative L2 7.721e-7; its last
-hidden input is exact. Native producer recreates all979 captured keys byte-exact,
-as do1/4-thread repeats. Pre-RoPE error2.240e-7 grows to1.571e-5 after RoPE;
-original-pre-RoPE/native-RoPE intervention leaves1.571e-5. Wrong-token control
-rejects at48.4% error; scale/head/position controls reject. Next independently
-audit complete arrays/coefficients and publish proof before accepting this
-component diagnosis. Earlier source-RoPE full-speech failure is still rejected.
+branch diag/dia-key-history-20261015; evidence under
+/mnt/storage/crispasr/dia-key-history-20261015. Candidate
+c4a9a78e643df6ee59bdc95fe36bae39e06adccd is pushed; lint38723508075 is submitted.
+Original/native producer diagnosis, independent full-array/physical-coefficient
+and rejecting-control audit are complete, with public anonymous SHA verification
+of all98 proof payloads. Source matches the actual tested/published bytes.
+Audit applicable terminal checks, rebase/ff tools only and remove the branch once
+accepted. No production/kernel/default or model/speech promotion is proposed.
+Completed results are in HISTORY.md and
+[the receipt](docs/dia-key-history-producer-2026-10-15.md).
 
 ## Dia correctness — early probe complete, full speech still open
 
@@ -119,9 +110,13 @@ The [complete-code original-DAC diagnosis](docs/dia-full-codec-preparation-2026-
 is complete, with original positive PCM relative L2 5.572e-7 and WER0. Both native
 full-code and original-return-slice variants remain near-silent with WER1 through
 the original DAC. Do not repeat that unchanged cross-decode or treat the scoped
-protocol fix as a speech repair. Next select a specific key-producer/history
-arithmetic mechanism using the retained owned-input evidence and measured
-46/904 CFG margin. Do not substitute seed/filter changes or another all-layer
+protocol fix as a speech repair. The key-history producer diagnostic is now
+complete: native normalization/projection error is about2e-7, while original
+pre-RoPE keys through native RoPE still differ by1.571e-5. Next run a distinct
+fixed-shared-history full-decoder intervention on GH: original layer0 key-prefix
+and current-key controls, measuring the46/904 CFG margin. First reproduce the
+baseline inputs/logits exactly; keep other caches/recipe unchanged and retain
+all arms. This needs a fresh claim before code, and is not full speech acceptance. Do not substitute seed/filter changes or another all-layer
 sweep. After a demonstrated repair, require actual fixed-recipe CLI/C-ABI
 speech, predetermined additional prompts/speakers/lengths/session reuse,
 original intermediate diff, DAC/ASR and actual CUDA. Q4/profiling follow speech

@@ -57,7 +57,8 @@
   "ci": {
     "general": 38713471171,
     "lint": 38713474686,
-    "status": "queued"
+    "status": "all13-general-jobs-pass-lint-pending",
+    "general_protocol_guard_executed": true
   },
   "separate_original_dac_run": 38710473906,
   "full_model_execution": false,
