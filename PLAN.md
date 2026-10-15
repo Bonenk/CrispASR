@@ -74,6 +74,12 @@ lint38764928533 are submitted. Actual compiled file/axis guards, full patched
 runtime syntax and actual hosted-ggml paired-input graph guard pass. Audit the
 complete native controls and all hosted arms before interpreting or integrating.
 See the [preparation receipt](docs/dia-query-key-preparation-2026-10-15.md).
+While the hosted factorial is queued, prepare a one-step native query-producer
+probe using exact pinned C++/ggml source and the physically audited Q matrix.
+Require reproduction of the captured native query byte-for-byte before comparing
+projection and RoPE on identical owned inputs. Preserve one/four-thread repeats,
+scale/head-order rejection controls, full arrays and actual binary/library hashes.
+This bounded component probe does not repeat full speech or replace hosted gates.
 
 ## Dia correctness — early probe complete, full speech still open
 
@@ -94,12 +100,10 @@ pre-RoPE keys through native RoPE still differ by1.571e-5. The completed
 [full-decoder key intervention](docs/dia-cache-intervention-results-2026-10-15.md)
 reproduces both native controls exactly. Original prefix/current/both keys all
 retain the reversed46/904 ordering: key-only substitution is insufficient.
-Next claim a matched current-query/key intervention, first verifying original
-query provenance, axes, pre/post-RoPE conventions and physical coefficients.
-The retained original GGUF has only decoder_block0_cross_q, not self-Q. First
-capture actual self-Q from the pinned original layer0 module, with a positive
-control reproducing retained original self-attention output. Do not reuse cross-Q
-or an unvalidated reconstruction. Then prepare the bounded GH replay.
+The matched query/key diagnostic is active in the claim above. Actual original
+module self-Q is captured with strict full-reference reconstruction and exact
+retained component controls; full-model self-Q was not previously captured.
+The five-arm GH replay is submitted, with no hosted numerical pass yet.
 Require exact baseline/native-QK controls and fixed other caches/recipe. Do not
 repeat unchanged key-only/all-layer source-RoPE speech runs, substitute seeds
 or relax filtering. This conditional diagnostic remains separate from speech.
