@@ -47,6 +47,11 @@ execution. A device run must use the matching SDK/runtime and select
 the310P composed-fallback task. That flag is intentionally inappropriate for
 a910B device supporting BF16 ADD. These physical paths remain unvalidated.
 
+The standalone executable imports the CANN target's configured SDK library
+search directories for static linkage. The SDK workflow retains the final
+link command as well as compiler commands. The first310P attempt compiled all
+backend sources but failed this final linkage; that attempt remains rejected.
+
 This is operator/scheduler preparation, not full-model speech, ACL capture/
 replay, quantization or performance acceptance. ACL build flags or repeated
 correct outputs alone do not prove that capture/replay executed. Keep the

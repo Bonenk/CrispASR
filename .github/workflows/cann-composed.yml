@@ -94,6 +94,7 @@ jobs:
             build-sdk/bin/cann-composed
             build-sdk/CMakeCache.txt
             build-sdk/compile_commands.json
+            build-sdk/CMakeFiles/cann-composed.dir/link.txt
             build-sdk/executable.sha256
             build-sdk/ldd.txt
           if-no-files-found: error
