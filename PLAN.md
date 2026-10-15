@@ -44,6 +44,29 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — Dia one-step decoder suffix and margin localization
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-dia-suffix-20261015, branch diag/dia-suffix-20261015;
+large inputs, builds and evidence under /mnt/storage/crispasr/dia-suffix-20261015.
+Prepare a scratch-only patch of pinned runtime8d0ad886 that imports the audited
+native18-layer self-cache prefix and executes only step978. Preserve original
+encoder/cross-cache construction, actual graph expressions and forced token row.
+Require that one-step baseline reproduces every retained native stage and final
+logit exactly. Then replace one decoder-layer output with its captured native
+value as a byte-exact control before using actual captured original outputs.
+Retain calculated and consumed activation arrays, all18 layer stages, final
+hidden/logits/norms and original sampler46/904 margin/ranks/support. Keep other
+caches, inputs and recipe fixed. Preserve pruned graph intermediates explicitly
+and use owned pointers for renamed replacement leaves. Tiny tests must exercise
+prefix layout/last-position exclusion, malformed-file rejection and actual ggml
+graph ownership. Local preparation is bounded to those tests and full-source
+syntax checking against pinned headers; full F32 execution belongs on GH.
+Skipping prefix inference does not reproduce the original RNG stream and cannot
+prove sampled trajectory/speech. No production graph/default/model pin change,
+unchanged full-speech replay or acceptance from component/rank improvements.
+Close simultaneous original full-model self-Q provenance as a separate follow-up.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
