@@ -34,6 +34,17 @@ retained. This component diagnosis does not establish model or speech parity.
 
 ## Script contract
 
+`dia_full_codec_crossdecode.py` replays retained native stopping/BOS/delay
+records, verifies every feedback row and complete code/PCM frame count, then
+runs the actual pinned original DAC on the native codes and original-code
+positive control. It also replays the original Python generation protocol on
+those retained predictions to audit its returned slice, without neural-model
+inference. Full PCM/norm/RMS and fixed original Whisper ASR results survive;
+positive PCM/zero-WER controls are required, while native speech remains a
+separate unaccepted model gate. No production graph/default changes.
+Run with `-f pip="numpy==1.26.4 torch==2.6.0 torchaudio==2.6.0 torchvision==0.21.0 pydantic==2.11.3 descript-audio-codec==1.0.0 descript-audiotools==0.7.2 openai-whisper==20250625"`.
+Use `--self-test` for scale/order/shape/nonfinite/zero-norm rejection controls.
+
 `cann_model_fixture.py` prepares a CPU-only Moonshine Tiny fixture for future
 CANN model validation. It freshly converts immutable original weights, checks
 every converted coefficient against the physically F32 regression model, uses the
