@@ -1,5 +1,16 @@
 # CrispASR — Port history
 
+## Dia full-decoder key intervention preparation — 2026-10-15
+
+Prepared the bounded diagnostic worker at2f04f4e6 and verified local axis
+ownership, malformed input rejection through the actual compiled C++ loader,
+exact pinned-source patch application and patched-runtime C++ syntax. Published
+and anonymously SHA-verified the31-payload fixed979-step input bundle. These
+preparation actions are complete; full-model intervention and lint remain
+queued in38726696058/38726699171 and are tracked in PLAN.md. No numerical,
+speech or GPU acceptance. See the
+[preparation receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
+
 ## Dia original output-protocol repair integrated — 2026-10-15
 
 Candidatefc1b05c922edfeece675a32f1b7855f588276968 passes all13 general CI jobs

@@ -57,6 +57,13 @@ head2 CFG46/904 margin/ranks/support. Validate actual file/axis provenance and
 reject malformed inputs. Key-only results are conditional; they do not prove
 joint Q/K causality or model speech acceptance. No production default change,
 full-model VPS execution, seed/filter workaround or unchanged speech rerun.
+Candidate2f04f4e6 is pushed. Heavy38726696058 and lint38726699171 are submitted
+and queued; no hosted numerical result yet. Local actual file-reader/axis
+guards and full patched-runtime syntax pass. The immutable31-payload input
+fixture is public and anonymously full-SHA verified. Audit the baseline first,
+then all conditional arms; retain failures and update the
+[preparation receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
+
 
 ## CLAIMED 2026-10-15 — Dia hosted codec prerequisite completion
 
@@ -105,7 +112,7 @@ pre-RoPE keys through native RoPE still differ by1.571e-5. Next run a distinct
 fixed-shared-history full-decoder intervention on GH: original layer0 key-prefix
 and current-key controls, measuring the46/904 CFG margin. First reproduce the
 baseline inputs/logits exactly; keep other caches/recipe unchanged and retain
-all arms. This needs a fresh claim before code, and is not full speech acceptance. Do not substitute seed/filter changes or another all-layer
+all arms. The owned claim above is active; this is not full speech acceptance. Do not substitute seed/filter changes or another all-layer
 sweep. After a demonstrated repair, require actual fixed-recipe CLI/C-ABI
 speech, predetermined additional prompts/speakers/lengths/session reuse,
 original intermediate diff, DAC/ASR and actual CUDA. Q4/profiling follow speech

@@ -1,0 +1,25 @@
+{
+  "candidate_source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+  "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+  "heavy_run": 38726696058,
+  "lint_run": 38726699171,
+  "hosted_status": "queued",
+  "local_preparation": {
+    "axis_ownership_pass": true,
+    "compiled_file_loader_pass": true,
+    "pinned_patch_applies": true,
+    "patched_runtime_syntax_pass": true
+  },
+  "input_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "5e2fc2430413357a21807cd0350960aeeb6fe183",
+    "path": "dia-20261015-cache-intervention/fixed-history-inputs-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5e2fc2430413357a21807cd0350960aeeb6fe183/dia-20261015-cache-intervention/fixed-history-inputs-v1.zip",
+    "bytes": 138612077,
+    "sha256": "a0c7e2e876394469e07a455095cf79f6e004c1d2087f3ce4fb671dedbb567d52",
+    "anonymous_full_sha256_verified": true
+  },
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "production_defaults_changed": false
+}
