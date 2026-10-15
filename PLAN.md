@@ -42,6 +42,22 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — Dia full-decoder layer0 key intervention
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-dia-cache-intervention-20261015, branch
+diag/dia-cache-intervention-20261015; evidence under
+/mnt/storage/crispasr/dia-cache-intervention-20261015. Prepare a diagnostic-only
+GH heavy-CPU replay using the pinned boundary runtime and immutable original
+step978 fixture. First require byte-exact baseline input/logit reproduction.
+Then replace layer0 original key prefix only, current key only, and both at
+step978, holding other caches, Q, masks, weights and sampling recipe fixed.
+Retain every arm and compare final-stage cosine, norms, relative L2 and the
+head2 CFG46/904 margin/ranks/support. Validate actual file/axis provenance and
+reject malformed inputs. Key-only results are conditional; they do not prove
+joint Q/K causality or model speech acceptance. No production default change,
+full-model VPS execution, seed/filter workaround or unchanged speech rerun.
+
 ## CLAIMED 2026-10-15 — Dia hosted codec prerequisite completion
 
 Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-full-codec-20261015,
