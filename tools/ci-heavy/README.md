@@ -42,6 +42,14 @@ kernel shape/reduction effects from full-model behavior. `dia_cfg_margin.py`
 explains the actual four-logit CFG rank margin without running inference.
 See the [attention arithmetic method](dia-attention-arithmetic/README.md).
 
+`dia_self_query.py` captures actual pinned original self-attention Q with
+physically verified coefficients, exact retained component controls and strict
+full-reference reconstruction gates. `dia_query_key_intervention.py` then
+prepares a conditional five-arm full-decoder Q/K factorial. The replayed query
+is explicitly distinguished from an earlier full-model query capture. Native
+controls and actual consumed tensors must remain exact; no speech or default
+acceptance follows. See the [query/key method](dia-query-key-intervention/README.md).
+
 `omnivoice_audio_parity.py` is the standalone utility split from draft PR521.
 It executes hash-pinned original numpy/pydub functions against the preserved C++
 helper/probe on738 waveform and18 text cases, retaining full inputs and both
