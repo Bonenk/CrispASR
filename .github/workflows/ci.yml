@@ -180,6 +180,9 @@ jobs:
       - name: Run the unit tier
         run: ctest --test-dir build -L unit -E live --output-on-failure --timeout 300
 
+      - name: Dia original generation and codec-input protocol
+        run: python3 tests/test_dia_output_protocol.py -v
+
       - name: TTS session failure, ownership and conversion contracts
         run: python3 tests/test_tts_session_contracts.py -v
 

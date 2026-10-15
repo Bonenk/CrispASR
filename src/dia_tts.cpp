@@ -636,7 +636,10 @@ static bool dia_check_stopping(dia_tts_context& ctx, uint32_t max_steps) {
     auto& m = ctx.model;
     auto& tokens = ctx.current_audio_tokens;
 
-    if (ctx.delay_steps == -1 && (tokens[0] == m.eos_token_id || ctx.current_position >= max_steps - m.max_delay - 1)) {
+    // The original restarts the countdown at the capacity boundary even if
+    // EOS was already seen. Signed arithmetic also preserves tiny token caps.
+    if ((ctx.delay_steps == -1 && tokens[0] == m.eos_token_id) ||
+        (int64_t)ctx.current_position == (int64_t)max_steps - m.max_delay - 1) {
         ctx.delay_steps = (int)m.max_delay;
     }
 
@@ -665,21 +668,12 @@ static void dia_revert_delay(const std::vector<uint32_t>& raw_tokens, std::vecto
     filtered.reserve(valid_steps * m.n_output_heads);
 
     for (size_t t = 0; t < valid_steps; t++) {
-        bool skip = false;
         for (int c = 0; c < (int)m.n_output_heads; c++) {
             size_t src_t = t + m.delay_pattern[c];
             size_t idx = src_t * m.n_output_heads + c;
-            if (idx >= raw_tokens.size() || raw_tokens[idx] >= m.audio_vocab_size) {
-                skip = true;
-                break;
-            }
-        }
-        if (!skip) {
-            for (int c = 0; c < (int)m.n_output_heads; c++) {
-                size_t src_t = t + m.delay_pattern[c];
-                size_t idx = src_t * m.n_output_heads + c;
-                filtered.push_back(raw_tokens[idx]);
-            }
+            // Python preserves the frame and zeros each invalid codebook
+            // index separately; dropping it changes timing in every channel.
+            filtered.push_back(idx < raw_tokens.size() && raw_tokens[idx] < m.audio_vocab_size ? raw_tokens[idx] : 0);
         }
     }
 }
@@ -2061,6 +2055,10 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
             }
 
             if (stop) {
+                // Original generate() breaks before incrementing dec_step;
+                // its returned slice excludes the row just written. Forced
+                // diagnostic paths bypass stopping and keep their full rows.
+                ctx->output_tokens.resize(ctx->output_tokens.size() - m.n_output_heads);
                 if (p.verbosity >= 1)
                     fprintf(stderr, "dia_tts: stopped at step %u\n", step + 1);
                 break;
