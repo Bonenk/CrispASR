@@ -42,28 +42,18 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia tiny invariants and exact-input attention arithmetic
+## CLAIMED 2026-10-15 — Dia attention arithmetic tooling integration
 
 Owner: maintainer session. Owned worktree
 /mnt/volume1/crispasr-dia-attention-20261015, branch diag/dia-attention-20261015;
 all builds, tensors and evidence under /mnt/storage/crispasr/dia-attention-20261015.
-User requests small tensors to isolate the mathematical source of divergence.
-Implement a standalone bridge using the literal pinned ggml attention sequence:
-GQA expansion, QK products, scale=1 softmax, and probability-weighted V. Check
-analytically constructed tiny pairing/grouping/batch/scale and softmax controls
-before feeding the actual original replay Q/K/V from the accepted step978 proof.
-Keep actual original SDPA distinct from any explicit shadow decomposition.
-Capture scores, probabilities and weighted values; inject original shadow scores
-and probabilities to isolate each arithmetic boundary. Require a native-owned
-Q/K/V control to reproduce the hosted attention exactly, fresh repeats and
-one/four-thread agreement, actual scale/head-order negative controls, and
-independent raw-array/magnitude audit. Reuse the completed head-isolation proof;
-recompute the four disputed logits' CFG margin decomposition and retain source
-and input hashes rather than rerunning an unchanged full-model head experiment.
-No full model or new speech run on VPS, production/default change, altered
-sampling recipe, or component-to-speech acceptance claim. Publish complete
-reproducible evidence and update HISTORY/PLAN when complete. The separate hosted
-Q/K factorial remains pinned and must not be restarted for this component probe.
+The user-requested tiny/exact-input attention diagnosis is complete, independently
+audited and public; see [results](docs/dia-attention-arithmetic-2026-10-15.md)
+and HISTORY.md. Candidate95ade290 preserves all tested e6be594f tool bytes after
+rebasing independently onto main. Lint38771099343 is queued at95ade290.
+Remaining: applicable lint terminal pass,
+then integrate the standalone tools without the separate unvalidated Q/K worker.
+Full speech/rank repair remains unproven; no production/default change.
 
 ## CLAIMED 2026-10-15 — Dia original self-query and joint Q/K intervention
 

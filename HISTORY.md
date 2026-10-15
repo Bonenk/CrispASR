@@ -1,5 +1,23 @@
 # CrispASR — Port history
 
+## Dia tiny cancellation and exact-input attention diagnosis completed — 2026-10-15
+
+Tested e6be594f / byte-equivalent standalone candidate95ade290 establishes exact
+native-hosted and original-module attention controls. Tiny head/batch/scale
+invariants pass; actual wrong-scale/head-order/doubled-value executions reject.
+Four cancellation terms give exact/Python0.5 versus native0.25, independently
+reproduced by float32 accumulation. Original Q/K/V through native attention has
+relative L2 4.8023e-7; original probabilities through native value multiplication
+retain4.6733e-7. The worst component reduces exactly to one979-term native dot.
+Native is closer to the high-precision sum for that actual dot; original Torch
+scalar and full-matrix dispatch differ. Four incoming logits explain the CFG
+margin swap exactly; float64 CFG does not change the margins. Independent565
+payload/99-metric audit and18 fresh ELF case/modes pass. Complete816-payload
+public proof passes anonymous hashes/CRC and both fresh extracted audits.
+See [full arithmetic receipt](docs/dia-attention-arithmetic-2026-10-15.md).
+Tool integration remains pending lint in PLAN.md. No full-decoder causal
+attribution, speech repair, GPU/Q4/performance or default acceptance follows.
+
 ## Dia native self-query arithmetic isolation completed — 2026-10-15
 
 Candidateb1de5628 reproduces the captured native step978 query byte-for-byte
