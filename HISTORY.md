@@ -1,5 +1,16 @@
 # CrispASR — Port history
 
+## Dia one-step replay preparation completed — 2026-10-15
+
+Candidate70f2d9de is prepared on its owned diagnostic worktree. Tiny actual ggml
+cache-prefix/renamed-input/producer-root guards, exact finite activation loader,
+ZIP integrity/path and lossless cache reconstruction controls, complete patched
+runtime syntax against pinned headers and format18 pass locally. Hosted37-arm
+baseline/native/original replay and lint are submitted but queued. No new model,
+rank, speech or GPU result is established and candidate tools are not integrated.
+Active execution/audit/integration stays in PLAN.md;
+[preparation and immutable run links](docs/dia-suffix-replay-preparation-2026-10-15.md).
+
 ## Dia full-decoder Q/K diagnosis and standalone tools integrated — 2026-10-15
 
 Tool integrations f38980ce / 63780005 preserve tested source95ade290 / b1de5628

@@ -67,6 +67,22 @@ prove sampled trajectory/speech. No production graph/default/model pin change,
 unchanged full-speech replay or acceptance from component/rank improvements.
 Close simultaneous original full-model self-Q provenance as a separate follow-up.
 
+**Checkpoint:** candidate70f2d9de678b31f6b55f957e3a721aa91bf0af88 pushed on
+`diag/dia-suffix-20261015`. [Heavy38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943)
+and [lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203)
+are queued; no new numerical result. The actual ggml prefix/ownership guard,
+finite-file/path/integrity/lossless-reconstruction controls, full patched-source
+syntax against pinnedC36 headers, format18 and all4 unskipped secret tests pass
+locally. The hosted worker requires all127 captured baseline stages/logits and
+all18 native clamps exact before18 original activation clamps. It additionally
+captures all18 cross K/V pairs and verifies every arm identical. Cache captures
+use reconstruction-verified baseline references/current-row deltas, retaining
+complete byte hashes and actual current rows. [Preparation](docs/dia-suffix-replay-preparation-2026-10-15.md).
+Next: inspect terminal jobs, independently audit the complete artifact including
+lossless reconstruction and original Torch2.6 sampling, then integrate accepted
+method bytes and choose the first controlled suffix/within-layer experiment.
+Do not resubmit unchanged jobs while queued or send this CPU task to Kaggle.
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
