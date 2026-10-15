@@ -56,17 +56,21 @@ compile against official SDKs and preserve metadata. Physical execution remains
 pending. This does not establish ACL capture/replay, model speech, quantization
 or speed; no backend default/kernel changes are intended.
 
-Candidate81d8e279 is submitted; hosted CPU/SDK workflow38698323227, general
-CI38698330667, lint38698334091 and secret scan38698323280 await completion.
-Hosted CPU is independently audited. The310P SDK compile reaches final linking
-but fails because static ggml-cann private SDK link directories do not propagate
-to the standalone executable. Failed source81d8e279/log/artifact are retained.
-Repair the probe consumer CMake linkage without production/kernel changes;
-revalidate CPU and both official SDK configurations on a new candidate.
-The910B job remains in progress; MiMo workflow38703457282 remains queued.
-Audit terminal results and integrate only after applicable checks pass.
-Completed local CPU evidence is in HISTORY.md and
-[the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
+Original81d8e279 passes hosted CPU but both SDK jobs fail the final executable
+link; full rejected logs and both raw digest-verified artifacts are retained.
+The probe-only consumer repair is rebased onto current main at candidate
+f19d41698eccf951c7aade9769d44f9bd263146a. Fresh local CPU passes all five
+contracts and independent12,288 matrix/12,288 final values. The original/fixed
+CMake-generation control confirms only the repaired final command includes the
+configured SDK library directory, without claiming an installed SDK or NPU.
+The complete146-payload repair proof is public and anonymously SHA-verified.
+
+New composed CPU/SDK workflow38706162449, general CI38706180793,
+lint38706184333 and secret scan38706162315 are submitted on that exact source.
+Audit their terminal results and integrate only after applicable checks pass.
+Physical composed fallback/model/ACL/performance acceptance remains open.
+Completed CPU/configuration work and rejected first SDK attempts are in
+HISTORY.md and [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
 
 ## Dia correctness — early probe complete, full speech still open
 

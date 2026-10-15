@@ -31,7 +31,7 @@
     "general": 38698330667,
     "lint": 38698334091,
     "secret": 38698323280,
-    "status": "hosted-cpu-accepted-310p-final-link-failed-910b-in-progress"
+    "status": "original-cpu-accepted-both-sdk-final-links-failed-original-secret-passed"
   },
   "physical_cann_execution": false,
   "acl_capture_replay_acceptance": false,
@@ -58,5 +58,88 @@
     "artifact_sha256": "c3ceb8cd15476fdb4633201b0618e1a6030b592b56bda9f5d6548eb6d3ca0efc",
     "failure": "CANN source libraries compiled; standalone static executable linker cannot find ascendcl, nnopbase, opapi and acl_op_compiler. Private ggml-cann SDK link directories do not propagate to the consumer.",
     "accepted": false
+  },
+  "sdk910b_failed_attempt": {
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "job": 116303015497,
+    "artifact": 11957628767,
+    "artifact_sha256": "b68db0a1453439da86dde3e492405a7d340d8e96b5fb733c5935163af3675831",
+    "failure": "CANN source libraries compiled; standalone static executable linker cannot find ascendcl, nnopbase, opapi and acl_op_compiler. Private ggml-cann SDK link directories do not propagate to the consumer.",
+    "accepted": false
+  },
+  "repair": {
+    "candidate_source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+    "integrated": false,
+    "scope": "Only standalone consumer CMake SDK search directories, retained link commands and documentation. No production/kernel/default changes.",
+    "independent_local_cpu_audit": {
+      "passed": true,
+      "scope": "Independent fresh local CPU audit after standalone CMake link repair; no CANN SDK or device execution",
+      "actual_computes": 18,
+      "independent_matrix_values": 12288,
+      "independent_final_values": 12288,
+      "scale_negative_controls": 18,
+      "rejected_invalid_requests": 8,
+      "tested_elf_sha256": "51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf"
+    },
+    "configure_guard": {
+      "passed": true,
+      "scope": "Actual CMake generation only: original final link misses the static backend SDK search directory, corrected consumer includes it. No SDK headers/libraries installed or compiled; no executable or NPU validation.",
+      "rows": [
+        {
+          "method": "original",
+          "command": [
+            "cmake",
+            "-S",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/original",
+            "-B",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/original/build",
+            "-DGGML_CANN=ON",
+            "-DSOC_TYPE=ascend310p",
+            "-DUSE_ACL_GRAPH=OFF",
+            "-DGGML_NATIVE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DCANN_INSTALL_DIR=/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/intentionally-not-installed-sdk"
+          ],
+          "sdk_search_path_present": false,
+          "configure_source_sha256": "bc34fe97d47f49f27ccdc282c8ee6ccfdab7c5cfcfcac3ae4a402cffac59d4dc"
+        },
+        {
+          "method": "fixed",
+          "command": [
+            "cmake",
+            "-S",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/fixed",
+            "-B",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/fixed/build",
+            "-DGGML_CANN=ON",
+            "-DSOC_TYPE=ascend310p",
+            "-DUSE_ACL_GRAPH=OFF",
+            "-DGGML_NATIVE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DCANN_INSTALL_DIR=/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/intentionally-not-installed-sdk"
+          ],
+          "sdk_search_path_present": true,
+          "configure_source_sha256": "45dc160af7bdc24cf2413a59037591c88baeac3986179a289a49f6da014a7aa1"
+        }
+      ]
+    },
+    "publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "file": "cann-20261015-composed/static-link-repair-v2.zip",
+      "bytes": 988939,
+      "sha256": "7447eee8c9d0d7f53b6df73a93c68378077badeef5d5d8c809a4a9ac7a09ceaf",
+      "payloads": 146,
+      "source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+      "anonymous_verified": true,
+      "revision": "138b0dd326c6746854f00a80b500ed9959920fe4",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/138b0dd326c6746854f00a80b500ed9959920fe4/cann-20261015-composed/static-link-repair-v2.zip"
+    },
+    "ci": {
+      "composed": 38706162449,
+      "general": 38706180793,
+      "lint": 38706184333,
+      "secret": 38706162315,
+      "status": "submitted-not-yet-accepted"
+    }
   }
 }

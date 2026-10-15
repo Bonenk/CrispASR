@@ -7,6 +7,20 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## CANN standalone SDK link repair prepared — 2026-10-15
+
+Both initial official SDK builds compile the CANN backend but reject the final
+static probe link because private SDK search directories do not propagate.
+Full failure logs and both raw artifact ZIPs are retained with verified GitHub
+digests. Candidate f19d4169 rebases the probe onto current main and forwards the
+configured directories only to the standalone consumer; production is unchanged.
+Fresh CPU passes all five contracts,18 computes and independent12,288 matrix/
+12,288 final values. An original/fixed actual CMake-generation control observes
+the missing/present SDK directory without SDK or NPU execution. The146-payload
+repair proof is public and anonymously verified. New official SDK/general/lint
+checks remain required before integration; no hardware/model/ACL/speed acceptance.
+[Full receipts](docs/cann-composed-preparation-2026-10-15.md).
+
 ## MiMo Q4 projection amplification isolated — 2026-10-15
 
 The bounded real CPU Q4_K gate experiment is complete: dynamic Q8_K activation

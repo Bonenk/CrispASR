@@ -1,6 +1,6 @@
 # CANN composed scheduler probe: CPU proof, hardware pending
 
-Candidate `81d8e279b2e739f85219c15e9ded31895e51d53d` prepares the mixed-graph fallback task after merged PR544.
+Initial candidate `81d8e279b2e739f85219c15e9ded31895e51d53d` prepares the mixed-graph fallback task after merged PR544.
 It adds a standalone actual ggml graph and a dedicated immutable-source CPU/SDK
 workflow. Production kernels/defaults and model behavior are unchanged.
 
@@ -40,10 +40,39 @@ complete returned arrays, verifies18 scale negatives and8 rejected requests,
 and hashes the actual returned ELF. Raw artifact827,670 bytes has SHA256
 `6d97f14420389221bfa4703f83cf2cefb9fa47d7d340455376da775fe21e56ce`,
 matching GitHub's artifact digest exactly. The full raw ZIP and job log are
-retained under storage. Both SDK jobs are queued; general/lint/secret gates
-remain pending. SDK jobs retain actual executables, compiler
-metadata and loader reports; hosted runners cannot execute the NPU path.
-The candidate is not integrated pending those checks.
+retained under storage. The original secret scan passes. Both original SDK jobs
+compile the backend but fail the final static executable link: the SDK library
+names propagate from ggml-cann while its private search directories do not.
+Both failed raw artifacts match their GitHub SHA256 digests and their full job
+logs remain preserved. They do not establish successful executable compilation.
+
+## Static consumer repair
+
+Rebased candidate `f19d41698eccf951c7aade9769d44f9bd263146a` forwards the
+backend target's configured SDK link directories to this standalone executable.
+It hardcodes no SDK path and changes no production/kernel/default code. The
+workflow additionally retains its final linker command.
+
+A fresh CPU build passes all five contracts and independently recalculates
+12,288 matrix/12,288 final values,18 scale negatives and8 rejected requests.
+Its actual executable SHA remains
+`51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf`.
+An actual CMake-generation comparison confirms that the original final link
+omits the configured SDK directory and only the corrected link includes it.
+That configure-only control installs or executes no fake SDK; real official
+SDK executable compilation remains a separate required gate.
+
+[Complete146-payload repair proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/138b0dd326c6746854f00a80b500ed9959920fe4/cann-20261015-composed/static-link-repair-v2.zip) contains the fresh CPU arrays/executable,
+compiler/source metadata, independent audit, original/fixed generated commands,
+and both rejected SDK logs/raw ZIPs. It is988,939 bytes, SHA256
+`7447eee8c9d0d7f53b6df73a93c68378077badeef5d5d8c809a4a9ac7a09ceaf`, fully and anonymously downloaded/rehashed.
+
+[New composed CPU/SDK run](https://github.com/CrispStrobe/CrispASR/actions/runs/38706162449),
+[general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/38706180793),
+[lint](https://github.com/CrispStrobe/CrispASR/actions/runs/38706184333) and
+[secret scan](https://github.com/CrispStrobe/CrispASR/actions/runs/38706162315)
+target the repaired candidate. These submitted jobs remain unaccepted pending
+terminal artifact audits. The candidate is not integrated.
 
 Physical310P composed fallback, full-model NPU speech,910B ACL capture/replay,
 quantization and performance remain open. An ACL build flag or repeated output
