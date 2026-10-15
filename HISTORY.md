@@ -32267,3 +32267,58 @@ recipe, compare embedding/hidden inputs and actual self-prefix separately.
 Do not load the full model or rerun accepted late-layer probes. Results:
 docs/dia-layer16-owned-input-results-2026-10-15.md/.json. Main integration
 source e07d7363 has secret scan and Docker green; other applicable CI pending.
+
+## Dia layer0 replay and split self-cache proof — 2026-10-15
+
+The claimed early-layer replay is complete. All13 original F32 tensors and14
+mapped native payloads match physical hashes. Native output reproduces hosted
+bytes and one/four-thread repeats exactly;39 comparisons and32 magnitude
+negatives independently pass their declared positive/rejecting gates. The
+incoming hidden state is identical. Eight original context interventions and
+four split key/value contexts retain actual inputs and separate process outputs;
+all64 split-stage rows and two real wrong-cache controls are independently
+audited. Key-only output effect3.366e-6 exceeds value-only1.397e-7 in this
+fixture; it is not an additive attribution or a proved sole speech cause.
+All283 payloads are publicly archived and anonymously SHA-verified. No new
+runtime fix, speech/Q4/GPU/performance/default acceptance. Detailed results:
+docs/dia-layer0-owned-input-results-2026-10-15.md/.json.
+
+Completed claim and acceptance scope:
+
+## CLAIMED 2026-10-15 — Dia early decoder owned-input isolation
+
+Owner: maintainer session. Controller worktree:
+/mnt/volume1/crispasr-decoder-boundary-tracking-20261013. Bounded diagnostic
+method remains in the owned Dia diagnostic worktree; artifacts and actual
+execution use /mnt/storage/crispasr/dia-layer0-owned-replay-20261015.
+
+Hypothesis: distinguish same-input layer0 arithmetic from incoming embedding,
+actual self-prefix and cross-cache differences at the shared-history step978,
+before choosing a layer2/3 replay. The all-layer cumulative scan peaks at
+layer3 (relative L2 3.806e-6); this does not establish a causal layer3 defect.
+Use actual original DecoderLayer and literal native expressions, only this
+layer's immutable-range coefficients, physical F32 mapping checks and captured
+inputs/cache prefixes. Require native output to reproduce its hosted capture,
+per-stage cosine/norm/error metrics, repeats/thread controls and rejecting real
+cache/scale controls. Preserve each process's outputs separately, including any
+failure; original cross-process exactness is unresolved in the previous probe.
+No full-model load, changed seed/prompt/filter/gate, new kernel/default, speech
+acceptance or performance claim from this diagnostic.
+
+After a demonstrated defect, fix only that defect with an observed failing
+regression, then use GH/Kaggle for fresh fixed-recipe native CLI/C-ABI speech
+and original diff. After fixed-prompt success, cover more prompts, speakers,
+lengths, session reuse, DAC/ASR and actual CUDA. Q4 and profiling follow output
+acceptance. If no defect is found, retain the result and choose a new localized
+hypothesis rather than replaying every layer blindly.
+
+Evidence to consult, not redo:
+- [First F32 divergence](docs/dia-f32-first-divergence-2026-10-14.md):979 shared
+  inputs, first differing draw step978/head2, nucleus membership46/904.
+- [Layer16 and cumulative scan](docs/dia-layer16-owned-input-results-2026-10-15.md)
+  and [layer17](docs/dia-layer17-owned-input-results-2026-10-14.md): same-input
+  component checks pass, native hosted outputs exact; full speech still fails.
+- [Integrated top-k repair](docs/dia-topk-selection-2026-10-14.md): separate
+  recipe defect,18,288 captured probability/sample rows unchanged; not a speech fix.
+- Completed cache/GQA/attention, MLP, query/RoPE, codec-precision and capture
+  transparency proofs are indexed in the archived plan and docs.

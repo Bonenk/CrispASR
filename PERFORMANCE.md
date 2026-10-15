@@ -3629,3 +3629,14 @@ and all18-layer scan archives are public and anonymously SHA-verified.
 Cumulative drift peaks earlier at layer3 (3.806e-6); no layer16 repair,
 full-speech/Q4/GPU/performance or release acceptance is inferred. Details:
 [Dia layer16 and scan](docs/dia-layer16-owned-input-results-2026-10-15.md).
+
+## Dia early layer and actual self-cache history (2026-10-15)
+
+Layer0 reproduces native hosted output and repeated one/four-thread runs
+byte-exact. The incoming hidden state is identical; split original-module
+interventions localize the larger context effect to actual self-cache keys
+(3.366e-6 relative L2) rather than values(1.397e-7). Independent audits cover
+39 main rows,32 scale negatives,8 owned contexts,64 split-stage rows and2 real
+wrong-cache controls. Complete283-payload evidence is public and anonymously
+SHA-verified. No new runtime repair, speech/Q4/GPU/performance/default acceptance.
+See [layer0 proof](docs/dia-layer0-owned-input-results-2026-10-15.md).

@@ -175,8 +175,9 @@ server cache-policy cases separately cover transcript-sidecar changes; actual
 server requests cover voice speech, reuse, unknown-voice rejection and recovery.
 The policy controls are not described as model-executed sidecar tests.
 
-Final integrated-main CI and the subsequent tagged packaging jobs remain release
-gates. Individual passing PR checks establish the scope shown above; they do
+Integrated main1c33cb58 now passes all13 general CI jobs,2,026 unit tests and
+all10 lint checks. Fresh frozen-source package/wheel validation and subsequent
+tagged packaging remain release gates. Individual passing PR checks do
 not establish that v0.8.44 binary assets or wheels have already been built or
 published. Version propagation and the annotated tag must use
 `scripts/bump-version.sh` after final-main CI passes.
@@ -595,3 +596,14 @@ and all18-layer scan archives are public and anonymously SHA-verified.
 Cumulative drift peaks earlier at layer3 (3.806e-6); no layer16 repair,
 full-speech/Q4/GPU/performance or release acceptance is inferred. Details:
 [Dia layer16 and scan](docs/dia-layer16-owned-input-results-2026-10-15.md).
+
+## Dia early layer and actual self-cache history (2026-10-15)
+
+Layer0 reproduces native hosted output and repeated one/four-thread runs
+byte-exact. The incoming hidden state is identical; split original-module
+interventions localize the larger context effect to actual self-cache keys
+(3.366e-6 relative L2) rather than values(1.397e-7). Independent audits cover
+39 main rows,32 scale negatives,8 owned contexts,64 split-stage rows and2 real
+wrong-cache controls. Complete283-payload evidence is public and anonymously
+SHA-verified. No new runtime repair, speech/Q4/GPU/performance/default acceptance.
+See [layer0 proof](docs/dia-layer0-owned-input-results-2026-10-15.md).

@@ -41,43 +41,46 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia early decoder owned-input isolation
+## CLAIMED 2026-10-15 — CANN composed fallback probe preparation
 
-Owner: maintainer session. Controller worktree:
-/mnt/volume1/crispasr-decoder-boundary-tracking-20261013. Bounded diagnostic
-method remains in the owned Dia diagnostic worktree; artifacts and actual
-execution use /mnt/storage/crispasr/dia-layer0-owned-replay-20261015.
+Owner: maintainer session. New owned worktree:
+/mnt/volume1/crispasr-cann-composed-20261015, branch
+prepare/cann-composed-probe-20261015. Builds/artifacts under
+/mnt/storage/crispasr/cann-composed-20261015. Prepare a small actual ggml graph
+with supported F32 matrix work, a BF16 ADD boundary and supported F32 work after
+it. Require exact CANN registry/device identity and genuine CANN/CPU placements
+for a310P fallback claim. Validate the mathematical output against an independent
+integer oracle, changed inputs, repeats and shape changes. First prove the CPU
+control and missing-CANN/wrong-device rejection without simulating an NPU; then
+compile against official SDKs and preserve metadata. Physical execution remains
+pending. This does not establish ACL capture/replay, model speech, quantization
+or speed; no backend default/kernel changes are intended.
 
-Hypothesis: distinguish same-input layer0 arithmetic from incoming embedding,
-actual self-prefix and cross-cache differences at the shared-history step978,
-before choosing a layer2/3 replay. The all-layer cumulative scan peaks at
-layer3 (relative L2 3.806e-6); this does not establish a causal layer3 defect.
-Use actual original DecoderLayer and literal native expressions, only this
-layer's immutable-range coefficients, physical F32 mapping checks and captured
-inputs/cache prefixes. Require native output to reproduce its hosted capture,
-per-stage cosine/norm/error metrics, repeats/thread controls and rejecting real
-cache/scale controls. Preserve each process's outputs separately, including any
-failure; original cross-process exactness is unresolved in the previous probe.
-No full-model load, changed seed/prompt/filter/gate, new kernel/default, speech
-acceptance or performance claim from this diagnostic.
+## Dia correctness — early probe complete, full speech still open
 
-After a demonstrated defect, fix only that defect with an observed failing
-regression, then use GH/Kaggle for fresh fixed-recipe native CLI/C-ABI speech
-and original diff. After fixed-prompt success, cover more prompts, speakers,
-lengths, session reuse, DAC/ASR and actual CUDA. Q4 and profiling follow output
-acceptance. If no defect is found, retain the result and choose a new localized
-hypothesis rather than replaying every layer blindly.
+The layer0 owned-input and split-key/value probe is complete and public:
+[results](docs/dia-layer0-owned-input-results-2026-10-15.md). Native hosted output
+and all input embeddings are byte-exact. In this fixture, self-cache keys have
+a larger context effect than values/cross-cache. No new runtime defect is
+established, and old source-RoPE speech failures remain rejected. Do not replay
+all remaining layers or rerun the unchanged source-RoPE candidate blindly.
+
+Next choose a specific key-producer/history arithmetic hypothesis, or audit
+unmeasured full-length codec behavior using existing native codes decoded by
+the actual original DAC. Keep that cross-decode diagnostic distinct from a
+complete free-generation success; never invent a missing stopping row. Preserve
+all original/native inputs, source pins and full payloads in separate process
+directories. After any demonstrated repair, require actual fixed-recipe
+CLI/C-ABI speech, more prompts/speakers/lengths/session reuse, original diff,
+DAC/ASR and actual CUDA; Q4/profiling follow output acceptance.
 
 Evidence to consult, not redo:
 - [First F32 divergence](docs/dia-f32-first-divergence-2026-10-14.md):979 shared
   inputs, first differing draw step978/head2, nucleus membership46/904.
 - [Layer16 and cumulative scan](docs/dia-layer16-owned-input-results-2026-10-15.md)
-  and [layer17](docs/dia-layer17-owned-input-results-2026-10-14.md): same-input
-  component checks pass, native hosted outputs exact; full speech still fails.
+  and [layer17](docs/dia-layer17-owned-input-results-2026-10-14.md).
 - [Integrated top-k repair](docs/dia-topk-selection-2026-10-14.md): separate
   recipe defect,18,288 captured probability/sample rows unchanged; not a speech fix.
-- Completed cache/GQA/attention, MLP, query/RoPE, codec-precision and capture
-  transparency proofs are indexed in the archived plan and docs.
 
 ## CANN — hardware follow-ups after merged PR544
 

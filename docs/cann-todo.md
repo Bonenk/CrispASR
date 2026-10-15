@@ -1,6 +1,6 @@
 # CANN remaining work
 
-Updated 2026-10-14. PR544 is merged; its requested integration is complete.
+Updated 2026-10-15. PR544 is merged; its requested integration is complete.
 Two subsequent device-reported defects have narrow repairs with retained
 before/after evidence. The 310P BF16 capability repair is integrated. The
 910B rotary-capacity repair is also integrated after physical, SDK and
@@ -31,13 +31,13 @@ upstream tolerances. Passing operator suites alone cannot accept a model.
 
 [Completed rotary integration receipt](cann-rope-integration-2026-10-14.md).
 
-[Active CPU fixture submission](cann-model-fixture-preparation-2026-10-14.md).
+[Completed CPU fixture preparation](cann-model-fixture-preparation-2026-10-14.md).
 
 [Actual native CPU backend proof](moonshine-native-backend-fixture-2026-10-14.md).
 
 [Completed full CPU fixture proof](moonshine-hosted-cpu-fixture-2026-10-14.md).
 
-[Strict device validation candidate and bounded controls](moonshine-strict-device-validation-2026-10-14.md).
+[Integrated strict device validation and bounded controls](moonshine-strict-device-validation-2026-10-14.md).
 
 [Portable full-model validator preparation and live GPU-argument controls](cann-model-validator-preparation-2026-10-14.md); hosted interface and actual binary-snapshot proof pass and are integrated; physical NPU success remains pending.
 
@@ -45,3 +45,7 @@ Official compiler-metadata follow-up38605386237 is accepted on both chips: actua
 ASCEND/ACL definitions and all six target links are independently audited from
 complete retained artifacts/logs. Physical model/fallback/ACL/quant/timing tasks
 above remain open. See the portable validator evidence linked above.
+
+Current priorities and maintainer claims are in [PLAN.md](../PLAN.md).
+Completed preparation/compiler/operator work is historical evidence; the
+remaining tasks above require full-model or composed-graph device validation.
