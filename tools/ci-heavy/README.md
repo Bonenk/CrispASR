@@ -48,7 +48,10 @@ full-reference reconstruction gates. `dia_query_key_intervention.py` then
 prepares a conditional five-arm full-decoder Q/K factorial. The replayed query
 is explicitly distinguished from an earlier full-model query capture. Native
 controls and actual consumed tensors must remain exact; no speech or default
-acceptance follows. See the [query/key method](dia-query-key-intervention/README.md).
+acceptance follows. `dia_query_producer.py` additionally splits one-step native
+Q projection and RoPE using physically audited coefficients, exact captured Q,
+owned-input substitutions and actual ELF/array proof. See the
+[query/key method](dia-query-key-intervention/README.md).
 
 `omnivoice_audio_parity.py` is the standalone utility split from draft PR521.
 It executes hash-pinned original numpy/pydub functions against the preserved C++

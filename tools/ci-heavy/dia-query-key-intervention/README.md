@@ -61,3 +61,27 @@ This is a dispatch recipe, not a hosted acceptance claim. Exact source, run IDs,
 terminal status and independent hosted audit belong in PLAN.md and the receipt.
 No new model runs belong on the VPS; local evidence and all large files stay
 under /mnt/storage/crispasr/dia-query-key-20261015.
+
+## One-step native query producer
+
+`tools/ci-heavy/dia_query_producer.py` builds the literal pinned projection/RoPE
+with the actual c36dab89 libraries and headers. It needs the complete original
+query proof and previous hosted native artifact extracted locally. Only the
+16 MiB native query matrix and small owned arrays are loaded; no full model or
+new full-speech run is involved. Large outputs belong on /mnt/storage.
+
+```sh
+python tools/ci-heavy/dia_query_producer.py \
+  --query-proof /path/to/query-replay-v2 \
+  --native /path/to/hosted-native-out \
+  --headers /path/to/c36-include \
+  --output /mnt/storage/crispasr/fresh-native-query-probe
+```
+
+The producer requires an exact captured-native query control before interpreting
+projection versus RoPE. It retains both one/four-thread fresh repeats, consumed
+pre-RoPE arrays, native-owned substitution control, actual scale/head-order
+negative controls, source, ELF, linked libraries and hashes. Its optional CMake
+target is `dia-query-producer` when this method directory is added to a build.
+This is conditional one-step attribution; it supplies no speech/GPU acceptance
+or additive causal percentages and does not replace the queued full factorial.
