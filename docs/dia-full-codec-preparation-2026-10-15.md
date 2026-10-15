@@ -4,7 +4,8 @@ The final emitted native row is now recoverable from retained raw sampler
 predictions and the actual producer stopping/BOS logic. Complete CLI/C-ABI
 code grids agree. Original-DAC decoding/ASR and independent audit are now
 complete locally. Native speech still fails. Initial hosted dependency failure
-is preserved; its corrected dispatch remains queued.
+is preserved; the prerequisite-corrected hosted retry38723274160 has started.
+Its terminal numerical/ASR audit is still pending.
 
 ## Complete reconstruction
 

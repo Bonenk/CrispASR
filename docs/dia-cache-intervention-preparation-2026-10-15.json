@@ -8,7 +8,9 @@
     "axis_ownership_pass": true,
     "compiled_file_loader_pass": true,
     "pinned_patch_applies": true,
-    "patched_runtime_syntax_pass": true
+    "patched_runtime_syntax_pass": true,
+    "pinned_torch26_sampling_observer_pass": true,
+    "sampling_observer_scope": "Actual worker observer reproduces retained original/native support exactly and ranks32/33 reverse; original CFG margin +4.6253204345703125e-05, native -2.6702880859375e-05. No new full-model inference."
   },
   "input_publication": {
     "repo": "cstr/crispasr-regression-fixtures",

@@ -59,7 +59,9 @@ joint Q/K causality or model speech acceptance. No production default change,
 full-model VPS execution, seed/filter workaround or unchanged speech rerun.
 Candidate2f04f4e6 is pushed. Heavy38726696058 and lint38726699171 are submitted
 and queued; no hosted numerical result yet. Local actual file-reader/axis
-guards and full patched-runtime syntax pass. The immutable31-payload input
+guards, full patched-runtime syntax and pinned Torch2.6 sampling-observer
+checks pass. Original/native supports and46/904 ranks reproduce exactly.
+The immutable31-payload input
 fixture is public and anonymously full-SHA verified. Audit the baseline first,
 then all conditional arms; retain failures and update the
 [preparation receipt](docs/dia-cache-intervention-preparation-2026-10-15.md).
@@ -74,7 +76,7 @@ original-DAC/ASR diagnosis is independently complete: original WER0, both native
 code variants WER1. Hosted first missing-hub and second missing-ffmpeg failures
 are preserved in complete public SHA-verified archives; the second also passes
 independent partial PCM audit. Prerequisite-only candidatea40755b7 is pushed;
-hosted38723274160 is submitted with unchanged model/source and PCM/ASR gates.
+hosted38723274160 has started, with unchanged model/source and PCM/ASR gates.
 Audit the terminal hosted result and integrate diagnostic worker/README only
 after applicable checks. The separate production output-protocol repair is
 already integrated as6503408c after13 general/10 lint jobs; no speech promotion.

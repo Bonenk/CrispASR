@@ -4,7 +4,9 @@
 
 Prepared the bounded diagnostic worker at2f04f4e6 and verified local axis
 ownership, malformed input rejection through the actual compiled C++ loader,
-exact pinned-source patch application and patched-runtime C++ syntax. Published
+exact pinned-source patch application and patched-runtime C++ syntax. The actual
+worker sampling observer also reproduces both retained support sets and the
+46/904 rank reversal on pinned Torch2.6.0+cpu. Published
 and anonymously SHA-verified the31-payload fixed979-step input bundle. These
 preparation actions are complete; full-model intervention and lint remain
 queued in38726696058/38726699171 and are tracked in PLAN.md. No numerical,

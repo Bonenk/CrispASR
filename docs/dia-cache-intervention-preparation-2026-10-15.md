@@ -17,6 +17,12 @@ missing, truncated, extra-length and nonfinite files. The patch applies to the
 exact pinned runtime, and the full patched translation unit passes a C++17
 syntax check against its actual headers. All four repository secret guards
 pass unskipped. These are preparation checks, not hosted/model acceptance.
+The actual worker sampling observer also passes on pinned Torch2.6.0+cpu:
+original/native support sets exactly match the retained first-divergence proof,
+with46/904 ranks32/33 reversed. Original CFG margin is+4.6253204e-5; native
+is−2.6702881e-5. This independently checks the measurement path without a new
+full-model inference.
+
 
 The [immutable input ZIP](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5e2fc2430413357a21807cd0350960aeeb6fe183/dia-20261015-cache-intervention/fixed-history-inputs-v1.zip)
 contains31 payloads,138612077 compressed bytes, SHA256
