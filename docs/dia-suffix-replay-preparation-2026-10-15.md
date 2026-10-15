@@ -5,8 +5,8 @@ No production runtime or default changes are proposed by this diagnostic.
 
 - Immutable candidate: [70f2d9de678b31f6b55f957e3a721aa91bf0af88](https://github.com/CrispStrobe/CrispASR/commit/70f2d9de678b31f6b55f957e3a721aa91bf0af88).
 - [Full worker/method](https://github.com/CrispStrobe/CrispASR/blob/70f2d9de678b31f6b55f957e3a721aa91bf0af88/tools/ci-heavy/dia-suffix-replay/README.md).
-- [Hosted numerical job38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943): queued at checkpoint.
-- [Lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203): queued at checkpoint.
+- [Hosted numerical job38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943): started; terminal numerical result pending.
+- [Lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203): in progress/queued; terminal lint result pending.
 
 The pinned runtime8d0ad886/ggmlC36 imports native self-cache positions0..977
 from the independently audited full-decoder Q/K artifact. It computes only
@@ -48,3 +48,24 @@ trajectory, speech repair, Q4, performance or GPU acceptance. Missing simultaneo
 full-model original self-Q capture remains a separate follow-up. The earlier
 [Q/K factorial result](dia-query-key-results-2026-10-15.md) remains definitive
 for that unchanged experiment; do not repeat it while waiting for this new probe.
+
+## Independent auditor preparation
+
+[Auditor5cb83887](https://github.com/CrispStrobe/CrispASR/blob/5cb83887/tools/ci-heavy/dia-suffix-replay/audit.py)
+and its weight-free calibration are prepared separately from the unchanged
+submitted worker70f2d9de. The actual hosted artifact still must pass this audit.
+Independent byte slicing reconstructs all3 capture encodings;24 broken metadata,
+path, hash, row and metric controls reject, and hand-derived3-4-5 metric values
+pass in both local and Torch2.6 reference environments. The actual original
+sampler reproduces prior original/native margins +4.6253204345703125e-5 and
+−2.6702880859375e-5, ranks32/33 and33/32, and both exact retained support lists.
+This is calibration on already audited logits, not a new numerical experiment.
+
+The audit checks official terminal run/artifact identity, SHA/size/CRC, safe
+unique paths, extracted root receipt and all payload hashes. It checks immutable
+method git objects, reproduces the scratch patch, checks ELF/library identities
+and reruns the retained actual ggml guard. It then reconstructs all captures,
+verifies native controls, prefixes, computed/consumed activations, earlier block
+boundaries and split logits, and recalculates all666 layer metrics, hidden/logit
+errors and the actual pinned filter. Calibration logs/receipt remain under
+`/mnt/storage/crispasr/dia-suffix-20261015/auditor-calibration-v2/`.

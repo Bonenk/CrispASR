@@ -70,7 +70,7 @@ Close simultaneous original full-model self-Q provenance as a separate follow-up
 **Checkpoint:** candidate70f2d9de678b31f6b55f957e3a721aa91bf0af88 pushed on
 `diag/dia-suffix-20261015`. [Heavy38793672943](https://github.com/CrispStrobe/CrispASR/actions/runs/38793672943)
 and [lint38793677203](https://github.com/CrispStrobe/CrispASR/actions/runs/38793677203)
-are queued; no new numerical result. The actual ggml prefix/ownership guard,
+has started (heavy) and remains in progress/queued (lint); no terminal numerical result. The actual ggml prefix/ownership guard,
 finite-file/path/integrity/lossless-reconstruction controls, full patched-source
 syntax against pinnedC36 headers, format18 and all4 unskipped secret tests pass
 locally. The hosted worker requires all127 captured baseline stages/logits and
@@ -82,6 +82,18 @@ Next: inspect terminal jobs, independently audit the complete artifact including
 lossless reconstruction and original Torch2.6 sampling, then integrate accepted
 method bytes and choose the first controlled suffix/within-layer experiment.
 Do not resubmit unchanged jobs while queued or send this CPU task to Kaggle.
+
+Independent auditor preparation is complete at5cb83887 on the same feature
+branch; the submitted numerical worker remains unchanged at70f2d9de. All3 raw/
+baseline/current-row encodings reconstruct exactly by independent byte slicing;
+24 corrupt-evidence controls and hand-derived3-4-5 metric checks pass in both
+local and Torch2.6 reference environments. Actual original-filter calibration
+reproduces the prior original/native margins, ranks and support exactly; this
+is old-fixture calibration, not a new suffix result. Evidence is retained under
+/mnt/storage/crispasr/dia-suffix-20261015/auditor-calibration-v2. The auditor also
+requires official archive/source/method/ELF/library proof, fresh ggml guard,
+all666 layer metric rows, prefix/current controls and split-logit consistency.
+Run it against the complete hosted artifact before integration or interpretation.
 
 ## Dia correctness — early probe complete, full speech still open
 
