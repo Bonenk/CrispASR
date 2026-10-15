@@ -7,6 +7,20 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## MiMo existing F32 cache-read hypothesis rejected — 2026-10-15
+
+Hosted run38703457282 completes all four fresh CPU processes but correctly
+fails the numerical gate. F16→F32 reads move eager/flash hidden relative L2
+6.05%→5.73% and logit relative L2 4.01%→5.13%, both outside0.5%. All three
+input stages stay exact; all five flash stages are exact across read choices.
+The option has an observable eager effect but does not fix parity. Original
+absolute Q4 gates already fail on the default arm. Independent audit verifies
+20 original comparisons,20 pair/read comparisons,20 scale negatives, actual
+ELF/reference/source and raw GitHub digest. Failed audit assumptions are retained.
+The complete59-payload proof is public and anonymously verified. No production
+change or model/speech/GPU/performance/default promotion; close this hypothesis.
+[Detailed result and next requirements](docs/mimo-kvread-ab-2026-10-15.md).
+
 ## CANN standalone SDK link repair prepared — 2026-10-15
 
 Both initial official SDK builds compile the CANN backend but reject the final
@@ -19,7 +33,10 @@ Fresh CPU passes all five contracts,18 computes and independent12,288 matrix/
 the missing/present SDK directory without SDK or NPU execution. The146-payload
 repair proof is public and anonymously verified. New official SDK/general/lint
 checks remain required before integration; no hardware/model/ACL/speed acceptance.
-[Full receipts](docs/cann-composed-preparation-2026-10-15.md).
+[Full receipts](docs/cann-composed-preparation-2026-10-15.md). The repaired
+candidate's hosted CPU replay38706162449 also passes the complete independent
+array/rejection/ELF audit. Its raw ZIP matches GitHub's67c725dc digest and all11
+published proof files are anonymously downloaded/rehashed. SDKs remain pending.
 
 ## MiMo Q4 projection amplification isolated — 2026-10-15
 

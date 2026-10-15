@@ -1,0 +1,685 @@
+{
+  "result": {
+    "scope": "Four-process MiMo Q4 cache-read precision diagnosis; no runtime promotion.\n\nUse the existing core attention/cache-read overrides on unmodified production\nsources. Retain failing arms before deciding whether the F32-read hypothesis\npasses the existing flash/eager numerical gate. This is not speech acceptance\nor a timing benchmark. The original Python stage reference remains independent.\n",
+    "source": "f242ba80eccbc801a44bebe134486667cf6b127d",
+    "ggml_source": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "passed": false,
+    "controls": {
+      "passed": true,
+      "rejected": [
+        "double-scale",
+        "channel-order",
+        "shape",
+        "nonfinite",
+        "zero-norm"
+      ]
+    },
+    "pins": {
+      "model": [
+        "mimo-asr-q4_k.gguf",
+        "12dbc7cc7a20c7add6ff00bf8b12bca1c46304e0100a5c5a6e74bdecfc57a306"
+      ],
+      "reference": [
+        "diff-harness-ref/mimo-asr-ref.gguf",
+        "7d4dfedc32a1451751199ed694a887f5091d3131bdefa840f811bc74e6312218"
+      ]
+    },
+    "arms": {
+      "flash-readf16": {
+        "exit_code": 0
+      },
+      "eager-readf16": {
+        "exit_code": 0
+      },
+      "flash-readf32": {
+        "exit_code": 0
+      },
+      "eager-readf32": {
+        "exit_code": 0
+      }
+    },
+    "comparisons": {
+      "f16": {
+        "prefill_audio_features": {
+          "cosine": 0.9999999999999998,
+          "mine_norm": 6.152528058656769,
+          "ref_norm": 6.152528058656769,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_text_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.837039588007749,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 6.775130636119278,
+          "ref_norm": 6.775130636119278,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9981740024583549,
+          "mine_norm": 247.90618933589587,
+          "ref_norm": 247.59081435870507,
+          "relative_l2": 0.06048362923775539,
+          "norm_error": 0.001273774950042661,
+          "max_abs": 1.8570919036865234,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.999197836434869,
+          "mine_norm": 1155.8217247678967,
+          "ref_norm": 1154.230373263767,
+          "relative_l2": 0.04010535977929328,
+          "norm_error": 0.0013787122059782941,
+          "max_abs": 0.7060127258300781,
+          "byte_exact": false
+        }
+      },
+      "f32": {
+        "prefill_audio_features": {
+          "cosine": 0.9999999999999998,
+          "mine_norm": 6.152528058656769,
+          "ref_norm": 6.152528058656769,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_text_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.837039588007749,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 6.775130636119278,
+          "ref_norm": 6.775130636119278,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9983610543042906,
+          "mine_norm": 247.611084079274,
+          "ref_norm": 247.59081435870507,
+          "relative_l2": 0.05725527440845251,
+          "norm_error": 8.186782139496529e-05,
+          "max_abs": 1.3577146530151367,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9989765668199106,
+          "mine_norm": 1125.0540699972883,
+          "ref_norm": 1154.230373263767,
+          "relative_l2": 0.05132337672839954,
+          "norm_error": 0.025277712268113484,
+          "max_abs": 0.6617512702941895,
+          "byte_exact": false
+        }
+      }
+    },
+    "elf_sha256": "d89161918553c0ae316df2126c3b3361dba9ea1f18f6501e1eed7d78b45d1358",
+    "read_f32_effect": {
+      "flash": {
+        "prefill_audio_features": {
+          "cosine": 0.9999999999999998,
+          "mine_norm": 6.152528058656769,
+          "ref_norm": 6.152528058656769,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_text_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.837039588007749,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 6.775130636119278,
+          "ref_norm": 6.775130636119278,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_last_hidden": {
+          "cosine": 1.0,
+          "mine_norm": 247.59081435870507,
+          "ref_norm": 247.59081435870507,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 1.0000000000000002,
+          "mine_norm": 1154.230373263767,
+          "ref_norm": 1154.230373263767,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        }
+      },
+      "eager": {
+        "prefill_audio_features": {
+          "cosine": 0.9999999999999998,
+          "mine_norm": 6.152528058656769,
+          "ref_norm": 6.152528058656769,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_text_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.837039588007749,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 1.0,
+          "mine_norm": 6.775130636119278,
+          "ref_norm": 6.775130636119278,
+          "relative_l2": 0.0,
+          "norm_error": 0.0,
+          "max_abs": 0.0,
+          "byte_exact": true
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9984219113587388,
+          "mine_norm": 247.611084079274,
+          "ref_norm": 247.90618933589587,
+          "relative_l2": 0.05615903514440163,
+          "norm_error": 0.0011903908386168283,
+          "max_abs": 1.170912742614746,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9990663408504216,
+          "mine_norm": 1125.0540699972883,
+          "ref_norm": 1155.8217247678967,
+          "relative_l2": 0.05026152090267333,
+          "norm_error": 0.026619723536332573,
+          "max_abs": 0.6353926658630371,
+          "byte_exact": false
+        }
+      }
+    },
+    "hypothesis_passes": false,
+    "original_python_gate_passes": false,
+    "input_stages_unchanged": true,
+    "baseline_gate_failure_reproduced": true,
+    "read_override_has_observable_effect": true
+  },
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "hypothesis_accepted": false,
+    "source": "f242ba80eccbc801a44bebe134486667cf6b127d",
+    "raw_artifact_sha256": "b6f8af43667aa32c60af5219235274b44781a67e3e21c2e60f109ef576219548",
+    "raw_github_digest_matches": true,
+    "retained_payloads": 44,
+    "four_fresh_processes": true,
+    "independent_stage_reference_comparisons": 20,
+    "independent_flash_eager_and_read_effect_comparisons": 20,
+    "scale_negative_controls": 20,
+    "reference_sha256": "7d4dfedc32a1451751199ed694a887f5091d3131bdefa840f811bc74e6312218",
+    "tested_elf_sha256": "d89161918553c0ae316df2126c3b3361dba9ea1f18f6501e1eed7d78b45d1358",
+    "original_python": {
+      "flash-readf16": {
+        "prefill_audio_features": {
+          "cosine": 0.9990188670170753,
+          "mine_norm": 6.152528058656756,
+          "ref_norm": 6.171803832209732,
+          "relative_l2": 0.04433837832088702,
+          "norm_error": 0.0031231993234098754,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_text_embeds": {
+          "cosine": 0.9970077582696133,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.8365383933301365,
+          "relative_l2": 0.07736647913341997,
+          "norm_error": 0.00017669236516981712,
+          "max_abs": 0.0072362422943115234,
+          "byte_exact": false
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 0.9986664006197092,
+          "mine_norm": 6.7751306361192665,
+          "ref_norm": 6.792430537010639,
+          "relative_l2": 0.05164196418027656,
+          "norm_error": 0.0025469382126337425,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9629347332333303,
+          "mine_norm": 247.5908143587052,
+          "ref_norm": 245.29708260654803,
+          "relative_l2": 0.27369902034142174,
+          "norm_error": 0.009350831766051781,
+          "max_abs": 8.442626953125,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9811692967346912,
+          "mine_norm": 1154.230373263773,
+          "ref_norm": 1048.5014301249141,
+          "relative_l2": 0.22721673635417958,
+          "norm_error": 0.10083814871503094,
+          "max_abs": 2.698958158493042,
+          "byte_exact": false
+        }
+      },
+      "eager-readf16": {
+        "prefill_audio_features": {
+          "cosine": 0.9990188670170753,
+          "mine_norm": 6.152528058656756,
+          "ref_norm": 6.171803832209732,
+          "relative_l2": 0.04433837832088702,
+          "norm_error": 0.0031231993234098754,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_text_embeds": {
+          "cosine": 0.9970077582696133,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.8365383933301365,
+          "relative_l2": 0.07736647913341997,
+          "norm_error": 0.00017669236516981712,
+          "max_abs": 0.0072362422943115234,
+          "byte_exact": false
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 0.9986664006197092,
+          "mine_norm": 6.7751306361192665,
+          "ref_norm": 6.792430537010639,
+          "relative_l2": 0.05164196418027656,
+          "norm_error": 0.0025469382126337425,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9640981583309302,
+          "mine_norm": 247.90618933589596,
+          "ref_norm": 245.29708260654803,
+          "relative_l2": 0.2695933233292327,
+          "norm_error": 0.010636517571360082,
+          "max_abs": 8.285194396972656,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9812739361613972,
+          "mine_norm": 1155.8217247679022,
+          "ref_norm": 1048.5014301249141,
+          "relative_l2": 0.22751329895310377,
+          "norm_error": 0.10235588770747062,
+          "max_abs": 2.8209428787231445,
+          "byte_exact": false
+        }
+      },
+      "flash-readf32": {
+        "prefill_audio_features": {
+          "cosine": 0.9990188670170753,
+          "mine_norm": 6.152528058656756,
+          "ref_norm": 6.171803832209732,
+          "relative_l2": 0.04433837832088702,
+          "norm_error": 0.0031231993234098754,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_text_embeds": {
+          "cosine": 0.9970077582696133,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.8365383933301365,
+          "relative_l2": 0.07736647913341997,
+          "norm_error": 0.00017669236516981712,
+          "max_abs": 0.0072362422943115234,
+          "byte_exact": false
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 0.9986664006197092,
+          "mine_norm": 6.7751306361192665,
+          "ref_norm": 6.792430537010639,
+          "relative_l2": 0.05164196418027656,
+          "norm_error": 0.0025469382126337425,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9629347332333303,
+          "mine_norm": 247.5908143587052,
+          "ref_norm": 245.29708260654803,
+          "relative_l2": 0.27369902034142174,
+          "norm_error": 0.009350831766051781,
+          "max_abs": 8.442626953125,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9811692967346912,
+          "mine_norm": 1154.230373263773,
+          "ref_norm": 1048.5014301249141,
+          "relative_l2": 0.22721673635417958,
+          "norm_error": 0.10083814871503094,
+          "max_abs": 2.698958158493042,
+          "byte_exact": false
+        }
+      },
+      "eager-readf32": {
+        "prefill_audio_features": {
+          "cosine": 0.9990188670170753,
+          "mine_norm": 6.152528058656756,
+          "ref_norm": 6.171803832209732,
+          "relative_l2": 0.04433837832088702,
+          "norm_error": 0.0031231993234098754,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_text_embeds": {
+          "cosine": 0.9970077582696133,
+          "mine_norm": 2.837039588007749,
+          "ref_norm": 2.8365383933301365,
+          "relative_l2": 0.07736647913341997,
+          "norm_error": 0.00017669236516981712,
+          "max_abs": 0.0072362422943115234,
+          "byte_exact": false
+        },
+        "prefill_inputs_embeds": {
+          "cosine": 0.9986664006197092,
+          "mine_norm": 6.7751306361192665,
+          "ref_norm": 6.792430537010639,
+          "relative_l2": 0.05164196418027656,
+          "norm_error": 0.0025469382126337425,
+          "max_abs": 0.009288221597671509,
+          "byte_exact": false
+        },
+        "prefill_last_hidden": {
+          "cosine": 0.9628738860619873,
+          "mine_norm": 247.61108407927406,
+          "ref_norm": 245.29708260654803,
+          "relative_l2": 0.2739373540463511,
+          "norm_error": 0.00943346511967147,
+          "max_abs": 7.2014312744140625,
+          "byte_exact": false
+        },
+        "prefill_text_logits_step0": {
+          "cosine": 0.9813081964124059,
+          "mine_norm": 1125.0540699972944,
+          "ref_norm": 1048.5014301249141,
+          "relative_l2": 0.2131753166835414,
+          "norm_error": 0.07301147873805003,
+          "max_abs": 2.6769466400146484,
+          "byte_exact": false
+        }
+      }
+    },
+    "files": [
+      {
+        "path": "CMakeCache.txt",
+        "bytes": 42506,
+        "sha256": "4690035b282d3cf2a39a33cef226a08a137ef1ca78060cd305dfb619d4577de3"
+      },
+      {
+        "path": "actual-binaries/ggml/src/libggml-base.so.0.26.0",
+        "bytes": 964048,
+        "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b"
+      },
+      {
+        "path": "actual-binaries/ggml/src/libggml-cpu.so.0.26.0",
+        "bytes": 1431992,
+        "sha256": "d1d276add014805b04e2d6587196d865ad604cc2c3aac3ff61ba2ce9c1c859d5"
+      },
+      {
+        "path": "actual-binaries/ggml/src/libggml.so.0.26.0",
+        "bytes": 60720,
+        "sha256": "5cce8cd436039e068f9e56979e1940d9f7fe0cc3fc61196371b2d3b6710bbd68"
+      },
+      {
+        "path": "actual-binaries/libmimo_kvread_probe.so",
+        "bytes": 310528,
+        "sha256": "d89161918553c0ae316df2126c3b3361dba9ea1f18f6501e1eed7d78b45d1358"
+      },
+      {
+        "path": "build.log",
+        "bytes": 8963,
+        "sha256": "a9a05d1796df7303e58ac8d711b3c72beea06cfd0462969a40fce5738c59b722"
+      },
+      {
+        "path": "compile_commands.json",
+        "bytes": 343949,
+        "sha256": "a5872d8b835d09e85f05bc165d7c5109f7a1925442c37817c90dedb6dfa00dac"
+      },
+      {
+        "path": "configure.log",
+        "bytes": 2535,
+        "sha256": "3f34aa3fdfa72f06a9916984b9b4d5dd77513258050dcaa4b953bbdad7611b8f"
+      },
+      {
+        "path": "eager-readf16/execution.json",
+        "bytes": 2176,
+        "sha256": "d6b546ec7d9e2949d36d9211382f5963329eb13afa93ce8b895ba2d58fb26741"
+      },
+      {
+        "path": "eager-readf16/prefill_audio_features.npy",
+        "bytes": 1163392,
+        "sha256": "bb4dfcc48ccb682b0ecf6b2bc247127404803a2af8b0442e1b7c41f1ea3a326c"
+      },
+      {
+        "path": "eager-readf16/prefill_input_ids.npy",
+        "bytes": 10352,
+        "sha256": "e7884d13570a7f361accc76b421582abba1cfda487a7ef36ea5caef0d1436fee"
+      },
+      {
+        "path": "eager-readf16/prefill_inputs_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "c7d862caaf9676f78bf5afa2ec82258873eef5a5ac59f0f79be3d39c0f0630af"
+      },
+      {
+        "path": "eager-readf16/prefill_last_hidden.npy",
+        "bytes": 16512,
+        "sha256": "12ec770f489fe2a49941724c534fd1913782b7a66861e2d372ae48b119351a69"
+      },
+      {
+        "path": "eager-readf16/prefill_text_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "ff11a8289c6769ef6d8b1f1184248f002fb7565cea3fd0ed5b79dd3c44fcb188"
+      },
+      {
+        "path": "eager-readf16/prefill_text_logits_step0.npy",
+        "bytes": 606848,
+        "sha256": "28f0d0151aa7b473dff903e3e05c634954eb29e5ed4d4d86d7c1ca326345da69"
+      },
+      {
+        "path": "eager-readf16.log",
+        "bytes": 1865,
+        "sha256": "a3292328205d468b5ad538b92572e458f7abbae37c904cd423e5df1e06b2b3dd"
+      },
+      {
+        "path": "eager-readf32/execution.json",
+        "bytes": 2174,
+        "sha256": "d115f6c600460488b1c9c08c258f54bddbeec58b3dd341729ddd113806ec8c7c"
+      },
+      {
+        "path": "eager-readf32/prefill_audio_features.npy",
+        "bytes": 1163392,
+        "sha256": "bb4dfcc48ccb682b0ecf6b2bc247127404803a2af8b0442e1b7c41f1ea3a326c"
+      },
+      {
+        "path": "eager-readf32/prefill_input_ids.npy",
+        "bytes": 10352,
+        "sha256": "e7884d13570a7f361accc76b421582abba1cfda487a7ef36ea5caef0d1436fee"
+      },
+      {
+        "path": "eager-readf32/prefill_inputs_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "c7d862caaf9676f78bf5afa2ec82258873eef5a5ac59f0f79be3d39c0f0630af"
+      },
+      {
+        "path": "eager-readf32/prefill_last_hidden.npy",
+        "bytes": 16512,
+        "sha256": "5375ede80010ae04d5d35e55d67c5fee29f0e9a0b4f979435371481a2ec9c046"
+      },
+      {
+        "path": "eager-readf32/prefill_text_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "ff11a8289c6769ef6d8b1f1184248f002fb7565cea3fd0ed5b79dd3c44fcb188"
+      },
+      {
+        "path": "eager-readf32/prefill_text_logits_step0.npy",
+        "bytes": 606848,
+        "sha256": "4ba0716efbe9576ae8e6de301da59bb8047f6e2fcb49b5bb7241b38ebcb16406"
+      },
+      {
+        "path": "eager-readf32.log",
+        "bytes": 1863,
+        "sha256": "4a9fda80cbfdb577dcc2f51ed8b7a8596fd77b6b1a3415f267108d54cccb33c3"
+      },
+      {
+        "path": "flash-readf16/execution.json",
+        "bytes": 2165,
+        "sha256": "35a4dce34f7d63b1ca13ef013a61cfc9e37793211091464bc586360bc4c29ae8"
+      },
+      {
+        "path": "flash-readf16/prefill_audio_features.npy",
+        "bytes": 1163392,
+        "sha256": "bb4dfcc48ccb682b0ecf6b2bc247127404803a2af8b0442e1b7c41f1ea3a326c"
+      },
+      {
+        "path": "flash-readf16/prefill_input_ids.npy",
+        "bytes": 10352,
+        "sha256": "e7884d13570a7f361accc76b421582abba1cfda487a7ef36ea5caef0d1436fee"
+      },
+      {
+        "path": "flash-readf16/prefill_inputs_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "c7d862caaf9676f78bf5afa2ec82258873eef5a5ac59f0f79be3d39c0f0630af"
+      },
+      {
+        "path": "flash-readf16/prefill_last_hidden.npy",
+        "bytes": 16512,
+        "sha256": "ad4bde9b24a5e94409b7b4e9bf721cde50436effd093c2312451b8b438e85aba"
+      },
+      {
+        "path": "flash-readf16/prefill_text_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "ff11a8289c6769ef6d8b1f1184248f002fb7565cea3fd0ed5b79dd3c44fcb188"
+      },
+      {
+        "path": "flash-readf16/prefill_text_logits_step0.npy",
+        "bytes": 606848,
+        "sha256": "b105e8343bb337a80f3810aac4cef488da5bd3af1474b40bad6ce17702c87907"
+      },
+      {
+        "path": "flash-readf16.log",
+        "bytes": 1854,
+        "sha256": "1dba5821bf3389934b38619b8379ccb79300c26abf94eed31e0b14361e813532"
+      },
+      {
+        "path": "flash-readf32/execution.json",
+        "bytes": 2171,
+        "sha256": "b390d2b357aafcd0565528f3c2a92499cae958ddc7d3f80f2bd5144974168a9d"
+      },
+      {
+        "path": "flash-readf32/prefill_audio_features.npy",
+        "bytes": 1163392,
+        "sha256": "bb4dfcc48ccb682b0ecf6b2bc247127404803a2af8b0442e1b7c41f1ea3a326c"
+      },
+      {
+        "path": "flash-readf32/prefill_input_ids.npy",
+        "bytes": 10352,
+        "sha256": "e7884d13570a7f361accc76b421582abba1cfda487a7ef36ea5caef0d1436fee"
+      },
+      {
+        "path": "flash-readf32/prefill_inputs_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "c7d862caaf9676f78bf5afa2ec82258873eef5a5ac59f0f79be3d39c0f0630af"
+      },
+      {
+        "path": "flash-readf32/prefill_last_hidden.npy",
+        "bytes": 16512,
+        "sha256": "ad4bde9b24a5e94409b7b4e9bf721cde50436effd093c2312451b8b438e85aba"
+      },
+      {
+        "path": "flash-readf32/prefill_text_embeds.npy",
+        "bytes": 1163392,
+        "sha256": "ff11a8289c6769ef6d8b1f1184248f002fb7565cea3fd0ed5b79dd3c44fcb188"
+      },
+      {
+        "path": "flash-readf32/prefill_text_logits_step0.npy",
+        "bytes": 606848,
+        "sha256": "b105e8343bb337a80f3810aac4cef488da5bd3af1474b40bad6ce17702c87907"
+      },
+      {
+        "path": "flash-readf32.log",
+        "bytes": 1860,
+        "sha256": "8e0ff01b243a8ec93de852b5468653a3f3fb625ac7fd22f967c0c821d2946361"
+      },
+      {
+        "path": "ldd.log",
+        "bytes": 774,
+        "sha256": "3b900e8c68e8e9e1d5b2206c6dce109e80c023d33b1640859f76f4cb87abc555"
+      },
+      {
+        "path": "original-reference.gguf",
+        "bytes": 4130240,
+        "sha256": "7d4dfedc32a1451751199ed694a887f5091d3131bdefa840f811bc74e6312218"
+      },
+      {
+        "path": "result.json",
+        "bytes": 7094,
+        "sha256": "0473c981f6acb64dd568087e6fd608c313bcfd9dc0c81dc1ec305e50c80a6e4b"
+      },
+      {
+        "path": "worker-source.py",
+        "bytes": 11900,
+        "sha256": "72eebf2d20364eb96d78affe1075fabccc98abc158c86aa823cb229cef9c15ce"
+      }
+    ],
+    "prior_audit_failure": "v1 incorrectly assumed CMake represented every OFF cache entry as BOOL; GGML_CANN is UNINITIALIZED=OFF here. v1 fails before numerical audit; raw log retained, numerical gates unchanged.",
+    "scope": "Complete four-arm CPU numerical audit; cache-read hypothesis rejected. Full model hash is the producer verified-download receipt, not a new local whole-model measurement. No speech/GPU/performance/default acceptance."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "mimo-20261015-kvread/complete-rejected-cache-read-v1.zip",
+    "bytes": 24103492,
+    "sha256": "08e36b54c194a42277ea5f833cd6296912a6e81a73fdd3cf3ffc81f90c7e9e9a",
+    "payloads": 59,
+    "source": "f242ba80eccbc801a44bebe134486667cf6b127d",
+    "anonymous_verified": true,
+    "revision": "4f18b5bea0c5891aeb0ea77ee377803109bc2f51",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4f18b5bea0c5891aeb0ea77ee377803109bc2f51/mimo-20261015-kvread/complete-rejected-cache-read-v1.zip"
+  },
+  "run": 38703457282,
+  "artifact": 11959085113,
+  "artifact_bytes": 11891130,
+  "raw_artifact_sha256": "b6f8af43667aa32c60af5219235274b44781a67e3e21c2e60f109ef576219548",
+  "runtime_baseline": "ecd7de6e1947f6e8e2f09fdbaae01f7bf31c6be1",
+  "production_changes": false
+}

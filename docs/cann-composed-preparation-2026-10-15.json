@@ -139,7 +139,32 @@
       "general": 38706180793,
       "lint": 38706184333,
       "secret": 38706162315,
-      "status": "submitted-not-yet-accepted"
+      "status": "hosted-cpu-independently-accepted-sdk-general-lint-pending"
+    },
+    "hosted_cpu_audit": {
+      "independent_hosted_cpu_audit_pass": true,
+      "source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+      "raw_artifact_bytes": 827670,
+      "raw_artifact_sha256": "67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4",
+      "github_artifact_digest_matches": true,
+      "actual_computes": 18,
+      "independent_matrix_values": 12288,
+      "independent_final_values": 12288,
+      "scale_negative_controls": 18,
+      "rejected_invalid_requests": 8,
+      "tested_elf_sha256": "5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4",
+      "scope": "Complete hosted CPU raw arrays/executable/negative-request audit; no SDK/NPU/fallback/ACL/model/performance acceptance"
+    },
+    "hosted_cpu_publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "345ae04fb0bb82876f28df2b9e90f2dad63d7868",
+      "prefix": "cann-20261015-composed/hosted-repaired-cpu-38706162449",
+      "files": 11,
+      "all_files_anonymous_sha256_verified": true,
+      "raw_artifact_bytes": 827670,
+      "raw_artifact_sha256": "67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4",
+      "raw_artifact_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/cpu-artifact.zip",
+      "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/payload-manifest.json"
     }
   }
 }

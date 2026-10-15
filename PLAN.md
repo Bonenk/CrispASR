@@ -66,8 +66,10 @@ configured SDK library directory, without claiming an installed SDK or NPU.
 The complete146-payload repair proof is public and anonymously SHA-verified.
 
 New composed CPU/SDK workflow38706162449, general CI38706180793,
-lint38706184333 and secret scan38706162315 are submitted on that exact source.
-Audit their terminal results and integrate only after applicable checks pass.
+lint38706184333 and secret scan38706162315 target that exact source. The new
+hosted CPU artifact is independently audited and fully published/anonymous-SHA
+verified; both SDK jobs and general/lint remain pending. Audit remaining terminal
+results and integrate only after applicable checks pass.
 Physical composed fallback/model/ACL/performance acceptance remains open.
 Completed CPU/configuration work and rejected first SDK attempts are in
 HISTORY.md and [the preparation receipt](docs/cann-composed-preparation-2026-10-15.md).
@@ -114,39 +116,16 @@ further rerun of the already accepted rotary repair is requested. Details and
 commands: [CANN TODO](docs/cann-todo.md) and
 [portable validator](docs/cann-model-validator-preparation-2026-10-14.md).
 
-## CLAIMED 2026-10-15 — MiMo existing F32 cache-read A/B
-
-Owner: maintainer session. Owned worktree planned at
-/mnt/volume1/crispasr-mimo-kvread-20261015, branch
-diag/mimo-kvread-20261015. Builds, downloads and evidence under
-/mnt/storage/crispasr/mimo-kvread-20261015; heavy execution on hosted GH CPU.
-The completed bounded Q4 projection diagnosis is archived in HISTORY.md and
-[its receipt](docs/mimo-q4-projection-2026-10-15.md).
-
-Test the existing CRISPASR_KV_READ_F32 OFF/ON against the existing core eager
-attention override, four fresh CPU processes on the same immutable Q4 model
-and original five-stage reference. Preserve arrays, exact ELF/source/config,
-input/model hashes, failed arms and scale/shape controls. Verify original
-stage cosines AND norms/errors; compare nonflash to its matching flash arm
-with the existing .9999 cosine/.005 relative-L2 gate. Do not add a runtime
-flag, modify graph math/defaults, repeat BLAS sweeps, or claim speech/performance
-acceptance. This experiment can reject the cache-read hypothesis. Any promising
-result still needs full fixed-recipe CLI/C-ABI speech and actual GPU validation.
-
-Candidate f242ba80eccbc801a44bebe134486667cf6b127d is pushed. Heavy CPU
-workflow38703457282 is submitted on that exact source; its terminal arrays and
-ELF/configuration still need independent audit. Local five rejecting metric
-controls, Python syntax, documentation anchors and all four unskipped secret
-checks pass. Production graph math/defaults are unchanged. The diagnostic must
-also reproduce the old failure and observe the override effect before accepting
-the hypothesis. Do not merge or report hosted numerical success while queued.
-
 ## Remaining PRs — scoped salvage and acceptance
 
 - **PR492 / MiMo:** independent opt-in mel/cached-decode pieces are merged.
-  Diagnose remaining Q4 non-flash LM differences with pinned original layers
-  and CPU activation-quantization controls. CANN RVQ/F16 embedding and ggml NZ
-  need physical Ascend and PR-only/NZ-only/composed attribution. The measured
+  Dynamic Q8 activation amplification is measured; the existing F32 cache-read
+  hypothesis is independently rejected and archived in HISTORY.md.
+  [Four-arm result](docs/mimo-kvread-ab-2026-10-15.md): hidden/logit error remains
+  5.73%/5.13%, with a0.5% gate. The default Q4 original-stage gap also remains.
+  Next select a specific attention/activation arithmetic hypothesis on owned
+  inputs under a fresh claim; do not repeat the old BLAS/cache-read sweeps.
+  CANN RVQ/F16 embedding and ggml NZ need physical Ascend and PR-only/NZ-only/composed attribution. The measured
   full tokenizer path was7–10% slower; do not enable it by default. Review the
   complete latest thread before proposing any further split or merge.
 - **Issue518 / draft PR521 / OmniVoice:** audio/text utilities match upstream;

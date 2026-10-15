@@ -71,8 +71,15 @@ and both rejected SDK logs/raw ZIPs. It is988,939 bytes, SHA256
 [general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/38706180793),
 [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/38706184333) and
 [secret scan](https://github.com/CrispStrobe/CrispASR/actions/runs/38706162315)
-target the repaired candidate. These submitted jobs remain unaccepted pending
-terminal artifact audits. The candidate is not integrated.
+target the repaired candidate. Hosted CPU now passes, with independently
+recalculated12,288 matrix/12,288 final values,18 scale controls and8 rejected
+requests. The actual hosted ELF SHA is
+`5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4`.
+[Raw hosted artifact](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/cpu-artifact.zip) is827,670 bytes, SHA256
+`67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4`, matching GitHub's digest. All11 published payloads, including the
+[independent audit/metadata manifest](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/payload-manifest.json), are anonymously downloaded and
+rehashed. Both SDK jobs and general/lint remain pending. The candidate is not
+integrated; CPU success cannot establish CANN device execution.
 
 Physical310P composed fallback, full-model NPU speech,910B ACL capture/replay,
 quantization and performance remain open. An ACL build flag or repeated output
