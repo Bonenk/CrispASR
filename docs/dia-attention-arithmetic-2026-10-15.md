@@ -144,5 +144,5 @@ metrics, source/library hashes, audits, public delivery and CFG inputs.
 Standalone tools await [lint38771099343](https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343)
 before integration; that exact-source run is queued. The separate
 [full-decoder Q/K factorial](https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112)
-is still queued atff7e07c0 and is not restarted. Native speech remains rejected;
+is running at ff7e07c0 and is not restarted. Native speech remains rejected;
 this probe establishes no CUDA/Q4/speed/default acceptance.

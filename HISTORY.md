@@ -1,5 +1,14 @@
 # CrispASR — Port history
 
+## Dia hosted-audit control calibration completed — 2026-10-15
+
+The prepared independent full-decoder auditor reproduces the previous real
+key-only hosted proof: all720 payloads, immutable method source, official ZIP
+hash/CRC, exact native controls, all18 stage metrics and original sampler
+supports/ranks pass. Its new paired Q/K checks remain unexecuted pending the
+current hosted artifact; this calibration accepts no new numerical experiment.
+See the [audit checkpoint](docs/dia-query-key-preparation-2026-10-15.md#hosted-audit-preparation-checkpoint--1715-utc).
+
 ## Dia tiny cancellation and exact-input attention diagnosis completed — 2026-10-15
 
 Tested e6be594f / byte-equivalent standalone candidate95ade290 establishes exact

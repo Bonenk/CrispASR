@@ -82,7 +82,8 @@ full-reference self-attention/output relative errors9.53e-7/1.08e-6, strict
 2e-6 reconstruction gates unchanged. Native versus replayed-original Q differs
 by5.37e-5. Independent49-payload audit and complete59-payload public proof pass;
 both full anonymous downloads verify. This is replay Q, not a previously
-captured full-model query. Hosted workerff7e07c0 is pushed; heavy38764924112 remains queued.
+captured full-model query. Hosted worker ff7e07c0 is pushed; heavy38764924112 is running its worker step
+(started 16:57 UTC; checked 17:15 UTC). No hosted numerical pass is known.
 Candidateb1de5628 adds the completed native producer; lint38767820341 is
 submitted on that source, superseding the earlier manual lint38764928533. Actual compiled file/axis guards, full patched
 runtime syntax and actual hosted-ggml paired-input graph guard pass. Audit the
@@ -94,7 +95,12 @@ controls reject. Independent87-payload audit and full98-payload anonymous proof
 pass, including a fresh public extraction and actual binary replay.
 Projection relative L2 is1.48e-7; original pre-Q through native RoPE still
 has5.37e-5 error. See the [native producer receipt](docs/dia-native-query-producer-2026-10-15.md)
-and HISTORY.md. Remaining: hosted factorial and newest lint terminal results,
+and HISTORY.md. Independent artifact auditing is prepared and calibrated against all720 payloads
+of the previous successful key-only run, including source, archive hashes/CRC,
+all controls, stages and sampler supports. Its new Q/K-specific checks remain
+unexecuted until the new artifact arrives. The actual worker phase beyond the
+Actions step is not visible through the current API response.
+Remaining: hosted factorial and newest lint terminal results,
 independent complete raw-array audit, then integration only if their gates pass.
 The hosted worker/patch/selftest bytes are unchanged fromff7e07c0; do not restart
 the full model solely for this standalone component addition.
@@ -121,7 +127,7 @@ retain the reversed46/904 ordering: key-only substitution is insufficient.
 The matched query/key diagnostic is active in the claim above. Actual original
 module self-Q is captured with strict full-reference reconstruction and exact
 retained component controls; full-model self-Q was not previously captured.
-The five-arm GH replay is submitted, with no hosted numerical pass yet.
+The five-arm GH replay is running, with no hosted numerical pass yet.
 Require exact baseline/native-QK controls and fixed other caches/recipe. Do not
 repeat unchanged key-only/all-layer source-RoPE speech runs, substitute seeds
 or relax filtering. This conditional diagnostic remains separate from speech.

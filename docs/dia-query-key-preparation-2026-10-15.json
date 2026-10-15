@@ -6,8 +6,10 @@
       "databaseId": 38764924112,
       "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
       "event": "workflow_dispatch",
-      "status": "queued",
-      "conclusion": ""
+      "status": "in_progress",
+      "conclusion": "",
+      "completed_jobs": 0,
+      "total_jobs": 1
     },
     "previous_lint": {
       "databaseId": 38764928533,
@@ -22,7 +24,9 @@
       "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
       "event": "workflow_dispatch",
       "status": "queued",
-      "conclusion": ""
+      "conclusion": "",
+      "completed_jobs": 4,
+      "total_jobs": 10
     }
   },
   "producer": {
@@ -554,5 +558,17 @@
   "production_defaults_changed": false,
   "latest_candidate_source": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
   "hosted_worker_unchanged_from_candidate_source": true,
-  "native_query_probe_receipt": "dia-native-query-producer-2026-10-15.json"
+  "native_query_probe_receipt": "dia-native-query-producer-2026-10-15.json",
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC",
+  "hosted_audit_preparation": {
+    "audit_sha256": "c6336245a26871f1cd027daaad0a8103d7e622f2ff44b082c0e8a9b99215cea6",
+    "calibration_source": "fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4",
+    "calibration_artifact_sha256": "83db2618e48dd329f58da66dfd1ff2e3f493adfb6177cee1e1104c6838efe02c",
+    "calibration_verified_payloads": 720,
+    "calibration_key_only_pass": true,
+    "new_query_key_checks_executed": false,
+    "full_query_key_audit_pass": false,
+    "storage_directory": "/mnt/storage/crispasr/dia-query-key-20261015",
+    "scope": "Prepared independent archive/source/raw-array/sampler audit passes previous real key-only proof; pending Q/K artifact is not yet audited."
+  }
 }

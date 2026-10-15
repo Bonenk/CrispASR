@@ -64,7 +64,7 @@ producer metrics, payload hashes and publication metadata.
 ## Remaining acceptance
 
 [Full Q/K factorial38764924112](https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112)
-is still queued at source `ff7e07c0f5ec846ff7de569c117c1d0b30af404d`.
+is running at source `ff7e07c0f5ec846ff7de569c117c1d0b30af404d`.
 The new commit leaves that worker, original-query producer, patch, graph guard
 and selftest byte-for-byte unchanged. Only a standalone target and its docs
 are added to their CMake/method directory.

@@ -1256,11 +1256,14 @@
     "databaseId": 38771099343,
     "headSha": "95ade29094e81c8a9c7437fd0caafedca76e3e1e",
     "status": "queued",
-    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343"
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343",
+    "completed_jobs": 1,
+    "total_jobs": 10
   },
   "full_decoder_query_key_run": {
     "databaseId": 38764924112,
     "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
-    "status": "queued"
-  }
+    "status": "in_progress"
+  },
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC"
 }

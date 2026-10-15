@@ -50,7 +50,9 @@ Both anonymous full downloads match. Their immutable revision is
 ## Hosted factorial and controls
 
 The [heavy run38764924112](https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112)
-remains queued at the exact candidate source. Latest
+is running at the exact candidate source; its worker step started16:57 UTC
+and remains active at the17:15 UTC checkpoint. The internal build/export/replay
+phase is not exposed by the current API response. Latest
 [lint38767820341](https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341)
 is submitted at `b1de56284867dfcd45bc90289aadbb34a189f4e2`, superseding the earlier
 manual lint38764928533. This commit adds the completed
@@ -80,3 +82,19 @@ records the exact pipeline and dispatch. Full hosted artifacts still require
 independent source/hash/CRC/array audit before interpretation or integration.
 This conditional diagnostic cannot promote speech, GPU, Q4, speed or defaults.
 All large files remain under /mnt/storage/crispasr/dia-query-key-20261015.
+
+## Hosted audit preparation checkpoint — 17:15 UTC
+
+The independent audit verifies official archive size/SHA/CRC/safe paths, complete
+payload sets, methods against immutable git objects, input manifests, native
+controls, actual consumed Q/K, all979 shared input/logit rows, all18 stage metrics
+and actual original sampler supports/ranks. It additionally cross-checks native
+and original-key-only arms against the prior accepted key experiment.
+
+Its shared checks pass a fresh calibration against the previous real successful
+key-only artifact:720 payloads, both exact native controls, all reported stages
+and original sampling supports reproduce. This does not execute the new paired
+Q/K-specific branches or accept the pending factorial. The prepared auditor and
+calibration logs/results remain under the owned storage directory; the new raw
+artifact is still unavailable. Latest candidate lint has4/10 successful jobs;
+the standalone attention-tool lint has1/10, with the rest queued.

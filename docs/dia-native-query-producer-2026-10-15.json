@@ -680,13 +680,15 @@
   "hosted_factorial": {
     "databaseId": 38764924112,
     "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
-    "status": "queued",
+    "status": "in_progress",
     "numerical_pass": false
   },
   "latest_lint": {
     "databaseId": 38767820341,
     "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
-    "status": "queued"
+    "status": "queued",
+    "completed_jobs": 4,
+    "total_jobs": 10
   },
   "hosted_worker_unchanged_from_factorial_source": true,
   "public_extracted_replay": {
@@ -702,5 +704,6 @@
       "payloads": 98,
       "anonymous_full_sha256_verified": true
     }
-  }
+  },
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC"
 }
