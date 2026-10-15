@@ -4,7 +4,7 @@ The pinned original Python generation/output methods demonstrate three defects
 in the current native protocol: the final return slice includes an extra row,
 the EOS countdown is not restarted at the capacity boundary, and invalid codec
 indices cause complete frames to be dropped rather than individually zeroed.
-A candidate repairs these shared runtime paths. It is not integrated, and full
+The repair is integrated as6503408cb95d42e80ad84bee513ae58a67e616c5. Full
 speech acceptance remains open.
 
 The reference executes actual `_prepare_audio_prompt`, `generate`,
@@ -51,12 +51,15 @@ Candidate `fc1b05c922edfeece675a32f1b7855f588276968` is pushed.
 [Fresh general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/38713471171)
 and [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/38713474686)
 target that exact source. All13 general CI jobs pass, including execution of
-the new original-protocol guard; lint remains queued. The guard is wired into general CI. The
+the new original-protocol guard; all10 lint jobs also pass. The guard is wired into general CI. The
 [complete-code original-DAC diagnosis](dia-full-codec-preparation-2026-10-15.md)
 is independently complete locally: original WER0, both native-code variants
 WER1. The same repaired protocol also matches all1115 feedback/1114 returned
 rows/1099 codec frames on both real CLI/C-ABI captures. That complete proof is
-linked in the codec receipt. Lint remains queued and is required before integration.
+linked in the codec receipt. The repair is rebased/ff integrated; all five
+tested source/workflow/fixture files remain byte-identical tofc1b05c9. The
+accepted feature branch is removed with its source worktree preserved. Main-tip
+CI runs separately.
 No neural arithmetic, sampler or default is changed. Full free-generation,
 CLI/C-ABI speech, original intermediate diff, CUDA, Q4 and speed remain separate
 gates. Current-source output must be measured rather than inferring its PCM

@@ -97,7 +97,8 @@ The repaired production protocol is also compiled/replayed on both real retained
 CLI/C-ABI sampler captures. All1115 feedback rows,1114 returned rows and1099
 aligned codec frames match actual original methods exactly. This establishes
 protocol correctness on those captures, without a new neural generation or
-speech acceptance. The runtime candidate remains pending applicable CI.
+speech acceptance. The scoped runtime protocol repair is now integrated after
+all13 general CI and10 lint jobs; its tested source bytes remain unchanged.
 
 [Complete117-payload diagnosis and retained-protocol proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip)
 is23,699,070 bytes, SHA256

@@ -1,5 +1,19 @@
 # CrispASR — Port history
 
+## Dia original output-protocol repair integrated — 2026-10-15
+
+Candidatefc1b05c922edfeece675a32f1b7855f588276968 passes all13 general CI jobs
+and10 lint checks, including the actual original-protocol guard. Rebased/ff
+integration6503408cb95d42e80ad84bee513ae58a67e616c5 preserves all five tested
+source/workflow/fixture files byte-for-byte. Shared CLI/C-ABI runtime now matches
+original EOS/capacity countdown, final stopping-row return slice and invalid
+codec-index zeroing. All16 original witness cases pass (old code fails12), each
+individually restored defect rejects, and real retained CLI/C-ABI protocol arrays
+match exactly. Feature branch is removed with source preserved. This is a scoped
+correctness repair; existing full-model speech rejection is unchanged. Main-tip
+CI and release gates are separate. [Receipt](docs/dia-output-protocol-2026-10-15.md).
+
+
 ## Dia key-history producer diagnosis complete — 2026-10-15
 
 Actual original layer0 producer reconstructs979 captured steps within its fixed
@@ -64,7 +78,8 @@ candidate fc1b05c922edfeece675a32f1b7855f588276968 passes all16 and rejects each
 individually restored stopping/return-slice/invalid-frame defect. All50 proof
 payloads, including actual extracted native executable and old failures, are
 public with anonymous full SHA verification. Fresh general CI/lint are submitted;
-the production candidate remains unintegrated pending CI. Original-DAC
+the production candidate is now rebased/ff integrated after13 general and10 lint
+checks. Original-DAC
 diagnosis is now independently completed locally. This completes regression preparation, not full speech acceptance.
 [Receipt](docs/dia-output-protocol-2026-10-15.md).
 
@@ -101,7 +116,7 @@ ledgers and full original GGUF hash verify; original1210-frame/619520-sample
 speech controls are retained. Full native/protocol preparation proof is public,
 anonymously rehashed and includes all raw inputs, literal sources and notices.
 The queued hosted duplicate38710473906 is superseded as the primary diagnosis
-by an independently audited local run; the scoped protocol repair awaits CI.
+by an independently audited local run; the scoped protocol repair is now integrated after13 general and10 lint jobs.
 [Detailed proof and scope](docs/dia-full-codec-preparation-2026-10-15.md).
 
 ## MiMo existing F32 cache-read hypothesis rejected — 2026-10-15

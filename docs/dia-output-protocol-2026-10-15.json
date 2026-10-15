@@ -1,6 +1,6 @@
 {
   "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
-  "integrated": false,
+  "integrated": true,
   "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
   "torch_version": "2.6.0+cpu",
   "cases": 16,
@@ -57,7 +57,7 @@
   "ci": {
     "general": 38713471171,
     "lint": 38713474686,
-    "status": "all13-general-jobs-pass-lint-pending",
+    "status": "all13-general-and-all10-lint-jobs-pass",
     "general_protocol_guard_executed": true
   },
   "separate_original_dac_run": 38710473906,
@@ -105,5 +105,7 @@
     "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip"
   },
   "codec_diagnosis_complete": true,
-  "codec_restores_native_speech": false
+  "codec_restores_native_speech": false,
+  "integrated_source": "6503408cb95d42e80ad84bee513ae58a67e616c5",
+  "tested_source_files_byte_unchanged_after_rebase": true
 }

@@ -118,6 +118,21 @@ cases retained; both SDK architectures and all 13 general CI jobs pass.
 Full-model speech and speed are unvalidated.
 See [the complete hardware receipt](docs/cann-310p3-hardware-2026-10-13.json).
 
+## Dia: original output-protocol corrections
+
+The shared CLI/C-ABI runtime now follows the original EOS/capacity countdown,
+excludes the final stopping row from the returned slice, and replaces invalid
+codec indices with zero while preserving frame timing. Short caps and forced
+diagnostic modes retain their original behavior. All16 original-Python witness
+cases pass; old source fails12, and restoring each defect independently rejects.
+Actual retained CLI/C-ABI arrays also match the original protocol. All13 general
+CI jobs and10 lint checks pass on the exact tested candidate; rebase preserves
+its source bytes. [Complete proof](docs/dia-output-protocol-2026-10-15.md).
+
+This scoped repair does not establish Dia speech acceptance. Complete original-
+DAC cross-decode gives original-code WER0 and both native-code variants WER1;
+neural generation, CUDA, Q4 and performance remain separate open gates.
+
 ## Dia: reproducible DAC precision conversion
 
 The explicit `models/convert-dia-dac-to-gguf.py` tool exports the critical
@@ -191,8 +206,8 @@ published. Version propagation and the annotated tag must use
 
 ## Known limitations and excluded investigations
 
-Dia short-text/delay-reversal and reference-harness changes remain on an
-unmerged branch. F16 neural stages pass the pinned original reference, but the
+Additional Dia neural/reference-harness changes remain on an unmerged branch;
+the separately proven output-protocol corrections above are integrated. F16 neural stages pass the pinned original reference, but the
 128-step startup DAC replay fails cosine/magnitude (cosine 0.9976444, norm error
 0.04271824). Q4_K also fails neural boundaries. Complete native long-prompt
 roundtrips pass, while the reported short sentence has WER 1.0 through both

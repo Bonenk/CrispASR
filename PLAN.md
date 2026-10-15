@@ -23,7 +23,8 @@ Follow docs/contributing.md for all affected surfaces, including the C ABI.
 Current main checkpoint1c33cb58 passes all13 CI jobs (2,026 unit tests),10 lint
 checks, Ruby and Pages. These are completed checks, not pending jobs. Last
 published release is v0.8.43; v0.8.44 is untagged. Future commits need their own
-applicable CI. The latest runtime repair is the integrated Dia top-k fix.
+applicable CI. The latest runtime repair is the integrated Dia output-protocol fix; its
+exact tested source passes13 general and10 lint jobs. Main-tip CI is separate.
 
 ## Ordered roadmap
 
@@ -41,47 +42,19 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia original output protocol regression
+## CLAIMED 2026-10-15 — Dia hosted codec prerequisite completion
 
-Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-output-protocol-20261015,
-branch fix/dia-output-protocol-20261015; build/proof data under
-/mnt/storage/crispasr/dia-output-protocol-20261015. Independently replay the actual
-pinned original Python generation/output methods with synthetic decoder draws,
-then compile the current native stopping/BOS/emission/reversal bodies unchanged
-and compare their complete outputs. Cover natural EOS, capacity stops, tiny caps,
-invalid codec indices and forced diagnostic paths. Observe failing guards before
-any runtime repair. The retained producer has an extra final row; audit the
-current source as well, whose reversal currently drops invalid frames while the
-original zeros invalid entries. Preserve original source hashes, exact witnesses,
-raw failures and complete successful receipts. Apply only demonstrated shared
-runtime repairs, run fresh CI and full-code original-DAC crosschecks; no speech,
-CUDA, quantization or performance acceptance follows from protocol correctness.
-The complete-code original-DAC diagnosis is now independently audited; fresh
-applicable CI remains required before integrating the production candidate.
-
-Candidate fc1b05c922edfeece675a32f1b7855f588276968 is pushed. Actual original
-Torch2.6 witnesses regenerate byte-exact; old source fails12/16 cases, repaired
-source passes16/16, and restoring each of three defects independently rejects.
-Complete50-payload proof is public and anonymously SHA-verified. General
-CI38713471171 passes all13 jobs, including the real new protocol guard;
-lint38713474686 remains queued. Actual retained CLI/C-ABI
-predictions also match all1115 feedback/1114 returned rows/1099 codec frames
-against the original. Codec/ASR diagnosis is complete locally with strict
-original positive controls: both native-code variants still fail WER1.
-Hosted duplicate38710473906 failed on the omitted huggingface_hub import
-dependency before original inference; complete rejected evidence is preserved.
-Corrected dispatch38716091962 adds huggingface_hub1.10.1 and is queued. The
-worker math remains unchanged at7b42071f; README command repair87a11e3d is
-pushed on its separate branch. Corrected hosted38716091962 passed strict PCM
-controls but failed before ASR because ffmpeg is absent. Maintainer now claims
-the scoped prerequisite check/bootstrap in the existing owned full-codec
-worktree/branch; preserve the complete second failed artifact/log, keep all
-numerical/ASR thresholds unchanged. Prerequisite-only source a40755b7 is pushed;
-fresh hosted38723274160 is queued. Independent partial hosted PCM audit passes
-while ASR did not run in the failed attempt. Complete raw failure proof is
-public/anonymous-SHA verified. Audit fresh CI before runtime integration. Completed local
-regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
-full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
+Owner: maintainer session. Owned worktree /mnt/volume1/crispasr-dia-full-codec-20261015,
+branch diag/dia-full-codec-20261015; evidence under
+/mnt/storage/crispasr/dia-full-codec-crossdecode-20261015. Local complete-code
+original-DAC/ASR diagnosis is independently complete: original WER0, both native
+code variants WER1. Hosted first missing-hub and second missing-ffmpeg failures
+are preserved in complete public SHA-verified archives; the second also passes
+independent partial PCM audit. Prerequisite-only candidatea40755b7 is pushed;
+hosted38723274160 is submitted with unchanged model/source and PCM/ASR gates.
+Audit the terminal hosted result and integrate diagnostic worker/README only
+after applicable checks. The separate production output-protocol repair is
+already integrated as6503408c after13 general/10 lint jobs; no speech promotion.
 
 ## CLAIMED 2026-10-15 — Dia key-history diagnostic tooling integration
 

@@ -349,5 +349,12 @@
     "run": 38723274160,
     "status": "queued",
     "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes"
+  },
+  "protocol_runtime_integration": {
+    "source": "6503408cb95d42e80ad84bee513ae58a67e616c5",
+    "tested_candidate": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "all13_general_and10_lint_pass": true,
+    "tested_source_byte_unchanged": true,
+    "speech_acceptance": false
   }
 }
