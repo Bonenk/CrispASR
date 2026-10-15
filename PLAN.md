@@ -124,6 +124,14 @@ flag, modify graph math/defaults, repeat BLAS sweeps, or claim speech/performanc
 acceptance. This experiment can reject the cache-read hypothesis. Any promising
 result still needs full fixed-recipe CLI/C-ABI speech and actual GPU validation.
 
+Candidate f242ba80eccbc801a44bebe134486667cf6b127d is pushed. Heavy CPU
+workflow38703457282 is submitted on that exact source; its terminal arrays and
+ELF/configuration still need independent audit. Local five rejecting metric
+controls, Python syntax, documentation anchors and all four unskipped secret
+checks pass. Production graph math/defaults are unchanged. The diagnostic must
+also reproduce the old failure and observe the override effect before accepting
+the hypothesis. Do not merge or report hosted numerical success while queued.
+
 ## Remaining PRs — scoped salvage and acceptance
 
 - **PR492 / MiMo:** independent opt-in mel/cached-decode pieces are merged.
