@@ -1,5 +1,74 @@
 # CrispASR — Port history
 
+## Dia hosted terminal intervention integrated — 2026-10-15
+
+Integrationa787a00d preserves tested85be03e3 and auditor63468e54 method bytes.
+Heavy38805728288 and all10 lint jobs pass. Independent official/source/byte
+verification covers277 payloads, both exact native controls, the prior original
+layer17 anchor,90 stage rows, actual original-filter outputs and all lossless
+captures. Conditional margin increments are+4.76837e-5 for original post17,
++3.81470e-6 for original final hidden, and+2.14577e-5 remaining original-head
+contrast. Actual F32 and F64 CFG margins agree exactly. No new algebraic defect,
+production/default change or speech/Q4/GPU/speed acceptance follows. All public
+proof files are anonymously fully verified. [Results](docs/dia-terminal-replay-results-2026-10-15.md).
+The next full-original trace/single-token sensitivity work stays in PLAN.md.
+
+### Archived Dia plan checkpoint before terminal completion
+
+The following completed-diagnosis inventory is retained as historical context;
+its former next-step wording is superseded by the current PLAN.md.
+
+## Dia correctness — early probe complete, full speech still open
+
+The layer0 owned-input and split-key/value probe is complete and public:
+[results](docs/dia-layer0-owned-input-results-2026-10-15.md). Native hosted output
+and all input embeddings are byte-exact. In this fixture, self-cache keys have
+a larger context effect than values/cross-cache. No new runtime defect is
+established, and old source-RoPE speech failures remain rejected. Do not replay
+all remaining layers or rerun the unchanged source-RoPE candidate blindly.
+
+The [complete-code original-DAC diagnosis](docs/dia-full-codec-preparation-2026-10-15.md)
+is complete, with original positive PCM relative L2 5.572e-7 and WER0. Both native
+full-code and original-return-slice variants remain near-silent with WER1 through
+the original DAC. Do not repeat that unchanged cross-decode or treat the scoped
+protocol fix as a speech repair. The key-history producer diagnostic is now
+complete: native normalization/projection error is about2e-7, while original
+pre-RoPE keys through native RoPE still differ by1.571e-5. The completed
+[full-decoder key intervention](docs/dia-cache-intervention-results-2026-10-15.md)
+reproduces both native controls exactly. Original prefix/current/both keys all
+retain the reversed46/904 ordering: key-only substitution is insufficient.
+The [joint Q/K factorial](docs/dia-query-key-results-2026-10-15.md) is complete:
+all739 hosted payloads and native controls pass independent audit. Query-only,
+key-only and joint replacement retain the reversed46/904 ranks and native
+sampling support. Joint Q/K improves block0 attention relative L2 from4.71e-6
+to1.42e-6 but leaves the final margin at−2.6702880859e-5. The tested layer0
+substitution is insufficient. All diagnostic tooling is integrated; complete
+raw hosted and25-row block0 proofs are public and anonymously verified.
+Do not rerun these unchanged arms or all-layer source-RoPE speech controls.
+
+The [one-step suffix replay](docs/dia-suffix-replay-results-2026-10-15.md)
+is complete:37 arms,1,323 independently verified payloads,666 layer rows and
+all18 exact native controls. Original outputs10/11/12/14/17 restore reference
+support non-monotonically. Original output17 leaves final-hidden error7.38e-8
+and margin+2.0981e-5 versus original+4.6253e-5. No unique bad layer or speech
+repair follows; no unchanged37-arm or late-layer owned-input repeats.
+
+Next bounded task, requiring a new claim before implementation:
+
+1. Use the accepted one-step baseline for native/original final-hidden clamps
+   inside the actual pinned hosted runtime, with native control exact. Retain
+   both computed and consumed hidden, all upstream stages, head logits and
+   actual original-filter margin/ranks/support. Crosscheck the accepted native
+   and original-layer17 anchors exactly. This distinguishes terminal norm/head
+   effects in the hosted path from prior local component reconstruction.
+2. Close missing simultaneous full-model original self-Q provenance using
+   unchanged-blueprint hooks and OFF/ON/OFF transparency controls. Separate
+   full-model capture from qualified module replay and shadow arrays.
+3. Only a new demonstrated runtime defect justifies a production candidate;
+   then rerun full decoded speech before performance, Q4 or GPU promotion.
+
+
+
 ## Dia terminal artifact auditor prepared — 2026-10-15
 
 Candidate63468e54 adds independent five-arm source/archive/capture validation

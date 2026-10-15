@@ -44,100 +44,49 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia hosted terminal hidden-state intervention
+## CLAIMED 2026-10-15 — Dia full-original trace and single-decision fork
 
 Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-terminal-20261015, branch diag/dia-terminal-20261015;
-large scratch/evidence under /mnt/storage/crispasr/dia-terminal-20261015.
-Extend the accepted scratch-only one-step8d0ad886/C36 replay with a separately
-owned replacement leaf after final RMSNorm and before all9 output heads.
-Retain computed and consumed hidden by pointer and preserve the discarded
-producer as a graph root. Native baseline, native layer17 and native hidden
-controls must reproduce all127 stages/logits exactly; the original-layer17
-anchor must reproduce accepted38793672943 bytes. Then inject the actual full
-original final-hidden capture, require all upstream stages/caches unchanged,
-and measure every logit plus the actual original-filter margin/ranks/support.
-No simultaneous layer/hidden clamp, source model/default change or tolerance
-relaxation. Tiny ownership/file controls and full-source syntax are local;
-full F32 model execution belongs on GH. Interpret differences as conditional
-terminal-stage effects, not a speech fix or additive global causal shares.
-Do not repeat local norm/head/late-layer probes unchanged. Complete simultaneous
-original full-model self-Q provenance remains a separate follow-up.
+/mnt/volume1/crispasr-dia-original-trace-20261015, branch diag/dia-original-trace-20261015;
+large scratch/evidence under /mnt/storage/crispasr/dia-original-trace-20261015.
+Use pinned8d0ad886 reference tools and actual original4a9e29b1/caba weights,
+Torch2.6 CPU, seed42 and the unchanged3072-token recipe. Capture simultaneous
+actual full-model self Q/K/V/attention, pre-RoPE Q/K/V projections and decoder
+boundaries at position978; retain actual original cross-cache valid prefixes.
+Require OFF/ON/OFF all-common arrays, complete trajectories and PCM byte-exact,
+canonical original input/code grids and original TTS→ASR WER0 before any fork.
+Then call the unchanged original sampler and replace only the step978/codebook2
+sample877 with904. Verify the clone does not consume RNG or alter other entries,
+all earlier inputs/logits exact, and one changed next-input entry. Retain complete
+subsequent codes/audio and report fork TTS→ASR honestly, whether speech succeeds
+or fails. No changed seed/filter/threshold, teacher-forced prefix, model arithmetic,
+production sampler or default. This tests sensitivity, not a speech repair.
+Local work is tiny actual-original module/sampler observation contracts; full
+original runs and recognizer/build tasks belong on GH. Missing full-model self-Q
+provenance must be distinguished from earlier qualified module replay/shadows.
 
-**Checkpoint:** candidate85be03e353cd2aa4da5529acfc41585eecf87116 is pushed on
-`diag/dia-terminal-20261015`. [Heavy38805728288](https://github.com/CrispStrobe/CrispASR/actions/runs/38805728288)
-and [lint38805731957](https://github.com/CrispStrobe/CrispASR/actions/runs/38805731957)
-are queued. Full patched source passes C++17 syntax against exactC36 headers;
-accepted finite-loader/prefix controls, single-use terminal patch checks and
-all4 unskipped secret guards pass locally. Five arms retain every logit and
-stage, and validate the prior original-layer17 anchor before interpreting the
-actual original-hidden replacement. No new terminal numerical result yet.
-Local receipt: /mnt/storage/crispasr/dia-terminal-20261015/local-v1/preflight.json.
-Next inspect terminal jobs, independently audit complete artifacts, then decide
-whether the measured final-norm/head effects justify any new arithmetic probe.
-[Method and submission](docs/dia-terminal-replay-preparation-2026-10-15.md).
+## Dia correctness — next full-original trace
 
-Independent auditor63468e54 is prepared on the same feature branch while the
-submitted worker stays byte-identical to85be03e3. It checks all5 arms, all127
-logical captures, both native controls, the accepted original-layer17 anchor,
-computed/consumed hidden,90 layer metric rows and actual original-filter output.
-It records separate F32 and exact-input F64 CFG margin sequences, with signed
-conditional differences required to telescope exactly. Existing24 calibrated
-byte/metric controls and12 new corruption/nonfinite controls pass. Two actual
-accepted activation captures, the composed scratch patch and3 exact rational
-CFG cases also calibrate successfully. [Receipt](docs/dia-terminal-auditor-calibration-2026-10-15.json).
-This is auditor preparation only; both submitted GH jobs remain queued and no
-terminal hidden-state result is accepted. Raw calibration receipts stay under
-/mnt/storage/crispasr/dia-terminal-20261015/auditor-calibration-v1 and-v2.
+Native full speech remains rejected; no validated production arithmetic fix
+follows from the completed probes. Completed diagnosis and exact receipts are
+archived in HISTORY.md. The [terminal result](docs/dia-terminal-replay-results-2026-10-15.md)
+separates conditional final-normalization/head effects; CFG F64 gives identical
+margins. Avoid unchanged norm/head/late-layer/source-RoPE and37-arm repeats.
 
-## Dia correctness — early probe complete, full speech still open
-
-The layer0 owned-input and split-key/value probe is complete and public:
-[results](docs/dia-layer0-owned-input-results-2026-10-15.md). Native hosted output
-and all input embeddings are byte-exact. In this fixture, self-cache keys have
-a larger context effect than values/cross-cache. No new runtime defect is
-established, and old source-RoPE speech failures remain rejected. Do not replay
-all remaining layers or rerun the unchanged source-RoPE candidate blindly.
-
-The [complete-code original-DAC diagnosis](docs/dia-full-codec-preparation-2026-10-15.md)
-is complete, with original positive PCM relative L2 5.572e-7 and WER0. Both native
-full-code and original-return-slice variants remain near-silent with WER1 through
-the original DAC. Do not repeat that unchanged cross-decode or treat the scoped
-protocol fix as a speech repair. The key-history producer diagnostic is now
-complete: native normalization/projection error is about2e-7, while original
-pre-RoPE keys through native RoPE still differ by1.571e-5. The completed
-[full-decoder key intervention](docs/dia-cache-intervention-results-2026-10-15.md)
-reproduces both native controls exactly. Original prefix/current/both keys all
-retain the reversed46/904 ordering: key-only substitution is insufficient.
-The [joint Q/K factorial](docs/dia-query-key-results-2026-10-15.md) is complete:
-all739 hosted payloads and native controls pass independent audit. Query-only,
-key-only and joint replacement retain the reversed46/904 ranks and native
-sampling support. Joint Q/K improves block0 attention relative L2 from4.71e-6
-to1.42e-6 but leaves the final margin at−2.6702880859e-5. The tested layer0
-substitution is insufficient. All diagnostic tooling is integrated; complete
-raw hosted and25-row block0 proofs are public and anonymously verified.
-Do not rerun these unchanged arms or all-layer source-RoPE speech controls.
-
-The [one-step suffix replay](docs/dia-suffix-replay-results-2026-10-15.md)
-is complete:37 arms,1,323 independently verified payloads,666 layer rows and
-all18 exact native controls. Original outputs10/11/12/14/17 restore reference
-support non-monotonically. Original output17 leaves final-hidden error7.38e-8
-and margin+2.0981e-5 versus original+4.6253e-5. No unique bad layer or speech
-repair follows; no unchanged37-arm or late-layer owned-input repeats.
-
-Next bounded task, requiring a new claim before implementation:
-
-1. Use the accepted one-step baseline for native/original final-hidden clamps
-   inside the actual pinned hosted runtime, with native control exact. Retain
-   both computed and consumed hidden, all upstream stages, head logits and
-   actual original-filter margin/ranks/support. Crosscheck the accepted native
-   and original-layer17 anchors exactly. This distinguishes terminal norm/head
-   effects in the hosted path from prior local component reconstruction.
-2. Close missing simultaneous full-model original self-Q provenance using
-   unchanged-blueprint hooks and OFF/ON/OFF transparency controls. Separate
-   full-model capture from qualified module replay and shadow arrays.
+1. Capture simultaneous actual original full-model self Q/K/V, pre-RoPE
+   projections and full decoder boundaries at position978, with OFF/ON/OFF
+   transparency. Require all common tensors, complete trajectories and PCM
+   exact, and original positive speech. Do not relabel module replay/shadows
+   as full-model observations.
+2. After those controls pass, test an original-only single decision fork:
+   call the unchanged original sampler, then replace only step978/codebook2's
+   sampled877 with904. Keep seed, noise consumption, recipe and all earlier
+   inputs fixed; record complete subsequent codes/audio and TTS→ASR. This is a
+   causal sensitivity diagnostic, not a production filter workaround. Require
+   the exact pre-fork prefix and one changed next-input entry; report either
+   quality outcome honestly without changing an acceptance threshold.
 3. Only a new demonstrated runtime defect justifies a production candidate;
-   then rerun full decoded speech before performance, Q4 or GPU promotion.
+   require decoded-output acceptance before performance/Q4/GPU promotion.
 
 ## CANN — hardware follow-ups after merged PR544
 

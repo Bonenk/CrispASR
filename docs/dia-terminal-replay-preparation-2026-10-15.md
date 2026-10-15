@@ -1,5 +1,7 @@
 # Dia hosted terminal hidden-state preparation — 2026-10-15
 
+**Completed:** [accepted result](dia-terminal-replay-results-2026-10-15.md) supersedes this historical preparation checkpoint.
+
 The [accepted37-arm suffix result](dia-suffix-replay-results-2026-10-15.md)
 restores original support after output17 replacement, but leaves margin
 +2.09808349609375e-5 versus original+4.6253204345703125e-5. The replacement

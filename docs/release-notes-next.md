@@ -552,3 +552,13 @@ Five original-output substitutions restore the reference support with
 non-monotonic layer sensitivity. Complete raw proof and lossless reconstruction
 methods are public. This adds diagnostic tooling, not a native speech repair,
 new default, Q4/GPU acceptance or performance gain. [Results](dia-suffix-replay-results-2026-10-15.md).
+
+## Dia hosted terminal diagnosis
+
+A five-arm hosted replay and independent277-payload audit retain exact native
+controls and original final-hidden consumption. All90 layer metric rows and
+original sampler outputs are recalculated. Conditional margin differences
+separate post-layer17, final-normalization and head-projection effects; F64 CFG
+reproduces every observed margin exactly. Complete raw proof is public. These
+are integrated diagnostic tools, not a native speech fix, new default or
+Q4/GPU/performance acceptance. [Result](dia-terminal-replay-results-2026-10-15.md).
