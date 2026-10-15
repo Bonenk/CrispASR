@@ -54,16 +54,13 @@ Only the25,362,432-byte coefficient range was fetched from the4,517,988,832-byte
 model; the full model was not downloaded or rehashed locally. Dequantizing
 these Q4 coefficients does not recover original-checkpoint precision.
 
-## Next experiment
+## Completed follow-up
 
-Test the existing `CRISPASR_KV_READ_F32` option OFF/ON with flash/eager controls,
-fresh processes and the immutable original five-stage reference on hosted CPU.
-It changes the cache-read representation, not model bytes or stored cache
-precision. Its effect is unmeasured; the CPU prefill flash path already uses
-F32 tiled accumulation, so no particular cause or benefit is assumed.
-If this reduces the initial attention difference, Q4 amplification may fall;
-otherwise reject that hypothesis before trying more precision changes. Actual
-CLI/C-ABI decoded speech and controlled timing remain required before promotion.
+The existing F32 cache-read OFF/ON experiment is complete and rejected:
+[full four-arm result](mimo-kvread-ab-2026-10-15.md). It does not fix Q4
+flash/eager parity, and no production default changed. Select a new specific
+attention/activation arithmetic hypothesis before further whole-model work.
+Actual CLI/C-ABI speech and controlled timing remain required before promotion.
 
 ## Public retained proof
 

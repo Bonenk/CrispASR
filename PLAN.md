@@ -76,7 +76,7 @@ HISTORY.md and [the preparation receipt](docs/cann-composed-preparation-2026-10-
 
 ## CLAIMED 2026-10-15 — Dia retained native codes through original DAC
 
-Owner: maintainer session. Owned source worktree planned at
+Owner: maintainer session. Owned source worktree:
 /mnt/volume1/crispasr-dia-full-codec-20261015, branch
 diag/dia-full-codec-20261015. All models/builds/payloads under
 /mnt/storage/crispasr/dia-full-codec-crossdecode-20261015; heavy CPU reference
@@ -96,6 +96,17 @@ No new neural generation, seed/recipe change, GPU/speed/default/whole-port
 acceptance follows; this localizes whether silence is codec or generated-code
 content. Do not rerun the already rejected source-RoPE/full-LM cache-read arms.
 
+Preparation is complete and publicly verified: literal native replay matches all
+1115 observed feedback rows and reconstructs all1100 code frames, including the
+final stopping row. Actual original Torch2.6 protocol replay matches all feedback
+but returns1114 rather than1115 delayed rows: native has one extra tail row.
+After auditing the codec result, fix that return-slice mismatch under a separate
+runtime claim with EOS/capacity/short-run/forced-path controls. No silence repair
+or whole-model acceptance is established by this11.61ms tail difference.
+Candidate7b42071f41e5814f957d7397d8c73615b2cd7c9a and hosted original-DAC/ASR
+workflow38710473906 are submitted; audit their actual terminal arrays/receipts.
+[Preparation and protocol proof](docs/dia-full-codec-preparation-2026-10-15.md).
+
 ## Dia correctness — early probe complete, full speech still open
 
 The layer0 owned-input and split-key/value probe is complete and public:
@@ -105,9 +116,8 @@ a larger context effect than values/cross-cache. No new runtime defect is
 established, and old source-RoPE speech failures remain rejected. Do not replay
 all remaining layers or rerun the unchanged source-RoPE candidate blindly.
 
-Next choose a specific key-producer/history arithmetic hypothesis, or audit
-unmeasured full-length codec behavior using existing native codes decoded by
-the actual original DAC. Keep that cross-decode diagnostic distinct from a
+The complete-code original-DAC experiment is now claimed above. After its
+result, choose a specific key-producer/history arithmetic hypothesis if needed. Keep that cross-decode diagnostic distinct from a
 complete free-generation success; never invent a missing stopping row. Preserve
 all original/native inputs, source pins and full payloads in separate process
 directories. After any demonstrated repair, require actual fixed-recipe

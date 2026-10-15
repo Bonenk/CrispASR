@@ -7,6 +7,20 @@ technical deep-dives are in `LEARNINGS.md`.
 ---
 
 
+## Dia complete code reconstruction and original return-slice replay — 2026-10-15
+
+Literal native stopping/BOS/reversal replay reconstructs the complete final row:
+all1115 feedback inputs match, CLI/C ABI aligned grids are exact,1100 frames
+match563200 retained PCM samples, and corrupted prediction feedback rejects.
+An actual original Torch2.6 protocol replay consumes the same1115 predictions
+but returns1114 delayed rows; the1114 shared rows match exactly. This establishes
+one extra native tail row, not a repaired silence/whole-port gate. Selected input
+ledgers and full original GGUF hash verify; original1210-frame/619520-sample
+speech controls are retained. Full native/protocol preparation proof is public,
+anonymously rehashed and includes all raw inputs, literal sources and notices.
+Original DAC/ASR workflow38710473906 and a scoped tail repair remain pending.
+[Detailed proof and scope](docs/dia-full-codec-preparation-2026-10-15.md).
+
 ## MiMo existing F32 cache-read hypothesis rejected — 2026-10-15
 
 Hosted run38703457282 completes all four fresh CPU processes but correctly
