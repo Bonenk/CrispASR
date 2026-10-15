@@ -3,7 +3,7 @@
   "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
   "heavy_run": 38738218813,
   "lint_run": 38738222779,
-  "hosted_status": "repair submitted; numerical retry pending",
+  "hosted_status": "complete; independent audit passes; key-only hypothesis insufficient",
   "local_preparation": {
     "axis_ownership_pass": true,
     "compiled_file_loader_pass": true,
@@ -58,5 +58,18 @@
     "payloads": 15,
     "anonymous_verified": true,
     "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/26b52aa34bafd3b50b22c0e62cedda6231f40fdc/dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip"
+  },
+  "integration": "e34d551b186cbd07fb07d9d81ae166adc30b0ce7",
+  "results_receipt": "dia-cache-intervention-results-2026-10-15.json",
+  "publication": {
+    "revision": "02eac70ef6025a299bc8bbae8976346c346e0687",
+    "prefix": "dia-20261015-cache-intervention/complete-hosted-intervention-v2",
+    "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/02eac70ef6025a299bc8bbae8976346c346e0687/dia-20261015-cache-intervention/complete-hosted-intervention-v2/manifest.json",
+    "raw_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/02eac70ef6025a299bc8bbae8976346c346e0687/dia-20261015-cache-intervention/complete-hosted-intervention-v2/raw.zip",
+    "raw_bytes": 1177709408,
+    "raw_sha256": "83db2618e48dd329f58da66dfd1ff2e3f493adfb6177cee1e1104c6838efe02c",
+    "published_files": 12,
+    "raw_payloads": 720,
+    "anonymous_all_files_full_sha256_verified": true
   }
 }

@@ -642,3 +642,22 @@ interventions localize the larger context effect to actual self-cache keys
 wrong-cache controls. Complete283-payload evidence is public and anonymously
 SHA-verified. No new runtime repair, speech/Q4/GPU/performance/default acceptance.
 See [layer0 proof](docs/dia-layer0-owned-input-results-2026-10-15.md).
+
+## Linux packaging preflight
+
+The bounded accepted-source Linux CLI, shared library and installed wheel pass
+complete archive/dependency and relocated startup checks. The installed wheel
+finds its own packaged native/helper libraries and enumerates116 C-ABI backends
+from an unrelated directory without loader overrides. This validates source
+998f8d18 at version0.8.43; final release assets still require the final frozen
+source, version bump, applicable CI and platform matrix.
+
+## Completed Dia key-history diagnostic
+
+A five-arm fixed-history full-decoder intervention now retains complete raw
+inputs, stages and original filtering results. Both native controls reproduce
+all979 logit rows exactly; independently replacing original layer0 prefix,
+current key or both does not restore the disputed token ranking. All720 hosted
+payloads and18-stage metrics are independently audited, with terminal heavy
+and lint checks passing. This accepts diagnostic tooling only; Dia free speech,
+GPU and quantized quality remain unaccepted.

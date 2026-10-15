@@ -1,5 +1,31 @@
 # CrispASR — Port history
 
+## Dia full-decoder layer0 key intervention completed — 2026-10-15
+
+Integration `e34d551b186cbd07fb07d9d81ae166adc30b0ce7` retains tested diagnostic code fromfc8f652f.
+Heavy38738218813 and all10 lint checks pass. Independent full artifact audit
+checks720 payloads, all979 baseline/native-control input/logit rows exactly,
+all consumed keys, held Q/V/cross inputs and recomputed18-stage metrics.
+Original-key prefix/current/both retain ranks33/32 instead of original32/33.
+Combined margin is−2.1457672119e-5 versus native−2.6702880859e-5 and original
++4.6253204346e-5. Key substitution alone is insufficient; joint Q/K phase effects
+remain untested. All arms, source, ELF/libraries, APIs/logs and audit are public
+and anonymously full-hash verified. No production graph/default or speech/GPU
+acceptance changes. See the [complete result](docs/dia-cache-intervention-results-2026-10-15.md).
+
+## Accepted-source Linux CLI/library/wheel preflight complete — 2026-10-15
+
+Frozen998f8d18 passes both bounded empty-tag Release jobs, official raw ZIP
+hash/CRC/path/link audits, actual hosted symlink-bundle relocation and local
+materialized-library loading. The exact frozen Python tree builds and installs
+as a Linux wheel. Isolated unrelated-directory startup loads its own native and
+helper libraries, lists116 stable C-ABI backends, handles repeated missing-model
+errors and passes all18 ELF dependency checks. Large files remain on storage;
+CIFS materialization and the two corrected smoke-harness assumptions are
+explicit in the [receipt](docs/release-preflight-2026-10-15.md). All publication
+steps skip. Version remains0.8.43; this is not final-tip/full-matrix or model/GPU
+acceptance. Final release freeze/bump/tag remains pending.
+
 ## OmniVoice standalone utilities integrated — 2026-10-15
 
 Integration `5d582d75b71f5e7a29f6728dcdc93aa091ba6dd8` retains the PR521 standalone header, probe and

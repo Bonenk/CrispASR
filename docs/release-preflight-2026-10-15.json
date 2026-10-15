@@ -5,11 +5,11 @@
   "source_branch": "diag/release-preflight-source-20261015",
   "cli_run": 38742749435,
   "library_run": 38742753167,
-  "status": "CLI artifact audited; shared library job and wheel validation pending",
+  "status": "bounded CLI/library/wheel packaging preflight complete",
   "no_tag_or_publication_requested": true,
   "v0844_tag_exists": false,
-  "native_artifact_acceptance": false,
-  "wheel_built": false,
+  "native_artifact_acceptance": true,
+  "wheel_built": true,
   "model_inference_acceptance": false,
   "gpu_acceptance": false,
   "full_platform_matrix": false,
@@ -133,5 +133,308 @@
     "dependency_check": "  [ ok ] crispasr  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] crispasr-quantize  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libc2pa_c.so  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgfortran.so.5  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgomp.so.1  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libopenblas.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libquadmath.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.23 GLIBCXX<=-\n\nscanned 7 ELF file(s); highest glibc requirement: 2.34 (from crispasr)\nOK: every non-system dependency is bundled.\n",
     "publication_steps_skipped": true,
     "scope": "Linux CLI packaging preflight only; no model/GPU/full-platform or final release acceptance."
+  },
+  "wheel_installed_and_c_abi_smoke_pass": true,
+  "library_and_wheel_audit": {
+    "preparation": {
+      "frozen_source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+      "artifact_id": 11981646466,
+      "raw_sha256": "be88c50b50e8e9b7906f1ed9b93cd11c92b50640dc82050d751932376d1d67ce",
+      "tar_sha256": "0e4867ae79d46fb8efa75015546eb0f701d686ffb1c4a12d508c6b6745ecd141",
+      "unique_safe_members": 49,
+      "archive_links": [
+        {
+          "path": "libcrispasr-linux-x86_64/src",
+          "target": "lib",
+          "resolved": "libcrispasr-linux-x86_64/lib",
+          "directory": true
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/ggml/src",
+          "target": "../lib",
+          "resolved": "libcrispasr-linux-x86_64/lib",
+          "directory": true
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libcrispasr.so.1",
+          "target": "libcrispasr.so.0.8.43",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-cpu.so",
+          "target": "libggml-cpu.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "bbdfb069952de3134bf5908a4ffc0d67a23903a8796ec51666f676678db573e7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libwhisper.so",
+          "target": "libcrispasr.so.0.8.43",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libcrispasr.so",
+          "target": "libcrispasr.so.1",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0",
+          "target": "libggml-cpu.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "bbdfb069952de3134bf5908a4ffc0d67a23903a8796ec51666f676678db573e7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml.so.0",
+          "target": "libggml.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "2a202e21fd19d914317cc5a2cf44eaa56be628706e401d27e30f4566b6c2507a"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml.so",
+          "target": "libggml.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "2a202e21fd19d914317cc5a2cf44eaa56be628706e401d27e30f4566b6c2507a"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-base.so",
+          "target": "libggml-base.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-base.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "ac5c39a4b50ddb2291f98181658bf92b6eb4a1c6c6572b12b808b73d8b172122"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-base.so.0",
+          "target": "libggml-base.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-base.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "ac5c39a4b50ddb2291f98181658bf92b6eb4a1c6c6572b12b808b73d8b172122"
+        }
+      ],
+      "materialized_file_aliases": 9,
+      "directory_aliases_preserved_in_raw_archive": true,
+      "extraction_scope": "CIFS wheel-materialized input; not a native symlink-preservation execution test",
+      "frozen_python_source_exact": true,
+      "bundle": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/wheel-materialized-input/libcrispasr-linux-x86_64"
+    },
+    "terminal_library_run": 38742753167,
+    "terminal_library_conclusion": "success",
+    "hosted_original_symlink_bundle_relocated_dlopen_pass": true,
+    "local_materialized_bundle_verification": "verifying bundle rpath closure + load after relocation: /mnt/storage/crispasr/release-preflight-20261015/library-38742753167/verify-tmp/tmp.XApIWo42Lh/relocated\n  rpath closure OK: every bundled dependency of 17 libs resolves internally\n  OK: libcrispasr.so.0.8.43 dlopens after relocation; session ABI resolves\n",
+    "wheel": {
+      "name": "crispasr-0.8.43-py3-none-linux_x86_64.whl",
+      "bytes": 53352316,
+      "sha256": "b26d6d1b496e07c318c5bb7171c6da7018f7a2c1550ee8ccda8534c18dcf90c2",
+      "crc_unique_safe_paths_pass": true,
+      "frozen_python_files_exact": true,
+      "installed_library_matches_raw_archive": true,
+      "smoke": {
+        "passed": true,
+        "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:28:48) [GCC 14.3.0]",
+        "isolated_environment": true,
+        "installed_package": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/installed-site-packages/crispasr",
+        "library": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/installed-site-packages/crispasr/libcrispasr.so",
+        "library_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7",
+        "version": "0.8.43",
+        "backend_count": 116,
+        "backends": [
+          "whisper",
+          "parakeet",
+          "reazonspeech",
+          "phonon2",
+          "nemotron",
+          "gigaam",
+          "xasr",
+          "dolphin",
+          "canary",
+          "canary-qwen",
+          "index-echo",
+          "lfm2-audio",
+          "mini-omni2",
+          "sidon",
+          "qwen3",
+          "raon-speech",
+          "higgs-stt",
+          "cohere",
+          "granite",
+          "granite-4.1",
+          "granite-4.1-plus",
+          "granite-4.1-nar",
+          "fastconformer-ctc",
+          "canary-ctc",
+          "voxtral",
+          "voxtral4b",
+          "voxtral-tts",
+          "wav2vec2",
+          "vibevoice",
+          "vibevoice-streaming",
+          "vibevoice-tts",
+          "vibevoice-1.5b",
+          "kugelaudio",
+          "zonos",
+          "qwen3-tts",
+          "miotts",
+          "confucius4-tts",
+          "bt2-tts",
+          "piano-transcription",
+          "basic-pitch",
+          "onsets-and-frames",
+          "hft-transformer",
+          "mt3",
+          "moss-tts",
+          "moss-tts-local",
+          "omnivoice",
+          "glm-asr",
+          "htdemucs",
+          "mel-band-roformer",
+          "crepe",
+          "beat-this",
+          "btc-chords",
+          "tabcnn",
+          "rvc-svc",
+          "kyutai-stt",
+          "firered-asr",
+          "moonshine",
+          "hikari",
+          "moonshine-streaming",
+          "gemma4-e2b",
+          "omniasr",
+          "omniasr-300m",
+          "omniasr-llm",
+          "omniasr-llm-unlimited",
+          "orpheus",
+          "kokoro",
+          "chatterbox",
+          "chatterbox-turbo",
+          "chatterbox-nano",
+          "chatterbox-finnish-nano",
+          "kartoffelbox-turbo",
+          "lahgtna-chatterbox",
+          "bananamind-tts",
+          "tada",
+          "tada-1b",
+          "tada-tts-1b",
+          "tada-3b-ml",
+          "outetts",
+          "csm",
+          "dia",
+          "dots-tts",
+          "fireredtts3",
+          "pocket-tts",
+          "pocket-tts-de",
+          "pocket-tts-es",
+          "pocket-tts-it",
+          "pocket-tts-pt",
+          "pocket-tts-fr",
+          "fastpitch",
+          "speecht5",
+          "bark",
+          "parler-tts",
+          "voxcpm2-tts",
+          "voxcpm2-vae",
+          "cosyvoice3-tts",
+          "cosyvoice3-tts-rl",
+          "indextts",
+          "f5-tts",
+          "irodori-tts",
+          "supertonic",
+          "piper",
+          "melotts",
+          "m2m100",
+          "m2m100-wmt21",
+          "marian",
+          "madlad",
+          "mimo-asr",
+          "ark-asr",
+          "moss-audio",
+          "hojo-asr",
+          "moss-transcribe",
+          "moss-diarize",
+          "mega-asr",
+          "funasr",
+          "paraformer",
+          "sensevoice"
+        ],
+        "helper_dlopen": true,
+        "repeated_c_abi_backend_enumeration_and_missing_model_errors": true,
+        "cwd": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/unrelated-cwd",
+        "loader_overrides_absent": true,
+        "scope": "Actual installed frozen-source wheel and native-library startup; no successful model inference, GPU or dynamic-plugin-registry acceptance."
+      },
+      "dependency_check": "  [ ok ] libcrispasr.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr.so.0.8.43  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr.so.1  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr_helpers.so  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=- GLIBCXX<=-\n  [ ok ] libgfortran.so.5  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libggml-base.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-base.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-base.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libggml.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libggml.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libgomp.so.1  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libopenblas.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libquadmath.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.23 GLIBCXX<=-\n  [ ok ] libwhisper.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n\nscanned 18 ELF file(s); highest glibc requirement: 2.34 (from libcrispasr.so)\nOK: every non-system dependency is bundled.\n"
+    },
+    "logs": [
+      {
+        "path": "complete.log",
+        "sha256": "0d5792efc64f05cb96540ebb6ee53680e1d811c6caee20e2833024ebc3de5458",
+        "bytes": 916818
+      },
+      {
+        "path": "prepare.py",
+        "sha256": "8c4a97b4580030b5cde2b2860281bd7f3a83a72fcabfab63d82ad597d87db95a",
+        "bytes": 3888
+      },
+      {
+        "path": "preparation.json",
+        "sha256": "7e4e4327e9f66a1cfb09db7b57ee5019152c657da2874f969b0d88e20ff09948",
+        "bytes": 3762
+      },
+      {
+        "path": "stage.log",
+        "sha256": "9f43f87223900a5fd70e593409eaefc12ed2afa6be6de70df409e7d93944e6c9",
+        "bytes": 530
+      },
+      {
+        "path": "wheel-build.log",
+        "sha256": "3da3f8d3a394c7013b08d764b2ef79484bfaad53b475963be5ddfc04120023f2",
+        "bytes": 9729
+      },
+      {
+        "path": "wheel-install.log",
+        "sha256": "1f56eeceb6a5be8588ffac4f07534b37df9e2665c8cd7ebddc56dcf7e0f5520f",
+        "bytes": 206
+      },
+      {
+        "path": "wheel_smoke.py",
+        "sha256": "f7d5fc7fc850cab420b6b2a7d40de51bc758535b170501b69ef5a1ef3a332e99",
+        "bytes": 1923
+      },
+      {
+        "path": "wheel-smoke.log",
+        "sha256": "73a4193737eb159c0f9cc701a755f3ef84044e769f4db4360b5b7ebb0421f22e",
+        "bytes": 3286
+      },
+      {
+        "path": "wheel-smoke.json",
+        "sha256": "009c4715b44251ce540cfe6055d4f80c28af6d14242753cc86d87c6e708237c7",
+        "bytes": 3061
+      },
+      {
+        "path": "verify-bundle.log",
+        "sha256": "b8dadd98ab231bb911d68f1ade63fc0caeb8c2624e354770673d349f701401de",
+        "bytes": 312
+      },
+      {
+        "path": "wheel-dependencies.log",
+        "sha256": "c087911fe6816c428e3e03d93614afee4cb5dbbc3d2c2e28dfeaf518a0927068",
+        "bytes": 1828
+      }
+    ],
+    "test_harness_corrections": [
+      "Quantizer has no version option: expected usage exit1 is verified from frozen source; original invalid-version assertion retained.",
+      "C ABI advertises dia: corrected invalid dia-tts expectation from frozen source; original failed harness/script retained."
+    ],
+    "model_inference_acceptance": false,
+    "gpu_acceptance": false,
+    "full_platform_matrix": false,
+    "final_release_freeze": false
   }
 }

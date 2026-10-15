@@ -31,7 +31,7 @@ are under /mnt/storage/crispasr/omnivoice-utility-split-20261015.
 GH reproduction recipe (the validated source is recorded in the receipt):
 
 ```sh
-gh workflow run heavy-cpu.yml --ref fix/omnivoice-utility-split-20261015 \
+gh workflow run heavy-cpu.yml --ref main \
   -f script=tools/ci-heavy/omnivoice_audio_parity.py \
   -f 'pip=numpy==1.26.4 pydub==0.25.1' -f timeout_minutes=30
 ```

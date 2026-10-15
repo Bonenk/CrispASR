@@ -22,7 +22,7 @@ attention inputs. The executable's exit alone cannot pass the diagnostic.
 Run on GH with:
 
 ```sh
-gh workflow run heavy-cpu.yml --ref diag/dia-cache-intervention-20261015 \
+gh workflow run heavy-cpu.yml --ref main \
   -f script=tools/ci-heavy/dia_cache_intervention.py \
   -f 'pip=numpy==1.26.4 torch==2.6.0 safetensors==0.5.3 gguf==0.18.0 huggingface_hub==1.10.1 requests' \
   -f timeout_minutes=300
@@ -66,3 +66,7 @@ reproduces both missing old lookups and verifies the corrected consumed values.
 It passes locally against the actual failed-run ggml libraries and exact
 c36dab89 headers; the worker runs it before downloading full model weights.
 The repaired full native control is still mandatory before interpreting arms.
+
+The repaired five-arm run and independent audit are complete; key replacement
+alone does not restore the disputed ordering. See the
+[complete result](../../../docs/dia-cache-intervention-results-2026-10-15.md).

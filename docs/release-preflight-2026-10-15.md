@@ -10,8 +10,7 @@ as version 0.8.43; these are not v0.8.44 assets or the final release freeze.
 and [library run38742753167](https://github.com/CrispStrobe/CrispASR/actions/runs/38742753167)
 use the existing Release workflow's empty-tag dry run, selecting only
 `build-linux` and `build-libs-linux-x86_64`. Both event metadata records match
-the frozen SHA and validation branch. The CLI run passes; the library job is
-still queued. No tag or
+the frozen SHA and validation branch. Both runs are terminal-successful and the bounded packaging preflight passes. No tag or
 publication was requested. The v0.8.44 tag is absent.
 
 Existing local guards pass against byte-identical frozen scripts:
@@ -38,11 +37,34 @@ exit1. Actual ldd resolves bundled libraries beside both executables, and the
 dependency checker accepts all seven ELF files with `$ORIGIN` RUNPATHs.
 All release attachment, creation and notes steps are terminal-skipped.
 
-The library archive and wheel have not been validated. After that job
-finishes, verify its raw hash, source, CRC and archive paths, actual relocated
-C-ABI loading and dependency closure; then stage,
-build and install a wheel from the same frozen Python tree and actual library
-bundle. Library discovery must resolve inside the installed package from an
-unrelated directory without loader-path overrides. Confirm all publication
-steps skipped. These checks do not replace model/GPU acceptance, the full
-platform matrix, applicable final-tip CI or the later version-bump process.
+The library artifact11981646466 passes full SHA256/CRC, 49 unique safe tar
+members and every original symlink target. Its raw SHA256 is
+`be88c50b50e8e9b7906f1ed9b93cd11c92b50640dc82050d751932376d1d67ce`. The actual hosted symlink bundle passes
+relocated dependency closure/dlopen and session-ABI checks. Locally, CIFS cannot
+create those symlinks: the immutable tar remains untouched, its two directory
+aliases are audited, and nine file aliases are explicitly materialized as the
+wheel stager expects. That materialized bundle also passes relocated loading.
+This is not a local native-symlink preservation execution claim.
+
+The wheel uses the exact frozen Python tree and actual shared bundle, with the
+existing `stage_libs.py`, compiled legacy helper and Linux wheel tagging. The
+built wheel is `crispasr-0.8.43-py3-none-linux_x86_64.whl`, 53352316 bytes,
+SHA256 `b26d6d1b496e07c318c5bb7171c6da7018f7a2c1550ee8ccda8534c18dcf90c2`. Every Python member matches the frozen commit;
+CRC, unique safe paths and actual installed-library bytes pass. An isolated
+Python3.13 environment installs it with NumPy2.3.5. From an unrelated directory,
+without loader or Python path overrides, library discovery resolves inside the
+installed package, both native/helper libraries load, and all116 backend names
+remain stable across repeated C-ABI calls and missing-model error paths. All18
+wheel ELF files pass dependency closure with `$ORIGIN` RUNPATHs. Large packages,
+source, installed site-packages and logs remain under /mnt/storage.
+
+The two initial smoke-harness assumptions (a quantizer version switch and a
+`dia-tts` C-ABI name) were corrected against frozen source; original failed
+scripts/logs remain retained. They required no runtime or package change.
+
+Both workflows' release attachment/creation/notes steps are terminal-skipped.
+No tag, publication or version bump occurred. This bounded preflight completes
+the accepted-source packaging task; it does not replace model/GPU acceptance,
+the full platform matrix, a final source freeze, applicable final-tip CI or the
+later version-bump process. The JSON receipt retains the complete audit,
+original archive link table, wheel identity and verification log hashes.

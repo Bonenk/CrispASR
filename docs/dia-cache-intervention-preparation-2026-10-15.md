@@ -1,5 +1,10 @@
 # Dia full-decoder layer0 key intervention preparation
 
+**Completed:** the repaired hosted run and independent 720-payload audit pass.
+All three original-key arms fail to restore the disputed ranking; see the
+[complete result](dia-cache-intervention-results-2026-10-15.md). The preparation
+and failed first attempt below are retained as historical evidence.
+
 Initial candidate `2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea` adds a diagnostic worker
 and small runner. Production runtime/defaults remain unchanged. The worker
 patches only its scratch checkout at the immutable previously tested boundary
@@ -13,7 +18,7 @@ missing tensor upload: its new full-key input prunes the unused past-key leaf.
 The new input also needs a retained pointer across capture renaming. No
 original-key arm ran, so there is no valid intervention result. That plumbing
 is now repaired and both cases pass a small actual ggml graph; repaired retry
-38738218813 and its lint are pending. The failed raw artifact and logs are
+38738218813 and all10 lint checks subsequently pass; see the complete result. The failed raw artifact and logs are
 retained in full, with publication details below.
 The [method](https://github.com/CrispStrobe/CrispASR/blob/2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea/tools/ci-heavy/dia-cache-intervention/README.md)
 records the exact dispatch and predefined gates.
@@ -75,8 +80,8 @@ Full patched-runtime syntax and existing input/axis controls still pass.
 
 [Repaired heavy38738218813](https://github.com/CrispStrobe/CrispASR/actions/runs/38738218813)
 and [lint38738222779](https://github.com/CrispStrobe/CrispASR/actions/runs/38738222779)
-are submitted at `fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4`. Numerical retry results are pending. Both
-native controls remain mandatory, followed by all three original-key arms.
+are submitted at `fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4`. The numerical retry and independent audit are complete. Both native controls
+are exact and all three original-key arms are retained in the result receipt.
 No acceptance threshold, model coefficient or production default changed.
 
 The [complete failed-run proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/26b52aa34bafd3b50b22c0e62cedda6231f40fdc/dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip)
