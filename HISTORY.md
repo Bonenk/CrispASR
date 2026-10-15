@@ -1,5 +1,22 @@
 # CrispASR — Port history
 
+## Dia full-decoder Q/K diagnosis and standalone tools integrated — 2026-10-15
+
+Tool integrations f38980ce / 63780005 preserve tested source95ade290 / b1de5628
+after rebase. Heavy38764924112 passes atff7e07c0; both applicable lint runs pass
+all10 checks. Independent official archive/source/CRC audit verifies739 payloads,
+all979 exact native-control logits/stages, actual consumed Q/K, held inputs,
+all18 layer metrics and actual original sampler supports. Query-only/key-only/
+joint margins−1.4305e-5/−2.1458e-5/−2.6703e-5 all retain native33/32 ranks.
+Joint replacement improves actual-original block0 attention error4.71e-6→1.42e-6
+but leaves the final margin unchanged. Complete raw hosted proof and38-payload
+block0 stage proof pass all anonymous hashes;25 extra rows are independently
+recalculated. The tested conditional layer0 substitution is insufficient.
+Standalone tiny cancellation, exact-input attention, scalar-reduction, CFG
+margin and original/native query producer tools are integrated. No production
+default change or speech/GPU/Q4/speed acceptance. See [complete result](docs/dia-query-key-results-2026-10-15.md);
+rank-directed suffix replay and missing full-model self-Q provenance remain in PLAN.md.
+
 ## Dia hosted-audit control calibration completed — 2026-10-15
 
 The prepared independent full-decoder auditor reproduces the previous real

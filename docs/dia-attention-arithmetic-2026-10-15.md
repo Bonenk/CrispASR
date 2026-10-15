@@ -1,5 +1,7 @@
 # Dia tiny tensors and exact-input attention arithmetic
 
+**Completed and integrated:** tested diagnostic tools are integrated at f38980ce. Hosted and applicable lint checks pass. The [completed Q/K result](dia-query-key-results-2026-10-15.md) remains negative for restoring the disputed ordering. Earlier preparation checkpoints below are historical; they are not current pending jobs.
+
 The component probe is complete. Tiny analytic fixtures pass the intended head,
 batch and scale laws, and four cancellation terms expose a reduction-order
 difference. Actual original Q/K/V reproduce retained original-module attention
@@ -9,7 +11,7 @@ byte-for-byte. No full model or new speech generation is run on the VPS.
 Tested source is `e6be594f27788d8bfcbab2b60682f64e7ea977fc`. Rebased standalone
 candidate `95ade29094e81c8a9c7437fd0caafedca76e3e1e` preserves all tested
 scripts/C++ bytes; only README context changed to avoid importing the separate
-unvalidated Q/K factorial. These diagnostic tools remain unmerged pending lint.
+unvalidated Q/K factorial. These diagnostic tools are now integrated after all10 lint checks pass.
 Runtime expressions are pinned to `8d0ad8862d2cad5d305a48a57f2a99b5024bc39a`,
 actual ggml headers/libraries to `c36dab89b662838f0f5d4826c399198c0b90bbfc`,
 and original Python classes to `4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8`.

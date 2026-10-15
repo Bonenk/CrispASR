@@ -1,5 +1,7 @@
 # Dia native self-query projection and RoPE isolation
 
+**Completed and integrated:** tested diagnostic tools are integrated at 63780005. Hosted and applicable lint checks pass. The [completed Q/K result](dia-query-key-results-2026-10-15.md) remains negative for restoring the disputed ordering. Earlier preparation checkpoints below are historical; they are not current pending jobs.
+
 The one-step probe reproduces the captured native layer0 self-query at step978
 byte-for-byte. Projection relative error is 1.48e-7; applying native RoPE to the
 original pre-RoPE query still gives 5.37e-5 error. This localizes the query
@@ -71,4 +73,4 @@ are added to their CMake/method directory.
 [Latest lint38767820341](https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341)
 is queued at the new candidate. Independently audit full hosted raw artifacts
 and exact native controls before interpretation or integration. These tools
-remain unmerged; speech, CUDA, Q4 and speed acceptance remain separate.
+are integrated; speech, CUDA, Q4 and speed acceptance remain separate.

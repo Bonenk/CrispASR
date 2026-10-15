@@ -1,0 +1,3506 @@
+{
+  "independent_audit_pass": true,
+  "calibration_key_only": false,
+  "full_query_key_audit_pass": true,
+  "source": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+  "verified_payloads": 739,
+  "verified_method_files": [
+    "dia_query_key_intervention.py",
+    "dia_cache_intervention.py",
+    "dia-cache-intervention/graph_guard.cpp",
+    "dia-cache-intervention/CMakeLists.txt",
+    "dia-cache-intervention/selftest.py",
+    "dia-cache-intervention/patch.py",
+    "dia-cache-intervention/README.md",
+    "dia-cache-intervention/key_input.h",
+    "dia-cache-intervention/runner.cpp",
+    "dia-query-key-intervention/README.md",
+    "dia-query-key-intervention/graph_guard.cpp",
+    "dia-query-key-intervention/CMakeLists.txt",
+    "dia-query-key-intervention/selftest.py",
+    "dia-query-key-intervention/patch.py"
+  ],
+  "official_artifact_id": 11994700398,
+  "official_artifact_sha256": "4e444752df59e76f965822e826282e07dbfac893215bc12e223facae4ba520de",
+  "all979_baseline_native_control_logits_exact": true,
+  "all_consumed_keys_and_queries_exact": true,
+  "earlier978_logits_and_held_inputs_exact": true,
+  "original_sampler_replayed": true,
+  "all18_layer_metrics_recomputed": true,
+  "arms": [
+    {
+      "arm": "baseline",
+      "sampling": {
+        "cfg46": 6.791618347167969,
+        "cfg904": 6.791645050048828,
+        "margin46_minus904": -2.6702880859375e-05,
+        "rank46": 33,
+        "rank904": 32,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ]
+      },
+      "final_hidden": {
+        "cosine_min": 0.9999999999973835,
+        "mine_norm": 45.800056345709024,
+        "ref_norm": 45.80004216977574,
+        "max_row_norm_error": 6.052822700830518e-07,
+        "relative_l2": 2.280212657071085e-06,
+        "max_abs": 1.163780689239502e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999981901,
+        "mine_norm": 989.0276425518852,
+        "ref_norm": 989.0275907882956,
+        "max_row_norm_error": 7.31597370906556e-07,
+        "relative_l2": 1.413203900611083e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cosine_min": 0.9999999999989716,
+          "mine_norm": 26.297409628609525,
+          "ref_norm": 26.297410367247885,
+          "max_row_norm_error": 1.1333430127713484e-07,
+          "relative_l2": 1.4360987107866919e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 1,
+          "cosine_min": 0.999999999998942,
+          "mine_norm": 32.60581998850903,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.1769340257927752e-07,
+          "relative_l2": 1.45076911286986e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 2,
+          "cosine_min": 0.9999999999969691,
+          "mine_norm": 35.42223597608413,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.0133363471129826e-07,
+          "relative_l2": 2.4530929251724008e-06,
+          "max_abs": 7.62939453125e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 3,
+          "cosine_min": 0.9999999999927717,
+          "mine_norm": 40.215589812646805,
+          "ref_norm": 40.21557874374188,
+          "max_row_norm_error": 3.114090734168684e-07,
+          "relative_l2": 3.80600208799053e-06,
+          "max_abs": 1.3232231140136719e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 4,
+          "cosine_min": 0.9999999999948748,
+          "mine_norm": 45.74354487089765,
+          "ref_norm": 45.74353661636031,
+          "max_row_norm_error": 2.482480589982572e-07,
+          "relative_l2": 3.166902595186595e-06,
+          "max_abs": 1.609325408935547e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 5,
+          "cosine_min": 0.9999999999967821,
+          "mine_norm": 48.66185141008544,
+          "ref_norm": 48.66184977877142,
+          "max_row_norm_error": 1.5346316994957476e-07,
+          "relative_l2": 2.534919603326942e-06,
+          "max_abs": 1.5974044799804688e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 6,
+          "cosine_min": 0.9999999999960749,
+          "mine_norm": 50.11537262925527,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.4638569851020975e-07,
+          "relative_l2": 2.799526602666286e-06,
+          "max_abs": 2.5272369384765625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 7,
+          "cosine_min": 0.9999999999967895,
+          "mine_norm": 56.37123735940797,
+          "ref_norm": 56.371237323294366,
+          "max_row_norm_error": 1.8081559494120825e-07,
+          "relative_l2": 2.53155913423968e-06,
+          "max_abs": 2.288818359375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 8,
+          "cosine_min": 0.9999999999968737,
+          "mine_norm": 69.9424504621899,
+          "ref_norm": 69.94245100686283,
+          "max_row_norm_error": 7.418959058203001e-08,
+          "relative_l2": 2.4673203839088007e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 9,
+          "cosine_min": 0.999999999995535,
+          "mine_norm": 81.50519113955497,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.396133595514385e-08,
+          "relative_l2": 2.959206959118416e-06,
+          "max_abs": 1.621246337890625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 10,
+          "cosine_min": 0.9999999999965227,
+          "mine_norm": 88.70045377890445,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 6.482244008232385e-08,
+          "relative_l2": 2.572805219700209e-06,
+          "max_abs": 2.86102294921875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 11,
+          "cosine_min": 0.9999999999976087,
+          "mine_norm": 108.51249600670327,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.0302371156178936e-07,
+          "relative_l2": 2.1820343782648897e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 12,
+          "cosine_min": 0.9999999999974387,
+          "mine_norm": 122.70303122044574,
+          "ref_norm": 122.70302095215452,
+          "max_row_norm_error": 1.6435688254823333e-07,
+          "relative_l2": 2.2549087140255015e-06,
+          "max_abs": 2.5987625122070312e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 13,
+          "cosine_min": 0.9999999999978069,
+          "mine_norm": 141.82645513093422,
+          "ref_norm": 141.82645167822773,
+          "max_row_norm_error": 6.164380539352976e-08,
+          "relative_l2": 2.0456419157545696e-06,
+          "max_abs": 2.944469451904297e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 14,
+          "cosine_min": 0.9999999999979489,
+          "mine_norm": 161.09771036979814,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 3.141967230835263e-08,
+          "relative_l2": 1.9987908289230952e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 15,
+          "cosine_min": 0.999999999997987,
+          "mine_norm": 190.0161329884898,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1580587655490859e-07,
+          "relative_l2": 1.9708372687938223e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 16,
+          "cosine_min": 0.9999999999976613,
+          "mine_norm": 222.39867822046958,
+          "ref_norm": 222.39869456353009,
+          "max_row_norm_error": 8.228349313021965e-08,
+          "relative_l2": 2.126875475570996e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 17,
+          "cosine_min": 0.9999999999969856,
+          "mine_norm": 410.04025270499955,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.84600260031165e-07,
+          "relative_l2": 2.347025692152483e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ]
+    },
+    {
+      "arm": "native-control",
+      "sampling": {
+        "cfg46": 6.791618347167969,
+        "cfg904": 6.791645050048828,
+        "margin46_minus904": -2.6702880859375e-05,
+        "rank46": 33,
+        "rank904": 32,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ]
+      },
+      "final_hidden": {
+        "cosine_min": 0.9999999999973835,
+        "mine_norm": 45.800056345709024,
+        "ref_norm": 45.80004216977574,
+        "max_row_norm_error": 6.052822700830518e-07,
+        "relative_l2": 2.280212657071085e-06,
+        "max_abs": 1.163780689239502e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999981901,
+        "mine_norm": 989.0276425518852,
+        "ref_norm": 989.0275907882956,
+        "max_row_norm_error": 7.31597370906556e-07,
+        "relative_l2": 1.413203900611083e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cosine_min": 0.9999999999989716,
+          "mine_norm": 26.297409628609525,
+          "ref_norm": 26.297410367247885,
+          "max_row_norm_error": 1.1333430127713484e-07,
+          "relative_l2": 1.4360987107866919e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 1,
+          "cosine_min": 0.999999999998942,
+          "mine_norm": 32.60581998850903,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.1769340257927752e-07,
+          "relative_l2": 1.45076911286986e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 2,
+          "cosine_min": 0.9999999999969691,
+          "mine_norm": 35.42223597608413,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.0133363471129826e-07,
+          "relative_l2": 2.4530929251724008e-06,
+          "max_abs": 7.62939453125e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 3,
+          "cosine_min": 0.9999999999927717,
+          "mine_norm": 40.215589812646805,
+          "ref_norm": 40.21557874374188,
+          "max_row_norm_error": 3.114090734168684e-07,
+          "relative_l2": 3.80600208799053e-06,
+          "max_abs": 1.3232231140136719e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 4,
+          "cosine_min": 0.9999999999948748,
+          "mine_norm": 45.74354487089765,
+          "ref_norm": 45.74353661636031,
+          "max_row_norm_error": 2.482480589982572e-07,
+          "relative_l2": 3.166902595186595e-06,
+          "max_abs": 1.609325408935547e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 5,
+          "cosine_min": 0.9999999999967821,
+          "mine_norm": 48.66185141008544,
+          "ref_norm": 48.66184977877142,
+          "max_row_norm_error": 1.5346316994957476e-07,
+          "relative_l2": 2.534919603326942e-06,
+          "max_abs": 1.5974044799804688e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 6,
+          "cosine_min": 0.9999999999960749,
+          "mine_norm": 50.11537262925527,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.4638569851020975e-07,
+          "relative_l2": 2.799526602666286e-06,
+          "max_abs": 2.5272369384765625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 7,
+          "cosine_min": 0.9999999999967895,
+          "mine_norm": 56.37123735940797,
+          "ref_norm": 56.371237323294366,
+          "max_row_norm_error": 1.8081559494120825e-07,
+          "relative_l2": 2.53155913423968e-06,
+          "max_abs": 2.288818359375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 8,
+          "cosine_min": 0.9999999999968737,
+          "mine_norm": 69.9424504621899,
+          "ref_norm": 69.94245100686283,
+          "max_row_norm_error": 7.418959058203001e-08,
+          "relative_l2": 2.4673203839088007e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 9,
+          "cosine_min": 0.999999999995535,
+          "mine_norm": 81.50519113955497,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.396133595514385e-08,
+          "relative_l2": 2.959206959118416e-06,
+          "max_abs": 1.621246337890625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 10,
+          "cosine_min": 0.9999999999965227,
+          "mine_norm": 88.70045377890445,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 6.482244008232385e-08,
+          "relative_l2": 2.572805219700209e-06,
+          "max_abs": 2.86102294921875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 11,
+          "cosine_min": 0.9999999999976087,
+          "mine_norm": 108.51249600670327,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.0302371156178936e-07,
+          "relative_l2": 2.1820343782648897e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 12,
+          "cosine_min": 0.9999999999974387,
+          "mine_norm": 122.70303122044574,
+          "ref_norm": 122.70302095215452,
+          "max_row_norm_error": 1.6435688254823333e-07,
+          "relative_l2": 2.2549087140255015e-06,
+          "max_abs": 2.5987625122070312e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 13,
+          "cosine_min": 0.9999999999978069,
+          "mine_norm": 141.82645513093422,
+          "ref_norm": 141.82645167822773,
+          "max_row_norm_error": 6.164380539352976e-08,
+          "relative_l2": 2.0456419157545696e-06,
+          "max_abs": 2.944469451904297e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 14,
+          "cosine_min": 0.9999999999979489,
+          "mine_norm": 161.09771036979814,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 3.141967230835263e-08,
+          "relative_l2": 1.9987908289230952e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 15,
+          "cosine_min": 0.999999999997987,
+          "mine_norm": 190.0161329884898,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1580587655490859e-07,
+          "relative_l2": 1.9708372687938223e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 16,
+          "cosine_min": 0.9999999999976613,
+          "mine_norm": 222.39867822046958,
+          "ref_norm": 222.39869456353009,
+          "max_row_norm_error": 8.228349313021965e-08,
+          "relative_l2": 2.126875475570996e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 17,
+          "cosine_min": 0.9999999999969856,
+          "mine_norm": 410.04025270499955,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.84600260031165e-07,
+          "relative_l2": 2.347025692152483e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ]
+    },
+    {
+      "arm": "original-query",
+      "sampling": {
+        "cfg46": 6.791614532470703,
+        "cfg904": 6.791628837585449,
+        "margin46_minus904": -1.430511474609375e-05,
+        "rank46": 33,
+        "rank904": 32,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ]
+      },
+      "final_hidden": {
+        "cosine_min": 0.9999999999969873,
+        "mine_norm": 45.800060026565696,
+        "ref_norm": 45.80004216977574,
+        "max_row_norm_error": 6.286971312441381e-07,
+        "relative_l2": 2.419362139612452e-06,
+        "max_abs": 1.2308359146118164e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999977511,
+        "mine_norm": 989.0276306802834,
+        "ref_norm": 989.0275907882956,
+        "max_row_norm_error": 6.877843982122656e-07,
+        "relative_l2": 1.499696274458934e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cosine_min": 0.9999999999926283,
+          "mine_norm": 26.297406096951605,
+          "ref_norm": 26.297410367247885,
+          "max_row_norm_error": 2.824639150356134e-07,
+          "relative_l2": 3.807976688780173e-06,
+          "max_abs": 6.318092346191406e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 1,
+          "cosine_min": 0.9999999999953726,
+          "mine_norm": 32.6058193967748,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.3152397715376907e-07,
+          "relative_l2": 3.027261657308106e-06,
+          "max_abs": 9.775161743164062e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 2,
+          "cosine_min": 0.9999999999936762,
+          "mine_norm": 35.422230483916046,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 1.7787230643939722e-07,
+          "relative_l2": 3.5350857558036652e-06,
+          "max_abs": 1.4439225196838379e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 3,
+          "cosine_min": 0.9999999999889682,
+          "mine_norm": 40.21557767397604,
+          "ref_norm": 40.21557874374188,
+          "max_row_norm_error": 1.1420169776510392e-07,
+          "relative_l2": 4.678161680016133e-06,
+          "max_abs": 2.485513687133789e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 4,
+          "cosine_min": 0.9999999999921478,
+          "mine_norm": 45.74353303387551,
+          "ref_norm": 45.74353661636031,
+          "max_row_norm_error": 1.7025476406473672e-07,
+          "relative_l2": 3.915936220119046e-06,
+          "max_abs": 1.6689300537109375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 5,
+          "cosine_min": 0.9999999999953065,
+          "mine_norm": 48.66184829680653,
+          "ref_norm": 48.66184977877142,
+          "max_row_norm_error": 2.0444752324433324e-07,
+          "relative_l2": 3.0504969284597684e-06,
+          "max_abs": 1.722574234008789e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 6,
+          "cosine_min": 0.9999999999947522,
+          "mine_norm": 50.1153695925823,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.2304192714983628e-07,
+          "relative_l2": 3.1844876204298287e-06,
+          "max_abs": 1.6391277313232422e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 7,
+          "cosine_min": 0.9999999999956107,
+          "mine_norm": 56.37124171741432,
+          "ref_norm": 56.371237323294366,
+          "max_row_norm_error": 2.983726570260359e-07,
+          "relative_l2": 2.9109414878517956e-06,
+          "max_abs": 2.193450927734375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 8,
+          "cosine_min": 0.999999999995832,
+          "mine_norm": 69.94245676201875,
+          "ref_norm": 69.94245100686283,
+          "max_row_norm_error": 1.7752343506316492e-07,
+          "relative_l2": 2.8001728930313365e-06,
+          "max_abs": 3.266334533691406e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 9,
+          "cosine_min": 0.9999999999946848,
+          "mine_norm": 81.5051932517196,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 6.880329284086883e-08,
+          "relative_l2": 3.2013807555383124e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 10,
+          "cosine_min": 0.9999999999958505,
+          "mine_norm": 88.70045101505517,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 1.0955809803814276e-07,
+          "relative_l2": 2.843752533542025e-06,
+          "max_abs": 2.181529998779297e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 11,
+          "cosine_min": 0.9999999999970987,
+          "mine_norm": 108.5124963394474,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.1506172059583264e-07,
+          "relative_l2": 2.3988217527966865e-06,
+          "max_abs": 2.956390380859375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 12,
+          "cosine_min": 0.9999999999968876,
+          "mine_norm": 122.70302955681517,
+          "ref_norm": 122.70302095215452,
+          "max_row_norm_error": 1.3586120473085828e-07,
+          "relative_l2": 2.4695256871875538e-06,
+          "max_abs": 2.9921531677246094e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 13,
+          "cosine_min": 0.99999999999746,
+          "mine_norm": 141.82645297179886,
+          "ref_norm": 141.82645167822773,
+          "max_row_norm_error": 4.447274348784447e-08,
+          "relative_l2": 2.196043873469345e-06,
+          "max_abs": 3.3020973205566406e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 14,
+          "cosine_min": 0.9999999999976372,
+          "mine_norm": 161.09770618133808,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 7.497943144141317e-08,
+          "relative_l2": 2.1357012026770343e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 15,
+          "cosine_min": 0.9999999999976841,
+          "mine_norm": 190.01612957780677,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.5055472479819088e-07,
+          "relative_l2": 2.111522659928299e-06,
+          "max_abs": 4.1961669921875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 16,
+          "cosine_min": 0.9999999999974635,
+          "mine_norm": 222.3986775518173,
+          "ref_norm": 222.39869456353009,
+          "max_row_norm_error": 7.839351001681649e-08,
+          "relative_l2": 2.223642446313084e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 17,
+          "cosine_min": 0.9999999999967645,
+          "mine_norm": 410.0402531469301,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.878255343010451e-07,
+          "relative_l2": 2.4618936553417304e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ]
+    },
+    {
+      "arm": "original-keys",
+      "sampling": {
+        "cfg46": 6.791610240936279,
+        "cfg904": 6.791631698608398,
+        "margin46_minus904": -2.1457672119140625e-05,
+        "rank46": 33,
+        "rank904": 32,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ]
+      },
+      "final_hidden": {
+        "cosine_min": 0.9999999999975365,
+        "mine_norm": 45.80005476143828,
+        "ref_norm": 45.80004216977574,
+        "max_row_norm_error": 5.275709875629531e-07,
+        "relative_l2": 2.2500735799734423e-06,
+        "max_abs": 1.0967254638671875e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999984804,
+        "mine_norm": 989.0276927269871,
+        "ref_norm": 989.0275907882956,
+        "max_row_norm_error": 7.25557626202189e-07,
+        "relative_l2": 1.3678654523791844e-06,
+        "max_abs": 5.53131103515625e-05,
+        "byte_exact": false
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cosine_min": 0.9999999999913669,
+          "mine_norm": 26.297413565104733,
+          "ref_norm": 26.297410367247885,
+          "max_row_norm_error": 1.8550132541150788e-07,
+          "relative_l2": 4.122860667464502e-06,
+          "max_abs": 7.152557373046875e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 1,
+          "cosine_min": 0.9999999999944098,
+          "mine_norm": 32.60582205367051,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.665250548565922e-07,
+          "relative_l2": 3.2829908804677427e-06,
+          "max_abs": 1.0013580322265625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 2,
+          "cosine_min": 0.9999999999924523,
+          "mine_norm": 35.42224326139939,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 4.833967224282532e-07,
+          "relative_l2": 3.85395499475671e-06,
+          "max_abs": 1.6033649444580078e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 3,
+          "cosine_min": 0.9999999999886072,
+          "mine_norm": 40.21560463069399,
+          "ref_norm": 40.21557874374188,
+          "max_row_norm_error": 6.777155270309976e-07,
+          "relative_l2": 4.816745306066112e-06,
+          "max_abs": 1.2882053852081299e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 4,
+          "cosine_min": 0.9999999999909258,
+          "mine_norm": 45.743558485191585,
+          "ref_norm": 45.74353661636031,
+          "max_row_norm_error": 5.359931454229638e-07,
+          "relative_l2": 4.276985373386967e-06,
+          "max_abs": 3.5643577575683594e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 5,
+          "cosine_min": 0.9999999999944045,
+          "mine_norm": 48.66185725613401,
+          "ref_norm": 48.66184977877142,
+          "max_row_norm_error": 2.6364234106956985e-07,
+          "relative_l2": 3.3035697575955373e-06,
+          "max_abs": 3.0279159545898438e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 6,
+          "cosine_min": 0.9999999999937347,
+          "mine_norm": 50.11537719605482,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 3.4164403617253924e-07,
+          "relative_l2": 3.4943177704992734e-06,
+          "max_abs": 3.8743019104003906e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 7,
+          "cosine_min": 0.9999999999951525,
+          "mine_norm": 56.37123573656706,
+          "ref_norm": 56.371237323294366,
+          "max_row_norm_error": 2.0419293900175717e-07,
+          "relative_l2": 3.0627571924703026e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 8,
+          "cosine_min": 0.999999999996051,
+          "mine_norm": 69.94245101434575,
+          "ref_norm": 69.94245100686283,
+          "max_row_norm_error": 5.890828957966221e-08,
+          "relative_l2": 2.784002675588264e-06,
+          "max_abs": 2.8133392333984375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 9,
+          "cosine_min": 0.9999999999949759,
+          "mine_norm": 81.50519395133558,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 6.658729234665373e-08,
+          "relative_l2": 3.1619448359497504e-06,
+          "max_abs": 2.6702880859375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 10,
+          "cosine_min": 0.9999999999961574,
+          "mine_norm": 88.70045832300238,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 1.1795894860888723e-07,
+          "relative_l2": 2.701653773519574e-06,
+          "max_abs": 4.00543212890625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 11,
+          "cosine_min": 0.9999999999973702,
+          "mine_norm": 108.51249533762054,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.1160318003078373e-07,
+          "relative_l2": 2.2683989017732855e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 12,
+          "cosine_min": 0.9999999999972476,
+          "mine_norm": 122.70303020309782,
+          "ref_norm": 122.70302095215452,
+          "max_row_norm_error": 1.4795405323120292e-07,
+          "relative_l2": 2.3227031518086593e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 13,
+          "cosine_min": 0.9999999999978302,
+          "mine_norm": 141.82645487689481,
+          "ref_norm": 141.82645167822773,
+          "max_row_norm_error": 3.938519310686672e-08,
+          "relative_l2": 2.0715874127818396e-06,
+          "max_abs": 2.7000904083251953e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 14,
+          "cosine_min": 0.9999999999979481,
+          "mine_norm": 161.09771160457706,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 6.014421849442897e-09,
+          "relative_l2": 2.0253451118006576e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 15,
+          "cosine_min": 0.9999999999980129,
+          "mine_norm": 190.01613438619273,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 9.406485490526251e-08,
+          "relative_l2": 1.9772849160699984e-06,
+          "max_abs": 4.76837158203125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 16,
+          "cosine_min": 0.9999999999975986,
+          "mine_norm": 222.39867757761485,
+          "ref_norm": 222.39869456353009,
+          "max_row_norm_error": 1.0849484177732904e-07,
+          "relative_l2": 2.1642390315048268e-06,
+          "max_abs": 5.14984130859375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 17,
+          "cosine_min": 0.9999999999971341,
+          "mine_norm": 410.0402872142615,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.0785299781909146e-07,
+          "relative_l2": 2.2729744541865005e-06,
+          "max_abs": 0.000133514404296875,
+          "byte_exact": false
+        }
+      ]
+    },
+    {
+      "arm": "original-query-and-keys",
+      "sampling": {
+        "cfg46": 6.791617393493652,
+        "cfg904": 6.791644096374512,
+        "margin46_minus904": -2.6702880859375e-05,
+        "rank46": 33,
+        "rank904": 32,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ]
+      },
+      "final_hidden": {
+        "cosine_min": 0.9999999999973831,
+        "mine_norm": 45.80005647299446,
+        "ref_norm": 45.80004216977574,
+        "max_row_norm_error": 5.943611982583974e-07,
+        "relative_l2": 2.275937653282411e-06,
+        "max_abs": 1.1444091796875e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999982261,
+        "mine_norm": 989.0276326231719,
+        "ref_norm": 989.0275907882956,
+        "max_row_norm_error": 7.31181987401186e-07,
+        "relative_l2": 1.4110887054672845e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      },
+      "layers": [
+        {
+          "layer": 0,
+          "cosine_min": 0.9999999999992555,
+          "mine_norm": 26.297409222677885,
+          "ref_norm": 26.297410367247885,
+          "max_row_norm_error": 1.6360391652536777e-07,
+          "relative_l2": 1.211065708039845e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 1,
+          "cosine_min": 0.999999999999125,
+          "mine_norm": 32.605820356919146,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.4279661075811134e-07,
+          "relative_l2": 1.3252189329773374e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 2,
+          "cosine_min": 0.9999999999970798,
+          "mine_norm": 35.4222371800354,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.442543654585961e-07,
+          "relative_l2": 2.405214070444228e-06,
+          "max_abs": 8.106231689453125e-06,
+          "byte_exact": false
+        },
+        {
+          "layer": 3,
+          "cosine_min": 0.9999999999928973,
+          "mine_norm": 40.21559040056888,
+          "ref_norm": 40.21557874374188,
+          "max_row_norm_error": 3.4172180329861135e-07,
+          "relative_l2": 3.766305310882887e-06,
+          "max_abs": 1.33514404296875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 4,
+          "cosine_min": 0.9999999999950121,
+          "mine_norm": 45.74354504467551,
+          "ref_norm": 45.74353661636031,
+          "max_row_norm_error": 2.4561835765268825e-07,
+          "relative_l2": 3.1323144828486426e-06,
+          "max_abs": 1.4543533325195312e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 5,
+          "cosine_min": 0.9999999999968799,
+          "mine_norm": 48.66185200901915,
+          "ref_norm": 48.66184977877142,
+          "max_row_norm_error": 1.71105511093117e-07,
+          "relative_l2": 2.4907922191008488e-06,
+          "max_abs": 1.3589859008789062e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 6,
+          "cosine_min": 0.999999999996105,
+          "mine_norm": 50.115372418637826,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.376813958981927e-07,
+          "relative_l2": 2.7772893256243656e-06,
+          "max_abs": 2.4080276489257812e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 7,
+          "cosine_min": 0.9999999999967637,
+          "mine_norm": 56.37123759481326,
+          "ref_norm": 56.371237323294366,
+          "max_row_norm_error": 1.8879028074181292e-07,
+          "relative_l2": 2.5260464305471178e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 8,
+          "cosine_min": 0.9999999999968215,
+          "mine_norm": 69.94245125388252,
+          "ref_norm": 69.94245100686283,
+          "max_row_norm_error": 7.005556734718255e-08,
+          "relative_l2": 2.4677871533003555e-06,
+          "max_abs": 2.3365020751953125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 9,
+          "cosine_min": 0.9999999999954419,
+          "mine_norm": 81.50519168386221,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.496682287109422e-08,
+          "relative_l2": 2.9570432422076812e-06,
+          "max_abs": 1.811981201171875e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 10,
+          "cosine_min": 0.9999999999965726,
+          "mine_norm": 88.70045271175756,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 7.79809968820544e-08,
+          "relative_l2": 2.5679628386260157e-06,
+          "max_abs": 2.8133392333984375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 11,
+          "cosine_min": 0.9999999999976281,
+          "mine_norm": 108.51249416413773,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 9.851005411398717e-08,
+          "relative_l2": 2.170515190653428e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 12,
+          "cosine_min": 0.9999999999975084,
+          "mine_norm": 122.70302896332274,
+          "ref_norm": 122.70302095215452,
+          "max_row_norm_error": 1.3692785705288202e-07,
+          "relative_l2": 2.2332681415996902e-06,
+          "max_abs": 2.7120113372802734e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 13,
+          "cosine_min": 0.99999999999785,
+          "mine_norm": 141.8264530758412,
+          "ref_norm": 141.82645167822773,
+          "max_row_norm_error": 2.8637476834347808e-08,
+          "relative_l2": 2.0344370755011545e-06,
+          "max_abs": 3.0338764190673828e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 14,
+          "cosine_min": 0.9999999999979743,
+          "mine_norm": 161.09770758103204,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 4.2110125386685127e-08,
+          "relative_l2": 1.9902322126784785e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 15,
+          "cosine_min": 0.9999999999980328,
+          "mine_norm": 190.01613119404547,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1831227142433676e-07,
+          "relative_l2": 1.957703250751218e-06,
+          "max_abs": 4.291534423828125e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 16,
+          "cosine_min": 0.999999999997709,
+          "mine_norm": 222.39867973664863,
+          "ref_norm": 222.39869456353009,
+          "max_row_norm_error": 6.860648471551656e-08,
+          "relative_l2": 2.111732868939873e-06,
+          "max_abs": 4.673004150390625e-05,
+          "byte_exact": false
+        },
+        {
+          "layer": 17,
+          "cosine_min": 0.9999999999971371,
+          "mine_norm": 410.04026581597674,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.532143582647308e-07,
+          "relative_l2": 2.304077497061518e-06,
+          "max_abs": 0.0001373291015625,
+          "byte_exact": false
+        }
+      ]
+    }
+  ],
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "scope": "Q is captured from actual pinned original module replay whose stages reconstruct the full reference within2e-6, but are not byte-exact. The factorial tests that conditional Q/K substitution, not an earlier full-model query or speech repair.",
+  "integration": "637800051f7a2498d9830828f2dc435a372465f5",
+  "query_capture_integration": "c4f4cd41",
+  "attention_tool_integration": "f38980ce07b4a98b6275d25781f047d75329b090",
+  "source_code_unchanged_after_rebase": true,
+  "additional_native_producer_tested_source": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+  "heavy_run": {
+    "conclusion": "success",
+    "databaseId": 38764924112,
+    "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+    "jobs": [
+      {
+        "completedAt": "2026-10-15T17:20:30Z",
+        "conclusion": "success",
+        "databaseId": 116525527836,
+        "name": "run",
+        "startedAt": "2026-10-15T16:55:04Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T16:55:05Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T16:55:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:55:13Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v4",
+            "number": 2,
+            "startedAt": "2026-10-15T16:55:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:55:13Z",
+            "conclusion": "success",
+            "name": "Validate script path",
+            "number": 3,
+            "startedAt": "2026-10-15T16:55:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:57:04Z",
+            "conclusion": "success",
+            "name": "Free disk and set up scratch (Linux)",
+            "number": 4,
+            "startedAt": "2026-10-15T16:55:13Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:57:04Z",
+            "conclusion": "skipped",
+            "name": "Set up scratch (macOS)",
+            "number": 5,
+            "startedAt": "2026-10-15T16:57:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:57:04Z",
+            "conclusion": "success",
+            "name": "Set output dir",
+            "number": 6,
+            "startedAt": "2026-10-15T16:57:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:57:04Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v5",
+            "number": 7,
+            "startedAt": "2026-10-15T16:57:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T16:57:25Z",
+            "conclusion": "success",
+            "name": "Install extra pip packages",
+            "number": 8,
+            "startedAt": "2026-10-15T16:57:04Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:56Z",
+            "conclusion": "success",
+            "name": "Run tools/ci-heavy/dia_query_key_intervention.py",
+            "number": 9,
+            "startedAt": "2026-10-15T16:57:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:56Z",
+            "conclusion": "success",
+            "name": "Job summary",
+            "number": 10,
+            "startedAt": "2026-10-15T17:19:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:20:27Z",
+            "conclusion": "success",
+            "name": "Run actions/upload-artifact@v4",
+            "number": 11,
+            "startedAt": "2026-10-15T17:19:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:20:27Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v5",
+            "number": 21,
+            "startedAt": "2026-10-15T17:20:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:20:27Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v4",
+            "number": 22,
+            "startedAt": "2026-10-15T17:20:27Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:20:27Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 23,
+            "startedAt": "2026-10-15T17:20:27Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112/job/116525527836"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112"
+  },
+  "lint_run": {
+    "conclusion": "success",
+    "databaseId": 38767820341,
+    "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+    "jobs": [
+      {
+        "completedAt": "2026-10-15T17:08:21Z",
+        "conclusion": "success",
+        "databaseId": 116535552848,
+        "name": "clang-format (style)",
+        "startedAt": "2026-10-15T17:07:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:07:47Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:07:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:07:56Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:07:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:10Z",
+            "conclusion": "success",
+            "name": "Install clang-format",
+            "number": 3,
+            "startedAt": "2026-10-15T17:07:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:19Z",
+            "conclusion": "success",
+            "name": "Check formatting",
+            "number": 4,
+            "startedAt": "2026-10-15T17:08:10Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:19Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:08:19Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:19Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:08:19Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535552848"
+      },
+      {
+        "completedAt": "2026-10-15T17:08:56Z",
+        "conclusion": "success",
+        "databaseId": 116535553223,
+        "name": "README language metadata",
+        "startedAt": "2026-10-15T17:08:30Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:08:31Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:08:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:41Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:08:31Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:41Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:08:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:42Z",
+            "conclusion": "success",
+            "name": "Check LEARNINGS.md index is current",
+            "number": 4,
+            "startedAt": "2026-10-15T17:08:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:47Z",
+            "conclusion": "success",
+            "name": "Lint shell in workflow run blocks",
+            "number": 5,
+            "startedAt": "2026-10-15T17:08:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:47Z",
+            "conclusion": "success",
+            "name": "Check backend capability table is current",
+            "number": 6,
+            "startedAt": "2026-10-15T17:08:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:47Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice language table is current",
+            "number": 7,
+            "startedAt": "2026-10-15T17:08:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:47Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice instruct table is current",
+            "number": 8,
+            "startedAt": "2026-10-15T17:08:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:48Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice duration table is current",
+            "number": 9,
+            "startedAt": "2026-10-15T17:08:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:51Z",
+            "conclusion": "success",
+            "name": "Install huggingface_hub",
+            "number": 10,
+            "startedAt": "2026-10-15T17:08:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:51Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream language-map drift",
+            "number": 11,
+            "startedAt": "2026-10-15T17:08:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:52Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream duration-table drift",
+            "number": 12,
+            "startedAt": "2026-10-15T17:08:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:52Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream instruct-map drift",
+            "number": 13,
+            "startedAt": "2026-10-15T17:08:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:54Z",
+            "conclusion": "success",
+            "name": "Check README language columns vs HF cards",
+            "number": 14,
+            "startedAt": "2026-10-15T17:08:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:54Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 27,
+            "startedAt": "2026-10-15T17:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:54Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 28,
+            "startedAt": "2026-10-15T17:08:54Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:08:54Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 29,
+            "startedAt": "2026-10-15T17:08:54Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553223"
+      },
+      {
+        "completedAt": "2026-10-15T17:25:42Z",
+        "conclusion": "success",
+        "databaseId": 116535553296,
+        "name": "kaggle_harness bundled-copy sync",
+        "startedAt": "2026-10-15T17:25:33Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:25:35Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:25:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:38Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:25:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:38Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:25:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:39Z",
+            "conclusion": "success",
+            "name": "Check bundled harness copies match canonical",
+            "number": 4,
+            "startedAt": "2026-10-15T17:25:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:39Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:25:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:39Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:25:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:39Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:25:39Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553296"
+      },
+      {
+        "completedAt": "2026-10-15T17:10:24Z",
+        "conclusion": "success",
+        "databaseId": 116535553353,
+        "name": "core_cpu_backend header reachable everywhere",
+        "startedAt": "2026-10-15T17:10:16Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:10:17Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:10:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:21Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:10:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:21Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:21Z",
+            "conclusion": "success",
+            "name": "Every core_cpu_backend:: user includes the header unconditionally",
+            "number": 4,
+            "startedAt": "2026-10-15T17:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:21Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:22Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:10:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:10:22Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:10:22Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553353"
+      },
+      {
+        "completedAt": "2026-10-15T17:09:31Z",
+        "conclusion": "success",
+        "databaseId": 116535553356,
+        "name": "CUDA runtime ships split from every package",
+        "startedAt": "2026-10-15T17:09:20Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:09:21Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:09:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:24Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:09:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:25Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:09:24Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:28Z",
+            "conclusion": "success",
+            "name": "Run pip install --quiet pyyaml",
+            "number": 4,
+            "startedAt": "2026-10-15T17:09:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:28Z",
+            "conclusion": "success",
+            "name": "Every CUDA-bundling job also ships a split archive",
+            "number": 5,
+            "startedAt": "2026-10-15T17:09:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:28Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 9,
+            "startedAt": "2026-10-15T17:09:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-15T17:09:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:09:29Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-15T17:09:29Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553356"
+      },
+      {
+        "completedAt": "2026-10-15T17:19:11Z",
+        "conclusion": "success",
+        "databaseId": 116535553402,
+        "name": "model-registry URLs resolve",
+        "startedAt": "2026-10-15T17:18:34Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:18:35Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:18:34Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:39Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:18:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:39Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:18:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:08Z",
+            "conclusion": "success",
+            "name": "HEAD every registry download URL",
+            "number": 4,
+            "startedAt": "2026-10-15T17:18:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:08Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:19:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:09Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:19:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:19:09Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:19:09Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553402"
+      },
+      {
+        "completedAt": "2026-10-15T17:24:24Z",
+        "conclusion": "success",
+        "databaseId": 116535553439,
+        "name": "version files agree with VERSION",
+        "startedAt": "2026-10-15T17:24:15Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:24:17Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:24:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:24:17Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "startedAt": "2026-10-15T17:24:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Every versioned file matches VERSION",
+            "number": 4,
+            "startedAt": "2026-10-15T17:24:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 7,
+            "startedAt": "2026-10-15T17:24:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:24:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:24:20Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:24:20Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553439"
+      },
+      {
+        "completedAt": "2026-10-15T17:25:46Z",
+        "conclusion": "success",
+        "databaseId": 116535553450,
+        "name": "chat ABI bound by every binding",
+        "startedAt": "2026-10-15T17:25:37Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:25:39Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:25:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:42Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:25:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:43Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:25:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:44Z",
+            "conclusion": "success",
+            "name": "Every chat entry point is bound in all five bindings",
+            "number": 4,
+            "startedAt": "2026-10-15T17:25:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:44Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:25:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:44Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:25:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:25:44Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:25:44Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553450"
+      },
+      {
+        "completedAt": "2026-10-15T17:44:43Z",
+        "conclusion": "success",
+        "databaseId": 116535553496,
+        "name": "clang-tidy (lint / types / security)",
+        "startedAt": "2026-10-15T17:28:05Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:28:06Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:28:05Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:28:12Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:28:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:28:22Z",
+            "conclusion": "success",
+            "name": "Install build tools + clang-tidy",
+            "number": 3,
+            "startedAt": "2026-10-15T17:28:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:28:39Z",
+            "conclusion": "success",
+            "name": "Configure (tidy preset)",
+            "number": 4,
+            "startedAt": "2026-10-15T17:28:22Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:44:41Z",
+            "conclusion": "success",
+            "name": "Build (clang-tidy fires on each TU)",
+            "number": 5,
+            "startedAt": "2026-10-15T17:28:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:44:41Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-15T17:44:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:44:41Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-15T17:44:41Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553496"
+      },
+      {
+        "completedAt": "2026-10-15T17:35:55Z",
+        "conclusion": "success",
+        "databaseId": 116535553531,
+        "name": "doc anchors resolve",
+        "startedAt": "2026-10-15T17:35:46Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:35:47Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:35:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:51Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:35:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:52Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:35:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:52Z",
+            "conclusion": "success",
+            "name": "Every in-repo",
+            "number": 4,
+            "startedAt": "2026-10-15T17:35:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:52Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:35:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:53Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:35:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:35:53Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:35:53Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341/job/116535553531"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38767820341"
+  },
+  "attention_lint_run": {
+    "conclusion": "success",
+    "databaseId": 38771099343,
+    "headSha": "95ade29094e81c8a9c7437fd0caafedca76e3e1e",
+    "jobs": [
+      {
+        "completedAt": "2026-10-15T17:18:53Z",
+        "conclusion": "success",
+        "databaseId": 116546830753,
+        "name": "clang-format (style)",
+        "startedAt": "2026-10-15T17:18:20Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:18:21Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:18:20Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:30Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:18:21Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:41Z",
+            "conclusion": "success",
+            "name": "Install clang-format",
+            "number": 3,
+            "startedAt": "2026-10-15T17:18:30Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:52Z",
+            "conclusion": "success",
+            "name": "Check formatting",
+            "number": 4,
+            "startedAt": "2026-10-15T17:18:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:52Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:18:52Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:18:52Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:18:52Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546830753"
+      },
+      {
+        "completedAt": "2026-10-15T17:12:50Z",
+        "conclusion": "success",
+        "databaseId": 116546830866,
+        "name": "kaggle_harness bundled-copy sync",
+        "startedAt": "2026-10-15T17:12:40Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:12:42Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:12:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:12:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:12:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Check bundled harness copies match canonical",
+            "number": 4,
+            "startedAt": "2026-10-15T17:12:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:12:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:12:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:12:46Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:12:46Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546830866"
+      },
+      {
+        "completedAt": "2026-10-15T17:59:14Z",
+        "conclusion": "success",
+        "databaseId": 116546830932,
+        "name": "core_cpu_backend header reachable everywhere",
+        "startedAt": "2026-10-15T17:59:05Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:59:07Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:59:06Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:11Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:59:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:11Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:59:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:12Z",
+            "conclusion": "success",
+            "name": "Every core_cpu_backend:: user includes the header unconditionally",
+            "number": 4,
+            "startedAt": "2026-10-15T17:59:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:12Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:59:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:12Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:59:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:59:12Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:59:12Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546830932"
+      },
+      {
+        "completedAt": "2026-10-15T17:52:33Z",
+        "conclusion": "success",
+        "databaseId": 116546830968,
+        "name": "chat ABI bound by every binding",
+        "startedAt": "2026-10-15T17:52:24Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:52:25Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:52:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:29Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:52:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:29Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:52:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:29Z",
+            "conclusion": "success",
+            "name": "Every chat entry point is bound in all five bindings",
+            "number": 4,
+            "startedAt": "2026-10-15T17:52:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:29Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:52:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:29Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:52:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:52:30Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:52:29Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546830968"
+      },
+      {
+        "completedAt": "2026-10-15T17:58:49Z",
+        "conclusion": "success",
+        "databaseId": 116546830974,
+        "name": "README language metadata",
+        "startedAt": "2026-10-15T17:58:27Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:58:29Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:58:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:36Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:58:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:36Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:58:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:37Z",
+            "conclusion": "success",
+            "name": "Check LEARNINGS.md index is current",
+            "number": 4,
+            "startedAt": "2026-10-15T17:58:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:39Z",
+            "conclusion": "success",
+            "name": "Lint shell in workflow run blocks",
+            "number": 5,
+            "startedAt": "2026-10-15T17:58:37Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:39Z",
+            "conclusion": "success",
+            "name": "Check backend capability table is current",
+            "number": 6,
+            "startedAt": "2026-10-15T17:58:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:40Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice language table is current",
+            "number": 7,
+            "startedAt": "2026-10-15T17:58:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:40Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice instruct table is current",
+            "number": 8,
+            "startedAt": "2026-10-15T17:58:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:41Z",
+            "conclusion": "success",
+            "name": "Check OmniVoice duration table is current",
+            "number": 9,
+            "startedAt": "2026-10-15T17:58:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:43Z",
+            "conclusion": "success",
+            "name": "Install huggingface_hub",
+            "number": 10,
+            "startedAt": "2026-10-15T17:58:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:44Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream language-map drift",
+            "number": 11,
+            "startedAt": "2026-10-15T17:58:43Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:44Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream duration-table drift",
+            "number": 12,
+            "startedAt": "2026-10-15T17:58:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:44Z",
+            "conclusion": "success",
+            "name": "Report OmniVoice upstream instruct-map drift",
+            "number": 13,
+            "startedAt": "2026-10-15T17:58:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:46Z",
+            "conclusion": "success",
+            "name": "Check README language columns vs HF cards",
+            "number": 14,
+            "startedAt": "2026-10-15T17:58:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:46Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 27,
+            "startedAt": "2026-10-15T17:58:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:46Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 28,
+            "startedAt": "2026-10-15T17:58:46Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:58:46Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 29,
+            "startedAt": "2026-10-15T17:58:46Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546830974"
+      },
+      {
+        "completedAt": "2026-10-15T18:05:27Z",
+        "conclusion": "success",
+        "databaseId": 116546831026,
+        "name": "clang-tidy (lint / types / security)",
+        "startedAt": "2026-10-15T17:49:28Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:49:29Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:49:28Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:49:36Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:49:29Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:49:47Z",
+            "conclusion": "success",
+            "name": "Install build tools + clang-tidy",
+            "number": 3,
+            "startedAt": "2026-10-15T17:49:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:49:50Z",
+            "conclusion": "success",
+            "name": "Configure (tidy preset)",
+            "number": 4,
+            "startedAt": "2026-10-15T17:49:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:05:25Z",
+            "conclusion": "success",
+            "name": "Build (clang-tidy fires on each TU)",
+            "number": 5,
+            "startedAt": "2026-10-15T17:49:50Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:05:25Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-15T18:05:25Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:05:25Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-15T18:05:25Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546831026"
+      },
+      {
+        "completedAt": "2026-10-15T17:32:47Z",
+        "conclusion": "success",
+        "databaseId": 116546831058,
+        "name": "CUDA runtime ships split from every package",
+        "startedAt": "2026-10-15T17:32:37Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:32:39Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:32:38Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:42Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:32:39Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:42Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:32:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:45Z",
+            "conclusion": "success",
+            "name": "Run pip install --quiet pyyaml",
+            "number": 4,
+            "startedAt": "2026-10-15T17:32:42Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:45Z",
+            "conclusion": "success",
+            "name": "Every CUDA-bundling job also ships a split archive",
+            "number": 5,
+            "startedAt": "2026-10-15T17:32:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:45Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 9,
+            "startedAt": "2026-10-15T17:32:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:46Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-15T17:32:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:32:46Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-15T17:32:46Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546831058"
+      },
+      {
+        "completedAt": "2026-10-15T18:14:48Z",
+        "conclusion": "success",
+        "databaseId": 116546831078,
+        "name": "version files agree with VERSION",
+        "startedAt": "2026-10-15T18:14:39Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T18:14:41Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T18:14:40Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:44Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T18:14:41Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:44Z",
+            "conclusion": "success",
+            "name": "Run actions/setup-python@v6",
+            "number": 3,
+            "startedAt": "2026-10-15T18:14:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:44Z",
+            "conclusion": "success",
+            "name": "Every versioned file matches VERSION",
+            "number": 4,
+            "startedAt": "2026-10-15T18:14:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:45Z",
+            "conclusion": "success",
+            "name": "Post Run actions/setup-python@v6",
+            "number": 7,
+            "startedAt": "2026-10-15T18:14:44Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:45Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T18:14:45Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:14:45Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T18:14:45Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546831078"
+      },
+      {
+        "completedAt": "2026-10-15T17:29:13Z",
+        "conclusion": "success",
+        "databaseId": 116546831279,
+        "name": "model-registry URLs resolve",
+        "startedAt": "2026-10-15T17:28:47Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T17:28:48Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T17:28:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:28:51Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T17:28:48Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:28:51Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T17:28:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:29:11Z",
+            "conclusion": "success",
+            "name": "HEAD every registry download URL",
+            "number": 4,
+            "startedAt": "2026-10-15T17:28:51Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:29:12Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T17:29:11Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:29:12Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T17:29:12Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T17:29:12Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T17:29:12Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546831279"
+      },
+      {
+        "completedAt": "2026-10-15T18:07:04Z",
+        "conclusion": "success",
+        "databaseId": 116546831430,
+        "name": "doc anchors resolve",
+        "startedAt": "2026-10-15T18:06:56Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-15T18:06:57Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-15T18:06:56Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:00Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-15T18:06:57Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:00Z",
+            "conclusion": "success",
+            "name": "Set up Python",
+            "number": 3,
+            "startedAt": "2026-10-15T18:07:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:01Z",
+            "conclusion": "success",
+            "name": "Every in-repo",
+            "number": 4,
+            "startedAt": "2026-10-15T18:07:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:01Z",
+            "conclusion": "success",
+            "name": "Post Set up Python",
+            "number": 7,
+            "startedAt": "2026-10-15T18:07:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:01Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 8,
+            "startedAt": "2026-10-15T18:07:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-15T18:07:01Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 9,
+            "startedAt": "2026-10-15T18:07:01Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343/job/116546831430"
+      }
+    ],
+    "status": "completed",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343"
+  },
+  "publication": {
+    "revision": "6fa7de84ebc1700c841cf155827ba326b8e889e1",
+    "prefix": "dia-20261015-query-key/complete-hosted-query-key-v1",
+    "files": [
+      {
+        "path": "raw.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/raw.zip",
+        "bytes": 1177798269,
+        "sha256": "4e444752df59e76f965822e826282e07dbfac893215bc12e223facae4ba520de"
+      },
+      {
+        "path": "run.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/run.json",
+        "bytes": 2753,
+        "sha256": "71ce27d538f22ed150737e9b5dfe977950c9cd90ef598d3543169fa2996674f3"
+      },
+      {
+        "path": "artifacts.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/artifacts.json",
+        "bytes": 744,
+        "sha256": "e0834e96d0132d16a96b1f489b548ba29c9c6539a5a58c6ac42f81213d410eb8"
+      },
+      {
+        "path": "lint.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/lint.json",
+        "bytes": 16070,
+        "sha256": "5f9a576e8ac38246cf8c9280035c94a4909bcf30dc47adfeef82cd8725a7ef2f"
+      },
+      {
+        "path": "attention-lint.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/attention-lint.json",
+        "bytes": 16070,
+        "sha256": "852612c235618f7ee6658acf6c7d0c1266a32362e5d30273e75519426e0ba81a"
+      },
+      {
+        "path": "main-ci.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/main-ci.json",
+        "bytes": 23353,
+        "sha256": "4f41646630b220f6d5620f8c80e5310824c0713dfb884d319c3c62d51fcb6dd8"
+      },
+      {
+        "path": "complete.log",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/complete.log",
+        "bytes": 67347,
+        "sha256": "36e8ca80d351e4caddd322d27816ddc7eb203f45f8d4ea8b8c603e127185366f"
+      },
+      {
+        "path": "audit_hosted.py",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/audit_hosted.py",
+        "bytes": 11130,
+        "sha256": "c6336245a26871f1cd027daaad0a8103d7e622f2ff44b082c0e8a9b99215cea6"
+      },
+      {
+        "path": "audit-v1.log",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/audit-v1.log",
+        "bytes": 1442,
+        "sha256": "31818446d2a96fd83e61c3197aeb935c7f03dbd2607d61b8145b72fac70edd04"
+      },
+      {
+        "path": "independent-audit-v1.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/independent-audit-v1.json",
+        "bytes": 39963,
+        "sha256": "5ec6df48dfdad9238db4b09ce808b0f5ff7e0235db53ad37d2756ffecadd06ab"
+      },
+      {
+        "path": "CrispASR-LICENSE",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/CrispASR-LICENSE",
+        "bytes": 1184,
+        "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e"
+      },
+      {
+        "path": "Dia-LICENSE",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/Dia-LICENSE",
+        "bytes": 11338,
+        "sha256": "34c1659a3495220f85dffebd4d3a930bcbfd9f216f8a3c5f880a1d4a59a5358d"
+      },
+      {
+        "path": "GGML-LICENSE",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/GGML-LICENSE",
+        "bytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      },
+      {
+        "path": "publish.py",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/publish.py",
+        "bytes": 3977,
+        "sha256": "2c6233490f3cdb3f5d0f6a8f047e2b38d5a61abf4377495a59fc29aa3466147b"
+      },
+      {
+        "path": "compact-query-v1/CrispASR-LICENSE",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/CrispASR-LICENSE",
+        "bytes": 1184,
+        "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e"
+      },
+      {
+        "path": "compact-query-v1/Dia-LICENSE",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/Dia-LICENSE",
+        "bytes": 11338,
+        "sha256": "34c1659a3495220f85dffebd4d3a930bcbfd9f216f8a3c5f880a1d4a59a5358d"
+      },
+      {
+        "path": "compact-query-v1/independent-audit.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/independent-audit.json",
+        "bytes": 969,
+        "sha256": "cc3642d618f3068997be54d238a5245a44ff225f97e72d2bd48e54fe5cb12e31"
+      },
+      {
+        "path": "compact-query-v1/manifest.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/manifest.json",
+        "bytes": 1367,
+        "sha256": "8ba7c8ac2ca5c28a1a335673b11c89c596f41891937caf2be1de5b4401207eac"
+      },
+      {
+        "path": "compact-query-v1/native-query.npy",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/native-query.npy",
+        "bytes": 16512,
+        "sha256": "de641663e15e26f626fe8a75108e52eebdf8ebd09ee2d725ba9f9385453b6985"
+      },
+      {
+        "path": "compact-query-v1/original-query.npy",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/original-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "compact-query-v1/producer-receipt.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/compact-query-v1/producer-receipt.json",
+        "bytes": 16517,
+        "sha256": "fe1e57d7517923e7b930801ab96204f591ad38caf8e9ef8cec71836cd62b9865"
+      },
+      {
+        "path": "manifest.json",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6fa7de84ebc1700c841cf155827ba326b8e889e1/dia-20261015-query-key/complete-hosted-query-key-v1/manifest.json",
+        "bytes": 3789,
+        "sha256": "6e28d1dec91580baaea3bc7ae108d2d65a379420dec63bac1155681b6ac54f11"
+      }
+    ],
+    "anonymous_all_files_full_sha256_verified": true,
+    "raw_payloads": 739
+  },
+  "block0_stage_analysis": {
+    "canonical_reference_sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78",
+    "official_artifact_sha256": "4e444752df59e76f965822e826282e07dbfac893215bc12e223facae4ba520de",
+    "scope": "Actual original full-model block0 capture versus independently audited factorial outputs; no new inference and no speech acceptance.",
+    "rows": [
+      {
+        "arm": "baseline",
+        "part": "pre_sa_norm",
+        "source_payload_sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd",
+        "cosine_min": 1.0000000000000002,
+        "relative_l2": 0.0,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "arm": "baseline",
+        "part": "sa_attention",
+        "source_payload_sha256": "451fbe31df7b3d114db882fb4bcab17aef2e090238bf5b61b8e0d4f1e7268e7a",
+        "cosine_min": 0.9999999999434873,
+        "relative_l2": 4.711226770896692e-06,
+        "mine_norm": 3.8461870770285964,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 2.204388409365876e-06,
+        "max_abs": 2.7939677238464355e-06
+      },
+      {
+        "arm": "baseline",
+        "part": "sa_output",
+        "source_payload_sha256": "dc64aa8e2982553d6c8c2cc3b3b41b69b672ad97b92c0c8b1216bfaaf3e8b4c1",
+        "cosine_min": 0.9999999999961181,
+        "relative_l2": 2.789912440986251e-06,
+        "mine_norm": 7.676560380766977,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 1.3956132782766417e-07,
+        "max_abs": 1.3932585716247559e-06
+      },
+      {
+        "arm": "baseline",
+        "part": "sa_residual",
+        "source_payload_sha256": "811e7b05b4df712695c4cb0d026b84aef2a0eb1ab83341bcdc939245f0c77287",
+        "cosine_min": 0.9999999999977157,
+        "relative_l2": 2.14013339627829e-06,
+        "mine_norm": 10.008625961793632,
+        "ref_norm": 10.008627043865031,
+        "max_row_norm_error": 1.0811386963460734e-07,
+        "max_abs": 1.3709068298339844e-06
+      },
+      {
+        "arm": "baseline",
+        "part": "output",
+        "source_payload_sha256": "9ef27b99502f18e398ebd7b8affcc47510168d0bb56e957c028467379ae4c057",
+        "cosine_min": 0.9999999999989716,
+        "relative_l2": 1.4360987107866919e-06,
+        "mine_norm": 26.297409628609525,
+        "ref_norm": 26.297410367247885,
+        "max_row_norm_error": 1.1333430127713484e-07,
+        "max_abs": 6.67572021484375e-06
+      },
+      {
+        "arm": "native-control",
+        "part": "pre_sa_norm",
+        "source_payload_sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd",
+        "cosine_min": 1.0000000000000002,
+        "relative_l2": 0.0,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "arm": "native-control",
+        "part": "sa_attention",
+        "source_payload_sha256": "451fbe31df7b3d114db882fb4bcab17aef2e090238bf5b61b8e0d4f1e7268e7a",
+        "cosine_min": 0.9999999999434873,
+        "relative_l2": 4.711226770896692e-06,
+        "mine_norm": 3.8461870770285964,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 2.204388409365876e-06,
+        "max_abs": 2.7939677238464355e-06
+      },
+      {
+        "arm": "native-control",
+        "part": "sa_output",
+        "source_payload_sha256": "dc64aa8e2982553d6c8c2cc3b3b41b69b672ad97b92c0c8b1216bfaaf3e8b4c1",
+        "cosine_min": 0.9999999999961181,
+        "relative_l2": 2.789912440986251e-06,
+        "mine_norm": 7.676560380766977,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 1.3956132782766417e-07,
+        "max_abs": 1.3932585716247559e-06
+      },
+      {
+        "arm": "native-control",
+        "part": "sa_residual",
+        "source_payload_sha256": "811e7b05b4df712695c4cb0d026b84aef2a0eb1ab83341bcdc939245f0c77287",
+        "cosine_min": 0.9999999999977157,
+        "relative_l2": 2.14013339627829e-06,
+        "mine_norm": 10.008625961793632,
+        "ref_norm": 10.008627043865031,
+        "max_row_norm_error": 1.0811386963460734e-07,
+        "max_abs": 1.3709068298339844e-06
+      },
+      {
+        "arm": "native-control",
+        "part": "output",
+        "source_payload_sha256": "9ef27b99502f18e398ebd7b8affcc47510168d0bb56e957c028467379ae4c057",
+        "cosine_min": 0.9999999999989716,
+        "relative_l2": 1.4360987107866919e-06,
+        "mine_norm": 26.297409628609525,
+        "ref_norm": 26.297410367247885,
+        "max_row_norm_error": 1.1333430127713484e-07,
+        "max_abs": 6.67572021484375e-06
+      },
+      {
+        "arm": "original-query",
+        "part": "pre_sa_norm",
+        "source_payload_sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd",
+        "cosine_min": 1.0000000000000002,
+        "relative_l2": 0.0,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "arm": "original-query",
+        "part": "sa_attention",
+        "source_payload_sha256": "3aa6f66ec1f405221993b6744c9a4bb2b30094430d8b83021bffff27022a763d",
+        "cosine_min": 0.9999999974390162,
+        "relative_l2": 2.019747590399051e-05,
+        "mine_norm": 3.846185408365295,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 5.591577297514583e-06,
+        "max_abs": 1.3083219528198242e-05
+      },
+      {
+        "arm": "original-query",
+        "part": "sa_output",
+        "source_payload_sha256": "bc481c5cfa54abc20b7232b78482cd44def4e4a7d172847f8ba0f6799b5a6163",
+        "cosine_min": 0.9999999999390423,
+        "relative_l2": 1.1109253212161911e-05,
+        "mine_norm": 7.676552050547898,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 1.224711122183031e-06,
+        "max_abs": 5.017966032028198e-06
+      },
+      {
+        "arm": "original-query",
+        "part": "sa_residual",
+        "source_payload_sha256": "6ff688bfd70de2999c83376839e22969c23f76fd7116f214043172d74d70a6fc",
+        "cosine_min": 0.9999999999638147,
+        "relative_l2": 8.520238003872075e-06,
+        "mine_norm": 10.00862230984424,
+        "ref_norm": 10.008627043865031,
+        "max_row_norm_error": 4.729940250580711e-07,
+        "max_abs": 5.02169132232666e-06
+      },
+      {
+        "arm": "original-query",
+        "part": "output",
+        "source_payload_sha256": "a9cfc7a37a1a70c437fa73d158f95f643a3760a8d3d64330736293db915c84b7",
+        "cosine_min": 0.9999999999926283,
+        "relative_l2": 3.807976688780173e-06,
+        "mine_norm": 26.297406096951605,
+        "ref_norm": 26.297410367247885,
+        "max_row_norm_error": 2.824639150356134e-07,
+        "max_abs": 6.318092346191406e-06
+      },
+      {
+        "arm": "original-keys",
+        "part": "pre_sa_norm",
+        "source_payload_sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd",
+        "cosine_min": 1.0000000000000002,
+        "relative_l2": 0.0,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "arm": "original-keys",
+        "part": "sa_attention",
+        "source_payload_sha256": "5bd197dfa5db2163dd250997e0894f26fc8b62827ae53298f5ad22e23f4785d7",
+        "cosine_min": 0.9999999971710817,
+        "relative_l2": 2.1849365687724544e-05,
+        "mine_norm": 3.8461888308348184,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 5.678553809174147e-06,
+        "max_abs": 1.3828277587890625e-05
+      },
+      {
+        "arm": "original-keys",
+        "part": "sa_output",
+        "source_payload_sha256": "551afeb7276470251e0362dcc8e7b6d3c4507501396ed198ca0de43ac1a8e043",
+        "cosine_min": 0.9999999999291562,
+        "relative_l2": 1.1937130365210573e-05,
+        "mine_norm": 7.676568349400657,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 8.984859449778781e-07,
+        "max_abs": 5.062669515609741e-06
+      },
+      {
+        "arm": "original-keys",
+        "part": "sa_residual",
+        "source_payload_sha256": "4503b3fb7d3e0f1e7d422ecaea7afc7b4fa87dae24d578c8b0cb45c3ada4a5b7",
+        "cosine_min": 0.9999999999581193,
+        "relative_l2": 9.154785883730841e-06,
+        "mine_norm": 10.00862925405217,
+        "ref_norm": 10.008627043865031,
+        "max_row_norm_error": 2.208282043891785e-07,
+        "max_abs": 5.062669515609741e-06
+      },
+      {
+        "arm": "original-keys",
+        "part": "output",
+        "source_payload_sha256": "ec65433a7c93c00b88c0f9270563413d8649bb7cc283d2f361f415855af68fe2",
+        "cosine_min": 0.9999999999913669,
+        "relative_l2": 4.122860667464502e-06,
+        "mine_norm": 26.297413565104733,
+        "ref_norm": 26.297410367247885,
+        "max_row_norm_error": 1.8550132541150788e-07,
+        "max_abs": 7.152557373046875e-06
+      },
+      {
+        "arm": "original-query-and-keys",
+        "part": "pre_sa_norm",
+        "source_payload_sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd",
+        "cosine_min": 1.0000000000000002,
+        "relative_l2": 0.0,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "arm": "original-query-and-keys",
+        "part": "sa_attention",
+        "source_payload_sha256": "cad56ee4c64b870719eebbaed5461e0a71e45d0fabcfdc12af6329eee2e0f1fd",
+        "cosine_min": 0.9999999999769555,
+        "relative_l2": 1.4222974986048418e-06,
+        "mine_norm": 3.846187094860201,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 2.022124231060296e-06,
+        "max_abs": 1.6540288925170898e-06
+      },
+      {
+        "arm": "original-query-and-keys",
+        "part": "sa_output",
+        "source_payload_sha256": "b5f5c0bc64f1e093717bd68f2db66ae0c702b7fbfdac740c6c82a71d99a1695e",
+        "cosine_min": 0.9999999999990712,
+        "relative_l2": 1.3755820654476892e-06,
+        "mine_norm": 7.676560028319053,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 1.854735409700936e-07,
+        "max_abs": 1.3113021850585938e-06
+      },
+      {
+        "arm": "original-query-and-keys",
+        "part": "sa_residual",
+        "source_payload_sha256": "d3ab4e0859447840d441ec5ce0bf6c9e06013d725fe3833bf1d4274cb6f8baac",
+        "cosine_min": 0.9999999999994571,
+        "relative_l2": 1.0530220905196539e-06,
+        "mine_norm": 10.008625522685213,
+        "ref_norm": 10.008627043865031,
+        "max_row_norm_error": 1.51986862095832e-07,
+        "max_abs": 1.3113021850585938e-06
+      },
+      {
+        "arm": "original-query-and-keys",
+        "part": "output",
+        "source_payload_sha256": "6235cd6dda6df7d51210f3b763d1d846fb9f32d99ed398f160b800f3f28b67ce",
+        "cosine_min": 0.9999999999992555,
+        "relative_l2": 1.211065708039845e-06,
+        "mine_norm": 26.297409222677885,
+        "ref_norm": 26.297410367247885,
+        "max_row_norm_error": 1.6360391652536777e-07,
+        "max_abs": 6.67572021484375e-06
+      }
+    ],
+    "payloads": [
+      {
+        "path": "analyze_block0.py",
+        "bytes": 2268,
+        "sha256": "d7ddcc03db900930d8308fb9362da369bf22bf4633dc33197471c5a0aeb61927"
+      },
+      {
+        "path": "baseline-output.npy",
+        "bytes": 16512,
+        "sha256": "73aec046d106bdbf57445fb3f8f7e741da9ff8d0b5feae3469c8121d4fd296a6"
+      },
+      {
+        "path": "baseline-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "baseline-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "b0f600d7894a90d4fd750bca90c94227eb147a96e7b3d30e90dbf64e2c24d2f5"
+      },
+      {
+        "path": "baseline-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "0e7a54bde40217d75cc85f2c5bf4ed3b5cfe54f4d76012e34f83836881684445"
+      },
+      {
+        "path": "baseline-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "0a6f726bfb4ae60ad3e259f438162ac1d111e53045f025beea40c338bcbfaf2b"
+      },
+      {
+        "path": "native-control-output.npy",
+        "bytes": 16512,
+        "sha256": "73aec046d106bdbf57445fb3f8f7e741da9ff8d0b5feae3469c8121d4fd296a6"
+      },
+      {
+        "path": "native-control-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "native-control-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "b0f600d7894a90d4fd750bca90c94227eb147a96e7b3d30e90dbf64e2c24d2f5"
+      },
+      {
+        "path": "native-control-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "0e7a54bde40217d75cc85f2c5bf4ed3b5cfe54f4d76012e34f83836881684445"
+      },
+      {
+        "path": "native-control-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "0a6f726bfb4ae60ad3e259f438162ac1d111e53045f025beea40c338bcbfaf2b"
+      },
+      {
+        "path": "original-keys-output.npy",
+        "bytes": 16512,
+        "sha256": "4a92549b5cabd86b5e2885aac0fdac3b813f6d3982876a8c443d8bf91524cf7d"
+      },
+      {
+        "path": "original-keys-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "original-keys-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "e1fa892d20316eaf48ad83856e3ef8cafaa47037a1f40656f6b8c22ef54ff7f4"
+      },
+      {
+        "path": "original-keys-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "36b89afef2b48bceb364e607c15c9a8d0b63325465278a85f89ab64460fe808f"
+      },
+      {
+        "path": "original-keys-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "a5008c9c3a0612e7d2599aa8adb59e0b5ce7eaf426acc18e47275e0432dc8aa9"
+      },
+      {
+        "path": "original-query-and-keys-output.npy",
+        "bytes": 16512,
+        "sha256": "a5dbba8be3288b7a70ee864439ed430fa9d0cc99352d25a7e8a34a6891b3e328"
+      },
+      {
+        "path": "original-query-and-keys-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "original-query-and-keys-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "846fe0e9a4d3eff0b70b4bd32c18bb13898ca3e1ac440db243e482ca4e543656"
+      },
+      {
+        "path": "original-query-and-keys-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "10618e02e90a5ad5bb86d943452d1687fc013d541618f1c563fee8613bafdf32"
+      },
+      {
+        "path": "original-query-and-keys-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "1abb9b8f48f9178931eaef037faa4d488302667ac6f8d3ff02e2975ed05f1102"
+      },
+      {
+        "path": "original-query-output.npy",
+        "bytes": 16512,
+        "sha256": "c074b9ebc38229e62909f6f5b48cac5b873a4a721561085aca681d3c57e58fd1"
+      },
+      {
+        "path": "original-query-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "original-query-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "0295a9f3017f943dfce3908a96b271080f025333b359e4e61be2d9f40d306e83"
+      },
+      {
+        "path": "original-query-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "b752b32e025896900dde72a123c1e95f65ec7e7ceaeb519a718466562d428487"
+      },
+      {
+        "path": "original-query-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "d474b0370ae54753c2925c68d09ea1312ac427c5907e247649f8175ef8541151"
+      },
+      {
+        "path": "reference-output.npy",
+        "bytes": 16512,
+        "sha256": "f0e264330803b9cee894e4a4c1570aa0d28c09322f53cc4cf4c453f1bc5911e0"
+      },
+      {
+        "path": "reference-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "reference-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "c3ff55980d2f76daf67616a2487a7161973f03a2218f2f663a46f0a4315e6514"
+      },
+      {
+        "path": "reference-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "c327a62bac8bd3a18371c6a404fca2120b55fe446b1cf90d5eecb31163a59ed8"
+      },
+      {
+        "path": "reference-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "d0dd86bde3696d8097379595ccaad947a80829d41f6bbcc0c55f37c449db4f68"
+      }
+    ]
+  },
+  "block0_independent_audit": {
+    "independent_stage_audit_pass": true,
+    "payloads_verified": 31,
+    "metric_rows_recomputed": 25,
+    "native_arrays_match_audited_raw_payloads": true,
+    "canonical_reference_sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+  },
+  "block0_publication": {
+    "revision": "82b9605fd7b8836dd738f9bc7e97def3cf47fa72",
+    "path": "dia-20261015-query-key/block0-factorial-stage-analysis-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/82b9605fd7b8836dd738f9bc7e97def3cf47fa72/dia-20261015-query-key/block0-factorial-stage-analysis-v1.zip",
+    "bytes": 299688,
+    "sha256": "98cbd36684db6ace8f548cf90e91d3cc53ad827e9906e03bcb82d6f534c85681",
+    "payloads": 38,
+    "anonymous_full_sha256_verified": true
+  },
+  "decision": "The tested replayed-Q/captured-K substitutions, including joint Q/K, do not restore original ordering or support. Early attention improves with joint replacement but this is insufficient for the final margin. No speech repair or production/default change."
+}

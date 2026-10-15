@@ -1,7 +1,9 @@
 # Dia original self-query and paired query/key diagnostic
 
+**Completed and integrated:** tested diagnostic tools are integrated at 63780005. Hosted and applicable lint checks pass. The [completed Q/K result](dia-query-key-results-2026-10-15.md) remains negative for restoring the disputed ordering. Earlier preparation checkpoints below are historical; they are not current pending jobs.
+
 Candidate `ff7e07c0f5ec846ff7de569c117c1d0b30af404d` captures actual original self-attention Q and adds a
-scratch-only five-arm full-decoder diagnostic. It is not integrated. Production
+scratch-only five-arm full-decoder diagnostic. It is now integrated as diagnostic tooling. Production
 runtime and defaults remain unchanged.
 
 ## Original-module query provenance

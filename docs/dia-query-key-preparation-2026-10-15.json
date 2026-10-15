@@ -1,14 +1,14 @@
 {
   "candidate_source": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
-  "integrated": false,
+  "integrated": true,
   "runs": {
     "heavy": {
       "databaseId": 38764924112,
       "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
       "event": "workflow_dispatch",
-      "status": "in_progress",
-      "conclusion": "",
-      "completed_jobs": 0,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_jobs": 1,
       "total_jobs": 1
     },
     "previous_lint": {
@@ -23,9 +23,9 @@
       "databaseId": 38767820341,
       "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
       "event": "workflow_dispatch",
-      "status": "queued",
-      "conclusion": "",
-      "completed_jobs": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "completed_jobs": 10,
       "total_jobs": 10
     }
   },
@@ -552,7 +552,7 @@
     "header_revision": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
     "initial_include_directory_failure_retained": "local-guards-v1/0.log; corrected to exact c36 public headers in local-guards-v2"
   },
-  "full_model_intervention_complete": false,
+  "full_model_intervention_complete": true,
   "speech_acceptance": false,
   "gpu_acceptance": false,
   "production_defaults_changed": false,
@@ -566,9 +566,11 @@
     "calibration_artifact_sha256": "83db2618e48dd329f58da66dfd1ff2e3f493adfb6177cee1e1104c6838efe02c",
     "calibration_verified_payloads": 720,
     "calibration_key_only_pass": true,
-    "new_query_key_checks_executed": false,
-    "full_query_key_audit_pass": false,
+    "new_query_key_checks_executed": true,
+    "full_query_key_audit_pass": true,
     "storage_directory": "/mnt/storage/crispasr/dia-query-key-20261015",
     "scope": "Prepared independent archive/source/raw-array/sampler audit passes previous real key-only proof; pending Q/K artifact is not yet audited."
-  }
+  },
+  "integration": "637800051f7a2498d9830828f2dc435a372465f5",
+  "full_query_key_result": "dia-query-key-results-2026-10-15.json"
 }

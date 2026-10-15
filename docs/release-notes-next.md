@@ -532,3 +532,13 @@ interventions localize the larger context effect to actual self-cache keys
 wrong-cache controls. Complete283-payload evidence is public and anonymously
 SHA-verified. No new runtime repair, speech/Q4/GPU/performance/default acceptance.
 See [layer0 proof](dia-layer0-owned-input-results-2026-10-15.md).
+
+## Dia joint Q/K and arithmetic diagnostics completed (2026-10-15)
+
+Integrated standalone query producers, tiny arithmetic controls, exact-input
+attention decomposition, scalar reduction and CFG margin explanation. The
+full-decoder Q/K factorial passes all739 raw payload/control checks and all
+applicable hosted/lint gates. Joint replacement improves early attention but
+does not restore original token ordering or support. Full public proof and
+independent audits are retained; no speech/GPU/Q4/default promotion follows.
+See [the complete result](dia-query-key-results-2026-10-15.md).

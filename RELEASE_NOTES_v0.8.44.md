@@ -661,3 +661,16 @@ current key or both does not restore the disputed token ranking. All720 hosted
 payloads and18-stage metrics are independently audited, with terminal heavy
 and lint checks passing. This accepts diagnostic tooling only; Dia free speech,
 GPU and quantized quality remain unaccepted.
+
+## Dia: reproducible arithmetic and joint Q/K diagnostics
+
+Integrated standalone original/native query producers, tiny attention invariants,
+exact-input QK/softmax/value decomposition, one-dot reduction and four-logit CFG
+margin explanation. Native hosted and original-module controls reproduce exactly;
+complete raw arrays, actual executable/libraries and independent audits are public.
+The full-decoder five-arm Q/K factorial passes all739 payload checks and both
+native controls. Joint replacement improves early attention but does not restore
+the original disputed ranking or sampling support. All applicable heavy/lint
+checks pass at their recorded sources. These are diagnostic tools; native Dia
+free speech, GPU and quantized quality remain unaccepted.
+See [the complete result](docs/dia-query-key-results-2026-10-15.md).

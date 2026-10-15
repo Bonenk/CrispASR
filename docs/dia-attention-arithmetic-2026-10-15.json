@@ -2,7 +2,7 @@
   "candidate_source": "95ade29094e81c8a9c7437fd0caafedca76e3e1e",
   "tested_source": "e6be594f27788d8bfcbab2b60682f64e7ea977fc",
   "tested_code_byte_unchanged_after_rebase": true,
-  "integrated": false,
+  "integrated": true,
   "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
   "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
   "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
@@ -1250,20 +1250,24 @@
   "speech_acceptance": false,
   "gpu_acceptance": false,
   "production_defaults_changed": false,
-  "full_decoder_query_key_result_pending": true,
+  "full_decoder_query_key_result_pending": false,
   "limitation": "Explicit shadow scores/probabilities are not internal tensors of fused SDPA. Original full-model self-Q was not retained. No speech or global rank causality from component error.",
   "lint_run": {
     "databaseId": 38771099343,
     "headSha": "95ade29094e81c8a9c7437fd0caafedca76e3e1e",
-    "status": "queued",
+    "status": "completed",
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38771099343",
-    "completed_jobs": 1,
-    "total_jobs": 10
+    "completed_jobs": 10,
+    "total_jobs": 10,
+    "conclusion": "success"
   },
   "full_decoder_query_key_run": {
     "databaseId": 38764924112,
     "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
-    "status": "in_progress"
+    "status": "completed",
+    "conclusion": "success"
   },
-  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC"
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC",
+  "integration": "f38980ce07b4a98b6275d25781f047d75329b090",
+  "full_query_key_result": "dia-query-key-results-2026-10-15.json"
 }

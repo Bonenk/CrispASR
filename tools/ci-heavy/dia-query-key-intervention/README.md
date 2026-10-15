@@ -50,6 +50,10 @@ Q/K files. The weight-free actual ggml guard tests both renamed replacement
 leaves, pruned original query producer, actual consumed arrays and dot products.
 Full patched-runtime syntax is checked against its exact ggml headers.
 
+The original audited run used this historical dispatch command. Its feature
+branch is retired after integration; the command records provenance rather than
+a current ref to rerun.
+
 ```sh
 gh workflow run heavy-cpu.yml --ref diag/dia-query-key-20261015 \
   -f script=tools/ci-heavy/dia_query_key_intervention.py \
@@ -57,8 +61,11 @@ gh workflow run heavy-cpu.yml --ref diag/dia-query-key-20261015 \
   -f timeout_minutes=300
 ```
 
-This is a dispatch recipe, not a hosted acceptance claim. Exact source, run IDs,
-terminal status and independent hosted audit belong in PLAN.md and the receipt.
+The [completed hosted run](https://github.com/CrispStrobe/CrispASR/actions/runs/38764924112)
+and independent739-payload audit pass; the result does not restore the original
+ordering or support. Exact source, terminal CI and public proof are recorded in
+[the result receipt](../../../docs/dia-query-key-results-2026-10-15.md). Do not
+repeat the unchanged historical experiment.
 No new model runs belong on the VPS; local evidence and all large files stay
 under /mnt/storage/crispasr/dia-query-key-20261015.
 

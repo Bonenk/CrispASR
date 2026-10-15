@@ -20,11 +20,13 @@ Only then profile or promote defaults. Preserve failures and source/input
 hashes; use distinct run directories so failed evidence cannot be overwritten.
 Follow docs/contributing.md for all affected surfaces, including the C ABI.
 
-Current main checkpoint1c33cb58 passes all13 CI jobs (2,026 unit tests),10 lint
-checks, Ruby and Pages. These are completed checks, not pending jobs. Last
-published release is v0.8.43; v0.8.44 is untagged. Future commits need their own
-applicable CI. The latest runtime repair is the integrated Dia output-protocol fix; its
-exact tested source passes13 general and10 lint jobs. Main-tip CI is separate.
+Pre-integration main checkpoint e2b8e0a3 passes all13 general CI jobs, Ruby and
+the secret scan. Both integrated diagnostic candidates pass all10 applicable
+lint checks, and the full Q/K hosted experiment passes its independent audit.
+These are exact-source checks; the final integration tip requires fresh CI.
+Last published release is v0.8.43; v0.8.44 remains untagged. The latest Dia
+production protocol/top-k repairs remain distinct from diagnostic tooling and
+do not establish native speech acceptance.
 
 ## Ordered roadmap
 
@@ -41,69 +43,6 @@ exact tested source passes13 general and10 lint jobs. Main-tip CI is separate.
 Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
-
-## CLAIMED 2026-10-15 — Dia attention arithmetic tooling integration
-
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-attention-20261015, branch diag/dia-attention-20261015;
-all builds, tensors and evidence under /mnt/storage/crispasr/dia-attention-20261015.
-The user-requested tiny/exact-input attention diagnosis is complete, independently
-audited and public; see [results](docs/dia-attention-arithmetic-2026-10-15.md)
-and HISTORY.md. Candidate95ade290 preserves all tested e6be594f tool bytes after
-rebasing independently onto main. Lint38771099343 is queued at95ade290.
-Remaining: applicable lint terminal pass,
-then integrate the standalone tools without the separate unvalidated Q/K worker.
-Full speech/rank repair remains unproven; no production/default change.
-
-## CLAIMED 2026-10-15 — Dia original self-query and joint Q/K intervention
-
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-query-key-20261015, branch
-diag/dia-query-key-20261015; all coefficients, arrays, builds and evidence under
-/mnt/storage/crispasr/dia-query-key-20261015. First capture actual original
-layer0 self-attention Q before/after RoPE at step978, using pinned original
-Python classes and physically verified F32 coefficients/owned inputs. Require
-reproduction of retained original self-attention output, exact fresh repeats,
-correct axes/dtype/position and scale/head-order rejection controls. The retained
-cross-Q is not a self-Q fixture. Preserve any failure in a distinct run folder.
-Only after that gate passes, publish a complete reproducible input fixture and
-prepare a scratch-only joint intervention on pinned runtime8d0ad886: baseline,
-native Q/K control, original-Q only, original-K only and original-Q plus keys.
-Require all979 baseline/native-control logits and actual consumed tensors exact;
-keep earlier978 logits, V/other caches/inputs/recipe unchanged. Compare all18
-layers, final logits/norms/errors and original sampler46/904 margins/support.
-Use GH for the full model and applicable lint, then independently audit full raw
-artifacts and retain public proof before integration. No full model on VPS,
-unchanged source-RoPE speech rerun, production graph/default change or speech/GPU
-acceptance from this conditional diagnostic. Claim covers producer preparation
-and bounded hosted diagnostic; successful speech remains a separate gate.
-Original-module producer proof now passes: retained component stages exact,
-full-reference self-attention/output relative errors9.53e-7/1.08e-6, strict
-2e-6 reconstruction gates unchanged. Native versus replayed-original Q differs
-by5.37e-5. Independent49-payload audit and complete59-payload public proof pass;
-both full anonymous downloads verify. This is replay Q, not a previously
-captured full-model query. Hosted worker ff7e07c0 is pushed; heavy38764924112 is running its worker step
-(started 16:57 UTC; checked 17:15 UTC). No hosted numerical pass is known.
-Candidateb1de5628 adds the completed native producer; lint38767820341 is
-submitted on that source, superseding the earlier manual lint38764928533. Actual compiled file/axis guards, full patched
-runtime syntax and actual hosted-ggml paired-input graph guard pass. Audit the
-complete native controls and all hosted arms before interpreting or integrating.
-See the [preparation receipt](docs/dia-query-key-preparation-2026-10-15.md).
-The bounded native query-producer probe is complete: captured query and native
-owned-input control byte-exact; one/four-thread repeats exact; scale/head-order
-controls reject. Independent87-payload audit and full98-payload anonymous proof
-pass, including a fresh public extraction and actual binary replay.
-Projection relative L2 is1.48e-7; original pre-Q through native RoPE still
-has5.37e-5 error. See the [native producer receipt](docs/dia-native-query-producer-2026-10-15.md)
-and HISTORY.md. Independent artifact auditing is prepared and calibrated against all720 payloads
-of the previous successful key-only run, including source, archive hashes/CRC,
-all controls, stages and sampler supports. Its new Q/K-specific checks remain
-unexecuted until the new artifact arrives. The actual worker phase beyond the
-Actions step is not visible through the current API response.
-Remaining: hosted factorial and newest lint terminal results,
-independent complete raw-array audit, then integration only if their gates pass.
-The hosted worker/patch/selftest bytes are unchanged fromff7e07c0; do not restart
-the full model solely for this standalone component addition.
 
 ## Dia correctness — early probe complete, full speech still open
 
@@ -124,13 +63,30 @@ pre-RoPE keys through native RoPE still differ by1.571e-5. The completed
 [full-decoder key intervention](docs/dia-cache-intervention-results-2026-10-15.md)
 reproduces both native controls exactly. Original prefix/current/both keys all
 retain the reversed46/904 ordering: key-only substitution is insufficient.
-The matched query/key diagnostic is active in the claim above. Actual original
-module self-Q is captured with strict full-reference reconstruction and exact
-retained component controls; full-model self-Q was not previously captured.
-The five-arm GH replay is running, with no hosted numerical pass yet.
-Require exact baseline/native-QK controls and fixed other caches/recipe. Do not
-repeat unchanged key-only/all-layer source-RoPE speech runs, substitute seeds
-or relax filtering. This conditional diagnostic remains separate from speech.
+The [joint Q/K factorial](docs/dia-query-key-results-2026-10-15.md) is complete:
+all739 hosted payloads and native controls pass independent audit. Query-only,
+key-only and joint replacement retain the reversed46/904 ranks and native
+sampling support. Joint Q/K improves block0 attention relative L2 from4.71e-6
+to1.42e-6 but leaves the final margin at−2.6702880859e-5. The tested layer0
+substitution is insufficient. All diagnostic tooling is integrated; complete
+raw hosted and25-row block0 proofs are public and anonymously verified.
+Do not rerun these unchanged arms or all-layer source-RoPE speech controls.
+
+Next bounded task, requiring a new claim before implementation:
+
+1. Prepare a one-step native suffix replay on the retained shared-prefix state,
+   holding token history, native self-prefixes, cross caches and recipe fixed.
+   Require the full native baseline and native activation substitutions exact.
+2. Substitute actual original captured decoder-layer outputs at selected
+   boundaries and measure final CFG46/904 margin/support, not only cosine.
+   Reuse the prefix rather than running979 steps for every arm. Use GH for the
+   full F32 model; local work remains tiny or one-layer owned-input diagnostics.
+3. Close missing simultaneous full-model original self-Q provenance using
+   unchanged-blueprint hooks and OFF/ON/OFF transparency controls. Separate
+   original full-model capture from qualified module replay and shadow arrays.
+
+Do not change the seed/filter, promote a component pass to speech acceptance,
+or interpret nonlinear intervention effects as additive causal percentages.
 After a demonstrated repair, require actual fixed-recipe CLI/C-ABI
 speech, predetermined additional prompts/speakers/lengths/session reuse,
 original intermediate diff, DAC/ASR and actual CUDA. Q4/profiling follow speech

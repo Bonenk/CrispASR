@@ -1,6 +1,6 @@
 {
   "candidate_source": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
-  "integrated": false,
+  "integrated": true,
   "producer": {
     "scope": "One-step native Q projection/RoPE attribution with exact captured control.\n\nUses only the 16 MiB physically audited query matrix and small owned arrays.\nNo full model, speech, GPU, optimization or default acceptance is performed.\n",
     "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
@@ -680,15 +680,16 @@
   "hosted_factorial": {
     "databaseId": 38764924112,
     "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
-    "status": "in_progress",
-    "numerical_pass": false
+    "status": "completed",
+    "numerical_pass": true
   },
   "latest_lint": {
     "databaseId": 38767820341,
     "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
-    "status": "queued",
-    "completed_jobs": 4,
-    "total_jobs": 10
+    "status": "completed",
+    "completed_jobs": 10,
+    "total_jobs": 10,
+    "conclusion": "success"
   },
   "hosted_worker_unchanged_from_factorial_source": true,
   "public_extracted_replay": {
@@ -705,5 +706,7 @@
       "anonymous_full_sha256_verified": true
     }
   },
-  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC"
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC",
+  "integration": "637800051f7a2498d9830828f2dc435a372465f5",
+  "full_query_key_result": "dia-query-key-results-2026-10-15.json"
 }
