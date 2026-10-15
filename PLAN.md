@@ -71,7 +71,12 @@ Hosted duplicate38710473906 failed on the omitted huggingface_hub import
 dependency before original inference; complete rejected evidence is preserved.
 Corrected dispatch38716091962 adds huggingface_hub1.10.1 and is queued. The
 worker math remains unchanged at7b42071f; README command repair87a11e3d is
-pushed on its separate branch. Audit fresh CI before runtime integration. Completed local
+pushed on its separate branch. Corrected hosted38716091962 passed strict PCM
+controls but failed before ASR because ffmpeg is absent. Maintainer now claims
+the scoped prerequisite check/bootstrap in the existing owned full-codec
+worktree/branch; preserve the complete second failed artifact/log, keep all
+numerical/ASR thresholds unchanged and resubmit exact fixed source. Audit fresh
+CI before runtime integration. Completed local
 regression preparation is in [the receipt](docs/dia-output-protocol-2026-10-15.md);
 full speech, intermediate parity, C-ABI/CLI and CUDA acceptance remain open.
 
@@ -91,6 +96,15 @@ repeated and batched versus original one-step computation distinct. No full
 model load or unchanged source-RoPE/full-speech rerun; no seed/filter/default,
 model/speech/CUDA/Q4/performance promotion. This tests the larger measured
 self-key history effect rather than blindly replaying more decoder layers.
+
+Preparation verifies11 original F32 tensors, about80MB, and all979 shared token
+rows. Original one-step reconstruction passes at relative L2 7.721e-7; its last
+hidden input is exact. Native producer recreates all979 captured keys byte-exact,
+as do1/4-thread repeats. Pre-RoPE error2.240e-7 grows to1.571e-5 after RoPE;
+original-pre-RoPE/native-RoPE intervention leaves1.571e-5. Wrong-token control
+rejects at48.4% error; scale/head/position controls reject. Next independently
+audit complete arrays/coefficients and publish proof before accepting this
+component diagnosis. Earlier source-RoPE full-speech failure is still rejected.
 
 ## Dia correctness — early probe complete, full speech still open
 
