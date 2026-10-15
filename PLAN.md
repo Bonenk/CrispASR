@@ -42,6 +42,24 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-15 — Immutable accepted-source package preflight
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-release-preflight-20261015, branch
+diag/release-preflight-20261015; evidence under
+/mnt/storage/crispasr/release-preflight-20261015. Freeze accepted source
+998f8d18e536bf503fbd4c655caa01a1d461836f on immutable validation branch
+diag/release-preflight-source-20261015. Use existing Release workflow with
+empty tag and only Linux x86 CLI/library legs; no publication or version bump.
+This is a bounded packaging preflight while higher-priority science is queued,
+not the final release freeze or complete platform matrix. Require exact run and
+artifact source identity, complete raw hashes/CRCs/safe paths, actual relocated
+CLI/C-ABI startup and dependency closure. Build/install a wheel from the same
+frozen Python tree and actual shared bundle, with packaged-library discovery
+from an unrelated directory. Version remains0.8.43; do not label these artifacts
+v0.8.44 or claim actual model/GPU acceptance. Audit fresh artifacts before any
+release decision; unmerged Dia intervention/OmniVoice runtime scopes excluded.
+
 ## CLAIMED 2026-10-15 — OmniVoice PR521 standalone utility salvage
 
 Owner: maintainer session. Owned worktree
