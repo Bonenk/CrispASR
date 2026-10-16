@@ -79,6 +79,24 @@ step/token branch. Require pristine/OFF/identity controls, fixed sampler/RNG,
 actual native/original DAC speech, additional prompts/seeds and current-main
 integration before promotion. No production/GPU/Q4/performance claim yet.
 
+## CLAIMED 2026-10-16 — Dia all-step serial F32 head experiment
+
+Owner: maintainer session. Worktree
+/mnt/volume1/crispasr-dia-serial-head-20261016, branch diag/dia-serial-head-20261016;
+large scratch/evidence under /mnt/storage/crispasr/dia-serial-head-20261016.
+Implement a scratch gated CPU ggml graph head callback using native loaded F32
+weights/current hidden, serial separately-rounded multiply/add at every step.
+No reference injection or token/step-specific numerical behavior. Hold runtime
+8d0ad886/C36, F32 model/cross caches, portable RNG, source RoPE off and original
+recipe fixed. Pristine/OFF/identity graph paths must have byte-exact complete
+trajectories/logits/audio; serial path uses unchanged sampler/RNG. Save all
+native codes/audio, actual original DAC and same-recognizer ASR, positive
+controls and all physical/source/library receipts. Tiny analytic fusion and
+actual captured-head graph tests locally; full model/build/generation on GH.
+Current main lacks these diagnostic RNG/cache paths, so this is explicitly a
+pinned-runtime causal experiment; current-main/default, extra prompts/seeds,
+GPU/Q4 and performance remain separate gates before production promotion.
+
 ## Dia correctness — after reciprocal decision diagnosis
 
 The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
