@@ -104,7 +104,9 @@ and lint38913941844 both pass at that exact SHA. Heavy completed all four
 cases and failed quality: the original positives also return empty ASR text.
 Official artifact12057273677 is fully retained and its3022635432bytes match
 GitHub SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90.
-The independent full-array audit is running; crossed recognition below is next.
+Independent audit verifies1829 payloads,352 passing stage rows and20556 exact
+original sampler decisions. All four input histories/code grids are exact;
+crossed recognition below is next. See docs/dia-broader-speech-results-2026-10-16.md.
 No broader speech acceptance, F16/Q4/GPU or default promotion.
 
 Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
@@ -274,7 +276,7 @@ predeclared cases and failed its unchanged quality gate. Its CRC-checked receipt
 preview reports exact original/native input histories and all352 stage rows
 passing, but all original/native/CLI ASR transcripts are empty. Full official
 artifact12057273677 (3022635432bytes, SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90)
-is retained and fully SHA-verified; independent array audit remains required.
+is retained and fully SHA-verified; independent1829-payload array audit is complete.
 
 Prepare a crossed ASR replay using both retained candidate shared libraries from
 old38892690744 and new38913941927, with the identical pinned Nemotron Q4 model.
@@ -296,13 +298,15 @@ Repair0dfccc7d in /mnt/volume1/crispasr-echo-ffn-fused-20261016 passes a tiny
 verbatim vendored build_ffn control: the old helper captures5 and fails; the
 repair captures6 and passes. Earlier synthetic native proof does not establish
 production FFN completeness. Fresh CI38929450279, lint38929454381 and hosted
-tiny38929458991 are queued. Prepared full-model composition uses separate
+tiny38929458991 passes, including independent52-payload audit of actual
+released source,18 Python controls and old-five/fixed-six literal builder.
+CI38929450279 and lint38929454381 remain queued. Full-model composition uses separate
 worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-v2-20261016; do not launch until
 the corrected tiny controls pass. Compositione344c2d064b912e765b0cc74271d88ae845c7bc8
 passes10 local controls and retains byte-exact runtime/reference sources from
 repair0dfccc7d. A storage watcher independently audits the corrected hosted tiny
-artifact before dispatching that exact frozen full-model composition; failed
-audit prevents launch. Runtime mathematics/defaults are unchanged.
+artifact and dispatched exact frozen full-model38931686491 after acceptance.
+That EN/ZH run is queued; its collector is prepared. Runtime mathematics/defaults are unchanged.
 
 ## Quantization — no unproven model promotion
 

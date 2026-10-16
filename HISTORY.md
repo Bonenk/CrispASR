@@ -1,3 +1,21 @@
+## Dia broader numerical diagnostic completed; speech rejected — 2026-10-16
+
+Heavy38913941927 completes all four predeclared prompt/seed cases and correctly
+fails the unchanged quality gate: original/native/DAC/CLI ASR transcripts are
+empty. Independent audit verifies1829 payloads,352 passing stage rows and20556
+exact original sampler decisions. Every original/native input history and code
+grid matches; minimum stage cosine across cases is0.9999620016. This accepts
+the numerical diagnostic, not broader speech, F16/Q4/GPU, defaults or release.
+[Complete per-stage/per-case results](docs/dia-broader-speech-results-2026-10-16.md)
+and machine receipt retain failures. Crossed recognition and permanent complete
+proof publication remain in PLAN.md.
+
+The corrected Echo fused-product observer also passes hosted38929458991 and
+independent52-payload audit, including released5.6.0 source,18 original-class
+controls and the actual verbatim-builder old-five/fixed-six witness. This gate
+dispatched frozen e344c2d0 full-model38931686491. CI/lint, full-model acceptance
+and main integration remain pending; no Q4/GPU/default promotion.
+
 ## Echo production FFN observer gap found — 2026-10-16
 
 Following the actual vendored Qwen3.5 caller and complete build_ffn body found

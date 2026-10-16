@@ -1,7 +1,7 @@
 {
   "candidate": "d8183cf92abc24eeeb6c969db563e968c5345d46",
   "hermes_local_source": "5020e60dd1939ee3d86ad9b260198962b7d85da7",
-  "status": "prior candidate superseded: production fused-product name was missing; repair0dfccc7d passes local verbatim-builder control; fresh hosted gates pending",
+  "status": "fused repair hosted tiny and independent52-payload audit pass; fresh CI/lint and full-model38931686491 pending; not integrated",
   "local_actual_original_class_controls": 18,
   "local_original_provenance": {
     "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
@@ -125,7 +125,7 @@
   "q4_acceptance": false,
   "gpu_acceptance": false,
   "pending": [
-    "fresh corrected observer tiny official-artifact audit and CI/lint",
+    "fresh corrected-observer CI/lint; hosted tiny audit already passes",
     "full-model F16 OFF/ON/OFF stage and decoded-output identity",
     "same-original-input FFN projection attribution before another Q4 recipe"
   ],
@@ -203,11 +203,35 @@
     "hosted": {
       "tiny": 38929458991,
       "ci": 38929450279,
-      "lint": 38929454381
+      "lint": 38929454381,
+      "tiny_conclusion": "success"
     },
     "fullmodel_composition": "e344c2d064b912e765b0cc74271d88ae845c7bc8",
     "fullmodel_dispatch_condition": "Corrected hosted tiny official-artifact independent audit must pass; watcher checks exact frozen branch SHA.",
     "superseded_fullmodel_run": 38928056585,
-    "superseded_fullmodel_conclusion": "cancelled before execution"
+    "superseded_fullmodel_conclusion": "cancelled before execution",
+    "independent_audit": {
+      "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+      "run": 38929458991,
+      "artifact": 12058424897,
+      "official_sha256": "ad7a16e617a742c13a2ac8a4d929ab6bb96f2792bb587a87a5d6fab2fae82a2e",
+      "payloads_verified": 52,
+      "python_controls": 18,
+      "native_scheduler_control": true,
+      "verbatim_builder_old_five_fixed_six": true,
+      "actual_released_source": {
+        "version": "5.6.0",
+        "filename": "transformers-5.6.0-py3-none-any.whl",
+        "sha256": "def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd",
+        "url": "https://files.pythonhosted.org/packages/e8/80/ac700df26a83969d2cf8d09d3dd191bb9bbe8156fa4607e614438b1da8c8/transformers-5.6.0-py3-none-any.whl"
+      },
+      "original_class_matches_independent_x86_control": true,
+      "macho_cpu_type": 16777228,
+      "full_model_acceptance": false,
+      "q4_acceptance": false,
+      "gpu_acceptance": false,
+      "production_defaults_changed": false
+    },
+    "fullmodel_run": 38931686491
   }
 }
