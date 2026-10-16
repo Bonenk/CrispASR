@@ -44,6 +44,21 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Dia reciprocal native sampled-decision fork
+
+Owner: maintainer session. Owned worktree
+/mnt/volume1/crispasr-dia-native-fork-20261016, branch diag/dia-native-fork-20261016;
+large scratch/evidence under /mnt/storage/crispasr/dia-native-fork-20261016.
+Use immutable8d0ad886/C36, physically audited full F32 neural weights, F32 cross
+caches, portable RNG, source RoPE off, original seed42 and unchanged3072-token
+recipe. Scratch-only post-sampler substitution at978/codebook2,904→877.
+Require baseline and identity904 full trajectories/logits/codes/audio byte-exact,
+unchanged RNG across substitution and exact earlier fork prefix. Capture all
+raw ensuing outputs, decode with actual original DAC and score both original
+positive and native arms through the same recognizer. Tiny actual sampler and
+patch guards locally; full generation/build/ASR on GH CPU. No production token
+override, default/filter/seed/threshold change or claimed runtime repair.
+
 ## Dia correctness — reciprocal native decision diagnostic
 
 The [full original trace and one-decision fork](docs/dia-original-trace-results-2026-10-16.md)
