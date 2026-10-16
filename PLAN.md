@@ -103,15 +103,20 @@ compiled production comparison guards (20 acceptance/rejection controls),
 three parser/scratch tests, one device/environment test, three computation/
 sampler source tests and the existing original output-protocol test pass.
 Whole-runtime syntax and all237 ordered ggml computation calls match pristine
-main. Hosted full-model validation38883779736, lint38883782438 and general
-CI38883785994 are queued; raw collection is active. Independent full artifact
+main. Hosted full-model validation38883779736 is running; general CI38883785994
+has7/13 jobs passing, including Linux unit/DL, Windows, macOS, iOS and both
+AMR compilers. Lint38883782438 has4/10 checks passing. No failures at this
+checkpoint; raw collection is active. Independent full artifact
 and array auditors are prepared; storage watcher97658 starts each after its
 raw collector finishes. Audit execution and acceptance remain pending.
 Further synthetic actual-runtime capture proof is independently accepted:
 381 physical tensors,398 complete neural boundaries and exact OFF/ON/OFF
 input/logit controls. Completed details/public proof are in HISTORY.md and
 [the compact receipt](docs/dia-reference-wire-tiny-runtime-2026-10-16.json).
-This does not replace the pending full1.6B/DAC/speech gates. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+A second eight-query/two-KV/four-way GQA case passes all398 boundaries,
+381 physical tensors and18 actual-original-module wrong-tiling rejection
+controls. Its complete public proof is archived in HISTORY.md. These synthetic
+cases do not replace the pending full1.6B/DAC/speech gates. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
 
 ## Dia correctness — after reciprocal decision diagnosis
 

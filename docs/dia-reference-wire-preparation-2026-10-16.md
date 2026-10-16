@@ -101,3 +101,26 @@ immutable revision and verified a second full anonymous download.
 Full1.6B reference/diff, real DAC, native speech, GPU and Q4 remain separate
 pending gates. These small synthetic weights prove capture plumbing and
 scaled-down numerical consistency, not full-model quality.
+
+## Nontrivial GQA head-order control
+
+The first case's single KV head cannot distinguish head tiling from
+interleaving. A second case therefore uses eight query heads and two KV heads:
+correct mapping `[0,0,0,0,1,1,1,1]`, compared with deliberately wrong
+`[0,1,0,1,0,1,0,1]`. Its four-way grouping matches full Dia. The unchanged
+compiled C++ probe executes all12 encoder/18 decoder layers, with decoder
+hidden32 and the same small head/MLP widths. All381 physical F32 tensors and
+398 complete neural comparisons pass independent audit; original inputs and
+OFF/ON/OFF logits remain exact. Minimum cosine0.9999996972; maximum row norm
+error0.000422272. No capture or head-layout runtime repair was needed.
+
+Feeding the exact captured normalized inputs and K/V into the actual original
+Attention modules gives18 passing correct-cache controls. Replacing their
+cache head order with tiling makes all18 fail the unchanged cosine/magnitude
+gates. Complete positive/negative outputs are retained. The1063-payload proof
+is [public at an immutable revision](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/3cf5dafa0973b884d3bace90680ebef0ec271b0d/dia-20261016-reference-wire/tiny-runtime-gqa-v2/tiny-runtime-gqa-captures-v2.zip), with a fresh anonymous full
+38,113,866-byte download and SHA256
+`7d96fe1a23bf8fd79a52ae3884756619fe047a5213d1ce23f58a1d83e4ce87ca`.
+[Compact audit and source receipt](dia-reference-wire-gqa-runtime-2026-10-16.json).
+This is synthetic neural/capture validation; the full-model and real-DAC
+workers remain the acceptance gates.

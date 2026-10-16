@@ -1,3 +1,17 @@
+## Dia nontrivial grouped-query capture proof accepted — 2026-10-16
+
+A second synthetic case uses eight query heads and two KV heads, retaining
+four-way grouping as in full Dia. All381 physical tensors and398 complete
+neural comparisons pass independent audit; original IDs and OFF/ON/OFF logits
+remain exact. Minimum cosine0.9999996972 and maximum row norm error0.000422272.
+Actual original Attention modules pass18 correct-cache controls and reject
+18 deliberately tiled-head controls. This covers a limitation of the first
+single-KV-head case, where tiling and interleaving coincide. The complete1063-
+payload38,113,866-byte proof is public at HF revision3cf5dafa, with an anonymous
+full-download size/SHA check. It reuses the identical actual compiled probe and
+claims synthetic neural/capture consistency only. Full1.6B/DAC/speech/GPU/Q4
+acceptance remains separate. [Source/audit/public receipt](docs/dia-reference-wire-gqa-runtime-2026-10-16.json).
+
 ## Dia opt-in head graph integrated — 2026-10-16
 
 Accepted candidate d198d7a4 passes all13 general CI38874305718 and10 lint

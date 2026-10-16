@@ -1,0 +1,68 @@
+{
+  "source": "c7f9da872e87ba238c579083841b3547faee772f",
+  "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "original": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+  "source_files": {
+    "src/dia_tts.cpp": "b0fbab1bdb85da80469764bc64af60f503498887c046d73a23eba61787d668b5",
+    "src/dia_dump_step.h": "8e8401307b559fa7c64975cf84fd63f0f41a460182caa9248184ae1f62de014a",
+    "src/dia_sampling.h": "46f789b14d0bc7ee1a8c14b52ae11039a86de3408a3a4830e89b86964fc07145",
+    "src/core/gguf_loader.cpp": "c26f21f34f88875a6900722d6c5c90176b8a71bcbc9b0a5603dc5c1a56dd6fd5",
+    "tools/dia_attention_capture.py": "fe7fbc125ec7f980d4a5a892c1636fc05c234ac1b182f40b5a20a16fb18207ff",
+    "tools/dia_decoder_capture.py": "384c3584804cbb0fdca67a0cbf983199312b293345e889fc8af3b1095f0fe7ee",
+    "tools/reference_backends/dia_tts_reference.py": "69787f81198361761f93081d21138a0ca891276da13b8c19091358e41bad7d37",
+    "models/convert-dia-to-gguf.py": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57"
+  },
+  "original_source_hashes": {
+    "dia/__init__.py": "d6cc98eb95ccf0123697c036df7759db197d5424aa9eb52f75e8d4f88d736b6a",
+    "dia/audio.py": "a4a92aba2e0b45a3da2ac8c27c36002501a0500a528eb9e613661f7d9a057875",
+    "dia/config.py": "6bbdb7c764e11b9b9f4170948cb06da5a4dec00b2c080090ce96975fce731698",
+    "dia/layers.py": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+    "dia/model.py": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "dia/state.py": "83d0ddc651bab76afe91c8851b515f12863d1221778765a6d9d4462581f5d13f"
+  },
+  "actual_binary_sha256": "88f4be1a50b84ed4b77bf517fcd2ccf221f1749fe260d88c2753e885e5655bc8",
+  "synthetic_model_sha256": "256b5127a32971c105f4e206f1841f41711ea6c44c17da3734a2bc825c887bf9",
+  "physical_f32_tensors_verified": 381,
+  "original_parameters_sha256": "b816a5ea7d934863fcacca48a0faa35d8c209dec7f93f1262b11bac551edcd1d",
+  "original_input_replay_exact": true,
+  "off_on_off_inputs_logits_exact": true,
+  "all_layers_all_optional_boundaries": true,
+  "doubled_scale_rejections": 398,
+  "neural_stages_pass": 398,
+  "codec_stub": true,
+  "full_model_acceptance": false,
+  "speech_acceptance": false,
+  "query_heads": 8,
+  "kv_heads": 2,
+  "gqa_groups": 4,
+  "decoder_hidden": 32,
+  "encoder_hidden": 1024,
+  "head_dim": 4,
+  "worst_cosine_stage": {
+    "stage": "decoder_block6_cross_q",
+    "values": 64,
+    "cos_min": 0.9999996972377867,
+    "max_row_norm_error": 0.0002516384517243786,
+    "relative_l2": 0.00011511929477779861
+  },
+  "worst_magnitude_stage": {
+    "stage": "decoder_sa15_q",
+    "values": 64,
+    "cos_min": 0.9999998832247711,
+    "max_row_norm_error": 0.00042227241430514706,
+    "relative_l2": 0.00016709296069901668
+  },
+  "gqa_correct_controls": 18,
+  "gqa_wrong_tiling_rejections": 18,
+  "gqa_wrong_tiling_best_cosine": 0.8063900308234427,
+  "publication": {
+    "path": "dia-20261016-reference-wire/tiny-runtime-gqa-v2/tiny-runtime-gqa-captures-v2.zip",
+    "bytes": 38113866,
+    "sha256": "7d96fe1a23bf8fd79a52ae3884756619fe047a5213d1ce23f58a1d83e4ce87ca",
+    "payloads": 1063,
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "3cf5dafa0973b884d3bace90680ebef0ec271b0d",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/3cf5dafa0973b884d3bace90680ebef0ec271b0d/dia-20261016-reference-wire/tiny-runtime-gqa-v2/tiny-runtime-gqa-captures-v2.zip",
+    "anonymous_full_download_verified": true
+  }
+}
