@@ -1,3 +1,17 @@
+## Dia current-main head preparation locally verified — 2026-10-16
+
+Candidate d198d7a4 implements an opt-in generic CPU F32 head graph on current
+main/ggml0a862076; all compute/apply function bytes match the causal candidate.
+Local actual static-library graph replay passes both captured hidden states,
+all18,504 serial outputs, one/four threads and native/identity controls. The
+registered tiny graph test passes30 checks; isolated removal of the GPU guard
+is detected. Whole current runtime syntax and format18 pass. Failed CIFS
+shared-library symlink build remains intact; accepted static proof is under
+/mnt/storage/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
+These completed local checks do not accept hosted builds, full generation,
+defaults, GPU/Q4 or performance. Hosted/quality gates remain in PLAN.md.
+[Preparation and source/array receipts](docs/dia-current-main-head-preparation-2026-10-16.md).
+
 ## Dia numerical cause confirmed on a second CPU — 2026-10-16
 
 Heavy38868907653 atd868644b passes on Xeon Platinum8573C. The official160994-byte

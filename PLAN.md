@@ -53,7 +53,7 @@ large scratch/evidence under /mnt/storage/crispasr/dia-serial-head-20261016.
 Candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is pushed. Heavy CPU
 [38870499727](https://github.com/CrispStrobe/CrispASR/actions/runs/38870499727)
 and lint [38870502430](https://github.com/CrispStrobe/CrispASR/actions/runs/38870502430)
-are submitted; heavy is executing and lint remains queued. The scratch CPU ggml graph callback uses only native
+are submitted; heavy and lint are executing. The scratch CPU ggml graph callback uses only native
 loaded F32 weights/current hidden and separately rounded serial arithmetic on
 every head at every step. No reference injection or token/step-specific math.
 
@@ -96,6 +96,25 @@ change or production/speech claim; hosted current-main generation follows the
 pending causal result and needs independent cache/sampler/recipe validation.
 Keep current top-k and output-protocol repairs rather than copying the old
 runtime wholesale. All CLI/C-ABI callers share this library path.
+
+Candidate d198d7a48742c8424444d9b67dde9eb5d26f590f is pushed. Local static
+current-ggml build passes, as do30 actual tiny graph/admission checks, deliberate
+GPU-guard removal rejection, all18,504 reference head values on both hidden
+states with one/four threads, identity/OFF and whole-runtime syntax. Compute/
+apply functions are byte-exact to the immutable causal candidate. Failed CIFS
+shared-library symlink build is retained under local-v1; accepted static proof
+is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2026-10-16.md).
+
+Hosted build/replay38874191736, lint38874302965 and general CI38874305718
+are queued at this checkpoint, all at d198d7a4. Single raw collector
+session10831 at the owned storage root/collector-v1 preserves official metadata,
+complete logs and digest-verified raw artifact; full artifact audit remains due.
+These compile/graph jobs load no full neural model. Pinned speech38870499727
+still runs; its lint38870502430 has started, with its separate collector/auditor
+unchanged. Do not repeat either run or promote before the corresponding gates.
+After the causal result, test actual current-main baseline versus head-only
+through CLI/Session first; add diagnostic cache/RNG paths only if those results
+justify them. Reference rounding compatibility alone is not general speech proof.
 
 ## Dia correctness — after reciprocal decision diagnosis
 

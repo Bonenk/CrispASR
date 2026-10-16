@@ -714,3 +714,18 @@ and original DAC (WER1→0), all1,226 original input rows and1,210 code frames.
 Complete public evidence is anonymously SHA-verified. This is diagnostic
 recovery for one prompt/seed, not a production token override, native speech
 repair or GPU/Q4/performance acceptance. [Results](docs/dia-native-fork-results-2026-10-16.md).
+
+## Dia CPU reduction cause identified
+
+Integrated projection/reduction probes now distinguish the actual reference's
+MKL COMPATIBLE arithmetic from AUTO/AVX512 and ggml's AVX2/FMA reduction.
+Separately rounded serial F32 multiply/add matches all4,096 captured query
+values and18,504 head outputs on each hidden state. A fresh second-CPU replay
+and its independent13-payload audit pass, alongside all10 source-pinned lint
+checks. Complete local and hosted proof archives are public and SHA-verified.
+On unchanged native hidden, this arithmetic alone restores the disputed
+sampling support without a token override. This supersedes the earlier broad
+head-exclusion conclusion, whose local control used a different CPU dispatch.
+Full-generation serial-head validation remains pending; production defaults,
+GPU/Q4 and performance are not promoted. [Cause](docs/dia-reduction-cause-2026-10-16.md)
+and [hosted replay](docs/dia-reduction-cause-hosted-2026-10-16.json).
