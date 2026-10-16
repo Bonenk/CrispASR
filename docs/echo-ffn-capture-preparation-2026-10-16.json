@@ -1,7 +1,7 @@
 {
   "candidate": "d8183cf92abc24eeeb6c969db563e968c5345d46",
   "hermes_local_source": "5020e60dd1939ee3d86ad9b260198962b7d85da7",
-  "status": "candidate pushed; hosted checks pending; not integrated",
+  "status": "hosted tiny CPU controls and independent artifact audit pass; general CI/lint pending; not integrated",
   "local_actual_original_class_controls": 18,
   "local_original_provenance": {
     "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
@@ -19,7 +19,7 @@
     "class_sha256": "c4e763e69d5676e71d222060e36258f6b2cc939a3597118c4207d370d120a265",
     "full_modeling_sha256": "3e2b6239e4b2c3e512d4f9836a1dba12e975ae652407e84f2d3c2beebf0c9528",
     "same_class_as_independent_torch26_x86_control": true,
-    "full_package_hosted_check_pending": true
+    "full_package_hosted_check_pending": false
   },
   "local_native_scheduler": {
     "scope": "actual ggml scheduler observer small tensors only; no model/GPU/Q4 acceptance",
@@ -92,7 +92,30 @@
   "hosted": {
     "mac_cpu_tiny": 38920692197,
     "ci": 38918654236,
-    "lint": 38918655348
+    "lint": 38918655348,
+    "mac_cpu_tiny_conclusion": "success",
+    "independent_audit": {
+      "source": "d8183cf92abc24eeeb6c969db563e968c5345d46",
+      "run": 38920692197,
+      "artifact": 12055666350,
+      "official_sha256": "80ab98d7a56d86e7acc0c73630fa4b5db199ac65a657289dc932e32293249291",
+      "payloads_verified": 29,
+      "python_controls": 18,
+      "native_scheduler_control": true,
+      "actual_released_source": {
+        "version": "5.6.0",
+        "filename": "transformers-5.6.0-py3-none-any.whl",
+        "sha256": "def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd",
+        "url": "https://files.pythonhosted.org/packages/e8/80/ac700df26a83969d2cf8d09d3dd191bb9bbe8156fa4607e614438b1da8c8/transformers-5.6.0-py3-none-any.whl"
+      },
+      "original_class_matches_independent_x86_control": true,
+      "macho_cpu_type": 16777228,
+      "full_model_acceptance": false,
+      "q4_acceptance": false,
+      "gpu_acceptance": false,
+      "production_defaults_changed": false
+    },
+    "retained_audit_failure": "v1 expected older CTest summary wording; v2 verifies actual passing test row plus 100% summary; no producer/gate changes"
   },
   "default_graph_math_changed": false,
   "production_defaults_changed": false,
@@ -100,7 +123,7 @@
   "q4_acceptance": false,
   "gpu_acceptance": false,
   "pending": [
-    "hosted tiny original/ggml and general CI/lint",
+    "general CI/lint at byte-exact C++/CMake source",
     "full-model F16 OFF/ON/OFF stage and decoded-output identity",
     "same-original-input FFN projection attribution before another Q4 recipe"
   ],

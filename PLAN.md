@@ -68,11 +68,10 @@ all runtime graph mathematics, integration, main pushes and heavy-run scheduling
   existing gates/defaults, no runtime graph edits or repeated failed recipe.
 
 Both tmux sessions used the configured default model/provider and are now idle
-after completing their assignments. Their worktrees and logs are preserved. OmniVoice finds
-two unchecked output allocations; coordinator integration candidate2985a4c6
-passes independently extracted production-body normal/OOM/mutation/frozen-old
-controls. GeneralCI38914114501 and lint38914114178 are queued; no main merge
-until green. The old-source and mutation controls both crash with signal11.
+after completing their assignments. Their worktrees and logs are preserved.
+The bounded OmniVoice output-allocation fix is integrated after all13 CI jobs
+and all10 lint jobs passed on candidate2985a4c6. Completed proof is in HISTORY.md;
+remaining PR521 integration and original/native clone-quality acceptance stay open.
 Echo attention-Q8 is already in rejected recipes; do not repeat it. Its first
 worker proposalf642293f is rejected. Final local5020e60d provides the reviewed
 source-verified Python FFN helper; coordinator candidate d8183cf9 composes it
@@ -229,9 +228,12 @@ MLP ClassDef is byte-exact to the independently SHA-verified released
 transformers5.6.0 wheel. Actual ggml scheduler six-boundary OFF/ON/OFF,
 ownership/stride/admission controls pass; first-row mutation is rejected.
 The public dumper rejects invalid source pins before loading weights.
-Mac CPU tiny38920692197, generalCI38918654236 and lint38918655348 are queued
-at that frozen SHA. Official-artifact collectors and independent auditors
-are prepared under storage; no main integration until the applicable gates.
+Mac CPU tiny38920692197 passes on that frozen SHA. Independent v2 audit
+verifies all29 payloads, released original source,18 Python controls and the
+actual arm64 ggml scheduler executable. The first audit expected different
+CTest summary wording; its failure is retained and the corrected audit also
+requires the explicit passing test row. GeneralCI38918654236 and
+lint38918655348 remain queued; no main integration until the applicable gates.
 Full-model F16 transparency and same-original-input FFN replay are still open.
 The revised source slices before CPU transfer: actual37-token tiny MLP
 captures/output remain byte-exact while observed copies fall10656→288 bytes.

@@ -18,6 +18,16 @@ The notes below distinguish decoded model evidence, source-level regression
 controls and SDK compilation. They do not announce a new default quantization,
 performance gain or completed Ascend hardware validation.
 
+## OmniVoice allocation failure handling
+
+Both public code-generation and PCM-decoding output allocations now return
+null and set output length to zero when allocation fails. Previously these
+paths could pass null to memcpy and crash. The regression extracts the actual
+production function bodies: five normal/OOM/gain cases pass; removing either
+guard reproduces the crash, as do the frozen original functions. All13 general
+CI jobs and all10 lint jobs pass on the byte-identical integrated candidate.
+This bounded fix does not establish full PR521 or clone-quality acceptance.
+
 ## Dolphin: non-streaming decoding and automatic binding sessions
 
 Honor the checkpoint causal flag in both depthwise convolution sites and preserve
