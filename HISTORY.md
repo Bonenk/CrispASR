@@ -1,3 +1,20 @@
+## Echo FFN observer integrated with tested combined source — 2026-10-16
+
+Final landing6db7e164 preserves four original commits and all3591 non-document
+entries of frozen3a13e0c6 byte-for-byte, including integrated Dia sampling and
+OmniVoice allocation fixes. Combined CI38967377917 passes all13 jobs; lint38967380611
+passes all10. Exact-source terminal logs are retained. The full1946-payload
+original/native2B F16 observer audit and local actual-class/literal-builder tests
+remain applicable; no changed compute source requires reinterpreting old results.
+See [composition receipt](docs/echo-ffn-integration-2026-10-16.json).
+
+Public original dumper and native crispasr-diff now expose six matching FFN
+boundaries under their existing opt-in capture gates. Original/native OFF/ON/OFF
+stages,16 cached greedy IDs, text, CLI subtitles and C-ABI segments remain accepted
+for the audited2B F16 fixtures. This is diagnostic tooling for the pending9B Q4
+attribution, not9B/Q4/GPU/performance/default acceptance. Both active Echo landing
+claims are archived; the quantization investigation remains in PLAN.md.
+
 ## Matched Dia CUDA precision/recipe matrix independently audited — 2026-10-16
 
 All25 syntheses and27 original Whisper recognitions completed on Tesla T4 sm75,

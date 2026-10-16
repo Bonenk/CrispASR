@@ -649,3 +649,10 @@ speech or Q4 acceptance, and changes no defaults. The repeated source-F16 anchor
 preserves quality; legacy PCM has a retained small nonzero difference. Full
 receipts and failed-auditor provenance are archived in HISTORY.md and
 [the matrix result](docs/dia-cuda-factorial-results-2026-10-16.json).
+
+
+Echo FFN diagnostic capture is integrated. The final composition preserves all
+3591 non-document entries of the combined source that passed13 CI and10 lint
+jobs. The1946-payload2B F16 observer proof includes original/native intermediate
+identity, cached generation, CLI subtitles and C-ABI segments. These controls
+support the diagnostic tooling;9B Q4 acceptance and performance remain pending.

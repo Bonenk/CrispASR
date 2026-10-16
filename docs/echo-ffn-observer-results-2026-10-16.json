@@ -6286,9 +6286,14 @@
     "complete": true
   },
   "integration": {
-    "source": "d51b6cf3fd7a14fbbcdc16111763879667d05a47",
-    "ci": 38952809132,
-    "lint": 38952812485,
-    "status": "queued; not integrated"
+    "status": "integrated",
+    "source": "6db7e16409ab3bd5f82c8190187ccc10227c2063",
+    "tested_source": "3a13e0c62dae026ef49fcf55013285540ae7a0b4",
+    "non_document_tree_exact": true,
+    "ci_run": 38967377917,
+    "ci_jobs_passed": 13,
+    "lint_run": 38967380611,
+    "lint_jobs_passed": 10,
+    "receipt": "docs/echo-ffn-integration-2026-10-16.json"
   }
 }

@@ -27,7 +27,9 @@ payloads. These are exact-source checks. The diagnostic integration and future
 release tips require fresh CI; older documentation-tip queues are superseded.
 Last published release is v0.8.43; v0.8.44 remains untagged. Dia sampling controls are integrated from candidate7d0f68f3 (all13 CI and10
 lint jobs passed); all non-document source bytes are preserved. Fresh main
-CI remains pending. Routing controls do not establish native speech acceptance.
+CI remains pending. Echo observer integration preserves the complete non-document
+tree of3a13e0c6 (all13 combined CI and10 lint jobs passed). Routing controls do
+not establish native speech acceptance.
 
 ## Ordered roadmap
 
@@ -349,24 +351,6 @@ MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
-## CLAIMED 2026-10-16 — Compose accepted Echo observer with integrated Dia controls
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
-branch integrate/echo-ffn-v2-20261016, frozen composition3a13e0c62dae026ef49fcf55013285540ae7a0b4.
-All13 combined CI38967377917 jobs and all10 lint38967380611 jobs passed.
-Fresh final landing will preserve the tested non-document tree. All11 observer files and8 Dia
-source files are byte-exact to their accepted candidates. All three local Dia
-routing suites,18 actual-class Python observer tests and the literal native
-FFN builder control pass; the old-helper negative fails as intended.
-Frozen Echo compositiond51b6cf3 passes all13
-CI38952809132 and10 lint38952812485 jobs, alongside its accepted1946-payload
-full-model audit. Rebase the three original observer commits and documentation
-onto current main with the already integrated Dia sampling fix intact. Preserve
-all11 tested observer source files and all Dia source bytes, including both sets
-of CI controls. Resolve only the additive workflow composition if required.
-Run actual local literal-source controls, inspect complete source differences,
-and validate the combined CI/lint composition before fast-forward integration.
-No graph math, model recipe, Q4 acceptance or default change.
 
 ## CLAIMED 2026-10-16 — Isolate Dia categorical draw placement
 
@@ -393,14 +377,3 @@ before weights and between arms; independently audit terminal pinned evidence.
 All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
 
 
-## CLAIMED 2026-10-16 — Final Echo observer landing
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v3-20261016,
-branch integrate/echo-ffn-v3-20261016. Preserve original four observer/document
-commits while composing onto current main. Acceptance: all non-document tree
-bytes match frozen3a13e0c62dae026ef49fcf55013285540ae7a0b4, which passes all13
-CI38967377917 and10 lint38967380611 jobs, plus full1946-payload2B F16 audit
-and local actual-class/native-builder/Dia routing controls. Main changes since
-its base are documentation only. Verify exact composition, run required secret
-checks and fast-forward main; update pending claims/results after integration.
-No Q4/9B/GPU/performance/default acceptance inferred.
