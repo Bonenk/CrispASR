@@ -362,7 +362,14 @@ Tiny actual original sampler/ID/RNG and generation/delay/frame-count controls
 pass under Torch2.6 and2.11. Exception restoration, broken-restoration and invalid
 input controls pass; read-only review finds no blocking source defect. Three
 recent sessions were terminal before one submission; terminal collector is active.
-Full-model results, tiny CUDA execution and terminal audit remain pending.
+Actual T4 tiny controls completed and all73 public files are anonymously
+hash-verified at revision65b7524ef49366fc4c570870be2b1620b8446501. CPU/CUDA
+differ on all288 corresponding nondegenerate IDs; both one-hot controls match.
+CPU placement matches direct CPU IDs/RNG, returns IDs to CUDA, and leaves its
+RNG unchanged. Independent local Torch2.11 replay matches432 CPU IDs and all
+six after-RNG states. First five CUDA-draw syntheses checkpointed publicly at
+revision15ce3f04cac9d7274a1ff59fa76613a666e2d87f before the CPU-draw arm.
+This is a pinned receipt check; full payload/speech/terminal audit remains pending.
 See [preparation receipt](docs/dia-sampler-device-preparation-2026-10-16.json).
 Scope: original F32 neural computation
 and filtering on one supported CUDA host; same model instance and fixed native

@@ -1,3 +1,22 @@
+## Actual CPU/CUDA categorical draw confound independently verified — 2026-10-16
+
+Before neural-weight downloads, Tesla T4 sm75/Torch2.11.0+cu128 runs identical
+9x1028 F32 uniform, linear and one-hot weights at seeds42/123, eight draws each.
+All288 corresponding nondegenerate CPU/CUDA IDs differ; all144 one-hot IDs match.
+Only the active device RNG advances. The explicit CPU-placement wrapper reproduces
+direct CPU draws and CPU RNG exactly, returns IDs to CUDA, preserves CUDA RNG and
+restores the original callable. Independent local Torch2.11 replay from the captured
+CPU states matches all432 CPU IDs and all six after-RNG states, with no neural
+weights. All73 public files are fully anonymously hash-verified, including source.
+
+[Immutable tiny proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/tree/65b7524ef49366fc4c570870be2b1620b8446501/dia-20261016-original-cuda/sampler-device-v1-preflight)
+pins actual PyTorch source70d99e99. For num_samples1 this version uses the same
+high-level exponential-race algorithm on both devices, with device-specific
+random generators; this is not evidence of different multinomial CDF algorithms.
+The controls establish that equal integer seeds do not align draw streams.
+They do not establish why Dia speech fails; the unchanged-CUDA-compute full-model
+CUDA/CPU/CUDA experiment remains running. See its preparation receipt and PLAN.md.
+
 ## Dia sampler-device intervention prepared and submitted — 2026-10-16
 
 Frozen4d622e7e preserves original F32 CUDA neural computation and filtering while
