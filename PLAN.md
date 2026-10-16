@@ -59,6 +59,22 @@ positive and native arms through the same recognizer. Tiny actual sampler and
 patch guards locally; full generation/build/ASR on GH CPU. No production token
 override, default/filter/seed/threshold change or claimed runtime repair.
 
+Checkpoint: candidateeae36591 is pushed. Heavy CPU
+[38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
+and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
+are dispatched; results are pending. The worker adds a genuinely pristine build
+before observer-only, identity904 and restore877 arms. Complete pristine/OFF/
+identity trajectories, captures and native PCM must remain byte-exact. Actual
+original DAC cross-decodes and original canonical/DAC ASR positives are required;
+every ASR result uses the same final recognizer library. Local actual pinned
+sampler/MT-state controls and9 rejects pass; repeated patching rejects. The
+patched whole runtime passes syntax checking against exact8d0ad886/C36 headers.
+Clang-format18 and all4 unskipped no-secrets checks pass. No full-model or
+quality result follows from dispatch. [Preparation](docs/dia-native-fork-preparation-2026-10-16.md).
+Next: inspect hosted gates, independently audit all arrays/provenance, report
+the reciprocal quality outcome and retain public immutable evidence before
+integration. Source tooling remains on its owned feature branch pending proof.
+
 ## Dia correctness — reciprocal native decision diagnostic
 
 The [full original trace and one-decision fork](docs/dia-original-trace-results-2026-10-16.md)
