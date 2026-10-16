@@ -49,11 +49,13 @@ not isolate precision, device, Torch or recipe effects and establishes no native
 or default acceptance. See [CUDA results](docs/dia-original-cuda-results-2026-10-16.json) and
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
 
-Dia top-k/top-p routing through Session and CLI is prepared on a frozen candidate,
-including missing CLI flags and restoration of configured defaults between server
-requests. Literal-source positive and old-source negative controls pass; hosted
-CI (13 jobs) and lint (10 jobs) pass; integration remains pending. This enables the planned recipe comparison
-without changing the shipped sampling defaults or establishing speech acceptance.
+Dia top-k/top-p routing now reaches the native backend through Session C ABI,
+Python and CLI. The CLI accepts the missing flags, and server requests restore
+configured defaults after an override. All13 candidate CI jobs and10 lint jobs
+pass; the integrated non-document source tree is byte-identical. Tiny actual
+routing controls and old-source negatives pass; fresh main CI remains pending.
+Sampling defaults are unchanged. This enables the planned matched recipe
+comparison without establishing speech acceptance.
 
 ## OmniVoice allocation failure handling
 

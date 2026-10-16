@@ -1,3 +1,19 @@
+## Dia sampling controls integrated with validated source bytes — 2026-10-16
+
+Candidate7d0f68f3 passes all13 CI38946681937 and all10 lint38946685918 jobs;
+complete exact-source logs are retained. Composition5a523b73 preserves both
+original commits/authorship and the complete non-document source tree. Actual
+native top-k/top-p setters now route through Session C ABI, Python and CLI;
+missing CLI flags are parsed, and server requests restore configured defaults
+after per-request overrides. Literal-source controls pass all three suites,
+including compiled-out behavior and actual Python-to-CABI calls. Prior negative
+controls reject missing routing and the first candidate's request-default leak.
+
+No shipped sampling defaults or runtime graph mathematics change. Model
+loading/synthesis in these tiny controls is stubbed; this establishes routing,
+not speech or a matched inference-recipe comparison. Fresh main CI is pending.
+See [integration receipt](docs/dia-sampling-integration-2026-10-16.json).
+
 ## Original Dia F16 CUDA completed: two passing controls, three quality failures — 2026-10-16
 
 Frozenacb956c7 completed the five fixed cases on Tesla T4 (sm7.5), original

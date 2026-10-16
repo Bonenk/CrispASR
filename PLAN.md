@@ -25,9 +25,9 @@ secret scan and Pages. Native-fork worker5417ed6d passes all10 lint jobs
 (38855559850) and heavy38855559740; independent auditc0fac6c1 passes642
 payloads. These are exact-source checks. The diagnostic integration and future
 release tips require fresh CI; older documentation-tip queues are superseded.
-Last published release is v0.8.43; v0.8.44 remains untagged. The latest Dia
-production protocol/top-k repairs remain distinct from diagnostic tooling and
-do not establish native speech acceptance.
+Last published release is v0.8.43; v0.8.44 remains untagged. Dia sampling controls are integrated from candidate7d0f68f3 (all13 CI and10
+lint jobs passed); all non-document source bytes are preserved. Fresh main
+CI remains pending. Routing controls do not establish native speech acceptance.
 
 ## Ordered roadmap
 
@@ -62,27 +62,6 @@ continue same-original-input FFN projection attribution for rejected9B Q4 recipe
 The accepted2B F16 observer is not9B Q4 attribution. No Q4/GPU/default/release
 promotion. Physical ledger rows are internally checked and tied to producer/model
 hashes; no multi-GB neural weights are reread locally.
-
-## CLAIMED 2026-10-16 — Dia sampling controls through Session and CLI
-
-Owner: coordinator; new worktree
-/mnt/volume1/crispasr-dia-sampling-controls-v2-20261016, branch
-fix/dia-sampling-controls-v2-20261016, frozen source
-7d0f68f322d503962d28c1e38f3eb07ac06a03f7. Implementation and local validation
-are complete; all13 CI38946681937 and all10 lint38946685918 jobs pass at that exact source.
-Collector-v2 retains terminal logs under storage. The actual native setters,
-CABI dispatch, Python methods, CLI parser/adapter and repeated-request default
-restoration pass tiny execution controls. Three separate old-source controls
-reject missing CABI routing, missing adapter routing and193c5964's default leak.
-Independent Hermes read-only review confirms the request repair, with no further
-problem in this scope. Full model loading/synthesis is stubbed in these controls;
-no new speech, inference-recipe or numerical acceptance is inferred. Completed
-preparation and first candidate's no-execution CI cancellations are in HISTORY.md.
-
-Next: preserve terminal hosted logs and integrate with source bytes preserved. This enables a valid matched original/native recipe
-comparison without changing current defaults or graph mathematics. Artifacts under
-/mnt/storage/crispasr/dia-sampling-controls-20261016. Do not launch the model
-recipe matrix until the direct-original result is audited.
 
 ## Dia correctness — current dependencies
 
@@ -382,13 +361,3 @@ state; do not assume the old404s or missing credentials remain true. Legacy
 MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
-
-## CLAIMED 2026-10-16 — Integrate validated Dia sampling controls
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampling-land-20261016,
-branch integrate/dia-sampling-20261016. Preserve candidate commits0827925d and
-7d0f68f3, original authorship and all affected source bytes. All13 candidate CI
-jobs38946681937 and all10 lint38946685918 jobs pass. Retain final logs, compare
-the complete non-document source tree, and fast-forward main after the tiny
-literal-source regression and four secret guards pass. Record integration
-receipt and request fresh main CI. No sampling default or runtime graph changes.
