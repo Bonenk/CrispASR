@@ -46,6 +46,21 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Echo C ABI expected cue formatting
+
+Owner: coordinator; worktree
+/mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
+diag/echo-ffn-fullmodel-v4-20261016, based on frozen890d8cf2. Source review
+finds the validation worker unconditionally inserts a newline before a cue's
+translation; both actual CLI and Session append it only for nonempty translation
+(src/crispasr_c_api.cpp and crispasr_backend_index_echo.cpp). Correct the
+validator's expectation and cover both actual text contracts with tiny controls;
+no runtime/decoded-content gate change. V3 run38938308165 is queued and will be
+cancelled before execution in favor of the complete fixed composition. Keep all
+frozen sources/failure evidence, prerequisites, model inputs and stage gates.
+Acceptance remains exact-source full-model observer/CABI/CLI validation plus
+independent official-artifact audit; no Q4/GPU/default promotion.
+
 ## CLAIMED 2026-10-16 — Echo hosted audio-tool prerequisite repair
 
 Owner: coordinator; worktree
