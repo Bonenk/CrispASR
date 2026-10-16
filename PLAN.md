@@ -51,7 +51,7 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
 diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
-Hosted38938983824 is queued. Missing ffmpeg in failed38931686491 and the worker's
+Hosted38938983824 is running its full-model worker. Missing ffmpeg in failed38931686491 and the worker's
 unconditional-translation-newline expectation are repaired and archived in
 HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
 formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
@@ -74,7 +74,7 @@ recipes; no current Q4/GPU/default or release promotion.
 Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
 diag/dia-direct-original-v3-20261016, sourced41cfb273dc5dda942d11cab20b3285a08585955.
-Corrected hosted38940468611 is queued. Earlier no-step cancellation and missing
+Corrected hosted38940468611 is running its original-model worker. Earlier no-step cancellation and missing
 shallow-source prerequisite failure are archived in HISTORY.md. The explicit
 source fetch is proven in a fresh depth-one repository; all original constructor,
 WeightNorm preservation, five text/seed controls and quality gates are unchanged.
@@ -98,6 +98,22 @@ select new passing seeds, flip defaults or discard existing failures. If needed,
 compare source-recommended F16 on actual supported CUDA hardware via Kaggle,
 with source/weight/input pins and unchanged decoded gates. This is a hypothesis,
 not an established cause or accepted replacement recipe.
+
+## CLAIMED 2026-10-16 — Dia sampling controls through Session and CLI
+
+Owner: coordinator; new worktree
+/mnt/volume1/crispasr-dia-sampling-controls-20261016, branch
+fix/dia-sampling-controls-20261016. Current native top-k/top-p fields are used by
+the sampler, but Dia is absent from the generic Session setter dispatch and the
+CLI adapter ignores both explicit overrides. This is a prerequisite for a valid
+matched original/native recipe test, independent of the running constructor
+control. Add bounded native setters and route the existing C ABI/Python/CLI
+controls; preserve current defaults, graph mathematics and earlier failed gates.
+Acceptance: actual production setter/dispatch/adapter execution with tiny fake
+contexts, explicit/default/repeated/unsupported/null controls, old-source negative
+controls, applicable hosted CI and lint. Heavy builds stay on GH; artifacts under
+/mnt/storage/crispasr/dia-sampling-controls-20261016. Do not launch the model
+recipe matrix until the direct-original result is audited.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
