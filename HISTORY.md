@@ -29,8 +29,14 @@ registered tiny graph test passes30 checks; isolated removal of the GPU guard
 is detected. Whole current runtime syntax and format18 pass. Failed CIFS
 shared-library symlink build remains intact; accepted static proof is under
 /mnt/storage/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
-These completed local checks do not accept hosted builds, full generation,
-defaults, GPU/Q4 or performance. Hosted/quality gates remain in PLAN.md.
+Hosted build38874191736 and independent57-payload audit now pass; fresh
+compilation against returned actual static libraries reproduces all12 head
+replays exactly. Artifact12034799042 is74580109 bytes, SHA256
+ce9eec4730fb40dabb97c2bb4469bf94624d0f6d10108dcbdb54247e437026b8.
+All10 lint38874302965 checks pass. General CI remains partial (9/13 passing);
+remaining builds and full current-main generation stay in PLAN.md. These are
+accepted build/graph diagnostics, not defaults, GPU/Q4 or performance acceptance.
+[Hosted receipt](docs/dia-current-main-head-hosted-2026-10-16.json).
 [Preparation and source/array receipts](docs/dia-current-main-head-preparation-2026-10-16.md).
 
 ## Dia numerical cause confirmed on a second CPU — 2026-10-16

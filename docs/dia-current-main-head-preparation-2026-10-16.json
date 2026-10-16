@@ -139,5 +139,8 @@
   "heavy_run": 38874191736,
   "lint_run": 38874302965,
   "ci_run": 38874305718,
-  "hosted_result_accepted": false
+  "hosted_result_accepted": true,
+  "hosted_audit": "dia-current-main-head-hosted-2026-10-16.json",
+  "general_ci_acceptance": false,
+  "runtime_integrated_on_main": false
 }

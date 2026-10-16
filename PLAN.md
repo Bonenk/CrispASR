@@ -31,7 +31,8 @@ do not establish native speech acceptance.
 
 ## Ordered roadmap
 
-1. **Dia correctness:** isolate early decoder drift, then prove real speech.
+1. **Dia correctness:** validate current-main speech, reconcile reference/diff
+   wiring, then broaden prompts/seeds before GPU/Q4 and profiling.
 2. **CANN hardware preparation:** compose fallback/ACL controls and execute on
    physical Ascend when available; do useful CPU/SDK preparation meanwhile.
 3. **Remaining PR decisions:** salvage independently accepted #492/#521 pieces
@@ -70,7 +71,9 @@ is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2
 
 Hosted build/replay38874191736 passes; independent audit verifies57 payloads
 and12 freshly compiled graph replays against the returned actual libraries.
-Lint38874302965 and general CI38874305718 remain queued at d198d7a4. Single raw collector
+All10 lint38874302965 checks pass at d198d7a4. General CI38874305718
+has9/13 jobs passing (including Linux unit/DL, macOS, Windows, Android and iOS);
+clang AMR, Vulkan, fuzz and Opus jobs remain queued. Single raw collector
 session10831 at the owned storage root/collector-v1 preserves official metadata,
 complete logs and digest-verified raw artifact; its independent full audit passes.
 These compile/graph jobs load no full neural model. Pinned speech38870499727
@@ -94,7 +97,27 @@ Require exact pristine/OFF/identity trajectories/PCM, actual CLI/Session checks,
 original positive and native/original DAC ASR. Save all outcomes before the
 quality gate and independently audit complete artifacts. No default/GPU/Q4 or
 additional-prompt acceptance follows. Need general CI/lint on d198d7a4 before
-integration; its model experiment may run independently while those queue.
+integration; its model experiment runs independently while the remaining jobs queue.
+
+Current-main worker3e1f2e2fe04b22c862864a32c80d765ab500435b is pushed and
+[heavy38880025781](https://github.com/CrispStrobe/CrispASR/actions/runs/38880025781)
+is submitted/queued. C++/binding files remain exact to d198d7a4; the new worker
+changes no runtime code. Local selftest maps all1226 actual original inputs to
+all1210 original code frames, rejects8 invalid input/metric controls, verifies3
+ASR cases and rejects doubled-vector scale despite cosine1. The literal
+production output-protocol regression also passes. Frozen recipe and gates:
+[worker method](https://github.com/CrispStrobe/CrispASR/blob/3e1f2e2fe04b22c862864a32c80d765ab500435b/tools/ci-heavy/dia-main-head/SPEECH.md).
+Single collector session77807 under the owned storage root/collector-v1 retains
+full official metadata/logs/raw artifact and verifies its digest. New full
+artifact audit must follow; no quality result exists yet.
+
+Reference wiring is a concrete pending integration gap: current main still has
+the older Dia reference shim and lacks Dia in dump_reference.py/crispasr-diff
+registration. Reconcile the proven original observer and strict diff route from
+the pinned worktree, retain current top-k/output fixes, and validate through
+those real entry points. The current worker measures six available boundaries,
+not all18 layers; do not label it full docs/contributing parity integration.
+This remains a release/promotion prerequisite, before performance work.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
