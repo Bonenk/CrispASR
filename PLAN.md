@@ -69,6 +69,25 @@ fused observer after immutable full-model and applicable CI acceptance. Then
 continue same-original-input FFN projection attribution for the rejected Q4
 recipes; no current Q4/GPU/default or release promotion.
 
+## CLAIMED 2026-10-16 — Independent original Whisper recognition diagnostic
+
+Owner: coordinator; separate worktree
+/mnt/volume1/crispasr-dia-whisper-crosscheck-20261016, branch
+diag/dia-whisper-crosscheck-20261016. Use actual original OpenAI Whisper20250625,
+source31243bad24cc746f07d4c8bfdd2d974872cb1803, fixed base.en checksum
+25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead.
+A single small CPU model (about145MB, below local2GB ceiling) uses existing
+packages read-only, four threads; all source/model/PCM/results live under
+/mnt/storage/crispasr/dia-whisper-crosscheck-20261016. No package installation or
+GPU session. Predeclare all18 retained clips: legacy original plus JFK, and
+original/native/original-DAC/CLI for each hello/fox seed42/123. Verify source and
+sealed payload hashes, use untouched original ffmpeg loader and transcribe(),
+English, temperature0, no prompt, no previous-text conditioning and F32 CPU.
+Retain exact resampled16k PCM, transcripts, WER and raw recognizer outputs for
+every clip. This is ASR-domain attribution only: no replaced seeds/models,
+quality-gate relaxation, or speech/default/GPU/Q4 acceptance. Existing Nemotron
+failures remain failures; the direct original generator control remains needed.
+
 ## CLAIMED 2026-10-16 — Dia shallow-checkout source prerequisite
 
 Owner: coordinator; worktree
