@@ -102,8 +102,14 @@ not an established cause or accepted replacement recipe.
 ## CLAIMED 2026-10-16 — Dia sampling controls through Session and CLI
 
 Owner: coordinator; new worktree
-/mnt/volume1/crispasr-dia-sampling-controls-20261016, branch
-fix/dia-sampling-controls-20261016. Current native top-k/top-p fields are used by
+/mnt/volume1/crispasr-dia-sampling-controls-v2-20261016, branch
+fix/dia-sampling-controls-v2-20261016. Initial193c5964 and its worktree remain
+frozen: local literal routing/Python tests pass and both old-dispatch/old-adapter
+negative controls fail as expected. Before any hosted execution, coordinator
+found the server's fresh per-request negative sentinels must restore the adapter's
+initial sampling defaults after explicit overrides. Compose that repair and
+actual repeated-request controls in v2; no inference recipe change follows.
+Current native top-k/top-p fields are used by
 the sampler, but Dia is absent from the generic Session setter dispatch and the
 CLI adapter ignores both explicit overrides. This is a prerequisite for a valid
 matched original/native recipe test, independent of the running constructor
