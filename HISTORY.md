@@ -1,3 +1,18 @@
+## Dia public reference/diff local preparation verified — 2026-10-16
+
+Candidate c7f9da87 registers the pinned original Dia observer and text-only
+strict diff, with all encoder/decoder/DAC stages and selected-step optional
+attention/block boundaries. Local17 actual original-module tests, three public
+routing/archive tests,20 compiled production comparison/input controls, three
+parser/scratch tests, one device/environment test, three source-contract tests
+and the existing production protocol regression pass. Both complete C++
+runtime and dispatcher syntax pass; all237 computation calls and the sampler
+header match pristine main. Format18 and all4 unskipped no-secrets checks pass.
+Early test extraction/format/empty-metadata failures remain in the storage
+proof root; their corrected contracts pass. These are completed local checks,
+not merged runtime or full-model acceptance. Hosted validation and independent
+artifact audits remain in PLAN.md. [Scope and provenance](docs/dia-reference-wire-preparation-2026-10-16.md).
+
 ## Dia generic all-step serial head restores unforced speech — 2026-10-16
 
 Heavy38870499727 at3c2fbb5a and all10 lint38870502430 jobs pass. Independent
@@ -33,8 +48,8 @@ Hosted build38874191736 and independent57-payload audit now pass; fresh
 compilation against returned actual static libraries reproduces all12 head
 replays exactly. Artifact12034799042 is74580109 bytes, SHA256
 ce9eec4730fb40dabb97c2bb4469bf94624d0f6d10108dcbdb54247e437026b8.
-All10 lint38874302965 checks pass. General CI remains partial (9/13 passing);
-remaining builds and full current-main generation stay in PLAN.md. These are
+All10 lint38874302965 checks pass. General CI is separately tracked; remaining builds and full current-main
+generation stay in PLAN.md. These are
 accepted build/graph diagnostics, not defaults, GPU/Q4 or performance acceptance.
 [Hosted receipt](docs/dia-current-main-head-hosted-2026-10-16.json).
 [Preparation and source/array receipts](docs/dia-current-main-head-preparation-2026-10-16.md).

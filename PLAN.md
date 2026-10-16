@@ -72,8 +72,8 @@ is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2
 Hosted build/replay38874191736 passes; independent audit verifies57 payloads
 and12 freshly compiled graph replays against the returned actual libraries.
 All10 lint38874302965 checks pass at d198d7a4. General CI38874305718
-has9/13 jobs passing (including Linux unit/DL, macOS, Windows, Android and iOS);
-clang AMR, Vulkan, fuzz and Opus jobs remain queued. Single raw collector
+has10/13 jobs passing (including both AMR compilers, Linux unit/DL, macOS,
+Windows, Android and iOS); Vulkan, fuzz and Opus jobs remain queued. Single raw collector
 session10831 at the owned storage root/collector-v1 preserves official metadata,
 complete logs and digest-verified raw artifact; its independent full audit passes.
 These compile/graph jobs load no full neural model. Pinned speech38870499727
@@ -101,7 +101,7 @@ integration; its model experiment runs independently while the remaining jobs qu
 
 Current-main worker3e1f2e2fe04b22c862864a32c80d765ab500435b is pushed and
 [heavy38880025781](https://github.com/CrispStrobe/CrispASR/actions/runs/38880025781)
-is submitted/queued. C++/binding files remain exact to d198d7a4; the new worker
+is running. C++/binding files remain exact to d198d7a4; the new worker
 changes no runtime code. Local selftest maps all1226 actual original inputs to
 all1210 original code frames, rejects8 invalid input/metric controls, verifies3
 ASR cases and rejects doubled-vector scale despite cosine1. The literal
@@ -142,7 +142,8 @@ sampler source tests and the existing original output-protocol test pass.
 Whole-runtime syntax and all237 ordered ggml computation calls match pristine
 main. Hosted full-model validation38883779736, lint38883782438 and general
 CI38883785994 are queued; raw collection is active. Independent full artifact
-and array audit follows. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+and array auditors are prepared; storage watcher97658 starts each after its
+raw collector finishes. Audit execution and acceptance remain pending. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
 
 ## Dia correctness — after reciprocal decision diagnosis
 

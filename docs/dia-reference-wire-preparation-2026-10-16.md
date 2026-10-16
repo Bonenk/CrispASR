@@ -27,7 +27,7 @@ All237 ordered ggml computation calls match pristine9aa8df20; a graph or F16
 precision mutation makes that source guard fail. Whole-runtime syntax passes.
 
 These checks establish local contracts, not full-model neutrality or parity.
-The [hosted worker](../tools/ci-heavy/dia-reference-wire/README.md) builds
+The [hosted worker](https://github.com/CrispStrobe/CrispASR/blob/c7f9da872e87ba238c579083841b3547faee772f/tools/ci-heavy/dia-reference-wire/README.md) builds
 actual pristine/candidate runtimes, checks complete OFF/ON/OFF generation,
 and runs the public dumper and strict diff on fresh original intermediates.
 It retains failures and complete raw evidence for independent audit. No full
@@ -48,3 +48,14 @@ and [general CI38883785994](https://github.com/CrispStrobe/CrispASR/actions/runs
 are queued at this checkpoint. All4 unskipped no-secrets checks and
 clang-format18 pass locally. Candidate code is not integrated on main yet.
 The method link above describes candidate files until integration.
+
+Independent auditors are prepared for both the wiring run and current-main
+speech run. They verify official ZIP metadata/digests, complete payload sets,
+immutable source copies, physical export ledgers and actual returned libraries.
+The wiring audit independently recomputes all tensor metrics and exact replay/
+transparency checks; the speech audit reconstructs current cropped code grids,
+checks native decode replay and CLI/Session trajectories, recomputes ASR WER
+and all six boundary metrics. Watcher session97658 starts them after raw
+collection finishes. Syntax checks pass; these audits have not yet run against
+the pending artifacts and are not accepted proof. Complete C++ dispatcher
+syntax also passes locally.
