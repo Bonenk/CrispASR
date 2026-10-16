@@ -72,5 +72,107 @@
     "bytes": 958385,
     "remote_size_sha256_verified": true
   },
-  "interpretation": "Legacy clone and DSP port have the same 2/9 WER; output-only codes are identical. Quality remains unaccepted; cross-check the fixed audio and resampler before attributing the transcript error to the DSP change."
+  "interpretation": "Legacy clone and DSP port have the same 2/9 WER; output-only codes are identical. Quality remains unaccepted; cross-check the fixed audio and resampler before attributing the transcript error to the DSP change.",
+  "current_reproducibility": {
+    "checked": "2026-10-16",
+    "historical_hf_pin": "HTTP404 at recorded revision; historical verification retained without inferring why it is unavailable",
+    "recovered_proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "repo_type": "dataset",
+      "revision": "0fdb91b317771d5910714ed9e61fd6545e5d171e",
+      "path": "omnivoice/clone-diagnostic-recovery-20261016/complete-recovered-v1.zip",
+      "bytes": 1806246,
+      "sha256": "d1718ee94b838afbefd5863c1835a0393047275706ccc39de14946fca3cfaf8d",
+      "anonymous_full_download_verified": true,
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/0fdb91b317771d5910714ed9e61fd6545e5d171e/omnivoice/clone-diagnostic-recovery-20261016/complete-recovered-v1.zip"
+    },
+    "official_native_artifact": {
+      "run": 37891923274,
+      "id": 11600052124,
+      "bytes": 948706,
+      "sha256": "5faff66181800f2ce947d0b469f6709e87a3cedef9fdbfa179a9b345cf472f96"
+    },
+    "independent_array_audit": {
+      "native_run": 37891923274,
+      "native_artifact": 11600052124,
+      "native": {
+        "legacy": {
+          "codes": 528,
+          "samples": 63335,
+          "wer": 0.2222222222222222
+        },
+        "punctuation": {
+          "codes": 528,
+          "samples": 63335,
+          "wer": 0.2222222222222222
+        },
+        "reference-cleanup": {
+          "codes": 528,
+          "samples": 63335,
+          "wer": 0.2222222222222222
+        },
+        "output-cleanup": {
+          "codes": 528,
+          "samples": 68136,
+          "wer": 0.2222222222222222
+        }
+      },
+      "output_cleanup_codes_exact": true,
+      "punctuation_changed_codes": 452,
+      "total_codes": 528,
+      "original_native_comparisons": [
+        {
+          "native": "legacy",
+          "original": "unprocessed",
+          "equal_codes": 1,
+          "total": 528
+        },
+        {
+          "native": "punctuation",
+          "original": "unprocessed",
+          "equal_codes": 4,
+          "total": 528
+        },
+        {
+          "native": "reference-cleanup",
+          "original": "unprocessed",
+          "equal_codes": 3,
+          "total": 528
+        },
+        {
+          "native": "output-cleanup",
+          "original": "unprocessed",
+          "equal_codes": 3,
+          "total": 528
+        },
+        {
+          "native": "legacy",
+          "original": "full-cleanup",
+          "equal_codes": 1,
+          "total": 528
+        },
+        {
+          "native": "punctuation",
+          "original": "full-cleanup",
+          "equal_codes": 2,
+          "total": 528
+        },
+        {
+          "native": "reference-cleanup",
+          "original": "full-cleanup",
+          "equal_codes": 5,
+          "total": 528
+        },
+        {
+          "native": "output-cleanup",
+          "original": "full-cleanup",
+          "equal_codes": 5,
+          "total": 528
+        }
+      ],
+      "matched_precision_parity_tested": false,
+      "clone_quality_accepted": false,
+      "scope": "Recovered sealed observations; native quantized and original F32 generations are different controls, not a parity pair"
+    }
+  }
 }

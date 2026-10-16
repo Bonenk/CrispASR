@@ -1,3 +1,22 @@
+## OmniVoice clone diagnostic evidence recovered — 2026-10-16
+
+The old HF diagnostic revision returns404. Exact native run37891923274 and
+unexpired official artifact11600052124 retain the original four-arm arrays.
+Independent audit verifies all four native code/PCM pairs, both original
+code/PCM pairs and the unchanged2/9 WER. Reference/output cleanup codes match;
+adding punctuation changes452/528 codes, contradicting an earlier unaccepted
+worker inference. Quantized-native/original-F32 generations remain different
+controls; no matched-precision parity or clone-quality acceptance is inferred.
+
+The [complete recovered evidence](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/0fdb91b317771d5910714ed9e61fd6545e5d171e/omnivoice/clone-diagnostic-recovery-20261016/complete-recovered-v1.zip) is public at immutable
+revision0fdb91b317771d5910714ed9e61fd6545e5d171e, 1806246bytes,
+SHA256`d1718ee94b838afbefd5863c1835a0393047275706ccc39de14946fca3cfaf8d`. A full anonymous download matches that digest.
+It retains both raw archives, official run/artifact records, verifier/result,
+exact diagnostic/native/binding source and license notices. The old404 record
+is preserved alongside the usable replacement in
+`docs/omnivoice-clone-diagnostic-2026-10-09.json`. Runtime PR521 and its quality
+gate remain pending; no new synthesis or gate relaxation.
+
 ## Dia broader numerical diagnostic completed; speech rejected — 2026-10-16
 
 Heavy38913941927 completes all four predeclared prompt/seed cases and correctly

@@ -22,8 +22,9 @@ performance gain or completed Ascend hardware validation.
 
 The broader Dia CPU matrix completed all four predeclared cases but failed
 speech quality: original and native ASR outputs are empty. The official3.02GB
-artifact digest is verified; a separate array audit and crossed recognizer
-replay are in progress. No broader speech or F16/Q4/GPU/default promotion.
+artifact digest and1829-payload independent audit are verified: all352 stage
+rows and20556 original sampling decisions match. Crossed recognizer replay
+remains in progress. No broader speech or F16/Q4/GPU/default promotion.
 Echo's optional FFN observer also needs its fused-product capture repair and
 full-model transparency gates before inclusion. These remain pending work in
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).

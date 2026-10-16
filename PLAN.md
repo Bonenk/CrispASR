@@ -197,6 +197,11 @@ commands: [CANN TODO](docs/cann-todo.md) and
   CANN RVQ/F16 embedding and ggml NZ need physical Ascend and PR-only/NZ-only/composed attribution. The measured
   full tokenizer path was7–10% slower; do not enable it by default. Review the
   complete latest thread before proposing any further split or merge.
+- OmniVoice diagnostic data recovery is complete: the recorded HF pin returns
+  404, but exact original GH artifact11600052124 has been recovered, independently
+  array-audited and permanently republished with a verified anonymous download.
+  See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
+  work is runtime/input/precision/quality diagnosis, not another proof search.
 - **Issue518 / draft PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
   The standalone utilities are integrated with complete original/native array
