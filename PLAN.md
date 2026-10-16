@@ -46,6 +46,29 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Independent pending-run auditors and Dia preservation
+
+Owner: coordinator with the two existing Hermes tmux workers. New bounded
+assignments supersede their completed read-only follow-ups below. Worker
+hermes-asr-omnivoice uses worktree
+/mnt/volume1/crispasr-hermes-dia-asr-audit-20261016 to prepare an independent
+artifact auditor for frozen crossed-ASR source30e75dcd/run38930760374. Worker
+hermes-asr-echo uses worktree
+/mnt/volume1/crispasr-hermes-echo-observer-audit-20261016 to prepare an independent
+artifact auditor for frozen full-model sourcee344c2d0/run38931686491. Both must
+read the actual producers, verify complete manifests/provenance and raw outputs,
+recompute gates, and include rejection controls for corrupt or missing evidence.
+No model downloads, runtime mathematics, heavy jobs, pushes or publication.
+Coordinator reviews every assertion and retains ownership of graph math and
+integration. Acceptance requires executing against complete official artifacts;
+synthetic rejection controls alone establish tooling readiness only.
+
+Coordinator separately preserves the complete failed Dia four-case diagnostic
+archive12057273677 under the public regression-fixture dataset, with raw failure
+logs, executable independent audit, source/license provenance and immutable
+anonymous-download hash verification. Large bytes remain under /mnt/storage.
+No speech/model/default acceptance follows from publication or auditor readiness.
+
 ## CLAIMED 2026-10-16 — Hermes workers for remaining PR and quantization
 
 Owner/coordinator: maintainer session. User explicitly authorized two Hermes
