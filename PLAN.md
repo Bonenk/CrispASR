@@ -49,8 +49,12 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
 Owner: coordinator only; worktree
-/mnt/volume1/crispasr-dia-direct-original-20261016, branch
-diag/dia-direct-original-20261016, based on frozen crossed-ASR30e75dcd tooling.
+/mnt/volume1/crispasr-dia-direct-original-v2-20261016, branch
+diag/dia-direct-original-v2-20261016, based on frozen7f43bf7c tooling.
+The first queued run38935996279 is cancelled before execution: source preflight
+found that real DAC uses required built-in WeightNorm pre-hooks. The replacement
+must preserve these exact original hooks while rejecting added observation
+hooks; a real tiny weight-normalized convolution supplies the local control.
 Crossed recognizer38930760374 completed successfully: both sealed ELF sets
 recognize legacy/JFK and return empty text for all four expanded original PCMs.
 Independent full artifact audit is assigned above; this preliminary receipt
