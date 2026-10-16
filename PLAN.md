@@ -20,10 +20,11 @@ Only then profile or promote defaults. Preserve failures and source/input
 hashes; use distinct run directories so failed evidence cannot be overwritten.
 Follow docs/contributing.md for all affected surfaces, including the C ABI.
 
-Pre-integration main checkpoint e2b8e0a3 passes all13 general CI jobs, Ruby and
-the secret scan. Both integrated diagnostic candidates pass all10 applicable
-lint checks, and the full Q/K hosted experiment passes its independent audit.
-These are exact-source checks; the final integration tip requires fresh CI.
+Main checkpointad2998ab passes all13 general CI jobs (38855803220), Ruby,
+secret scan and Pages. Its lint is still running. Corrected native-fork source
+5417ed6d passes all10 lint jobs (38855559850); its heavy speech experiment
+38855559740 is running. These are exact-source checks; future integration and
+release tips require fresh CI. Read-only query reconciliation is recorded below.
 Last published release is v0.8.43; v0.8.44 remains untagged. The latest Dia
 production protocol/top-k repairs remain distinct from diagnostic tooling and
 do not establish native speech acceptance.
@@ -67,6 +68,11 @@ guard; a fresh shallow clone reproduces the earlier failure and passes after
 fetch. The auditor accepts explicit expected immutable worker SHA/run ID rather
 than trusting the receipt or silently reusing the failed run's identity. All4
 unskipped no-secrets checks pass. Full hosted quality/audit remains pending.
+Corrected heavy38855559740 is now running; corrected lint38855559850 passes.
+The [query-capture reconciliation](docs/dia-query-capture-reconciliation-2026-10-16.md)
+confirms earlier keys/norm input exact but module Q differs6.90e-7 from actual
+full-model Q. Preserve that qualification; use the new actual tensors only for
+a justified later intervention after the reciprocal speech result.
 
 Initial candidateeae36591: heavy CPU
 [38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)

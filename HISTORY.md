@@ -1,3 +1,12 @@
+## Dia query capture qualification checked — 2026-10-16
+
+Read-only hash-verified comparison reconciles seven earlier module/factorial
+captures with actual full-model observations. Keys and pre-SA normalized input
+are exact; pre-RoPE/rotated Q differ by relative L2 6.9062e-7/6.9030e-7, and
+attention/output by9.5295e-7/1.0753e-6. No new model/graph/intervention ran.
+The earlier query factorial remains qualified module replay; do not relabel
+it as actual-full-Q substitution. [Receipt and limits](docs/dia-query-capture-reconciliation-2026-10-16.md).
+
 ## Outside request and PR status reconciled — 2026-10-16
 
 Read issue546 and the complete related545 thread: the new request explicitly
