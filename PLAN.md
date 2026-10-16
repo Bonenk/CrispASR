@@ -48,36 +48,20 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
 ## CLAIMED 2026-10-16 — Echo full-model observer validation and integration
 
-Owner: coordinator; frozen worktree
-/mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
-diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
-Hosted38938983824 completed successfully. Its3.505GB official artifact12066499638
-is downloaded and its full SHA25658753e76e2a68b5d079f1a32355941b3d8fb72e46d90c2b8ce6b878a4e1f0200
-matches the official digest. Independent scientific audit PASSES all1946 payloads
-and17 repository snapshots: EN/ZH OFF/ON/OFF identities, all144 FFN vectors,
-unchanged magnitude/cosine/cache gates, raw decoded text, CLI and CABI. Coordinator
-claims fresh landing worktree /mnt/volume1/crispasr-echo-ffn-land-20261016, branch
-integrate/echo-ffn-20261016, based on current main. Preserve the three original
-observer commits d8ed1979/d8183cf9/0dfccc7d and verify all affected source bytes
-against audited0dfccc7d while retaining current main's independent changes.
-Run applicable composition CI/lint before integration; archive complete proof
-permanently. No Q4/GPU/default/release promotion. Missing ffmpeg in failed38931686491 and the worker's
-unconditional-translation-newline expectation are repaired and archived in
-HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
-formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
-checks pass. Full artifact collector and independent coordinator auditor/watch
-are prepared under /mnt/storage/crispasr/echo-ffn-fullmodel-20261016, collector-v4
-and audit-preparation-v4. Auditor gate controls pass; actual artifact acceptance
-remains pending. The physical ledger audit checks internal rows and producer/
-model pins without reloading multi-GB models locally.
+Owner: coordinator; frozen landing worktree
+/mnt/volume1/crispasr-echo-ffn-land-20261016, branch integrate/echo-ffn-20261016,
+sourced51b6cf3fd7a14fbbcdc16111763879667d05a47. CI38952809132 and lint38952812485
+are queued. All11 observer source files match tested0dfccc7d exactly, the three
+original commits/authorship are preserved, and main's OmniVoice fix is retained.
+The1946-payload/690-comparison full-model observer audit and permanently public,
+fully anonymously verified proof are complete; see HISTORY.md and
+[result](docs/echo-ffn-observer-results-2026-10-16.json).
 
-Next: audit complete69/68 old stages and144 FFN vectors per case, original/native
-cosines and magnitude,16 cached greedy IDs, generation-prefill identity, actual
-raw text/cues, CLI SRT and metadata-only Session CABI. Preserve every failed gate.
-All13 generalCI38929450279 and all10 lint38929454381 jobs pass. Only integrate the
-fused observer after immutable full-model and applicable CI acceptance. Then
-continue same-original-input FFN projection attribution for the rejected Q4
-recipes; no current Q4/GPU/default or release promotion.
+Next: audit frozen composition CI/lint, integrate unchanged tested sources, then
+continue same-original-input FFN projection attribution for rejected9B Q4 recipes.
+The accepted2B F16 observer is not9B Q4 attribution. No Q4/GPU/default/release
+promotion. Physical ledger rows are internally checked and tied to producer/model
+hashes; no multi-GB neural weights are reread locally.
 
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
@@ -90,11 +74,10 @@ Retain the official55896329byte artifact12065989037 (SHAa6460cf55be5b71afc083bf4
 Coordinator's frozen continuation worktree is
 /mnt/volume1/crispasr-dia-direct-finish-20261016, branch
 diag/dia-direct-finish-20261016, sourceabeee3e8eb5121e0f80bbe8a4a8f6f245fc8fb3f.
-Hosted38950148117 is queued: it recognizes sealed PCM plus legacy/JFK positive
-controls, without repeating synthesis. Canonical selection and corrupted/missing
-alias controls pass; actual four-library dlopen/mapping passes with isolated
-LD_LIBRARY_PATH. Collector and independent matrix-WER/parent-byte auditor/watch
-are prepared under /mnt/storage/crispasr/dia-direct-finish-20261016.
+Hosted38950148117 and independent115-payload/seven-cell audit are complete.
+Sealed legacy/JFK positives have WER0; all five direct-original clips return empty
+text/WER1. Complete original/failure/continuation proofs are permanently public,
+with full anonymous hashes verified. No synthesis was repeated. See HISTORY.md.
 
 New independent v2 audit verifies all94 retained payloads, seven original source
 files and exact decorated-method hashes; its initial decorator-extraction failure
@@ -104,8 +87,8 @@ at least0.99999999998, but none is byte-exact. See
 [partial audited result](docs/dia-direct-original-results-2026-10-16.json).
 No constructor-cause attribution: the legacy reference comes from an older host/
 run without paired explicit CPU dispatch controls. A causal comparison requires
-fresh same-host/same-environment controls. Actual ASR and speech conclusions remain
-pending; preserve all failed identity/quality gates.
+fresh same-host/same-environment controls. Speech fails all five current direct
+CPU cases; preserve those failures and all previous identity/quality gates.
 Both sealed Nemotron builds and independent original Whisper now pass legacy/JFK
 but fail all expanded captured-original audio. Their completed full audits/public proof
 are archived in HISTORY.md and docs/dia-broader-speech-results-2026-10-16.md.
@@ -144,12 +127,19 @@ comparison without changing current defaults or graph mathematics. Artifacts und
 /mnt/storage/crispasr/dia-sampling-controls-20261016. Do not launch the model
 recipe matrix until the direct-original result is audited.
 
-## Dia correctness — after reciprocal decision diagnosis
-
 ## CLAIMED 2026-10-16 — Independent original Dia CUDA positive control
 
-Owner: coordinator, worktree /mnt/volume1/crispasr-dia-original-cuda-20261016,
-branch diag/dia-original-cuda-20261016. While CPU recognition/CI queues wait,
+Owner: coordinator, fresh worktree /mnt/volume1/crispasr-dia-original-cuda-v2-20261016,
+branch diag/dia-original-cuda-v2-20261016. First frozen source1e390814 was uploaded
+byte-exact and ran a real supported CUDA probe, then stopped before installation/
+model download: its package-name prefix guard incorrectly rejected torch-stoi.
+All terminal logs/resolver proposal/output were retained before retry. Coordinator
+claims a narrow v2 guard repair: reject actual Torch/CUDA core package names and
+NVIDIA runtime packages, permit auxiliary torch-stoi/torchtyping dependencies;
+validate the saved real proposal and injected core-package rejection controls.
+Add pre-install GPU metadata. Preserve every scientific knob and failure; version
+all run/proof paths before one corrected submission, with session checks.
+While CPU CI queues wait,
 prepare and execute a real CUDA original-Python control through Kaggle per the
 sibling usage guide. This is independent of the deferred matched native/original
 recipe matrix: use the pinned original README's F16 path and generate defaults
@@ -170,8 +160,10 @@ The completed reduction/cache/RNG, broader matrix and recognition investigations
 are in HISTORY.md and their pinned machine receipts. Current claims above carry
 the direct-original and full-model observer dependencies.
 
-1. Finish the direct-original construction control, then the predeclared source-
-   default inference-recipe intervention. Existing full-F32 broader quality fails
+1. Direct-original CPU construction/recognition is audited and fails speech.
+   Complete the source-default original CUDA control, then fresh paired-host
+   construction/observation and the predeclared matched inference-recipe intervention.
+   Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
    heads-only-F32/F16 neural export with full-F32 positive controls before GPU/Q4

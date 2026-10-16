@@ -90,10 +90,80 @@
   "continuation": {
     "source": "abeee3e8eb5121e0f80bbe8a4a8f6f245fc8fb3f",
     "run": 38950148117,
-    "status": "queued",
-    "synthesis_repeated": false,
-    "actual_four_canonical_elf_loader_control": "passed with explicitly isolated LD_LIBRARY_PATH",
-    "raw_recognition": "pending",
-    "independent_recognition_audit": "prepared"
+    "artifact": 12069357826,
+    "sha256": "cb9596666dfe2538d6798afef5b851a7bc25d410d84fbea47321d68f914b24ca",
+    "payloads_verified": 115,
+    "recognition_cells": 7,
+    "controls_wer_zero": true,
+    "results": {
+      "legacy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 562688
+      },
+      "hello-42": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 197120
+      },
+      "hello-123": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 128000
+      },
+      "fox-42": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 224768
+      },
+      "fox-123": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 586752
+      }
+    },
+    "speech_acceptance": false,
+    "synthesis_repeated": false
+  },
+  "public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "568d0772df782e3933e00bfa3593d53ff67ef873",
+    "parent_revision": "aec1b6abbf0887f1e72943a07e73d067d949f3f0",
+    "files": [
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/raw-synthesis.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/raw-synthesis.zip",
+        "bytes": 55896329,
+        "sha256": "a6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/raw-recognition.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/raw-recognition.zip",
+        "bytes": 55975059,
+        "sha256": "cb9596666dfe2538d6798afef5b851a7bc25d410d84fbea47321d68f914b24ca",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/proof.zip",
+        "bytes": 33029,
+        "sha256": "6c77d079f21f5698f18d97bee6acab80a0c810004f83c4cc7281488c3edbe121",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/README.md",
+        "bytes": 3039,
+        "sha256": "991669cf011eb4b32e46754fb1feb9c6e955ccc92d8091516c1e478eda9a75f1",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
   }
 }

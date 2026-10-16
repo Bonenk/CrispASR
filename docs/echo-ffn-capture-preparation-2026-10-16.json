@@ -1,7 +1,7 @@
 {
   "candidate": "d8183cf92abc24eeeb6c969db563e968c5345d46",
   "hermes_local_source": "5020e60dd1939ee3d86ad9b260198962b7d85da7",
-  "status": "fused repair tiny and independent52-payload audit pass; all13 CI/all10 lint pass; full-model rerun38938983824 queued; no integration/model acceptance",
+  "status": "Full 2B F16 observer audit passes1946 payloads; complete public proof verified; landingd51b6cf3 CI/lint pending; no9B Q4/GPU/default promotion",
   "local_actual_original_class_controls": 18,
   "local_original_provenance": {
     "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
@@ -308,5 +308,6 @@
         "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38929454381"
       }
     }
-  }
+  },
+  "fullmodel_audited_result": "echo-ffn-observer-results-2026-10-16.json"
 }
