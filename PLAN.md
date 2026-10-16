@@ -45,44 +45,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Dia CPU reduction/dispatch numerical cause
-
-Owner: maintainer session. Worktree
-/mnt/volume1/crispasr-dia-reduction-cause-20261016, branch
-diag/dia-reduction-cause-20261016; all coefficients/results/scratch under
-/mnt/storage/crispasr/dia-reduction-cause-20261016.
-
-Local cause is proven: original MKL COMPATIBLE reproduces full-model Q and
-head logits exactly; AUTO/AVX512 reproduces the earlier module discrepancy.
-A serial F32 multiply-then-add recurrence independently matches all4,096 Q
-values and18,504 head logits on each captured hidden. Actual c36 AVX2/FMA
-4×8-dot recurrence also reproduces the hosted native disputed logits exactly.
-On unchanged native hidden, serial head margin becomes+2.050399780273e-5
-versus native−2.670288085938e-5; original sampler/noise changes904→877 with
-no token override. The earlier broad no-head-repair conclusion is superseded
-because it tested a different CPU arithmetic path. FP64 is not the same fix.
-
-Candidate d868644bda0f0bdc6e6288a564d51a8ff545ff87 is pushed. Fresh hosted
-COMPATIBLE replay [38868907653](https://github.com/CrispStrobe/CrispASR/actions/runs/38868907653)
-and lint [38868910390](https://github.com/CrispStrobe/CrispASR/actions/runs/38868910390)
-were submitted. Heavy38868907653 now passes on Xeon Platinum8573C. Official
-artifact12032740700 (160994 bytes, SHA256
-06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf)
-and all13 returned payloads are independently hash-verified; fresh Q and both
-hidden/head outputs match exactly. Lint38868910390 remains queued. The worker
-runs only small captured Q/head projections, not a full neural model or speech. Independent saved-array audit passes;
-79-payload public proof at HF revision81d18136133e7bad61961813f45afa58301fe32e
-is fully anonymously downloaded and SHA verified (170121121 bytes,
-b092ed027e26480ae4ad6c59d30d216662c7c5afe949f5300c9afafe86163397).
-[Candidate report](https://github.com/CrispStrobe/CrispASR/blob/d868644bda0f0bdc6e6288a564d51a8ff545ff87/docs/dia-reduction-cause-2026-10-16.md).
-
-Next: audit hosted replay, integrate proven diagnostic tooling, then claim a
-generic opt-in all-step serial F32 head candidate. It must use native loaded
-weights/current hidden in the graph, without reference input or a special
-step/token branch. Require pristine/OFF/identity controls, fixed sampler/RNG,
-actual native/original DAC speech, additional prompts/seeds and current-main
-integration before promotion. No production/GPU/Q4/performance claim yet.
-
 ## CLAIMED 2026-10-16 — Dia all-step serial F32 head experiment
 
 Owner: maintainer session. Worktree
@@ -91,7 +53,7 @@ large scratch/evidence under /mnt/storage/crispasr/dia-serial-head-20261016.
 Candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is pushed. Heavy CPU
 [38870499727](https://github.com/CrispStrobe/CrispASR/actions/runs/38870499727)
 and lint [38870502430](https://github.com/CrispStrobe/CrispASR/actions/runs/38870502430)
-are submitted and queued. The scratch CPU ggml graph callback uses only native
+are submitted; heavy is executing and lint remains queued. The scratch CPU ggml graph callback uses only native
 loaded F32 weights/current hidden and separately rounded serial arithmetic on
 every head at every step. No reference injection or token/step-specific math.
 
@@ -107,8 +69,15 @@ trajectories/logits/captures/audio and OFF/identity grids/final RNG must be exac
 Baseline also must reproduce accepted full free-generation arrays/PCM. Actual
 original DAC and same-recognizer ASR cover every arm, with both original
 positives. Final hosted gate requires serial WER0 through both decoders; retain
-complete evidence even if that gate fails. Full-generation outcome and its
-independent auditor remain pending. [Preparation](docs/dia-serial-head-preparation-2026-10-16.md).
+complete evidence even if that gate fails. Full-generation outcome remains
+pending. Independent auditor eadfb145 is prepared and passes26 rejecting
+controls, including fresh MT engine replay. Single collector session55605 at
+the owned storage root/collector-v1 retains the official complete artifact
+and invokes that auditor after exact-source lint completes. No duplicate run.
+The cause tools/report are integrated at61f4ed8c with all7 accepted files
+byte-exact; second-CPU heavy38868907653 and all10 lint38868910390 jobs pass.
+Its independent13-payload/complete-array audit passes; completed cause work
+is archived in HISTORY.md. [Preparation](docs/dia-serial-head-preparation-2026-10-16.md).
 Current main lacks these diagnostic RNG/cache paths, so this is explicitly a
 pinned-runtime causal experiment; current-main/default, extra prompts/seeds,
 GPU/Q4 and performance remain separate gates before production promotion.

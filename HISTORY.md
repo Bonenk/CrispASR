@@ -30,9 +30,15 @@ native hidden; this is reference-rounding compatibility, not a generic FP64 win.
 
 Public79-payload proof plus manifest is fully anonymously SHA/size verified at
 HF revision81d18136133e7bad61961813f45afa58301fe32e. Local failed loader/alias
-audits remain retained. A fresh hosted original projection replay and lint are
-submitted; their results and the all-step runtime speech candidate remain open
-in PLAN.md. No production/native-default/GPU/Q4/performance acceptance follows.
+audits remain retained. Fresh hosted replay38868907653 passes on a separate
+Intel Xeon Platinum8573C, and all10 lint38868910390 jobs pass at immutable
+d868644bda0f0bdc6e6288a564d51a8ff545ff87. Independent audit verifies the
+official artifact12032740700 (160994 bytes, SHA256
+06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf),
+all13 payloads, full source identity and all4,096 fresh Q/18,504 head values on
+each hidden byte-exact. Integration61f4ed8c preserves all7 tested source/report
+files byte-exact after rebase. [Replay receipt](docs/dia-reduction-cause-hosted-2026-10-16.json).
+The distinct all-step runtime speech candidate remains open in PLAN.md. No production/native-default/GPU/Q4/performance acceptance follows.
 
 ## Dia reciprocal native decision diagnosis completed — 2026-10-16
 

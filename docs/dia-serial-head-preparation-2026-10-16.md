@@ -3,7 +3,8 @@
 Immutable candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is submitted in
 [heavy CPU38870499727](https://github.com/CrispStrobe/CrispASR/actions/runs/38870499727)
 and [lint38870502430](https://github.com/CrispStrobe/CrispASR/actions/runs/38870502430).
-Both are queued at this checkpoint; no full-generation result is accepted.
+Heavy is executing; lint remains queued at this checkpoint. No full-generation
+result is accepted.
 
 The callback is a CPU node in the actual weighted ggml graph. Serial mode uses
 native loaded F32 head weights and current hidden, with separately rounded
@@ -48,3 +49,16 @@ Current main lacks the diagnostic portable-RNG/F32-cross-cache path used by
 this pinned experiment. Additional current-main integration, prompts/seeds,
 actual GPU/Q4 checks and profiling remain separate before any promotion.
 [Candidate method](https://github.com/CrispStrobe/CrispASR/blob/3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b/tools/ci-heavy/dia-serial-head/README.md).
+
+Independent auditor eadfb145 is prepared and its26 rejecting calibration
+controls pass. It checks complete source/artifact/physical identities, all
+controls, delay-reversed grids, original-decoder ASR scores and a freshly
+compiled head recurrence using retained actual libraries. Fresh seed42
+std::mt19937 advanced once per decoder step must match each final state.
+Single collector session55605 under the owned storage root/collector-v1
+preserves the complete heavy artifact even on failure, then audits it after
+the exact-source lint gate completes. No second model run was submitted.
+
+The second-CPU replay also passes its independent full-array audit and all10
+lint jobs. Cause integration61f4ed8c preserves all7 tested files byte-exact;
+this completed projection evidence remains distinct from pending speech.
