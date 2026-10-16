@@ -1303,5 +1303,38 @@
     ],
     "network_sampler_choice_cause": "Not yet isolated. Separate precision and sampling recipe under matched CUDA hardware/framework.",
     "native_runtime_cause_established": false
+  },
+  "aligned_sampler_analysis": {
+    "publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "5d33683e3cb3645d2173be542a01d50c6b05b059",
+      "raw_revision": "c098003aa2404b2535467ea9276d12e6850f180d",
+      "files": [
+        {
+          "path": "dia-20261016-original-cuda/trajectory-v1-aligned-sampler-v1/proof.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5d33683e3cb3645d2173be542a01d50c6b05b059/dia-20261016-original-cuda/trajectory-v1-aligned-sampler-v1/proof.zip",
+          "bytes": 11443,
+          "sha256": "2fe9d71471f110246de4951b9b2da51165146d57776c106266951403c92dfded",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-original-cuda/trajectory-v1-aligned-sampler-v1/README.md",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5d33683e3cb3645d2173be542a01d50c6b05b059/dia-20261016-original-cuda/trajectory-v1-aligned-sampler-v1/README.md",
+          "bytes": 2627,
+          "sha256": "1df9b101b4e3729088d93f7ff3a48ed8109609bdd8ba18227de2b760dda91bea",
+          "anonymous_full_download_verified": true
+        }
+      ],
+      "complete": true
+    },
+    "every_actual_rvq_code_equals_delayed_sampled_prediction": true,
+    "index_mapping": "RVQ frame t/head c corresponds to sampler step t+delay[c]",
+    "quiet_constant_suffix_starts_at_frame": 2,
+    "fox_first_departure_after_frame2": {
+      "fox-42": 595,
+      "fox-123": 526
+    },
+    "frame32_all_heads_cpu_original_filter_support_size": 1,
+    "filter_probe_scope": "Literal original Torch2.6 CPU F32 sampler on actual captured CUDA input rows. No exact CUDA softmax or RNG replay claim. Global observer gate remains failed."
   }
 }

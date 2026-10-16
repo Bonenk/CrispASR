@@ -352,7 +352,9 @@ can be scheduled after checking actual exported and wrapped surfaces.
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
 branch integrate/echo-ffn-v2-20261016, frozen composition3a13e0c62dae026ef49fcf55013285540ae7a0b4.
 Combined CI38967377917/lint38967380611 are queued. All11 observer files and8 Dia
-source files are byte-exact to their accepted candidates; local Dia controls pass.
+source files are byte-exact to their accepted candidates. All three local Dia
+routing suites,18 actual-class Python observer tests and the literal native
+FFN builder control pass; the old-helper negative fails as intended.
 Frozen Echo compositiond51b6cf3 passes all13
 CI38952809132 and10 lint38952812485 jobs, alongside its accepted1946-payload
 full-model audit. Rebase the three original observer commits and documentation
@@ -366,7 +368,14 @@ No graph math, model recipe, Q4 acceptance or default change.
 ## CLAIMED 2026-10-16 — Matched original Dia CUDA precision and recipe controls
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-factorial-20261016,
-branch diag/dia-cuda-factorial-20261016. The audited trajectory localizes quiet
+branch diag/dia-cuda-factorial-20261016, frozen sourcec856d4eed845a4f842f1a68890567b36466bf238.
+Kernelcrispasr-dia-cuda-factorial-v1/version1 is RUNNING; uploaded code is byte-exact,
+SHA6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572. Tiny actual
+47-parameter F16/F32 constructors, original generate and all five arm routes pass;
+six changed-knob negatives fail. Read-only review finds no concrete defect. Two
+recent sessions were verified terminal before one submission; collector-v1 retains
+terminal evidence. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
+The audited trajectory localizes quiet
 outputs to almost constant RVQ inputs but does not explain their selection.
 Use untouched original normal constructors/generate/DAC, same pinned weights,
 five fixed texts/seeds and supported CUDA host/framework. Predeclare four arms:

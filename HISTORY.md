@@ -1,3 +1,34 @@
+## Dia delay-aligned sampler mechanism and matched experiment prepared — 2026-10-16
+
+Every actual RVQ entry matches the captured sampled prediction at t+delay[c],
+checked across all five complete grids. Quiet paths repeat the same vector from
+frame2 through the end; both fox paths first depart after frame2 at595/526.
+At frame2 all nine selected codes rank first in their own delay-aligned logits.
+Literal original Torch2.6 CPU/F32 sampler filtering on selected real CUDA rows
+has support size1 for every head at frame32 in every case; those rows therefore
+select the constant code deterministically in that CPU filter replay. Fine-head
+supports widen near the fox departures. This is not exact CUDA softmax/RNG
+replay, a general observer acceptance or an explanation of the neural-logit cause.
+Unaligned per-frame/per-head rank comparisons are invalid for this delay pattern.
+
+[Complete aligned-input supplement](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5d33683e3cb3645d2173be542a01d50c6b05b059/dia-20261016-original-cuda/trajectory-v1-aligned-sampler-v1/README.md)
+retains scripts, input ledger and results, fully anonymously hash-verified.
+The raw201-payload evidence and strict legacy observer failure remain unchanged.
+
+Frozen factorial sourcec856d4ee preserves source weights/constructors/generate/DAC
+and crosses compute precision with the original/native recipe bundle on one
+CUDA host, plus a repeated source-F16 anchor. Tiny actual47-parameter F16/F32
+constructors and original-generation routes pass; six knob perturbations fail.
+Source/ASR/package-guard controls pass; read-only review finds no concrete defect.
+One kernel version1 was submitted after two recent sessions were verified terminal;
+uploaded source matches SHA6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572.
+Each completed arm checkpoints before the next constructor. Actual25-output
+results and independent audit remain pending in PLAN.md; no default promotion.
+
+Echo composition3a13e0c6 also passes18 actual-class Python observer tests, three
+Dia routing suites and the literal native FFN builder with its rejecting old-helper
+control. Combined CI38967377917/lint38967380611 remain pending before integration.
+
 ## Dia CUDA trajectories audited: constant code paths, global observer gate failed — 2026-10-16
 
 Source06c3d758 completed all five OFF/ON/OFF captures and recognitions. Independent
