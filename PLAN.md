@@ -374,7 +374,10 @@ SHA6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572. Tiny actual
 47-parameter F16/F32 constructors, original generate and all five arm routes pass;
 six changed-knob negatives fail. Read-only review finds no concrete defect. Two
 recent sessions were verified terminal before one submission; collector-v1 retains
-terminal evidence. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
+terminal evidence. Actual T4 sm75/Torch2.11.0+cu128/CUDA12.8 source-F16 arm
+completed all five syntheses and checkpointed public proof. Its full343-parameter
+ledger retains80 F32 norms. Remaining arms, recognitions and final audit are
+pending. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
 The audited trajectory localizes quiet
 outputs to almost constant RVQ inputs but does not explain their selection.
 Use untouched original normal constructors/generate/DAC, same pinned weights,

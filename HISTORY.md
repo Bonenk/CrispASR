@@ -1,3 +1,11 @@
+## Matched Dia CUDA experiment checkpoints its first source arm — 2026-10-16
+
+Actual Tesla T4 sm75, Torch2.11.0+cu128/CUDA12.8 completed all five source-F16
+syntheses and checkpointed them publicly before the next constructor. The actual
+full343-parameter ledger preserves80 F32 norms and263 F16 parameters. This is a
+partial producer checkpoint; remaining arms, all recognitions and the final
+independent evidence audit are pending in PLAN.md. No quality acceptance inferred.
+
 ## Dia delay-aligned sampler mechanism and matched experiment prepared — 2026-10-16
 
 Every actual RVQ entry matches the captured sampled prediction at t+delay[c],

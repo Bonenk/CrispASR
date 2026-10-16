@@ -201,5 +201,21 @@
   "full_model_results": "pending",
   "speech_acceptance": false,
   "native_acceptance": false,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "first_public_checkpoint": {
+    "revision": "834705fa5b1bcf23c2fbbeda0e9eabe92e3194cf",
+    "last_completed_stage": "f16-source",
+    "gpu": "Tesla T4",
+    "torch": "2.11.0+cu128",
+    "cuda": "12.8",
+    "arms": 1,
+    "outputs": 5,
+    "complete": false
+  },
+  "actual_parameter_dtype_ledger": {
+    "parameters": 343,
+    "f32_norm_parameters": 80,
+    "other_parameters_f16": 263
+  },
+  "checkpoint_scope": "First five source-F16 syntheses completed and published; remaining arms, recognition and final independent audit pending."
 }
