@@ -92,8 +92,8 @@
     }
   ],
   "full_generation_acceptance": false,
-  "lint_acceptance": false,
-  "general_ci_acceptance": false,
+  "lint_acceptance": true,
+  "general_ci_acceptance": true,
   "lint_run": 38874302965,
   "lint_jobs_passed": 10,
   "general_ci_run": 38874305718,
@@ -125,8 +125,8 @@
     },
     {
       "name": "linux-amr-fetch (clang++)",
-      "status": "queued",
-      "conclusion": ""
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "name": "linux-x86_64",
@@ -140,8 +140,8 @@
     },
     {
       "name": "linux-vulkan",
-      "status": "queued",
-      "conclusion": ""
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "name": "windows",
@@ -150,8 +150,8 @@
     },
     {
       "name": "linux-fuzz-smoke",
-      "status": "queued",
-      "conclusion": ""
+      "status": "completed",
+      "conclusion": "success"
     },
     {
       "name": "ios",
@@ -160,12 +160,14 @@
     },
     {
       "name": "linux-opus-fetch",
-      "status": "queued",
-      "conclusion": ""
+      "status": "completed",
+      "conclusion": "success"
     }
   ],
-  "general_ci_jobs_passed": 9,
+  "general_ci_jobs_passed": 13,
   "general_ci_jobs_total": 13,
   "artifact_bytes": 74580109,
-  "artifact_id": 12034799042
+  "artifact_id": 12034799042,
+  "integrated_source": "9384c3a5164b21a50badcab27e447eb06410fda7",
+  "production_sources_byte_exact_to_tested_candidate": true
 }

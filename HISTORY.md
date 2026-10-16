@@ -1,3 +1,17 @@
+## Dia opt-in head graph integrated — 2026-10-16
+
+Accepted candidate d198d7a4 passes all13 general CI38874305718 and10 lint
+38874302965 jobs, hosted graph build/replay38874191736, independent57-payload
+audit and12 fresh returned-library graph replays. Rebase9384c3a5 preserves all
+production source/CMake/binding/example bytes exactly. The registered unit
+passes30 checks and its removed-GPU-guard negative control fails as intended.
+The gated CPU F32 diagnostic is now integrated; unset/off preserves the native
+graph. Identity and generic serial modes remain opt-in, reject unsupported
+GPU/non-F32 heads and intentionally retain ordinary matmul overhead. Current
+F16 cross cache/std sampler/top-k/crop defaults remain intact. Full current-main
+speech, reference/diff and GPU/Q4/performance acceptance remain separate tasks.
+[Integration and proof](docs/dia-current-main-head-preparation-2026-10-16.md).
+
 ## Dia actual-runtime synthetic capture proof accepted — 2026-10-16
 
 Unmodified candidate c7f9da87 runs all12 encoder/18 decoder layers with small

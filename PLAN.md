@@ -46,44 +46,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Current-main serial head preparation
-
-Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-main-head-20261016,
-branch diag/dia-main-head-20261016. Builds/proofs under
-/mnt/storage/crispasr/dia-main-head-20261016. Prepare the generic all-step
-serial F32 head gate on current main and its current ggml0a862076, while the
-immutable pinned-runtime speech experiment runs. Explicit OFF keeps the
-original graph; identity copies it. Reject unsupported GPU/non-F32 use before
-building the graph. Verify actual current-ggml native/identity/serial outputs,
-thread parity and tiny fusion, plus whole-runtime compilation. No default
-change or production/speech claim; hosted current-main generation follows the
-pending causal result and needs independent cache/sampler/recipe validation.
-Keep current top-k and output-protocol repairs rather than copying the old
-runtime wholesale. All CLI/C-ABI callers share this library path.
-
-Candidate d198d7a48742c8424444d9b67dde9eb5d26f590f is pushed. Local static
-current-ggml build passes, as do30 actual tiny graph/admission checks, deliberate
-GPU-guard removal rejection, all18,504 reference head values on both hidden
-states with one/four threads, identity/OFF and whole-runtime syntax. Compute/
-apply functions are byte-exact to the immutable causal candidate. Failed CIFS
-shared-library symlink build is retained under local-v1; accepted static proof
-is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2026-10-16.md).
-
-Hosted build/replay38874191736 passes; independent audit verifies57 payloads
-and12 freshly compiled graph replays against the returned actual libraries.
-All10 lint38874302965 checks pass at d198d7a4. General CI38874305718
-has12/13 jobs passing (including both AMR compilers, Linux unit/DL, Vulkan,
-fuzz, macOS, Windows, Android and iOS); Opus is running. Single raw collector
-session10831 at the owned storage root/collector-v1 preserves official metadata,
-complete logs and digest-verified raw artifact; its independent full audit passes.
-These compile/graph jobs load no full neural model. Pinned speech38870499727
-and all10 lint38870502430 jobs pass; complete independent655-payload audit
-accepts scoped unforced serial-head speech recovery. Completed proof is in
-HISTORY.md and docs/dia-serial-head-results-2026-10-16.md. Do not repeat it.
-Next test actual current-main baseline versus head-only
-through CLI/Session first; add diagnostic cache/RNG paths only if those results
-justify them. Reference rounding compatibility alone is not general speech proof.
-
 ## CLAIMED 2026-10-16 — Current-main native speech A/B
 
 Owner: maintainer session. New worktree /mnt/volume1/crispasr-dia-main-speech-20261016,
@@ -96,8 +58,9 @@ current top-k and output-protocol fixes; do not port old diagnostic defaults.
 Require exact pristine/OFF/identity trajectories/PCM, actual CLI/Session checks,
 original positive and native/original DAC ASR. Save all outcomes before the
 quality gate and independently audit complete artifacts. No default/GPU/Q4 or
-additional-prompt acceptance follows. Need general CI/lint on d198d7a4 before
-integration; its model experiment runs independently while the remaining jobs queue.
+additional-prompt acceptance follows. All13 general CI and10 lint jobs pass at d198d7a4. The opt-in graph is
+integrated at9384c3a5 with production sources byte-exact to the tested candidate;
+its model experiment remains separate and changes no production defaults.
 
 Current-main worker3e1f2e2fe04b22c862864a32c80d765ab500435b is pushed and
 [heavy38880025781](https://github.com/CrispStrobe/CrispASR/actions/runs/38880025781)

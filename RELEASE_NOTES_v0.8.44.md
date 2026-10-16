@@ -733,3 +733,21 @@ This is scoped to the pinned F32 runtime and one prompt/seed; current-main
 defaults, additional prompts, GPU/Q4 and performance are not promoted.
 [Speech result](docs/dia-serial-head-results-2026-10-16.md). [Cause](docs/dia-reduction-cause-2026-10-16.md)
 and [hosted replay](docs/dia-reduction-cause-hosted-2026-10-16.json).
+
+
+## Dia opt-in CPU head arithmetic diagnostic
+
+The integrated `CRISPASR_DIA_SERIAL_HEAD=serial` path computes every head using
+actual native weights/hidden with separately rounded F32 products and serial
+addition. Unset/`off` preserves the original graph; `identity` controls the
+extra node. CPU/F32 admission guards reject unsupported opt-in configurations.
+All13 general CI and10 lint jobs pass at the source-pinned candidate.30 tiny
+graph/admission checks, a deliberately removed guard and12 independently
+recompiled returned-library replays verify the implementation.
+
+The ordinary matmul remains a dependency, so this diagnostic is intentionally
+slower. Current F16 cross cache, native sampler, top-k and stop/crop defaults
+are preserved. The previously accepted one-prompt pinned-runtime speech proof
+does not establish current-main default quality. Full speech and public
+reference/diff validation remain pending; GPU/Q4/performance and release
+promotion are unchanged. [Exact scope](docs/dia-current-main-head-preparation-2026-10-16.md).

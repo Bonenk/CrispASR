@@ -147,6 +147,14 @@ pass 40/40 replay stages but produce empty CLI/C-ABI ASR transcripts for
 The [cache precision control](dia-cross-cache-controls-2026-10-13.json) remains
 an unmerged experiment; changing model precision alone did not repair this case.
 
+Dia also has an opt-in CPU head diagnostic, `CRISPASR_DIA_SERIAL_HEAD`:
+`off` (the default), `identity`, or `serial`. Serial uses separately rounded
+F32 products and sequential addition on actual native weights/hidden state;
+identity controls the added graph node. Opt-in requires CPU and F32 head
+weights and rejects unsupported configurations. It retains the ordinary
+matmul dependency and is intentionally slower; no speed or general speech
+improvement is claimed. [Validation and current scope](dia-current-main-head-preparation-2026-10-16.md).
+
 ## dots.tts — voice cloning and performance
 
 `dots-tts` supports zero-shot voice cloning from a reference WAV. Place the
