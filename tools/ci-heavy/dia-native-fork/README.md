@@ -53,3 +53,32 @@ rejects. No neural arithmetic is copied or reimplemented in the helper. Source,
 physical export receipts, pre/post libraries, logs, complete raw arrays and
 all actual original DAC source/provenance are retained and hashed. Results
 require a separate complete-artifact audit before interpretation or integration.
+
+## Independent auditor
+
+`audit.py` is prepared to validate the official complete artifact. It requires
+`raw.zip`, `run.json`, `artifacts.json` and `lint.json` in a bundle directory;
+these must describe successful immutable workereae36591. It verifies ZIP CRC,
+full archive/payload hashes and exact file closure before extracting/loading.
+No full neural model runs locally.
+
+```sh
+python tools/ci-heavy/dia-native-fork/audit_selftest.py --repo /path/to/CrispASR \
+  --scratch /path/to/fresh-local-audit-controls
+python tools/ci-heavy/dia-native-fork/audit.py --bundle /path/to/bundle \
+  --repo /path/to/CrispASR --original-repo /path/to/original-dia \
+  --canonical /path/to/canonical/ref.gguf \
+  --terminal-bundle /path/to/accepted-terminal-bundle \
+  --output /path/to/fresh-audit.json
+```
+
+Use NumPy and gguf. The fresh sampler guard requires g++ and the pinned8d0ad886
+git object. Reproduction verifies all retained methods against immutable git
+objects, regenerates the exact scratch patch, freshly compiles/runs the actual
+sampler guard, checks pristine/patched ELF and unchanged ggml libraries, full
+control/prefix/RNG/code/capture invariants, physical export receipts, accepted
+native/canonical archives and actual original DAC source provenance. ASR edit
+distance, audio duration/RMS and audio/library/model hashes are recalculated
+independently; either fork quality outcome is reported without a threshold.
+The calibration passes23 rejecting controls plus the actual sampler guard.
+Preparation/calibration does not establish a successful full artifact audit.
