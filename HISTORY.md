@@ -1,3 +1,14 @@
+## Outside request and PR status reconciled — 2026-10-16
+
+Read issue546 and the complete related545 thread: the new request explicitly
+includes GGUF conversion and zero-shot voice cloning. Those requirements are
+now consolidated in the existing Drama3 backlog; no backend/model acceptance
+is implied. PR492 was closed unmerged by author KokerZhou on2026-10-15T16:28:59Z,
+confirmed against its complete discussion and close event. Its independent
+accepted pieces and unresolved numerical/hardware follow-ups keep their prior
+status; closing the PR does not establish a merge or successful acceptance.
+PR521 remains the sole open PR at381f3a3a, with its prior clone gate unchanged.
+
 ## Dia actual original trace and one-decision fork integrated — 2026-10-16
 
 Worker9ed6cff6 passes heavy38818571466 and all applicable lint38818570959.

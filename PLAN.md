@@ -59,10 +59,19 @@ positive and native arms through the same recognizer. Tiny actual sampler and
 patch guards locally; full generation/build/ASR on GH CPU. No production token
 override, default/filter/seed/threshold change or claimed runtime repair.
 
-Checkpoint: candidateeae36591 is pushed. Heavy CPU
+Current checkpoint: corrected candidate5417ed6d is pushed. Heavy CPU
+[38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
+and lint [38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850)
+are dispatched with the unchanged experiment. Fetch now precedes the source
+guard; a fresh shallow clone reproduces the earlier failure and passes after
+fetch. The auditor accepts explicit expected immutable worker SHA/run ID rather
+than trusting the receipt or silently reusing the failed run's identity. All4
+unskipped no-secrets checks pass. Full hosted quality/audit remains pending.
+
+Initial candidateeae36591: heavy CPU
 [38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
 and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
-are dispatched; results are pending. The worker adds a genuinely pristine build
+completed: heavy failed at bootstrap; all10 lint jobs passed. The worker adds a genuinely pristine build
 before observer-only, identity904 and restore877 arms. Complete pristine/OFF/
 identity trajectories, captures and native PCM must remain byte-exact. Actual
 original DAC cross-decodes and original canonical/DAC ASR positives are required;
@@ -141,7 +150,8 @@ commands: [CANN TODO](docs/cann-todo.md) and
 
 ## Remaining PRs — scoped salvage and acceptance
 
-- **PR492 / MiMo:** independent opt-in mel/cached-decode pieces are merged.
+- **PR492 / MiMo:** author KokerZhou closed the PR unmerged on2026-10-15;
+  it is no longer an open merge candidate. Independent opt-in mel/cached-decode pieces are merged.
   Dynamic Q8 activation amplification is measured; the existing F32 cache-read
   hypothesis is independently rejected and archived in HISTORY.md.
   [Four-arm result](docs/mimo-kvread-ab-2026-10-15.md): hidden/logit error remains
@@ -210,6 +220,11 @@ Unrelated future research need not be advertised as accepted to release proven
 improvements. Existing failed gates must stay explicit.
 
 ## Research backlog — Drama3 (issue545)
+
+Issue546 requests the same backend, explicitly including GGUF conversion and
+zero-shot voice cloning; track those requirements together with545. Cloning
+must cover the original reference-audio processing and actual CLI/C ABI paths,
+with closed-loop decoded-speech/voice validation before claiming support.
 
 Metadata/source/licence triage is complete; no weights or implementation started.
 Pin fishaudio/drama-3 e0a9218aa48888270f06ef1ed9ea67622c0e17d2 and read the

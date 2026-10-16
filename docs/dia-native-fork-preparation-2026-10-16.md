@@ -1,5 +1,14 @@
 # Dia reciprocal native sampled-decision fork — preparation
 
+Current attempt: corrected source5417ed6d, heavy CPU
+[38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
+and lint [38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850).
+The source fetch now precedes its tiny guard. The actual fresh shallow-clone
+test passes; all experiment/runtime/model/recipe/gates remain unchanged.
+The independent auditor now requires the expected full worker SHA and run ID
+as explicit arguments, then checks every official record/source against them.
+Full hosted quality and artifact audit remain pending.
+
 Update: first heavy38851402907 failed before model/build at its tiny guard:
 the shallow checkout had not fetched the pinned source yet. The bootstrap now
 fetches before checking source. A fresh shallow repository reproduces the
@@ -10,7 +19,7 @@ passes all10 jobs. Relaunch is being prepared with the same runtime, model,
 sampler, recipe and acceptance gates. The earlier checkpoints below remain
 historical preparation records; no hosted speech outcome is accepted yet.
 
-Candidateeae36591 is pushed on diag/dia-native-fork-20261016. Heavy CPU
+Original attempt: candidateeae36591 on diag/dia-native-fork-20261016. Heavy CPU
 [38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
 and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
 are dispatched; this checkpoint is not a hosted result. The owned worktree is
