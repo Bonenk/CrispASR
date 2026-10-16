@@ -548,33 +548,6 @@ compiler chip/ACL definitions and all six links per chip are independently audit
 ACL replay, quantized-model quality and performance remain separate gates.
 
 
-## Dia F32 sampling boundary diagnosed — 2026-10-14
-
-Late block-zero self K/V replay passes10 metric rows and14 controls; native
-last cache slots match hosted values exactly. The complete unforced F32
-trajectory matches original inputs through979 steps, then the step978/head2
-nucleus support swaps tokens46/904, causing original877/native904. Actual
-original filtering with both retained noise streams reproduces that difference.
-All963 aligned prefix code frames agree; both PCM prefixes are nearly silent
-and agree at cosine0.999963626/norm ratio0.996749141. The original only reaches
-speech later; the native ASR failure is not cleared. Complete independently
-audited public proofs and scopes are in docs/dia-self-kv-owned-input-results-
-2026-10-14.md and docs/dia-f32-first-divergence-2026-10-14.md. No runtime, filter,
-seed, default or quality-gate change; no performance or release acceptance.
-
-
-## Dia complete layer17 diagnosis — 2026-10-14
-
-Whole original/native layer17 replay passes39 metric rows and32 scale controls;
-eight inherited-input/cache interventions and two real wrong-cache controls
-are independently audited. Native output and one/four-thread results reproduce
-hosted bytes exactly. Matching-input output relative L2 is6.590e-7; inherited
-hidden-input drift has the largest measured individual effect in this block.
-Complete coefficients, sources, arrays, methods and binary proof are public:
-docs/dia-layer17-owned-input-results-2026-10-14.md and .json. Native speech
-remains rejected; no Q4/GPU/performance/default or release acceptance.
-
-
 ## Integrated Dia top-k correctness repair (2026-10-15)
 
 The shared sampler now selects exactly k temperature-scaled logit indices
@@ -586,29 +559,6 @@ testing passes2,026 tests. Header/test bytes are unchanged after rebase. No spee
 Q4/GPU/performance or release acceptance is inferred. Details and public proof:
 [Dia top-k selection](docs/dia-topk-selection-2026-10-14.md).
 
-## Dia layer16 and earlier hidden-state drift (2026-10-15)
-
-Bounded original/native layer16 replay reproduces the hosted native output
-byte-exact, with same-input final relative L2 3.636e-7. Independent audit covers
-39 rows,32 scale negatives,8 current context interventions and2 real cache
-negatives. The report retains an unresolved original cross-process exactness
-failure and the initial-array retention limitation. Both complete component
-and all18-layer scan archives are public and anonymously SHA-verified.
-Cumulative drift peaks earlier at layer3 (3.806e-6); no layer16 repair,
-full-speech/Q4/GPU/performance or release acceptance is inferred. Details:
-[Dia layer16 and scan](docs/dia-layer16-owned-input-results-2026-10-15.md).
-
-## Dia early layer and actual self-cache history (2026-10-15)
-
-Layer0 reproduces native hosted output and repeated one/four-thread runs
-byte-exact. The incoming hidden state is identical; split original-module
-interventions localize the larger context effect to actual self-cache keys
-(3.366e-6 relative L2) rather than values(1.397e-7). Independent audits cover
-39 main rows,32 scale negatives,8 owned contexts,64 split-stage rows and2 real
-wrong-cache controls. Complete283-payload evidence is public and anonymously
-SHA-verified. No new runtime repair, speech/Q4/GPU/performance/default acceptance.
-See [layer0 proof](docs/dia-layer0-owned-input-results-2026-10-15.md).
-
 ## Linux packaging preflight
 
 The bounded accepted-source Linux CLI, shared library and installed wheel pass
@@ -618,102 +568,10 @@ from an unrelated directory without loader overrides. This validates source
 998f8d18 at version0.8.43; final release assets still require the final frozen
 source, version bump, applicable CI and platform matrix.
 
-## Completed Dia key-history diagnostic
+## Dia diagnostic provenance
 
-A five-arm fixed-history full-decoder intervention now retains complete raw
-inputs, stages and original filtering results. Both native controls reproduce
-all979 logit rows exactly; independently replacing original layer0 prefix,
-current key or both does not restore the disputed token ranking. All720 hosted
-payloads and18-stage metrics are independently audited, with terminal heavy
-and lint checks passing. This accepts diagnostic tooling only; Dia free speech,
-GPU and quantized quality remain unaccepted.
-
-## Dia: reproducible arithmetic and joint Q/K diagnostics
-
-Integrated standalone original/native query producers, tiny attention invariants,
-exact-input QK/softmax/value decomposition, one-dot reduction and four-logit CFG
-margin explanation. Native hosted and original-module controls reproduce exactly;
-complete raw arrays, actual executable/libraries and independent audits are public.
-The full-decoder five-arm Q/K factorial passes all739 payload checks and both
-native controls. Joint replacement improves early attention but does not restore
-the original disputed ranking or sampling support. All applicable heavy/lint
-checks pass at their recorded sources. These are diagnostic tools; native Dia
-free speech, GPU and quantized quality remain unaccepted.
-See [the complete result](docs/dia-query-key-results-2026-10-15.md).
-
-## Dia one-step diagnostic replay
-
-A validated one-step replay reproduces all127 native stages and logits, then
-all18 native replacement controls exactly. Independent audit checks1,323
-payloads,37 arms,666 layer metric rows and the actual original sampling filter.
-Five original-output substitutions restore the reference support with
-non-monotonic layer sensitivity. Complete raw proof and lossless reconstruction
-methods are public. This adds diagnostic tooling, not a native speech repair,
-new default, Q4/GPU acceptance or performance gain. [Results](docs/dia-suffix-replay-results-2026-10-15.md).
-
-## Dia hosted terminal diagnosis
-
-A five-arm hosted replay and independent277-payload audit retain exact native
-controls and original final-hidden consumption. All90 layer metric rows and
-original sampler outputs are recalculated. Conditional margin differences
-separate post-layer17, final-normalization and head-projection effects; F64 CFG
-reproduces every observed margin exactly. Complete raw proof is public. These
-are integrated diagnostic tools, not a native speech fix, new default or
-Q4/GPU/performance acceptance. [Result](docs/dia-terminal-replay-results-2026-10-15.md).
-
-## Dia actual original trace and decision sensitivity
-
-All18 layers now have simultaneous actual original self Q/K/V/attention,
-pre-RoPE projections and decoder boundaries with exact OFF/ON/OFF controls.
-An independent549-payload audit recalculates125 comparisons and checks complete
-prefix/RNG provenance. Changing only one sampled token in the original takes
-this prompt/seed from WER0 to quiet audio and empty ASR/WER1 despite stage cosine
-at least0.9999999961. Complete raw proof is public and anonymously SHA-verified.
-This explains a severe sensitivity mechanism; it adds no native speech repair,
-new default or Q4/GPU/performance acceptance. [Results](docs/dia-original-trace-results-2026-10-16.md).
-
-## Dia reciprocal decision diagnosis
-
-A642-payload independent audit proves exact native controls and unchanged RNG.
-Restoring one sampled decision recovers the expected sentence through native
-and original DAC (WER1→0), all1,226 original input rows and1,210 code frames.
-Complete public evidence is anonymously SHA-verified. This is diagnostic
-recovery for one prompt/seed, not a production token override, native speech
-repair or GPU/Q4/performance acceptance. [Results](docs/dia-native-fork-results-2026-10-16.md).
-
-## Dia CPU reduction cause identified
-
-Integrated projection/reduction probes now distinguish the actual reference's
-MKL COMPATIBLE arithmetic from AUTO/AVX512 and ggml's AVX2/FMA reduction.
-Separately rounded serial F32 multiply/add matches all4,096 captured query
-values and18,504 head outputs on each hidden state. A fresh second-CPU replay
-and its independent13-payload audit pass, alongside all10 source-pinned lint
-checks. Complete local and hosted proof archives are public and SHA-verified.
-On unchanged native hidden, this arithmetic alone restores the disputed
-sampling support without a token override. This supersedes the earlier broad
-head-exclusion conclusion, whose local control used a different CPU dispatch.
-Full-generation generic serial-head validation now passes an independent
-655-payload audit: native/original DAC WER0, all1226 original input rows and
-1210 original code frames exact, without a token override or reference input.
-This is scoped to the pinned F32 runtime and one prompt/seed; current-main
-defaults, additional prompts, GPU/Q4 and performance are not promoted.
-[Speech result](docs/dia-serial-head-results-2026-10-16.md). [Cause](docs/dia-reduction-cause-2026-10-16.md)
-and [hosted replay](docs/dia-reduction-cause-hosted-2026-10-16.json).
-
-
-## Dia opt-in CPU head arithmetic diagnostic
-
-The integrated `CRISPASR_DIA_SERIAL_HEAD=serial` path computes every head using
-actual native weights/hidden with separately rounded F32 products and serial
-addition. Unset/`off` preserves the original graph; `identity` controls the
-extra node. CPU/F32 admission guards reject unsupported opt-in configurations.
-All13 general CI and10 lint jobs pass at the source-pinned candidate.30 tiny
-graph/admission checks, a deliberately removed guard and12 independently
-recompiled returned-library replays verify the implementation.
-
-The ordinary matmul remains a dependency, so this diagnostic is intentionally
-slower. Current F16 cross cache, native sampler, top-k and stop/crop defaults
-are preserved. The previously accepted one-prompt pinned-runtime speech proof
-does not establish current-main default quality. Full speech and public
-reference/diff validation remain pending; GPU/Q4/performance and release
-promotion are unchanged. [Exact scope](docs/dia-current-main-head-preparation-2026-10-16.md).
+Completed reduction, query/key, cache-history, terminal and reciprocal replay
+investigations are archived in [HISTORY.md](HISTORY.md#completed-dia-release-note-investigations-archived--2026-10-16).
+The accepted current-runtime scope, broader-test dependency and immutable proof
+links are described in the Dia sections above. Earlier rejected source pins
+retain their original outcomes and are not current-main acceptance statements.

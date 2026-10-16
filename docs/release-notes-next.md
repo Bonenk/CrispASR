@@ -4,6 +4,16 @@ The published release is documented in [v0.8.43 release notes](../RELEASE_NOTES_
 and [the tagged validation receipt](release-tag-v0.8.43-2026-10-12.json). No later
 tag has been cut.
 
+**Current 2026-10-16 status:** the canonical next-release notes are
+[RELEASE_NOTES_v0.8.44.md](../RELEASE_NOTES_v0.8.44.md). Dia reference/diff
+wiring and all three opt-in CPU controls are now integrated. The current-runtime
+factorial restores one fixed prompt/seed through both DACs and CLI (WER0);
+four broader cases are in validation. Dated investigations below retain their
+original pins/outcomes; statements that an older control failed or was unmerged
+do not describe the current three-control candidate. Defaults, GPU/Q4 and
+performance remain unpromoted. Completed investigation history is archived in
+[HISTORY.md](../HISTORY.md).
+
 ## Dia DAC precision conversion
 
 The explicit [converter](../models/convert-dia-dac-to-gguf.py) reproduces the

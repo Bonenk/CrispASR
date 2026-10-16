@@ -138,22 +138,31 @@ object pipeline. To test raw streaming in `cmd.exe`, request
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts/confucius4-tts, 16 kHz for speecht5, 44.1 kHz for melotts/dia/parler-tts/zonos-tts/supertonic, 48 kHz for voxcpm2-tts/dots-tts/irodori-tts/moss-tts-local/sidon, 24 kHz for most others). Programmatic callers don't need this table: `crispasr_session_output_sample_rate()` returns the active backend's output rate, with `crispasr_session_input_channels()` / `output_channels()` alongside (everything is mono today) — #332.
 
 Dia's explicit [DAC companion conversion](dia-dac-conversion.md) preserves
-critical original F32 output weights with a 1,312-byte size increase. Its
-numerical reference checks pass; native short-speech and Q4 acceptance remain
-failed, so the published companion remains the registry default. The
-[completed heads-only/full-F32 controls](dia-neural-precision-hosted-2026-10-13.json)
-pass 40/40 replay stages but produce empty CLI/C-ABI ASR transcripts for
-`[S1] We are committed to making it secure.` (seed 42, temperature 1.2).
-The [cache precision control](dia-cross-cache-controls-2026-10-13.json) remains
-an unmerged experiment; changing model precision alone did not repair this case.
+critical original F32 output weights with a 1,312-byte size increase. Numerical
+startup and full-history checks pass; registry companion pins are unchanged.
 
-Dia also has an opt-in CPU head diagnostic, `CRISPASR_DIA_SERIAL_HEAD`:
-`off` (the default), `identity`, or `serial`. Serial uses separately rounded
-F32 products and sequential addition on actual native weights/hidden state;
-identity controls the added graph node. Opt-in requires CPU and F32 head
-weights and rejects unsupported configurations. It retains the ordinary
-matmul dependency and is intentionally slower; no speed or general speech
-improvement is claimed. [Validation and current scope](dia-current-main-head-preparation-2026-10-16.md).
+The following CPU diagnostic controls are integrated and disabled by default:
+
+- `CRISPASR_DIA_SERIAL_HEAD=serial` uses separately rounded F32 products and
+  sequential addition on actual native head weights/hidden. `off` is the
+  default; `identity` controls the extra node. It requires CPU and F32 head
+  weights, retains the ordinary matmul dependency and is intentionally slower.
+- `CRISPASR_DIA_CROSS_CACHE_F32=1` keeps projected cross-attention K/V in F32.
+  It increases cross-cache memory, without changing model-file precision.
+- `CRISPASR_DIA_PORTABLE_RNG=1` uses the pinned original PyTorch2.6 MKL CPU
+  exponential sampling recipe. Only the literal value `1` enables either
+  boolean control; unset/`0` preserves existing behavior.
+
+With all three controls, an explicitly converted full-F32 neural model and
+F32-output DAC, the fixed prompt `[S1] We are committed to making it secure.`
+(seed42, temperature1.2, top_p0.95, top_k45, CFG3) restores all1226 original
+input rows/1210 code frames and WER0 through native DAC, original DAC and CLI.
+The other cache/sampler combinations fail this same control. These controls
+are not an accepted general recipe for the published model or `-m auto`.
+Additional texts/seeds are in validation; GPU/Q4 and performance are separate.
+[Results, complete public proofs and first-fork diagnosis](dia-cache-sampler-results-2026-10-16.md).
+The public original dumper and text-only `crispasr-diff` route now cover the
+complete neural/codec stage map; [wiring proof](dia-reference-wire-composed-2026-10-16.json).
 
 ## dots.tts — voice cloning and performance
 
