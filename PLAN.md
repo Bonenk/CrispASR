@@ -62,22 +62,22 @@ positive and native arms through the same recognizer. Tiny actual sampler and
 patch guards locally; full generation/build/ASR on GH CPU. No production token
 override, default/filter/seed/threshold change or claimed runtime repair.
 
-Current checkpoint: immutable worker5417ed6df0d69f69f8bda8a6ea6ce5f3e924e3da
-is running in heavy CPU
-[38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740).
-All10 lint jobs pass in
-[38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850).
-No full hosted quality or independent artifact result is accepted yet.
+Current checkpoint: worker5417ed6df0d69f69f8bda8a6ea6ce5f3e924e3da passes
+heavy [38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
+and all10 lint38855559850 checks. Official artifact12028934794 is retained:
+904039288 bytes, SHA256
+0cdd76a38bdae5be82b7a854b7d0c3f1194e47237afee4b68fb1164baca2ad47.
+Local complete bundle: owned storage root/hosted-38855559740-v1.
 
-Automatic evidence collection is running from the owned storage root at
-collector-v1/collect.py (log collector-v1/collector.log). It waits for the exact
-run/source, retains official run/lint metadata, complete logs and the raw ZIP,
-checks official archive size/SHA, and invokes the independent auditor only
-for a successful run. Output uses fresh hosted-38855559740-v1; failures remain
-preserved. Inspect the collector result before retrying or collecting again.
-The auditor is prepared and calibrated, not yet accepted against this artifact.
+Provisional worker result: pristine/OFF/identity are silent with WER1; restoring
+only904→877 yields the exact expected sentence/WER0 through both native and
+actual original DAC. All producer controls pass. Independent audit-v1 stopped
+on an incorrect unconditional expectation for a debug-only max_gen log line;
+the failed log/workdir remain preserved. Correct that auditor assumption using
+pinned source/export provenance and add missing/wrong/debug-log controls, then
+rerun the complete audit. Do not change the experiment or quality gates.
 
-Next: independently audit all arrays/provenance and actual DAC/ASR outcomes,
+Next: finish independent all-payload/array/provenance and actual DAC/ASR audit,
 retain public immutable evidence, then integrate accepted diagnostic tooling.
 A restored token is never a production workaround or native speech acceptance.
 Completed local sampler/syntax/auditor and failed-bootstrap work is archived
