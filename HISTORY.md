@@ -1,3 +1,24 @@
+## Hermes utility audits and Echo tiny capture controls completed — 2026-10-16
+
+Two user-authorized tmux Hermes workers used the configured Meta Muse Spark /
+Together AI defaults. The first completed a full current issue/PR audit and
+found two real unchecked OmniVoice output allocations. Candidate2985a4c6 fixes
+both; independent extracted actual-function controls pass5 normal/OOM modes,
+while both removed guards and frozen5243fc79 crash on the two OOM modes.
+Its generalCI38914114501 and lint38914114178 remain in flight; no main merge
+or fullPR521/clone-quality acceptance is claimed.
+
+The second worker's initial Echo proposalf642293f is rejected and preserved;
+reviewed local5020e60d supplies original FFN capture. Coordinator candidate
+ d8183cf9 composes it with native/public dump/diff stages, early source checks,
+owned proof directories and18 actual-class controls. Complete class source is
+byte-exact to the independently verified released5.6.0 wheel. Actual ggml
+six-boundary OFF/ON/OFF, ownership, stride/admission and a rejected first-row
+mutation pass. Earlier harness failures omitted input reset and are retained.
+These are completed small controls, with hosted checks, full-model F16
+transparency and Q4 attribution still pending in PLAN.md. [Exact scope and
+local proof](docs/echo-ffn-capture-preparation-2026-10-16.json).
+
 ## Completed Dia release-note investigations archived — 2026-10-16
 
 The following dated investigation notes were moved from the draft release
