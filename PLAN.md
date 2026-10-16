@@ -103,21 +103,21 @@ not an established cause or accepted replacement recipe.
 
 Owner: coordinator; new worktree
 /mnt/volume1/crispasr-dia-sampling-controls-v2-20261016, branch
-fix/dia-sampling-controls-v2-20261016. Initial193c5964 and its worktree remain
-frozen: local literal routing/Python tests pass and both old-dispatch/old-adapter
-negative controls fail as expected. Before any hosted execution, coordinator
-found the server's fresh per-request negative sentinels must restore the adapter's
-initial sampling defaults after explicit overrides. Compose that repair and
-actual repeated-request controls in v2; no inference recipe change follows.
-Current native top-k/top-p fields are used by
-the sampler, but Dia is absent from the generic Session setter dispatch and the
-CLI adapter ignores both explicit overrides. This is a prerequisite for a valid
-matched original/native recipe test, independent of the running constructor
-control. Add bounded native setters and route the existing C ABI/Python/CLI
-controls; preserve current defaults, graph mathematics and earlier failed gates.
-Acceptance: actual production setter/dispatch/adapter execution with tiny fake
-contexts, explicit/default/repeated/unsupported/null controls, old-source negative
-controls, applicable hosted CI and lint. Heavy builds stay on GH; artifacts under
+fix/dia-sampling-controls-v2-20261016, frozen source
+7d0f68f322d503962d28c1e38f3eb07ac06a03f7. Implementation and local validation
+are complete; CI38946681937 and lint38946685918 are queued at that exact source.
+Collector-v2 retains terminal logs under storage. The actual native setters,
+CABI dispatch, Python methods, CLI parser/adapter and repeated-request default
+restoration pass tiny execution controls. Three separate old-source controls
+reject missing CABI routing, missing adapter routing and193c5964's default leak.
+Independent Hermes read-only review confirms the request repair, with no further
+problem in this scope. Full model loading/synthesis is stubbed in these controls;
+no new speech, inference-recipe or numerical acceptance is inferred. Completed
+preparation and first candidate's no-execution CI cancellations are in HISTORY.md.
+
+Next: audit applicable hosted CI/lint on this frozen source, then integrate with
+source bytes preserved. This enables a valid matched original/native recipe
+comparison without changing current defaults or graph mathematics. Artifacts under
 /mnt/storage/crispasr/dia-sampling-controls-20261016. Do not launch the model
 recipe matrix until the direct-original result is audited.
 

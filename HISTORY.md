@@ -1,3 +1,31 @@
+## Dia sampling-control prerequisite prepared and tested — 2026-10-16
+
+Source audit found that Dia's sampler reads top-k/top-p fields, but generic Session
+dispatch omitted Dia and its CLI adapter ignored the overrides. The shared fields
+also lacked CLI flags. Candidate193c5964 adds native setters, existing CABI routing,
+`--tts-top-k`/`--tts-top-p` parsing/help, adapter forwarding and literal-source
+regressions. Actual Python Session methods execute against the compiled C ABI.
+Replaying the old dispatch or adapter independently fails the new controls.
+
+Coordinator then found the server's per-request negative sentinels would retain
+a previous override in the reused Dia context. Frozen composition7d0f68f3 stores
+the initialized defaults and restores them on omitted options. Tests cover both
+unmodified defaults and explicit configured defaults, with old193c5964 failing
+both restoration cases. Three tests pass: nine literal native/Session/CLI/parser
+scenarios, compiled-out dispatch, and actual Python-to-CABI execution. Full model
+loading/synthesis is stubbed; no new model parity or speech claim follows.
+Hermes's read-only review independently verifies the repaired request sequence.
+Current temperature1.2/top-k45/top-p0.95 and all graph math remain unchanged.
+
+Initial CI38946255709/lint38946258638 were canceled while queued, with no executed
+steps; their snapshots and immutable193c5964 source are retained. Final
+CI38946681937/lint38946685918 target exact
+7d0f68f322d503962d28c1e38f3eb07ac06a03f7; acceptance and integration remain pending
+in PLAN.md. Every branch/main push passed all four unskipped secrets checks.
+Local positive/negative receipts, review reports and terminal-log collector live
+under /mnt/storage/crispasr/dia-sampling-controls-20261016. Fresh issue/PR inventory
+is unchanged: eight open issues and only draftPR521; no new comments or closures.
+
 ## Dia second-ASR recognition audit completed — 2026-10-16
 
 Frozen worker0a62782e uses actual original OpenAI Whisper20250625/base.en,
