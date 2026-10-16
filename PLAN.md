@@ -51,7 +51,8 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 Owner: coordinator; frozen landing worktree
 /mnt/volume1/crispasr-echo-ffn-land-20261016, branch integrate/echo-ffn-20261016,
 sourced51b6cf3fd7a14fbbcdc16111763879667d05a47. CI38952809132 and lint38952812485
-are queued. All11 observer source files match tested0dfccc7d exactly, the three
+pass all13 CI and10 lint jobs at that exact source; final logs are retained.
+All11 observer source files match tested0dfccc7d exactly, the three
 original commits/authorship are preserved, and main's OmniVoice fix is retained.
 The1946-payload/690-comparison full-model observer audit and permanently public,
 fully anonymously verified proof are complete; see HISTORY.md and
@@ -391,3 +392,16 @@ replacement, seed selection or default changes. Keep models/GPU work on Kaggle;
 all local proof under /mnt/storage/crispasr/dia-cuda-trace-20261016. Check active
 sessions before submission, publish raw proof immediately, then independently
 audit code/latent statistics, cosine and magnitudes before interpreting a cause.
+
+## CLAIMED 2026-10-16 — Compose accepted Echo observer with integrated Dia controls
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
+branch integrate/echo-ffn-v2-20261016. Frozen Echo compositiond51b6cf3 passes all13
+CI38952809132 and10 lint38952812485 jobs, alongside its accepted1946-payload
+full-model audit. Rebase the three original observer commits and documentation
+onto current main with the already integrated Dia sampling fix intact. Preserve
+all11 tested observer source files and all Dia source bytes, including both sets
+of CI controls. Resolve only the additive workflow composition if required.
+Run actual local literal-source controls, inspect complete source differences,
+and validate the combined CI/lint composition before fast-forward integration.
+No graph math, model recipe, Q4 acceptance or default change.
