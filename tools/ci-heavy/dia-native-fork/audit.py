@@ -16,7 +16,6 @@ import zipfile
 
 import numpy as np
 
-SOURCE = 'eae36591ebe6afadc560d665854445f87001f042'
 RUNTIME = '8d0ad8862d2cad5d305a48a57f2a99b5024bc39a'
 ORIGINAL = '4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8'
 GGML = 'c36dab89b662838f0f5d4826c399198c0b90bbfc'
@@ -74,15 +73,19 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ['bundle','repo','original-repo','canonical','terminal-bundle','output']:
         parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--worker-source',required=True,help='Expected immutable full worker git SHA')
+    parser.add_argument('--run-id',type=int,required=True,help='Expected official heavy run ID')
     args = parser.parse_args(); assert not args.output.exists()
+    assert re.fullmatch('[0-9a-f]{40}',args.worker_source) and args.run_id > 0
+    source = args.worker_source
     bundle = args.bundle; archive = bundle/'raw.zip'; out = bundle/'out'
     run = json.loads((bundle/'run.json').read_text()); lint = json.loads((bundle/'lint.json').read_text())
     for record in [run,lint]:
-        assert record['headSha'] == SOURCE and record['status'] == 'completed' and record['conclusion'] == 'success'
+        assert record['headSha'] == source and record['status'] == 'completed' and record['conclusion'] == 'success'
         assert record['jobs'] and all(j['conclusion'] == 'success' for j in record['jobs'])
     artifacts = json.loads((bundle/'artifacts.json').read_text())['artifacts']; assert len(artifacts) == 1
     artifact = artifacts[0]
-    assert artifact['workflow_run']['head_sha'] == SOURCE and artifact['workflow_run']['id'] == 38851402907
+    assert artifact['workflow_run']['head_sha'] == source and artifact['workflow_run']['id'] == args.run_id
     assert artifact['digest'] == 'sha256:'+sha(archive) and artifact['size_in_bytes'] == archive.stat().st_size
     with zipfile.ZipFile(archive) as z:
         assert z.testzip() is None
@@ -93,7 +96,7 @@ def main():
         assert z.read('receipt.json') == (out/'receipt.json').read_bytes()
     assert set(names) == {f.relative_to(out).as_posix() for f in out.rglob('*') if f.is_file()}
     receipt = json.loads((out/'receipt.json').read_text())
-    assert receipt['worker_source'] == SOURCE and receipt['runtime_source'] == RUNTIME and receipt['ggml_source'] == GGML
+    assert receipt['worker_source'] == source and receipt['runtime_source'] == RUNTIME and receipt['ggml_source'] == GGML
     for key in ['reciprocal_diagnostic_complete','pristine_off_identity_exact','fork_prefix_and_rng_exact','accepted_native_prefix_exact']:
         assert receipt[key] is True
     for key in ['production_defaults_changed','native_speech_acceptance','gpu_acceptance','q4_acceptance']:
@@ -126,7 +129,7 @@ def main():
         elif name == 'GGML-LICENSE': continue
         elif name == 'pristine-dia_tts.cpp': ref,relative = RUNTIME,'src/dia_tts.cpp'
         elif name in ['dia_sampling.h','dia_exponential_rng.h','dia_dump_step.h']: ref,relative = RUNTIME,'src/'+name
-        else: ref,relative = SOURCE,'tools/ci-heavy/'+name
+        else: ref,relative = source,'tools/ci-heavy/'+name
         assert file.read_bytes() == subprocess.check_output(['git','show',ref+':'+relative],cwd=repo),name
     # Regenerate the patch from source bytes validated against the immutable git object.
     spec = importlib.util.spec_from_file_location('verified_fork_patch',method/'dia-native-fork/patch.py')
@@ -227,7 +230,7 @@ def main():
     for row in receipt['arms']:
         arm = row['arm']; assert row['steps'] == len(arrays[arm][0]) and row['native_asr'] == results[arm]['native-pcm.npy']
         assert row['original_dac_asr'] == results[arm].get('original-dac-pcm.npy')
-    result = dict(source=SOURCE,official_artifact_sha256=sha(archive),payloads_verified=len(payloads),
+    result = dict(source=source,run_id=args.run_id,official_artifact_sha256=sha(archive),payloads_verified=len(payloads),
                   audit_workdir=audit_workdir.name,fresh_sampler_guard_log_sha256=sha(audit_workdir/'fresh-sampler-guard.log'),
                   pristine_off_identity_exact=True,fork_prefix_and_rng_exact=True,accepted_native_prefix_exact=True,
                   fresh_actual_sampler_guard=True,original_dac_relative_l2=error,results=results,

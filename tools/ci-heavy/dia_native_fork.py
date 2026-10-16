@@ -142,9 +142,9 @@ def main():
     checkpoint()
     (out/'method').mkdir(); shutil.copyfile(__file__,out/'method/dia_native_fork.py')
     shutil.copytree(METHOD,out/'method/dia-native-fork',ignore=shutil.ignore_patterns('__pycache__'))
-    run([sys.executable,METHOD/'selftest.py','--repo',ROOT,'--scratch',scratch/'tiny-guard'],'tiny-fork-contracts')
     runtime = scratch/'pinned-runtime'
     run(['git','fetch','origin',SOURCE],'fetch-runtime')
+    run([sys.executable,METHOD/'selftest.py','--repo',ROOT,'--scratch',scratch/'tiny-guard'],'tiny-fork-contracts')
     run(['git','worktree','add','--detach',runtime,SOURCE],'checkout-runtime')
     run(['git','-C',runtime,'submodule','update','--init','--recursive'],'runtime-submodules')
     assert subprocess.check_output(['git','-C',runtime/'ggml','rev-parse','HEAD'],text=True).strip() == GGML

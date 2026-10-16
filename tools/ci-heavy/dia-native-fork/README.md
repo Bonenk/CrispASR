@@ -58,7 +58,8 @@ require a separate complete-artifact audit before interpretation or integration.
 
 `audit.py` is prepared to validate the official complete artifact. It requires
 `raw.zip`, `run.json`, `artifacts.json` and `lint.json` in a bundle directory;
-these must describe successful immutable workereae36591. It verifies ZIP CRC,
+these must describe the explicit expected successful immutable worker/run.
+Pass their full SHA/run ID independently of the artifact receipt. It verifies ZIP CRC,
 full archive/payload hashes and exact file closure before extracting/loading.
 No full neural model runs locally.
 
@@ -66,6 +67,7 @@ No full neural model runs locally.
 python tools/ci-heavy/dia-native-fork/audit_selftest.py --repo /path/to/CrispASR \
   --scratch /path/to/fresh-local-audit-controls
 python tools/ci-heavy/dia-native-fork/audit.py --bundle /path/to/bundle \
+  --worker-source <full-worker-sha> --run-id <heavy-run-id> \
   --repo /path/to/CrispASR --original-repo /path/to/original-dia \
   --canonical /path/to/canonical/ref.gguf \
   --terminal-bundle /path/to/accepted-terminal-bundle \
@@ -82,3 +84,9 @@ distance, audio duration/RMS and audio/library/model hashes are recalculated
 independently; either fork quality outcome is reported without a threshold.
 The calibration passes23 rejecting controls plus the actual sampler guard.
 Preparation/calibration does not establish a successful full artifact audit.
+
+Bootstrap correction: the first hosted run38851402907 failed before model/build
+because its tiny guard attempted to read the pinned source before fetching it
+into the shallow checkout. Fetch now precedes the guard. The failed raw artifact
+is retained; a fresh shallow repository exercises the corrected order. The
+runtime, model, sampler, recipe, controls and quality thresholds stay fixed.
