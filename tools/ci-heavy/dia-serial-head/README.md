@@ -50,3 +50,34 @@ gh workflow run heavy-cpu.yml --ref <candidate> \
 Full speech acceptance, current-main porting, additional prompts/seeds,
 CPU/GPU/Q4 validation and profiling remain separate. The CPU custom operation
 and duplicate head work are diagnostic costs, not a promoted optimization.
+
+## Independent artifact audit
+
+`audit.py` requires official run/lint/artifact metadata and complete raw ZIP,
+explicit expected worker SHA/run ID, original source/canonical GGUF, accepted
+terminal/full-native proof bundles, C36 ggml Git objects and the published small
+head fixture ZIP. It validates all source/payload/physical/ELF identities,
+regenerates the patch, verifies complete controls and prior baseline, checks
+raw input/delayed/code alignment and independently scores every ASR/PCM row.
+It freshly compiles the callback against retained actual libraries, replays all
+returned preflight cases, and compares the selected actual serial hidden/logits
+when that generation reaches the capture step. Fresh std::mt19937 seed42 and
+one discard per decoder call must reproduce each complete final RNG state.
+
+```sh
+python tools/ci-heavy/dia-serial-head/audit_selftest.py --output FRESH_CONTROLS
+python tools/ci-heavy/dia-serial-head/audit.py \
+  --worker-source FULL_SHA --run-id RUN_ID \
+  --bundle COMPLETE_HOSTED_BUNDLE --repo CRISPASR_REPO \
+  --original-repo ORIGINAL_DIA --canonical CANONICAL_REF_GGUF \
+  --terminal-bundle ACCEPTED_TERMINAL_BUNDLE \
+  --native-bundle ACCEPTED_RECIPROCAL_NATIVE_BUNDLE \
+  --head-fixture COMPLETE_REDUCTION_CAUSE_ZIP --ggml-repo C36_GGML_REPO \
+  --output FRESH_AUDIT_JSON
+```
+
+Calibration passes26 rejecting grid/RNG/path/nonfinite/ASR/scale controls with
+an actual freshly compiled MT engine. This calibrates the auditor only; the
+complete future artifact audit remains pending. An expected final speech-gate
+failure may still have fully verified diagnostic evidence; the auditor reports
+that outcome explicitly and never turns it into speech/production acceptance.
