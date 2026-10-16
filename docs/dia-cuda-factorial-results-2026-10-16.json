@@ -1,0 +1,405 @@
+{
+  "source": "c856d4eed845a4f842f1a68890567b36466bf238",
+  "public_revision": "51fbf91a838a81c8bc27187222ec7a343645c70f",
+  "prefix": "dia-20261016-original-cuda/precision-recipe-v1",
+  "payloads_verified": 261,
+  "public_files_full_anonymous_hash_verified": 262,
+  "original_dia_source_files_verified": 7,
+  "recognition_cells": 27,
+  "controls_wer_zero": true,
+  "gpu": "Tesla T4",
+  "capability": [
+    7,
+    5
+  ],
+  "torch": "2.11.0+cu128",
+  "cuda": "12.8",
+  "arm_plan": {
+    "f16-source": {
+      "precision": "float16",
+      "temperature": 1.3,
+      "top_k": 35
+    },
+    "f16-native-recipe": {
+      "precision": "float16",
+      "temperature": 1.2,
+      "top_k": 45
+    },
+    "f32-source": {
+      "precision": "float32",
+      "temperature": 1.3,
+      "top_k": 35
+    },
+    "f32-native-recipe": {
+      "precision": "float32",
+      "temperature": 1.2,
+      "top_k": 45
+    },
+    "f16-source-anchor": {
+      "precision": "float16",
+      "temperature": 1.3,
+      "top_k": 35
+    }
+  },
+  "results": {
+    "f16-source/legacy": {
+      "arm": "f16-source",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.00014440477487098554,
+      "cuda_peak_allocated": 5757552128,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "dd3f9f12e1303b85a11495f808cf9f291b1c2ae901daed463b60d6778afd6737"
+    },
+    "f16-source/hello-42": {
+      "arm": "f16-source",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 4933087744,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "f16-source/hello-123": {
+      "arm": "f16-source",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 4927497216,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "f16-source/fox-42": {
+      "arm": "f16-source",
+      "case": "fox-42",
+      "samples": 524288,
+      "rms": 0.09770538715311772,
+      "cuda_peak_allocated": 5930332672,
+      "seed": 42,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "67ac2f3af3513b0b9ca277304ed9ab56f8366f6a7e99159a73d3a17804476112"
+    },
+    "f16-source/fox-123": {
+      "arm": "f16-source",
+      "case": "fox-123",
+      "samples": 357376,
+      "rms": 0.0871937551802259,
+      "cuda_peak_allocated": 4843922944,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "fd639cff6b489d10fbe2b2bc5aa2c9f7c9eb0495105183446bdf0fd2088950c4"
+    },
+    "f16-native-recipe/legacy": {
+      "arm": "f16-native-recipe",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.0001444050719414704,
+      "cuda_peak_allocated": 5931782656,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "c1a7a0280f5ed6850bcfc6bc476eb473586ec2252d6c28492ca5ce2d871bff8d"
+    },
+    "f16-native-recipe/hello-42": {
+      "arm": "f16-native-recipe",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 4934537728,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "f16-native-recipe/hello-123": {
+      "arm": "f16-native-recipe",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 4929872896,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "f16-native-recipe/fox-42": {
+      "arm": "f16-native-recipe",
+      "case": "fox-42",
+      "samples": 466944,
+      "rms": 0.08571590027255406,
+      "cuda_peak_allocated": 5931409920,
+      "seed": 42,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "72fcdd7a1d92ead5c594098c0e6cc9fbe1dc22640f16e9c570727e84b490b1b6"
+    },
+    "f16-native-recipe/fox-123": {
+      "arm": "f16-native-recipe",
+      "case": "fox-123",
+      "samples": 471040,
+      "rms": 0.06997889829245836,
+      "cuda_peak_allocated": 5931625472,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "1f98048e6379d9096f28a9184710b1a4e507e402f396df46e621751f692d787e"
+    },
+    "f32-source/legacy": {
+      "arm": "f32-source",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.0001444050719414704,
+      "cuda_peak_allocated": 9686618624,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "c1a7a0280f5ed6850bcfc6bc476eb473586ec2252d6c28492ca5ce2d871bff8d"
+    },
+    "f32-source/hello-42": {
+      "arm": "f32-source",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 8688964096,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "f32-source/hello-123": {
+      "arm": "f32-source",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 8684504064,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "f32-source/fox-42": {
+      "arm": "f32-source",
+      "case": "fox-42",
+      "samples": 477184,
+      "rms": 0.02399362124298136,
+      "cuda_peak_allocated": 9686825984,
+      "seed": 42,
+      "transcript": "Thank you.",
+      "wer": 1.0,
+      "pcm_sha256": "51449989960457c0787bae950e3eb29b9ee3ab4a7f53c5afa1c391f4195cd183"
+    },
+    "f32-source/fox-123": {
+      "arm": "f32-source",
+      "case": "fox-123",
+      "samples": 412672,
+      "rms": 0.10089036533319407,
+      "cuda_peak_allocated": 8687084032,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "f3d3a90d6880d3168f109bf74e0b7e95297170b7e5cb614320df8f585fa7bf66"
+    },
+    "f32-native-recipe/legacy": {
+      "arm": "f32-native-recipe",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.0001444050719414704,
+      "cuda_peak_allocated": 9686241792,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "c1a7a0280f5ed6850bcfc6bc476eb473586ec2252d6c28492ca5ce2d871bff8d"
+    },
+    "f32-native-recipe/hello-42": {
+      "arm": "f32-native-recipe",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 8688964096,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "f32-native-recipe/hello-123": {
+      "arm": "f32-native-recipe",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 8684504064,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "f32-native-recipe/fox-42": {
+      "arm": "f32-native-recipe",
+      "case": "fox-42",
+      "samples": 463360,
+      "rms": 0.07713114245011828,
+      "cuda_peak_allocated": 9686554624,
+      "seed": 42,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7bc59d851f0cbb90b19050277863bd9508eb6f9c6471d7324d1294898e7dd1ab"
+    },
+    "f32-native-recipe/fox-123": {
+      "arm": "f32-native-recipe",
+      "case": "fox-123",
+      "samples": 481792,
+      "rms": 0.08692789185058837,
+      "cuda_peak_allocated": 9685794816,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7ebd85297d85ab24183693bdde1b53c8ea4bd16585e835efd8d2816dda59ac31"
+    },
+    "f16-source-anchor/legacy": {
+      "arm": "f16-source-anchor",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.0001444050719414704,
+      "cuda_peak_allocated": 5931520512,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "c1a7a0280f5ed6850bcfc6bc476eb473586ec2252d6c28492ca5ce2d871bff8d"
+    },
+    "f16-source-anchor/hello-42": {
+      "arm": "f16-source-anchor",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 4934392320,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "f16-source-anchor/hello-123": {
+      "arm": "f16-source-anchor",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 4929577984,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "f16-source-anchor/fox-42": {
+      "arm": "f16-source-anchor",
+      "case": "fox-42",
+      "samples": 524288,
+      "rms": 0.09770538715311772,
+      "cuda_peak_allocated": 5931348480,
+      "seed": 42,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "67ac2f3af3513b0b9ca277304ed9ab56f8366f6a7e99159a73d3a17804476112"
+    },
+    "f16-source-anchor/fox-123": {
+      "arm": "f16-source-anchor",
+      "case": "fox-123",
+      "samples": 357376,
+      "rms": 0.0871937551802259,
+      "cuda_peak_allocated": 4845200896,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "fd639cff6b489d10fbe2b2bc5aa2c9f7c9eb0495105183446bdf0fd2088950c4"
+    }
+  },
+  "initial_rng_exact_across_arms": true,
+  "anchors": {
+    "legacy": {
+      "same_shape": true,
+      "pcm_exact": false,
+      "cosine": 0.9999999977021555,
+      "first_norm": 0.10384299877480836,
+      "final_norm": 0.10384321240133167,
+      "relative_l2": 6.782278770870514e-05,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "hello-42": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 1.0000000000000002,
+      "first_norm": 0.06367437151095579,
+      "final_norm": 0.06367437151095579,
+      "relative_l2": 0.0,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "hello-123": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 0.9999999999999999,
+      "first_norm": 0.0579262926329289,
+      "final_norm": 0.0579262926329289,
+      "relative_l2": 0.0,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "fox-42": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 1.0,
+      "first_norm": 70.74625721797287,
+      "final_norm": 70.74625721797287,
+      "relative_l2": 0.0,
+      "first_wer": 0.0,
+      "final_wer": 0.0
+    },
+    "fox-123": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 1.0,
+      "first_norm": 52.12524072655752,
+      "final_norm": 52.12524072655752,
+      "relative_l2": 0.0,
+      "first_wer": 0.0,
+      "final_wer": 0.0
+    }
+  },
+  "anchor_quality_matches": true,
+  "source_fox_controls_pass": true,
+  "all_wer_zero": false,
+  "speech_acceptance": false,
+  "native_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false,
+  "scope": "Payload/source/dtype/control/PCM/WAV/raw-ASR/RNG/anchor audit; no neural weights reread, no GPU inference or cross-version ffmpeg replay",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "9ab4789ff4bc8ff46e9c656264f78d8af90fc8c6",
+    "parent_revision": "51fbf91a838a81c8bc27187222ec7a343645c70f",
+    "raw_revision": "51fbf91a838a81c8bc27187222ec7a343645c70f",
+    "files": [
+      {
+        "path": "dia-20261016-original-cuda/precision-recipe-v1-audit-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9ab4789ff4bc8ff46e9c656264f78d8af90fc8c6/dia-20261016-original-cuda/precision-recipe-v1-audit-v1/proof.zip",
+        "bytes": 7303920,
+        "sha256": "ffe84abcc0113cc6f87066552b70eb6e88338a9a7ed4bb9b896902f4c7cb5e41",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-original-cuda/precision-recipe-v1-audit-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9ab4789ff4bc8ff46e9c656264f78d8af90fc8c6/dia-20261016-original-cuda/precision-recipe-v1-audit-v1/README.md",
+        "bytes": 3026,
+        "sha256": "3b41d0e39d2376984a9c84fc9b7f1f7880e4253cbaec52872b8f61a751002463",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  }
+}

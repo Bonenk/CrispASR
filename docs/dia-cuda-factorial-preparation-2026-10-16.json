@@ -4,7 +4,7 @@
   "script_sha256": "6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572",
   "kernel_slug": "crispasr-dia-cuda-factorial-v1",
   "kernel_version": 1,
-  "status": "KernelWorkerStatus.RUNNING",
+  "status": "KernelWorkerStatus.COMPLETE",
   "experimental_axes": [
     "original compute dtype float16 vs float32",
     "source1.3/35 vs native1.2/45 sampling recipe bundle"
@@ -198,7 +198,7 @@
   },
   "independent_review": "No concrete defects found; read-only harness review retained",
   "prelaunch_recent_sessions_verified_terminal": 2,
-  "full_model_results": "pending",
+  "full_model_results": "independently audited; see result_receipt",
   "speech_acceptance": false,
   "native_acceptance": false,
   "production_defaults_changed": false,
@@ -217,5 +217,9 @@
     "f32_norm_parameters": 80,
     "other_parameters_f16": 263
   },
-  "checkpoint_scope": "First five source-F16 syntheses completed and published; remaining arms, recognition and final independent audit pending."
+  "checkpoint_scope": "All25 syntheses and27 recognitions completed;261 payloads and262 anonymous public files independently verified. Earlier first_public_checkpoint retained as historical evidence.",
+  "terminal_status": "COMPLETE",
+  "final_raw_revision": "51fbf91a838a81c8bc27187222ec7a343645c70f",
+  "independent_audit_complete": true,
+  "result_receipt": "docs/dia-cuda-factorial-results-2026-10-16.json"
 }

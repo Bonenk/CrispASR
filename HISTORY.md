@@ -1,3 +1,27 @@
+## Matched Dia CUDA precision/recipe matrix independently audited — 2026-10-16
+
+All25 syntheses and27 original Whisper recognitions completed on Tesla T4 sm75,
+Torch2.11.0+cu128/CUDA12.8. Independent audit verifies261 payloads,262 full
+anonymous public downloads, original source/method/input hashes, all343 parameter
+dtypes per arm, initial RNG states, raw PCM/WAV/recognizer JSON and recomputed WER.
+Every arm remains quiet for legacy and both hello cases (empty/WER1). Both fox
+cases pass WER0 for both F16 recipes and F32/native1.2/45; F32/source1.3/35 fails
+fox42 with Thank you., while fox123 passes. Both sealed recognizer controls pass.
+Thus precision or recipe alone does not recover the broad failure. CPU/CUDA
+categorical generators remain a confound for earlier cross-device comparisons;
+a separate fixed-compute sampler-placement intervention is claimed in PLAN.md.
+
+The repeated F16/source anchor preserves speech outcomes. Both hello and fox
+PCM arrays are byte-exact; legacy is not: cosine0.9999999977021555, first/final
+norm0.10384299877480836/0.10384321240133167, relativeL2 6.782278770870514e-5.
+No global waveform identity is claimed. Auditor-v1 failed from an arm/pip-plan
+variable collision; its script/log are preserved beside corrected audit-v2.
+[Permanent independent audit](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9ab4789ff4bc8ff46e9c656264f78d8af90fc8c6/dia-20261016-original-cuda/precision-recipe-v1-audit-v1/README.md)
+includes scripts, failures, source controls and terminal logs; both public files
+were fully anonymously hash-verified (proof7303920bytes). Raw revision51fbf91a
+is immutable. See [complete result](docs/dia-cuda-factorial-results-2026-10-16.json).
+Speech/native/Q4/default acceptance remains false.
+
 ## Matched Dia CUDA experiment checkpoints its first source arm — 2026-10-16
 
 Actual Tesla T4 sm75, Torch2.11.0+cu128/CUDA12.8 completed all five source-F16

@@ -60,8 +60,9 @@ the direct-original and full-model observer dependencies.
    codes were clamped, and all three quiet paths use one common nine-book vector
    for over99% of frames. Both hello and fox cases pass exact observer identity;
    first legacy OFF0 differs slightly, so the global observer gate remains failed.
-   The matched CUDA precision/recipe experiment completed; see its active audit
-   claim below. Precision/recipe alone did not recover the three quiet cases.
+   The matched CUDA precision/recipe experiment is independently audited:261
+   payloads and262 anonymous file checks. Precision/recipe alone did not recover
+   the three quiet cases; see docs/dia-cuda-factorial-results-2026-10-16.json.
    Next isolate categorical draw placement with unchanged CUDA neural compute.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
@@ -352,8 +353,8 @@ can be scheduled after checking actual exported and wrapped surfaces.
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
 branch integrate/echo-ffn-v2-20261016, frozen composition3a13e0c62dae026ef49fcf55013285540ae7a0b4.
-Combined CI38967377917 has12/13 jobs passed; Vulkan remains running.
-All10 lint38967380611 jobs passed. All11 observer files and8 Dia
+All13 combined CI38967377917 jobs and all10 lint38967380611 jobs passed.
+Fresh final landing will preserve the tested non-document tree. All11 observer files and8 Dia
 source files are byte-exact to their accepted candidates. All three local Dia
 routing suites,18 actual-class Python observer tests and the literal native
 FFN builder control pass; the old-helper negative fails as intended.
@@ -366,41 +367,6 @@ of CI controls. Resolve only the additive workflow composition if required.
 Run actual local literal-source controls, inspect complete source differences,
 and validate the combined CI/lint composition before fast-forward integration.
 No graph math, model recipe, Q4 acceptance or default change.
-
-## CLAIMED 2026-10-16 — Matched original Dia CUDA precision and recipe controls
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-factorial-20261016,
-branch diag/dia-cuda-factorial-20261016, frozen sourcec856d4eed845a4f842f1a68890567b36466bf238.
-Kernelcrispasr-dia-cuda-factorial-v1/version1 is COMPLETE; uploaded code is byte-exact,
-SHA6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572. Tiny actual
-47-parameter F16/F32 constructors, original generate and all five arm routes pass;
-six changed-knob negatives fail. Read-only review finds no concrete defect. Two
-recent sessions were verified terminal before one submission; collector-v1 retains
-terminal evidence. Actual T4 sm75/Torch2.11.0+cu128/CUDA12.8 source-F16 arm
-completed all25 syntheses and27 recognitions, checkpointing each arm publicly.
-Both recognizer controls pass. All arms fail legacy and both hello cases; both
-F16 recipes and F32/native pass both fox cases, while F32/source fails fox42.
-Final raw revision51fbf91a838a81c8bc27187222ec7a343645c70f; independent audit-v2
-is running after preserving an audit-v1 variable-collision failure. No speech
-acceptance follows from producer completion. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
-The audited trajectory localizes quiet
-outputs to almost constant RVQ inputs but does not explain their selection.
-Use untouched original normal constructors/generate/DAC, same pinned weights,
-five fixed texts/seeds and supported CUDA host/framework. Predeclare four arms:
-F16 vs F32 compute crossed with source1.3/35 vs current native1.2/45 sampling;
-keep CFG3/top-p.95/capacity3072 fixed. Repeat source-F16 as the final anchor.
-Preserve F32 norms, all original hooks, no added generation observers, no token
-forcing or seed/prompt selection. Both original fox positives and sealed legacy/
-JFK recognizer positives remain controls; failed cases stay in the proof. Keep
-full parameter dtype ledgers, RNG snapshots, PCM and raw original Whisper
-recognition for all25 outputs. Compare final anchor and original speech outcomes;
-no global speech/default/quant acceptance inferred from diagnostic completion.
-Validate source/knob controls and negative perturbations before one supported
-Kaggle submission per ../kaggle_usage.md, after session checks. No CPU fallback,
-Torch replacement or GPU-draw retries. Checkpoint each completed arm to public HF
-before constructing the next; independently audit the final pinned proof. Large
-assets and local preparation under /mnt/storage/crispasr/dia-cuda-factorial-20261016.
-
 
 ## CLAIMED 2026-10-16 — Isolate Dia categorical draw placement
 
@@ -425,3 +391,16 @@ after current session inventory per ../kaggle_usage.md; no CPU neural fallback,
 framework replacement, quota workaround or draw fishing. Public HF checkpoints
 before weights and between arms; independently audit terminal pinned evidence.
 All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
+
+
+## CLAIMED 2026-10-16 — Final Echo observer landing
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v3-20261016,
+branch integrate/echo-ffn-v3-20261016. Preserve original four observer/document
+commits while composing onto current main. Acceptance: all non-document tree
+bytes match frozen3a13e0c62dae026ef49fcf55013285540ae7a0b4, which passes all13
+CI38967377917 and10 lint38967380611 jobs, plus full1946-payload2B F16 audit
+and local actual-class/native-builder/Dia routing controls. Main changes since
+its base are documentation only. Verify exact composition, run required secret
+checks and fast-forward main; update pending claims/results after integration.
+No Q4/9B/GPU/performance/default acceptance inferred.

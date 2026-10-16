@@ -638,3 +638,14 @@ investigations are archived in [HISTORY.md](HISTORY.md#completed-dia-release-not
 The accepted current-runtime scope, broader-test dependency and immutable proof
 links are described in the Dia sections above. Earlier rejected source pins
 retain their original outcomes and are not current-main acceptance statements.
+
+
+Dia diagnostic update (2026-10-16): the matched original CUDA precision/recipe
+matrix completed all25 outputs and27 recognitions. Independent audit verifies261
+payloads and262 anonymous public files. Both F16 recipes and F32/native pass the
+two fox cases, but legacy and both hello cases remain quiet in every arm;
+F32/source additionally fails fox42. This does not establish broader native
+speech or Q4 acceptance, and changes no defaults. The repeated source-F16 anchor
+preserves quality; legacy PCM has a retained small nonzero difference. Full
+receipts and failed-auditor provenance are archived in HISTORY.md and
+[the matrix result](docs/dia-cuda-factorial-results-2026-10-16.json).
