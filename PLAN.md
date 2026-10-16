@@ -68,14 +68,19 @@ provenance must be distinguished from earlier qualified module replay/shadows.
 Checkpoint: candidate9ed6cff6 is pushed. Heavy CPU
 [38818571466](https://github.com/CrispStrobe/CrispASR/actions/runs/38818571466)
 and lint [38818570959](https://github.com/CrispStrobe/CrispASR/actions/runs/38818570959)
-are dispatched; results are pending. Actual tiny original generation with
+both completed successfully at candidate9ed6cff6. The worker reports original
+WER0 and the one-decision original fork WER1 with an empty transcript. These
+are provisional pending independent raw-artifact audit; artifact12014433279
+is338692054 bytes, SHA c57ddb8fba5fd6c2c96eca39192c3cb38f4079924a5efbc788c60a7462c8ced4.
+Audit work continues in the same owned worktree and storage directory.
+Actual tiny original generation with
 simultaneous observers passes OFF/ON/OFF byte equality; actual Attention/cache/
 sampler contracts and6 rejected controls pass. All4 unskipped secret checks pass.
 The new full-model hook import wiring was exercised locally before dispatch.
 [Preparation and limits](docs/dia-original-trace-preparation-2026-10-15.md).
 Next: inspect hosted stages, independently audit every payload/control, then
 publish immutable evidence and integrate only accepted tooling/results. No
-full-model, fork speech, native repair or release acceptance is claimed yet.
+audited full-model/fork result, native repair or release acceptance is claimed yet.
 
 ## Dia correctness — next full-original trace
 
