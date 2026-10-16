@@ -46,6 +46,35 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Hermes workers for remaining PR and quantization
+
+Owner/coordinator: maintainer session. User explicitly authorized two Hermes
+tmux workers using configured Meta Muse Spark / Together AI. Coordinator retains
+all runtime graph mathematics, integration, main pushes and heavy-run scheduling.
+
+- Worker hermes-asr-omnivoice, worktree
+  /mnt/volume1/crispasr-hermes-omnivoice-20261016, branch
+  diag/hermes-omnivoice-20261016: read full PR521/issue518 and compare every
+  remaining change against current code. Reconcile standalone utilities already
+  merged, identify remaining integration/ABI/cache/default behavior, implement
+  bounded utility/test/harness fixes only with original-reference evidence.
+  Preserve failed clone gates and contributor attribution; no runtime graph edits.
+- Worker hermes-asr-echo, worktree
+  /mnt/volume1/crispasr-hermes-echo-20261016, branch
+  diag/hermes-echo-20261016: audit all rejected Q4 receipts against tools/code;
+  identify the earliest divergent tensors and prepare a distinct targeted
+  precision experiment using original inputs. Implement only conversion,
+  analysis or validation tooling with calibrated rejection tests; preserve
+  existing gates/defaults, no runtime graph edits or repeated failed recipe.
+
+Worker logs, handoffs and all large data belong under
+/mnt/storage/crispasr/hermes-workers-20261016. Neither worker may change global
+configuration, main/protected checkouts, push/merge/publish, launch heavy jobs,
+or perform storage cleanup without coordinator scheduling. They report exact
+source/tests/evidence and reviewable local commits. Coordinator claims further
+scope before implementation if their audit requires it. Physical Ascend/Intel/
+legacy-GPU validation and private reporter inputs remain external dependencies.
+
 ## CLAIMED 2026-10-16 — Isolate Dia cache precision and sampling
 
 Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-cache-sampler-20261016,
@@ -72,9 +101,9 @@ passes26 decisions and noise/state checks. All11034 sampling decisions across
 The first native feedback difference is isolated to the random-sampling recipe:
 standard selects568 and portable/Python530 on original and both native logit
 sets. These completed findings are archived in HISTORY.md and the local receipt.
-Heavy38892690744, CI38892693594 and lint38892696276 are queued at that source;
+Heavy38892690744 is running; all13 CI38892693594 and10 lint38892696276 jobs pass;
 collectors and independent full-array auditors are armed under the storage root.
-Combined reference validation38891963272 is also queued, not accepted yet.
+Combined reference validation38891963272 passes, with independent1735-payload/176-stage audit; integration is next.
 See [scope and gates](docs/dia-cache-sampler-preparation-2026-10-16.md).
 
 ## CLAIMED 2026-10-16 — Dia reference/diff entry-point wiring
@@ -135,8 +164,10 @@ heavy38891963272, general CI38891966094 and lint38891969068 are submitted.
 Actual combined C++ local replay passes1194 comparisons across capture,
 identity-head and serial-head modes, exact OFF/ON/OFF/identity trajectories,
 30 actual head-unit checks,17 original-module tests and237-call source guards.
-The full-model worker additionally checks identity transparency and both
-ordinary and serial public diff routes. Acceptance awaits hosted evidence.
+The full-model worker checks identity transparency and both ordinary/serial
+public diff routes. Heavy, all13 CI and10 lint pass. Independent audit verifies
+1735 payloads and all176 complete comparisons, including exact transparency.
+The diagnostic-only wiring is now ready for source-preserving integration.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
@@ -148,8 +179,9 @@ Completed preparation, failures and results are in HISTORY.md. This diagnostic
 uses8d0ad886/C36; it does not establish current-main default speech acceptance.
 
 1. The completed CPU dispatch/reduction investigation identifies a sufficient
-   arithmetic difference at this boundary. Validate the generic all-step head
-   candidate next; the single decision explains this prompt/seed's quiet trajectory.
+   arithmetic difference at this boundary. The generic head gate is integrated;
+   current-main head-only speech failed. Finish the claimed cache/sampler matrix
+   before broader speech acceptance; the pinned recovery remains scoped.
    Do not add a token override or change top_p/seed/quality thresholds as a fix.
 2. Earlier module Q differs6.90e-7 from actual full-model Q despite exact keys
    and normalized input. Preserve that qualification. A new intervention must
