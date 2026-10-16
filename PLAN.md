@@ -75,6 +75,16 @@ Next: inspect hosted gates, independently audit all arrays/provenance, report
 the reciprocal quality outcome and retain public immutable evidence before
 integration. Source tooling remains on its owned feature branch pending proof.
 
+Auditor preparation checkpoint: bc59663e adds an independent complete-artifact
+auditor and23 rejecting prefix/RNG/path/nonfinite/ASR-score/scale controls,
+calibrated with a freshly compiled actual pinned sampler. Calibration and all4
+unskipped no-secrets checks pass. Local proof is
+/mnt/storage/crispasr/dia-native-fork-20261016/local-v1/auditor-v2.
+The heavy worker remains immutableeae36591; heavy38851402907 and lint38851403072
+are still queued as of2026-10-16T04:45Z. No full artifact or speech outcome has
+been accepted. The auditor is prepared to regenerate the scratch patch, check
+all physical receipts/raw arrays and independently recalculate every ASR score.
+
 ## Dia correctness — reciprocal native decision diagnostic
 
 The [full original trace and one-decision fork](docs/dia-original-trace-results-2026-10-16.md)

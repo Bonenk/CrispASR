@@ -55,3 +55,26 @@ No production runtime/default, model pin, sampler filter, seed or acceptance
 threshold changes. Native speech, Q4/GPU/performance and release promotion
 remain unaccepted. The full worker method is retained on the candidate branch
 at tools/ci-heavy/dia-native-fork/README.md until hosted evidence is audited.
+
+## Independent auditor preparation checkpoint
+
+Auditorbc59663e is pushed on the same owned feature branch. The worker remains
+pinned toeae36591; its queued heavy/lint runs are unchanged. The auditor verifies
+complete official ZIP/CRC/SHA/file closure, every payload and immutable method,
+regenerates the exact patch and freshly compiles/runs the actual sampler guard.
+It checks full control/prefix/RNG/code/stage invariants, pristine/patched ELF and
+unchanged ggml libraries, physical export ledgers, canonical/accepted native
+archives and original DAC source provenance. All ASR edit distances, audio
+durations/RMS and audio/library/model hashes are recalculated independently.
+
+Calibration passes23 rejecting controls, including changed prefixes, extra token
+changes, bad serialized MT states, false ASR scores, audio scale, nonfinite PCM
+and unsafe paths. Its fresh actual pinned sampler/patch guard also passes.
+Local receipt/logs remain under
+/mnt/storage/crispasr/dia-native-fork-20261016/local-v1/auditor-v2.
+All4 unskipped no-secrets checks pass before the auditor push. Scratch audit runs
+use unique directories so a failed audit's evidence survives later retries.
+
+As of2026-10-16T04:45Z the heavy worker and lint are queued. Auditor calibration
+does not establish successful validation of the future hosted artifact or any
+speech outcome. Full artifact audit and integration remain pending.
