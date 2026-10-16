@@ -28,11 +28,16 @@ is independently verified across all12 cells: both old/current libraries pass
 legacy/JFK but return empty text for all four expanded original clips. Original
 Whisper independently passes both controls and fails all16 expanded audio views;
 its complete77-payload input/loader/output audit is verified. Direct original
-generation without added observers is running after a shallow-source repair. Complete failed
+generation without added observers completed all five clips, then hit an ASR
+library-alias validator failure. Its94-payload source/PCM audit is verified;
+recognition resumes from sealed audio without resynthesis. Expanded PCM is
+extremely close but not byte-identical, and legacy length/amplitude differ from
+the older capture; paired environment controls are required for cause attribution. Complete failed
 evidence is permanently public. No broader speech or F16/Q4/GPU/default promotion.
 Echo's fused-product observer repair passes all13 general CI and10 lint jobs.
-Full-model observer transparency remains pending before integration, with11
-small controls passing and the full independent artifact audit prepared. See
+The full-model observer job now reports success on EN/ZH; independent audit of
+the complete3.505GB artifact remains pending before integration, with11
+small controls passing. See
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
 
 Dia top-k/top-p routing through Session and CLI is prepared on a frozen candidate,

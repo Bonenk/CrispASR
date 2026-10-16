@@ -51,7 +51,8 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
 diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
-Hosted38938983824 is running its full-model worker. Missing ffmpeg in failed38931686491 and the worker's
+Hosted38938983824 completed successfully. Its3.505GB official artifact12066499638
+is downloaded; full digest and independent scientific audit are pending. Missing ffmpeg in failed38931686491 and the worker's
 unconditional-translation-newline expectation are repaired and archived in
 HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
 formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
@@ -77,15 +78,25 @@ diag/dia-direct-original-v3-20261016, sourced41cfb273dc5dda942d11cab20b3285a0858
 Corrected hosted38940468611 completed synthesis of all five clips, then failed
 in ASR library selection: uploaded SONAME aliases are regular duplicate files.
 Retain the official55896329byte artifact12065989037 (SHAa6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed).
-Coordinator claims fresh continuation worktree
+Coordinator's frozen continuation worktree is
 /mnt/volume1/crispasr-dia-direct-finish-20261016, branch
-diag/dia-direct-finish-20261016, based on frozen d41cfb27. Resume from those
-sealed PCM files; select and hash-check the canonical library plus all aliases,
-run actual pinned ASR with positive controls, preserve failures, and independently
-audit complete provenance and PCM metrics. Do not repeat synthesis. Correct the
-independent auditor's decorated-method source extraction in a new audit version,
-retaining its initial failure. Preliminary PCM comparisons differ, including the
-legacy length, so no identity or speech conclusion is accepted yet.
+diag/dia-direct-finish-20261016, sourceabeee3e8eb5121e0f80bbe8a4a8f6f245fc8fb3f.
+Hosted38950148117 is queued: it recognizes sealed PCM plus legacy/JFK positive
+controls, without repeating synthesis. Canonical selection and corrupted/missing
+alias controls pass; actual four-library dlopen/mapping passes with isolated
+LD_LIBRARY_PATH. Collector and independent matrix-WER/parent-byte auditor/watch
+are prepared under /mnt/storage/crispasr/dia-direct-finish-20261016.
+
+New independent v2 audit verifies all94 retained payloads, seven original source
+files and exact decorated-method hashes; its initial decorator-extraction failure
+is preserved. Legacy output is562688 rather than619520 samples and RMS0.0001578
+rather than0.0735339. Four expanded clips have equal lengths and PCM cosines
+at least0.99999999998, but none is byte-exact. See
+[partial audited result](docs/dia-direct-original-results-2026-10-16.json).
+No constructor-cause attribution: the legacy reference comes from an older host/
+run without paired explicit CPU dispatch controls. A causal comparison requires
+fresh same-host/same-environment controls. Actual ASR and speech conclusions remain
+pending; preserve all failed identity/quality gates.
 Earlier no-step cancellation and missing
 shallow-source prerequisite failure are archived in HISTORY.md. The explicit
 source fetch is proven in a fresh depth-one repository; all original constructor,

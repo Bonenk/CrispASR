@@ -1,3 +1,37 @@
+## Direct-original Dia synthesis audited; recognition resumed — 2026-10-16
+
+Frozen d41cfb27/run38940468611 completed all five actual-constructor/no-observer
+syntheses, then failed selecting the old recognizer library: GH upload converted
+the SONAME symlink into a second regular file with the same hash. Official
+artifact12065989037 is55896329bytes, SHA
+a6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed.
+Independent v2 audit verifies all94 payloads, seven original source files, actual
+constructor/WeightNorm/environment provenance and decorated-method hashes. The
+first auditor omitted generate's decorator when reconstructing inspect.getsource;
+that failed log remains retained, and v2 includes the original decorator bytes.
+
+All PCM files differ from their retained captures. Four expanded cases keep the
+same lengths, cosine>=0.99999999998 and relativeL2 from1.02e-7 to4.82e-6. Legacy
+changes619520→562688 samples and RMS0.0735339→0.0001578. This is not constructor-
+cause evidence: the legacy capture is from an older host/run without paired
+explicit CPU dispatch controls. Fresh same-host/environment controls are needed
+before attributing loading or observation. Recognition of these new files is
+pending; no identity, speech or default promotion follows.
+
+New frozen abeee3e8/run38950148117 resumes from the exact sealed artifact, never
+repeating synthesis. It verifies canonical ELF and all alias bytes, reconstructs
+SONAME symlinks in separate scratch, and recognizes all five direct clips plus
+sealed legacy/JFK positives with the original Nemotron library/model. Tiny
+corrupt/missing-alias controls pass; an actual isolated loader check maps all four
+expected canonical ELFs. A preliminary in-process dlopen without the child's
+isolated search path failed; the real child isolation is now explicitly tested.
+Complete artifact collector and independent seven-cell auditor are prepared.
+See [audited partial result](docs/dia-direct-original-results-2026-10-16.json).
+
+Echo38938983824 reports successful EN/ZH OFF/ON/OFF, CLI and unchanged diff runs.
+Official artifact12066499638 is3505456385bytes; download completed and full digest/
+independent audit remain pending. Hosted success alone is not observer acceptance.
+
 ## Dia sampling-control prerequisite prepared and tested — 2026-10-16
 
 Source audit found that Dia's sampler reads top-k/top-p fields, but generic Session
