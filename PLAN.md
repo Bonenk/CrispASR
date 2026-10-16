@@ -146,6 +146,26 @@ recipe matrix until the direct-original result is audited.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
+## CLAIMED 2026-10-16 — Independent original Dia CUDA positive control
+
+Owner: coordinator, worktree /mnt/volume1/crispasr-dia-original-cuda-20261016,
+branch diag/dia-original-cuda-20261016. While CPU recognition/CI queues wait,
+prepare and execute a real CUDA original-Python control through Kaggle per the
+sibling usage guide. This is independent of the deferred matched native/original
+recipe matrix: use the pinned original README's F16 path and generate defaults
+temperature1.3/top-k35, same five fixed text/seed cases, capacity3072/CFG3/top-p.95,
+untouched original constructor/generate and actual DAC, no added observers.
+Accept only supported CUDA hardware; no CPU fallback, torch reinstall, quota
+workaround or repeated GPU draw. Record source/weights/device/version/RNG recipe,
+all PCM, actual original Whisper base.en outputs with no expected-text prompt,
+and retained legacy/JFK recognizer positives. Preserve failed quality gates;
+this cannot establish native/CPU/F16/Q4/observer parity or a default change.
+GPU models stay on Kaggle; local preparation/proof under
+/mnt/storage/crispasr/dia-original-cuda-20261016. Check active sessions first and
+publish complete proof with an independent audit before interpreting results.
+
+## Dia correctness — current dependencies
+
 The completed reduction/cache/RNG, broader matrix and recognition investigations
 are in HISTORY.md and their pinned machine receipts. Current claims above carry
 the direct-original and full-model observer dependencies.
