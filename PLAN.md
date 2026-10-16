@@ -1,6 +1,6 @@
 # CrispASR — Pending work
 
-Updated 2026-10-15. This file contains current actions, dependencies and a
+Updated 2026-10-16. This file contains current actions, dependencies and a
 legacy audit inventory. Completed work and experiment receipts live in
 [HISTORY.md](HISTORY.md#plan-reconciliation-archive--2026-10-15).
 The archived snapshot preserves detailed older requirements without treating
@@ -44,66 +44,34 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-15 — Dia full-original trace and single-decision fork
+## Dia correctness — reciprocal native decision diagnostic
 
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-original-trace-20261015, branch diag/dia-original-trace-20261015;
-large scratch/evidence under /mnt/storage/crispasr/dia-original-trace-20261015.
-Use pinned8d0ad886 reference tools and actual original4a9e29b1/caba weights,
-Torch2.6 CPU, seed42 and the unchanged3072-token recipe. Capture simultaneous
-actual full-model self Q/K/V/attention, pre-RoPE Q/K/V projections and decoder
-boundaries at position978; retain actual original cross-cache valid prefixes.
-Require OFF/ON/OFF all-common arrays, complete trajectories and PCM byte-exact,
-canonical original input/code grids and original TTS→ASR WER0 before any fork.
-Then call the unchanged original sampler and replace only the step978/codebook2
-sample877 with904. Verify the clone does not consume RNG or alter other entries,
-all earlier inputs/logits exact, and one changed next-input entry. Retain complete
-subsequent codes/audio and report fork TTS→ASR honestly, whether speech succeeds
-or fails. No changed seed/filter/threshold, teacher-forced prefix, model arithmetic,
-production sampler or default. This tests sensitivity, not a speech repair.
-Local work is tiny actual-original module/sampler observation contracts; full
-original runs and recognizer/build tasks belong on GH. Missing full-model self-Q
-provenance must be distinguished from earlier qualified module replay/shadows.
+The [full original trace and one-decision fork](docs/dia-original-trace-results-2026-10-16.md)
+are complete and independently audited. All18 actual original self-attention
+captures now have full-model provenance, exact OFF/ON/OFF controls and canonical
+code/input parity. Native-vs-original cosine remains at least0.9999999961 over125
+stage comparisons, yet changing only original sampled877→904 at978/codebook2
+changes WER0 to an empty transcript/WER1. Complete evidence is public.
+No new production arithmetic defect or native speech repair follows.
 
-Checkpoint: candidate9ed6cff6 is pushed. Heavy CPU
-[38818571466](https://github.com/CrispStrobe/CrispASR/actions/runs/38818571466)
-and lint [38818570959](https://github.com/CrispStrobe/CrispASR/actions/runs/38818570959)
-both completed successfully at candidate9ed6cff6. The worker reports original
-WER0 and the one-decision original fork WER1 with an empty transcript. These
-are provisional pending independent raw-artifact audit; artifact12014433279
-is338692054 bytes, SHA c57ddb8fba5fd6c2c96eca39192c3cb38f4079924a5efbc788c60a7462c8ced4.
-Audit work continues in the same owned worktree and storage directory.
-Actual tiny original generation with
-simultaneous observers passes OFF/ON/OFF byte equality; actual Attention/cache/
-sampler contracts and6 rejected controls pass. All4 unskipped secret checks pass.
-The new full-model hook import wiring was exercised locally before dispatch.
-[Preparation and limits](docs/dia-original-trace-preparation-2026-10-15.md).
-Next: inspect hosted stages, independently audit every payload/control, then
-publish immutable evidence and integrate only accepted tooling/results. No
-audited full-model/fork result, native repair or release acceptance is claimed yet.
-
-## Dia correctness — next full-original trace
-
-Native full speech remains rejected; no validated production arithmetic fix
-follows from the completed probes. Completed diagnosis and exact receipts are
-archived in HISTORY.md. The [terminal result](docs/dia-terminal-replay-results-2026-10-15.md)
-separates conditional final-normalization/head effects; CFG F64 gives identical
-margins. Avoid unchanged norm/head/late-layer/source-RoPE and37-arm repeats.
-
-1. Capture simultaneous actual original full-model self Q/K/V, pre-RoPE
-   projections and full decoder boundaries at position978, with OFF/ON/OFF
-   transparency. Require all common tensors, complete trajectories and PCM
-   exact, and original positive speech. Do not relabel module replay/shadows
-   as full-model observations.
-2. After those controls pass, test an original-only single decision fork:
-   call the unchanged original sampler, then replace only step978/codebook2's
-   sampled877 with904. Keep seed, noise consumption, recipe and all earlier
-   inputs fixed; record complete subsequent codes/audio and TTS→ASR. This is a
-   causal sensitivity diagnostic, not a production filter workaround. Require
-   the exact pre-fork prefix and one changed next-input entry; report either
-   quality outcome honestly without changing an acceptance threshold.
-3. Only a new demonstrated runtime defect justifies a production candidate;
-   require decoded-output acceptance before performance/Q4/GPU promotion.
+1. **Reciprocal native intervention:** use the same pinned8d0ad886/C36 scratch
+   runtime, F32 weights/cross caches, portable RNG and source-RoPE-off configuration
+   underlying the accepted native boundary. Call the
+   unchanged sampler and replace only sampled904→877 at the same decision.
+   Require an unmodified baseline and identity904 control with complete byte-exact
+   trajectories/audio, unchanged RNG consumption and all earlier inputs/logits,
+   plus exactly one changed next-input entry. Keep all ensuing codes/audio and
+   actual DAC/ASR roundtrips. Report either quality outcome honestly. This tests
+   whether correcting that one decision is sufficient in the native trajectory;
+   it is not a production token/filter workaround.
+2. Use the full original pre-projection/Q/K/V/boundary captures only for a new
+   specific hypothesis. Avoid unchanged norm/head/late-layer/source-RoPE sweeps.
+   Tiny arithmetic/reduction controls and prior terminal interventions already
+   constrain the remaining small differences; do not name a unique bad operator
+   without new evidence.
+3. After any justified runtime candidate, require unchanged controls and real
+   decoded-output acceptance on bounded additional prompts/seeds, then GPU/Q4
+   and performance. Keep defaults and acceptance thresholds fixed meanwhile.
 
 ## CANN — hardware follow-ups after merged PR544
 

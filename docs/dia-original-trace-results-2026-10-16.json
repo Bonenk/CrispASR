@@ -1,0 +1,1038 @@
+{
+  "source": "9ed6cff6f12627fddb61ea0ff7410b50950fd2b3",
+  "archive_sha256": "c57ddb8fba5fd6c2c96eca39192c3cb38f4079924a5efbc788c60a7462c8ced4",
+  "payloads": 549,
+  "arms": {
+    "off": 41,
+    "on": 491,
+    "repeat": 41,
+    "fork": 41
+  },
+  "all_common_arrays_and_rng_exact": true,
+  "canonical_exact": true,
+  "all18_actual_full_model_observations": true,
+  "one_sample_fork_prefix_exact": true,
+  "original_wer": 0,
+  "fork_wer": 1,
+  "fork_transcript": "",
+  "metrics_vs_accepted_native": [
+    {
+      "stage": "decoder_ca0",
+      "cos_min": 0.9999999999996837,
+      "native_rms": 0.04986260362283053,
+      "original_rms": 0.04986260968352835,
+      "max_abs": 5.960464477539062e-07,
+      "relative_l2": 7.605107269263871e-07
+    },
+    {
+      "stage": "cross_k0",
+      "cos_min": 0.9999999999990465,
+      "native_rms": 0.09388950957520792,
+      "original_rms": 0.09388950381295373,
+      "max_abs": 1.1846423149108887e-06,
+      "relative_l2": 4.211305386025708e-07
+    },
+    {
+      "stage": "cross_v0",
+      "cos_min": 0.9999999999997173,
+      "native_rms": 0.02553382469337904,
+      "original_rms": 0.025533823561704444,
+      "max_abs": 2.980232238769531e-07,
+      "relative_l2": 4.861801371945938e-07
+    },
+    {
+      "stage": "decoder_block0_ca_residual",
+      "cos_min": 0.9999999999981116,
+      "native_rms": 0.17259852383094484,
+      "original_rms": 0.17259854743949024,
+      "max_abs": 1.5497207641601562e-06,
+      "relative_l2": 1.946589529131497e-06
+    },
+    {
+      "stage": "decoder_block0_cross_attention",
+      "cos_min": 0.999999999970525,
+      "native_rms": 0.008604952982799246,
+      "original_rms": 0.008604953694884131,
+      "max_abs": 1.7508864402770996e-07,
+      "relative_l2": 1.2640412864822058e-06
+    },
+    {
+      "stage": "decoder_block0_cross_output",
+      "cos_min": 0.9999999999996837,
+      "native_rms": 0.04986260362283053,
+      "original_rms": 0.04986260968352835,
+      "max_abs": 5.960464477539062e-07,
+      "relative_l2": 7.605107269263871e-07
+    },
+    {
+      "stage": "decoder_block0_cross_q",
+      "cos_min": 0.9999999998554275,
+      "native_rms": 0.3336064676401112,
+      "original_rms": 0.3336065724533879,
+      "max_abs": 1.9118189811706543e-05,
+      "relative_l2": 5.2041931353829e-06
+    },
+    {
+      "stage": "decoder_block0_input",
+      "cos_min": 1.0000000000000002,
+      "native_rms": 0.09980662079421034,
+      "original_rms": 0.09980662079421034,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "stage": "decoder_block0_mlp_gate",
+      "cos_min": 0.9999999999997913,
+      "native_rms": 2.922361819887423,
+      "original_rms": 2.922362272463223,
+      "max_abs": 1.239776611328125e-05,
+      "relative_l2": 6.572491603367249e-07
+    },
+    {
+      "stage": "decoder_block0_mlp_hidden",
+      "cos_min": 0.999999999997921,
+      "native_rms": 0.04195732643723921,
+      "original_rms": 0.04195732430917059,
+      "max_abs": 2.1457672119140625e-06,
+      "relative_l2": 2.0241625487474783e-06
+    },
+    {
+      "stage": "decoder_block0_mlp_output",
+      "cos_min": 0.9999999999986897,
+      "native_rms": 0.3095774261762841,
+      "original_rms": 0.3095773924727408,
+      "max_abs": 6.4373016357421875e-06,
+      "relative_l2": 1.6143750336144385e-06
+    },
+    {
+      "stage": "decoder_block0_mlp_up",
+      "cos_min": 0.9999999999983151,
+      "native_rms": 0.1662792946945138,
+      "original_rms": 0.16627928849175172,
+      "max_abs": 4.559755325317383e-06,
+      "relative_l2": 1.8308027423453522e-06
+    },
+    {
+      "stage": "decoder_block0_output",
+      "cos_min": 0.9999999999989716,
+      "native_rms": 0.41089702544702383,
+      "original_rms": 0.41089703698824825,
+      "max_abs": 6.67572021484375e-06,
+      "relative_l2": 1.4360987107866919e-06
+    },
+    {
+      "stage": "decoder_block0_pre_ca_norm",
+      "cos_min": 0.9999999999982186,
+      "native_rms": 0.045935597926029824,
+      "original_rms": 0.045935601553667056,
+      "max_abs": 1.2516975402832031e-06,
+      "relative_l2": 1.889219717588192e-06
+    },
+    {
+      "stage": "decoder_block0_pre_mlp_norm",
+      "cos_min": 0.9999999999987833,
+      "native_rms": 0.11247583984783346,
+      "original_rms": 0.11247584602131953,
+      "max_abs": 1.3709068298339844e-06,
+      "relative_l2": 1.5600522807820744e-06
+    },
+    {
+      "stage": "decoder_block0_pre_sa_norm",
+      "cos_min": 1.0000000000000002,
+      "native_rms": 0.041323336759085526,
+      "original_rms": 0.041323336759085526,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "stage": "decoder_block0_sa_attention",
+      "cos_min": 0.9999999999434873,
+      "native_rms": 0.06009667307857182,
+      "original_rms": 0.06009667992678833,
+      "max_abs": 2.7939677238464355e-06,
+      "relative_l2": 4.711226770896692e-06
+    },
+    {
+      "stage": "decoder_block0_sa_output",
+      "cos_min": 0.9999999999961181,
+      "native_rms": 0.11994625594948405,
+      "original_rms": 0.11994627268934514,
+      "max_abs": 1.3932585716247559e-06,
+      "relative_l2": 2.789912440986251e-06
+    },
+    {
+      "stage": "decoder_block0_sa_residual",
+      "cos_min": 0.9999999999977157,
+      "native_rms": 0.15638478065302555,
+      "original_rms": 0.15638479756039117,
+      "max_abs": 1.3709068298339844e-06,
+      "relative_l2": 2.14013339627829e-06
+    },
+    {
+      "stage": "decoder_layer_0",
+      "cos_min": 0.9999999999989716,
+      "native_rms": 0.41089702544702383,
+      "original_rms": 0.41089703698824825,
+      "max_abs": 6.67572021484375e-06,
+      "relative_l2": 1.4360987107866919e-06
+    },
+    {
+      "stage": "decoder_layer_1",
+      "cos_min": 0.999999999998942,
+      "native_rms": 0.5094659373204536,
+      "original_rms": 0.5094659303882529,
+      "max_abs": 8.58306884765625e-06,
+      "relative_l2": 1.45076911286986e-06
+    },
+    {
+      "stage": "decoder_layer_10",
+      "cos_min": 0.9999999999965227,
+      "native_rms": 1.3859445902953822,
+      "original_rms": 1.3859445853975487,
+      "max_abs": 2.86102294921875e-05,
+      "relative_l2": 2.572805219700209e-06
+    },
+    {
+      "stage": "decoder_layer_11",
+      "cos_min": 0.9999999999976087,
+      "native_rms": 1.695507750104739,
+      "original_rms": 1.6955076605687447,
+      "max_abs": 3.62396240234375e-05,
+      "relative_l2": 2.1820343782648897e-06
+    },
+    {
+      "stage": "decoder_layer_12",
+      "cos_min": 0.9999999999974387,
+      "native_rms": 1.917234862819465,
+      "original_rms": 1.9172347023774146,
+      "max_abs": 2.5987625122070312e-05,
+      "relative_l2": 2.2549087140255015e-06
+    },
+    {
+      "stage": "decoder_layer_13",
+      "cos_min": 0.9999999999978069,
+      "native_rms": 2.2160383614208476,
+      "original_rms": 2.2160383074723087,
+      "max_abs": 2.944469451904297e-05,
+      "relative_l2": 2.0456419157545696e-06
+    },
+    {
+      "stage": "decoder_layer_14",
+      "cos_min": 0.9999999999979489,
+      "native_rms": 2.5171517245280963,
+      "original_rms": 2.5171517347630226,
+      "max_abs": 3.4332275390625e-05,
+      "relative_l2": 1.9987908289230952e-06
+    },
+    {
+      "stage": "decoder_layer_15",
+      "cos_min": 0.999999999997987,
+      "native_rms": 2.969002077945153,
+      "original_rms": 2.9690023729047104,
+      "max_abs": 4.57763671875e-05,
+      "relative_l2": 1.9708372687938223e-06
+    },
+    {
+      "stage": "decoder_layer_16",
+      "cos_min": 0.9999999999976613,
+      "native_rms": 3.4749793471948376,
+      "original_rms": 3.474979602555158,
+      "max_abs": 4.57763671875e-05,
+      "relative_l2": 2.126875475570996e-06
+    },
+    {
+      "stage": "decoder_layer_17",
+      "cos_min": 0.9999999999969856,
+      "native_rms": 6.406878948515619,
+      "original_rms": 6.406881853144804,
+      "max_abs": 0.0001430511474609375,
+      "relative_l2": 2.347025692152483e-06
+    },
+    {
+      "stage": "decoder_layer_2",
+      "cos_min": 0.9999999999969691,
+      "native_rms": 0.5534724371263146,
+      "original_rms": 0.553472337482129,
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 2.4530929251724008e-06
+    },
+    {
+      "stage": "decoder_layer_3",
+      "cos_min": 0.9999999999927717,
+      "native_rms": 0.6283685908226064,
+      "original_rms": 0.628368417870967,
+      "max_abs": 1.3232231140136719e-05,
+      "relative_l2": 3.80600208799053e-06
+    },
+    {
+      "stage": "decoder_layer_4",
+      "cos_min": 0.9999999999948748,
+      "native_rms": 0.7147428886077758,
+      "original_rms": 0.7147427596306299,
+      "max_abs": 1.609325408935547e-05,
+      "relative_l2": 3.166902595186595e-06
+    },
+    {
+      "stage": "decoder_layer_5",
+      "cos_min": 0.9999999999967821,
+      "native_rms": 0.7603414282825851,
+      "original_rms": 0.7603414027933036,
+      "max_abs": 1.5974044799804688e-05,
+      "relative_l2": 2.534919603326942e-06
+    },
+    {
+      "stage": "decoder_layer_6",
+      "cos_min": 0.9999999999960749,
+      "native_rms": 0.7830526973321136,
+      "original_rms": 0.7830526306373373,
+      "max_abs": 2.5272369384765625e-05,
+      "relative_l2": 2.799526602666286e-06
+    },
+    {
+      "stage": "decoder_layer_7",
+      "cos_min": 0.9999999999967895,
+      "native_rms": 0.8808005837407497,
+      "original_rms": 0.8808005831764746,
+      "max_abs": 2.288818359375e-05,
+      "relative_l2": 2.53155913423968e-06
+    },
+    {
+      "stage": "decoder_layer_8",
+      "cos_min": 0.9999999999968737,
+      "native_rms": 1.0928507884717173,
+      "original_rms": 1.0928507969822319,
+      "max_abs": 2.0503997802734375e-05,
+      "relative_l2": 2.4673203839088007e-06
+    },
+    {
+      "stage": "decoder_layer_9",
+      "cos_min": 0.999999999995535,
+      "native_rms": 1.2735186115555466,
+      "original_rms": 1.2735186307190034,
+      "max_abs": 1.621246337890625e-05,
+      "relative_l2": 2.959206959118416e-06
+    },
+    {
+      "stage": "decoder_sa0_attention",
+      "cos_min": 0.9999999999434873,
+      "native_rms": 0.06009667307857182,
+      "original_rms": 0.06009667992678833,
+      "max_abs": 2.7939677238464355e-06,
+      "relative_l2": 4.711226770896692e-06
+    },
+    {
+      "stage": "decoder_sa0_k",
+      "cos_min": 0.9999999986246273,
+      "native_rms": 0.775984280791418,
+      "original_rms": 0.7759842800627231,
+      "max_abs": 0.00023877620697021484,
+      "relative_l2": 1.573063980353562e-05
+    },
+    {
+      "stage": "decoder_sa0_q",
+      "cos_min": 0.9999999981141157,
+      "native_rms": 0.4924255988324781,
+      "original_rms": 0.49242562842003323,
+      "max_abs": 0.0005460083484649658,
+      "relative_l2": 5.374406666409501e-05
+    },
+    {
+      "stage": "decoder_sa0_v",
+      "cos_min": 0.9999999999992409,
+      "native_rms": 0.07561741199934686,
+      "original_rms": 0.07561741195388604,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 6.78768864427413e-07
+    },
+    {
+      "stage": "decoder_sa10_attention",
+      "cos_min": 0.999999999876233,
+      "native_rms": 0.15444266443329144,
+      "original_rms": 0.15444249705496654,
+      "max_abs": 7.964670658111572e-06,
+      "relative_l2": 8.391865737444581e-06
+    },
+    {
+      "stage": "decoder_sa10_k",
+      "cos_min": 0.9999999984873165,
+      "native_rms": 0.8318593777432672,
+      "original_rms": 0.8318594260790172,
+      "max_abs": 0.0002964138984680176,
+      "relative_l2": 1.7245843899285998e-05
+    },
+    {
+      "stage": "decoder_sa10_q",
+      "cos_min": 0.9999999976047813,
+      "native_rms": 0.6858866155066873,
+      "original_rms": 0.6858866293606053,
+      "max_abs": 0.0004801750183105469,
+      "relative_l2": 5.4313052658226175e-05
+    },
+    {
+      "stage": "decoder_sa10_v",
+      "cos_min": 0.9999999996591938,
+      "native_rms": 0.18913350621955607,
+      "original_rms": 0.18913350643294755,
+      "max_abs": 2.4199485778808594e-05,
+      "relative_l2": 5.8244303269911765e-06
+    },
+    {
+      "stage": "decoder_sa11_attention",
+      "cos_min": 0.9999999999756094,
+      "native_rms": 0.2624168625622407,
+      "original_rms": 0.26241680865938416,
+      "max_abs": 5.304813385009766e-06,
+      "relative_l2": 3.7259953797638372e-06
+    },
+    {
+      "stage": "decoder_sa11_k",
+      "cos_min": 0.9999999968819501,
+      "native_rms": 0.7582367099267806,
+      "original_rms": 0.7582367560610105,
+      "max_abs": 0.0004203319549560547,
+      "relative_l2": 1.9603254721935447e-05
+    },
+    {
+      "stage": "decoder_sa11_q",
+      "cos_min": 0.9999999973794677,
+      "native_rms": 0.684315791578405,
+      "original_rms": 0.6843158101276472,
+      "max_abs": 0.0005197525024414062,
+      "relative_l2": 5.6665653866664745e-05
+    },
+    {
+      "stage": "decoder_sa11_v",
+      "cos_min": 0.999999999833226,
+      "native_rms": 0.3058572081467588,
+      "original_rms": 0.3058572037231955,
+      "max_abs": 1.436471939086914e-05,
+      "relative_l2": 3.376455016939284e-06
+    },
+    {
+      "stage": "decoder_sa12_attention",
+      "cos_min": 0.9999999998070798,
+      "native_rms": 0.20591591821893254,
+      "original_rms": 0.20591592255316515,
+      "max_abs": 6.511807441711426e-06,
+      "relative_l2": 4.5262109258927665e-06
+    },
+    {
+      "stage": "decoder_sa12_k",
+      "cos_min": 0.9999999985610669,
+      "native_rms": 0.8918163881642757,
+      "original_rms": 0.891816437930328,
+      "max_abs": 0.0004369467496871948,
+      "relative_l2": 1.822813182203509e-05
+    },
+    {
+      "stage": "decoder_sa12_q",
+      "cos_min": 0.9999999969217825,
+      "native_rms": 0.773751250017786,
+      "original_rms": 0.7737514568243159,
+      "max_abs": 0.0004414021968841553,
+      "relative_l2": 5.506545696677591e-05
+    },
+    {
+      "stage": "decoder_sa12_v",
+      "cos_min": 0.9999999999281305,
+      "native_rms": 0.22291739310566558,
+      "original_rms": 0.22291738900266986,
+      "max_abs": 5.796551704406738e-06,
+      "relative_l2": 2.826026537690871e-06
+    },
+    {
+      "stage": "decoder_sa13_attention",
+      "cos_min": 0.9999999999035054,
+      "native_rms": 0.24697137741874578,
+      "original_rms": 0.24697138539571006,
+      "max_abs": 9.424053132534027e-06,
+      "relative_l2": 4.811864439657038e-06
+    },
+    {
+      "stage": "decoder_sa13_k",
+      "cos_min": 0.9999999986422522,
+      "native_rms": 0.7531239774889719,
+      "original_rms": 0.753124009845694,
+      "max_abs": 0.00029414892196655273,
+      "relative_l2": 1.65653145239928e-05
+    },
+    {
+      "stage": "decoder_sa13_q",
+      "cos_min": 0.9999999976744157,
+      "native_rms": 0.5095533834689892,
+      "original_rms": 0.509553470061314,
+      "max_abs": 0.00026363134384155273,
+      "relative_l2": 4.9159100503271004e-05
+    },
+    {
+      "stage": "decoder_sa13_v",
+      "cos_min": 0.9999999999300206,
+      "native_rms": 0.40068643882040406,
+      "original_rms": 0.4006864277609715,
+      "max_abs": 2.7894973754882812e-05,
+      "relative_l2": 3.7601725555581016e-06
+    },
+    {
+      "stage": "decoder_sa14_attention",
+      "cos_min": 0.9999999999614114,
+      "native_rms": 0.20799118195839522,
+      "original_rms": 0.20799117324643082,
+      "max_abs": 4.1425228118896484e-06,
+      "relative_l2": 3.051448011443606e-06
+    },
+    {
+      "stage": "decoder_sa14_k",
+      "cos_min": 0.999999998336865,
+      "native_rms": 0.7658604102470369,
+      "original_rms": 0.7658604560061274,
+      "max_abs": 0.0003676414489746094,
+      "relative_l2": 1.82109238996656e-05
+    },
+    {
+      "stage": "decoder_sa14_q",
+      "cos_min": 0.9999999975711737,
+      "native_rms": 0.5273019287625684,
+      "original_rms": 0.527302018031789,
+      "max_abs": 0.00030328333377838135,
+      "relative_l2": 5.5154561246973607e-05
+    },
+    {
+      "stage": "decoder_sa14_v",
+      "cos_min": 0.9999999999564967,
+      "native_rms": 0.23740343644930723,
+      "original_rms": 0.23740343814079906,
+      "max_abs": 5.751848220825195e-06,
+      "relative_l2": 2.735907319107928e-06
+    },
+    {
+      "stage": "decoder_sa15_attention",
+      "cos_min": 0.9999999997673619,
+      "native_rms": 0.21951793612450557,
+      "original_rms": 0.2195179297015832,
+      "max_abs": 2.7418136596679688e-06,
+      "relative_l2": 3.167517536636778e-06
+    },
+    {
+      "stage": "decoder_sa15_k",
+      "cos_min": 0.9999999960597721,
+      "native_rms": 0.6223043658474393,
+      "original_rms": 0.6223043961774489,
+      "max_abs": 0.0003311634063720703,
+      "relative_l2": 2.7123984960386094e-05
+    },
+    {
+      "stage": "decoder_sa15_q",
+      "cos_min": 0.9999999973920219,
+      "native_rms": 0.5375688009284391,
+      "original_rms": 0.5375688781356228,
+      "max_abs": 0.00027823448181152344,
+      "relative_l2": 5.937624786949337e-05
+    },
+    {
+      "stage": "decoder_sa15_v",
+      "cos_min": 0.999999999779677,
+      "native_rms": 0.275460596585032,
+      "original_rms": 0.27546058960894304,
+      "max_abs": 6.109476089477539e-06,
+      "relative_l2": 2.548582726450524e-06
+    },
+    {
+      "stage": "decoder_sa16_attention",
+      "cos_min": 0.9999999999918588,
+      "native_rms": 0.30166519629991295,
+      "original_rms": 0.3016651606524866,
+      "max_abs": 4.0531158447265625e-06,
+      "relative_l2": 2.615294900708027e-06
+    },
+    {
+      "stage": "decoder_sa16_k",
+      "cos_min": 0.9999999973977378,
+      "native_rms": 0.656072936676863,
+      "original_rms": 0.6560729581851092,
+      "max_abs": 0.0003420114517211914,
+      "relative_l2": 1.8723662914064198e-05
+    },
+    {
+      "stage": "decoder_sa16_q",
+      "cos_min": 0.9999999976018153,
+      "native_rms": 0.7282267692556301,
+      "original_rms": 0.7282269549828913,
+      "max_abs": 0.00045120716094970703,
+      "relative_l2": 5.486568430129009e-05
+    },
+    {
+      "stage": "decoder_sa16_v",
+      "cos_min": 0.9999999999603525,
+      "native_rms": 0.3468288845191663,
+      "original_rms": 0.34682887522131317,
+      "max_abs": 7.152557373046875e-06,
+      "relative_l2": 2.575558005282625e-06
+    },
+    {
+      "stage": "decoder_sa17_attention",
+      "cos_min": 0.9999999999732784,
+      "native_rms": 0.3111385407284013,
+      "original_rms": 0.31113847881107987,
+      "max_abs": 6.638467311859131e-06,
+      "relative_l2": 3.2655241045700147e-06
+    },
+    {
+      "stage": "decoder_sa17_k",
+      "cos_min": 0.9999999983136687,
+      "native_rms": 0.4912538397200243,
+      "original_rms": 0.49125384499990976,
+      "max_abs": 0.0001582503318786621,
+      "relative_l2": 1.830551244006828e-05
+    },
+    {
+      "stage": "decoder_sa17_q",
+      "cos_min": 0.9999999971291521,
+      "native_rms": 0.7055979635636791,
+      "original_rms": 0.7055981112447961,
+      "max_abs": 0.0004432201385498047,
+      "relative_l2": 5.815125284524832e-05
+    },
+    {
+      "stage": "decoder_sa17_v",
+      "cos_min": 0.999999999974426,
+      "native_rms": 0.36691876820535796,
+      "original_rms": 0.36691876345851887,
+      "max_abs": 6.616115570068359e-06,
+      "relative_l2": 2.366479600471457e-06
+    },
+    {
+      "stage": "decoder_sa1_attention",
+      "cos_min": 0.9999999999936876,
+      "native_rms": 0.08857707521888193,
+      "original_rms": 0.08857707412170555,
+      "max_abs": 1.216307282447815e-06,
+      "relative_l2": 1.7430980504566458e-06
+    },
+    {
+      "stage": "decoder_sa1_k",
+      "cos_min": 0.9999999972945856,
+      "native_rms": 1.0481492337961757,
+      "original_rms": 1.0481492496502187,
+      "max_abs": 0.00032579898834228516,
+      "relative_l2": 2.07014413483316e-05
+    },
+    {
+      "stage": "decoder_sa1_q",
+      "cos_min": 0.9999999968162991,
+      "native_rms": 0.49232747128359283,
+      "original_rms": 0.4923273578944015,
+      "max_abs": 0.00025957822799682617,
+      "relative_l2": 6.284417803455467e-05
+    },
+    {
+      "stage": "decoder_sa1_v",
+      "cos_min": 0.9999999999892477,
+      "native_rms": 0.09006577343508061,
+      "original_rms": 0.09006577315889018,
+      "max_abs": 2.2649765014648438e-06,
+      "relative_l2": 1.4295718222447892e-06
+    },
+    {
+      "stage": "decoder_sa2_attention",
+      "cos_min": 0.999999999689936,
+      "native_rms": 0.09067760286039397,
+      "original_rms": 0.09067753804202866,
+      "max_abs": 3.0063092708587646e-06,
+      "relative_l2": 5.978565864424471e-06
+    },
+    {
+      "stage": "decoder_sa2_k",
+      "cos_min": 0.9999999978741717,
+      "native_rms": 0.909438901893754,
+      "original_rms": 0.9094389227480655,
+      "max_abs": 0.00038902461528778076,
+      "relative_l2": 1.800438573712966e-05
+    },
+    {
+      "stage": "decoder_sa2_q",
+      "cos_min": 0.9999999975976408,
+      "native_rms": 0.4975449515250814,
+      "original_rms": 0.49754499872174707,
+      "max_abs": 0.0001989603042602539,
+      "relative_l2": 4.3408407457118205e-05
+    },
+    {
+      "stage": "decoder_sa2_v",
+      "cos_min": 0.9999999999760726,
+      "native_rms": 0.11266378918520169,
+      "original_rms": 0.11266379055291767,
+      "max_abs": 2.294778823852539e-06,
+      "relative_l2": 2.1262364490736136e-06
+    },
+    {
+      "stage": "decoder_sa3_attention",
+      "cos_min": 0.9999999994017428,
+      "native_rms": 0.08105543497080903,
+      "original_rms": 0.08105532287864059,
+      "max_abs": 5.9604644775390625e-06,
+      "relative_l2": 1.0622431032810572e-05
+    },
+    {
+      "stage": "decoder_sa3_k",
+      "cos_min": 0.9999999982759141,
+      "native_rms": 0.48443438491930635,
+      "original_rms": 0.48443440084740663,
+      "max_abs": 0.00014178454875946045,
+      "relative_l2": 1.696211261161005e-05
+    },
+    {
+      "stage": "decoder_sa3_q",
+      "cos_min": 0.9999999984941907,
+      "native_rms": 0.3745609619496813,
+      "original_rms": 0.3745607800140345,
+      "max_abs": 0.00015872716903686523,
+      "relative_l2": 4.314647780314995e-05
+    },
+    {
+      "stage": "decoder_sa3_v",
+      "cos_min": 0.9999999998242087,
+      "native_rms": 0.1391174885244211,
+      "original_rms": 0.13911749109685262,
+      "max_abs": 1.1578202247619629e-05,
+      "relative_l2": 4.650753860471236e-06
+    },
+    {
+      "stage": "decoder_sa4_attention",
+      "cos_min": 0.9999999999135798,
+      "native_rms": 0.12323563140973702,
+      "original_rms": 0.1232356280903793,
+      "max_abs": 3.378838300704956e-06,
+      "relative_l2": 3.5329659431571078e-06
+    },
+    {
+      "stage": "decoder_sa4_k",
+      "cos_min": 0.9999999985965556,
+      "native_rms": 0.47417501035241105,
+      "original_rms": 0.47417503514696846,
+      "max_abs": 0.00011754035949707031,
+      "relative_l2": 1.2596140034860788e-05
+    },
+    {
+      "stage": "decoder_sa4_q",
+      "cos_min": 0.9999999989379774,
+      "native_rms": 0.3188037761174018,
+      "original_rms": 0.31880373432043374,
+      "max_abs": 8.52346420288086e-05,
+      "relative_l2": 3.270692271032813e-05
+    },
+    {
+      "stage": "decoder_sa4_v",
+      "cos_min": 0.9999999997263475,
+      "native_rms": 0.23090879772943534,
+      "original_rms": 0.23090878919194271,
+      "max_abs": 2.899765968322754e-05,
+      "relative_l2": 6.444499628353077e-06
+    },
+    {
+      "stage": "decoder_sa5_attention",
+      "cos_min": 0.9999999999649596,
+      "native_rms": 0.1391859139582297,
+      "original_rms": 0.13918593704841972,
+      "max_abs": 2.3543834686279297e-06,
+      "relative_l2": 2.732186182350657e-06
+    },
+    {
+      "stage": "decoder_sa5_k",
+      "cos_min": 0.9999999986909333,
+      "native_rms": 0.4863871632803952,
+      "original_rms": 0.48638717462485526,
+      "max_abs": 0.00014072656631469727,
+      "relative_l2": 1.246532347456617e-05
+    },
+    {
+      "stage": "decoder_sa5_q",
+      "cos_min": 0.9999999989482854,
+      "native_rms": 0.33728620603875814,
+      "original_rms": 0.33728638246629583,
+      "max_abs": 0.00010502338409423828,
+      "relative_l2": 3.394415954265768e-05
+    },
+    {
+      "stage": "decoder_sa5_v",
+      "cos_min": 0.9999999998058694,
+      "native_rms": 0.23759495197043654,
+      "original_rms": 0.23759495281639723,
+      "max_abs": 1.2122094631195068e-05,
+      "relative_l2": 4.5680662937451814e-06
+    },
+    {
+      "stage": "decoder_sa6_attention",
+      "cos_min": 0.9999999998379981,
+      "native_rms": 0.08407141309814856,
+      "original_rms": 0.08407127816714753,
+      "max_abs": 6.232410669326782e-06,
+      "relative_l2": 9.120347856148782e-06
+    },
+    {
+      "stage": "decoder_sa6_k",
+      "cos_min": 0.999999997915026,
+      "native_rms": 0.49975098525544626,
+      "original_rms": 0.4997509824887545,
+      "max_abs": 0.0001970529556274414,
+      "relative_l2": 1.921818642747946e-05
+    },
+    {
+      "stage": "decoder_sa6_q",
+      "cos_min": 0.999999998553813,
+      "native_rms": 0.4745899750398305,
+      "original_rms": 0.4745901065326455,
+      "max_abs": 0.00015930086374282837,
+      "relative_l2": 3.7790930837248876e-05
+    },
+    {
+      "stage": "decoder_sa6_v",
+      "cos_min": 0.9999999999586092,
+      "native_rms": 0.13661827131802112,
+      "original_rms": 0.13661826890037893,
+      "max_abs": 3.159046173095703e-06,
+      "relative_l2": 3.42258119158937e-06
+    },
+    {
+      "stage": "decoder_sa7_attention",
+      "cos_min": 0.9999999999104949,
+      "native_rms": 0.08447009450328839,
+      "original_rms": 0.08447005652076446,
+      "max_abs": 3.635883331298828e-06,
+      "relative_l2": 6.067855739458748e-06
+    },
+    {
+      "stage": "decoder_sa7_k",
+      "cos_min": 0.9999999984613153,
+      "native_rms": 0.5258833905577646,
+      "original_rms": 0.5258833864790476,
+      "max_abs": 0.00014482438564300537,
+      "relative_l2": 1.860261844838963e-05
+    },
+    {
+      "stage": "decoder_sa7_q",
+      "cos_min": 0.9999999986013529,
+      "native_rms": 0.43296092616320747,
+      "original_rms": 0.43296085736748463,
+      "max_abs": 0.00019948184490203857,
+      "relative_l2": 4.0589949585582564e-05
+    },
+    {
+      "stage": "decoder_sa7_v",
+      "cos_min": 0.9999999999477367,
+      "native_rms": 0.14703679000367498,
+      "original_rms": 0.14703678655875302,
+      "max_abs": 6.198883056640625e-06,
+      "relative_l2": 3.737950191317548e-06
+    },
+    {
+      "stage": "decoder_sa8_attention",
+      "cos_min": 0.9999999999734503,
+      "native_rms": 0.176414376214559,
+      "original_rms": 0.17641441271850677,
+      "max_abs": 4.798173904418945e-06,
+      "relative_l2": 4.160505534057344e-06
+    },
+    {
+      "stage": "decoder_sa8_k",
+      "cos_min": 0.9999999986305935,
+      "native_rms": 0.7383826748163597,
+      "original_rms": 0.7383826958155745,
+      "max_abs": 0.00022846460342407227,
+      "relative_l2": 1.4736717706241796e-05
+    },
+    {
+      "stage": "decoder_sa8_q",
+      "cos_min": 0.9999999980199573,
+      "native_rms": 0.7864575400121087,
+      "original_rms": 0.7864577424802942,
+      "max_abs": 0.0005537271499633789,
+      "relative_l2": 5.395485782719321e-05
+    },
+    {
+      "stage": "decoder_sa8_v",
+      "cos_min": 0.999999999971331,
+      "native_rms": 0.1902684762027324,
+      "original_rms": 0.19026847645923028,
+      "max_abs": 4.187226295471191e-06,
+      "relative_l2": 2.548122007538367e-06
+    },
+    {
+      "stage": "decoder_sa9_attention",
+      "cos_min": 0.9999999998733494,
+      "native_rms": 0.17226490257358115,
+      "original_rms": 0.17226489233410763,
+      "max_abs": 6.496906280517578e-06,
+      "relative_l2": 6.063090919992793e-06
+    },
+    {
+      "stage": "decoder_sa9_k",
+      "cos_min": 0.9999999981614289,
+      "native_rms": 1.0106168869567365,
+      "original_rms": 1.0106169367292215,
+      "max_abs": 0.00039839744567871094,
+      "relative_l2": 1.8935097601267096e-05
+    },
+    {
+      "stage": "decoder_sa9_q",
+      "cos_min": 0.9999999971820779,
+      "native_rms": 0.506198782621121,
+      "original_rms": 0.5061987902924728,
+      "max_abs": 0.00022077560424804688,
+      "relative_l2": 5.280091496684979e-05
+    },
+    {
+      "stage": "decoder_sa9_v",
+      "cos_min": 0.9999999999687025,
+      "native_rms": 0.1996687837261744,
+      "original_rms": 0.1996687807074751,
+      "max_abs": 3.9637088775634766e-06,
+      "relative_l2": 3.0306141947665223e-06
+    },
+    {
+      "stage": "encoder_embedding",
+      "cos_min": 0.9999999999999999,
+      "native_rms": 0.02740607046407788,
+      "original_rms": 0.02740607046407788,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "stage": "encoder_layer_0",
+      "cos_min": 0.9999999999999283,
+      "native_rms": 0.2136082893475512,
+      "original_rms": 0.2136082918501197,
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 1.7437147029257725e-07
+    },
+    {
+      "stage": "encoder_layer_1",
+      "cos_min": 0.9999999999999081,
+      "native_rms": 0.23005038373857595,
+      "original_rms": 0.23005038956134077,
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 1.8678639492032577e-07
+    },
+    {
+      "stage": "encoder_layer_10",
+      "cos_min": 0.9999999999997391,
+      "native_rms": 2.509912037497082,
+      "original_rms": 2.5099118700099137,
+      "max_abs": 1.9073486328125e-05,
+      "relative_l2": 4.537436858982186e-07
+    },
+    {
+      "stage": "encoder_layer_11",
+      "cos_min": 0.9999999999997833,
+      "native_rms": 99.14519464586716,
+      "original_rms": 99.14519818464622,
+      "max_abs": 0.00067138671875,
+      "relative_l2": 2.7157799833685605e-07
+    },
+    {
+      "stage": "encoder_layer_2",
+      "cos_min": 0.99999999999944,
+      "native_rms": 0.24771422303498167,
+      "original_rms": 0.24771422748814398,
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 2.519934094754504e-07
+    },
+    {
+      "stage": "encoder_layer_3",
+      "cos_min": 0.9999999999994252,
+      "native_rms": 0.2691199125423252,
+      "original_rms": 0.2691199147492898,
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 2.7908308943943833e-07
+    },
+    {
+      "stage": "encoder_layer_4",
+      "cos_min": 0.9999999999995406,
+      "native_rms": 0.6312184572722174,
+      "original_rms": 0.6312184362031635,
+      "max_abs": 3.814697265625e-06,
+      "relative_l2": 3.318729210492447e-07
+    },
+    {
+      "stage": "encoder_layer_5",
+      "cos_min": 0.9999999999995838,
+      "native_rms": 0.6449859784193246,
+      "original_rms": 0.6449859580787487,
+      "max_abs": 3.814697265625e-06,
+      "relative_l2": 3.3270086230798707e-07
+    },
+    {
+      "stage": "encoder_layer_6",
+      "cos_min": 0.9999999999996015,
+      "native_rms": 0.7166089987997952,
+      "original_rms": 0.7166089736568839,
+      "max_abs": 4.76837158203125e-06,
+      "relative_l2": 3.4123122969608866e-07
+    },
+    {
+      "stage": "encoder_layer_7",
+      "cos_min": 0.9999999999995136,
+      "native_rms": 0.7797876617118024,
+      "original_rms": 0.7797876387809582,
+      "max_abs": 4.76837158203125e-06,
+      "relative_l2": 3.5630184421099326e-07
+    },
+    {
+      "stage": "encoder_layer_8",
+      "cos_min": 0.9999999999996343,
+      "native_rms": 1.103144060493678,
+      "original_rms": 1.103144085362438,
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 3.28027540486147e-07
+    },
+    {
+      "stage": "encoder_layer_9",
+      "cos_min": 0.9999999999996508,
+      "native_rms": 1.311727768567769,
+      "original_rms": 1.311727782100649,
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 3.6422956075532587e-07
+    },
+    {
+      "stage": "encoder_output",
+      "cos_min": 0.9999999999997091,
+      "native_rms": 0.06661053887986809,
+      "original_rms": 0.06661053597665294,
+      "max_abs": 5.960464477539062e-07,
+      "relative_l2": 5.087925881459873e-07
+    },
+    {
+      "stage": "encoder_tokens",
+      "cos_min": 1.0,
+      "native_rms": 67.03682493552255,
+      "original_rms": 67.03682493552255,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "stage": "decoder_hidden",
+      "cos_min": 0.9999999999973835,
+      "native_rms": 0.7156258804017035,
+      "original_rms": 0.7156256589027461,
+      "max_abs": 1.163780689239502e-05,
+      "relative_l2": 2.280212657071085e-06
+    }
+  ],
+  "native_speech_acceptance": false,
+  "production_defaults_changed": false,
+  "publication": {
+    "revision": "bed84796a4f829f87b017ad765a2f3a6f8cd335e",
+    "prefix": "dia-20261016-original-trace/complete-hosted-original-trace-v1",
+    "raw_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/bed84796a4f829f87b017ad765a2f3a6f8cd335e/dia-20261016-original-trace/complete-hosted-original-trace-v1/raw.zip",
+    "anonymous_all_files_full_sha256_verified": true
+  },
+  "native_comparison_configuration": {
+    "runtime": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "neural_weights": "f32",
+    "cross_cache": "f32",
+    "portable_rng": true,
+    "source_rope": false,
+    "position": 978,
+    "scope": "Accepted aligned-history diagnostic captures, not current-default speech."
+  }
+}

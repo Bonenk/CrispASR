@@ -1,5 +1,8 @@
 # Dia actual original trace and sampled-decision fork — preparation
 
+Superseded by the [independently audited result](dia-original-trace-results-2026-10-16.md).
+The text below preserves the preparation checkpoint.
+
 Candidate9ed6cff6 runs on the owned branch diag/dia-original-trace-20261015.
 Heavy CPU [38818571466](https://github.com/CrispStrobe/CrispASR/actions/runs/38818571466)
 and lint [38818570959](https://github.com/CrispStrobe/CrispASR/actions/runs/38818570959)

@@ -562,3 +562,14 @@ separate post-layer17, final-normalization and head-projection effects; F64 CFG
 reproduces every observed margin exactly. Complete raw proof is public. These
 are integrated diagnostic tools, not a native speech fix, new default or
 Q4/GPU/performance acceptance. [Result](dia-terminal-replay-results-2026-10-15.md).
+
+## Dia actual original trace and decision sensitivity
+
+All18 layers now have simultaneous actual original self Q/K/V/attention,
+pre-RoPE projections and decoder boundaries with exact OFF/ON/OFF controls.
+An independent549-payload audit recalculates125 comparisons and checks complete
+prefix/RNG provenance. Changing only one sampled token in the original takes
+this prompt/seed from WER0 to quiet audio and empty ASR/WER1 despite stage cosine
+at least0.9999999961. Complete raw proof is public and anonymously SHA-verified.
+This explains a severe sensitivity mechanism; it adds no native speech repair,
+new default or Q4/GPU/performance acceptance. [Results](dia-original-trace-results-2026-10-16.md).

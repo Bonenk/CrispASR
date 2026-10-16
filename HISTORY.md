@@ -1,3 +1,26 @@
+## Dia actual original trace and one-decision fork integrated — 2026-10-16
+
+Worker9ed6cff6 passes heavy38818571466 and all applicable lint38818570959.
+Auditor4b0df07b verifies549 raw payloads,41/491/41/41 arm arrays and125 native
+comparison rows;15 rejecting/scale controls pass. Integrated tooling6f001996
+preserves worker/auditor bytes after rebase. All18 self Q/K/V/attention,
+pre-RoPE projections,16 boundaries per layer and valid cross-cache prefixes now
+come from simultaneous actual original full-model calls. OFF/ON/OFF common
+arrays, complete trajectories/PCM and RNG witnesses are byte-exact; canonical
+inputs/codes and all18 prior original layer outputs/final hidden remain exact.
+
+Changing only original step978/codebook2 sampled877→904, after the unchanged
+sampler, preserves RNG and every earlier input/logit but yields quiet audio and
+empty ASR/WER1 versus original WER0. Native comparisons have cosine at least
+0.9999999960597721 and maximum relative L2 6.284418e-5. This is a controlled
+single-decision sensitivity result for one prompt/seed, not a native speech fix
+or unique arithmetic cause. The reciprocal native intervention remains in PLAN.
+
+Complete338692054-byte raw proof and auditor are public at immutable revision
+bed84796a4f829f87b017ad765a2f3a6f8cd335e; every published file was anonymously
+fully downloaded and SHA-verified. [Result and all18-layer table](docs/dia-original-trace-results-2026-10-16.md).
+No production arithmetic/default, Q4/GPU/performance or release promotion.
+
 # CrispASR — Port history
 
 ## Dia hosted terminal intervention integrated — 2026-10-15

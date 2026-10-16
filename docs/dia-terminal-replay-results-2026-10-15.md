@@ -1,5 +1,11 @@
 # Dia hosted terminal interventions — 2026-10-15
 
+Follow-up: the [actual full-original trace and one-decision fork](dia-original-trace-results-2026-10-16.md)
+are complete. All18 actual self-attention captures pass exact OFF/ON/OFF
+controls; replacing only original sampled877→904 reproduces quiet audio and
+empty ASR. The terminal findings below remain valid; the reciprocal native
+decision intervention is the next pending sensitivity test.
+
 The actual pinned hosted graph now separates terminal normalization and head
 projection effects. Heavy38805728288 passes at85be03e3; lint38805731957 passes
 all10 jobs. Independent audit checks277 payloads,5 arms,90 layer comparisons,
