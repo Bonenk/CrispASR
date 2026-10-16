@@ -573,3 +573,12 @@ this prompt/seed from WER0 to quiet audio and empty ASR/WER1 despite stage cosin
 at least0.9999999961. Complete raw proof is public and anonymously SHA-verified.
 This explains a severe sensitivity mechanism; it adds no native speech repair,
 new default or Q4/GPU/performance acceptance. [Results](dia-original-trace-results-2026-10-16.md).
+
+## Dia reciprocal decision diagnosis
+
+A642-payload independent audit proves exact native controls and unchanged RNG.
+Restoring one sampled decision recovers the expected sentence through native
+and original DAC (WER1→0), all1,226 original input rows and1,210 code frames.
+Complete public evidence is anonymously SHA-verified. This is diagnostic
+recovery for one prompt/seed, not a production token override, native speech
+repair or GPU/Q4/performance acceptance. [Results](dia-native-fork-results-2026-10-16.md).

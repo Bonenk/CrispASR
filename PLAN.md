@@ -21,12 +21,10 @@ hashes; use distinct run directories so failed evidence cannot be overwritten.
 Follow docs/contributing.md for all affected surfaces, including the C ABI.
 
 Main checkpointad2998ab passes all13 general CI jobs (38855803220), Ruby,
-secret scan and Pages; its lint was cancelled by the subsequent documentation
-push. Documentation tipd7ad6e53 has a passing secret scan; CI38860690471 and
-lint38860690647 are queued. Corrected native-fork source5417ed6d passes all10
-lint jobs (38855559850); heavy speech experiment38855559740 is running.
-These are exact-source checks; future integration and release tips require
-fresh CI. Read-only query reconciliation is recorded below.
+secret scan and Pages. Native-fork worker5417ed6d passes all10 lint jobs
+(38855559850) and heavy38855559740; independent auditc0fac6c1 passes642
+payloads. These are exact-source checks. The diagnostic integration and future
+release tips require fresh CI; older documentation-tip queues are superseded.
 Last published release is v0.8.43; v0.8.44 remains untagged. The latest Dia
 production protocol/top-k repairs remain distinct from diagnostic tooling and
 do not establish native speech acceptance.
@@ -47,75 +45,29 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Dia reciprocal native sampled-decision fork
+## Dia correctness — after reciprocal decision diagnosis
 
-Owner: maintainer session. Owned worktree
-/mnt/volume1/crispasr-dia-native-fork-20261016, branch diag/dia-native-fork-20261016;
-large scratch/evidence under /mnt/storage/crispasr/dia-native-fork-20261016.
-Use immutable8d0ad886/C36, physically audited full F32 neural weights, F32 cross
-caches, portable RNG, source RoPE off, original seed42 and unchanged3072-token
-recipe. Scratch-only post-sampler substitution at978/codebook2,904→877.
-Require baseline and identity904 full trajectories/logits/codes/audio byte-exact,
-unchanged RNG across substitution and exact earlier fork prefix. Capture all
-raw ensuing outputs, decode with actual original DAC and score both original
-positive and native arms through the same recognizer. Tiny actual sampler and
-patch guards locally; full generation/build/ASR on GH CPU. No production token
-override, default/filter/seed/threshold change or claimed runtime repair.
+The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
+complete and independently audited:642 payloads, exact controls/prefix/RNG,
+WER1→0 through both decoders and all1,226 original input rows/1,210 original
+code frames restored. Public immutable proof is fully anonymously SHA-verified.
+Completed preparation, failures and results are in HISTORY.md. This diagnostic
+uses8d0ad886/C36; it does not establish current-main default speech acceptance.
 
-Current checkpoint: worker5417ed6df0d69f69f8bda8a6ea6ce5f3e924e3da passes
-heavy [38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
-and all10 lint38855559850 checks. Official artifact12028934794 is retained:
-904039288 bytes, SHA256
-0cdd76a38bdae5be82b7a854b7d0c3f1194e47237afee4b68fb1164baca2ad47.
-Local complete bundle: owned storage root/hosted-38855559740-v1.
-
-Provisional worker result: pristine/OFF/identity are silent with WER1; restoring
-only904→877 yields the exact expected sentence/WER0 through both native and
-actual original DAC. All producer controls pass. Independent audit-v1 stopped
-on an incorrect unconditional expectation for a debug-only max_gen log line;
-the failed log/workdir remain preserved. Correct that auditor assumption using
-pinned source/export provenance and add missing/wrong/debug-log controls, then
-rerun the complete audit. Do not change the experiment or quality gates.
-
-Next: finish independent all-payload/array/provenance and actual DAC/ASR audit,
-retain public immutable evidence, then integrate accepted diagnostic tooling.
-A restored token is never a production workaround or native speech acceptance.
-Completed local sampler/syntax/auditor and failed-bootstrap work is archived
-in HISTORY.md and [preparation](docs/dia-native-fork-preparation-2026-10-16.md).
-
-The [query-capture reconciliation](docs/dia-query-capture-reconciliation-2026-10-16.md)
-confirms earlier keys/norm input exact but module Q differs6.90e-7 from actual
-full-model Q. Preserve that qualification; use the new actual tensors only for
-a justified later intervention after the reciprocal speech result.
-
-## Dia correctness — reciprocal native decision diagnostic
-
-The [full original trace and one-decision fork](docs/dia-original-trace-results-2026-10-16.md)
-are complete and independently audited. All18 actual original self-attention
-captures now have full-model provenance, exact OFF/ON/OFF controls and canonical
-code/input parity. Native-vs-original cosine remains at least0.9999999961 over125
-stage comparisons, yet changing only original sampled877→904 at978/codebook2
-changes WER0 to an empty transcript/WER1. Complete evidence is public.
-No new production arithmetic defect or native speech repair follows.
-
-1. **Reciprocal native intervention:** use the same pinned8d0ad886/C36 scratch
-   runtime, F32 weights/cross caches, portable RNG and source-RoPE-off configuration
-   underlying the accepted native boundary. Call the
-   unchanged sampler and replace only sampled904→877 at the same decision.
-   Require an unmodified baseline and identity904 control with complete byte-exact
-   trajectories/audio, unchanged RNG consumption and all earlier inputs/logits,
-   plus exactly one changed next-input entry. Keep all ensuing codes/audio and
-   actual DAC/ASR roundtrips. Report either quality outcome honestly. This tests
-   whether correcting that one decision is sufficient in the native trajectory;
-   it is not a production token/filter workaround.
-2. Use the full original pre-projection/Q/K/V/boundary captures only for a new
-   specific hypothesis. Avoid unchanged norm/head/late-layer/source-RoPE sweeps.
-   Tiny arithmetic/reduction controls and prior terminal interventions already
-   constrain the remaining small differences; do not name a unique bad operator
-   without new evidence.
-3. After any justified runtime candidate, require unchanged controls and real
-   decoded-output acceptance on bounded additional prompts/seeds, then GPU/Q4
-   and performance. Keep defaults and acceptance thresholds fixed meanwhile.
+1. Select a new specific arithmetic hypothesis using actual full-model captures
+   and the signed terminal margin budget; claim the bounded intervention before
+   coding. The single decision now explains this prompt/seed's quiet trajectory.
+   Do not add a token override or change top_p/seed/quality thresholds as a fix.
+2. Earlier module Q differs6.90e-7 from actual full-model Q despite exact keys
+   and normalized input. Preserve that qualification. A new intervention must
+   use the actual original tensors and native identity controls, with cosine,
+   magnitudes, relative errors and decision-margin effects. Do not repeat the
+   rejected qualified-Q, norm/head/late-layer/source-RoPE sweeps unchanged.
+3. Any production candidate must run current runtime without reference injection,
+   preserve controls, and pass real speech on bounded additional prompts/seeds,
+   then actual GPU/Q4 and performance. Single-seed diagnostic recovery is not
+   production acceptance. If no new operator hypothesis is justified, advance
+   independent CANN preparation instead of repeating accepted diagnostics.
 
 ## CANN — hardware follow-ups after merged PR544
 

@@ -82,7 +82,7 @@ control/prefix/RNG/code/capture invariants, physical export receipts, accepted
 native/canonical archives and actual original DAC source provenance. ASR edit
 distance, audio duration/RMS and audio/library/model hashes are recalculated
 independently; either fork quality outcome is reported without a threshold.
-The calibration passes23 rejecting controls plus the actual sampler guard.
+The corrected calibration passes29 rejecting controls plus the actual sampler guard.
 Preparation/calibration does not establish a successful full artifact audit.
 
 Bootstrap correction: the first hosted run38851402907 failed before model/build
@@ -90,3 +90,9 @@ because its tiny guard attempted to read the pinned source before fetching it
 into the shallow checkout. Fetch now precedes the guard. The failed raw artifact
 is retained; a fresh shallow repository exercises the corrected order. The
 runtime, model, sampler, recipe, controls and quality thresholds stay fixed.
+
+Completed result: [audited reciprocal speech/trajectory recovery](../../../docs/dia-native-fork-results-2026-10-16.md).
+The auditor accepts silent capacity logs because that pinned runtime message is
+verbosity-gated; any printed capacity must remain3072. Exact immutable worker/
+runtime/export provenance remains required. Imports never write bytecode into
+evidence. Both earlier failed audits are retained in the public result bundle.

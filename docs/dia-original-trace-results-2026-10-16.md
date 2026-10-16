@@ -1,5 +1,11 @@
 # Dia actual original trace and single-decision sensitivity — 2026-10-16
 
+Follow-up: the [reciprocal native experiment](dia-native-fork-results-2026-10-16.md)
+is complete and independently audited. The one-token restoration recovers WER0
+and the original input/code trajectory for this prompt/seed. Earlier pending
+statements below describe the historical preparation checkpoint. No production
+speech/default/GPU/Q4/performance acceptance follows.
+
 Changing only one sampled decision is sufficient to destroy this original
 Python model's speech for the pinned prompt/seed. This is now an independently
 audited conditional result, not a claimed native arithmetic repair.

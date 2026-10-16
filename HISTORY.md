@@ -1,3 +1,22 @@
+## Dia reciprocal native decision diagnosis completed — 2026-10-16
+
+Heavy38855559740 at5417ed6d and all10 lint38855559850 checks pass. Independent
+auditorc0fac6c1 verifies642 payloads and29 rejecting controls. Rebased method
+fc3f620c preserves all8 accepted source files. Pristine/OFF/identity complete
+trajectories/PCM are exact and silent/WER1. Changing only sampled904→877 after
+the unchanged sampler at978/codebook2 restores the exact sentence/WER0 through
+both native and actual original DAC. Prefix/stages/RNG remain exact. All1,226
+original decoder input rows and all1,210 original code frames match; the pinned
+historical native protocol retains one extra frame. No production override,
+unique arithmetic cause or native-default/GPU/Q4/performance acceptance follows.
+
+The904039288-byte official raw artifact and23 companion files are public at
+immutable revisionf0a412c02c23bf2625ec91011ed962493db66763; every file passes
+full anonymous SHA/size verification. Failed audit-v1(debug-only log assumption)
+and-v2(previous import's bytecode side effect) remain retained; corrected-v3
+uses a fresh extraction and forbids evidence bytecode writes. Quality gates and
+worker bytes are unchanged. [Results and full ledger](docs/dia-native-fork-results-2026-10-16.md).
+
 ## Dia reciprocal native diagnostic preparation — 2026-10-16
 
 Completed preparation is archived here; the hosted speech experiment and full

@@ -1,5 +1,11 @@
 # Dia reciprocal native sampled-decision fork — preparation
 
+Follow-up: the [reciprocal native experiment](dia-native-fork-results-2026-10-16.md)
+is complete and independently audited. The one-token restoration recovers WER0
+and the original input/code trajectory for this prompt/seed. Earlier pending
+statements below describe the historical preparation checkpoint. No production
+speech/default/GPU/Q4/performance acceptance follows.
+
 Current attempt: corrected source5417ed6d, heavy CPU
 [38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
 and lint [38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850).
