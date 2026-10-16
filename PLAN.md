@@ -52,7 +52,8 @@ Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
 diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
 Hosted38938983824 completed successfully. Its3.505GB official artifact12066499638
-is downloaded; full digest and independent scientific audit are pending. Missing ffmpeg in failed38931686491 and the worker's
+is downloaded and its full SHA25658753e76e2a68b5d079f1a32355941b3d8fb72e46d90c2b8ce6b878a4e1f0200
+matches the official digest. Independent scientific audit is running. Missing ffmpeg in failed38931686491 and the worker's
 unconditional-translation-newline expectation are repaired and archived in
 HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
 formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
@@ -97,20 +98,11 @@ No constructor-cause attribution: the legacy reference comes from an older host/
 run without paired explicit CPU dispatch controls. A causal comparison requires
 fresh same-host/same-environment controls. Actual ASR and speech conclusions remain
 pending; preserve all failed identity/quality gates.
-Earlier no-step cancellation and missing
-shallow-source prerequisite failure are archived in HISTORY.md. The explicit
-source fetch is proven in a fresh depth-one repository; all original constructor,
-WeightNorm preservation, five text/seed controls and quality gates are unchanged.
-Collector-v3 and independent audit-preparation-v3/watch live under
-/mnt/storage/crispasr/dia-direct-original-20261016. Audit controls pass; full
-original synthesis/PCM/recognizer evidence is pending. No large model runs locally.
-
 Both sealed Nemotron builds and independent original Whisper now pass legacy/JFK
-but fail all expanded original audio. Their completed full audits/public proof
+but fail all expanded captured-original audio. Their completed full audits/public proof
 are archived in HISTORY.md and docs/dia-broader-speech-results-2026-10-16.md.
-Direct constructor/no-added-observer PCM identity against those original captures
-is next; it distinguishes loading/observation from the existing reference path.
-No speech/default/F16/Q4/GPU promotion.
+Finish direct-PCM recognition, then isolate loading/observation on a fresh paired
+host/environment. No speech/default/F16/Q4/GPU promotion.
 
 After that control, test a concrete inference-recipe difference: pinned original
 Dia.generate defaults are temperature1.3/top_k35 (dia/model.py), while current
