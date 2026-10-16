@@ -134,6 +134,16 @@ Use GH for original full reference and actual model diff, with same-build
 instrumentation controls. Full native speech remains separately tracked above.
 No default/GPU/Q4/performance or complete checklist claim before those gates.
 
+Candidate c7f9da872e87ba238c579083841b3547faee772f is pushed. Local proof:
+17 tiny actual original-module tests, three public-dispatch/archive tests,
+compiled production comparison guards (20 acceptance/rejection controls),
+three parser/scratch tests, one device/environment test, three computation/
+sampler source tests and the existing original output-protocol test pass.
+Whole-runtime syntax and all237 ordered ggml computation calls match pristine
+main. Hosted full-model validation38883779736, lint38883782438 and general
+CI38883785994 are queued; raw collection is active. Independent full artifact
+and array audit follows. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+
 ## Dia correctness — after reciprocal decision diagnosis
 
 The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
