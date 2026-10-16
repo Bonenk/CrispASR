@@ -59,3 +59,45 @@ and all six boundary metrics. Watcher session97658 starts them after raw
 collection finishes. Syntax checks pass; these audits have not yet run against
 the pending artifacts and are not accepted proof. Complete C++ dispatcher
 syntax also passes locally.
+
+## Actual C++ runtime with synthetic original-class weights
+
+A further local test now exercises the unmodified candidate C++ runtime,
+not only Python hooks or isolated C++ helpers. It uses all12 encoder and18
+decoder layers with small projection widths: encoder hidden1024 (the runtime's
+fixed invariant), decoder hidden8, head dimension4 and MLP width16. All381 F32
+GGUF payloads match independently recreated original synthetic parameters.
+Original Python neural classes drive all masks, caches, attention and MLPs.
+Only the unused return from original generate uses a stub codec; native has no
+codec and must reject PCM only after completing neural inference. No real-model
+or speech acceptance follows.
+
+398 complete neural boundaries pass the unchanged cos_min>=.9995 and per-row
+norm-error<.02 gates. Encoder/decoder IDs match exactly; complete decoder
+inputs/logits are byte-identical with captures OFF/ON/OFF. All18 decoder layers
+expose72 attention captures and288 block boundaries at step5. Independent
+array auditing recomputes all398 metrics and rejects doubled magnitude at
+every boundary.
+
+| Captures | Count | Minimum cosine | Maximum row norm error | Maximum relative L2 |
+|---|---:|---:|---:|---:|
+| encoder | 15 | 1.0000000000 | 4.332987e-07 | 9.953484e-07 |
+| decoder layers | 18 | 0.9999999892 | 4.385596e-05 | 0.0001197079 |
+| self attention | 72 | 0.9999997781 | 0.0002090496 | 0.000165032 |
+| decoder block boundaries | 288 | 0.9999997504 | 0.0003283888 | 0.000285692 |
+
+[Compact source/audit receipt](dia-reference-wire-tiny-runtime-2026-10-16.json).
+The complete1024-payload proof contains actual parameters/GGUF, sources,
+compiled probe/static libraries, all reference/native arrays and independent
+audit. Its27,366,062-byte ZIP has SHA256
+`a5057a28d8e867a853913b4c6e0c382914e90f27578420febda4b10eaaad8e45` and
+is [publicly downloadable at an immutable revision](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/60deae78ec95424d76d15f028afa948c468778a9/dia-20261016-reference-wire/tiny-runtime-v1/tiny-runtime-captures-v1.zip).
+A fresh anonymous full download verifies size and SHA. Local method and raw
+proof remain at /mnt/storage/crispasr/dia-reference-wire-20261016/tiny-runtime-v1.
+The publication helper's duplicate metadata key failed after successful upload;
+the failed log is retained and a separate read-only verifier recovered the
+immutable revision and verified a second full anonymous download.
+
+Full1.6B reference/diff, real DAC, native speech, GPU and Q4 remain separate
+pending gates. These small synthetic weights prove capture plumbing and
+scaled-down numerical consistency, not full-model quality.

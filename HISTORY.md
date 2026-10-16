@@ -1,3 +1,16 @@
+## Dia actual-runtime synthetic capture proof accepted — 2026-10-16
+
+Unmodified candidate c7f9da87 runs all12 encoder/18 decoder layers with small
+original-class synthetic weights. Independent audit verifies all381 physical
+F32 tensors,398 complete neural comparisons, exact original IDs and complete
+OFF/ON/OFF decoder inputs/logits. All72 attention and288 block-boundary
+captures execute; doubled magnitudes are rejected at all398 boundaries.
+Minimum cosine0.9999997504; maximum row norm error0.000328389. The complete
+1024-payload27,366,062-byte proof is public at HF revision60deae78, with a fresh
+anonymous full-download SHA check. Original neural code is used; codec return
+is stubbed and no native codec is loaded. This accepts synthetic capture
+wiring, not full1.6B/DAC/speech/GPU/Q4 quality. [Receipt and public proof](docs/dia-reference-wire-tiny-runtime-2026-10-16.json).
+
 ## Dia public reference/diff local preparation verified — 2026-10-16
 
 Candidate c7f9da87 registers the pinned original Dia observer and text-only

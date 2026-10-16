@@ -1,6 +1,6 @@
 Checkpoint update: build38874191736 passes; independent audit verifies57
 payloads and12 fresh graph replays using retained actual static libraries.
-All10 lint checks pass; general CI is10/13 passing, with three jobs queued.
+All10 lint checks pass; general CI is12/13 passing, with the Opus job running.
 [Hosted audit receipt](dia-current-main-head-hosted-2026-10-16.json). Pinned full-generation recovery is now accepted
 within [its explicit scope](dia-serial-head-results-2026-10-16.md); current-main
 speech remains a separate pending test. Earlier submission status below is

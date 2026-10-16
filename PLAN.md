@@ -72,8 +72,8 @@ is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2
 Hosted build/replay38874191736 passes; independent audit verifies57 payloads
 and12 freshly compiled graph replays against the returned actual libraries.
 All10 lint38874302965 checks pass at d198d7a4. General CI38874305718
-has10/13 jobs passing (including both AMR compilers, Linux unit/DL, macOS,
-Windows, Android and iOS); Vulkan, fuzz and Opus jobs remain queued. Single raw collector
+has12/13 jobs passing (including both AMR compilers, Linux unit/DL, Vulkan,
+fuzz, macOS, Windows, Android and iOS); Opus is running. Single raw collector
 session10831 at the owned storage root/collector-v1 preserves official metadata,
 complete logs and digest-verified raw artifact; its independent full audit passes.
 These compile/graph jobs load no full neural model. Pinned speech38870499727
@@ -143,7 +143,12 @@ Whole-runtime syntax and all237 ordered ggml computation calls match pristine
 main. Hosted full-model validation38883779736, lint38883782438 and general
 CI38883785994 are queued; raw collection is active. Independent full artifact
 and array auditors are prepared; storage watcher97658 starts each after its
-raw collector finishes. Audit execution and acceptance remain pending. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+raw collector finishes. Audit execution and acceptance remain pending.
+Further synthetic actual-runtime capture proof is independently accepted:
+381 physical tensors,398 complete neural boundaries and exact OFF/ON/OFF
+input/logit controls. Completed details/public proof are in HISTORY.md and
+[the compact receipt](docs/dia-reference-wire-tiny-runtime-2026-10-16.json).
+This does not replace the pending full1.6B/DAC/speech gates. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
 
 ## Dia correctness — after reciprocal decision diagnosis
 
