@@ -85,9 +85,10 @@ Owner: primary maintainer session, not delegated. Prepare worktree
 Builds/arrays/logs under /mnt/storage/crispasr/dia-broader-speech-20261016.
 Heavy38892690744 reports success: only F32 cross-cache plus portable sampling
 passes both-decoder/CLI WER-zero among the four fixed-serial-head combinations.
-Official artifact12049198423 is downloading for full SHA/payload/array audit;
-that audit must pass before launching expanded model validation or integrating
-the control candidate. Prepare a model-independent worker/selftest meanwhile.
+Official artifact12049198423 passes independent535-payload v3 audit, including
+full native/original sampler replays and unchanged quality gates. The passing
+recipe is now eligible for expanded model validation; prepare/validate the
+model-independent worker and selftest before dispatch.
 
 Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
 today?" and "The quick brown fox jumps over the lazy dog." Keep original [S1]
@@ -98,36 +99,14 @@ arrays and unchanged WER-zero gates. Preserve production defaults and all source
 pins; no seed/phrase selection after results, forced inputs, GPU/Q4 or speed claim.
 No runtime graph change is planned. GH does heavy CPU; no multi-GB model locally.
 
-## CLAIMED 2026-10-16 — Isolate Dia cache precision and sampling
-
-Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-cache-sampler-20261016,
-branch diag/dia-cache-sampler-20261016; all builds/proofs under
-/mnt/storage/crispasr/dia-cache-sampler-20261016. Current-main head-only speech
-run38880025781 is rejected: independent170-payload audit confirms all native
-arms quiet and empty ASR/WER1 through both DACs and CLI, despite stage gates
-passing. Completed result is in HISTORY.md and its receipt; do not repeat it
-unchanged. Preserve production defaults and current top-k/stop/crop fixes.
-Port only disabled-by-default F32 cross-cache and original-compatible portable
-exponential sampling controls from the accepted pinned experiment. Verify tiny
-original noise/MT-state, masked/top-k sampling, cache storage and OFF identity.
-Then run a 2x2 F16/F32 cross-cache × standard/portable sampling experiment with
-the same generic serial head, prompt, seed and unchanged quality gates. Retain
-all inputs/logits/codes, real CLI/Session, native/original DAC and ASR positives;
-independently audit full artifacts. No source-RoPE, forced reference decisions,
-seed/threshold tuning, default promotion, GPU/Q4 or performance claim.
-
-Candidate5e04955e580b798b3cd45d870d407a3dd7600c4e is pushed. Exact-source
-local actual C++ replay passes2388 boundaries across capture/head/cache/sampler
-controls, including explicit-zero default identity. Actual original tiny sampler
-passes26 decisions and noise/state checks. All11034 sampling decisions across
-1226 complete original decoder steps match Python exactly on original logits.
-The first native feedback difference is isolated to the random-sampling recipe:
-standard selects568 and portable/Python530 on original and both native logit
-sets. These completed findings are archived in HISTORY.md and the local receipt.
-Heavy38892690744 reports success; all13 CI38892693594 and10 lint38892696276 jobs pass;
-collectors and independent full-array auditors are armed under the storage root.
-Combined reference validation38891963272 passes, with independent1735-payload/176-stage audit; integration is next.
-See [scope and gates](docs/dia-cache-sampler-preparation-2026-10-16.md).
+Dia cache/sampler factorial is complete and controls integrated at ad0d1546,
+with all tested executable sources exact to immutable5e04955e. Independent535-
+payload audit confirms only F32 cache + portable RNG with serial head restores
+all1226 original inputs/1210 frames and WER0 through both DACs and CLI. All13
+CI/10 lint pass; defaults remain unchanged. Completed findings/failures are in
+HISTORY.md and [the result](docs/dia-cache-sampler-results-2026-10-16.md).
+Continue the claimed broader fixed-case matrix; no full production/GPU/Q4 or
+performance acceptance follows from this single prompt/seed.
 
 Dia reference/diff wiring is integrated at a40ceaff with all executable source
 bytes exact to tested fb4e5924. Heavy38891963272, all13 CI and10 lint pass;

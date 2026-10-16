@@ -1,3 +1,19 @@
+## Dia current-runtime cache/sampler factorial accepted and integrated — 2026-10-16
+
+Integrationad0d1546 preserves tested5e04955e executable sources exactly. Heavy
+38892690744 and all13 CI/10 lint jobs pass. Independent v3 verifies535 payloads,
+all30 stage metrics, source/physical pins, baseline controls, both DACs and real
+CLI/Session. With serial head fixed, only F32 cross-cache + portable sampling
+restores all1226 original inputs/1210 code frames and WER0 through both DACs
+and CLI. Other three combinations remain quiet/WER1. F16-portable first differs
+at original input865; standard sampling differs at input1. Actual original
+sampler replay on native logits matches all10035 F16 and11034 F32 raw decisions.
+Auditor v1 exposed one omitted nested receipt; v2 hit CIFS extraction ENOMEM;
+v3 verifies the complete prior extraction against the official ZIP, all SHA
+records, the extra receipt/tiny arrays/state and full scientific results.
+Failures are retained; quality gates unchanged. This accepts one disabled-by-
+default CPU recipe, not broader speech, GPU/Q4 or performance. [Full result](docs/dia-cache-sampler-results-2026-10-16.md).
+
 ## Dia composed public reference/diff wiring integrated — 2026-10-16
 
 Integrationa40ceaff preserves every executable source byte from immutable
