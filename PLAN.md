@@ -21,10 +21,12 @@ hashes; use distinct run directories so failed evidence cannot be overwritten.
 Follow docs/contributing.md for all affected surfaces, including the C ABI.
 
 Main checkpointad2998ab passes all13 general CI jobs (38855803220), Ruby,
-secret scan and Pages. Its lint is still running. Corrected native-fork source
-5417ed6d passes all10 lint jobs (38855559850); its heavy speech experiment
-38855559740 is running. These are exact-source checks; future integration and
-release tips require fresh CI. Read-only query reconciliation is recorded below.
+secret scan and Pages; its lint was cancelled by the subsequent documentation
+push. Documentation tipd7ad6e53 has a passing secret scan; CI38860690471 and
+lint38860690647 are queued. Corrected native-fork source5417ed6d passes all10
+lint jobs (38855559850); heavy speech experiment38855559740 is running.
+These are exact-source checks; future integration and release tips require
+fresh CI. Read-only query reconciliation is recorded below.
 Last published release is v0.8.43; v0.8.44 remains untagged. The latest Dia
 production protocol/top-k repairs remain distinct from diagnostic tooling and
 do not establish native speech acceptance.
@@ -60,54 +62,31 @@ positive and native arms through the same recognizer. Tiny actual sampler and
 patch guards locally; full generation/build/ASR on GH CPU. No production token
 override, default/filter/seed/threshold change or claimed runtime repair.
 
-Current checkpoint: corrected candidate5417ed6d is pushed. Heavy CPU
-[38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740)
-and lint [38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850)
-are dispatched with the unchanged experiment. Fetch now precedes the source
-guard; a fresh shallow clone reproduces the earlier failure and passes after
-fetch. The auditor accepts explicit expected immutable worker SHA/run ID rather
-than trusting the receipt or silently reusing the failed run's identity. All4
-unskipped no-secrets checks pass. Full hosted quality/audit remains pending.
-Corrected heavy38855559740 is now running; corrected lint38855559850 passes.
+Current checkpoint: immutable worker5417ed6df0d69f69f8bda8a6ea6ce5f3e924e3da
+is running in heavy CPU
+[38855559740](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559740).
+All10 lint jobs pass in
+[38855559850](https://github.com/CrispStrobe/CrispASR/actions/runs/38855559850).
+No full hosted quality or independent artifact result is accepted yet.
+
+Automatic evidence collection is running from the owned storage root at
+collector-v1/collect.py (log collector-v1/collector.log). It waits for the exact
+run/source, retains official run/lint metadata, complete logs and the raw ZIP,
+checks official archive size/SHA, and invokes the independent auditor only
+for a successful run. Output uses fresh hosted-38855559740-v1; failures remain
+preserved. Inspect the collector result before retrying or collecting again.
+The auditor is prepared and calibrated, not yet accepted against this artifact.
+
+Next: independently audit all arrays/provenance and actual DAC/ASR outcomes,
+retain public immutable evidence, then integrate accepted diagnostic tooling.
+A restored token is never a production workaround or native speech acceptance.
+Completed local sampler/syntax/auditor and failed-bootstrap work is archived
+in HISTORY.md and [preparation](docs/dia-native-fork-preparation-2026-10-16.md).
+
 The [query-capture reconciliation](docs/dia-query-capture-reconciliation-2026-10-16.md)
 confirms earlier keys/norm input exact but module Q differs6.90e-7 from actual
 full-model Q. Preserve that qualification; use the new actual tensors only for
 a justified later intervention after the reciprocal speech result.
-
-Initial candidateeae36591: heavy CPU
-[38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
-and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
-completed: heavy failed at bootstrap; all10 lint jobs passed. The worker adds a genuinely pristine build
-before observer-only, identity904 and restore877 arms. Complete pristine/OFF/
-identity trajectories, captures and native PCM must remain byte-exact. Actual
-original DAC cross-decodes and original canonical/DAC ASR positives are required;
-every ASR result uses the same final recognizer library. Local actual pinned
-sampler/MT-state controls and9 rejects pass; repeated patching rejects. The
-patched whole runtime passes syntax checking against exact8d0ad886/C36 headers.
-Clang-format18 and all4 unskipped no-secrets checks pass. No full-model or
-quality result follows from dispatch. [Preparation](docs/dia-native-fork-preparation-2026-10-16.md).
-Next: inspect hosted gates, independently audit all arrays/provenance, report
-the reciprocal quality outcome and retain public immutable evidence before
-integration. Source tooling remains on its owned feature branch pending proof.
-
-Auditor preparation checkpoint: bc59663e adds an independent complete-artifact
-auditor and23 rejecting prefix/RNG/path/nonfinite/ASR-score/scale controls,
-calibrated with a freshly compiled actual pinned sampler. Calibration and all4
-unskipped no-secrets checks pass. Local proof is
-/mnt/storage/crispasr/dia-native-fork-20261016/local-v1/auditor-v2.
-The heavy worker remains immutableeae36591; heavy38851402907 and lint38851403072
-completed: heavy38851402907 failed before any model/build because the tiny
-source check ran before fetching its pin in the shallow CI clone. Lint38851403072
-passes all10 jobs. The failed13357-byte artifact12025048475 is retained with
-SHA779f0ee712d294a1175ff2a7a96eff1d43445dd1632aaf5cda222697504de5bf
-under /mnt/storage/crispasr/dia-native-fork-20261016/failed-38851402907-v1.
-The bootstrap fetch is reordered; a fresh shallow clone reproduces missing
-source before fetch and passes the actual pinned sampler guard after fetch.
-Proof: local-v1/shallow-bootstrap-v1 under the same storage root. Relaunch is
-being prepared;
-the model/runtime/recipe remain fixed. No speech outcome has been accepted.
-The auditor is prepared to regenerate the scratch patch, check
-all physical receipts/raw arrays and independently recalculate every ASR score.
 
 ## Dia correctness — reciprocal native decision diagnostic
 

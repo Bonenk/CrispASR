@@ -1,3 +1,24 @@
+## Dia reciprocal native diagnostic preparation — 2026-10-16
+
+Completed preparation is archived here; the hosted speech experiment and full
+artifact audit remain pending in PLAN.md. The actual pinned sampler/MT-state
+guard passes with9 rejecting controls; repeated patching rejects. Full patched
+runtime syntax passes against8d0ad886/C36. Auditorbc59663e adds23 rejecting
+prefix/RNG/path/nonfinite/ASR-score/scale controls and fresh actual sampler
+compilation. Local calibration remains under the owned storage root's
+local-v1/auditor-v2. Clang-format18 and all4 unskipped no-secrets checks pass.
+
+Initial heavy38851402907 at workereae36591 failed before model/build: its tiny
+guard read the runtime pin before fetching it into the shallow checkout. All10
+lint38851403072 jobs passed. The complete13357-byte failed artifact12025048475
+is retained under failed-38851402907-v1, SHA256
+779f0ee712d294a1175ff2a7a96eff1d43445dd1632aaf5cda222697504de5bf.
+Corrected5417ed6d fetches before the guard. A fresh shallow clone reproduces
+the missing-pin failure before fetch and passes afterward; proof remains in
+local-v1/shallow-bootstrap-v1. The auditor requires an independently supplied
+expected worker SHA/run ID. Runtime/model/recipe and quality gates are unchanged.
+[Preparation and limits](docs/dia-native-fork-preparation-2026-10-16.md).
+
 ## Dia query capture qualification checked — 2026-10-16
 
 Read-only hash-verified comparison reconciles seven earlier module/factorial
