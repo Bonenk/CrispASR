@@ -1,3 +1,27 @@
+## Original Dia F16 CUDA completed: two passing controls, three quality failures — 2026-10-16
+
+Frozenacb956c7 completed the five fixed cases on Tesla T4 (sm7.5), original
+F16 README path with80 F32 norms, Torch2.11.0+cu128, untouched generate/DAC
+and original1.3/35/.95/CFG3 recipe. Original Whisper base.en recognizes both
+fox seeds exactly (WER0), but legacy and both hello seeds are empty/WER1.
+Both sealed legacy/JFK recognizer controls pass WER0. The kernel stops at its
+final quality assertion after saving and publishing every result; it is not a
+setup failure or broad speech acceptance. Quiet RMS is .000144–.000148 versus
+.0872/.0977 for the fox clips. Their interior lag512 relative errors are
+3.39e-5–4.48e-5, suggesting a code/codec trajectory investigation, not proving
+its cause. Device, precision, Torch and recipe differ from the CPU experiment.
+
+Independent audit verifies81 payloads, seven original source files, all seven
+raw recognitions and82 complete anonymous public downloads. The corrected
+343-parameter original constructor schema is reproduced on meta without loading
+weights; the initial GGUF-count schema failure and full logs remain preserved.
+[Raw evidence](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/tree/36d27f2a0938283321e088e360da1cb6e5daee26/dia-20261016-original-cuda/f16-defaults-v2)
+and [independent audit proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5cafb56f8d373a1dd41df6794c1455d0468326d0/dia-20261016-original-cuda/f16-defaults-v2-audit-v1/README.md)
+are permanent; the audit archive is7318021bytes, SHA
+94549cdb6167a79f61866ec3b8d3bb25a68c07daeb42a9e108bf61e1c64ea9ea.
+All published files are fully anonymously hash-verified. No native/Q4/default
+promotion. See [result receipt](docs/dia-original-cuda-results-2026-10-16.json).
+
 ## Echo full-model observer accepted; integration composition frozen — 2026-10-16
 
 Full-model38938983824/sourcea1d84150 passes independent1946-payload/17-source

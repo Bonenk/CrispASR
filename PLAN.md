@@ -69,7 +69,7 @@ Owner: coordinator; new worktree
 /mnt/volume1/crispasr-dia-sampling-controls-v2-20261016, branch
 fix/dia-sampling-controls-v2-20261016, frozen source
 7d0f68f322d503962d28c1e38f3eb07ac06a03f7. Implementation and local validation
-are complete; CI38946681937 and lint38946685918 are queued at that exact source.
+are complete; all13 CI38946681937 and all10 lint38946685918 jobs pass at that exact source.
 Collector-v2 retains terminal logs under storage. The actual native setters,
 CABI dispatch, Python methods, CLI parser/adapter and repeated-request default
 restoration pass tiny execution controls. Three separate old-source controls
@@ -79,44 +79,10 @@ problem in this scope. Full model loading/synthesis is stubbed in these controls
 no new speech, inference-recipe or numerical acceptance is inferred. Completed
 preparation and first candidate's no-execution CI cancellations are in HISTORY.md.
 
-Next: audit applicable hosted CI/lint on this frozen source, then integrate with
-source bytes preserved. This enables a valid matched original/native recipe
+Next: preserve terminal hosted logs and integrate with source bytes preserved. This enables a valid matched original/native recipe
 comparison without changing current defaults or graph mathematics. Artifacts under
 /mnt/storage/crispasr/dia-sampling-controls-20261016. Do not launch the model
 recipe matrix until the direct-original result is audited.
-
-## CLAIMED 2026-10-16 — Independent original Dia CUDA positive control
-
-Owner: coordinator, fresh worktree /mnt/volume1/crispasr-dia-original-cuda-v2-20261016,
-branch diag/dia-original-cuda-v2-20261016, frozen sourceacb956c74c04083e6ae4915d664ed7082b529da5.
-Corrected kernel version2 is running; uploaded source is byte-exact. Actual14-package
-resolver proposal passes, all9 injected core-package changes fail, and scientific
-generation/recognition/dtype controls are AST-identical to the first source. Tiny
-actual original47-parameter F16 construction preserves F32 norms and rejects a
-naive half() conversion. Collector-v2 retains terminal evidence under storage.
-First frozen source1e390814 was uploaded
-byte-exact and ran a real supported CUDA probe, then stopped before installation/
-model download: its package-name prefix guard incorrectly rejected torch-stoi.
-All terminal logs/resolver proposal/output were retained before retry. Coordinator
-claims a narrow v2 guard repair: reject actual Torch/CUDA core package names and
-NVIDIA runtime packages, permit auxiliary torch-stoi/torchtyping dependencies;
-validate the saved real proposal and injected core-package rejection controls.
-Add pre-install GPU metadata. Preserve every scientific knob and failure; version
-all run/proof paths before one corrected submission, with session checks.
-While CPU CI queues wait,
-prepare and execute a real CUDA original-Python control through Kaggle per the
-sibling usage guide. This is independent of the deferred matched native/original
-recipe matrix: use the pinned original README's F16 path and generate defaults
-temperature1.3/top-k35, same five fixed text/seed cases, capacity3072/CFG3/top-p.95,
-untouched original constructor/generate and actual DAC, no added observers.
-Accept only supported CUDA hardware; no CPU fallback, torch reinstall, quota
-workaround or repeated GPU draw. Record source/weights/device/version/RNG recipe,
-all PCM, actual original Whisper base.en outputs with no expected-text prompt,
-and retained legacy/JFK recognizer positives. Preserve failed quality gates;
-this cannot establish native/CPU/F16/Q4/observer parity or a default change.
-GPU models stay on Kaggle; local preparation/proof under
-/mnt/storage/crispasr/dia-original-cuda-20261016. Check active sessions first and
-publish complete proof with an independent audit before interpreting results.
 
 ## Dia correctness — current dependencies
 
@@ -125,8 +91,13 @@ are in HISTORY.md and their pinned machine receipts. Current claims above carry
 the direct-original and full-model observer dependencies.
 
 1. Direct-original CPU construction/recognition is audited and fails speech.
-   Complete the source-default original CUDA control, then fresh paired-host
-   construction/observation and the predeclared matched inference-recipe intervention.
+   Original README F16 CUDA is independently audited: both fox seeds pass,
+   legacy and both hello seeds fail; both recognizer positives pass. Its81 payloads
+   and82 anonymous public downloads are verified. Next capture delayed codes,
+   actual RVQ inputs and codec latents under same-host OFF/ON/OFF controls to
+   localize the quiet, nearly512-hop-periodic outputs. Preserve the two passing
+   fox cases and all three failures. Then isolate precision/device/Torch/recipe
+   effects with paired controls before the matched original/native intervention.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
@@ -411,3 +382,13 @@ state; do not assume the old404s or missing credentials remain true. Legacy
 MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
+
+## CLAIMED 2026-10-16 — Integrate validated Dia sampling controls
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampling-land-20261016,
+branch integrate/dia-sampling-20261016. Preserve candidate commits0827925d and
+7d0f68f3, original authorship and all affected source bytes. All13 candidate CI
+jobs38946681937 and all10 lint38946685918 jobs pass. Retain final logs, compare
+the complete non-document source tree, and fast-forward main after the tiny
+literal-source regression and four secret guards pass. Record integration
+receipt and request fresh main CI. No sampling default or runtime graph changes.

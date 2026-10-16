@@ -2,11 +2,11 @@
   "source": "acb956c74c04083e6ae4915d664ed7082b529da5",
   "uploaded_script_sha256": "70cf784c70ef8455750fc8069587758dad2facc266c46ce7ced1e3b1a23329a9",
   "uploaded_source_exact": true,
-  "status": "KernelWorkerStatus.RUNNING",
+  "status": "ERROR at completed experiment quality gate",
   "kernel_slug": "crispasr-dia-original-cuda-v1",
   "kernel_version": 2,
   "script_version": "dia-original-cuda-v2",
-  "actual_gpu_model_validation": "pending",
+  "actual_gpu_model_validation": "Complete: Tesla T4; 2/5 fixed speech cases pass; both recognizer controls pass",
   "native_acceptance": false,
   "speech_acceptance": false,
   "first_attempt": {
@@ -29,5 +29,7 @@
   },
   "scientific_generation_recognition_source_ast_unchanged": true,
   "automatic_gpu_draw_loop": false,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "independent_audit_complete": true,
+  "result_receipt": "docs/dia-original-cuda-results-2026-10-16.json"
 }

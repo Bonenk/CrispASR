@@ -41,14 +41,18 @@ The full-model observer passes its independent1946-payload audit on EN/ZH,
 including all690 numerical comparisons and actual decoded/CLI/CABI controls.
 Complete3.505GB evidence and auditor pack are permanently public and anonymously
 hash-verified. Landing compositiond51b6cf3 remains pending build/lint acceptance
-before integration. Original Dia's separate F16 CUDA control is running after a
-bounded dependency-guard repair; it has no native or default acceptance. See
+before integration. Original Dia's F16 CUDA control completed on T4: both fox
+seeds pass WER0, while legacy and both hello seeds fail with empty text/WER1.
+Both recognizer positives pass. All81 payloads and82 full anonymous downloads
+are independently verified, with complete public raw and audit proof. This does
+not isolate precision, device, Torch or recipe effects and establishes no native
+or default acceptance. See [CUDA results](docs/dia-original-cuda-results-2026-10-16.json) and
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
 
 Dia top-k/top-p routing through Session and CLI is prepared on a frozen candidate,
 including missing CLI flags and restoration of configured defaults between server
 requests. Literal-source positive and old-source negative controls pass; hosted
-CI/lint and integration remain pending. This enables the planned recipe comparison
+CI (13 jobs) and lint (10 jobs) pass; integration remains pending. This enables the planned recipe comparison
 without changing the shipped sampling defaults or establishing speech acceptance.
 
 ## OmniVoice allocation failure handling
