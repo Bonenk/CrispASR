@@ -82,6 +82,21 @@ Current main lacks these diagnostic RNG/cache paths, so this is explicitly a
 pinned-runtime causal experiment; current-main/default, extra prompts/seeds,
 GPU/Q4 and performance remain separate gates before production promotion.
 
+## CLAIMED 2026-10-16 — Current-main serial head preparation
+
+Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-main-head-20261016,
+branch diag/dia-main-head-20261016. Builds/proofs under
+/mnt/storage/crispasr/dia-main-head-20261016. Prepare the generic all-step
+serial F32 head gate on current main and its current ggml0a862076, while the
+immutable pinned-runtime speech experiment runs. Explicit OFF keeps the
+original graph; identity copies it. Reject unsupported GPU/non-F32 use before
+building the graph. Verify actual current-ggml native/identity/serial outputs,
+thread parity and tiny fusion, plus whole-runtime compilation. No default
+change or production/speech claim; hosted current-main generation follows the
+pending causal result and needs independent cache/sampler/recipe validation.
+Keep current top-k and output-protocol repairs rather than copying the old
+runtime wholesale. All CLI/C-ABI callers share this library path.
+
 ## Dia correctness — after reciprocal decision diagnosis
 
 The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
@@ -91,7 +106,7 @@ code frames restored. Public immutable proof is fully anonymously SHA-verified.
 Completed preparation, failures and results are in HISTORY.md. This diagnostic
 uses8d0ad886/C36; it does not establish current-main default speech acceptance.
 
-1. The CPU dispatch/reduction claim above identifies a specific sufficient
+1. The completed CPU dispatch/reduction investigation identifies a sufficient
    arithmetic difference at this boundary. Validate the generic all-step head
    candidate next; the single decision explains this prompt/seed's quiet trajectory.
    Do not add a token override or change top_p/seed/quality thresholds as a fix.

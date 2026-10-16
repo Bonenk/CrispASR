@@ -38,6 +38,11 @@ official artifact12032740700 (160994 bytes, SHA256
 all13 payloads, full source identity and all4,096 fresh Q/18,504 head values on
 each hidden byte-exact. Integration61f4ed8c preserves all7 tested source/report
 files byte-exact after rebase. [Replay receipt](docs/dia-reduction-cause-hosted-2026-10-16.json).
+Complete second-CPU metadata/raw artifact/audit evidence is archived at HF
+revision76ad11e00728b22963606544dc912a80e5eb833a under
+dia-20261016-reduction-cause/complete-hosted-replay-v1; all178914 bytes are
+anonymously downloaded and SHA256 verified
+(8f555522fbcac0c0631bc029cae6ef3c1b2f500b5fa8a5e0327da9c0e6203889).
 The distinct all-step runtime speech candidate remains open in PLAN.md. No production/native-default/GPU/Q4/performance acceptance follows.
 
 ## Dia reciprocal native decision diagnosis completed — 2026-10-16

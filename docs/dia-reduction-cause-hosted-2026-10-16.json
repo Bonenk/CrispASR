@@ -34,5 +34,13 @@
   "artifact_sha256": "06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf",
   "integration": "61f4ed8c",
   "rebased_files_byte_exact": 7,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "public_proof": {
+    "revision": "76ad11e00728b22963606544dc912a80e5eb833a",
+    "path": "dia-20261016-reduction-cause/complete-hosted-replay-v1/complete-hosted-reduction-cause-v1.zip",
+    "bytes": 178914,
+    "sha256": "8f555522fbcac0c0631bc029cae6ef3c1b2f500b5fa8a5e0327da9c0e6203889",
+    "anonymous_full_download_sha_verified": true,
+    "payloads": 10
+  }
 }
