@@ -34,6 +34,14 @@ def main():
     invalid = b' '.join([b'0']*624+[b'625'])
     reject(lambda:audit.verify_rng(invalid,invalid,invalid))
     rejected = 4
+    quiet = 'DIA_CROSS_CACHE: type=F32 bytes=23003136\nDIA_ROTARY: source=0 head_dim=128\n'
+    audit.check_native_log(quiet)
+    for message in ['max_gen=3072,','max_gen 3072,']:
+        audit.check_native_log(quiet+message)
+    for message in ['max_gen=2048,','max_gen 2048,','DIA_FORCE_TOKENS:', 'DIA_FORCE_OUTPUT_TOKENS:']:
+        reject(lambda:audit.check_native_log(quiet+message)); rejected += 1
+    for required in ['DIA_CROSS_CACHE: type=F32','DIA_ROTARY: source=0']:
+        reject(lambda:audit.check_native_log(quiet.replace(required,''))); rejected += 1
     base = np.arange(981*9,dtype='i4').reshape(981,9); base[979,2] = 904
     fork = base.copy(); fork[979,2] = 877
     logits = np.arange(981*2*9*3,dtype='f4').reshape(981,2,9,3)

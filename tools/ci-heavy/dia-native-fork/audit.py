@@ -19,6 +19,8 @@ import numpy as np
 RUNTIME = '8d0ad8862d2cad5d305a48a57f2a99b5024bc39a'
 ORIGINAL = '4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8'
 GGML = 'c36dab89b662838f0f5d4826c399198c0b90bbfc'
+# Imported retained methods are evidence: never add bytecode to that tree.
+sys.dont_write_bytecode = True
 
 
 def sha(file):
@@ -67,6 +69,16 @@ def check_asr(row,pcm,pcm_path,library_sha):
     assert row['asr_sha256'] == '60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2'
     assert row['seconds'] == len(pcm)/44100
     assert math.isclose(row['rms'],float(np.sqrt(np.mean(pcm.astype('f8')**2))),rel_tol=1e-12,abs_tol=1e-15)
+
+
+def check_native_log(log):
+    assert 'DIA_CROSS_CACHE: type=F32' in log and 'DIA_ROTARY: source=0' in log
+    assert 'DIA_FORCE_TOKENS:' not in log and 'DIA_FORCE_OUTPUT_TOKENS:' not in log
+    # Pinned runtime prints capacity only at verbosity >= 1. Capacity/config
+    # provenance comes from the exact worker/runtime and physical export hashes;
+    # optional debug messages must agree, but silence is not evidence of a cap.
+    for value in re.findall(r'max_gen(?:=| )(\d+)',log):
+        assert int(value) == 3072
 
 
 def main():
@@ -153,8 +165,7 @@ def main():
     arrays = {}
     for arm,directory in dirs.items():
         log = (out/(arm+'-native.log')).read_text()
-        assert 'DIA_CROSS_CACHE: type=F32' in log and 'DIA_ROTARY: source=0' in log
-        assert 'max_gen=3072,' in log and 'DIA_FORCE_TOKENS:' not in log and 'DIA_FORCE_OUTPUT_TOKENS:' not in log
+        check_native_log(log)
         x = np.fromfile(directory/'native-inputs.i32',dtype='<i4').reshape(-1,9)
         l = np.memmap(directory/'native-logits.f32',dtype='<f4',mode='r').reshape(-1,2,9,1028)
         assert len(x) == len(l) > 979 and np.isfinite(l).all() and ((x >= 0) & (x <= 1026)).all()
