@@ -63,48 +63,6 @@ The accepted2B F16 observer is not9B Q4 attribution. No Q4/GPU/default/release
 promotion. Physical ledger rows are internally checked and tied to producer/model
 hashes; no multi-GB neural weights are reread locally.
 
-## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
-
-Owner: coordinator; frozen worktree
-/mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
-diag/dia-direct-original-v3-20261016, sourced41cfb273dc5dda942d11cab20b3285a08585955.
-Corrected hosted38940468611 completed synthesis of all five clips, then failed
-in ASR library selection: uploaded SONAME aliases are regular duplicate files.
-Retain the official55896329byte artifact12065989037 (SHAa6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed).
-Coordinator's frozen continuation worktree is
-/mnt/volume1/crispasr-dia-direct-finish-20261016, branch
-diag/dia-direct-finish-20261016, sourceabeee3e8eb5121e0f80bbe8a4a8f6f245fc8fb3f.
-Hosted38950148117 and independent115-payload/seven-cell audit are complete.
-Sealed legacy/JFK positives have WER0; all five direct-original clips return empty
-text/WER1. Complete original/failure/continuation proofs are permanently public,
-with full anonymous hashes verified. No synthesis was repeated. See HISTORY.md.
-
-New independent v2 audit verifies all94 retained payloads, seven original source
-files and exact decorated-method hashes; its initial decorator-extraction failure
-is preserved. Legacy output is562688 rather than619520 samples and RMS0.0001578
-rather than0.0735339. Four expanded clips have equal lengths and PCM cosines
-at least0.99999999998, but none is byte-exact. See
-[partial audited result](docs/dia-direct-original-results-2026-10-16.json).
-No constructor-cause attribution: the legacy reference comes from an older host/
-run without paired explicit CPU dispatch controls. A causal comparison requires
-fresh same-host/same-environment controls. Speech fails all five current direct
-CPU cases; preserve those failures and all previous identity/quality gates.
-Both sealed Nemotron builds and independent original Whisper now pass legacy/JFK
-but fail all expanded captured-original audio. Their completed full audits/public proof
-are archived in HISTORY.md and docs/dia-broader-speech-results-2026-10-16.md.
-Finish direct-PCM recognition, then isolate loading/observation on a fresh paired
-host/environment. No speech/default/F16/Q4/GPU promotion.
-
-After that control, test a concrete inference-recipe difference: pinned original
-Dia.generate defaults are temperature1.3/top_k35 (dia/model.py), while current
-native defaults are1.2/45 (src/dia_tts.cpp). Existing diagnostics explicitly used
-1.2/45 in both implementations. Predeclare matched original/native temperature
-and top-k controls across the same five text/seed cases before execution; do not
-select new passing seeds, flip defaults or discard existing failures. If needed,
-compare source-recommended F16 on actual supported CUDA hardware via Kaggle,
-with source/weight/input pins and unchanged decoded gates. This is a hypothesis,
-not an established cause or accepted replacement recipe.
-
 ## CLAIMED 2026-10-16 — Dia sampling controls through Session and CLI
 
 Owner: coordinator; new worktree
@@ -130,7 +88,13 @@ recipe matrix until the direct-original result is audited.
 ## CLAIMED 2026-10-16 — Independent original Dia CUDA positive control
 
 Owner: coordinator, fresh worktree /mnt/volume1/crispasr-dia-original-cuda-v2-20261016,
-branch diag/dia-original-cuda-v2-20261016. First frozen source1e390814 was uploaded
+branch diag/dia-original-cuda-v2-20261016, frozen sourceacb956c74c04083e6ae4915d664ed7082b529da5.
+Corrected kernel version2 is running; uploaded source is byte-exact. Actual14-package
+resolver proposal passes, all9 injected core-package changes fail, and scientific
+generation/recognition/dtype controls are AST-identical to the first source. Tiny
+actual original47-parameter F16 construction preserves F32 norms and rejects a
+naive half() conversion. Collector-v2 retains terminal evidence under storage.
+First frozen source1e390814 was uploaded
 byte-exact and ran a real supported CUDA probe, then stopped before installation/
 model download: its package-name prefix guard incorrectly rejected torch-stoi.
 All terminal logs/resolver proposal/output were retained before retry. Coordinator

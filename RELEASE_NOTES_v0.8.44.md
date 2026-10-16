@@ -30,14 +30,19 @@ Whisper independently passes both controls and fails all16 expanded audio views;
 its complete77-payload input/loader/output audit is verified. Direct original
 generation without added observers completed all five clips, then hit an ASR
 library-alias validator failure. Its94-payload source/PCM audit is verified;
-recognition resumes from sealed audio without resynthesis. Expanded PCM is
+recognition continuation now passes its115-payload/seven-cell audit: both sealed
+ASR positives have WER0, but all five newly generated direct clips return empty
+text/WER1, without resynthesis. Expanded PCM is
 extremely close but not byte-identical, and legacy length/amplitude differ from
 the older capture; paired environment controls are required for cause attribution. Complete failed
 evidence is permanently public. No broader speech or F16/Q4/GPU/default promotion.
 Echo's fused-product observer repair passes all13 general CI and10 lint jobs.
-The full-model observer job now reports success on EN/ZH; independent audit of
-the complete3.505GB artifact remains pending before integration, with11
-small controls passing. See
+The full-model observer passes its independent1946-payload audit on EN/ZH,
+including all690 numerical comparisons and actual decoded/CLI/CABI controls.
+Complete3.505GB evidence and auditor pack are permanently public and anonymously
+hash-verified. Landing compositiond51b6cf3 remains pending build/lint acceptance
+before integration. Original Dia's separate F16 CUDA control is running after a
+bounded dependency-guard repair; it has no native or default acceptance. See
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
 
 Dia top-k/top-p routing through Session and CLI is prepared on a frozen candidate,

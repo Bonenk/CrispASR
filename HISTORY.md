@@ -1,3 +1,61 @@
+## Echo full-model observer accepted; integration composition frozen — 2026-10-16
+
+Full-model38938983824/sourcea1d84150 passes independent1946-payload/17-source
+audit. Both EN/JFK and Mandarin preserve69 original and68 native arrays exactly
+under OFF/ON/OFF and add exactly144 FFN vectors. All690 comparisons pass unchanged
+cosine/magnitude gates. Worst cosine is0.9999866486 (JFK) /0.9999853969 (Mandarin),
+relativeL2 .0053496438/.0054465674, both llm_ffn_3_down_in. Sixteen cached greedy
+decisions, generation-prefill identity, raw original/native text, CLI SRT and
+metadata-detected CABI segments pass. This accepts2B F16 observer transparency,
+not9B Q4 attribution, GPU/default/performance or a release. Physical tensor rows
+are internally audited with producer/model hashes; large weights are not reread.
+
+[Complete public proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/aec1b6abbf0887f1e72943a07e73d067d949f3f0/echo-20261016-ffn-observer/complete-fullmodel-v1/README.md)
+at revisionaec1b6abbf0887f1e72943a07e73d067d949f3f0 retains unchanged3505456385byte
+official raw archive (SHA58753e76e2a68b5d079f1a32355941b3d8fb72e46d90c2b8ce6b878a4e1f0200)
+and10149681byte auditor/provenance/wheel pack (SHA913da6b0418cfc507af0eade483b9a27b8466d9b768488ad66c489253dac9a87).
+Every published file passes a complete anonymous download/hash check.
+Frozen landingd51b6cf3 preserves the three original observer commits, all11 tested
+source files byte-exact0dfccc7d and main's independent OmniVoice allocation fix.
+CI38952809132/lint38952812485 are queued; integration remains in PLAN.md.
+
+## Direct-original CPU recognition completed and permanently preserved — 2026-10-16
+
+Continuation38950148117/sourceabeee3e8 passes independent115-payload/seven-cell
+audit. Both sealed legacy/JFK positives have WER0. All five direct-original F32
+CPU clips, including legacy, return empty text/WER1. No synthesis was repeated;
+the constructor/PCM94-payload audit remains separate and accepted. The quieter,
+shorter legacy clip therefore fails speech, but comparison with an older host/run
+does not isolate construction or observation. Fresh paired environment controls
+and original CUDA investigation remain pending; no speech/default promotion.
+
+[Complete failed-control proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/README.md)
+at revision568d0772df782e3933e00bfa3593d53ff67ef873 retains both original official
+archives55896329/55975059bytes, full sources/PCM/libraries/recognitions, both
+independent audits, failed decorator-extraction log and loader controls. All files
+pass full anonymous download/hash checks. The recognition archive SHA is
+cb9596666dfe2538d6798afef5b851a7bc25d410d84fbea47321d68f914b24ca.
+See [combined result](docs/dia-direct-original-results-2026-10-16.json).
+
+## Original Dia CUDA control prepared; dependency guard corrected — 2026-10-16
+
+Frozen1e390814 was uploaded byte-exact, passed a real CUDA probe, then stopped
+before installation/model download because its broad torch-prefix guard rejected
+the auxiliary torch-stoi package. Terminal logs, actual14-package resolver plan
+and all working outputs were retained before retry. Corrected frozenacb956c7
+allows auxiliary packages, protects exact core/runtime package names and adds
+pre-install GPU metadata. The actual saved plan now passes; nine injected core
+changes fail, and generation/recognition/dtype AST controls remain unchanged.
+Actual tiny original Torch2.6 F16 construction preserves F32 norms across47
+parameters; naive global half() is rejected. No large model was loaded locally.
+
+One corrected kernel version2 was submitted after session checks and first-run
+log retention, with versioned working/proof paths and byte-exact pulled source.
+It is running, not accepted. Original README F16 plus original1.3/35 defaults,
+same five texts/seeds, actual DAC, original CUDA Whisper and sealed positives
+remain fixed. No CPU fallback, Torch reinstall or GPU draw loop is used.
+See [preparation receipt](docs/dia-original-cuda-preparation-2026-10-16.json).
+
 ## Direct-original Dia synthesis audited; recognition resumed — 2026-10-16
 
 Frozen d41cfb27/run38940468611 completed all five actual-constructor/no-observer

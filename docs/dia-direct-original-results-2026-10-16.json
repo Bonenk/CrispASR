@@ -19,7 +19,13 @@
       "captured_rms": 0.0735338612890324,
       "cosine": null,
       "relative_l2": null,
-      "asr": "pending; original worker failed before recognition"
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 562688
+      }
     },
     "hello-42": {
       "actual_samples": 197120,
@@ -32,7 +38,13 @@
       "captured_rms": 0.37031503893257445,
       "cosine": 0.9999999999999909,
       "relative_l2": 1.0246285035631653e-07,
-      "asr": "pending; original worker failed before recognition"
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 197120
+      }
     },
     "hello-123": {
       "actual_samples": 128000,
@@ -45,7 +57,13 @@
       "captured_rms": 0.18110286820359173,
       "cosine": 0.9999999999999929,
       "relative_l2": 1.2263177782982007e-07,
-      "asr": "pending; original worker failed before recognition"
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 128000
+      }
     },
     "fox-42": {
       "actual_samples": 224768,
@@ -58,7 +76,13 @@
       "captured_rms": 0.0017179235416331117,
       "cosine": 0.9999999999883675,
       "relative_l2": 4.822668354685466e-06,
-      "asr": "pending; original worker failed before recognition"
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 224768
+      }
     },
     "fox-123": {
       "actual_samples": 586752,
@@ -71,7 +95,13 @@
       "captured_rms": 0.004573956282685725,
       "cosine": 0.9999999999967979,
       "relative_l2": 2.52432336556998e-06,
-      "asr": "pending; original worker failed before recognition"
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 586752
+      }
     }
   },
   "all_pcm_exact": false,
@@ -165,5 +195,7 @@
       }
     ],
     "complete": true
-  }
+  },
+  "combined_diagnostic_complete": true,
+  "recognition_status": "Complete independently audited; sealed controlsWER0, all five direct clips empty/WER1"
 }
