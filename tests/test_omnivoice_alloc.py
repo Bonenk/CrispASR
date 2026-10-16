@@ -21,7 +21,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/omnivoice-alloc-baseline.json"
-STORAGE_ROOT = Path("/mnt/storage/crispasr/hermes-workers-20261016/omnivoice")
 
 def block(source: str, signature: str) -> str:
     start = source.index(signature)
@@ -160,7 +159,7 @@ def run_case(exe: Path, mode: str):
     try:
         import resource
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-    except (ImportError, Exception):
+    except (ImportError, OSError, ValueError):
         pass  # Non-Linux or restricted; harmless — core dumps are best-effort disabled.
     result = subprocess.run([str(exe), mode], capture_output=True, text=True)
     return result
@@ -179,14 +178,16 @@ def load_baseline_source(baseline_arg=None):
         path = Path(os.environ['CRISPASR_OMNIVOICE_ALLOC_BASELINE'])
     elif FIXTURE.exists():
         fixture = json.loads(FIXTURE.read_text())
-        # Glue fixture functions into a minimal translation unit with same sigs.
+        for name, function in fixture['functions'].items():
+            actual = hashlib.sha256(function['body'].encode()).hexdigest()
+            if actual != function['sha256']:
+                raise ValueError(f'Historical function checksum mismatch: {name}')
+        # Glue the checked historical functions into the standalone harness.
         text = '\n'.join(f["body"] for f in fixture["functions"].values())
         return text, fixture.get("pin", "fixture")
     else:
         return None, None
-    if path and path.exists():
-        return path.read_text(), str(path)
-    return None, None
+    return path.read_text(), str(path)
 
 def run_harness(current_source_text: str, baseline_source_text=None, proof_dir=None, verbose=True):
     """Core harness: compile+run fixed, mutated, and optional baseline.
@@ -195,11 +196,11 @@ def run_harness(current_source_text: str, baseline_source_text=None, proof_dir=N
     No absolute maintainer paths; TMPDIR caller-owned (storage/scratch-tmp).
     """
     env_tmp = os.environ.get('TMPDIR')
-    tmpdir_base = Path(env_tmp) if env_tmp else (STORAGE_ROOT / 'scratch-tmp')
-    tmpdir_base.mkdir(parents=True, exist_ok=True)
+    tmpdir_base = Path(env_tmp) if env_tmp else None
+    if tmpdir_base is not None:
+        tmpdir_base.mkdir(parents=True, exist_ok=True)
 
-    import tempfile as _tmp
-    with _tmp.TemporaryDirectory(prefix='omnivoice-alloc-', dir=str(tmpdir_base)) as tmp:
+    with tempfile.TemporaryDirectory(prefix='omnivoice-alloc-', dir=tmpdir_base) as tmp:
         tmpdir = Path(tmp)
         # Build fixed (current).
         exe_fixed, harness_fixed, _, cmd_fixed, build_fixed = make_executable(current_source_text, tmpdir, 'fixed')
@@ -240,7 +241,7 @@ def run_harness(current_source_text: str, baseline_source_text=None, proof_dir=N
 
         if proof_dir:
             proof_dir = Path(proof_dir)
-            proof_dir.mkdir(parents=True, exist_ok=True)
+            proof_dir.mkdir(parents=True, exist_ok=False)
             current_sha = hashlib.sha256(current_source_text.encode()).hexdigest()
             baseline_sha = hashlib.sha256(baseline_source_text.encode()).hexdigest() if baseline_source_text else None
             meta = {
@@ -289,11 +290,6 @@ class OmnivoiceAllocTest(unittest.TestCase):
         current = (ROOT / 'src/omnivoice.cpp').read_text()
         baseline_text, _ = load_baseline_source()
         run_harness(current, baseline_text, verbose=False)
-
-    def test_guard_removal_mutation_must_crash(self):
-        current = (ROOT / 'src/omnivoice.cpp').read_text()
-        # Only current + mutated (no baseline needed) — pure CI core.
-        run_harness(current, None, verbose=False)
 
 def main():
     parser = argparse.ArgumentParser(description='Omnivoice allocator literal-body regression')
