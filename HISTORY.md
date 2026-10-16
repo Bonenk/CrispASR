@@ -1,3 +1,17 @@
+## Echo production FFN observer gap found — 2026-10-16
+
+Following the actual vendored Qwen3.5 caller and complete build_ffn body found
+that parallel SiLU uses ggml_swiglu_split and names the product ffn_swiglu.
+It switches the internal gate type before the ffn_gate_par branch, so the
+previous observer misses down_in despite its synthetic scheduler test passing.
+The queued full-model run38928056585 was cancelled before execution. Local
+verbatim-builder replay against actual pinned ggml reproduces5 captured stages
+with old d8183cf9 and6 with repair0dfccc7d, with exact OFF/ON/OFF output.
+The complete builder, enum declarations, caller, generated shim, binaries,
+libraries and commands are retained under storage. The shim binds no-LoRA/
+no-bias/no-scale tiny inputs; it is not full-model or GPU acceptance. Hosted
+repair gates and full-model follow-up remain in PLAN.md.
+
 ## Hermes utility audits and Echo tiny capture controls completed — 2026-10-16
 
 Two user-authorized tmux Hermes workers used the configured Meta Muse Spark /

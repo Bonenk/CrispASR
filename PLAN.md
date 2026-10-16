@@ -261,6 +261,37 @@ The first Hermes full-model design is rejected for invented commands/pins; the
 worker is now checking primary metadata only. OmniVoice follow-up also needs a
 revision: passing other clips does not exclude ASR sensitivity to cloned speech.
 
+## CLAIMED 2026-10-16 — Dia crossed recognizer replay after broader failure
+
+Owner: coordinator, worktree /mnt/volume1/crispasr-dia-asr-crosscheck-20261016,
+branch diag/dia-asr-crosscheck-20261016. Heavy38913941927 completed all four
+predeclared cases and failed its unchanged quality gate. Its CRC-checked receipt
+preview reports exact original/native input histories and all352 stage rows
+passing, but all original/native/CLI ASR transcripts are empty. Full official
+artifact12057273677 (3022635432bytes, SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90)
+is downloading; independent audit remains required before accepting those claims.
+
+Prepare a crossed ASR replay using both retained candidate shared libraries from
+old38892690744 and new38913941927, with the identical pinned Nemotron Q4 model.
+Use sealed original PCM from the old accepted prompt and all four new cases,
+plus repository JFK as a recognizer control. Separate subprocesses must isolate
+the two ELF/dependency sets. Verify official ZIP digests, selected payload hashes,
+actual library SHA/SONAME and audio samples; retain exact text/WER and old/new
+recognizer agreement. No neural resynthesis, gate relaxation, alternate seeds,
+Q4/GPU/default promotion or large local model. GH runs the inference; local
+scratch and evidence live under /mnt/storage/crispasr/dia-asr-crosscheck-20261016.
+After recognition isolation, compare pristine original generation if needed.
+
+Echo full-model6835d2dd/run38928056585 was cancelled before execution after
+source review found the fused product is named ffn_swiglu, not ffn_gate_par.
+Repair0dfccc7d in /mnt/volume1/crispasr-echo-ffn-fused-20261016 passes a tiny
+verbatim vendored build_ffn control: the old helper captures5 and fails; the
+repair captures6 and passes. Earlier synthetic native proof does not establish
+production FFN completeness. Fresh CI38929450279, lint38929454381 and hosted
+tiny38929458991 are queued. Prepared full-model composition uses separate
+worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-v2-20261016; do not launch until
+the corrected tiny controls pass. Runtime mathematics/defaults are unchanged.
+
 ## Quantization — no unproven model promotion
 
 - **Index-Echo / issue485:** higher-precision accepted paths remain available.
