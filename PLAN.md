@@ -66,8 +66,14 @@ legacy seed42 plus the same four expanded prompt/seed/settings controls. Retain
 actual constructor/source/weight/environment hashes and full PCM; compare
 against archived captured-original PCM, run actual pinned ASR, and keep every
 failed gate. No new seed/text selection, default change, GPU or Q4 acceptance.
-Tiny tests verify the actual worker comparison logic; full-model acceptance
-requires the hosted result. Large assets stay on GH and /mnt/storage.
+Frozen candidate1c34dc02bff52a11c171a1dc9ec0d4403dee40ba passes all five
+real tiny constructor/capture cases, actual WeightNorm preservation and added
+observer rejection, PCM shape/dtype/nonfinite/scale controls, and all4 unskipped
+secret tests. Hosted38936657203 is queued with an official-artifact collector
+under /mnt/storage/crispasr/dia-direct-original-20261016/collector-v2.
+Cancelled38935996279 has no executed steps. Full-model acceptance requires the
+new hosted result; tiny DAC is expressly a stub. Large assets stay on GH and
+/mnt/storage.
 
 ## CLAIMED 2026-10-16 — Independent pending-run auditors and Dia preservation
 
