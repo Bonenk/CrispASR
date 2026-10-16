@@ -46,3 +46,28 @@ An independent complete artifact audit is required before accepting findings.
 The fork measures sensitivity to one sampled decision in the original. It
 does not establish a unique native defect, native speech quality, GPU/Q4 parity,
 performance or release readiness. No production arithmetic/default is changed.
+
+## Independent audit
+
+Keep official `raw.zip`, `run.json`, `artifacts.json` and `lint.json` together
+in a fresh bundle directory. The auditor verifies the complete ZIP/CRC/hash and
+extracts it itself. Supply the pinned canonical original reference and the
+separately accepted terminal bundle; no full model executes locally.
+
+```sh
+python tools/ci-heavy/dia-original-trace/audit_selftest.py
+python tools/ci-heavy/dia-original-trace/audit.py --bundle /path/to/bundle \
+  --repo /path/to/CrispASR --original-repo /path/to/original-dia \
+  --canonical /path/to/canonical/ref.gguf \
+  --terminal-bundle /path/to/accepted-terminal-bundle --output /path/to/fresh-audit.json
+```
+
+Use the existing reference environment with NumPy and gguf. Checks cover every
+raw payload and retained method against immutable git objects, exact lossless
+array reconstruction, complete OFF/ON/OFF equality, canonical grids, actual
+attention/boundary/cache identities, fork prefix and RNG witnesses, original/
+fork ASR reports and the retained recognizer ELF. The auditor also compares
+new actual full-model intermediates to accepted native raw captures with cosine,
+norms and relative error, and requires all18 original layer outputs plus final
+hidden to remain exact to the prior accepted original captures. The selftest
+rejects15 corrupt-prefix/path/nonfinite controls and checks scale sensitivity.
