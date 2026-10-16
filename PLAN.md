@@ -361,3 +361,21 @@ state; do not assume the old404s or missing credentials remain true. Legacy
 MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
+
+## CLAIMED 2026-10-16 — Original Dia CUDA code and codec trajectory capture
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-trace-20261016,
+branch diag/dia-cuda-trace-20261016. Hypothesis: the three quiet original F16
+clips collapse in delayed-code/RVQ/codec trajectories; the512-hop periodicity
+alone cannot identify the cause. Preserve the exact original source, weights,
+F16/F32-norm construction, five texts/seeds and1.3/35/.95/CFG3 recipe ofacb956c7.
+Capture actual decoder feedback/predictions, sampler inputs, raw delayed codes,
+actual post-delay/clamp RVQ codes and latent tensors without replacing arithmetic.
+Use same-instance OFF/ON/OFF PCM and CPU/CUDA RNG-state identity controls for each
+fixed case. Preserve original WeightNorm hooks and all failures. Tiny actual
+original method controls must validate capture and restoration before one real
+supported Kaggle CUDA run per ../kaggle_usage.md. No CPU model fallback, Torch
+replacement, seed selection or default changes. Keep models/GPU work on Kaggle;
+all local proof under /mnt/storage/crispasr/dia-cuda-trace-20261016. Check active
+sessions before submission, publish raw proof immediately, then independently
+audit code/latent statistics, cosine and magnitudes before interpreting a cause.
