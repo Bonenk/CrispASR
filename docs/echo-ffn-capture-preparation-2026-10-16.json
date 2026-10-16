@@ -1,7 +1,7 @@
 {
   "candidate": "d8183cf92abc24eeeb6c969db563e968c5345d46",
   "hermes_local_source": "5020e60dd1939ee3d86ad9b260198962b7d85da7",
-  "status": "hosted tiny CPU controls and independent artifact audit pass; general CI/lint pending; not integrated",
+  "status": "prior candidate superseded: production fused-product name was missing; repair0dfccc7d passes local verbatim-builder control; fresh hosted gates pending",
   "local_actual_original_class_controls": 18,
   "local_original_provenance": {
     "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
@@ -22,7 +22,7 @@
     "full_package_hosted_check_pending": false
   },
   "local_native_scheduler": {
-    "scope": "actual ggml scheduler observer small tensors only; no model/GPU/Q4 acceptance",
+    "scope": "Actual ggml scheduler on a synthetic named graph; not production Qwen FFN completeness. The later verbatim-builder control exposes the missing fused product.",
     "compile": [
       "c++",
       "-std=c++17",
@@ -115,7 +115,9 @@
       "gpu_acceptance": false,
       "production_defaults_changed": false
     },
-    "retained_audit_failure": "v1 expected older CTest summary wording; v2 verifies actual passing test row plus 100% summary; no producer/gate changes"
+    "retained_audit_failure": "v1 expected older CTest summary wording; v2 verifies actual passing test row plus 100% summary; no producer/gate changes",
+    "ci_conclusion": "success",
+    "lint_conclusion": "success"
   },
   "default_graph_math_changed": false,
   "production_defaults_changed": false,
@@ -123,7 +125,7 @@
   "q4_acceptance": false,
   "gpu_acceptance": false,
   "pending": [
-    "general CI/lint at byte-exact C++/CMake source",
+    "fresh corrected observer tiny official-artifact audit and CI/lint",
     "full-model F16 OFF/ON/OFF stage and decoded-output identity",
     "same-original-input FFN projection attribution before another Q4 recipe"
   ],
@@ -177,5 +179,35 @@
     "run": 38918654602,
     "status": "cancelled before execution",
     "reason": "Superseded by slice-before-transfer regression fix; old source/worktree/logs preserved"
+  },
+  "fused_product_repair": {
+    "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+    "node": "ffn_swiglu",
+    "explanation": "Actual parallel SiLU branch uses ggml_swiglu_split, then sets gate type to sequential; ffn_gate_par is skipped.",
+    "old_captured_boundaries": 5,
+    "repaired_captured_boundaries": 6,
+    "builder_sha256": "9c29e42d1ebaff37f59199d89daaebb588a2f2711b79fa621cb28264284652b6",
+    "compiled_source_snapshots_byte_exact_to_repair": true,
+    "local_executables": [
+      {
+        "label": "old-helper",
+        "exit": 1,
+        "sha256": "43d6f00167d64834e56b5dea3f1ce5bc472814132a10251990c532c3d273d0ab"
+      },
+      {
+        "label": "fixed-helper",
+        "exit": 0,
+        "sha256": "64a12df94c8166d0835a74dc9d145b010d890722524743290befabfb0c11306c"
+      }
+    ],
+    "hosted": {
+      "tiny": 38929458991,
+      "ci": 38929450279,
+      "lint": 38929454381
+    },
+    "fullmodel_composition": "e344c2d064b912e765b0cc74271d88ae845c7bc8",
+    "fullmodel_dispatch_condition": "Corrected hosted tiny official-artifact independent audit must pass; watcher checks exact frozen branch SHA.",
+    "superseded_fullmodel_run": 38928056585,
+    "superseded_fullmodel_conclusion": "cancelled before execution"
   }
 }

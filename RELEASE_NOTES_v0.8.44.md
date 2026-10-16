@@ -18,6 +18,16 @@ The notes below distinguish decoded model evidence, source-level regression
 controls and SDK compilation. They do not announce a new default quantization,
 performance gain or completed Ascend hardware validation.
 
+## Validation still pending
+
+The broader Dia CPU matrix completed all four predeclared cases but failed
+speech quality: original and native ASR outputs are empty. The official3.02GB
+artifact digest is verified; a separate array audit and crossed recognizer
+replay are in progress. No broader speech or F16/Q4/GPU/default promotion.
+Echo's optional FFN observer also needs its fused-product capture repair and
+full-model transparency gates before inclusion. These remain pending work in
+[PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
+
 ## OmniVoice allocation failure handling
 
 Both public code-generation and PCM-decoding output allocations now return

@@ -100,10 +100,12 @@ model-independent worker and selftest before dispatch.
 
 Prepared candidate17a7aedc508be885cce0024199bd48525d3fc41b passes the tiny
 shared-child/metric/inventory selftest. Heavy38913941927, generalCI38913941626
-and lint38913941844 are dispatched at that exact SHA. Heavy is now running
-(the original/reference/native matrix has begun after setup). Collector runs under
-storage and will preserve official raw artifact/digest/logs even on failure.
-Independent full-artifact scientific audit is required before acceptance.
+and lint38913941844 both pass at that exact SHA. Heavy completed all four
+cases and failed quality: the original positives also return empty ASR text.
+Official artifact12057273677 is fully retained and its3022635432bytes match
+GitHub SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90.
+The independent full-array audit is running; crossed recognition below is next.
+No broader speech acceptance, F16/Q4/GPU or default promotion.
 
 Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
 today?" and "The quick brown fox jumps over the lazy dog." Keep original [S1]
@@ -233,7 +235,10 @@ verifies all29 payloads, released original source,18 Python controls and the
 actual arm64 ggml scheduler executable. The first audit expected different
 CTest summary wording; its failure is retained and the corrected audit also
 requires the explicit passing test row. GeneralCI38918654236 and
-lint38918655348 remain queued; no main integration until the applicable gates.
+lint38918655348 pass all13/all10 jobs on the prior source. Source review
+subsequently found its production fused-product capture gap; repair0dfccc7d
+requires its own gates below. The earlier synthetic graph does not prove
+production six-boundary completeness. No main integration yet.
 Full-model F16 transparency and same-original-input FFN replay are still open.
 The revised source slices before CPU transfer: actual37-token tiny MLP
 captures/output remain byte-exact while observed copies fall10656→288 bytes.
@@ -269,7 +274,7 @@ predeclared cases and failed its unchanged quality gate. Its CRC-checked receipt
 preview reports exact original/native input histories and all352 stage rows
 passing, but all original/native/CLI ASR transcripts are empty. Full official
 artifact12057273677 (3022635432bytes, SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90)
-is downloading; independent audit remains required before accepting those claims.
+is retained and fully SHA-verified; independent array audit remains required.
 
 Prepare a crossed ASR replay using both retained candidate shared libraries from
 old38892690744 and new38913941927, with the identical pinned Nemotron Q4 model.
@@ -280,6 +285,9 @@ actual library SHA/SONAME and audio samples; retain exact text/WER and old/new
 recognizer agreement. No neural resynthesis, gate relaxation, alternate seeds,
 Q4/GPU/default promotion or large local model. GH runs the inference; local
 scratch and evidence live under /mnt/storage/crispasr/dia-asr-crosscheck-20261016.
+Candidate30e75dcdd8df573ed1f73e9c97b17f192b82d7af passes scoring/case
+controls and all4 unskipped secret tests; hosted38930760374 is queued with an
+official-artifact collector prepared. No build or neural resynthesis is repeated.
 After recognition isolation, compare pristine original generation if needed.
 
 Echo full-model6835d2dd/run38928056585 was cancelled before execution after
@@ -290,7 +298,11 @@ repair captures6 and passes. Earlier synthetic native proof does not establish
 production FFN completeness. Fresh CI38929450279, lint38929454381 and hosted
 tiny38929458991 are queued. Prepared full-model composition uses separate
 worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-v2-20261016; do not launch until
-the corrected tiny controls pass. Runtime mathematics/defaults are unchanged.
+the corrected tiny controls pass. Compositione344c2d064b912e765b0cc74271d88ae845c7bc8
+passes10 local controls and retains byte-exact runtime/reference sources from
+repair0dfccc7d. A storage watcher independently audits the corrected hosted tiny
+artifact before dispatching that exact frozen full-model composition; failed
+audit prevents launch. Runtime mathematics/defaults are unchanged.
 
 ## Quantization — no unproven model promotion
 
