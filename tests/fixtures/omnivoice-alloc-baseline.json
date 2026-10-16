@@ -1,0 +1,15 @@
+{
+  "pin": "5243fc79",
+  "source": "src/omnivoice.cpp at 5243fc79 (base before allocator guards)",
+  "whole_source_sha256": "29467b22d58674f03f54bab4b7462e48046b10829c7c7564844a671679ea873e",
+  "functions": {
+    "omnivoice_synthesize_codes": {
+      "body": "int32_t* omnivoice_synthesize_codes(struct omnivoice_context* ctx, const char* text, int* out_n_codes) {\n    if (!ctx || !text || !out_n_codes)\n        return nullptr;\n\n    ov_gen_result result = generate_iterative(ctx, text);\n\n    if (result.codes.empty()) {\n        *out_n_codes = 0;\n        return nullptr;\n    }\n\n    int n = (int)result.codes.size();\n    int32_t* out = (int32_t*)malloc(n * sizeof(int32_t));\n    std::memcpy(out, result.codes.data(), n * sizeof(int32_t));\n    *out_n_codes = n;\n    return out;\n}",
+      "sha256": "88d9bfea028e2346e9a108e3ae3f37d0d030b963d9624c79c4465794d3ad521d"
+    },
+    "omnivoice_decode_codes": {
+      "body": "float* omnivoice_decode_codes(struct omnivoice_context* ctx, const int32_t* codes, int n_codes, int* out_n_samples) {\n    if (!ctx || !codes || n_codes <= 0 || !out_n_samples)\n        return nullptr;\n    if (!ctx->tokenizer.loaded) {\n        fprintf(stderr, \"omnivoice: decode requires audio tokenizer \u2014 call omnivoice_set_tokenizer_path first\\n\");\n        *out_n_samples = 0;\n        return nullptr;\n    }\n\n    int n_cb = (int)ctx->hp.n_codebooks;\n    int T_frames = n_codes / n_cb;\n    if (T_frames <= 0 || n_codes != n_cb * T_frames) {\n        fprintf(stderr, \"omnivoice: decode_codes: n_codes=%d not divisible by n_codebooks=%d\\n\", n_codes, n_cb);\n        *out_n_samples = 0;\n        return nullptr;\n    }\n\n    if (ctx->verbosity >= 1) {\n        fprintf(stderr, \"omnivoice: decoding %d codes (%d codebooks \u00d7 %d frames)\\n\", n_codes, n_cb, T_frames);\n    }\n\n    ov_bench_stage bench(\"decode\");\n    auto pcm = higgs_decode(ctx, codes, n_cb, T_frames);\n    if (pcm.empty()) {\n        *out_n_samples = 0;\n        return nullptr;\n    }\n\n    // Match the reference implementation's post-processing: quiet prompts are\n    // normalized to 0.1 RMS for encoding, then decoded audio is restored to the\n    // prompt's original loudness.\n    if (ctx->ref_rms > 0.0f && ctx->ref_rms < 0.1f) {\n        const float gain = ctx->ref_rms / 0.1f;\n        for (float& sample : pcm)\n            sample *= gain;\n    }\n\n    int n = (int)pcm.size();\n    float* out = (float*)malloc(n * sizeof(float));\n    std::memcpy(out, pcm.data(), n * sizeof(float));\n    *out_n_samples = n;\n\n    if (ctx->verbosity >= 1) {\n        fprintf(stderr, \"omnivoice: decoded %d samples (%.2f s at %d Hz)\\n\", n, (float)n / 24000.0f, 24000);\n    }\n    return out;\n}",
+      "sha256": "45690dc191bd3703f69d8a86d457c0d84d0a0117794fc62e790674c5768db62c"
+    }
+  }
+}

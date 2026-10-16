@@ -192,6 +192,9 @@ jobs:
       - name: Dia original generation and codec-input protocol
         run: python3 tests/test_dia_output_protocol.py -v
 
+      - name: Omnivoice output allocation guards (literal bodies)
+        run: python3 tests/test_omnivoice_alloc.py -v
+
       - name: TTS session failure, ownership and conversion contracts
         run: python3 tests/test_tts_session_contracts.py -v
 
