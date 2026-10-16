@@ -41,6 +41,18 @@ speech acceptance are separate gates: preserve strict Q8 numerical failures
 rather than relaxing the F16 threshold. Proof is in
 `docs/dia-full-generation-2026-10-02.json`.
 
+A tiny logit error can change nucleus SUPPORT even when the winning race is
+not close. On actual Dia step864/head6, cache rounding swaps tokens55/1008
+(rank42→43), moving CDF-before55 across0.95 (0.9418578→0.9565715).
+Its probability becomes zero, so the sampled token changes despite an original
+race margin of0.84936. Capture sorted indices, cumulative probability BEFORE
+the token, filtered probabilities and the exact random noise; cosine or argmax
+alone misses this. Replay the actual Python and native samplers on the SAME
+captured logits before blaming random state. The complete current-runtime
+factorial and27 actual-logit replay choices are documented in
+`docs/dia-cache-sampler-results-2026-10-16.md`. This does not isolate a layer or
+promote a broad speech/default precision recipe.
+
 ## Nemotron: CPU window parity does not establish CUDA window parity (2026-10-02, #487)
 
 Aligning incremental frontend windows to causal stride boundaries can preserve

@@ -583,5 +583,133 @@
   "all_13_ci_pass": true,
   "all_10_lint_pass": true,
   "tested_runtime_sources_byte_exact": true,
-  "scope": "one fixed prompt/seed, disabled-by-default CPU recipe; broader speech, GPU, Q4 and performance remain unaccepted"
+  "scope": "one fixed prompt/seed, disabled-by-default CPU recipe; broader speech, GPU, Q4 and performance remain unaccepted",
+  "public_complete_proof": {
+    "path": "dia-20261016-cache-sampler/complete-factorial-v1/complete-cache-sampler-factorial-v1.zip",
+    "bytes": 1248008904,
+    "sha256": "3d11b3c3a5d9e35862c1f8a2507d5da2b15e8367602c897fb61a027f37d7ede7",
+    "payloads": 17,
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "b1e02825d4fdb91b8b702accdcfb252798d475ee",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/b1e02825d4fdb91b8b702accdcfb252798d475ee/dia-20261016-cache-sampler/complete-factorial-v1/complete-cache-sampler-factorial-v1.zip",
+    "anonymous_full_download_verified": true
+  },
+  "actual_logit_nucleus_boundary": {
+    "receipt": {
+      "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+      "step": 864,
+      "head": 6,
+      "original_token": 55,
+      "f16_token": 938,
+      "actual_original_sampler_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+      "torch": "2.6.0+cpu",
+      "input_prefix_exact": true,
+      "rows": [
+        {
+          "logits_source": "original",
+          "head": 6,
+          "selected": 55,
+          "probability_55": 0.015385376289486885,
+          "probability_938": 0.01616036146879196,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 2.840468406677246,
+          "score_938": 1.9911116361618042,
+          "score_margin_55_minus_938": 0.8493567705154419,
+          "retained_by_topk_and_nucleus_55": true,
+          "retained_by_topk_and_nucleus_938": true
+        },
+        {
+          "logits_source": "f16",
+          "head": 6,
+          "selected": 938,
+          "probability_55": 0.0,
+          "probability_938": 0.01616131328046322,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 0.0,
+          "score_938": 1.9912289381027222,
+          "score_margin_55_minus_938": -1.9912289381027222,
+          "retained_by_topk_and_nucleus_55": false,
+          "retained_by_topk_and_nucleus_938": true
+        },
+        {
+          "logits_source": "f32",
+          "head": 6,
+          "selected": 55,
+          "probability_55": 0.01538544986397028,
+          "probability_938": 0.016160504892468452,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 2.840481996536255,
+          "score_938": 1.9911292791366577,
+          "score_margin_55_minus_938": 0.8493527173995972,
+          "retained_by_topk_and_nucleus_55": true,
+          "retained_by_topk_and_nucleus_938": true
+        }
+      ],
+      "scope": "Actual original sampler and exponential noise on captured original/native logits, no model run or reference injection",
+      "rank_crossing_token": 1008,
+      "nucleus": [
+        {
+          "source": "original",
+          "token55_scaled_logit": -2.657008647918701,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570236682891846,
+          "unscaled_margin_55_minus_competitor": 1.811981201171875e-05,
+          "rank55": 42,
+          "probability55_after_top45": 0.014717267826199532,
+          "cumulative_probability_before55": 0.9418578147888184,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": true,
+          "actual_cpp_probability55": 0.015385376289486885,
+          "actual_cpp_probability938": 0.01616036333143711,
+          "actual_cpp_token": 55
+        },
+        {
+          "source": "f16",
+          "token55_scaled_logit": -2.6570417881011963,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570329666137695,
+          "unscaled_margin_55_minus_competitor": -1.0728836059570312e-05,
+          "rank55": 43,
+          "probability55_after_top45": 0.014717302285134792,
+          "cumulative_probability_before55": 0.9565715193748474,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": false,
+          "actual_cpp_probability55": 0.0,
+          "actual_cpp_probability938": 0.01616131328046322,
+          "actual_cpp_token": 938
+        },
+        {
+          "source": "f32",
+          "token55_scaled_logit": -2.656989812850952,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570231914520264,
+          "unscaled_margin_55_minus_competitor": 4.00543212890625e-05,
+          "rank55": 42,
+          "probability55_after_top45": 0.014717352576553822,
+          "cumulative_probability_before55": 0.9418586492538452,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": true,
+          "actual_cpp_probability55": 0.015385450795292854,
+          "actual_cpp_probability938": 0.016160503029823303,
+          "actual_cpp_token": 55
+        }
+      ],
+      "actual_cpp_sampler_sha256": "60eef3589f084cdb4d0e9361d0640c4dc535eab52dcddb38233785d689dcc6e1",
+      "actual_cpp_noise_sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e"
+    },
+    "public_proof": {
+      "path": "dia-20261016-cache-sampler/actual-logit-nucleus-v1/dia-actual-logit-nucleus-proof-v1.zip",
+      "bytes": 501619,
+      "sha256": "d3207e3cc5b0798bb834172fcf85e76b54d762336418e893cfd82e61862fee38",
+      "payloads": 41,
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "c0ccddf211ad0e5d9b9c5108def4d5062b4f4342",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/c0ccddf211ad0e5d9b9c5108def4d5062b4f4342/dia-20261016-cache-sampler/actual-logit-nucleus-v1/dia-actual-logit-nucleus-proof-v1.zip",
+      "anonymous_full_download_verified": true
+    },
+    "portable_reproduction_all_27_head_decisions_exact": true
+  }
 }

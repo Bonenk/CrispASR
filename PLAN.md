@@ -67,8 +67,14 @@ all runtime graph mathematics, integration, main pushes and heavy-run scheduling
   analysis or validation tooling with calibrated rejection tests; preserve
   existing gates/defaults, no runtime graph edits or repeated failed recipe.
 
-Both tmux sessions are live with the configured default model/provider. They
-have acknowledged their task and coordinator steering; first audits are in flight.
+Both tmux sessions use the configured default model/provider. OmniVoice finds
+two unchecked output allocations; coordinator integration candidate2985a4c6
+passes independently extracted production-body normal/OOM/mutation/frozen-old
+controls. GeneralCI38914114501 and lint38914114178 are queued; no main merge
+until green. The old-source and mutation controls both crash with signal11.
+Echo attention-Q8 is already in rejected recipes; do not repeat it. Its first
+worker proposal is rejected. A source-verified original FFN capture helper is
+under review, with actual tiny original class controls before any heavy run.
 Worker logs, handoffs and all large data belong under
 /mnt/storage/crispasr/hermes-workers-20261016. Neither worker may change global
 configuration, main/protected checkouts, push/merge/publish, launch heavy jobs,
@@ -81,7 +87,7 @@ legacy-GPU validation and private reporter inputs remain external dependencies.
 
 Owner: primary maintainer session, not delegated. Prepare worktree
 /mnt/volume1/crispasr-dia-broader-speech-20261016, branch
- diag/dia-broader-speech-20261016, based on immutable5e04955e runtime.
+diag/dia-broader-speech-20261016, based on immutable5e04955e runtime.
 Builds/arrays/logs under /mnt/storage/crispasr/dia-broader-speech-20261016.
 Heavy38892690744 reports success: only F32 cross-cache plus portable sampling
 passes both-decoder/CLI WER-zero among the four fixed-serial-head combinations.
@@ -89,6 +95,12 @@ Official artifact12049198423 passes independent535-payload v3 audit, including
 full native/original sampler replays and unchanged quality gates. The passing
 recipe is now eligible for expanded model validation; prepare/validate the
 model-independent worker and selftest before dispatch.
+
+Prepared candidate17a7aedc508be885cce0024199bd48525d3fc41b passes the tiny
+shared-child/metric/inventory selftest. Heavy38913941927, generalCI38913941626
+and lint38913941844 are dispatched at that exact SHA. Collector runs under
+storage and will preserve official raw artifact/digest/logs even on failure.
+Independent full-artifact scientific audit is required before acceptance.
 
 Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
 today?" and "The quick brown fox jumps over the lazy dog." Keep original [S1]
@@ -127,8 +139,10 @@ uses8d0ad886/C36; it does not establish current-main default speech acceptance.
 
 1. The completed CPU dispatch/reduction investigation identifies a sufficient
    arithmetic difference at this boundary. The generic head gate is integrated;
-   current-main head-only speech failed. Finish the claimed cache/sampler matrix
-   before broader speech acceptance; the pinned recovery remains scoped.
+   current-main head-only speech failed. The complete current-runtime factorial
+   now accepts one prompt/seed under all three opt-in controls. The step864 F16
+   fork is an actual nucleus-support rank crossing (55 versus1008); follow the
+   claimed four-case matrix before broad speech acceptance.
    Do not add a token override or change top_p/seed/quality thresholds as a fix.
 2. Earlier module Q differs6.90e-7 from actual full-model Q despite exact keys
    and normalized input. Preserve that qualification. A new intervention must

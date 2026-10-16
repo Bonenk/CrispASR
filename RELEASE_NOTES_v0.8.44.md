@@ -129,18 +129,21 @@ Actual retained CLI/C-ABI arrays also match the original protocol. All13 general
 CI jobs and10 lint checks pass on the exact tested candidate; rebase preserves
 its source bytes. [Complete proof](docs/dia-output-protocol-2026-10-15.md).
 
-This scoped repair does not establish Dia speech acceptance. Complete original-
-DAC cross-decode gives original-code WER0 and both native-code variants WER1;
-neural generation, CUDA, Q4 and performance remain separate open gates.
+The public pinned-original dumper and text-only `crispasr-diff` route now cover
+all encoder/decoder layers, selected attention/block boundaries and real DAC.
+Independent composed validation checks1735 payloads and88 stages in each of
+the ordinary and serial-head paths, with exact bounded OFF/ON/OFF controls.
+[Complete wiring proof](docs/dia-reference-wire-composed-2026-10-16.json).
 
-The original-DAC cross-decoder and layer0 key-history diagnostic tools are now
-integrated with pinned inputs and complete public proof. Hosted original-DAC
-validation reproduces the original speech at WER0; both native-code variants
-remain near-silent at WER1. Key-history component controls and all10 lint jobs
-pass. These tools make the remaining investigation reproducible; they do not
-establish native Dia speech, quantization or GPU acceptance. Details are in the
-[codec](docs/dia-full-codec-preparation-2026-10-15.md) and
-[key-history](docs/dia-key-history-producer-2026-10-15.md) receipts.
+Disabled-by-default CPU diagnostic controls now compose generic serial head
+arithmetic, F32 cross-cache and portable original-style sampling. On the fixed
+reported prompt/seed, this combination restores all1226 original input rows,
+1210 code frames and WER0 through native DAC, original DAC and actual CLI.
+Independent audit verifies535 payloads and every native/original sampling
+choice. The F16 first fork is traced to a nucleus rank-boundary crossing on
+actual logits; a model-free replay reproduces all27 decisions. Broader texts/
+seeds are in progress. Production defaults, model pins, GPU/Q4 and performance
+acceptance remain unchanged. [Results and public proofs](docs/dia-cache-sampler-results-2026-10-16.md).
 
 ## Dia: reproducible DAC precision conversion
 
@@ -158,9 +161,8 @@ passing 48/48 startup and 40/40 full-history comparisons against original
 references. A dedicated workflow checks real conversion bytes and every tensor
 audit row whenever the converter changes.
 
-This tooling is independent of the unmerged Dia runtime investigation. Native
-short-speech and Q4 gates remain failed, and registry companion pins are
-unchanged. Fresh [integration CI](docs/dia-dac-converter-hosted-2026-10-13.json) also passes real conversion, exact candidate bytes and all 134 physical tensor rows.
+This converter is integrated independently of the opt-in runtime controls.
+Registry companion pins and broad native/GPU/Q4 acceptance are unchanged. Fresh [integration CI](docs/dia-dac-converter-hosted-2026-10-13.json) also passes real conversion, exact candidate bytes and all 134 physical tensor rows.
 
 ## Backend discovery and CI coverage
 
@@ -207,44 +209,21 @@ server requests cover voice speech, reuse, unknown-voice rejection and recovery.
 The policy controls are not described as model-executed sidecar tests.
 
 Integrated main1c33cb58 now passes all13 general CI jobs,2,026 unit tests and
-all10 lint checks. Fresh frozen-source package/wheel validation and subsequent
-tagged packaging remain release gates. Individual passing PR checks do
+all10 lint checks. Bounded frozen-source package/wheel preflight already passes at998f8d18
+([receipt](docs/release-preflight-2026-10-15.md)); the final release tip still
+requires its own freeze, CI and tagged packaging. Individual passing PR checks do
 not establish that v0.8.44 binary assets or wheels have already been built or
 published. Version propagation and the annotated tag must use
 `scripts/bump-version.sh` after final-main CI passes.
 
 ## Known limitations and excluded investigations
 
-Additional Dia neural/reference-harness changes remain on an unmerged branch;
-the separately proven output-protocol corrections above are integrated. F16 neural stages pass the pinned original reference, but the
-128-step startup DAC replay fails cosine/magnitude (cosine 0.9976444, norm error
-0.04271824). Q4_K also fails neural boundaries. Complete native long-prompt
-roundtrips pass, while the reported short sentence has WER 1.0 through both
-CLI and C ABI: F16/Q8 are quiet and Q4 produces louder non-speech. Eight-stage
-DAC tracing now isolates a final-weight precision defect. The completed canonical original
-short-speech control reads the sentence verbatim (WER 0, 14.048 seconds,
-RMS 0.073534). Replaying that full original history passes all 40 F16
-comparisons, including DAC PCM at cosine 0.9999999 and norm error 0.00004443983.
-Q4_K passes only 13/40 and first fails at encoder layer 6. This distinct
-full-utterance result neither erases the startup-codec failure nor accepts
-native free generation. [The complete original receipt](docs/dia-full-original-short-2026-10-12.json)
-preserves full stage metrics and all 21 artifact hashes. A separately labelled
-original-model control using the exact compiled native sampler also fails
-short speech (WER 1), as does native free generation. Its 37-step identical
-input prefix passes neural cosine/magnitude; [the sampler receipt](docs/dia-native-sampler-control-2026-10-12.json)
-retains the first discrete divergence and complete proof. This implicates the
-sampling path. Pinned probability replay finds matching support and maximum probability error below 3.61e-7;
-these are excluded investigations. Thresholds, reference PCM and production
-recipes remain unchanged. The
-[complete rejected proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/43b643898356a14c9d7a8aa0168ef5ea0d64261d/dia-20261012/rejected-codec-and-short-speech-proof.zip)
-and [receipt](docs/dia-rejected-proof-2026-10-12.json) preserve both failures.
-
-The completed eight-boundary diagnostic isolates the startup codec failure to
-the precision of the final output weights. Preserving three original F32
-tensors passes all 48 canonical startup comparisons and adds only 1,312 bytes.
-[The full codec receipt](docs/dia-codec-precision-2026-10-12.json) retains all
-variants, rejected published results, four negative controls and 47 artifact
-hashes. Standalone conversion now reproduces the validated bytes and passes fresh startup/full-history comparisons. Native free speech remains excluded from release acceptance; production codec pins are unchanged.
+Dia production defaults and Q4 remain unaccepted for the reported short
+sentence. The scoped opt-in CPU recovery above does not establish broader
+texts/seeds, GPU or speed. Startup DAC precision needs the explicit converter;
+production companion pins are unchanged. Earlier rejected cache, rotary,
+precision and speech controls remain recorded in [HISTORY.md](HISTORY.md) and
+the linked complete immutable proofs; they are not promoted by the new result.
 
 The complete MiMo PR #492 and OmniVoice draft PR #521 remain unmerged.
 Independent MiMo mel/cached-decode pieces and OmniVoice standalone audio/text
@@ -272,24 +251,11 @@ Those controls are documented in
 [the full-inference receipt](docs/breeze-guided-full-inference-arithmetic-2026-10-12.json)
 and do not replace canonical fixtures or waive the recorded diagnostic.
 
-Dia's unmerged [portable sampler replay](docs/dia-portable-random-hosted-2026-10-13.json) reproduces all 11,034 original draws and 1,210 codec frames with native filtering. In the [real speech control](docs/dia-portable-speech-hosted-2026-10-13.json), the original neural model with this sampler produces byte-identical canonical PCM and WER 0, while native F16 CLI/C-ABI speech still fails with empty transcripts. The first differing draw follows a nucleus-support boundary change despite close logits. [Completed original-head/full-F32 controls](docs/dia-neural-precision-hosted-2026-10-13.json) both pass 40/40 replay stages but reject real CLI/C-ABI speech with empty transcripts and WER 1. Full F32 extends exact shared input history to 865 steps; [Opt-in cross-cache precision control](docs/dia-cross-cache-controls-2026-10-13.json) is complete and rejected, preserving fixed F32 weights and same-host OFF/ON/OFF guards. The runtime stays opt-in and unmerged; production defaults/model pins and speech/Q4/GPU gates remain unchanged.
-
-[Durable Dia proof retrieval](docs/dia-proof-archives.md) preserves all 77 canonical/component/converter/rejected-speech files in immutable public archives. The stdlib helper verifies full archive and payload hashes, rejects invalid extraction and preserves existing paths; eight contracts and real archive retrieval pass. Future validation input transport also passes complete [original/native-filter replay](docs/dia-public-input-replay-2026-10-13.json). These are reproducibility fixes, with native speech still rejected and cache precision under investigation.
-
-[Complete rejected neural precision and tiny cache proofs](docs/dia-neural-public-proof-2026-10-13.json) are also durably public, with full anonymous archive verification and unchanged acceptance scopes. The TTS documentation records the short-prompt failure; the architecture guide corrects the original checkpoint’s CFG equation.
-
-
-Completed fixed-cache control (GH 38357576078, source 2205d920d): all three
-F16/F32/F16-repeat arms pass 40/40 canonical stages, but all six CLI/C ABI
-speech controls remain empty/WER 1. OFF/repeat inputs, logits and PCM match
-exactly. Actual cross-cache vectors double from 11,501,568 to 23,003,136 bytes;
-F32 extends shared input history from 865 to 979 steps and reduces maximum
-aligned logit norm error from 2.40e-5 to 5.01e-6. At step 978/head 2, tiny neural
-changes include token 904 across the nucleus boundary; original/native filters
-agree on identical logits and reproduce the recorded draws. This is a rejected
-speech control, with no sampling-policy or quality-gate waiver.
-Complete [cache controls](docs/dia-cross-cache-hosted-2026-10-13.json) and [first-draw replay](docs/dia-cross-cache-boundary-2026-10-13.json).
-
+[Durable Dia proof retrieval](docs/dia-proof-archives.md) preserves canonical,
+component, converter and rejected-speech evidence with immutable archive and
+payload hashes. Original-head, cache and random-sampling investigations are
+archived in HISTORY.md. Current acceptance is the scoped three-control CPU
+result above; failed earlier controls retain their original gates.
 
 The scoped 310P BF16 capability candidate also passes both SDK9.2 compile
 architectures, including the upstream operator binary. Its physical rerun

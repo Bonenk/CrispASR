@@ -1,3 +1,15 @@
+## Dia F16 first fork traced to nucleus rank crossing — 2026-10-16
+
+Actual original/F16/F32 step864/head6 logits share identical feedback history.
+Token55 crosses token1008 by a CFG margin of +1.81198e-5 → -1.07288e-5;
+rank42→43 moves CDF-before55 from0.9418578 to0.9565715 across top_p0.95.
+The actual nucleus filter zeros its probability, causing token938 instead.
+The original exponential race margin is0.84936, so this is not a race near-tie.
+A standalone actual-source Python/C++ small-array replay matches all27 head
+choices. Full factorial proof and the501619-byte numerical proof are public,
+immutable and full-anonymous-download SHA-verified. Failed controls remain
+rejected. [Numerical values, hashes and proof links](docs/dia-cache-sampler-results-2026-10-16.md).
+
 ## Dia current-runtime cache/sampler factorial accepted and integrated — 2026-10-16
 
 Integrationad0d1546 preserves tested5e04955e executable sources exactly. Heavy
