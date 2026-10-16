@@ -4,8 +4,8 @@
   "script_sha256": "47cd65900c76748a1f15b10a66d881f945b14713b5b8ad165d1602ee38ad9535",
   "kernel_slug": "crispasr-dia-original-cuda-trace-v1",
   "kernel_version": 1,
-  "status": "KernelWorkerStatus.RUNNING",
-  "actual_full_model_observer_identity": "pending",
+  "status": "ERROR at complete strict observer identity gate",
+  "actual_full_model_observer_identity": "Failed legacy OFF0; four cases exact; all RNG states exact",
   "actual_speech_acceptance": false,
   "native_acceptance": false,
   "production_defaults_changed": false,
@@ -127,5 +127,6 @@
     ],
     "scope": "One tiny fixture; no general RMSNorm algorithm or GPU/full-model equivalence claim"
   },
-  "independent_full_proof_audit": "Prepared; pending completed raw GPU evidence"
+  "independent_full_proof_audit": "Complete:201 payloads,202 full anonymous hash checks; global observer acceptance remains false",
+  "result_receipt": "docs/dia-cuda-trajectory-results-2026-10-16.json"
 }

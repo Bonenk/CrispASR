@@ -46,24 +46,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Echo full-model observer validation and integration
-
-Owner: coordinator; frozen landing worktree
-/mnt/volume1/crispasr-echo-ffn-land-20261016, branch integrate/echo-ffn-20261016,
-sourced51b6cf3fd7a14fbbcdc16111763879667d05a47. CI38952809132 and lint38952812485
-pass all13 CI and10 lint jobs at that exact source; final logs are retained.
-All11 observer source files match tested0dfccc7d exactly, the three
-original commits/authorship are preserved, and main's OmniVoice fix is retained.
-The1946-payload/690-comparison full-model observer audit and permanently public,
-fully anonymously verified proof are complete; see HISTORY.md and
-[result](docs/echo-ffn-observer-results-2026-10-16.json).
-
-Next: audit frozen composition CI/lint, integrate unchanged tested sources, then
-continue same-original-input FFN projection attribution for rejected9B Q4 recipes.
-The accepted2B F16 observer is not9B Q4 attribution. No Q4/GPU/default/release
-promotion. Physical ledger rows are internally checked and tied to producer/model
-hashes; no multi-GB neural weights are reread locally.
-
 ## Dia correctness — current dependencies
 
 The completed reduction/cache/RNG, broader matrix and recognition investigations
@@ -73,11 +55,13 @@ the direct-original and full-model observer dependencies.
 1. Direct-original CPU construction/recognition is audited and fails speech.
    Original README F16 CUDA is independently audited: both fox seeds pass,
    legacy and both hello seeds fail; both recognizer positives pass. Its81 payloads
-   and82 anonymous public downloads are verified. Next capture delayed codes,
-   actual RVQ inputs and codec latents under same-host OFF/ON/OFF controls to
-   localize the quiet, nearly512-hop-periodic outputs. Preserve the two passing
-   fox cases and all three failures. Then isolate precision/device/Torch/recipe
-   effects with paired controls before the matched original/native intervention.
+   and82 anonymous public downloads are verified. The subsequent trajectory
+   experiment is fully audited (201 payloads/202 anonymous checks): no invalid
+   codes were clamped, and all three quiet paths use one common nine-book vector
+   for over99% of frames. Both hello and fox cases pass exact observer identity;
+   first legacy OFF0 differs slightly, so the global observer gate remains failed.
+   Next isolate compute precision and sampling recipe on one CUDA host, preserving
+   the two fox positives and all three failures before native recipe intervention.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
@@ -363,40 +347,13 @@ MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
-## CLAIMED 2026-10-16 — Original Dia CUDA code and codec trajectory capture
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-trace-20261016,
-branch diag/dia-cuda-trace-20261016, frozen source06c3d758bffa632e11e1b2578c5fc41b4387af82.
-Kernelcrispasr-dia-original-cuda-trace-v1/version1 is RUNNING; pulled uploaded
-script is byte-exact, SHA47cd65900c76748a1f15b10a66d881f945b14713b5b8ad165d1602ee38ad9535.
-Tiny actual-method OFF/ON/OFF PCM/RNG/prediction, delay/clamp, original9 WeightNorm
-hook and exception-restoration controls pass. Source invariants and changed-capacity
-negative pass; independent Hermes review finds no blocking defect. Full GPU model
-identity/quality and root audit remain pending. A first inventory request hit429;
-after cooldown, recent sessions were verified terminal before one submission.
-Collector-v1 retains terminal proof. Independent NumPy trajectory replay is
-prepared and passes literal original generate/DecoderOutput controls for sampled
-and capacity EOS, rejecting eight corrupted feedback/prediction/raw/truncation
-cases. Actual GPU evidence is still pending. See [preparation](docs/dia-cuda-trajectory-preparation-2026-10-16.json).
-Hypothesis: the three quiet original F16
-clips collapse in delayed-code/RVQ/codec trajectories; the512-hop periodicity
-alone cannot identify the cause. Preserve the exact original source, weights,
-F16/F32-norm construction, five texts/seeds and1.3/35/.95/CFG3 recipe ofacb956c7.
-Capture actual decoder feedback/predictions, sampler inputs, raw delayed codes,
-actual post-delay/clamp RVQ codes and latent tensors without replacing arithmetic.
-Use same-instance OFF/ON/OFF PCM and CPU/CUDA RNG-state identity controls for each
-fixed case. Preserve original WeightNorm hooks and all failures. Tiny actual
-original method controls must validate capture and restoration before one real
-supported Kaggle CUDA run per ../kaggle_usage.md. No CPU model fallback, Torch
-replacement, seed selection or default changes. Keep models/GPU work on Kaggle;
-all local proof under /mnt/storage/crispasr/dia-cuda-trace-20261016. Check active
-sessions before submission, publish raw proof immediately, then independently
-audit code/latent statistics, cosine and magnitudes before interpreting a cause.
-
 ## CLAIMED 2026-10-16 — Compose accepted Echo observer with integrated Dia controls
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
-branch integrate/echo-ffn-v2-20261016. Frozen Echo compositiond51b6cf3 passes all13
+branch integrate/echo-ffn-v2-20261016, frozen composition3a13e0c62dae026ef49fcf55013285540ae7a0b4.
+Combined CI38967377917/lint38967380611 are queued. All11 observer files and8 Dia
+source files are byte-exact to their accepted candidates; local Dia controls pass.
+Frozen Echo compositiond51b6cf3 passes all13
 CI38952809132 and10 lint38952812485 jobs, alongside its accepted1946-payload
 full-model audit. Rebase the three original observer commits and documentation
 onto current main with the already integrated Dia sampling fix intact. Preserve
@@ -405,3 +362,24 @@ of CI controls. Resolve only the additive workflow composition if required.
 Run actual local literal-source controls, inspect complete source differences,
 and validate the combined CI/lint composition before fast-forward integration.
 No graph math, model recipe, Q4 acceptance or default change.
+
+## CLAIMED 2026-10-16 — Matched original Dia CUDA precision and recipe controls
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-factorial-20261016,
+branch diag/dia-cuda-factorial-20261016. The audited trajectory localizes quiet
+outputs to almost constant RVQ inputs but does not explain their selection.
+Use untouched original normal constructors/generate/DAC, same pinned weights,
+five fixed texts/seeds and supported CUDA host/framework. Predeclare four arms:
+F16 vs F32 compute crossed with source1.3/35 vs current native1.2/45 sampling;
+keep CFG3/top-p.95/capacity3072 fixed. Repeat source-F16 as the final anchor.
+Preserve F32 norms, all original hooks, no added generation observers, no token
+forcing or seed/prompt selection. Both original fox positives and sealed legacy/
+JFK recognizer positives remain controls; failed cases stay in the proof. Keep
+full parameter dtype ledgers, RNG snapshots, PCM and raw original Whisper
+recognition for all25 outputs. Compare final anchor and original speech outcomes;
+no global speech/default/quant acceptance inferred from diagnostic completion.
+Validate source/knob controls and negative perturbations before one supported
+Kaggle submission per ../kaggle_usage.md, after session checks. No CPU fallback,
+Torch replacement or GPU-draw retries. Checkpoint each completed arm to public HF
+before constructing the next; independently audit the final pinned proof. Large
+assets and local preparation under /mnt/storage/crispasr/dia-cuda-factorial-20261016.

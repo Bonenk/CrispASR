@@ -1,3 +1,39 @@
+## Dia CUDA trajectories audited: constant code paths, global observer gate failed — 2026-10-16
+
+Source06c3d758 completed all five OFF/ON/OFF captures and recognitions. Independent
+audit verifies201 payloads,202 full anonymous downloads, original sources and
+all five integer feedback/BOS/EOS/delay replays. No invalid RVQ input was clamped.
+Actual RVQ zq and decoder input are byte-identical, as are decoder output/ON PCM.
+All three quiet clips use modal vector568/804/10/674/364/981/568/378/731 for
+99.802%/99.452%/99.329% of frames, with constant coarse book568. Both fox controls
+vary across133–334 codes per book and transcribe at WER0; quiet outputs are empty/
+WER1. Both sealed recognizer positives pass WER0. This locates the captured
+quietness upstream of codec decoding, without identifying its network/sampler
+cause or a native-runtime defect.
+
+Both hello and fox cases pass byte-exact three-phase PCM; all CPU/CUDA RNG
+snapshots match. Legacy ON/OFF1 are exact, but first OFF0 differs by maxabs
+4.866160452365875e-8, relativeL2 6.7822575e-5. Its OFF tokens were not captured:
+close PCM/equal RNG do not establish their identity or the first-call cause.
+The strict producer and auditor gates remain FAILED; their scripts/logs are
+retained. A separate complete evidence audit does not relax observer acceptance.
+
+[Permanent raw proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/tree/c098003aa2404b2535467ea9276d12e6850f180d/dia-20261016-original-cuda/trajectory-v1)
+and [independent audit pack](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5f0c0fe26b34d7b2af742337fbdaa5e369c25e3a/dia-20261016-original-cuda/trajectory-v1-audit-v1/README.md)
+are fully anonymously hash-verified; the audit archive is7320601bytes. Eight
+corrupted integer trajectories are rejected by tiny literal-original generation
+controls. See [result receipt](docs/dia-cuda-trajectory-results-2026-10-16.json).
+No speech/native/Q4/default promotion. A matched precision/recipe intervention
+is claimed in PLAN.md; the tested sources remain frozen.
+
+## Echo original integration composition passes all hosted gates — 2026-10-16
+
+Frozend51b6cf3 passes all13 CI38952809132 and10 lint38952812485 jobs, with full
+exact-source logs retained. Fresh composition3a13e0c6 preserves the original
+observer commits and all11 source files, plus all8 integrated Dia control files.
+Its three local Dia routing suites pass. Combined CI38967377917/lint38967380611
+remain pending before integration. No observer, Q4 or speech thresholds change.
+
 ## Dia original trajectory capture prepared and submitted — 2026-10-16
 
 Frozen06c3d758 adds nine actual original boundary captures with same-instance

@@ -40,8 +40,9 @@ Echo's fused-product observer repair passes all13 general CI and10 lint jobs.
 The full-model observer passes its independent1946-payload audit on EN/ZH,
 including all690 numerical comparisons and actual decoded/CLI/CABI controls.
 Complete3.505GB evidence and auditor pack are permanently public and anonymously
-hash-verified. Landing compositiond51b6cf3 remains pending build/lint acceptance
-before integration. Original Dia's F16 CUDA control completed on T4: both fox
+hash-verified. Compositiond51b6cf3 passes all13 CI and10 lint jobs; current-main
+composition3a13e0c6 retains accepted Echo and Dia source bytes and awaits its
+combined CI/lint gates before integration. Original Dia's F16 CUDA control completed on T4: both fox
 seeds pass WER0, while legacy and both hello seeds fail with empty text/WER1.
 Both recognizer positives pass. All81 payloads and82 full anonymous downloads
 are independently verified, with complete public raw and audit proof. This does
@@ -56,6 +57,14 @@ pass; the integrated non-document source tree is byte-identical. Tiny actual
 routing controls and old-source negatives pass; fresh main CI remains pending.
 Sampling defaults are unchanged. This enables the planned matched recipe
 comparison without establishing speech acceptance.
+
+Original Dia CUDA trajectory evidence is also complete and independently audited:
+201 payloads and202 full anonymous downloads. The quiet paths already contain
+nearly constant RVQ inputs; no invalid-code clamping created them. Four cases
+pass exact OFF/ON/OFF PCM, but first legacy OFF0 differs slightly, so the global
+observer gate remains failed. Complete failed proof is public. Neither this
+localization nor two fox positives establish broad speech or native acceptance.
+See [trajectory results](docs/dia-cuda-trajectory-results-2026-10-16.json).
 
 ## OmniVoice allocation failure handling
 
