@@ -67,8 +67,8 @@ all runtime graph mathematics, integration, main pushes and heavy-run scheduling
   analysis or validation tooling with calibrated rejection tests; preserve
   existing gates/defaults, no runtime graph edits or repeated failed recipe.
 
-Both tmux sessions used the configured default model/provider and are now idle
-after completing their assignments. Their worktrees and logs are preserved.
+Both tmux sessions used the configured default model/provider, completed their
+initial assignments, and now perform scoped read-only follow-up audits. Their worktrees and logs are preserved.
 The bounded OmniVoice output-allocation fix is integrated after all13 CI jobs
 and all10 lint jobs passed on candidate2985a4c6. Completed proof is in HISTORY.md;
 remaining PR521 integration and original/native clone-quality acceptance stay open.
@@ -243,6 +243,23 @@ Queued heavy38918654602 was cancelled without execution and replaced by
 are independently byte-exact; revised optional Python capture has18 local
 controls and the fresh exact-source hosted check. Preserve both source pins.
 [Preparation receipt](docs/echo-ffn-capture-preparation-2026-10-16.json).
+
+## CLAIMED 2026-10-16 — Echo full-model observer transparency
+
+Owner: coordinator, worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-20261016,
+branch diag/echo-ffn-fullmodel-20261016, based on frozen capture sourced8183cf9.
+Prepare an actual public-dumper Python and direct native stage/decoded-output
+OFF/ON/OFF worker for 2B EN/ZH F16 controls. Original HF source is5d98a34d,
+GGUFb3453826 and GGML0a862076; use released transformers5.6.0 with externally
+verified full-file/class hashes. All existing arrays and actual text/cues must
+remain byte-exact within each implementation; all six new boundaries must be
+present at every decoder layer. Keep original/native numerical parity distinct
+from observer identity, and retain all failed controls. Run heavy builds/models
+on GH; local data and scratch under /mnt/storage/crispasr/echo-ffn-fullmodel-20261016.
+No runtime math/default change, same-input Q4 attribution or GPU/model promotion.
+The first Hermes full-model design is rejected for invented commands/pins; the
+worker is now checking primary metadata only. OmniVoice follow-up also needs a
+revision: passing other clips does not exclude ASR sensitivity to cloned speech.
 
 ## Quantization — no unproven model promotion
 
