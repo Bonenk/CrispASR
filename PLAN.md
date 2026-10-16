@@ -194,12 +194,34 @@ commands: [CANN TODO](docs/cann-todo.md) and
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
   model-quality reports from merged contributor PR530 only with a new hypothesis.
 
+## CLAIMED 2026-10-16 — Paired Echo FFN boundary capture
+
+Owner: coordinator; runtime observation stays outside the Hermes worker.
+Worktree /mnt/volume1/crispasr-echo-ffn-native-20261016, branch
+ diag/echo-ffn-native-20261016. Data/builds under
+/mnt/storage/crispasr/echo-ffn-native-20261016. Extend the existing diagnostic
+scheduler observer (no graph mathematics or defaults) to retain last-prefill-
+token MLP input, gate/up outputs, activated product/down input and MLP/down
+output with layer names. Wire optional original capture and public diff stages
+only after actual source-verified helper review. Existing default block capture
+and imatrix callbacks must remain intact; no callback abort on unrelated nodes.
+
+Acceptance: tiny actual ggml tensor/backend readback, ownership, layer/name/
+shape/dtype/stride/last-token and observer composition controls; original tiny
+MLP OFF/ON/OFF exact; then hosted source-pinned full-model F16 identity and
+same-input per-projection attribution before any Q4 recipe proposal. Do not
+mistake first quantized block for first failed metric. No model locally, no
+new quantization/default or performance claim. Immutable prior proofs retained.
+
 ## Quantization — no unproven model promotion
 
 - **Index-Echo / issue485:** higher-precision accepted paths remain available.
   All four plain recipes and three calibrated recipes fail complete acceptance.
   Collection covers all96 FFN statistics and sensitive source F32 tensors are
-  preserved. Localize first divergent tensors (block0 or4 depending recipe),
+  preserved. Locate the first actually failing metric and attribute FFN
+  gate/up/product/down on the same input; first quantized block0/4 alone does
+  not establish first failure. In the middle recipe, block4 cosine0.999908
+  already passes the0.999 gate.
   then test targeted precision changes against complete EN/ZH stages, magnitudes,
   cache behavior, decoded/subtitle output and TTS-ASR. Do not repeat rejected
   recipes unchanged. Evidence: docs/index-echo-q4-imatrix-validation-2026-10-09.json.
