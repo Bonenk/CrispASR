@@ -172,3 +172,11 @@ step978/codebook2 decision is replaced877→904. The fork preserves RNG and all
 earlier inputs/logits; its ensuing speech quality is reported honestly.
 [Method, dependency pins and lossless array reconstruction](dia-original-trace/README.md).
 This original-only diagnostic changes no native arithmetic/default.
+
+`dia_native_fork.py` tests the reciprocal native904→877 sampled decision in
+the same pinned diagnostic runtime/configuration. Pristine, observer-only and
+identity controls must have byte-exact full trajectories/stages/native PCM.
+The fork preserves earlier inputs/logits/stages and serialized RNG. All ensuing
+native and actual-original-DAC audio/ASR outcomes are retained, with original
+positive controls; no token override is promoted to production.
+[Method and pinned dependency recipe](dia-native-fork/README.md).
