@@ -1,5 +1,15 @@
 # Dia reciprocal native sampled-decision fork — preparation
 
+Update: first heavy38851402907 failed before model/build at its tiny guard:
+the shallow checkout had not fetched the pinned source yet. The bootstrap now
+fetches before checking source. A fresh shallow repository reproduces the
+missing-source failure before fetch and passes the actual sampler guard after
+fetch; proof is under the owned storage root's local-v1/shallow-bootstrap-v1.
+The failed artifact and logs remain under failed-38851402907-v1. Lint38851403072
+passes all10 jobs. Relaunch is being prepared with the same runtime, model,
+sampler, recipe and acceptance gates. The earlier checkpoints below remain
+historical preparation records; no hosted speech outcome is accepted yet.
+
 Candidateeae36591 is pushed on diag/dia-native-fork-20261016. Heavy CPU
 [38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
 and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
