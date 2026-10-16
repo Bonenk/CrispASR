@@ -119,6 +119,21 @@ those real entry points. The current worker measures six available boundaries,
 not all18 layers; do not label it full docs/contributing parity integration.
 This remains a release/promotion prerequisite, before performance work.
 
+## CLAIMED 2026-10-16 — Dia reference/diff entry-point wiring
+
+Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-reference-wire-20261016,
+branch diag/dia-reference-wire-20261016; all builds/artifacts under
+/mnt/storage/crispasr/dia-reference-wire-20261016. Salvage the pinned8d0ad886
+actual original observer, its hook helpers, strict text-only diff route and
+output-only graph captures into current main. Register tools/dump_reference.py
+and crispasr-diff. Preserve current arithmetic, F16 cross caches, sampler,
+top-k/stopping/crop fixes; do not import portable RNG/source-RoPE experiments.
+Verify actual original tiny-module hooks, capture-step/input/scale failures,
+source-neutral capture instrumentation, both dispatcher routes and whole builds.
+Use GH for original full reference and actual model diff, with same-build
+instrumentation controls. Full native speech remains separately tracked above.
+No default/GPU/Q4/performance or complete checklist claim before those gates.
+
 ## Dia correctness — after reciprocal decision diagnosis
 
 The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
