@@ -25,8 +25,10 @@ speech quality: original and native ASR outputs are empty. The official3.02GB
 artifact digest and1829-payload independent audit are verified: all352 stage
 rows pass and20556 original sampling decisions match. Crossed recognizer replay
 is independently verified across all12 cells: both old/current libraries pass
-legacy/JFK but return empty text for all four expanded original clips. Direct
-original generation without added observers remains queued. Complete failed
+legacy/JFK but return empty text for all four expanded original clips. Original
+Whisper independently passes both controls and fails all16 expanded audio views;
+its complete77-payload input/loader/output audit is verified. Direct original
+generation without added observers remains queued after a shallow-source repair. Complete failed
 evidence is permanently public. No broader speech or F16/Q4/GPU/default promotion.
 Echo's fused-product observer repair passes all13 general CI and10 lint jobs.
 Full-model observer transparency remains pending before integration, with11

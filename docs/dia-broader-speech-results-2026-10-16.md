@@ -39,6 +39,34 @@ model/recipe quality and recognizer domain sensitivity remain distinct hypothese
 The next control uses the direct original constructor and untouched generate(),
 with original DAC WeightNorm hooks preserved and added observers rejected.
 
+A second architecture, **original OpenAI Whisper base.en**, now also fails all16
+expanded audio views while transcribing legacy and JFK at WER0. Source
+`31243bad24cc746f07d4c8bfdd2d974872cb1803` (20250625), checkpoint
+`25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead`,
+F32 CPU, four threads, English, temperature0, no prompt or previous-text
+conditioning. The original ffmpeg loader is unchanged. Independent audit
+verifies77 payloads, all18 exact original-loader resampling replays, selected
+sealed inputs, source/checkpoint hashes, raw outputs and WER.
+
+| Case | Whisper WER in original / native / original-DAC / CLI | Recognizer output |
+| --- | --- | --- |
+| hello-42 | 1 / 1 / 1 / 1 | Empty |
+| hello-123 | 1 / 1 / 1 / 1 | Unrelated short phrase |
+| fox-42 | 24.7778 / 24.7778 / 24.7778 / 24.7778 | Repetitive hallucination |
+| fox-123 | 1 / 1 / 1 / 1 | Punctuation only |
+
+Whisper's fox-42 WER is223/9, including insertions; WER is not capped at1.
+All four views of each case have the same Whisper transcript. This makes a
+Nemotron-only explanation less likely; it does not yet identify an original
+loading/capture, model, recipe or remaining recognizer-sensitivity cause.
+No existing quality gate is replaced or relaxed.
+
+[Complete independent Whisper proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/eeadb3f56a3db3ba0232bafb55ef8bc7d1389801/dia-20261016-broader-speech/independent-whisper-base-en-v2/proof.zip)
+retains all inputs, actual16k loader arrays, raw outputs, source/license,
+executable auditor, results and full logs. Revision`eeadb3f56a3db3ba0232bafb55ef8bc7d1389801`,
+36241894bytes, SHA256`5ad0e46849c53a97fdc04e6a7e220093ab717f9f30c16497931be28a9832a9bc`;
+full anonymous download is verified. Model weights are excluded.
+
 Each table entry below is the worst value across the four cases; extrema in
 different columns can come from different cases. Full per-case arrays/metrics
 and output transcripts are indexed in the [machine receipt](dia-broader-speech-results-2026-10-16.json).

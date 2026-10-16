@@ -3734,7 +3734,7 @@
   "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
   "compared_stage_rows": 352,
   "actual_original_sampler_decisions": 20556,
-  "pending": "Direct original constructor/generate control without added observers; full speech acceptance remains failed.",
+  "pending": "Direct original constructor/generate control without added observers, repaired source d41cfb27/run38940468611; then predeclared original/native inference-recipe controls. Existing failed speech gates remain unchanged.",
   "complete_public_proof": {
     "repo": "cstr/crispasr-regression-fixtures",
     "revision": "4500d64ef00a0e2902a4e5411ccdac2bc2c056c3",
@@ -3810,5 +3810,102 @@
       ],
       "complete": true
     }
+  },
+  "independent_whisper_recognition": {
+    "source": "0a62782e01084c84da20df1072f2577504436765",
+    "recognizer_source": "31243bad24cc746f07d4c8bfdd2d974872cb1803",
+    "model_sha256": "25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead",
+    "torch": "2.11.0+cu130",
+    "options": {
+      "language": "en",
+      "task": "transcribe",
+      "temperature": 0.0,
+      "condition_on_previous_text": false,
+      "initial_prompt": null,
+      "fp16": false,
+      "verbose": null
+    },
+    "payloads_verified": 77,
+    "original_loader_replays_exact": 18,
+    "controls_wer_zero": true,
+    "broader_all_wer_zero": false,
+    "twelve_expanded_views_wer": 1.0,
+    "four_fox42_views_wer": 24.77777777777778,
+    "cases": {
+      "hello-42": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "",
+        "full_transcript_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "hello-123": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "I'm not sure.",
+        "full_transcript_sha256": "1438ebe71a34e577d2e8b89633280e5941d59f66b6f328bbab304278b9e8f6d2"
+      },
+      "fox-42": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 24.77777777777778,
+          "native": 24.77777777777778,
+          "original-dac": 24.77777777777778,
+          "cli": 24.77777777777778
+        },
+        "transcript_preview": "I'm going to go ahead and get a little bit of a little bit of a little bit of a little bit of a little bit of a little b",
+        "full_transcript_sha256": "84fbdfdbb539fff476dba5fdacd4d8cf4f184f161d577276ba01af2c93784536"
+      },
+      "fox-123": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "...",
+        "full_transcript_sha256": "ab5df625bc76dbd4e163bed2dd888df828f90159bb93556525c31821b6541d46"
+      }
+    },
+    "complete_public_proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "eeadb3f56a3db3ba0232bafb55ef8bc7d1389801",
+      "parent_revision": "aaaefb0745efd5bb7871957f1bf71d62bb48ddc9",
+      "files": [
+        {
+          "path": "dia-20261016-broader-speech/independent-whisper-base-en-v2/proof.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/eeadb3f56a3db3ba0232bafb55ef8bc7d1389801/dia-20261016-broader-speech/independent-whisper-base-en-v2/proof.zip",
+          "bytes": 36241894,
+          "sha256": "5ad0e46849c53a97fdc04e6a7e220093ab717f9f30c16497931be28a9832a9bc",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/independent-whisper-base-en-v2/README.md",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/eeadb3f56a3db3ba0232bafb55ef8bc7d1389801/dia-20261016-broader-speech/independent-whisper-base-en-v2/README.md",
+          "bytes": 2382,
+          "sha256": "e7c9edb975bd227d2c5cce25055a07bc304b25d308cadfeee238000ca9b97bde",
+          "anonymous_full_download_verified": true
+        }
+      ],
+      "complete": true
+    },
+    "speech_acceptance": false,
+    "production_defaults_changed": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false
   }
 }

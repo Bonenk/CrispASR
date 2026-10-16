@@ -69,204 +69,49 @@ fused observer after immutable full-model and applicable CI acceptance. Then
 continue same-original-input FFN projection attribution for the rejected Q4
 recipes; no current Q4/GPU/default or release promotion.
 
-## CLAIMED 2026-10-16 — Independent original Whisper recognition diagnostic
-
-Owner: coordinator; separate worktree
-/mnt/volume1/crispasr-dia-whisper-crosscheck-20261016, branch
-diag/dia-whisper-crosscheck-20261016. Use actual original OpenAI Whisper20250625,
-source31243bad24cc746f07d4c8bfdd2d974872cb1803, fixed base.en checksum
-25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead.
-A single small CPU model (about145MB, below local2GB ceiling) uses existing
-packages read-only, four threads; all source/model/PCM/results live under
-/mnt/storage/crispasr/dia-whisper-crosscheck-20261016. No package installation or
-GPU session. Predeclare all18 retained clips: legacy original plus JFK, and
-original/native/original-DAC/CLI for each hello/fox seed42/123. Verify source and
-sealed payload hashes, use untouched original ffmpeg loader and transcribe(),
-English, temperature0, no prompt, no previous-text conditioning and F32 CPU.
-Retain exact resampled16k PCM, transcripts, WER and raw recognizer outputs for
-every clip. This is ASR-domain attribution only: no replaced seeds/models,
-quality-gate relaxation, or speech/default/GPU/Q4 acceptance. Existing Nemotron
-failures remain failures; the direct original generator control remains needed.
-
-## CLAIMED 2026-10-16 — Dia shallow-checkout source prerequisite
-
-Owner: coordinator; worktree
-/mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
-diag/dia-direct-original-v3-20261016, based on frozen1c34dc02. Hosted38936657203
-fails before synthesis because depth-one checkout lacks crossed-source30e75dcd
-for the exact helper byte check. Preserve artifact12062895878 (77225bytes,
-SHA59714712cefe8f2105a8923c08379b39d16ee65bb2f592af80395276496b9b84).
-Fetch that immutable source explicitly before git-show, keep the byte-equality
-assert unchanged, and prove missing-before/present-after in a fresh shallow Git
-repository. Reuse the five predeclared original F32 prompt/seed/settings controls,
-original constructor/WeightNorm preservation, pinned ASR and all failed quality
-gates. No runtime math, model/default/GPU/Q4 change. Acceptance remains exact
-hosted synthesis/PCM/recognizer evidence plus independent complete artifact audit.
-
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
-Owner: coordinator only; worktree
-/mnt/volume1/crispasr-dia-direct-original-v2-20261016, branch
-diag/dia-direct-original-v2-20261016, based on frozen7f43bf7c tooling.
-The first queued run38935996279 is cancelled before execution: source preflight
-found that real DAC uses required built-in WeightNorm pre-hooks. The replacement
-must preserve these exact original hooks while rejecting added observation
-hooks; a real tiny weight-normalized convolution supplies the local control.
-Crossed recognizer38930760374 completed successfully: both sealed ELF sets
-recognize legacy/JFK and return empty text for all four expanded original PCMs.
-Coordinator independent audit now verifies54 payloads,8 exact SONAME aliases,
-six PCM inputs and all12 recognition cells. The reusable worker auditor remains
-under review. This narrows the next intervention without a model-quality cause.
-Prepare GH CPU validation using the actual pinned Dia constructor, F32 weights,
-DAC and untouched generate(), without capture hooks/monkeypatching. Predeclare
-legacy seed42 plus the same four expanded prompt/seed/settings controls. Retain
-actual constructor/source/weight/environment hashes and full PCM; compare
-against archived captured-original PCM, run actual pinned ASR, and keep every
-failed gate. No new seed/text selection, default change, GPU or Q4 acceptance.
-Frozen candidate1c34dc02bff52a11c171a1dc9ec0d4403dee40ba passes all five
-real tiny constructor/capture cases, actual WeightNorm preservation and added
-observer rejection, PCM shape/dtype/nonfinite/scale controls, and all4 unskipped
-secret tests. Hosted38936657203 is queued with an official-artifact collector
-under /mnt/storage/crispasr/dia-direct-original-20261016/collector-v2.
-Cancelled38935996279 has no executed steps. Full-model acceptance requires the
-new hosted result; tiny DAC is expressly a stub. Large assets stay on GH and
-/mnt/storage.
+Owner: coordinator; frozen worktree
+/mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
+diag/dia-direct-original-v3-20261016, sourced41cfb273dc5dda942d11cab20b3285a08585955.
+Corrected hosted38940468611 is queued. Earlier no-step cancellation and missing
+shallow-source prerequisite failure are archived in HISTORY.md. The explicit
+source fetch is proven in a fresh depth-one repository; all original constructor,
+WeightNorm preservation, five text/seed controls and quality gates are unchanged.
+Collector-v3 and independent audit-preparation-v3/watch live under
+/mnt/storage/crispasr/dia-direct-original-20261016. Audit controls pass; full
+original synthesis/PCM/recognizer evidence is pending. No large model runs locally.
 
-## CLAIMED 2026-10-16 — Independent pending-run auditors and Dia preservation
+Both sealed Nemotron builds and independent original Whisper now pass legacy/JFK
+but fail all expanded original audio. Their completed full audits/public proof
+are archived in HISTORY.md and docs/dia-broader-speech-results-2026-10-16.md.
+Direct constructor/no-added-observer PCM identity against those original captures
+is next; it distinguishes loading/observation from the existing reference path.
+No speech/default/F16/Q4/GPU promotion.
 
-Owner: coordinator with the two existing Hermes tmux workers. New bounded
-assignments supersede their completed read-only follow-ups below. Worker
-hermes-asr-omnivoice uses worktree
-/mnt/volume1/crispasr-hermes-dia-asr-audit-20261016 to prepare an independent
-artifact auditor for frozen crossed-ASR source30e75dcd/run38930760374. Worker
-hermes-asr-echo uses worktree
-/mnt/volume1/crispasr-hermes-echo-observer-audit-20261016 to prepare an independent
-artifact auditor readiness (79145eba, unaccepted draft); coordinator owns
-the complete auditor for new sourcea1d84150/run38938983824. Both must
-read the actual producers, verify complete manifests/provenance and raw outputs,
-recompute gates, and include rejection controls for corrupt or missing evidence.
-No model downloads, runtime mathematics, heavy jobs, pushes or publication.
-Coordinator reviews every assertion and retains ownership of graph math and
-integration. Acceptance requires executing against complete official artifacts;
-synthetic rejection controls alone establish tooling readiness only.
-
-Coordinator has completed permanent publication of the entire failed four-case
-archive and the crossed-recognizer archive, both executable audits and full
-results/metadata. All anonymous full-download hashes match; see HISTORY.md and
-docs/dia-broader-speech-results-2026-10-16.md. These completed preservation tasks
-are not pending; remaining worker tooling and direct-original controls are.
-
-## CLAIMED 2026-10-16 — Hermes workers for remaining PR and quantization
-
-Owner/coordinator: maintainer session. User explicitly authorized two Hermes
-tmux workers using configured Meta Muse Spark / Together AI. Coordinator retains
-all runtime graph mathematics, integration, main pushes and heavy-run scheduling.
-
-- Worker hermes-asr-omnivoice, worktree
-  /mnt/volume1/crispasr-hermes-omnivoice-20261016, branch
-  diag/hermes-omnivoice-20261016: read full PR521/issue518 and compare every
-  remaining change against current code. Reconcile standalone utilities already
-  merged, identify remaining integration/ABI/cache/default behavior, implement
-  bounded utility/test/harness fixes only with original-reference evidence.
-  Preserve failed clone gates and contributor attribution; no runtime graph edits.
-- Worker hermes-asr-echo, worktree
-  /mnt/volume1/crispasr-hermes-echo-20261016, branch
-  diag/hermes-echo-20261016: audit all rejected Q4 receipts against tools/code;
-  identify the earliest divergent tensors and prepare a distinct targeted
-  precision experiment using original inputs. Implement only conversion,
-  analysis or validation tooling with calibrated rejection tests; preserve
-  existing gates/defaults, no runtime graph edits or repeated failed recipe.
-
-Both tmux sessions used the configured default model/provider, completed their
-initial assignments, and now perform scoped read-only follow-up audits. Their worktrees and logs are preserved.
-The bounded OmniVoice output-allocation fix is integrated after all13 CI jobs
-and all10 lint jobs passed on candidate2985a4c6. Completed proof is in HISTORY.md;
-remaining PR521 integration and original/native clone-quality acceptance stay open.
-Echo attention-Q8 is already in rejected recipes; do not repeat it. Its first
-worker proposalf642293f is rejected. Final local5020e60d provides the reviewed
-source-verified Python FFN helper; coordinator candidate d8183cf9 composes it
-with native/public dump/diff observation and additional guard tests. See the
-paired FFN claim below; no new Q4 recipe or acceptance is inferred.
-Worker logs, handoffs and all large data belong under
-/mnt/storage/crispasr/hermes-workers-20261016. Neither worker may change global
-configuration, main/protected checkouts, push/merge/publish, launch heavy jobs,
-or perform storage cleanup without coordinator scheduling. They report exact
-source/tests/evidence and reviewable local commits. Coordinator claims further
-scope before implementation if their audit requires it. Physical Ascend/Intel/
-legacy-GPU validation and private reporter inputs remain external dependencies.
-
-## CLAIMED 2026-10-16 — Broaden Dia CPU speech controls after factorial audit
-
-Owner: primary maintainer session, not delegated. Prepare worktree
-/mnt/volume1/crispasr-dia-broader-speech-20261016, branch
-diag/dia-broader-speech-20261016, based on immutable5e04955e runtime.
-Builds/arrays/logs under /mnt/storage/crispasr/dia-broader-speech-20261016.
-Heavy38892690744 reports success: only F32 cross-cache plus portable sampling
-passes both-decoder/CLI WER-zero among the four fixed-serial-head combinations.
-Official artifact12049198423 passes independent535-payload v3 audit, including
-full native/original sampler replays and unchanged quality gates. The passing
-recipe is now eligible for expanded model validation; prepare/validate the
-model-independent worker and selftest before dispatch.
-
-Prepared candidate17a7aedc508be885cce0024199bd48525d3fc41b passes the tiny
-shared-child/metric/inventory selftest. GeneralCI38913941626 and lint38913941844
-pass at that exact SHA. Heavy38913941927 completed all four cases and failed
-quality: the original positives also return empty ASR text.
-Official artifact12057273677 is fully retained and its3022635432bytes match
-GitHub SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90.
-Independent audit verifies1829 payloads,352 passing stage rows and20556 exact
-original sampler decisions. All four input histories/code grids are exact;
-crossed recognition below is next. See docs/dia-broader-speech-results-2026-10-16.md.
-No broader speech acceptance, F16/Q4/GPU or default promotion.
-
-Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
-today?" and "The quick brown fox jumps over the lazy dog." Keep original [S1]
-prompt formatting and the same temperature1.2/top_p0.95/top_k45/CFG3/cap3072.
-Run actual original Python positive, unforced native Session and CLI, native and
-original DACs, stage/magnitude and output-protocol checks, with complete retained
-arrays and unchanged WER-zero gates. Preserve production defaults and all source
-pins; no seed/phrase selection after results, forced inputs, GPU/Q4 or speed claim.
-No runtime graph change is planned. GH does heavy CPU; no multi-GB model locally.
-
-Dia cache/sampler factorial is complete and controls integrated at ad0d1546,
-with all tested executable sources exact to immutable5e04955e. Independent535-
-payload audit confirms only F32 cache + portable RNG with serial head restores
-all1226 original inputs/1210 frames and WER0 through both DACs and CLI. All13
-CI/10 lint pass; defaults remain unchanged. Completed findings/failures are in
-HISTORY.md and [the result](docs/dia-cache-sampler-results-2026-10-16.md).
-Continue the claimed broader fixed-case matrix; no full production/GPU/Q4 or
-performance acceptance follows from this single prompt/seed.
-
-Dia reference/diff wiring is integrated at a40ceaff with all executable source
-bytes exact to tested fb4e5924. Heavy38891963272, all13 CI and10 lint pass;
-independent audit verifies1735 payloads and88 stages in each of ordinary/serial
-modes, including real DAC and exact bounded pristine/OFF/ON/OFF/identity controls.
-Completed implementation/proof is archived in HISTORY.md and
-[the composed receipt](docs/dia-reference-wire-composed-2026-10-16.json).
-This closes the wiring task, not current-main unforced speech or GPU/Q4.
+After that control, test a concrete inference-recipe difference: pinned original
+Dia.generate defaults are temperature1.3/top_k35 (dia/model.py), while current
+native defaults are1.2/45 (src/dia_tts.cpp). Existing diagnostics explicitly used
+1.2/45 in both implementations. Predeclare matched original/native temperature
+and top-k controls across the same five text/seed cases before execution; do not
+select new passing seeds, flip defaults or discard existing failures. If needed,
+compare source-recommended F16 on actual supported CUDA hardware via Kaggle,
+with source/weight/input pins and unchanged decoded gates. This is a hypothesis,
+not an established cause or accepted replacement recipe.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
-The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
-complete and independently audited:642 payloads, exact controls/prefix/RNG,
-WER1→0 through both decoders and all1,226 original input rows/1,210 original
-code frames restored. Public immutable proof is fully anonymously SHA-verified.
-Completed preparation, failures and results are in HISTORY.md. This diagnostic
-uses8d0ad886/C36; it does not establish current-main default speech acceptance.
+The completed reduction/cache/RNG, broader matrix and recognition investigations
+are in HISTORY.md and their pinned machine receipts. Current claims above carry
+the direct-original and full-model observer dependencies.
 
-1. The completed CPU dispatch/reduction investigation identifies a sufficient
-   arithmetic difference at this boundary. The generic head gate is integrated;
-   current-main head-only speech failed. The complete current-runtime factorial
-   now accepts one prompt/seed under all three opt-in controls. The step864 F16
-   fork is an actual nucleus-support rank crossing (55 versus1008); follow the
-   claimed four-case matrix before broad speech acceptance.
-   If the predeclared broader cases pass, next test the same recipe with the
-   existing heads-only-F32/F16 neural export before GPU/Q4 and profiling. This
-   is a new combination after the head-reduction repair, not a repeat of the
-   earlier failed head/cache controls. Retain the full-F32 positive, source/
-   physical tensor audits and fixed prompts/seeds; compare decoded speech as
-   well as history parity. No smaller/fast/default claim before that result.
-   Do not add a token override or change top_p/seed/quality thresholds as a fix.
+1. Finish the direct-original construction control, then the predeclared source-
+   default inference-recipe intervention. Existing full-F32 broader quality fails
+   on both recognizer architectures; numerical/code equality alone is insufficient.
+   Once bounded fixed cases pass unchanged speech gates, test the existing
+   heads-only-F32/F16 neural export with full-F32 positive controls before GPU/Q4
+   and profiling. Preserve source/physical audits and all earlier failures.
+   Do not add token overrides, change seeds or relax thresholds as a fix.
 2. Earlier module Q differs6.90e-7 from actual full-model Q despite exact keys
    and normalized input. Preserve that qualification. A new intervention must
    use the actual original tensors and native identity controls, with cosine,
@@ -321,81 +166,6 @@ commands: [CANN TODO](docs/cann-todo.md) and
 - **Breeze:** accepted guided/voice/server fixes are merged. Investigate canonical
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
   model-quality reports from merged contributor PR530 only with a new hypothesis.
-
-## CLAIMED 2026-10-16 — Paired Echo FFN boundary capture
-
-Owner: coordinator; runtime observation stays outside the Hermes worker.
-Worktree /mnt/volume1/crispasr-echo-ffn-native-20261016, branch
- diag/echo-ffn-native-20261016. Data/builds under
-/mnt/storage/crispasr/echo-ffn-native-20261016. Extend the existing diagnostic
-scheduler observer (no graph mathematics or defaults) to retain last-prefill-
-token MLP input, gate/up outputs, activated product/down input and MLP/down
-output with layer names. Wire optional original capture and public diff stages
-only after actual source-verified helper review. Existing default block capture
-and imatrix callbacks must remain intact; no callback abort on unrelated nodes.
-
-Acceptance: tiny actual ggml tensor/backend readback, ownership, layer/name/
-shape/dtype/stride/last-token and observer composition controls; original tiny
-MLP OFF/ON/OFF exact; then hosted source-pinned full-model F16 identity and
-same-input per-projection attribution before any Q4 recipe proposal. Do not
-mistake first quantized block for first failed metric. No model locally, no
-new quantization/default or performance claim. Immutable prior proofs retained.
-
-Prepared candidate d8183cf92abc24eeeb6c969db563e968c5345d46 is pushed and
-passes18 independent actual-class controls under PyTorch2.6 CPU. Its complete
-MLP ClassDef is byte-exact to the independently SHA-verified released
-transformers5.6.0 wheel. Actual ggml scheduler six-boundary OFF/ON/OFF,
-ownership/stride/admission controls pass; first-row mutation is rejected.
-The public dumper rejects invalid source pins before loading weights.
-Mac CPU tiny38920692197 passes on that frozen SHA. Independent v2 audit
-verifies all29 payloads, released original source,18 Python controls and the
-actual arm64 ggml scheduler executable. The first audit expected different
-CTest summary wording; its failure is retained and the corrected audit also
-requires the explicit passing test row. GeneralCI38918654236 and
-lint38918655348 pass all13/all10 jobs on the prior source. Source review
-subsequently found its production fused-product capture gap; repair0dfccc7d
-requires its own gates below. The earlier synthetic graph does not prove
-production six-boundary completeness. No main integration yet.
-Full-model F16 transparency and same-original-input FFN replay are still open.
-The revised source slices before CPU transfer: actual37-token tiny MLP
-captures/output remain byte-exact while observed copies fall10656→288 bytes.
-This is a copy-size measurement, not a GPU speed or model-quality claim.
-Queued heavy38918654602 was cancelled without execution and replaced by
-38920692197. Existing generalCI/lint remain atd8ed1979: all C++/CMake sources
-are independently byte-exact; revised optional Python capture has18 local
-controls and the fresh exact-source hosted check. Preserve both source pins.
-[Preparation receipt](docs/echo-ffn-capture-preparation-2026-10-16.json).
-
-## CLAIMED 2026-10-16 — Echo full-model observer transparency
-
-Owner: coordinator, worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-20261016,
-branch diag/echo-ffn-fullmodel-20261016, based on frozen capture sourced8183cf9.
-Prepare an actual public-dumper Python and direct native stage/decoded-output
-OFF/ON/OFF worker for 2B EN/ZH F16 controls. Original HF source is5d98a34d,
-GGUFb3453826 and GGML0a862076; use released transformers5.6.0 with externally
-verified full-file/class hashes. All existing arrays and actual text/cues must
-remain byte-exact within each implementation; all six new boundaries must be
-present at every decoder layer. Keep original/native numerical parity distinct
-from observer identity, and retain all failed controls. Run heavy builds/models
-on GH; local data and scratch under /mnt/storage/crispasr/echo-ffn-fullmodel-20261016.
-No runtime math/default change, same-input Q4 attribution or GPU/model promotion.
-The first Hermes full-model design is rejected for invented commands/pins; the
-worker is now checking primary metadata only. OmniVoice follow-up also needs a
-revision: passing other clips does not exclude ASR sensitivity to cloned speech.
-
-## Dia recognition follow-up after completed crossed replay
-
-Crossed-ASR30e75dcd/run38930760374 and its independent full54-payload/8-alias
-root audit are completed and archived in HISTORY.md. Both ELF sets recognize
-legacy/JFK, both fail the same four expanded original PCMs, with exact old/new
-transcripts and parent/source/library hashes. Permanent complete archives are
-public and anonymously verified. Continue the direct-original control claimed
-above; worker reusable-auditor review remains pending. No repeated recognition
-or synthesis is needed to rediscover these accepted diagnostic observations.
-
-Echo production-builder diagnosis and completed tiny proofs are archived in
-HISTORY.md. The current full-model and CI dependencies are claimed above;
-old e344/run38931686491 is a retained failed prerequisite run, not a live queue.
 
 ## Quantization — no unproven model promotion
 
