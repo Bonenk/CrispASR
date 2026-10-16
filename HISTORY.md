@@ -1,3 +1,24 @@
+## Dia sampling recipe and first feedback difference isolated — 2026-10-16
+
+On actual original and native step-zero logits, the unchanged standard sampler
+selects head-zero568 while the pinned original Python sampler and candidate
+portable sampler select530. All9 head decisions agree within each recipe,
+regardless of original/native-OFF/native-serial logits. The recorded native
+input divergence therefore starts at row1 and is explained by the different
+random-sampling recipe; it is not evidence of a step-zero matrix error.
+Independent comparison also confirms OFF and serial native code grids/PCM are
+byte-identical in the rejected full speech run. This does not explain every
+later arithmetic divergence or establish a speech fix.
+
+At candidate5e04955e, replaying the actual original Python sampler and actual
+production portable sampler across all1226 canonical logit batches gives exact
+agreement on all11034 head decisions. Five tiny cases also verify masked noise,
+MT batch consumption, nucleus/top-k and greedy behavior. A fresh exact-source
+C++ synthetic replay passes2388 full boundary comparisons with original inputs
+and both cache precisions; OFF/zero/identity remain exact and RNG selection has
+no effect on forced-input neural logits. Full factorial speech/CLI/both-DAC/ASR
+validation and CI/lint are pending, with defaults unchanged. [Local receipts](docs/dia-cache-sampler-local-2026-10-16.json).
+
 ## Dia current-main head-only speech rejected — 2026-10-16
 
 Immutable3e1f2e2f heavy38880025781 completes diagnostics and fails the speech

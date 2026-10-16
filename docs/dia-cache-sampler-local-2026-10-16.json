@@ -1,0 +1,208 @@
+{
+  "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+  "actual_runtime_sha256": "af911a126deb77bfe5c23f30210b4b52f9e4809e1239a4748c4776ed8a05ae83",
+  "actual_probe_sha256": "18fb2aa101575d1ba137ad3a6f546aff5c053f8511b96624ad6c8b87c7cef10b",
+  "synthetic_comparisons": 2388,
+  "all_stage_gates_pass": true,
+  "off_zero_on_off_identity_exact": true,
+  "forced_input_sampling_independence": true,
+  "full_model_acceptance": false,
+  "speech_acceptance": false,
+  "original_tiny": {
+    "torch": "2.6.0+cpu",
+    "original_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "cases": [
+      {
+        "case": 0,
+        "heads": 9,
+        "vocab": 1028,
+        "temperature": 1.2,
+        "top_p": 0.95,
+        "top_k": 45,
+        "exact_original_tokens": true,
+        "one_mt_word_per_batch": true,
+        "max_noise_abs": 9.5367431640625e-07
+      },
+      {
+        "case": 1,
+        "heads": 3,
+        "vocab": 32,
+        "temperature": 1.2,
+        "top_p": 0.7,
+        "top_k": 7,
+        "exact_original_tokens": true,
+        "one_mt_word_per_batch": true,
+        "max_noise_abs": 2.384185791015625e-07
+      },
+      {
+        "case": 2,
+        "heads": 2,
+        "vocab": 17,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 1,
+        "exact_original_tokens": true,
+        "one_mt_word_per_batch": true,
+        "max_noise_abs": 5.960464477539063e-08
+      },
+      {
+        "case": 3,
+        "heads": 3,
+        "vocab": 17,
+        "temperature": 0.0,
+        "top_p": 0.5,
+        "top_k": 7,
+        "exact_original_tokens": true,
+        "one_mt_word_per_batch": false,
+        "max_noise_abs": 0.0
+      },
+      {
+        "case": 4,
+        "heads": 9,
+        "vocab": 1028,
+        "temperature": 1.2,
+        "top_p": 0.95,
+        "top_k": 45,
+        "exact_original_tokens": true,
+        "one_mt_word_per_batch": true,
+        "max_noise_abs": 9.5367431640625e-07
+      }
+    ]
+  },
+  "initial_decision": {
+    "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+    "original_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "torch": "2.6.0+cpu",
+    "step": 0,
+    "rows": [
+      {
+        "logits_source": "original",
+        "original_python": [
+          530,
+          402,
+          913,
+          546,
+          711,
+          166,
+          720,
+          153,
+          584
+        ],
+        "samplers": {
+          "standard": [
+            568,
+            254,
+            775,
+            560,
+            540,
+            110,
+            521,
+            309,
+            101
+          ],
+          "portable": [
+            530,
+            402,
+            913,
+            546,
+            711,
+            166,
+            720,
+            153,
+            584
+          ]
+        }
+      },
+      {
+        "logits_source": "native-off",
+        "original_python": [
+          530,
+          402,
+          913,
+          546,
+          711,
+          166,
+          720,
+          153,
+          584
+        ],
+        "samplers": {
+          "standard": [
+            568,
+            254,
+            775,
+            560,
+            540,
+            110,
+            521,
+            309,
+            101
+          ],
+          "portable": [
+            530,
+            402,
+            913,
+            546,
+            711,
+            166,
+            720,
+            153,
+            584
+          ]
+        }
+      },
+      {
+        "logits_source": "native-serial",
+        "original_python": [
+          530,
+          402,
+          913,
+          546,
+          711,
+          166,
+          720,
+          153,
+          584
+        ],
+        "samplers": {
+          "standard": [
+            568,
+            254,
+            775,
+            560,
+            540,
+            110,
+            521,
+            309,
+            101
+          ],
+          "portable": [
+            530,
+            402,
+            913,
+            546,
+            711,
+            166,
+            720,
+            153,
+            584
+          ]
+        }
+      }
+    ],
+    "first_feedback_difference_explained_by_sampling_recipe": true,
+    "full_speech_acceptance": false
+  },
+  "full_original_sampling": {
+    "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+    "canonical_sha256": "3db6f8923abffd612e6c83d7036debebd10ed28b77c3eb9ec3d91fec1ce1a542",
+    "original_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "torch": "2.6.0+cpu",
+    "steps": 1226,
+    "heads": 9,
+    "decisions": 11034,
+    "exact": 11034,
+    "mismatches": [],
+    "full_speech_acceptance": false
+  }
+}

@@ -64,6 +64,19 @@ all inputs/logits/codes, real CLI/Session, native/original DAC and ASR positives
 independently audit full artifacts. No source-RoPE, forced reference decisions,
 seed/threshold tuning, default promotion, GPU/Q4 or performance claim.
 
+Candidate5e04955e580b798b3cd45d870d407a3dd7600c4e is pushed. Exact-source
+local actual C++ replay passes2388 boundaries across capture/head/cache/sampler
+controls, including explicit-zero default identity. Actual original tiny sampler
+passes26 decisions and noise/state checks. All11034 sampling decisions across
+1226 complete original decoder steps match Python exactly on original logits.
+The first native feedback difference is isolated to the random-sampling recipe:
+standard selects568 and portable/Python530 on original and both native logit
+sets. These completed findings are archived in HISTORY.md and the local receipt.
+Heavy38892690744, CI38892693594 and lint38892696276 are queued at that source;
+collectors and independent full-array auditors are armed under the storage root.
+Combined reference validation38891963272 is also queued, not accepted yet.
+See [scope and gates](docs/dia-cache-sampler-preparation-2026-10-16.md).
+
 ## CLAIMED 2026-10-16 — Dia reference/diff entry-point wiring
 
 Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-reference-wire-20261016,
