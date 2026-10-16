@@ -949,5 +949,16 @@
     0,
     17
   ],
-  "scope": "bounded original-input and isolated DAC-code replay; unforced speech is separate"
+  "scope": "bounded original-input and isolated DAC-code replay; unforced speech is separate",
+  "public_proof": {
+    "path": "dia-20261016-reference-wire/complete-hosted-v1/complete-hosted-reference-wire-v1.zip",
+    "bytes": 163537930,
+    "sha256": "08c8a365c1cf2aa877f0301c1ff037c756cb02bc895f700f39817821d5981a4d",
+    "payloads": 434,
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "e6cddd222f7cade565ced28023c4d80a07a34095",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e6cddd222f7cade565ced28023c4d80a07a34095/dia-20261016-reference-wire/complete-hosted-v1/complete-hosted-reference-wire-v1.zip",
+    "anonymous_full_download_verified": true
+  },
+  "all_10_lint_pass": true
 }

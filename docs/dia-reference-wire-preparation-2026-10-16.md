@@ -45,20 +45,16 @@ Candidate [c7f9da87](https://github.com/CrispStrobe/CrispASR/commit/c7f9da872e87
 is pushed. Hosted [full-model validation38883779736](https://github.com/CrispStrobe/CrispASR/actions/runs/38883779736),
 [lint38883782438](https://github.com/CrispStrobe/CrispASR/actions/runs/38883782438)
 and [general CI38883785994](https://github.com/CrispStrobe/CrispASR/actions/runs/38883785994)
-are queued at this checkpoint. All4 unskipped no-secrets checks and
-clang-format18 pass locally. Candidate code is not integrated on main yet.
-The method link above describes candidate files until integration.
-
-Independent auditors are prepared for both the wiring run and current-main
-speech run. They verify official ZIP metadata/digests, complete payload sets,
-immutable source copies, physical export ledgers and actual returned libraries.
-The wiring audit independently recomputes all tensor metrics and exact replay/
-transparency checks; the speech audit reconstructs current cropped code grids,
-checks native decode replay and CLI/Session trajectories, recomputes ASR WER
-and all six boundary metrics. Watcher session97658 starts them after raw
-collection finishes. Syntax checks pass; these audits have not yet run against
-the pending artifacts and are not accepted proof. Complete C++ dispatcher
-syntax also passes locally.
+all pass at that frozen source. Independent v3 verifies904 payloads and88
+full stage comparisons; fresh returned-library C ABI replay passes398 synthetic
+comparisons with neutral-filename detection. Earlier auditor path assumptions
+and their failures are retained. The complete163537930-byte proof archive is
+[public and anonymously SHA-verified](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e6cddd222f7cade565ced28023c4d80a07a34095/dia-20261016-reference-wire/complete-hosted-v1/complete-hosted-reference-wire-v1.zip).
+All metrics, pins and hashes are in [the hosted receipt](dia-reference-wire-hosted-2026-10-16.json).
+Combined source fb4e5924 now runs heavy38891963272, CI38891966094 and lint38891969068;
+its local actual runtime passes1194 comparisons including identity/serial heads.
+Integration awaits these exact-source hosted results and independent audit.
+Current-main unforced speech is separately rejected; see HISTORY.md.
 
 ## Actual C++ runtime with synthetic original-class weights
 

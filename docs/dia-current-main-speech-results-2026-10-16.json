@@ -1,0 +1,226 @@
+{
+  "source": "3e1f2e2fe04b22c862864a32c80d765ab500435b",
+  "official_artifact_id": 12042285543,
+  "official_sha256": "279cc92998e487906d09161ec4ac35965f05186675cbed721f3756db279030be",
+  "payloads_verified": 170,
+  "pristine_off_identity_exact": true,
+  "results": {
+    "off": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.0001781026809299541
+      }
+    },
+    "identity": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      }
+    },
+    "serial": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.0001781026809299541
+      }
+    }
+  },
+  "metrics": [
+    {
+      "arm": "off",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999782154388,
+      "mine_norm": 37.52583508624022,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 0.00020874627710897278,
+      "norm_relative_error": 2.404476169948211e-06,
+      "max_abs": 0.00048792362213134766,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999787029192,
+      "mine_norm": 10.205319816873645,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 0.00020641250511750224,
+      "norm_relative_error": 3.4798711602279653e-06,
+      "max_abs": 0.0002186298370361328,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999995597658,
+      "mine_norm": 3.529273902488053,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 2.982985612170518e-05,
+      "norm_relative_error": 3.0576221992095753e-06,
+      "max_abs": 1.2248754501342773e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999997666187,
+      "mine_norm": 17.977738743137326,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 2.168022536277081e-05,
+      "norm_relative_error": 1.80771289293169e-06,
+      "max_abs": 5.5789947509765625e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999969479,
+      "mine_norm": 272.98661685549905,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 2.5682020508916117e-06,
+      "norm_relative_error": 6.978503561683169e-07,
+      "max_abs": 4.38690185546875e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999643095,
+      "mine_norm": 295.99235664759306,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 1.0827058760359395e-05,
+      "norm_relative_error": 6.7704148933867e-06,
+      "max_abs": 0.0001373291015625,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999782154388,
+      "mine_norm": 37.52583508624022,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 0.00020874627710897278,
+      "norm_relative_error": 2.404476169948211e-06,
+      "max_abs": 0.00048792362213134766,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999787029192,
+      "mine_norm": 10.205319816873645,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 0.00020641250511750224,
+      "norm_relative_error": 3.4798711602279653e-06,
+      "max_abs": 0.0002186298370361328,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999995597658,
+      "mine_norm": 3.529273902488053,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 2.982985612170518e-05,
+      "norm_relative_error": 3.0576221992095753e-06,
+      "max_abs": 1.2248754501342773e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999997666187,
+      "mine_norm": 17.977738743137326,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 2.168022536277081e-05,
+      "norm_relative_error": 1.80771289293169e-06,
+      "max_abs": 5.5789947509765625e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.999999999996903,
+      "mine_norm": 272.98661325908785,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 2.589382959342727e-06,
+      "norm_relative_error": 7.110246602604064e-07,
+      "max_abs": 4.57763671875e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.999999999964136,
+      "mine_norm": 295.9923557800641,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 1.0841246621019412e-05,
+      "norm_relative_error": 6.767483956782172e-06,
+      "max_abs": 0.00013780593872070312,
+      "pass": true
+    }
+  ],
+  "head_only_speech_pass": false,
+  "stage_gate_pass": true,
+  "production_defaults_changed": false,
+  "production_speech_acceptance": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false,
+  "run_id": 38880025781,
+  "official_artifact_bytes": 699892175
+}

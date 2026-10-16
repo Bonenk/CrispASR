@@ -1,3 +1,17 @@
+## Dia current-main head-only speech rejected — 2026-10-16
+
+Immutable3e1f2e2f heavy38880025781 completes diagnostics and fails the speech
+quality gate. Independent audit verifies170 payloads, official699892175-byte
+artifact12042285543 SHA256279cc92998e487906d09161ec4ac35965f05186675cbed721f3756db279030be,
+physical pins, pristine/OFF/identity equality, code-to-PCM replay and CLI/Session
+trajectories. OFF, identity and serial each generate1439 calls/1423 code frames;
+all native/original DAC and CLI transcripts are empty with WER1. Native RMS is
+0.000170746. The original positive has WER0. All available step-zero stage gates
+pass: stage similarity does not establish speech quality. This rejects head-only
+recovery with current F16 cross cache and standard sampler; it does not contradict
+the earlier pinned F32-cache/portable-noise recovery. Defaults remain unchanged.
+[Complete audited metrics](docs/dia-current-main-speech-results-2026-10-16.json).
+
 ## Dia full-model reference/diff wiring validated — 2026-10-16
 
 Heavy38883779736 at immutable c7f9da87 passes. Independent audit verifies all
@@ -13,8 +27,8 @@ Auditor v1/v2 failures are retained: nested original assets lost their relative
 path, then a versioned shared library was mistaken for an unversioned file.
 Corrected v3 preserves all integrity/quality gates and passes. This accepts
 bounded full-model harness wiring, not unforced speech, GPU, Q4 or speed.
-Combining with the separately integrated head gate and remaining lint are
-tracked in PLAN.md. [All per-stage metrics](docs/dia-reference-wire-hosted-2026-10-16.json).
+All10 lint checks also pass. Combining with the separately integrated head
+gate is tracked in PLAN.md. [All per-stage metrics](docs/dia-reference-wire-hosted-2026-10-16.json).
 
 ## Dia nontrivial grouped-query capture proof accepted — 2026-10-16
 

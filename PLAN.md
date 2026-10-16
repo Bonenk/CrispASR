@@ -46,41 +46,23 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Current-main native speech A/B
+## CLAIMED 2026-10-16 — Isolate Dia cache precision and sampling
 
-Owner: maintainer session. New worktree /mnt/volume1/crispasr-dia-main-speech-20261016,
-branch diag/dia-main-speech-20261016, based on accepted graph candidate d198d7a4.
-All heavy builds/models/results under GH scratch and local retained evidence at
-/mnt/storage/crispasr/dia-main-speech-20261016. Prepare current-main pristine,
-OFF/identity/serial native generation with F32 neural/codec pins, current F16
-cross caches and current sampler, fixed original prompt/seed42/recipe. Hold
-current top-k and output-protocol fixes; do not port old diagnostic defaults.
-Require exact pristine/OFF/identity trajectories/PCM, actual CLI/Session checks,
-original positive and native/original DAC ASR. Save all outcomes before the
-quality gate and independently audit complete artifacts. No default/GPU/Q4 or
-additional-prompt acceptance follows. All13 general CI and10 lint jobs pass at d198d7a4. The opt-in graph is
-integrated at9384c3a5 with production sources byte-exact to the tested candidate;
-its model experiment remains separate and changes no production defaults.
-
-Current-main worker3e1f2e2fe04b22c862864a32c80d765ab500435b is pushed and
-[heavy38880025781](https://github.com/CrispStrobe/CrispASR/actions/runs/38880025781)
-is running. C++/binding files remain exact to d198d7a4; the new worker
-changes no runtime code. Local selftest maps all1226 actual original inputs to
-all1210 original code frames, rejects8 invalid input/metric controls, verifies3
-ASR cases and rejects doubled-vector scale despite cosine1. The literal
-production output-protocol regression also passes. Frozen recipe and gates:
-[worker method](https://github.com/CrispStrobe/CrispASR/blob/3e1f2e2fe04b22c862864a32c80d765ab500435b/tools/ci-heavy/dia-main-head/SPEECH.md).
-Single collector session77807 under the owned storage root/collector-v1 retains
-full official metadata/logs/raw artifact and verifies its digest. New full
-artifact audit must follow; no quality result exists yet.
-
-Reference wiring is a concrete pending integration gap: current main still has
-the older Dia reference shim and lacks Dia in dump_reference.py/crispasr-diff
-registration. Reconcile the proven original observer and strict diff route from
-the pinned worktree, retain current top-k/output fixes, and validate through
-those real entry points. The current worker measures six available boundaries,
-not all18 layers; do not label it full docs/contributing parity integration.
-This remains a release/promotion prerequisite, before performance work.
+Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-cache-sampler-20261016,
+branch diag/dia-cache-sampler-20261016; all builds/proofs under
+/mnt/storage/crispasr/dia-cache-sampler-20261016. Current-main head-only speech
+run38880025781 is rejected: independent170-payload audit confirms all native
+arms quiet and empty ASR/WER1 through both DACs and CLI, despite stage gates
+passing. Completed result is in HISTORY.md and its receipt; do not repeat it
+unchanged. Preserve production defaults and current top-k/stop/crop fixes.
+Port only disabled-by-default F32 cross-cache and original-compatible portable
+exponential sampling controls from the accepted pinned experiment. Verify tiny
+original noise/MT-state, masked/top-k sampling, cache storage and OFF identity.
+Then run a 2x2 F16/F32 cross-cache × standard/portable sampling experiment with
+the same generic serial head, prompt, seed and unchanged quality gates. Retain
+all inputs/logits/codes, real CLI/Session, native/original DAC and ASR positives;
+independently audit full artifacts. No source-RoPE, forced reference decisions,
+seed/threshold tuning, default promotion, GPU/Q4 or performance claim.
 
 ## CLAIMED 2026-10-16 — Dia reference/diff entry-point wiring
 
@@ -107,7 +89,7 @@ main. Hosted full-model validation38883779736 and all13 general CI38883785994
 jobs pass. Independent v3 verifies904 payloads/88 complete comparisons; fresh
 returned-library C ABI replay passes398 synthetic comparisons with neutral
 filename detection. Completed metrics are in HISTORY.md and the hosted receipt.
-Lint38883782438 has7/10 checks passing, no failures. Combined-source acceptance
+All10 lint38883782438 checks also pass. Combined-source acceptance
 is now tracked in the following claim; the original worktree/proofs stay fixed.
 Further synthetic actual-runtime capture proof is independently accepted:
 381 physical tensors,398 complete neural boundaries and exact OFF/ON/OFF
@@ -116,7 +98,7 @@ input/logit controls. Completed details/public proof are in HISTORY.md and
 A second eight-query/two-KV/four-way GQA case passes all398 boundaries,
 381 physical tensors and18 actual-original-module wrong-tiling rejection
 controls. Its complete public proof is archived in HISTORY.md. These synthetic
-cases do not replace the pending full1.6B/DAC/speech gates. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+cases complement the accepted bounded full1.6B/DAC proof; unforced speech remains pending. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
 
 ## CLAIMED 2026-10-16 — Compose validated Dia captures with integrated head gate
 
@@ -134,6 +116,14 @@ submit full-model public-entry validation plus CI/lint at the combined source.
 No integration before those results and independent audit; no default or
 unforced-speech/GPU/Q4/performance promotion. Complete per-stage results are in
 [the hosted receipt](docs/dia-reference-wire-hosted-2026-10-16.json).
+
+Combined immutable fb4e5924ff00ca7f31d8a4b94a3db6b50f8347b2 is pushed:
+heavy38891963272, general CI38891966094 and lint38891969068 are submitted.
+Actual combined C++ local replay passes1194 comparisons across capture,
+identity-head and serial-head modes, exact OFF/ON/OFF/identity trajectories,
+30 actual head-unit checks,17 original-module tests and237-call source guards.
+The full-model worker additionally checks identity transparency and both
+ordinary and serial public diff routes. Acceptance awaits hosted evidence.
 
 ## Dia correctness — after reciprocal decision diagnosis
 

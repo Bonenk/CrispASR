@@ -33,8 +33,10 @@ speech experiment instead used diagnostic F32 cross cache and verified portable
 noise. [Its speech proof](dia-serial-head-results-2026-10-16.md) remains scoped
 to one prompt/seed and cannot be transferred to these different defaults.
 
-Current-main full speech A/B38880025781 is running on identical C++ source,
-with pristine/OFF/identity controls, native/original DAC, CLI/Session and
-recognizer positives. Independent raw-artifact auditing is required. Public
-reference/diff reconciliation, broader prompts/seeds, GPU/Q4 and profiling stay
+Current-main full speech A/B38880025781 completed and failed quality. Its
+independent170-payload audit confirms quiet output and empty ASR/WER1 for all
+native arms through both DACs and CLI; original positive WER0 and stage gates
+pass. [Audited result](dia-current-main-speech-results-2026-10-16.json).
+Next isolate F16/F32 cache from standard/portable noise with defaults preserved.
+Reference/diff composition, broader prompts/seeds, GPU/Q4 and profiling remain
 in PLAN.md. No model pin, production default or release tag is promoted.
