@@ -1,3 +1,28 @@
+## Dia original trajectory capture prepared and submitted — 2026-10-16
+
+Frozen06c3d758 adds nine actual original boundary captures with same-instance
+OFF/ON/OFF PCM and CPU/CUDA RNG identity gates. Tiny controls execute literal
+original sampler, CFG/masks, delay removal, RVQ reconstruction and DAC decode
+bodies with synthetic small logits/codec weights: all pass, including nine
+unchanged WeightNorm hooks, snapshot ownership and exception restoration. The
+first fixture lacked unused DAC base classes; its failure log is retained.
+Source controls preserve actual constructor/weights/dtypes/defaults/ASR and
+reject a changed capacity. Hermes read-only review finds no blocking defect.
+
+Uploaded kernelcrispasr-dia-original-cuda-trace-v1/version1 matches source exactly,
+SHA47cd65900c76748a1f15b10a66d881f945b14713b5b8ad165d1602ee38ad9535.
+One submission followed a session check after a rate-limited inventory request
+cooled down. The real GPU experiment and independent audit remain pending in
+PLAN.md; tiny controls establish neither full-model identity nor speech.
+
+A separate actual tiny Torch2.6 CPU operator probe confirms original RMSNorm
+with F16 input/F32 norm weights returns F32, while DenseGeneral contracts after
+casting to its F16 weights and converts the result back to the input dtype.
+Against a full-F32 product of the same values, cosine is .9999999858 but relative
+L2 is .000174445 (norm19.99597264 vs19.99507417, maxabs .00218773). This is a
+concrete precision-recipe distinction, not an established GPU/full-model failure
+cause or a native-runtime defect. No runtime graph change follows from it.
+
 ## Dia sampling controls integrated with validated source bytes — 2026-10-16
 
 Candidate7d0f68f3 passes all13 CI38946681937 and all10 lint38946685918 jobs;

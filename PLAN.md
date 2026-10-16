@@ -365,7 +365,16 @@ can be scheduled after checking actual exported and wrapped surfaces.
 ## CLAIMED 2026-10-16 — Original Dia CUDA code and codec trajectory capture
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-trace-20261016,
-branch diag/dia-cuda-trace-20261016. Hypothesis: the three quiet original F16
+branch diag/dia-cuda-trace-20261016, frozen source06c3d758bffa632e11e1b2578c5fc41b4387af82.
+Kernelcrispasr-dia-original-cuda-trace-v1/version1 is RUNNING; pulled uploaded
+script is byte-exact, SHA47cd65900c76748a1f15b10a66d881f945b14713b5b8ad165d1602ee38ad9535.
+Tiny actual-method OFF/ON/OFF PCM/RNG/prediction, delay/clamp, original9 WeightNorm
+hook and exception-restoration controls pass. Source invariants and changed-capacity
+negative pass; independent Hermes review finds no blocking defect. Full GPU model
+identity/quality and root audit remain pending. A first inventory request hit429;
+after cooldown, recent sessions were verified terminal before one submission.
+Collector-v1 retains terminal proof. See [preparation](docs/dia-cuda-trajectory-preparation-2026-10-16.json).
+Hypothesis: the three quiet original F16
 clips collapse in delayed-code/RVQ/codec trajectories; the512-hop periodicity
 alone cannot identify the cause. Preserve the exact original source, weights,
 F16/F32-norm construction, five texts/seeds and1.3/35/.95/CFG3 recipe ofacb956c7.
