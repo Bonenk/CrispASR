@@ -46,6 +46,24 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
+
+Owner: coordinator only; worktree
+/mnt/volume1/crispasr-dia-direct-original-20261016, branch
+diag/dia-direct-original-20261016, based on frozen crossed-ASR30e75dcd tooling.
+Crossed recognizer38930760374 completed successfully: both sealed ELF sets
+recognize legacy/JFK and return empty text for all four expanded original PCMs.
+Independent full artifact audit is assigned above; this preliminary receipt
+narrows the next intervention without establishing a model-quality cause.
+Prepare GH CPU validation using the actual pinned Dia constructor, F32 weights,
+DAC and untouched generate(), without capture hooks/monkeypatching. Predeclare
+legacy seed42 plus the same four expanded prompt/seed/settings controls. Retain
+actual constructor/source/weight/environment hashes and full PCM; compare
+against archived captured-original PCM, run actual pinned ASR, and keep every
+failed gate. No new seed/text selection, default change, GPU or Q4 acceptance.
+Tiny tests verify the actual worker comparison logic; full-model acceptance
+requires the hosted result. Large assets stay on GH and /mnt/storage.
+
 ## CLAIMED 2026-10-16 — Independent pending-run auditors and Dia preservation
 
 Owner: coordinator with the two existing Hermes tmux workers. New bounded
