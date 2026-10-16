@@ -373,7 +373,10 @@ hook and exception-restoration controls pass. Source invariants and changed-capa
 negative pass; independent Hermes review finds no blocking defect. Full GPU model
 identity/quality and root audit remain pending. A first inventory request hit429;
 after cooldown, recent sessions were verified terminal before one submission.
-Collector-v1 retains terminal proof. See [preparation](docs/dia-cuda-trajectory-preparation-2026-10-16.json).
+Collector-v1 retains terminal proof. Independent NumPy trajectory replay is
+prepared and passes literal original generate/DecoderOutput controls for sampled
+and capacity EOS, rejecting eight corrupted feedback/prediction/raw/truncation
+cases. Actual GPU evidence is still pending. See [preparation](docs/dia-cuda-trajectory-preparation-2026-10-16.json).
 Hypothesis: the three quiet original F16
 clips collapse in delayed-code/RVQ/codec trajectories; the512-hop periodicity
 alone cannot identify the cause. Preserve the exact original source, weights,

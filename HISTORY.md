@@ -23,6 +23,16 @@ L2 is .000174445 (norm19.99597264 vs19.99507417, maxabs .00218773). This is a
 concrete precision-recipe distinction, not an established GPU/full-model failure
 cause or a native-runtime defect. No runtime graph change follows from it.
 
+Follow-up on the same tiny fixture: Torch2.11 CPU returns raw F16 from RMSNorm,
+while2.6 returns raw F32. Source inventory finds six explicit compute-dtype norm
+casts and two final decoder norm/head paths whose logits are returned as F32.
+After the explicit cast, tiny norm and DenseGeneral values are byte-exact across
+both versions. This does not establish general RMSNorm numerical equality, but
+it rules out inferring a propagated dtype bug merely from the raw dtype change.
+The independent integer trajectory auditor is also prepared: literal original
+generate and DecoderOutput validate sampled/capacity EOS replay; eight corrupted
+feedback/prediction/raw/truncation cases are rejected, without neural weights.
+
 ## Dia sampling controls integrated with validated source bytes — 2026-10-16
 
 Candidate7d0f68f3 passes all13 CI38946681937 and all10 lint38946685918 jobs;

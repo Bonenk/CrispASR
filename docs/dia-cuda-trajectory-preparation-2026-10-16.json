@@ -52,5 +52,80 @@
   "independent_review": "No blocking finding. Input self-comparison deliberately validates F32, finite, nonempty 1-D PCM; cross-phase equality is checked separately.",
   "hardware_and_full_model_results": "Pending; unsupported GPU returns inconclusive without a fallback or automatic retry.",
   "prelaunch": "One recent account session verified terminal after API rate-limit cooldown; one submission. No account/quota changes.",
-  "storage": "/mnt/storage/crispasr/dia-cuda-trace-20261016"
+  "storage": "/mnt/storage/crispasr/dia-cuda-trace-20261016",
+  "independent_integer_replay_controls": {
+    "status": "PASS",
+    "torch": "2.6.0+cpu",
+    "actual_original_generate_and_decoder_output": true,
+    "results": {
+      "sampled_eos": {
+        "steps": 33,
+        "raw_rows": 32,
+        "rejected_corruptions": 4
+      },
+      "capacity_eos": {
+        "steps": 95,
+        "raw_rows": 94,
+        "rejected_corruptions": 4
+      }
+    },
+    "neural_weights_loaded": false
+  },
+  "tiny_norm_version_boundary": {
+    "versions": [
+      "2.6.0+cpu",
+      "2.11.0+cu130"
+    ],
+    "device": "cpu",
+    "raw_norm_dtypes": [
+      "torch.float32",
+      "torch.float16"
+    ],
+    "after_explicit_original_cast_values_exact": true,
+    "dense_values_exact": true,
+    "actual_norm_call_sites": [
+      {
+        "line": 554,
+        "norm": "norm",
+        "explicit_cast": false
+      },
+      {
+        "line": 599,
+        "norm": "norm",
+        "explicit_cast": false
+      },
+      {
+        "line": 307,
+        "norm": "pre_sa_norm",
+        "explicit_cast": true
+      },
+      {
+        "line": 319,
+        "norm": "post_sa_norm",
+        "explicit_cast": true
+      },
+      {
+        "line": 358,
+        "norm": "norm",
+        "explicit_cast": true
+      },
+      {
+        "line": 432,
+        "norm": "pre_sa_norm",
+        "explicit_cast": true
+      },
+      {
+        "line": 448,
+        "norm": "pre_ca_norm",
+        "explicit_cast": true
+      },
+      {
+        "line": 460,
+        "norm": "pre_mlp_norm",
+        "explicit_cast": true
+      }
+    ],
+    "scope": "One tiny fixture; no general RMSNorm algorithm or GPU/full-model equivalence claim"
+  },
+  "independent_full_proof_audit": "Prepared; pending completed raw GPU evidence"
 }
