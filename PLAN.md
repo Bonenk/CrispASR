@@ -45,6 +45,24 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Dia CPU reduction/dispatch numerical cause
+
+Owner: maintainer session. Separate worktree
+/mnt/volume1/crispasr-dia-reduction-cause-20261016, branch
+diag/dia-reduction-cause-20261016; all coefficients/results/build scratch under
+/mnt/storage/crispasr/dia-reduction-cause-20261016.
+Test the specific CPU-kernel-dispatch hypothesis behind actual full-model versus
+isolated original F32 Q/head projections. Use immutable original DenseGeneral,
+actual captured inputs/outputs and hash-verified small coefficient files. Vary
+CPU arithmetic dispatch in separate processes, preserve repeat/thread controls,
+and compare against high-precision exact-product reductions. Trace the actual
+ggml kernel/reduction code and measure signed head-margin effects. No full model
+on the VPS, token override, reference rescaling or changed acceptance threshold.
+Require reproducible operator-level evidence before naming a numerical cause;
+then validate any justified runtime candidate through unmodified generation
+and actual decoded speech on GH. Existing QK/norm/head experiments are not
+repeated unchanged: this task explicitly tests dispatch/rounding causality.
+
 ## Dia correctness — after reciprocal decision diagnosis
 
 The [reciprocal native result](docs/dia-native-fork-results-2026-10-16.md) is
