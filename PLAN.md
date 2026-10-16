@@ -77,6 +77,27 @@ source/tests/evidence and reviewable local commits. Coordinator claims further
 scope before implementation if their audit requires it. Physical Ascend/Intel/
 legacy-GPU validation and private reporter inputs remain external dependencies.
 
+## CLAIMED 2026-10-16 — Broaden Dia CPU speech controls after factorial audit
+
+Owner: primary maintainer session, not delegated. Prepare worktree
+/mnt/volume1/crispasr-dia-broader-speech-20261016, branch
+ diag/dia-broader-speech-20261016, based on immutable5e04955e runtime.
+Builds/arrays/logs under /mnt/storage/crispasr/dia-broader-speech-20261016.
+Heavy38892690744 reports success: only F32 cross-cache plus portable sampling
+passes both-decoder/CLI WER-zero among the four fixed-serial-head combinations.
+Official artifact12049198423 is downloading for full SHA/payload/array audit;
+that audit must pass before launching expanded model validation or integrating
+the control candidate. Prepare a model-independent worker/selftest meanwhile.
+
+Predeclare two new texts, each at seeds42/123: "Hello there, how are you doing
+today?" and "The quick brown fox jumps over the lazy dog." Keep original [S1]
+prompt formatting and the same temperature1.2/top_p0.95/top_k45/CFG3/cap3072.
+Run actual original Python positive, unforced native Session and CLI, native and
+original DACs, stage/magnitude and output-protocol checks, with complete retained
+arrays and unchanged WER-zero gates. Preserve production defaults and all source
+pins; no seed/phrase selection after results, forced inputs, GPU/Q4 or speed claim.
+No runtime graph change is planned. GH does heavy CPU; no multi-GB model locally.
+
 ## CLAIMED 2026-10-16 — Isolate Dia cache precision and sampling
 
 Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-cache-sampler-20261016,
@@ -103,7 +124,7 @@ passes26 decisions and noise/state checks. All11034 sampling decisions across
 The first native feedback difference is isolated to the random-sampling recipe:
 standard selects568 and portable/Python530 on original and both native logit
 sets. These completed findings are archived in HISTORY.md and the local receipt.
-Heavy38892690744 is running; all13 CI38892693594 and10 lint38892696276 jobs pass;
+Heavy38892690744 reports success; all13 CI38892693594 and10 lint38892696276 jobs pass;
 collectors and independent full-array auditors are armed under the storage root.
 Combined reference validation38891963272 passes, with independent1735-payload/176-stage audit; integration is next.
 See [scope and gates](docs/dia-cache-sampler-preparation-2026-10-16.md).
