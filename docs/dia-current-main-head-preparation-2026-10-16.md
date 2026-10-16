@@ -1,3 +1,10 @@
+Checkpoint update: build38874191736 passes; independent audit verifies57
+payloads and12 fresh graph replays using retained actual static libraries.
+Lint/general CI remain queued. Pinned full-generation recovery is now accepted
+within [its explicit scope](dia-serial-head-results-2026-10-16.md); current-main
+speech remains a separate pending test. Earlier submission status below is
+retained as preparation history.
+
 # Dia current-main serial head — preparation
 
 Candidate [d198d7a4](https://github.com/CrispStrobe/CrispASR/commit/d198d7a48742c8424444d9b67dde9eb5d26f590f)

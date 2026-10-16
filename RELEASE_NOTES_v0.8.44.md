@@ -726,6 +726,10 @@ checks. Complete local and hosted proof archives are public and SHA-verified.
 On unchanged native hidden, this arithmetic alone restores the disputed
 sampling support without a token override. This supersedes the earlier broad
 head-exclusion conclusion, whose local control used a different CPU dispatch.
-Full-generation serial-head validation remains pending; production defaults,
-GPU/Q4 and performance are not promoted. [Cause](docs/dia-reduction-cause-2026-10-16.md)
+Full-generation generic serial-head validation now passes an independent
+655-payload audit: native/original DAC WER0, all1226 original input rows and
+1210 original code frames exact, without a token override or reference input.
+This is scoped to the pinned F32 runtime and one prompt/seed; current-main
+defaults, additional prompts, GPU/Q4 and performance are not promoted.
+[Speech result](docs/dia-serial-head-results-2026-10-16.md). [Cause](docs/dia-reduction-cause-2026-10-16.md)
 and [hosted replay](docs/dia-reduction-cause-hosted-2026-10-16.json).

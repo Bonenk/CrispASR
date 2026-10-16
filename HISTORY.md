@@ -1,3 +1,24 @@
+## Dia generic all-step serial head restores unforced speech — 2026-10-16
+
+Heavy38870499727 at3c2fbb5a and all10 lint38870502430 jobs pass. Independent
+auditor eadfb145 verifies all655 payloads, full source/physical export/library
+identities, controls, code alignment, selected actual graph recurrence and full
+MT state consumption. Serial mode uses native weights/current hidden at every
+head/step, with no token override/reference injection and unchanged sampler,
+noise and recipe. Pristine/OFF/identity stay byte-exact and silent/WER1; serial
+returns the exact expected sentence/WER0 through native and original DAC.
+All1226 original decoder input rows and1210 original code frames match exactly.
+The historical runtime adds one output frame. Native PCM/codes match the earlier
+forced restoration exactly; original DAC PCM differs across jobs but both pass
+its provenance/positive/ASR gates. This accepts scoped pinned-runtime speech,
+not current-main/default/additional-prompt/GPU/Q4/performance behavior.
+Eight rebased method files at303a7bb3 remain byte-exact to accepted sources.
+Complete22-file public proof at HF revision990ff4cf7ee440ecdc239203f93f4093b84c58a8
+is fully anonymously downloaded and SHA-verified. Raw official artifact is
+904974837 bytes, SHA256
+1f7fd84771ce7ce08dcf7f5a3ae8c9fa379f1f4315d4bb4b836f739839916b15.
+[Full result and audit](docs/dia-serial-head-results-2026-10-16.md).
+
 ## Dia current-main head preparation locally verified — 2026-10-16
 
 Candidate d198d7a4 implements an opt-in generic CPU F32 head graph on current

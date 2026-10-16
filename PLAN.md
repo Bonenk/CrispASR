@@ -45,43 +45,6 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Dia all-step serial F32 head experiment
-
-Owner: maintainer session. Worktree
-/mnt/volume1/crispasr-dia-serial-head-20261016, branch diag/dia-serial-head-20261016;
-large scratch/evidence under /mnt/storage/crispasr/dia-serial-head-20261016.
-Candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is pushed. Heavy CPU
-[38870499727](https://github.com/CrispStrobe/CrispASR/actions/runs/38870499727)
-and lint [38870502430](https://github.com/CrispStrobe/CrispASR/actions/runs/38870502430)
-are submitted; heavy and lint are executing. The scratch CPU ggml graph callback uses only native
-loaded F32 weights/current hidden and separately rounded serial arithmetic on
-every head at every step. No reference injection or token/step-specific math.
-
-Local actual-graph tests pass all18,504 head outputs on both hidden states,
-one/four threads, exact native/identity controls, tiny fusion witness and four
-rejecting controls. The entire patched runtime passes syntax against pinned
-8d0ad886/C36 headers. Clang-format18, Python compilation and all4 unskipped
-no-secrets checks pass. Proof: owned storage root/local-v1/graph-v2.
-
-The hosted worker holds8d0ad886/C36, F32 model/cross caches, portable RNG,
-source RoPE off and original recipe fixed. Pristine/OFF/identity complete
-trajectories/logits/captures/audio and OFF/identity grids/final RNG must be exact.
-Baseline also must reproduce accepted full free-generation arrays/PCM. Actual
-original DAC and same-recognizer ASR cover every arm, with both original
-positives. Final hosted gate requires serial WER0 through both decoders; retain
-complete evidence even if that gate fails. Full-generation outcome remains
-pending. Independent auditor eadfb145 is prepared and passes26 rejecting
-controls, including fresh MT engine replay. Single collector session55605 at
-the owned storage root/collector-v1 retains the official complete artifact
-and invokes that auditor after exact-source lint completes. No duplicate run.
-The cause tools/report are integrated at61f4ed8c with all7 accepted files
-byte-exact; second-CPU heavy38868907653 and all10 lint38868910390 jobs pass.
-Its independent13-payload/complete-array audit passes; completed cause work
-is archived in HISTORY.md. [Preparation](docs/dia-serial-head-preparation-2026-10-16.md).
-Current main lacks these diagnostic RNG/cache paths, so this is explicitly a
-pinned-runtime causal experiment; current-main/default, extra prompts/seeds,
-GPU/Q4 and performance remain separate gates before production promotion.
-
 ## CLAIMED 2026-10-16 — Current-main serial head preparation
 
 Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-main-head-20261016,
@@ -105,16 +68,33 @@ apply functions are byte-exact to the immutable causal candidate. Failed CIFS
 shared-library symlink build is retained under local-v1; accepted static proof
 is local-v2/preflight-v2. [Preparation](docs/dia-current-main-head-preparation-2026-10-16.md).
 
-Hosted build/replay38874191736, lint38874302965 and general CI38874305718
-are queued at this checkpoint, all at d198d7a4. Single raw collector
+Hosted build/replay38874191736 passes; independent audit verifies57 payloads
+and12 freshly compiled graph replays against the returned actual libraries.
+Lint38874302965 and general CI38874305718 remain queued at d198d7a4. Single raw collector
 session10831 at the owned storage root/collector-v1 preserves official metadata,
-complete logs and digest-verified raw artifact; full artifact audit remains due.
+complete logs and digest-verified raw artifact; its independent full audit passes.
 These compile/graph jobs load no full neural model. Pinned speech38870499727
-still runs; its lint38870502430 has started, with its separate collector/auditor
-unchanged. Do not repeat either run or promote before the corresponding gates.
-After the causal result, test actual current-main baseline versus head-only
+and all10 lint38870502430 jobs pass; complete independent655-payload audit
+accepts scoped unforced serial-head speech recovery. Completed proof is in
+HISTORY.md and docs/dia-serial-head-results-2026-10-16.md. Do not repeat it.
+Next test actual current-main baseline versus head-only
 through CLI/Session first; add diagnostic cache/RNG paths only if those results
 justify them. Reference rounding compatibility alone is not general speech proof.
+
+## CLAIMED 2026-10-16 — Current-main native speech A/B
+
+Owner: maintainer session. New worktree /mnt/volume1/crispasr-dia-main-speech-20261016,
+branch diag/dia-main-speech-20261016, based on accepted graph candidate d198d7a4.
+All heavy builds/models/results under GH scratch and local retained evidence at
+/mnt/storage/crispasr/dia-main-speech-20261016. Prepare current-main pristine,
+OFF/identity/serial native generation with F32 neural/codec pins, current F16
+cross caches and current sampler, fixed original prompt/seed42/recipe. Hold
+current top-k and output-protocol fixes; do not port old diagnostic defaults.
+Require exact pristine/OFF/identity trajectories/PCM, actual CLI/Session checks,
+original positive and native/original DAC ASR. Save all outcomes before the
+quality gate and independently audit complete artifacts. No default/GPU/Q4 or
+additional-prompt acceptance follows. Need general CI/lint on d198d7a4 before
+integration; its model experiment may run independently while those queue.
 
 ## Dia correctness — after reciprocal decision diagnosis
 

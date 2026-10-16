@@ -1,3 +1,7 @@
+Completed: heavy38870499727/lint38870502430 and independent655-payload audit
+pass. [Final scoped result](dia-serial-head-results-2026-10-16.md) supersedes
+pending-status statements in this retained preparation checkpoint.
+
 # Dia all-step serial F32 head — preparation
 
 Immutable candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is submitted in
