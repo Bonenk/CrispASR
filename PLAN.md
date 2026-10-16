@@ -46,6 +46,21 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
+## CLAIMED 2026-10-16 — Echo hosted audio-tool prerequisite repair
+
+Owner: coordinator; worktree
+/mnt/volume1/crispasr-echo-ffn-fullmodel-v3-20261016, branch
+diag/echo-ffn-fullmodel-v3-20261016, based on frozene344c2d0.
+Full-model38931686491 failed before model downloads/build: worker selftest passes,
+but the GH image has no ffmpeg for original encode_audio. Preserve official
+artifact12061492453 (260621bytes, SHA92c389cdc31d7a657fef22d0bf5ff95735775355a3a972d33adab0f99b1f79a1)
+and independently verify its source/payloads/failure. Add bounded ffmpeg install
+through existing tools/ci-apt.sh plus actual version provenance, retaining the
+original prerequisite assert and all original numerical/identity/output gates.
+Acceptance: local existing worker controls; byte-exact runtime/reference sources
+against0dfccc7d; new exact-source hosted experiment and full artifact audit.
+No runtime math, changed inputs, model/default/quant/GPU or release promotion.
+
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
 Owner: coordinator only; worktree
