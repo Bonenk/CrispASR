@@ -9,7 +9,8 @@ neural tensors, real DAC pins, all encoder/decoder boundaries and selected
 attention/block captures pass unchanged cosine/magnitude gates. Bounded
 pristine/OFF/ON/OFF/identity inputs, logits and PCM are byte-identical.
 The original dumper and text-only crispasr-diff entry points are now registered
-on main. Original frozen worktrees/proofs are preserved. This accepts bounded
+on main. The full135129360-byte composed proof is public and independently
+anonymous-download SHA-verified at HF revision4f1fc028d6743b474209d8f7df743971c9adfaf4. Original frozen worktrees/proofs are preserved. This accepts bounded
 reference/diff wiring and diagnostic composition; unforced speech, broader
 prompts, GPU/Q4 and performance remain separate. [Complete composed metrics](docs/dia-reference-wire-composed-2026-10-16.json).
 

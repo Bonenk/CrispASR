@@ -1841,5 +1841,15 @@
   "integration_commit": "a40ceaff16aef9e1494db5e913a7bd3d9271737b",
   "all_13_ci_pass": true,
   "all_10_lint_pass": true,
-  "tested_source_preserved_exactly": true
+  "tested_source_preserved_exactly": true,
+  "public_proof": {
+    "path": "dia-20261016-reference-wire/complete-composed-v1/complete-composed-reference-wire-v1.zip",
+    "bytes": 135129360,
+    "sha256": "2fee2389e87c7f7c11cbc978e3a5450f651354621e4588ab56488b65504a46da",
+    "payloads": 15,
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "4f1fc028d6743b474209d8f7df743971c9adfaf4",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4f1fc028d6743b474209d8f7df743971c9adfaf4/dia-20261016-reference-wire/complete-composed-v1/complete-composed-reference-wire-v1.zip",
+    "anonymous_full_download_verified": true
+  }
 }

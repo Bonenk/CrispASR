@@ -67,6 +67,8 @@ all runtime graph mathematics, integration, main pushes and heavy-run scheduling
   analysis or validation tooling with calibrated rejection tests; preserve
   existing gates/defaults, no runtime graph edits or repeated failed recipe.
 
+Both tmux sessions are live with the configured default model/provider. They
+have acknowledged their task and coordinator steering; first audits are in flight.
 Worker logs, handoffs and all large data belong under
 /mnt/storage/crispasr/hermes-workers-20261016. Neither worker may change global
 configuration, main/protected checkouts, push/merge/publish, launch heavy jobs,
