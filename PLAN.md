@@ -74,7 +74,19 @@ recipes; no current Q4/GPU/default or release promotion.
 Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
 diag/dia-direct-original-v3-20261016, sourced41cfb273dc5dda942d11cab20b3285a08585955.
-Corrected hosted38940468611 is running its original-model worker. Earlier no-step cancellation and missing
+Corrected hosted38940468611 completed synthesis of all five clips, then failed
+in ASR library selection: uploaded SONAME aliases are regular duplicate files.
+Retain the official55896329byte artifact12065989037 (SHAa6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed).
+Coordinator claims fresh continuation worktree
+/mnt/volume1/crispasr-dia-direct-finish-20261016, branch
+diag/dia-direct-finish-20261016, based on frozen d41cfb27. Resume from those
+sealed PCM files; select and hash-check the canonical library plus all aliases,
+run actual pinned ASR with positive controls, preserve failures, and independently
+audit complete provenance and PCM metrics. Do not repeat synthesis. Correct the
+independent auditor's decorated-method source extraction in a new audit version,
+retaining its initial failure. Preliminary PCM comparisons differ, including the
+legacy length, so no identity or speech conclusion is accepted yet.
+Earlier no-step cancellation and missing
 shallow-source prerequisite failure are archived in HISTORY.md. The explicit
 source fetch is proven in a fresh depth-one repository; all original constructor,
 WeightNorm preservation, five text/seed controls and quality gates are unchanged.
