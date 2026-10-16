@@ -60,8 +60,9 @@ the direct-original and full-model observer dependencies.
    codes were clamped, and all three quiet paths use one common nine-book vector
    for over99% of frames. Both hello and fox cases pass exact observer identity;
    first legacy OFF0 differs slightly, so the global observer gate remains failed.
-   Next isolate compute precision and sampling recipe on one CUDA host, preserving
-   the two fox positives and all three failures before native recipe intervention.
+   The matched CUDA precision/recipe experiment completed; see its active audit
+   claim below. Precision/recipe alone did not recover the three quiet cases.
+   Next isolate categorical draw placement with unchanged CUDA neural compute.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
@@ -351,7 +352,8 @@ can be scheduled after checking actual exported and wrapped surfaces.
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-ffn-land-v2-20261016,
 branch integrate/echo-ffn-v2-20261016, frozen composition3a13e0c62dae026ef49fcf55013285540ae7a0b4.
-Combined CI38967377917/lint38967380611 are queued. All11 observer files and8 Dia
+Combined CI38967377917 has12/13 jobs passed; Vulkan remains running.
+All10 lint38967380611 jobs passed. All11 observer files and8 Dia
 source files are byte-exact to their accepted candidates. All three local Dia
 routing suites,18 actual-class Python observer tests and the literal native
 FFN builder control pass; the old-helper negative fails as intended.
@@ -369,15 +371,18 @@ No graph math, model recipe, Q4 acceptance or default change.
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-cuda-factorial-20261016,
 branch diag/dia-cuda-factorial-20261016, frozen sourcec856d4eed845a4f842f1a68890567b36466bf238.
-Kernelcrispasr-dia-cuda-factorial-v1/version1 is RUNNING; uploaded code is byte-exact,
+Kernelcrispasr-dia-cuda-factorial-v1/version1 is COMPLETE; uploaded code is byte-exact,
 SHA6b47e3f19d0473165995c76722cc68bf9576cf6957525e94a7ae745510978572. Tiny actual
 47-parameter F16/F32 constructors, original generate and all five arm routes pass;
 six changed-knob negatives fail. Read-only review finds no concrete defect. Two
 recent sessions were verified terminal before one submission; collector-v1 retains
 terminal evidence. Actual T4 sm75/Torch2.11.0+cu128/CUDA12.8 source-F16 arm
-completed all five syntheses and checkpointed public proof. Its full343-parameter
-ledger retains80 F32 norms. Remaining arms, recognitions and final audit are
-pending. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
+completed all25 syntheses and27 recognitions, checkpointing each arm publicly.
+Both recognizer controls pass. All arms fail legacy and both hello cases; both
+F16 recipes and F32/native pass both fox cases, while F32/source fails fox42.
+Final raw revision51fbf91a838a81c8bc27187222ec7a343645c70f; independent audit-v2
+is running after preserving an audit-v1 variable-collision failure. No speech
+acceptance follows from producer completion. See [preparation](docs/dia-cuda-factorial-preparation-2026-10-16.json).
 The audited trajectory localizes quiet
 outputs to almost constant RVQ inputs but does not explain their selection.
 Use untouched original normal constructors/generate/DAC, same pinned weights,
@@ -395,3 +400,28 @@ Kaggle submission per ../kaggle_usage.md, after session checks. No CPU fallback,
 Torch replacement or GPU-draw retries. Checkpoint each completed arm to public HF
 before constructing the next; independently audit the final pinned proof. Large
 assets and local preparation under /mnt/storage/crispasr/dia-cuda-factorial-20261016.
+
+
+## CLAIMED 2026-10-16 — Isolate Dia categorical draw placement
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampler-device-20261016,
+branch diag/dia-sampler-device-20261016. Scope: original F32 neural computation
+and filtering on one supported CUDA host; same model instance and fixed native
+recipe1.2/45/.95/CFG3/cap3072, original five texts/seeds. Predeclare CUDA draw,
+CPU draw, CUDA draw anchor (15 outputs). Middle arm copies final probabilities
+to CPU for the original torch.multinomial and returns IDs to CUDA; no other
+inference arithmetic, token forcing, prompts, weights, seeds or codec changes.
+This is an explicit sampler placement intervention, not observer transparency.
+Before model downloads, capture tiny identical CPU/CUDA uniform/linear/one-hot
+9x1028 probability draws, RNG states and deterministic one-hot controls. Retain
+runtime framework source revision. Source-preserving local tiny operator and
+original sampler tests must pass, with changed-placement/restoration negatives.
+For full generation preserve CPU/CUDA states before/after, draw counts and
+byte-exact probability transfer assertions; unchanged CPU state in CUDA arms,
+unchanged CUDA state in CPU-draw arm. Require anchor speech outcomes to match,
+both sealed recognizer positives to pass, all15 PCM/raw recognition cells retained.
+No precision/default/Q4/speech promotion from diagnostic completion. Submit once
+after current session inventory per ../kaggle_usage.md; no CPU neural fallback,
+framework replacement, quota workaround or draw fishing. Public HF checkpoints
+before weights and between arms; independently audit terminal pinned evidence.
+All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
