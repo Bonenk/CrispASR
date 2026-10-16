@@ -106,68 +106,13 @@ collectors and independent full-array auditors are armed under the storage root.
 Combined reference validation38891963272 passes, with independent1735-payload/176-stage audit; integration is next.
 See [scope and gates](docs/dia-cache-sampler-preparation-2026-10-16.md).
 
-## CLAIMED 2026-10-16 — Dia reference/diff entry-point wiring
-
-Owner: maintainer session. Worktree /mnt/volume1/crispasr-dia-reference-wire-20261016,
-branch diag/dia-reference-wire-20261016; all builds/artifacts under
-/mnt/storage/crispasr/dia-reference-wire-20261016. Salvage the pinned8d0ad886
-actual original observer, its hook helpers, strict text-only diff route and
-output-only graph captures into current main. Register tools/dump_reference.py
-and crispasr-diff. Preserve current arithmetic, F16 cross caches, sampler,
-top-k/stopping/crop fixes; do not import portable RNG/source-RoPE experiments.
-Verify actual original tiny-module hooks, capture-step/input/scale failures,
-source-neutral capture instrumentation, both dispatcher routes and whole builds.
-Use GH for original full reference and actual model diff, with same-build
-instrumentation controls. Full native speech remains separately tracked above.
-No default/GPU/Q4/performance or complete checklist claim before those gates.
-
-Candidate c7f9da872e87ba238c579083841b3547faee772f is pushed. Local proof:
-17 tiny actual original-module tests, three public-dispatch/archive tests,
-compiled production comparison guards (20 acceptance/rejection controls),
-three parser/scratch tests, one device/environment test, three computation/
-sampler source tests and the existing original output-protocol test pass.
-Whole-runtime syntax and all237 ordered ggml computation calls match pristine
-main. Hosted full-model validation38883779736 and all13 general CI38883785994
-jobs pass. Independent v3 verifies904 payloads/88 complete comparisons; fresh
-returned-library C ABI replay passes398 synthetic comparisons with neutral
-filename detection. Completed metrics are in HISTORY.md and the hosted receipt.
-All10 lint38883782438 checks also pass. Combined-source acceptance
-is now tracked in the following claim; the original worktree/proofs stay fixed.
-Further synthetic actual-runtime capture proof is independently accepted:
-381 physical tensors,398 complete neural boundaries and exact OFF/ON/OFF
-input/logit controls. Completed details/public proof are in HISTORY.md and
-[the compact receipt](docs/dia-reference-wire-tiny-runtime-2026-10-16.json).
-A second eight-query/two-KV/four-way GQA case passes all398 boundaries,
-381 physical tensors and18 actual-original-module wrong-tiling rejection
-controls. Its complete public proof is archived in HISTORY.md. These synthetic
-cases complement the accepted bounded full1.6B/DAC proof; unforced speech remains pending. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
-
-## CLAIMED 2026-10-16 — Compose validated Dia captures with integrated head gate
-
-Owner: maintainer session. Prepare worktree
-/mnt/volume1/crispasr-dia-reference-integration-20261016 and branch
-diag/dia-reference-integration-20261016, with builds/proofs under
-/mnt/storage/crispasr/dia-reference-wire-20261016. Immutable c7f9da87 now passes
-full-model heavy38883779736, all13 general CI, independent904-payload/88-stage
-audit and fresh returned-library C ABI398-stage replay. Preserve that worktree
-and proof. Compose its diagnostic-only capture/dumper/diff changes with the
-accepted disabled-by-default head gate on main. Retain both headers and all
-current stop/top-k/cache/sampler behavior. Verify original captures, private
-head controls and tiny actual combined-runtime OFF/ON/OFF/serial graphs, then
-submit full-model public-entry validation plus CI/lint at the combined source.
-No integration before those results and independent audit; no default or
-unforced-speech/GPU/Q4/performance promotion. Complete per-stage results are in
-[the hosted receipt](docs/dia-reference-wire-hosted-2026-10-16.json).
-
-Combined immutable fb4e5924ff00ca7f31d8a4b94a3db6b50f8347b2 is pushed:
-heavy38891963272, general CI38891966094 and lint38891969068 are submitted.
-Actual combined C++ local replay passes1194 comparisons across capture,
-identity-head and serial-head modes, exact OFF/ON/OFF/identity trajectories,
-30 actual head-unit checks,17 original-module tests and237-call source guards.
-The full-model worker checks identity transparency and both ordinary/serial
-public diff routes. Heavy, all13 CI and10 lint pass. Independent audit verifies
-1735 payloads and all176 complete comparisons, including exact transparency.
-The diagnostic-only wiring is now ready for source-preserving integration.
+Dia reference/diff wiring is integrated at a40ceaff with all executable source
+bytes exact to tested fb4e5924. Heavy38891963272, all13 CI and10 lint pass;
+independent audit verifies1735 payloads and88 stages in each of ordinary/serial
+modes, including real DAC and exact bounded pristine/OFF/ON/OFF/identity controls.
+Completed implementation/proof is archived in HISTORY.md and
+[the composed receipt](docs/dia-reference-wire-composed-2026-10-16.json).
+This closes the wiring task, not current-main unforced speech or GPU/Q4.
 
 ## Dia correctness — after reciprocal decision diagnosis
 

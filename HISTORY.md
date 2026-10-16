@@ -1,3 +1,18 @@
+## Dia composed public reference/diff wiring integrated — 2026-10-16
+
+Integrationa40ceaff preserves every executable source byte from immutable
+fb4e5924. Heavy38891963272, all13 general CI38891966094 and10 lint38891969068
+jobs pass. Independent artifact audit verifies1735 payloads and176 complete
+stage comparisons:88 through the ordinary public diff route and88 through
+the serial-head route. Actual pinned original reference generation,381 F32
+neural tensors, real DAC pins, all encoder/decoder boundaries and selected
+attention/block captures pass unchanged cosine/magnitude gates. Bounded
+pristine/OFF/ON/OFF/identity inputs, logits and PCM are byte-identical.
+The original dumper and text-only crispasr-diff entry points are now registered
+on main. Original frozen worktrees/proofs are preserved. This accepts bounded
+reference/diff wiring and diagnostic composition; unforced speech, broader
+prompts, GPU/Q4 and performance remain separate. [Complete composed metrics](docs/dia-reference-wire-composed-2026-10-16.json).
+
 ## Dia sampling recipe and first feedback difference isolated — 2026-10-16
 
 On actual original and native step-zero logits, the unchanged standard sampler

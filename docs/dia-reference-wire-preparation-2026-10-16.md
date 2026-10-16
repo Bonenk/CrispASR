@@ -53,7 +53,9 @@ and their failures are retained. The complete163537930-byte proof archive is
 All metrics, pins and hashes are in [the hosted receipt](dia-reference-wire-hosted-2026-10-16.json).
 Combined source fb4e5924 now runs heavy38891963272, CI38891966094 and lint38891969068;
 its local actual runtime passes1194 comparisons including identity/serial heads.
-Integration awaits these exact-source hosted results and independent audit.
+Integrationa40ceaff now preserves the tested fb4e5924 executable sources exactly.
+Heavy, all13 CI and10 lint pass; independent audit verifies1735 payloads/176
+comparisons. [Composed proof](dia-reference-wire-composed-2026-10-16.json).
 Current-main unforced speech is separately rejected; see HISTORY.md.
 
 ## Actual C++ runtime with synthetic original-class weights
