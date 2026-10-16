@@ -3734,5 +3734,81 @@
   "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
   "compared_stage_rows": 352,
   "actual_original_sampler_decisions": 20556,
-  "pending": "Crossed old/new native recognizer replay38930760374; pristine original generation comparison if needed; permanent complete-proof publication."
+  "pending": "Direct original constructor/generate control without added observers; full speech acceptance remains failed.",
+  "complete_public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "4500d64ef00a0e2902a4e5411ccdac2bc2c056c3",
+    "parent_revision": "0fdb91b317771d5910714ed9e61fd6545e5d171e",
+    "files": [
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/raw.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/raw.zip",
+        "bytes": 3022635432,
+        "sha256": "75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/proof.zip",
+        "bytes": 131244,
+        "sha256": "9eab7483f24349991aafac4d08455c508ca5677724b513836c3094a1d102b093",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/README.md",
+        "bytes": 2376,
+        "sha256": "615ce9ac941a800f88c8050aa7cb6e2b7b17e869486e3ca59574c6ded63c93da",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  },
+  "crossed_recognizer_replay": {
+    "source": "30e75dcdd8df573ed1f73e9c97b17f192b82d7af",
+    "run": 38930760374,
+    "artifact": 12060029304,
+    "sha256": "fdaa4da6e39a86ca52ddca48de50bc8c93de77f8d7bcfd906aab765517fee416",
+    "payloads_verified": 54,
+    "upload_dereferenced_aliases_verified": 8,
+    "pcm_inputs_verified": 6,
+    "recognition_cells_verified": 12,
+    "recognizers_agree": true,
+    "legacy_and_jfk_wer_zero_both_libraries": true,
+    "new_case_transcripts_empty_both_libraries": true,
+    "new_cases_wer_zero": false,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "production_defaults_changed": false,
+    "complete_public_proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6",
+      "parent_revision": "4500d64ef00a0e2902a4e5411ccdac2bc2c056c3",
+      "files": [
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/raw.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/raw.zip",
+          "bytes": 50159711,
+          "sha256": "fdaa4da6e39a86ca52ddca48de50bc8c93de77f8d7bcfd906aab765517fee416",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/proof.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/proof.zip",
+          "bytes": 16576,
+          "sha256": "58e45ef0a8ab893b703ea732c363ed77406f7832529c6ea28852053cfd89a612",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/README.md",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/README.md",
+          "bytes": 1795,
+          "sha256": "2565dac9e29d25e2dba7320272986d4c850990d39ee4e3a0e48693b006639559",
+          "anonymous_full_download_verified": true
+        }
+      ],
+      "complete": true
+    }
+  }
 }

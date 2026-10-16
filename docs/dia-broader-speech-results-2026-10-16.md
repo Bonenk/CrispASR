@@ -28,11 +28,16 @@ generated code grids exactly match original Python in all four cases.
 
 All352 rows satisfy cosine>=0.9995 and per-row norm error<2%. Actual ASR
 also returns empty text on the original DAC decoding native codes and on CLI
-PCM. This finding does not identify whether original generation, capture or
-recognition causes the speech failure. Crossed recognizer replay38930760374
-uses both retained library builds, the old accepted PCM, four new original
-PCMs and JFK, without resynthesis. A pristine original/no-hook comparison is
-the next distinct control if recognition does not explain the failure.
+PCM. Crossed [recognizer replay38930760374](https://github.com/CrispStrobe/CrispASR/actions/runs/38930760374)
+now passes independent audit:54 manifest payloads,8 upload-dereferenced SONAME
+aliases, six exact PCM inputs and all12 recognition cells. Both actual retained
+ELF sets transcribe the prior accepted original PCM and JFK at WER0, and both
+return empty text/WER1 for all four expanded original clips. Every selected
+parent PCM, source snapshot, child result and actual mapped-library hash checks.
+This argues against a recognizer-library regression; original loading/capture,
+model/recipe quality and recognizer domain sensitivity remain distinct hypotheses.
+The next control uses the direct original constructor and untouched generate(),
+with original DAC WeightNorm hooks preserved and added observers rejected.
 
 Each table entry below is the worst value across the four cases; extrema in
 different columns can come from different cases. Full per-case arrays/metrics
@@ -132,7 +137,17 @@ These are not cosine comparisons of diverged autoregressive trajectories.
 | encoder_tokens | 1.0000000000 | 0 | 0 |
 | uncond_logits | 1.0000000000 | 9.4143337e-07 | 6.8383328e-07 |
 
-Complete raw evidence and auditor are retained under
-`/mnt/storage/crispasr/dia-broader-speech-20261016`.
-Permanent complete-proof publication remains pending; the official GitHub
-artifact is retained, not replaced by this table.
+The complete failed experiment is permanently public: [unmodified official
+raw archive](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/raw.zip)
+and [full executable audit, results and metadata](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/proof.zip).
+Revision`4500d64ef00a0e2902a4e5411ccdac2bc2c056c3` retains all3022635432 raw bytes,
+SHA256`75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90`. The audit pack is131244bytes,
+SHA256`9eab7483f24349991aafac4d08455c508ca5677724b513836c3094a1d102b093`. Both full anonymous downloads were hash-verified.
+
+The [complete crossed-ASR raw archive](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/raw.zip)
+and [independent audit pack](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/proof.zip)
+are also permanently public at revision`951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6`.
+Raw50159711bytes, SHA256`fdaa4da6e39a86ca52ddca48de50bc8c93de77f8d7bcfd906aab765517fee416`;
+audit16576bytes, SHA256`58e45ef0a8ab893b703ea732c363ed77406f7832529c6ea28852053cfd89a612`.
+Full anonymous downloads match both digests. Publication preserves failed
+quality gates and establishes no model/default/GPU/Q4 acceptance.

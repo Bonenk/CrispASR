@@ -57,8 +57,9 @@ must preserve these exact original hooks while rejecting added observation
 hooks; a real tiny weight-normalized convolution supplies the local control.
 Crossed recognizer38930760374 completed successfully: both sealed ELF sets
 recognize legacy/JFK and return empty text for all four expanded original PCMs.
-Independent full artifact audit is assigned above; this preliminary receipt
-narrows the next intervention without establishing a model-quality cause.
+Coordinator independent audit now verifies54 payloads,8 exact SONAME aliases,
+six PCM inputs and all12 recognition cells. The reusable worker auditor remains
+under review. This narrows the next intervention without a model-quality cause.
 Prepare GH CPU validation using the actual pinned Dia constructor, F32 weights,
 DAC and untouched generate(), without capture hooks/monkeypatching. Predeclare
 legacy seed42 plus the same four expanded prompt/seed/settings controls. Retain
@@ -85,11 +86,11 @@ Coordinator reviews every assertion and retains ownership of graph math and
 integration. Acceptance requires executing against complete official artifacts;
 synthetic rejection controls alone establish tooling readiness only.
 
-Coordinator separately preserves the complete failed Dia four-case diagnostic
-archive12057273677 under the public regression-fixture dataset, with raw failure
-logs, executable independent audit, source/license provenance and immutable
-anonymous-download hash verification. Large bytes remain under /mnt/storage.
-No speech/model/default acceptance follows from publication or auditor readiness.
+Coordinator has completed permanent publication of the entire failed four-case
+archive and the crossed-recognizer archive, both executable audits and full
+results/metadata. All anonymous full-download hashes match; see HISTORY.md and
+docs/dia-broader-speech-results-2026-10-16.md. These completed preservation tasks
+are not pending; remaining worker tooling and direct-original controls are.
 
 ## CLAIMED 2026-10-16 — Hermes workers for remaining PR and quantization
 
@@ -144,9 +145,9 @@ recipe is now eligible for expanded model validation; prepare/validate the
 model-independent worker and selftest before dispatch.
 
 Prepared candidate17a7aedc508be885cce0024199bd48525d3fc41b passes the tiny
-shared-child/metric/inventory selftest. Heavy38913941927, generalCI38913941626
-and lint38913941844 both pass at that exact SHA. Heavy completed all four
-cases and failed quality: the original positives also return empty ASR text.
+shared-child/metric/inventory selftest. GeneralCI38913941626 and lint38913941844
+pass at that exact SHA. Heavy38913941927 completed all four cases and failed
+quality: the original positives also return empty ASR text.
 Official artifact12057273677 is fully retained and its3022635432bytes match
 GitHub SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90.
 Independent audit verifies1829 payloads,352 passing stage rows and20556 exact
@@ -318,29 +319,15 @@ The first Hermes full-model design is rejected for invented commands/pins; the
 worker is now checking primary metadata only. OmniVoice follow-up also needs a
 revision: passing other clips does not exclude ASR sensitivity to cloned speech.
 
-## CLAIMED 2026-10-16 — Dia crossed recognizer replay after broader failure
+## Dia recognition follow-up after completed crossed replay
 
-Owner: coordinator, worktree /mnt/volume1/crispasr-dia-asr-crosscheck-20261016,
-branch diag/dia-asr-crosscheck-20261016. Heavy38913941927 completed all four
-predeclared cases and failed its unchanged quality gate. Its CRC-checked receipt
-preview reports exact original/native input histories and all352 stage rows
-passing, but all original/native/CLI ASR transcripts are empty. Full official
-artifact12057273677 (3022635432bytes, SHA75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90)
-is retained and fully SHA-verified; independent1829-payload array audit is complete.
-
-Prepare a crossed ASR replay using both retained candidate shared libraries from
-old38892690744 and new38913941927, with the identical pinned Nemotron Q4 model.
-Use sealed original PCM from the old accepted prompt and all four new cases,
-plus repository JFK as a recognizer control. Separate subprocesses must isolate
-the two ELF/dependency sets. Verify official ZIP digests, selected payload hashes,
-actual library SHA/SONAME and audio samples; retain exact text/WER and old/new
-recognizer agreement. No neural resynthesis, gate relaxation, alternate seeds,
-Q4/GPU/default promotion or large local model. GH runs the inference; local
-scratch and evidence live under /mnt/storage/crispasr/dia-asr-crosscheck-20261016.
-Candidate30e75dcdd8df573ed1f73e9c97b17f192b82d7af passes scoring/case
-controls and all4 unskipped secret tests; hosted38930760374 is queued with an
-official-artifact collector prepared. No build or neural resynthesis is repeated.
-After recognition isolation, compare pristine original generation if needed.
+Crossed-ASR30e75dcd/run38930760374 and its independent full54-payload/8-alias
+root audit are completed and archived in HISTORY.md. Both ELF sets recognize
+legacy/JFK, both fail the same four expanded original PCMs, with exact old/new
+transcripts and parent/source/library hashes. Permanent complete archives are
+public and anonymously verified. Continue the direct-original control claimed
+above; worker reusable-auditor review remains pending. No repeated recognition
+or synthesis is needed to rediscover these accepted diagnostic observations.
 
 Echo full-model6835d2dd/run38928056585 was cancelled before execution after
 source review found the fused product is named ffn_swiglu, not ffn_gate_par.

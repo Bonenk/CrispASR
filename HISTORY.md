@@ -1,3 +1,20 @@
+## Dia crossed recognizers audited and complete failures preserved — 2026-10-16
+
+Frozen30e75dcd/run38930760374 succeeds. Independent audit verifies54 manifest
+payloads plus8 exact uploaded SONAME aliases, both selected parent PCM/source
+inventories, six input arrays and all12 recognition cells. Both old/current ELF
+sets transcribe legacy and JFK at WER0; both return empty text/WER1 for all four
+expanded original clips. This argues against a recognizer-build regression,
+without proving original model/recipe quality or excluding ASR domain sensitivity.
+
+The entire failed four-case diagnostic (3022635432bytes) and full audit pack
+are public at fixture revision4500d64ef00a0e2902a4e5411ccdac2bc2c056c3. Complete
+crossed-recognizer evidence and its executable independent audit are public at
+revision951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6. Every file passes full anonymous
+download SHA verification. [All immutable links and stage results](docs/dia-broader-speech-results-2026-10-16.md).
+Direct original/no-added-observer generation remains in PLAN.md; no speech,
+model/default/GPU/Q4/release acceptance follows from these diagnostic passes.
+
 ## OmniVoice clone diagnostic evidence recovered — 2026-10-16
 
 The old HF diagnostic revision returns404. Exact native run37891923274 and
@@ -26,8 +43,8 @@ exact original sampler decisions. Every original/native input history and code
 grid matches; minimum stage cosine across cases is0.9999620016. This accepts
 the numerical diagnostic, not broader speech, F16/Q4/GPU, defaults or release.
 [Complete per-stage/per-case results](docs/dia-broader-speech-results-2026-10-16.md)
-and machine receipt retain failures. Crossed recognition and permanent complete
-proof publication remain in PLAN.md.
+and machine receipt retain failures. Complete proof publication and crossed
+recognition are completed above; direct original generation remains in PLAN.md.
 
 The corrected Echo fused-product observer also passes hosted38929458991 and
 independent52-payload audit, including released5.6.0 source,18 original-class

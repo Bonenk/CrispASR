@@ -162,8 +162,13 @@ reported prompt/seed, this combination restores all1226 original input rows,
 1210 code frames and WER0 through native DAC, original DAC and actual CLI.
 Independent audit verifies535 payloads and every native/original sampling
 choice. The F16 first fork is traced to a nucleus rank-boundary crossing on
-actual logits; a model-free replay reproduces all27 decisions. Broader texts/
-seeds are in progress. Production defaults, model pins, GPU/Q4 and performance
+actual logits; a model-free replay reproduces all27 decisions. Four expanded
+prompt/seed controls match original input/code histories exactly and pass352
+stage comparisons, but all original/native speech recognitions fail. Crossed
+old/current recognizers both pass legacy/JFK and fail those four original clips;
+all12 replay cells are independently audited. Complete failed evidence is
+permanently public with verified anonymous hashes. Direct original generation
+without added observers remains pending. [Broader results and complete proof](docs/dia-broader-speech-results-2026-10-16.md). Production defaults, model pins, GPU/Q4 and performance
 acceptance remain unchanged. [Results and public proofs](docs/dia-cache-sampler-results-2026-10-16.md).
 
 ## Dia: reproducible DAC precision conversion
