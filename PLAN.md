@@ -69,6 +69,21 @@ fused observer after immutable full-model and applicable CI acceptance. Then
 continue same-original-input FFN projection attribution for the rejected Q4
 recipes; no current Q4/GPU/default or release promotion.
 
+## CLAIMED 2026-10-16 — Dia shallow-checkout source prerequisite
+
+Owner: coordinator; worktree
+/mnt/volume1/crispasr-dia-direct-original-v3-20261016, branch
+diag/dia-direct-original-v3-20261016, based on frozen1c34dc02. Hosted38936657203
+fails before synthesis because depth-one checkout lacks crossed-source30e75dcd
+for the exact helper byte check. Preserve artifact12062895878 (77225bytes,
+SHA59714712cefe8f2105a8923c08379b39d16ee65bb2f592af80395276496b9b84).
+Fetch that immutable source explicitly before git-show, keep the byte-equality
+assert unchanged, and prove missing-before/present-after in a fresh shallow Git
+repository. Reuse the five predeclared original F32 prompt/seed/settings controls,
+original constructor/WeightNorm preservation, pinned ASR and all failed quality
+gates. No runtime math, model/default/GPU/Q4 change. Acceptance remains exact
+hosted synthesis/PCM/recognizer evidence plus independent complete artifact audit.
+
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
 Owner: coordinator only; worktree
