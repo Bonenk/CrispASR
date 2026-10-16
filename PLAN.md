@@ -53,7 +53,15 @@ Owner: coordinator; frozen worktree
 diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
 Hosted38938983824 completed successfully. Its3.505GB official artifact12066499638
 is downloaded and its full SHA25658753e76e2a68b5d079f1a32355941b3d8fb72e46d90c2b8ce6b878a4e1f0200
-matches the official digest. Independent scientific audit is running. Missing ffmpeg in failed38931686491 and the worker's
+matches the official digest. Independent scientific audit PASSES all1946 payloads
+and17 repository snapshots: EN/ZH OFF/ON/OFF identities, all144 FFN vectors,
+unchanged magnitude/cosine/cache gates, raw decoded text, CLI and CABI. Coordinator
+claims fresh landing worktree /mnt/volume1/crispasr-echo-ffn-land-20261016, branch
+integrate/echo-ffn-20261016, based on current main. Preserve the three original
+observer commits d8ed1979/d8183cf9/0dfccc7d and verify all affected source bytes
+against audited0dfccc7d while retaining current main's independent changes.
+Run applicable composition CI/lint before integration; archive complete proof
+permanently. No Q4/GPU/default/release promotion. Missing ffmpeg in failed38931686491 and the worker's
 unconditional-translation-newline expectation are repaired and archived in
 HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
 formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
