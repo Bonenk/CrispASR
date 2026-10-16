@@ -65,8 +65,12 @@ because it tested a different CPU arithmetic path. FP64 is not the same fix.
 Candidate d868644bda0f0bdc6e6288a564d51a8ff545ff87 is pushed. Fresh hosted
 COMPATIBLE replay [38868907653](https://github.com/CrispStrobe/CrispASR/actions/runs/38868907653)
 and lint [38868910390](https://github.com/CrispStrobe/CrispASR/actions/runs/38868910390)
-are submitted. The worker runs only small captured Q/head projections on another
-CPU; no full neural model or generation. Independent saved-array audit passes;
+were submitted. Heavy38868907653 now passes on Xeon Platinum8573C. Official
+artifact12032740700 (160994 bytes, SHA256
+06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf)
+and all13 returned payloads are independently hash-verified; fresh Q and both
+hidden/head outputs match exactly. Lint38868910390 remains queued. The worker
+runs only small captured Q/head projections, not a full neural model or speech. Independent saved-array audit passes;
 79-payload public proof at HF revision81d18136133e7bad61961813f45afa58301fe32e
 is fully anonymously downloaded and SHA verified (170121121 bytes,
 b092ed027e26480ae4ad6c59d30d216662c7c5afe949f5300c9afafe86163397).
@@ -84,15 +88,27 @@ integration before promotion. No production/GPU/Q4/performance claim yet.
 Owner: maintainer session. Worktree
 /mnt/volume1/crispasr-dia-serial-head-20261016, branch diag/dia-serial-head-20261016;
 large scratch/evidence under /mnt/storage/crispasr/dia-serial-head-20261016.
-Implement a scratch gated CPU ggml graph head callback using native loaded F32
-weights/current hidden, serial separately-rounded multiply/add at every step.
-No reference injection or token/step-specific numerical behavior. Hold runtime
-8d0ad886/C36, F32 model/cross caches, portable RNG, source RoPE off and original
-recipe fixed. Pristine/OFF/identity graph paths must have byte-exact complete
-trajectories/logits/audio; serial path uses unchanged sampler/RNG. Save all
-native codes/audio, actual original DAC and same-recognizer ASR, positive
-controls and all physical/source/library receipts. Tiny analytic fusion and
-actual captured-head graph tests locally; full model/build/generation on GH.
+Candidate3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b is pushed. Heavy CPU
+[38870499727](https://github.com/CrispStrobe/CrispASR/actions/runs/38870499727)
+and lint [38870502430](https://github.com/CrispStrobe/CrispASR/actions/runs/38870502430)
+are submitted and queued. The scratch CPU ggml graph callback uses only native
+loaded F32 weights/current hidden and separately rounded serial arithmetic on
+every head at every step. No reference injection or token/step-specific math.
+
+Local actual-graph tests pass all18,504 head outputs on both hidden states,
+one/four threads, exact native/identity controls, tiny fusion witness and four
+rejecting controls. The entire patched runtime passes syntax against pinned
+8d0ad886/C36 headers. Clang-format18, Python compilation and all4 unskipped
+no-secrets checks pass. Proof: owned storage root/local-v1/graph-v2.
+
+The hosted worker holds8d0ad886/C36, F32 model/cross caches, portable RNG,
+source RoPE off and original recipe fixed. Pristine/OFF/identity complete
+trajectories/logits/captures/audio and OFF/identity grids/final RNG must be exact.
+Baseline also must reproduce accepted full free-generation arrays/PCM. Actual
+original DAC and same-recognizer ASR cover every arm, with both original
+positives. Final hosted gate requires serial WER0 through both decoders; retain
+complete evidence even if that gate fails. Full-generation outcome and its
+independent auditor remain pending. [Preparation](docs/dia-serial-head-preparation-2026-10-16.md).
 Current main lacks these diagnostic RNG/cache paths, so this is explicitly a
 pinned-runtime causal experiment; current-main/default, extra prompts/seeds,
 GPU/Q4 and performance remain separate gates before production promotion.

@@ -1,3 +1,15 @@
+## Dia numerical cause confirmed on a second CPU — 2026-10-16
+
+Heavy38868907653 atd868644b passes on Xeon Platinum8573C. The official160994-byte
+artifact12032740700 has SHA256
+06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf;
+all13 returned payloads verify. Fresh actual original COMPATIBLE query and
+both hidden/head projections are exact to the retained matching recurrence.
+This is cross-CPU component evidence, not full speech. Lint38868910390 and the
+new all-step graph experiment remain tracked in PLAN.md. Local actual graph
+callback/native/identity/fusion/thread controls and whole-runtime syntax pass;
+[preparation and limits](docs/dia-serial-head-preparation-2026-10-16.md).
+
 ## Dia pointwise numerical cause identified — 2026-10-16
 
 Local method71d5a6ec and candidate d868644b identify a reproducible CPU reduction
