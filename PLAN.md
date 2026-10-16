@@ -47,21 +47,37 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
 ## CLAIMED 2026-10-16 — Dia CPU reduction/dispatch numerical cause
 
-Owner: maintainer session. Separate worktree
+Owner: maintainer session. Worktree
 /mnt/volume1/crispasr-dia-reduction-cause-20261016, branch
-diag/dia-reduction-cause-20261016; all coefficients/results/build scratch under
+diag/dia-reduction-cause-20261016; all coefficients/results/scratch under
 /mnt/storage/crispasr/dia-reduction-cause-20261016.
-Test the specific CPU-kernel-dispatch hypothesis behind actual full-model versus
-isolated original F32 Q/head projections. Use immutable original DenseGeneral,
-actual captured inputs/outputs and hash-verified small coefficient files. Vary
-CPU arithmetic dispatch in separate processes, preserve repeat/thread controls,
-and compare against high-precision exact-product reductions. Trace the actual
-ggml kernel/reduction code and measure signed head-margin effects. No full model
-on the VPS, token override, reference rescaling or changed acceptance threshold.
-Require reproducible operator-level evidence before naming a numerical cause;
-then validate any justified runtime candidate through unmodified generation
-and actual decoded speech on GH. Existing QK/norm/head experiments are not
-repeated unchanged: this task explicitly tests dispatch/rounding causality.
+
+Local cause is proven: original MKL COMPATIBLE reproduces full-model Q and
+head logits exactly; AUTO/AVX512 reproduces the earlier module discrepancy.
+A serial F32 multiply-then-add recurrence independently matches all4,096 Q
+values and18,504 head logits on each captured hidden. Actual c36 AVX2/FMA
+4×8-dot recurrence also reproduces the hosted native disputed logits exactly.
+On unchanged native hidden, serial head margin becomes+2.050399780273e-5
+versus native−2.670288085938e-5; original sampler/noise changes904→877 with
+no token override. The earlier broad no-head-repair conclusion is superseded
+because it tested a different CPU arithmetic path. FP64 is not the same fix.
+
+Candidate d868644bda0f0bdc6e6288a564d51a8ff545ff87 is pushed. Fresh hosted
+COMPATIBLE replay [38868907653](https://github.com/CrispStrobe/CrispASR/actions/runs/38868907653)
+and lint [38868910390](https://github.com/CrispStrobe/CrispASR/actions/runs/38868910390)
+are submitted. The worker runs only small captured Q/head projections on another
+CPU; no full neural model or generation. Independent saved-array audit passes;
+79-payload public proof at HF revision81d18136133e7bad61961813f45afa58301fe32e
+is fully anonymously downloaded and SHA verified (170121121 bytes,
+b092ed027e26480ae4ad6c59d30d216662c7c5afe949f5300c9afafe86163397).
+[Candidate report](https://github.com/CrispStrobe/CrispASR/blob/d868644bda0f0bdc6e6288a564d51a8ff545ff87/docs/dia-reduction-cause-2026-10-16.md).
+
+Next: audit hosted replay, integrate proven diagnostic tooling, then claim a
+generic opt-in all-step serial F32 head candidate. It must use native loaded
+weights/current hidden in the graph, without reference input or a special
+step/token branch. Require pristine/OFF/identity controls, fixed sampler/RNG,
+actual native/original DAC speech, additional prompts/seeds and current-main
+integration before promotion. No production/GPU/Q4/performance claim yet.
 
 ## Dia correctness — after reciprocal decision diagnosis
 
@@ -72,9 +88,9 @@ code frames restored. Public immutable proof is fully anonymously SHA-verified.
 Completed preparation, failures and results are in HISTORY.md. This diagnostic
 uses8d0ad886/C36; it does not establish current-main default speech acceptance.
 
-1. Select a new specific arithmetic hypothesis using actual full-model captures
-   and the signed terminal margin budget; claim the bounded intervention before
-   coding. The single decision now explains this prompt/seed's quiet trajectory.
+1. The CPU dispatch/reduction claim above identifies a specific sufficient
+   arithmetic difference at this boundary. Validate the generic all-step head
+   candidate next; the single decision explains this prompt/seed's quiet trajectory.
    Do not add a token override or change top_p/seed/quality thresholds as a fix.
 2. Earlier module Q differs6.90e-7 from actual full-model Q despite exact keys
    and normalized input. Preserve that qualification. A new intervention must

@@ -1,3 +1,27 @@
+## Dia pointwise numerical cause identified — 2026-10-16
+
+Local method71d5a6ec and candidate d868644b identify a reproducible CPU reduction
+cause. MKL COMPATIBLE/SSE4_2 match actual full-model Q and original head logits
+byte-exact; AUTO/AVX512 reproduce the earlier local mismatch. A separately
+rounded serial F32 multiply/add recurrence matches all4,096 Q values and18,504
+head logits per hidden input. Independent cumulative-sum reconstruction passes.
+The actual c36 AVX2 four-eight-lane FMA dot and an explicit fmaf/tree model agree
+exactly, including all four hosted native disputed logits. A tiny fusion witness
+returns0 for separate operations versus−2^-46 for fmaf.
+
+On unchanged native hidden, compatible/serial head changes margin46−904 from
+−2.670288085938e-5(native) to+2.050399780273e-5, and the actual original filter/
+verified noise selects877 instead of904. There is no token override, reference
+injection or recipe change. Earlier head-exclusion prose was too broad because
+it used a different local MKL dispatch. High-precision sums remain negative on
+native hidden; this is reference-rounding compatibility, not a generic FP64 win.
+
+Public79-payload proof plus manifest is fully anonymously SHA/size verified at
+HF revision81d18136133e7bad61961813f45afa58301fe32e. Local failed loader/alias
+audits remain retained. A fresh hosted original projection replay and lint are
+submitted; their results and the all-step runtime speech candidate remain open
+in PLAN.md. No production/native-default/GPU/Q4/performance acceptance follows.
+
 ## Dia reciprocal native decision diagnosis completed — 2026-10-16
 
 Heavy38855559740 at5417ed6d and all10 lint38855559850 checks pass. Independent
