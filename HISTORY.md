@@ -1,3 +1,21 @@
+## Dia full-model reference/diff wiring validated — 2026-10-16
+
+Heavy38883779736 at immutable c7f9da87 passes. Independent audit verifies all
+904 payloads, actual pinned original sources,381 physical F32 neural tensors,
+real DAC pins and all88 complete stage comparisons. Actual public dumper and
+text-only diff execute with exact original input/code replay; bounded native
+pristine/OFF/ON/OFF inputs, logits and PCM are byte-identical. Encoder output,
+all12 encoder/18 decoder layers, selected attention/block boundaries,8 DAC
+stages and PCM pass unchanged cosine/magnitude gates. Fresh execution of the
+returned shared libraries detects a neutral-filename synthetic model through
+the C ABI and passes398 additional comparisons. All13 general CI jobs pass.
+Auditor v1/v2 failures are retained: nested original assets lost their relative
+path, then a versioned shared library was mistaken for an unversioned file.
+Corrected v3 preserves all integrity/quality gates and passes. This accepts
+bounded full-model harness wiring, not unforced speech, GPU, Q4 or speed.
+Combining with the separately integrated head gate and remaining lint are
+tracked in PLAN.md. [All per-stage metrics](docs/dia-reference-wire-hosted-2026-10-16.json).
+
 ## Dia nontrivial grouped-query capture proof accepted — 2026-10-16
 
 A second synthetic case uses eight query heads and two KV heads, retaining

@@ -103,12 +103,12 @@ compiled production comparison guards (20 acceptance/rejection controls),
 three parser/scratch tests, one device/environment test, three computation/
 sampler source tests and the existing original output-protocol test pass.
 Whole-runtime syntax and all237 ordered ggml computation calls match pristine
-main. Hosted full-model validation38883779736 is running; general CI38883785994
-has7/13 jobs passing, including Linux unit/DL, Windows, macOS, iOS and both
-AMR compilers. Lint38883782438 has4/10 checks passing. No failures at this
-checkpoint; raw collection is active. Independent full artifact
-and array auditors are prepared; storage watcher97658 starts each after its
-raw collector finishes. Audit execution and acceptance remain pending.
+main. Hosted full-model validation38883779736 and all13 general CI38883785994
+jobs pass. Independent v3 verifies904 payloads/88 complete comparisons; fresh
+returned-library C ABI replay passes398 synthetic comparisons with neutral
+filename detection. Completed metrics are in HISTORY.md and the hosted receipt.
+Lint38883782438 has7/10 checks passing, no failures. Combined-source acceptance
+is now tracked in the following claim; the original worktree/proofs stay fixed.
 Further synthetic actual-runtime capture proof is independently accepted:
 381 physical tensors,398 complete neural boundaries and exact OFF/ON/OFF
 input/logit controls. Completed details/public proof are in HISTORY.md and
@@ -117,6 +117,23 @@ A second eight-query/two-KV/four-way GQA case passes all398 boundaries,
 381 physical tensors and18 actual-original-module wrong-tiling rejection
 controls. Its complete public proof is archived in HISTORY.md. These synthetic
 cases do not replace the pending full1.6B/DAC/speech gates. [Preparation and exact scope](docs/dia-reference-wire-preparation-2026-10-16.md).
+
+## CLAIMED 2026-10-16 — Compose validated Dia captures with integrated head gate
+
+Owner: maintainer session. Prepare worktree
+/mnt/volume1/crispasr-dia-reference-integration-20261016 and branch
+diag/dia-reference-integration-20261016, with builds/proofs under
+/mnt/storage/crispasr/dia-reference-wire-20261016. Immutable c7f9da87 now passes
+full-model heavy38883779736, all13 general CI, independent904-payload/88-stage
+audit and fresh returned-library C ABI398-stage replay. Preserve that worktree
+and proof. Compose its diagnostic-only capture/dumper/diff changes with the
+accepted disabled-by-default head gate on main. Retain both headers and all
+current stop/top-k/cache/sampler behavior. Verify original captures, private
+head controls and tiny actual combined-runtime OFF/ON/OFF/serial graphs, then
+submit full-model public-entry validation plus CI/lint at the combined source.
+No integration before those results and independent audit; no default or
+unforced-speech/GPU/Q4/performance promotion. Complete per-stage results are in
+[the hosted receipt](docs/dia-reference-wire-hosted-2026-10-16.json).
 
 ## Dia correctness — after reciprocal decision diagnosis
 
