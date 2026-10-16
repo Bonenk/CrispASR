@@ -355,7 +355,16 @@ can be scheduled after checking actual exported and wrapped surfaces.
 ## CLAIMED 2026-10-16 — Isolate Dia categorical draw placement
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampler-device-20261016,
-branch diag/dia-sampler-device-20261016. Scope: original F32 neural computation
+branch diag/dia-sampler-device-20261016, frozen source4d622e7e9574c360c0f38154797a3453f26e2096.
+Kernelcrispasr-dia-sampler-device-v1/version1 is RUNNING; uploaded source is
+byte-exact, SHA4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435.
+Tiny actual original sampler/ID/RNG and generation/delay/frame-count controls
+pass under Torch2.6 and2.11. Exception restoration, broken-restoration and invalid
+input controls pass; read-only review finds no blocking source defect. Three
+recent sessions were terminal before one submission; terminal collector is active.
+Full-model results, tiny CUDA execution and terminal audit remain pending.
+See [preparation receipt](docs/dia-sampler-device-preparation-2026-10-16.json).
+Scope: original F32 neural computation
 and filtering on one supported CUDA host; same model instance and fixed native
 recipe1.2/45/.95/CFG3/cap3072, original five texts/seeds. Predeclare CUDA draw,
 CPU draw, CUDA draw anchor (15 outputs). Middle arm copies final probabilities
@@ -375,5 +384,3 @@ after current session inventory per ../kaggle_usage.md; no CPU neural fallback,
 framework replacement, quota workaround or draw fishing. Public HF checkpoints
 before weights and between arms; independently audit terminal pinned evidence.
 All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
-
-

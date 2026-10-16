@@ -1,3 +1,24 @@
+## Dia sampler-device intervention prepared and submitted — 2026-10-16
+
+Frozen4d622e7e preserves original F32 CUDA neural computation and filtering while
+crossing only final torch.multinomial draw placement, CUDA/CPU/CUDA anchor on one
+model instance and five fixed texts/seeds. Tiny actual original CPU sampler tests
+pass exact IDs/RNG under Torch2.6 and2.11. Original generate, delay removal and
+codec-input paths confirm sampledEOS33draws/8704samples and capacityEOS127/56832.
+Owned sample snapshots, normal/exception restoration, broken-restoration negative,
+invalid inputs and installed-stack guards pass. Neural steps/codec output in the
+frame-count control are stubs; no full-model result follows from those tests.
+
+One Kaggle version1 was submitted after three recent sessions were verified
+terminal. Pulled uploaded source matches SHA4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435.
+Actual tiny CPU/CUDA draws and placement controls execute and publish before any
+neural-weight download; every completed full-model arm checkpoints publicly.
+Runtime framework source revision, CPU/CUDA RNG states, first64 final probability
+inputs, all pre-override IDs, PCM and raw recognition are retained. This is an
+explicit operator-placement intervention, not observer transparency. Actual GPU
+results and independent terminal evidence audit remain in PLAN.md. No defaults,
+Q4 acceptance or source model recipes are changed.
+
 ## Echo FFN observer integrated with tested combined source — 2026-10-16
 
 Final landing6db7e164 preserves four original commits and all3591 non-document

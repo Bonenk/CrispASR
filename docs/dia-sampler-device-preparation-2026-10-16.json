@@ -1,0 +1,49 @@
+{
+  "source": "4d622e7e9574c360c0f38154797a3453f26e2096",
+  "kernel_slug": "crispasr-dia-sampler-device-v1",
+  "kernel_version": 1,
+  "uploaded_source_exact": true,
+  "script_sha256": "4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435",
+  "status": "KernelWorkerStatus.RUNNING",
+  "arms": [
+    "cuda-draw",
+    "cpu-draw",
+    "cuda-draw-anchor"
+  ],
+  "same_model_instance": true,
+  "neural_device": "cuda",
+  "compute_dtype": "float32",
+  "recipe": {
+    "temperature": 1.2,
+    "top_k": 45,
+    "top_p": 0.95,
+    "cfg_scale": 3.0,
+    "capacity": 3072
+  },
+  "fixed_cases": 5,
+  "syntheses_planned": 15,
+  "recognizer_positives": 2,
+  "source_preservation": "Original constructors, generate, CFG/filtering and DAC; explicit torch.multinomial placement intervention",
+  "added_sampler_observation": "First64 final probability inputs and every pre-override sampled ID; owned copies",
+  "observer_transparency_acceptance": false,
+  "local_controls": {
+    "original_cpu_sampler_ids_and_rng": "PASS under Torch2.6 and2.11",
+    "original_generate_delay_removal_codec_input_frame_count": "PASS sampledEOS33draws/8704samples; capacityEOS127draws/56832samples",
+    "restoration": "PASS normal and exception paths; broken-restoration negative rejected",
+    "invalid_inputs_rejected": 3,
+    "package_stack_changes_rejected": 4,
+    "read_only_review": "No concrete blocking source defect found"
+  },
+  "prelaunch_recent_sessions_checked": 3,
+  "prelaunch_active_sessions": 0,
+  "submission_count": 1,
+  "unsupported_gpu_policy": "Exit inconclusive; no CPU neural fallback/framework replacement/automatic retry",
+  "public_raw_prefix": "dia-20261016-original-cuda/sampler-device-v1",
+  "public_tiny_prefix": "dia-20261016-original-cuda/sampler-device-v1-preflight",
+  "full_model_results": "pending",
+  "independent_terminal_audit": "pending",
+  "speech_acceptance": false,
+  "native_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false
+}
