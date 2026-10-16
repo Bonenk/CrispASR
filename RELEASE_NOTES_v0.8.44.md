@@ -23,10 +23,14 @@ performance gain or completed Ascend hardware validation.
 The broader Dia CPU matrix completed all four predeclared cases but failed
 speech quality: original and native ASR outputs are empty. The official3.02GB
 artifact digest and1829-payload independent audit are verified: all352 stage
-rows and20556 original sampling decisions match. Crossed recognizer replay
-remains in progress. No broader speech or F16/Q4/GPU/default promotion.
-Echo's optional FFN observer also needs its fused-product capture repair and
-full-model transparency gates before inclusion. These remain pending work in
+rows pass and20556 original sampling decisions match. Crossed recognizer replay
+is independently verified across all12 cells: both old/current libraries pass
+legacy/JFK but return empty text for all four expanded original clips. Direct
+original generation without added observers remains queued. Complete failed
+evidence is permanently public. No broader speech or F16/Q4/GPU/default promotion.
+Echo's fused-product observer repair passes all13 general CI and10 lint jobs.
+Full-model observer transparency remains pending before integration, with11
+small controls passing and the full independent artifact audit prepared. See
 [PLAN.md](PLAN.md), with completed investigations in [HISTORY.md](HISTORY.md).
 
 ## OmniVoice allocation failure handling

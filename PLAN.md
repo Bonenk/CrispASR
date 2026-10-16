@@ -46,35 +46,28 @@ Hardware waits do not justify repeating accepted diagnostics or waiting hours
 without independent useful work. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 
-## CLAIMED 2026-10-16 — Echo C ABI expected cue formatting
+## CLAIMED 2026-10-16 — Echo full-model observer validation and integration
 
-Owner: coordinator; worktree
+Owner: coordinator; frozen worktree
 /mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016, branch
-diag/echo-ffn-fullmodel-v4-20261016, based on frozen890d8cf2. Source review
-finds the validation worker unconditionally inserts a newline before a cue's
-translation; both actual CLI and Session append it only for nonempty translation
-(src/crispasr_c_api.cpp and crispasr_backend_index_echo.cpp). Correct the
-validator's expectation and cover both actual text contracts with tiny controls;
-no runtime/decoded-content gate change. V3 run38938308165 is queued and will be
-cancelled before execution in favor of the complete fixed composition. Keep all
-frozen sources/failure evidence, prerequisites, model inputs and stage gates.
-Acceptance remains exact-source full-model observer/CABI/CLI validation plus
-independent official-artifact audit; no Q4/GPU/default promotion.
+diag/echo-ffn-fullmodel-v4-20261016, sourcea1d84150a98ef233483f0448768531e7171f7384.
+Hosted38938983824 is queued. Missing ffmpeg in failed38931686491 and the worker's
+unconditional-translation-newline expectation are repaired and archived in
+HISTORY.md. Eleven local controls pass, including actual compiled CLI/Session
+formatting; runtime/reference bytes stay exact0dfccc7d. Four unskipped secrets
+checks pass. Full artifact collector and independent coordinator auditor/watch
+are prepared under /mnt/storage/crispasr/echo-ffn-fullmodel-20261016, collector-v4
+and audit-preparation-v4. Auditor gate controls pass; actual artifact acceptance
+remains pending. The physical ledger audit checks internal rows and producer/
+model pins without reloading multi-GB models locally.
 
-## CLAIMED 2026-10-16 — Echo hosted audio-tool prerequisite repair
-
-Owner: coordinator; worktree
-/mnt/volume1/crispasr-echo-ffn-fullmodel-v3-20261016, branch
-diag/echo-ffn-fullmodel-v3-20261016, based on frozene344c2d0.
-Full-model38931686491 failed before model downloads/build: worker selftest passes,
-but the GH image has no ffmpeg for original encode_audio. Preserve official
-artifact12061492453 (260621bytes, SHA92c389cdc31d7a657fef22d0bf5ff95735775355a3a972d33adab0f99b1f79a1)
-and independently verify its source/payloads/failure. Add bounded ffmpeg install
-through existing tools/ci-apt.sh plus actual version provenance, retaining the
-original prerequisite assert and all original numerical/identity/output gates.
-Acceptance: local existing worker controls; byte-exact runtime/reference sources
-against0dfccc7d; new exact-source hosted experiment and full artifact audit.
-No runtime math, changed inputs, model/default/quant/GPU or release promotion.
+Next: audit complete69/68 old stages and144 FFN vectors per case, original/native
+cosines and magnitude,16 cached greedy IDs, generation-prefill identity, actual
+raw text/cues, CLI SRT and metadata-only Session CABI. Preserve every failed gate.
+All13 generalCI38929450279 and all10 lint38929454381 jobs pass. Only integrate the
+fused observer after immutable full-model and applicable CI acceptance. Then
+continue same-original-input FFN projection attribution for the rejected Q4
+recipes; no current Q4/GPU/default or release promotion.
 
 ## CLAIMED 2026-10-16 — Dia direct-original constructor without observers
 
@@ -114,7 +107,8 @@ hermes-asr-omnivoice uses worktree
 artifact auditor for frozen crossed-ASR source30e75dcd/run38930760374. Worker
 hermes-asr-echo uses worktree
 /mnt/volume1/crispasr-hermes-echo-observer-audit-20261016 to prepare an independent
-artifact auditor for frozen full-model sourcee344c2d0/run38931686491. Both must
+artifact auditor readiness (79145eba, unaccepted draft); coordinator owns
+the complete auditor for new sourcea1d84150/run38938983824. Both must
 read the actual producers, verify complete manifests/provenance and raw outputs,
 recompute gates, and include rejection controls for corrupt or missing evidence.
 No model downloads, runtime mathematics, heavy jobs, pushes or publication.
@@ -365,21 +359,9 @@ public and anonymously verified. Continue the direct-original control claimed
 above; worker reusable-auditor review remains pending. No repeated recognition
 or synthesis is needed to rediscover these accepted diagnostic observations.
 
-Echo full-model6835d2dd/run38928056585 was cancelled before execution after
-source review found the fused product is named ffn_swiglu, not ffn_gate_par.
-Repair0dfccc7d in /mnt/volume1/crispasr-echo-ffn-fused-20261016 passes a tiny
-verbatim vendored build_ffn control: the old helper captures5 and fails; the
-repair captures6 and passes. Earlier synthetic native proof does not establish
-production FFN completeness. Fresh CI38929450279, lint38929454381 and hosted
-tiny38929458991 passes, including independent52-payload audit of actual
-released source,18 Python controls and old-five/fixed-six literal builder.
-CI38929450279 and lint38929454381 remain queued. Full-model composition uses separate
-worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-v2-20261016; do not launch until
-the corrected tiny controls pass. Compositione344c2d064b912e765b0cc74271d88ae845c7bc8
-passes10 local controls and retains byte-exact runtime/reference sources from
-repair0dfccc7d. A storage watcher independently audits the corrected hosted tiny
-artifact and dispatched exact frozen full-model38931686491 after acceptance.
-That EN/ZH run is queued; its collector is prepared. Runtime mathematics/defaults are unchanged.
+Echo production-builder diagnosis and completed tiny proofs are archived in
+HISTORY.md. The current full-model and CI dependencies are claimed above;
+old e344/run38931686491 is a retained failed prerequisite run, not a live queue.
 
 ## Quantization — no unproven model promotion
 

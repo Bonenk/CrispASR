@@ -1,3 +1,30 @@
+## Echo hosted prerequisites and validation cue expectation repaired — 2026-10-16
+
+Full-model38931686491 failed before model downloads/build because ffmpeg was
+absent. Independent audit verifies official artifact12061492453, its260621bytes/
+SHA92c389cdc31d7a657fef22d0bf5ff95735775355a3a972d33adab0f99b1f79a1,
+all24 payloads and14 repository snapshots; its small controls passed and no
+model cases executed. Frozen890d8cf2 adds installation through ci-apt.sh and
+retains actual ffmpeg version output, preserving the original audio loader.
+
+Source review also found an incorrect worker CABI expectation: it appended a
+newline even when translation was empty. Both production CLI and Session append
+translation conditionally. Frozena1d84150 corrects the expectation and passes11
+controls, including compiling the actual formatting statements from both source
+files and demonstrating the old expectation fails the untranslated case.
+All runtime/reference bytes remain exact0dfccc7d. Queued v3/run38938308165 was
+cancelled before execution; new full-model38938983824 is the pending experiment.
+All13 repair-source generalCI38929450279 and all10 lint38929454381 jobs pass.
+
+Coordinator's full artifact auditor is prepared with calibrated scale, inventory,
+FFN width/output identity, dtype/nonfinite and actual sealed-provenance controls.
+No full-model acceptance follows from readiness. Worker79145eba remains an
+unaccepted draft: it uses the wrong provenance key and a presence-only text
+check, and does not cover the complete artifact. Its read-only follow-up's
+host-default package mismatches are not hosted blockers: exact hosted2.6/5.6
+version/source checks already passed. No worker runtime math or unreviewed
+tooling was merged. [Machine receipt](docs/echo-ffn-capture-preparation-2026-10-16.json).
+
 ## Dia crossed recognizers audited and complete failures preserved — 2026-10-16
 
 Frozen30e75dcd/run38930760374 succeeds. Independent audit verifies54 manifest
