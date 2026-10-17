@@ -4,7 +4,7 @@
   "kernel_version": 1,
   "uploaded_source_exact": true,
   "script_sha256": "e46c44131064ac48fe7a1b1aa0e202d4d1914f9601f2d4dcb69e2bd2b9397f66",
-  "status": "KernelWorkerStatus.RUNNING",
+  "status": "KernelWorkerStatus.COMPLETE",
   "counterfactual_not_native_parity_fix": true,
   "original_behavior_documented": "LEARNINGS.md:20 and src/dia_tts.cpp original countdown mirror",
   "intervention": "Preserve only original prepared final BOS at target row15/book8 by changing update_one apply_mask once per case",
@@ -57,10 +57,11 @@
   "prelaunch_active_sessions": 0,
   "submission_count": 1,
   "public_raw_prefix": "dia-20261017-original-cuda/bos-boundary-v1",
-  "full_model_results": "pending",
-  "independent_terminal_audit": "prepared; not executed",
+  "full_model_results": "Counterfactual rejected for speech recovery; same three failures in all arms",
+  "independent_terminal_audit": "PASS260payloads/261anonymous downloads",
   "speech_acceptance": false,
   "native_acceptance": false,
   "q4_acceptance": false,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "result_receipt": "docs/dia-bos-boundary-results-2026-10-17.json"
 }

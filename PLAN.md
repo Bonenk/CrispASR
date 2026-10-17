@@ -68,8 +68,11 @@ the remaining source-quality counterfactuals.
    Categorical draw placement is isolated and independently audited: CUDA/CPU/
    CUDA on the same model changes fox quality0/1/0 WER, with neural compute
    fixed. First applied feedback differences follow byte-identical probability
-   inputs. All other cases still fail speech. Next test the concrete final-BOS
-   preservation boundary under the active claim; see HISTORY.md and result receipt.
+   inputs. All other cases still fail speech. The final-BOS source counterfactual is independently rejected for speech
+   recovery (260payloads/261anonymous downloads): same three failures, fox controls
+   pass. Preserve original behavior. No new full-model sweep is justified by
+   those hypotheses; advance independent Echo owned-input quantization attribution.
+   See HISTORY.md and both result receipts.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
@@ -361,44 +364,6 @@ state; do not assume the old404s or missing credentials remain true. Legacy
 MioTTS/Glint integration and completed native sample-rate/binding/UTF-8 fixes
 are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
-
-
-## CLAIMED 2026-10-17 — Dia final delayed BOS boundary
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-bos-boundary-20261017,
-branch diag/dia-bos-boundary-20261017, frozen sourcea54bbb5e34c24c8fcb2f50539ca1bd4517e52982.
-Kernelcrispasr-dia-bos-boundary-v1/version1 is COMPLETE; pulled uploaded source
-is byte-exact, SHAe46c44131064ac48fe7a1b1aa0e202d4d1914f9601f2d4dcb69e2bd2b9397f66.
-Tiny original tests pass under Torch2.11 and2.6, including unchanged disabled-wrapper
-feedback and prepared BOS, sampled/capacity EOS, exact one-slot intervention and
-wrong-step/removed-preservation negatives. Literal native protocol passes unchanged.
-Read-only review finds no blocking source defect. Four recent sessions were terminal
-before one submission; terminal collector is active. Full-model quality and independent
-terminal evidence audit passes260 payloads/261 anonymous downloads. All15 outputs
-and17 recognitions completed: all three previous failures remain, both fox controls
-pass in every arm. This counterfactual does not recover speech; public audit pack
-is being prepared before archive. See docs/dia-bos-boundary-preparation-2026-10-17.json.
-The pinned original prefill explicitly
-places BOS in row15/book8 (delay15), but original generate decrements its BOS
-countdown before checking >0, so write step14 disables preservation and overwrites
-that prepared BOS at target row15. Native dia_tts.cpp mirrors the same boundary.
-This timing is already documented in LEARNINGS.md and intentionally matches
-original source; this counterfactual tests quality, not a new native-parity fix.
-It is not a proven quality cause or production fix. Tiny actual original generate/DecoderOutput must expose the invariant failure
-before intervention; use no neural weights. Predeclare original / preserve final
-prepared BOS / original anchor, with only update_one's apply_mask flag at target
-row15 changed. Assert original update method restoration and a single changed
-book8 slot; wrong-step/removed-preservation negatives must fail. Cover sampled and
-capacity EOS, existing delay replays and sampler controls. Preserve original
-sources and all old failures. If tiny gates pass, one supported CUDA experiment
-uses unchanged original normal F32 CUDA model/filter/RNG, fixed native1.2/45/.95/
-CFG3/cap3072 and original five texts/seeds; same instance and both fox plus sealed
-recognizer positives. No seed/prompt/forced-code changes. Each arm checkpoints
-publicly; keep actual probabilities/IDs, BOS before/after, RNG states, PCM and raw
-recognition. Independently audit full output before any native graph/default/Q4
-change. No full neural weights locally; all assets under
-/mnt/storage/crispasr/dia-bos-boundary-20261017. Actual GPU submission follows
-../kaggle_usage.md session checks, with no unsupported-host retry loop.
 
 
 ## CLAIMED 2026-10-17 — Echo9B paired FFN attribution on owned native inputs

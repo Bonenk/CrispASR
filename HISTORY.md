@@ -1,3 +1,28 @@
+## Dia final-BOS counterfactual does not recover speech — 2026-10-17
+
+Original/intervention/original-anchor completed all15 syntheses and17 recognitions
+on one F32 CUDA model. Legacy and both hello cases remain empty/WER1 in every
+arm; both fox seeds remain exact/WER0, and both sealed recognizer controls pass.
+The changed BOS alters fox durations/waveforms without recovering a failed case.
+It does not justify a native/default patch or an unchanged repeat of this sweep.
+Original source timing remains the native contract; the completed claim is archived.
+
+Independent audit verifies260 payloads and261 full anonymous public files,
+original source/method hashes, all343 parameter dtype ledgers, BOS before/prediction/
+after arrays, RNG activity, PCM/WAV/raw recognizer JSON and recomputed WER. Exactly
+one prepared book8 BOS is preserved at target row15 per intervention case; first15
+probability inputs remain byte-exact across source/intervention before that changed
+feedback can act. CUDA anchor quality matches. Both hello and fox PCM anchors are
+exact; legacy retains its small nonzero variation (cos.9999999977021555, norms
+.10384299877480836/.10384321240133167, relativeL2 6.782278770870514e-5).
+Global waveform identity and broad native/Q4 speech acceptance remain unproven.
+
+[Permanent independent audit](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4a3bb0cff3eeb09e4f35ad2f019104e88445b3cb/dia-20261017-original-cuda/bos-boundary-v1-audit-v1/README.md)
+retains raw methods, all control logs and terminal evidence; proof7297749bytes
+and README are fully anonymously hash-verified. Raw revisionce8d5c4f is immutable.
+See [complete result](docs/dia-bos-boundary-results-2026-10-17.json). No runtime
+arithmetic, quant recipe, hardware, performance or default change follows.
+
 ## Echo9B archived Q4 failure locations independently inventoried — 2026-10-17
 
 Root parsed all nine archived calibrated Q4 diff logs. First LLM blocks below
