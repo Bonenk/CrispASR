@@ -400,7 +400,8 @@ hosted success is claimed. Final local actual released5.6.0 MLP controls pass5/5
 (including changed-input/source, malformed-shape and scale-blind negatives);
 all four secret checks pass unskipped. The shared5.13dev source was correctly
 rejected before switching to an isolated released wheel, without changing shared
-packages. Heavy runner repeats controls on pinned Torch2.6 before build/download.
+packages. A further local Python3.12/Torch2.6CPU check passes the same5/5 controls.
+Heavy runner repeats controls with its full pinned package set before build/download.
 Collector retains terminal logs/artifacts under the claim's storage root. Audit
 physical weights, native OFF/ON/OFF identity, original layer outputs and all
 public payloads before drawing a projection diagnosis or changing precision.

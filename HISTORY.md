@@ -6,7 +6,8 @@ copy identity, unchanged OFF/ON/OFF, changed-input/source rejection, malformed
 shape rejection and a2x scale error that cosine alone cannot detect. All four
 secret checks pass. Initial shared Transformers5.13dev was correctly rejected;
 final controls use the verified released5.6.0 source in an isolated wheel,
-with shared packages unchanged. Local Torch is2.11; hosted repeats on2.6CPU.
+with shared packages unchanged. Both local Torch2.11 and Python3.12/Torch2.6CPU
+pass5/5; hosted repeats with the full pinned package set before downloads.
 
 [Heavy CPU39001786227](https://github.com/CrispStrobe/CrispASR/actions/runs/39001786227)
 and [lint39001788270](https://github.com/CrispStrobe/CrispASR/actions/runs/39001788270)
