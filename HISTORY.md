@@ -1,3 +1,31 @@
+## Echo9B first hosted FFN run audited; observer setup repaired — 2026-10-17
+
+Frozen967a62e0 heavy39001786227 built successfully, passed actual pinned-source
+tiny controls and ABI exports, and verified all three complete pinned weight
+downloads. All10 lint39001788270 jobs pass. The first native OFF prefill then
+failed at llm_block_0: the harness disabled the block observer while requiring
+block outputs. Native runtime behavior was correct. No9B FFN arrays or original
+layer attribution were produced; no quantization or speech gate was accepted.
+
+Independent audit verifies the43,177,443-byte GH artifact against API SHA256
+ed49695dd37c13674d215a8f755f54c16d43c43b15332fe8a4573f6bc273baf8, all36
+payloads,37 full anonymous public downloads and14 source snapshots. Public
+failed-partial revision702d609ab72e54f313f7665d2fa4c2c8a605deba preserves
+methods, physical quant metadata, actual binaries and failure logs. The original
+neural weights were not downloaded or independently rehashed locally. Initial
+audit incorrectly assumed GH uploaded the hidden .github method snapshot; its
+failed log is retained and the corrected audit verifies that file from the
+public checkpoint. [Failure receipt](docs/index-echo-owned-ffn-failed-2026-10-17.json).
+
+Fresh sourcec2deea37 keeps block observation identical across FFN OFF/ON/OFF,
+adds setup guards and negatives for the old failure and stale FFN in OFF2, and
+uses a newv2 public prefix. Six local actual5.6.0/Torch2.6CPU controls and all
+four secret checks pass. Runtime files, model pins, recipe and numerical gates
+are unchanged. [Heavy39008086579](https://github.com/CrispStrobe/CrispASR/actions/runs/39008086579)
+and [lint39008088033](https://github.com/CrispStrobe/CrispASR/actions/runs/39008088033)
+are dispatched; full execution and independent result audit remain in PLAN.md.
+No model/GPU/speed/default acceptance follows from repairing the harness.
+
 ## Tiny CPU attention accumulator mathematically isolated — 2026-10-17
 
 Sixty-four actual CPU operator cells and an independent F64 audit establish

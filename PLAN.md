@@ -372,55 +372,6 @@ are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
 
-## CLAIMED 2026-10-17 — Echo9B paired FFN attribution on owned native inputs
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-9b-owned-ffn-20261017,
-branch diag/echo-9b-owned-ffn-20261017. Original
-IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba:
-32 layers,4096 hidden,12288 intermediate;96 actual BF16 MLP weights confirmed
-by bounded safetensors-header reads. Converted public source
-cstr/index-echo-9b-GGUF@70cbee15fa7fadb85829d9d8d3439a5cb8fbe52b has unchanged
-primary e4b1dd17... and existing failed imatrix plain decoder85b43a41... (5.05GB).
-Capture all six existing FFN boundaries through native C API on JFK/ZH, with
-same-instance OFF/ON/OFF prefill/logit/prompt/stage identity and unchanged source.
-Reuse that failed recipe to obtain new boundary evidence, not repeat acceptance
-or promote it. Then free native context and load only one original MLP layer at
-a time via safe_open/get_tensor and the verified actual Qwen3_5MLP class. Replay
-on byte-identical owned native mlp_in; compare gate/up/product/down with cosine,
-both norms, relative errors. Separately apply original down_proj to actual native
-down_in to distinguish projection error from upstream activation drift. Source
-MLP OFF/ON/OFF must preserve output bytes. Retain all tensors/hashes/provenance
-and physical quant types; missing alignment, reshaped/aliased inputs or changed
-source must fail. Tiny actual-class positives and scale/input/source negatives
-precede any full model job. No graph arithmetic or quant recipe change yet.
-Use GH heavy-cpu for builds and this bounded CPU module replay; full9B Python
-model is never resident. No models locally; large assets remain under
-/mnt/storage/crispasr/echo-9b-owned-ffn-20261017 and remote HEAVY_SCRATCH.
-Public diagnostic fixture checkpoints must precede later crash-prone phases.
-No Q4/speech/GPU/performance/default acceptance follows from component attribution.
-
-
-Frozen diagnostic source967a62e094aaa361dad6d27ec39e1292e8dc91a0 is pushed.
-GH heavy CPU39001786227 and lint39001788270 are dispatched and queued; no
-hosted success is claimed. Final local actual released5.6.0 MLP controls pass5/5
-(including changed-input/source, malformed-shape and scale-blind negatives);
-all four secret checks pass unskipped. The shared5.13dev source was correctly
-rejected before switching to an isolated released wheel, without changing shared
-packages. A further local Python3.12/Torch2.6CPU check passes the same5/5 controls.
-Heavy runner repeats controls with its full pinned package set before build/download.
-Collector retains terminal logs/artifacts under the claim's storage root. Audit
-physical weights, native OFF/ON/OFF identity, original layer outputs and all
-public payloads before drawing a projection diagnosis or changing precision.
-See docs/index-echo-owned-ffn-preparation-2026-10-17.json.
-
-
-Echo worker967a62e0 additionally passes six local static workflow/portable-CPU/
-doc-anchor/chat-binding/harness-sync/version checks. These do not replace all
-hosted lint/build checks. Heavy39001786227 and lint39001788270 remain queued;
-no native9B tensor result has been produced yet. Terminal collector remains
-active under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017/collector-v1.
-
-
 ## CLAIMED 2026-10-17 — Echo9B native block-observer harness repair
 
 Owner: coordinator; fresh worktree
@@ -439,3 +390,17 @@ all10 lint39001788270 jobs pass. No9B captured-tensor attribution is accepted.
 Retest tiny actual-source controls before a fresh GH CPU run and public prefix.
 Large assets/results remain under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017.
 MiMo actual Q/K/V capture stays next after this actionable harness repair.
+
+Frozen repairc2deea373f9bd27f526f873bc01cb97068e1bff7 is pushed. Local actual
+released5.6.0/Torch2.6CPU controls pass6/6, including missing-block/stale-FFN
+negatives, and all four secret checks pass unskipped. Heavy CPU39008086579
+and lint39008088033 are dispatched to fresh immutable v2 fixture prefix.
+All runtime files and physical model pins are unchanged from failedv1.
+Independent failed-v1 audit verifies36payloads,37anonymous public files and14
+source snapshots; GH upload omitted the hidden workflow method snapshot, which
+was recovered and hash/source-verified from the public checkpoint. No9B FFN
+arrays exist in that failed proof. Both failed auditor assumption and correction
+remain retained. See docs/index-echo-owned-ffn-failed-2026-10-17.json and the
+updated preparation receipt. Await actual native OFF/ON/OFF and source-layer
+results before diagnosing projections, changing precision or promoting Q4.
+MiMo actual Q/K/V capture remains the next independent implementation task.
