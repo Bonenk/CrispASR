@@ -404,3 +404,18 @@ remain retained. See docs/index-echo-owned-ffn-failed-2026-10-17.json and the
 updated preparation receipt. Await actual native OFF/ON/OFF and source-layer
 results before diagnosing projections, changing precision or promoting Q4.
 MiMo actual Q/K/V capture remains the next independent implementation task.
+
+
+## CLAIMED 2026-10-17 — integration, privacy and maintainer handoff
+
+Owner: coordinator. Land the independently tested attention diagnostic02bd2aee
+and the locally controlled Echo worker967a62e0 plus observer repairc2deea37.
+Retain immutable experimental branches and public failure receipts. No runtime
+math, model acceptance, release tag or pending hardware result is implied.
+Move machine-specific documentation/receipt locations into ignored maintainer
+notes, replace public locations with portable aliases, and add a documentation
+privacy guard. Preserve numeric results, source/input hashes and public pins.
+Update PLAN/HISTORY and a public handoff with ordered tasks, entry points,
+acceptance gates and external dependencies, including the complete new547
+report. Verify local guards and dispatch applicable combined-source CI/lint.
+This is the requested wrap-up; do not start unbounded new model experiments.
