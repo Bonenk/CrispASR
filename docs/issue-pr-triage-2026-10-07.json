@@ -724,7 +724,7 @@
       "bytes": 6267
     }
   ],
-  "cold_root": "/mnt/storage/crispasr/triage-20261007",
+  "cold_root": "${CRISPASR_STORAGE}/crispasr/triage-20261007",
   "followup_commit": "4b45fec39ff603ad68bad0435c733e41695bfe10",
   "license_notice_probe": [
     {
@@ -1312,9 +1312,9 @@
     "volume1_bytes": 550490332,
     "original_paths": "preserved as symlinks",
     "verification": "sha256 before atomic replacement; age >5h; no open file descriptors",
-    "receipts": "/mnt/storage/crispasr/storage-cleanup-20261008/",
+    "receipts": "${CRISPASR_STORAGE}/crispasr/storage-cleanup-20261008/",
     "additional_archives_bytes": 281881417,
-    "additional_receipt": "/mnt/storage/crispasr/storage-cleanup-20261008/moved-next.json"
+    "additional_receipt": "${CRISPASR_STORAGE}/crispasr/storage-cleanup-20261008/moved-next.json"
   },
   "pr492_acceptance": {
     "source": "c50c50061",
@@ -1363,7 +1363,7 @@
       "nonflash_pool_relative_l2": 0.08340125921765856,
       "nonflash_rvq_match_fraction": 0.7359601449275363,
       "gate": "failed; thresholds unchanged",
-      "proof": "/mnt/storage/crispasr/pr492-acceptance-20261008/proof/run-37754319857/heavy-37754319857/all-comparisons.json"
+      "proof": "${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/proof/run-37754319857/heavy-37754319857/all-comparisons.json"
     },
     "documentation_source": "3c176505a",
     "cabi_params_status": "PASS: 8 requested combinations, 8 failed-open default resets, negative-control rebuild fails, restored build passes",
@@ -1380,7 +1380,7 @@
       "nonflash_hidden_relative_l2": 0.0004044577022490014,
       "nonflash_logits_relative_l2": 0.00036898378326964855,
       "tokenizer_pool_relative_l2": 0.08340125921765845,
-      "proof": "/mnt/storage/crispasr/pr492-acceptance-20261008/proof/f16-all-comparisons.json"
+      "proof": "${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/proof/f16-all-comparisons.json"
     },
     "tokenizer_diagnostic": {
       "source": "3c176505a",
@@ -1634,7 +1634,7 @@
       "max_relative_l2": 1.7494601817639193e-06,
       "scope": "Independent NumPy F64 pool on actual native transformer inputs; four selected frames, not full encoder acceptance",
       "conclusion": "Pooling matches the oracle at sampled frames including worst outlier; drift is present before pooling",
-      "proof": "/mnt/storage/crispasr/pr492-acceptance-20261008/proof/selected-pool-oracle.json"
+      "proof": "${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/proof/selected-pool-oracle.json"
     },
     "cuda_tokenizer": {
       "source": "d6b29207b6d1304243db987a2f4d97f5deac9c05",
@@ -1723,7 +1723,7 @@
     "static_job": 113263859250,
     "tests_per_configuration": 2,
     "skipped": false,
-    "proof": "/mnt/storage/crispasr/metal-cache-20261008/proof/"
+    "proof": "${CRISPASR_STORAGE}/crispasr/metal-cache-20261008/proof/"
   },
   "moonshine_onnx_destructor_followup": {
     "failure_run": 37749837117,
@@ -1736,7 +1736,7 @@
     "local_after": "diagnostic gone; C++17 syntax and clang-format 18 pass",
     "hosted_after": "PASS: full pinned cppcheck 2.7 run 37763588589 at 2da878e72629ccae55f412d88b0396b6bbcdfb6f",
     "scope": "resource-cleanup dispatch only; no model/stream graph changes",
-    "proof": "/mnt/storage/crispasr/triage-20261007/proof/moonshine-destructor"
+    "proof": "${CRISPASR_STORAGE}/crispasr/triage-20261007/proof/moonshine-destructor"
   },
   "main_validation_20261008": {
     "source": "2da878e72629ccae55f412d88b0396b6bbcdfb6f",
@@ -1768,7 +1768,7 @@
     "wer_max": 0.0,
     "f16_ctc_cos_min": 0.999141,
     "next": "Final integrated main CI/regression before release",
-    "proof": "/mnt/storage/crispasr/triage-20261007/proof/integration-20261008/data2vec-nightly-failed.log",
+    "proof": "${CRISPASR_STORAGE}/crispasr/triage-20261007/proof/integration-20261008/data2vec-nightly-failed.log",
     "diagnostic_source": "d43a25230",
     "diagnostic_run": 37786726672,
     "diagnostic_status": "completed; old Q4 passes, current Q4 fails old native target, Q8/F16 and frozen Python include A on both versions",

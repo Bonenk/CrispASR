@@ -1,0 +1,75 @@
+{
+  "candidate_source": "fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4",
+  "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+  "heavy_run": 38738218813,
+  "lint_run": 38738222779,
+  "hosted_status": "complete; independent audit passes; key-only hypothesis insufficient",
+  "local_preparation": {
+    "axis_ownership_pass": true,
+    "compiled_file_loader_pass": true,
+    "pinned_patch_applies": true,
+    "patched_runtime_syntax_pass": true,
+    "pinned_torch26_sampling_observer_pass": true,
+    "sampling_observer_scope": "Actual worker observer reproduces retained original/native support exactly and ranks32/33 reverse; original CFG margin +4.6253204345703125e-05, native -2.6702880859375e-05. No new full-model inference."
+  },
+  "input_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "5e2fc2430413357a21807cd0350960aeeb6fe183",
+    "path": "dia-20261015-cache-intervention/fixed-history-inputs-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5e2fc2430413357a21807cd0350960aeeb6fe183/dia-20261015-cache-intervention/fixed-history-inputs-v1.zip",
+    "bytes": 138612077,
+    "sha256": "a0c7e2e876394469e07a455095cf79f6e004c1d2087f3ce4fb671dedbb567d52",
+    "anonymous_full_sha256_verified": true
+  },
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "production_defaults_changed": false,
+  "initial_candidate_source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+  "initial_failed_run": {
+    "run": 38726696058,
+    "source": "2f04f4e6f64ab3aa607fe055b9e8c39a8b1a87ea",
+    "artifact": 11973635349,
+    "bytes": 428224673,
+    "sha256": "196a86087fc6df6d7037d7991f6cc23c67c6cbad727bc5a5aed529d9552e37ac",
+    "independent_audit": {
+      "independent_partial_audit_pass": true,
+      "full_model_intervention_complete": false,
+      "baseline_all979_inputs_logits_and_captured_keys_byte_exact": true,
+      "native_control_pre_boundary_exact_steps": 978,
+      "original_key_arms_ran": false,
+      "actual_runner_sha256": "dbbf9fba971b669f27e8813320a52dbc7da6abc505100c4b8cb67485ca5ef12b",
+      "scope": "Failed diagnostic native-control plumbing. No original-key causal result, speech, GPU or default acceptance."
+    }
+  },
+  "repair_completed": "Skip only pruned layer0 past-key upload at intervention step and retain input pointer across capture rename; actual hosted-ggml weight-free guard passes.",
+  "actual_hosted_ggml_graph_guard": {
+    "passed": true,
+    "scope": "Small actual hosted ggml graph; old pruned-leaf/name lookups absent and retained-pointer output exact. No weighted model replay.",
+    "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "binary_sha256": "04d67514fa242981a2fcd2c15faf5820e7c1acae65f66ee4e4c62db33f3d3288",
+    "source_sha256": "cd0bd2d4ed347395ae093d0f1ba95e52e6f765064086ab8d51957a9d3951fdd3",
+    "actual_shared_libraries": "Raw failed artifact libs/; independently matched against producer receipt"
+  },
+  "failed_attempt_publication": {
+    "revision": "26b52aa34bafd3b50b22c0e62cedda6231f40fdc",
+    "file": "dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip",
+    "bytes": 428154431,
+    "sha256": "f94ffdd5b3379bf553ef24a5d980c7d473845c2fc3cda1a8ee018a9313ce680a",
+    "payloads": 15,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/26b52aa34bafd3b50b22c0e62cedda6231f40fdc/dia-20261015-cache-intervention/complete-hosted-intervention-failure-v1.zip"
+  },
+  "integration": "e34d551b186cbd07fb07d9d81ae166adc30b0ce7",
+  "results_receipt": "dia-cache-intervention-results-2026-10-15.json",
+  "publication": {
+    "revision": "02eac70ef6025a299bc8bbae8976346c346e0687",
+    "prefix": "dia-20261015-cache-intervention/complete-hosted-intervention-v2",
+    "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/02eac70ef6025a299bc8bbae8976346c346e0687/dia-20261015-cache-intervention/complete-hosted-intervention-v2/manifest.json",
+    "raw_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/02eac70ef6025a299bc8bbae8976346c346e0687/dia-20261015-cache-intervention/complete-hosted-intervention-v2/raw.zip",
+    "raw_bytes": 1177709408,
+    "raw_sha256": "83db2618e48dd329f58da66dfd1ff2e3f493adfb6177cee1e1104c6838efe02c",
+    "published_files": 12,
+    "raw_payloads": 720,
+    "anonymous_all_files_full_sha256_verified": true
+  }
+}

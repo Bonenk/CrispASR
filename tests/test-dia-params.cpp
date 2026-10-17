@@ -82,3 +82,21 @@ TEST_CASE("dia_params: null generation-limit setter is safe", "[unit][dia]") {
     dia_tts_set_max_tokens(nullptr, 1024);
     SUCCEED();
 }
+
+TEST_CASE("dia_sampling: top-k one preserves a unique maximum after softmax rounds to ties", "[unit][dia]") {
+    const float logits[] = {0.0f, 1.0e-8f};
+    for (unsigned seed = 0; seed < 64; ++seed) {
+        std::mt19937 rng(seed);
+        REQUIRE(dia_sample_token(logits, 2, 1.0f, 0.95f, 1, rng) == 1);
+    }
+}
+
+TEST_CASE("dia_sampling: top-k keeps only its selected logit indices", "[unit][dia]") {
+    const float logits[] = {0.0f, 1.0e-8f, 2.0e-8f, 3.0e-8f};
+    for (unsigned seed = 0; seed < 64; ++seed) {
+        std::mt19937 rng(seed);
+        const auto token = dia_sample_token(logits, 4, 1.0f, 1.0f, 2, rng);
+        REQUIRE(token >= 2);
+        REQUIRE(token < 4);
+    }
+}

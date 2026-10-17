@@ -1,0 +1,141 @@
+{
+  "source": "170f7e6289bdbb65e30a5004e7c76e396cc5c664",
+  "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "model": {
+    "repo": "cstr/canary-ctc-aligner-GGUF",
+    "revision": "2b22dc9aff585bc8368a5228173c8afe22c155b7",
+    "filename": "canary-ctc-aligner-q4_k.gguf",
+    "bytes": 392167040,
+    "sha256": "d16dbf18f9a66f59c0ceb61b204caca5dda21742d6e9dc304c9d0518c81ee38c"
+  },
+  "sample_sha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0",
+  "original_parity": false,
+  "reporter_recording_reproduced": false,
+  "hardware": "GitHub CPU, GPU backends disabled",
+  "results": [
+    {
+      "bucket": 0,
+      "returncode": 0,
+      "cases": [
+        {
+          "seconds": 11,
+          "frames": 138,
+          "vocab": 16385,
+          "file": "case-0.f32",
+          "finite": true,
+          "size": 2261130,
+          "sha256": "a40df7737a595e0de3aec076f1fcd465632657a67632eea09c218f9f2dc5de28"
+        },
+        {
+          "seconds": 4,
+          "frames": 51,
+          "vocab": 16385,
+          "file": "case-1.f32",
+          "finite": true,
+          "size": 835635,
+          "sha256": "b9e314653b5263c93d031a7119d52a0e2adacbaeb9c6bf89e8fe07def00e3702"
+        },
+        {
+          "seconds": 33,
+          "frames": 413,
+          "vocab": 16385,
+          "file": "case-2.f32",
+          "finite": true,
+          "size": 6767005,
+          "sha256": "9c7eb6bc301159ba75a7686cb67bb064738bb7a8f22fc47bf7e65cbef81e0aa4"
+        },
+        {
+          "seconds": 90,
+          "frames": 1126,
+          "vocab": 16385,
+          "file": "case-3.f32",
+          "finite": true,
+          "size": 18449510,
+          "sha256": "7bc1f4a37f3e0bd37e816a535785fab26d4d3815c98d5e36453c7cc9eadce49a"
+        },
+        {
+          "seconds": 11,
+          "frames": 138,
+          "vocab": 16385,
+          "file": "case-4.f32",
+          "finite": true,
+          "size": 2261130,
+          "sha256": "a40df7737a595e0de3aec076f1fcd465632657a67632eea09c218f9f2dc5de28"
+        }
+      ]
+    },
+    {
+      "bucket": 128,
+      "returncode": 0,
+      "cases": [
+        {
+          "seconds": 11,
+          "frames": 138,
+          "vocab": 16385,
+          "file": "case-0.f32",
+          "finite": true,
+          "size": 2261130,
+          "sha256": "a40df7737a595e0de3aec076f1fcd465632657a67632eea09c218f9f2dc5de28"
+        },
+        {
+          "seconds": 4,
+          "frames": 51,
+          "vocab": 16385,
+          "file": "case-1.f32",
+          "finite": true,
+          "size": 835635,
+          "sha256": "67d6769e4f79acef540a4373a7416f3ca3dce34be5a1d4d33681e8ee407ba134"
+        },
+        {
+          "seconds": 33,
+          "frames": 413,
+          "vocab": 16385,
+          "file": "case-2.f32",
+          "finite": true,
+          "size": 6767005,
+          "sha256": "9c7eb6bc301159ba75a7686cb67bb064738bb7a8f22fc47bf7e65cbef81e0aa4"
+        },
+        {
+          "seconds": 90,
+          "frames": 1126,
+          "vocab": 16385,
+          "file": "case-3.f32",
+          "finite": true,
+          "size": 18449510,
+          "sha256": "7bc1f4a37f3e0bd37e816a535785fab26d4d3815c98d5e36453c7cc9eadce49a"
+        },
+        {
+          "seconds": 11,
+          "frames": 138,
+          "vocab": 16385,
+          "file": "case-4.f32",
+          "finite": true,
+          "size": 2261130,
+          "sha256": "a40df7737a595e0de3aec076f1fcd465632657a67632eea09c218f9f2dc5de28"
+        }
+      ]
+    }
+  ],
+  "workflow_run": 38119476469,
+  "workflow_conclusion": "success",
+  "artifact_id": 11695050692,
+  "local_reverification": {
+    "complete_arrays_checked": 10,
+    "finite_and_shape_checked": true,
+    "all_array_sha256_verified": true,
+    "returning_short_shape_exact": true
+  },
+  "issue": 532,
+  "allocation_crash_reproduced": false,
+  "runtime_fix_applied": false,
+  "public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "repo_type": "dataset",
+    "revision": "2cfe9f89b0d64a3450e03023b87f5178fbdc949a",
+    "path": "canary/ctc-allocation-20261011/proof.zip",
+    "bytes": 212942881,
+    "sha256": "fcc552aa6f5623d64a32a639db18857980ba9f9be7b0786d831a667bcd5ef0bd",
+    "remote_sha256_verified": true,
+    "model_weights_included": false
+  }
+}

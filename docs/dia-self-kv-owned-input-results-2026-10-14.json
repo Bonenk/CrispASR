@@ -1,0 +1,650 @@
+{
+  "receipt": {
+    "scope": "Bounded CPU block-zero late self K/V producer at step978 on each owned captured pre-norm input; actual retained cache last-slot controls. Previously accepted cache reorder/GQA consumption are not rerun. No full-model/speech/Q4/GPU/speed acceptance.",
+    "source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "position": 978,
+    "source_rope": false,
+    "torch_version": "2.6.0+cpu",
+    "fetch": {
+      "scope": "Only two complete original block-zero F32 self key/value tensors fetched through immutable strict HTTP ranges; both native transposes match the physically audited F32 export. Full checkpoint not loaded or locally rehashed.",
+      "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+      "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+      "checkpoint_bytes": 6444682848,
+      "header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+      "mapping_source_sha256": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57",
+      "physical_neural_audit_sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368",
+      "tensors": [
+        {
+          "original_name": "decoder.layers.0.self_attention.k_proj.weight",
+          "path": "key-original.f32",
+          "shape": [
+            2048,
+            4,
+            128
+          ],
+          "offset": 327515744,
+          "bytes": 4194304,
+          "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
+        },
+        {
+          "original_name": "decoder.layers.0.self_attention.v_proj.weight",
+          "path": "value-original.f32",
+          "shape": [
+            2048,
+            4,
+            128
+          ],
+          "offset": 365264480,
+          "bytes": 4194304,
+          "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
+        }
+      ],
+      "mapped": [
+        {
+          "name": "dia.decoder.layers.0.self_k_proj",
+          "path": "self_k_proj.native.f32",
+          "shape": [
+            512,
+            2048
+          ],
+          "bytes": 4194304,
+          "sha256": "1ea9ddddf63e3383facdd22462e6df3f23d5b652e73972a0a72ca6fbd33a009b"
+        },
+        {
+          "name": "dia.decoder.layers.0.self_v_proj",
+          "path": "self_v_proj.native.f32",
+          "shape": [
+            512,
+            2048
+          ],
+          "bytes": 4194304,
+          "sha256": "a801f5a783f81a5620a6886b677e15056232ab5a25d25245d67c66b616cf33d2"
+        }
+      ]
+    },
+    "verified_inputs": [
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+        "bytes": 99803232,
+        "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+      },
+      {
+        "path": "/mnt/akademie_storage/crispasr/dia-self-kv-owned-replay-20261014/key-original.f32",
+        "bytes": 4194304,
+        "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
+      },
+      {
+        "path": "/mnt/akademie_storage/crispasr/dia-self-kv-owned-replay-20261014/value-original.f32",
+        "bytes": 4194304,
+        "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
+      },
+      {
+        "path": "/mnt/akademie_storage/crispasr/dia-self-kv-owned-replay-20261014/self_k_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "1ea9ddddf63e3383facdd22462e6df3f23d5b652e73972a0a72ca6fbd33a009b"
+      },
+      {
+        "path": "/mnt/akademie_storage/crispasr/dia-self-kv-owned-replay-20261014/self_v_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "a801f5a783f81a5620a6886b677e15056232ab5a25d25245d67c66b616cf33d2"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+        "bytes": 1446416,
+        "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+        "bytes": 317376,
+        "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_sa_norm.f32",
+        "bytes": 16384,
+        "sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-0-original-input-k.f32",
+        "bytes": 4009984,
+        "sha256": "aa8525e4fa50878160f9df8f8b0386e2c3a4fb8e6af257f921b651dfd167f6a2"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-0-original-input-v.f32",
+        "bytes": 4009984,
+        "sha256": "f43f90b12fc57062582b531dbdee4a8b7058348fad0f5b84103fb25c2f65995c"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-0-native-input-k.f32",
+        "bytes": 4009984,
+        "sha256": "6248c71f5cb7fc16dc5b93c7d7cef59a2dab91a06e2445e16975df3e0f31da1f"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-0-native-input-v.f32",
+        "bytes": 4009984,
+        "sha256": "b3b9bea1f781f5764eef02a26f46e0266ee613604663f74af394ca1254cd2b04"
+      }
+    ],
+    "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+    "native_repeats_and_threads_exact": true,
+    "native_last_cache_slots_reproduced_exact": true,
+    "rows": [
+      {
+        "part": "key-projection",
+        "input_owner": "original",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 890,
+        "cosine_min": 0.999999999999963,
+        "max_row_norm_error": 8.364923753667597e-08,
+        "max_abs": 1.1920928955078125e-06,
+        "relative_l2": 2.2903441440093082e-07
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "original",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1004,
+        "cosine_min": 0.9999999990799919,
+        "max_row_norm_error": 7.56175555505223e-08,
+        "max_abs": 0.0002200603485107422,
+        "relative_l2": 3.553236743852998e-05
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "original",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 902,
+        "cosine_min": 0.9999999999999795,
+        "max_row_norm_error": 5.575063743989972e-08,
+        "max_abs": 8.940696716308594e-08,
+        "relative_l2": 1.9350294324339538e-07
+      },
+      {
+        "part": "key-projection",
+        "input_owner": "native",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 890,
+        "cosine_min": 0.999999999999963,
+        "max_row_norm_error": 8.364923753667597e-08,
+        "max_abs": 1.1920928955078125e-06,
+        "relative_l2": 2.2903441440093082e-07
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "native",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1004,
+        "cosine_min": 0.9999999990799919,
+        "max_row_norm_error": 7.56175555505223e-08,
+        "max_abs": 0.0002200603485107422,
+        "relative_l2": 3.553236743852998e-05
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "native",
+        "comparison": "same-input-actual-original-vs-literal-native",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 902,
+        "cosine_min": 0.9999999999999795,
+        "max_row_norm_error": 5.575063743989972e-08,
+        "max_abs": 8.940696716308594e-08,
+        "relative_l2": 1.9350294324339538e-07
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "original",
+        "comparison": "local-vs-retained-hosted-last-cache-slot",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 978,
+        "cosine_min": 0.9999999999995707,
+        "max_row_norm_error": 7.694977810501769e-08,
+        "max_abs": 3.5762786865234375e-06,
+        "relative_l2": 6.850817886488079e-07
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "original",
+        "comparison": "local-vs-retained-hosted-last-cache-slot",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 966,
+        "cosine_min": 0.9999999999997837,
+        "max_row_norm_error": 2.822308400318718e-07,
+        "max_abs": 2.980232238769531e-07,
+        "relative_l2": 6.199842775668717e-07
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "native",
+        "comparison": "local-vs-retained-hosted-last-cache-slot",
+        "byte_exact": true,
+        "values": 1024,
+        "changed_values": 0,
+        "cosine_min": 1.0,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "native",
+        "comparison": "local-vs-retained-hosted-last-cache-slot",
+        "byte_exact": true,
+        "values": 1024,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    ],
+    "controls": [
+      {
+        "part": "key-projection",
+        "input_owner": "original",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 1.0,
+        "max_row_norm_error": 1.0,
+        "max_abs": 4.018261909484863,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "key-projection",
+        "input_owner": "original",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.13974611490561856,
+        "max_row_norm_error": 0.08822155334554216,
+        "max_abs": 5.322387218475342,
+        "relative_l2": 1.4655042768340787
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "original",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 0.9999999999999999,
+        "max_row_norm_error": 1.0,
+        "max_abs": 4.052103042602539,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "original",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.13974611818201843,
+        "max_row_norm_error": 0.08822156867796038,
+        "max_abs": 5.599088907241821,
+        "relative_l2": 1.4655042770102373
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "original",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 1.0,
+        "max_row_norm_error": 1.0,
+        "max_abs": 0.5402604341506958,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "original",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.14354702868233846,
+        "max_row_norm_error": 0.5011283087621683,
+        "max_abs": 0.558167964220047,
+        "relative_l2": 1.5062818217065272
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "original",
+        "control": "wrong-position-977",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 0.9117674754288024,
+        "max_row_norm_error": 2.2645717190350467e-08,
+        "max_abs": 2.5134084224700928,
+        "relative_l2": 0.3125504373953861
+      },
+      {
+        "part": "key-projection",
+        "input_owner": "native",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 1.0,
+        "max_row_norm_error": 1.0,
+        "max_abs": 4.018261909484863,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "key-projection",
+        "input_owner": "native",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.13974611490561856,
+        "max_row_norm_error": 0.08822155334554216,
+        "max_abs": 5.322387218475342,
+        "relative_l2": 1.4655042768340787
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "native",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 0.9999999999999999,
+        "max_row_norm_error": 1.0,
+        "max_abs": 4.052103042602539,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "native",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.13974611818201843,
+        "max_row_norm_error": 0.08822156867796038,
+        "max_abs": 5.599088907241821,
+        "relative_l2": 1.4655042770102373
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "native",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 1.0,
+        "max_row_norm_error": 1.0,
+        "max_abs": 0.5402604341506958,
+        "relative_l2": 1.0
+      },
+      {
+        "part": "value-projection",
+        "input_owner": "native",
+        "control": "reversed-kv-heads",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": -0.14354702868233846,
+        "max_row_norm_error": 0.5011283087621683,
+        "max_abs": 0.558167964220047,
+        "relative_l2": 1.5062818217065272
+      },
+      {
+        "part": "key-rotary",
+        "input_owner": "native",
+        "control": "wrong-position-977",
+        "byte_exact": false,
+        "values": 1024,
+        "changed_values": 1024,
+        "cosine_min": 0.9117674754288024,
+        "max_row_norm_error": 2.2645717190350467e-08,
+        "max_abs": 2.5134084224700928,
+        "relative_l2": 0.3125504373953861
+      }
+    ],
+    "files": [
+      {
+        "path": "actual-metrics.py",
+        "bytes": 593,
+        "sha256": "53a4713ee35b6a46d72245756877cd53b53813dc07bbd4e706a9524777758fab"
+      },
+      {
+        "path": "actual-native-self-kv.cpp",
+        "bytes": 1413,
+        "sha256": "b93553176ef019ab862312a613cb7773c992ced991eb59c385250e2c60605aff"
+      },
+      {
+        "path": "actual-original-kv-driving.py",
+        "bytes": 124,
+        "sha256": "8f5611f32b9e24043585b3ad867ea201c6390d3bdf3448562cececd51be670c6"
+      },
+      {
+        "path": "actual-original-query-rotary.py",
+        "bytes": 3275,
+        "sha256": "548754ef9b5a384c5597f14621fc49db26ee134610eef4af5ad6143bd4b07c06"
+      },
+      {
+        "path": "bridge",
+        "bytes": 16912,
+        "sha256": "baea5756d501b16df70e5d1aad2e4ebb81349cb56b1c09ef26e1d0da02a89899"
+      },
+      {
+        "path": "bridge.cpp",
+        "bytes": 3026,
+        "sha256": "37ee66de18073002c5ba4e85673ec93c0c587aac7f01246c0ad4fef84d3291dd"
+      },
+      {
+        "path": "build-command.json",
+        "bytes": 451,
+        "sha256": "eb3e9a464130149e94c120b5554a1315c38d2bc879f4284316386e6026bd5b3f"
+      },
+      {
+        "path": "fetch-receipt.json",
+        "bytes": 1972,
+        "sha256": "eb9f86404ba63ce73fea6959d8fdbb6b283e90609075c792625641d33b8e003d"
+      },
+      {
+        "path": "fetch.py",
+        "bytes": 4004,
+        "sha256": "13757f4146a6a41a91fd5291bbcbbe673832ca5f3b524e6a05cb63962a028c18"
+      },
+      {
+        "path": "hosted-native-last-k.npy",
+        "bytes": 4224,
+        "sha256": "208e7e81d8b00a228b0af7151bfbb3c9e21c63185a1cadf77c7f13215acd1d72"
+      },
+      {
+        "path": "hosted-native-last-v.npy",
+        "bytes": 4224,
+        "sha256": "e9a335db9308881ef16c8a194651a3526912d04656ae2cbe9e771dc4fe32e94c"
+      },
+      {
+        "path": "hosted-original-last-k.npy",
+        "bytes": 4224,
+        "sha256": "87e3d53f7e20e81964e2febad4bd7a3d12ec9c84bfec9ebe68aca8237e1624d9"
+      },
+      {
+        "path": "hosted-original-last-v.npy",
+        "bytes": 4224,
+        "sha256": "0d060d3399538b77816e76c999762ad2edab54e89e89b04f47294c41c7ef9b19"
+      },
+      {
+        "path": "initial-receipt.json",
+        "bytes": 19987,
+        "sha256": "4660949be263ae01c5cde6dbffa92d18e4a8287794c075d0c182ae24913bdc5d"
+      },
+      {
+        "path": "initial-replay.log",
+        "bytes": 3171,
+        "sha256": "913811bf4b63505ab8df7e8ad8bd276692da5f330a065eebf73830668d644ae9"
+      },
+      {
+        "path": "initial-replay.py",
+        "bytes": 11213,
+        "sha256": "c9f15aa9bb26527f4c44e31538f90aedd3fbc928fad50526aa46e283cd496718"
+      },
+      {
+        "path": "key-original.f32",
+        "bytes": 4194304,
+        "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
+      },
+      {
+        "path": "native-execution.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "native-key-projection.npy",
+        "bytes": 4224,
+        "sha256": "0e8342e94bbcff8688d6953f8b6c2b86fa8b5e88b26efed85c7886c328ef8d91"
+      },
+      {
+        "path": "native-key-rotary-position977.npy",
+        "bytes": 4224,
+        "sha256": "fc48e43036ce6833187979275e1908fce699dd061d5424fe33ccea7dfec6a14e"
+      },
+      {
+        "path": "native-key-rotary.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "native-library-closure.log",
+        "bytes": 703,
+        "sha256": "a709bce919f0cd0c40a6d37fa848c661c4f0e6ebb97b84b36252d579a8062eb4"
+      },
+      {
+        "path": "native-t1.f32",
+        "bytes": 49152,
+        "sha256": "ba6f2a23cecd0e2285b7fcf0016967be2d8f9f569fc45901b8b5d14319961d06"
+      },
+      {
+        "path": "native-t4.f32",
+        "bytes": 49152,
+        "sha256": "ba6f2a23cecd0e2285b7fcf0016967be2d8f9f569fc45901b8b5d14319961d06"
+      },
+      {
+        "path": "native-value-projection.npy",
+        "bytes": 4224,
+        "sha256": "fe274911acb3c1d7ff4df3f72a3e98aac8048927ccf6583d18484e925c7b211d"
+      },
+      {
+        "path": "original-key-projection.npy",
+        "bytes": 4224,
+        "sha256": "0e8342e94bbcff8688d6953f8b6c2b86fa8b5e88b26efed85c7886c328ef8d91"
+      },
+      {
+        "path": "original-key-rotary-position977.npy",
+        "bytes": 4224,
+        "sha256": "fc48e43036ce6833187979275e1908fce699dd061d5424fe33ccea7dfec6a14e"
+      },
+      {
+        "path": "original-key-rotary.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "original-value-projection.npy",
+        "bytes": 4224,
+        "sha256": "fe274911acb3c1d7ff4df3f72a3e98aac8048927ccf6583d18484e925c7b211d"
+      },
+      {
+        "path": "owned-inputs.f32",
+        "bytes": 65536,
+        "sha256": "625aacdd1e47ac759fc7dd95b7b6cedc3d318d3275ccfeaf7c38926fd99d801f"
+      },
+      {
+        "path": "python313-abi-rejected.log",
+        "bytes": 868,
+        "sha256": "763d1ca12bbbf9b8e55d8da78d2dc80d98920d0e7d3134c0ca4f01565e8472db"
+      },
+      {
+        "path": "replay.py",
+        "bytes": 11321,
+        "sha256": "6034af3a2e84b88994d7342682f8eaf4d34c0d6ee7229e5073e9009b1b5c16d8"
+      },
+      {
+        "path": "self_k_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "1ea9ddddf63e3383facdd22462e6df3f23d5b652e73972a0a72ca6fbd33a009b"
+      },
+      {
+        "path": "self_v_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "a801f5a783f81a5620a6886b677e15056232ab5a25d25245d67c66b616cf33d2"
+      },
+      {
+        "path": "value-original.f32",
+        "bytes": 4194304,
+        "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
+      }
+    ]
+  },
+  "independent_audit": {
+    "independent_recalculation_pass": true,
+    "scope": "Bounded CPU block-zero late self K/V producer at step978 on each owned captured pre-norm input; actual retained cache last-slot controls. Previously accepted cache reorder/GQA consumption are not rerun. No full-model/speech/Q4/GPU/speed acceptance.",
+    "verified_payloads": 35,
+    "recalculated_rows": 10,
+    "recalculated_negative_controls": 14,
+    "native_repeats_and_threads_exact": true,
+    "native_last_cache_slots_reproduced_exact": true
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261014-decoder-boundaries/complete-owned-self-kv.zip",
+    "bytes": 17646336,
+    "sha256": "ba6b41aa43c3e5f90ae94185d839388db9db0a898af5ff85042e9e3e2d88b62e",
+    "payloads": 51,
+    "anonymous_verified": true,
+    "revision": "1aae877cd70f1d3b67ba1d2b6de60f267575563a",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1aae877cd70f1d3b67ba1d2b6de60f267575563a/dia-20261014-decoder-boundaries/complete-owned-self-kv.zip"
+  }
+}

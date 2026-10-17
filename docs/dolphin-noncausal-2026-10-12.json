@@ -1,0 +1,127 @@
+{
+  "upstream": {
+    "upstream": "78ea615194777f91a3970ff010b5d678d0bbf5f0",
+    "source_sha256": "bad508847e2d341af12d852053f9de4e48ad3fe3b3366ea1a96fad7dcf5163a7",
+    "torch": "2.9.1+cu128",
+    "seed": 42,
+    "cases": 12,
+    "modules": [
+      "ConvolutionalSpatialGatingUnit",
+      "EBranchformerEncoderLayer"
+    ],
+    "method": "Execute original CSGU.forward and EBranchformerEncoderLayer._forward with captured actual merge convolution; no model checkpoints"
+  },
+  "linked_ggml": "Actual published v0.8.43 CPU shared-library package, source eb633d908 / ggml c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "ggml_cpu_sha256": "bbdfb069952de3134bf5908a4ffc0d67a23903a8796ec51666f676678db573e7",
+  "controls": {
+    "correct": {
+      "returncode": 0,
+      "passed": 12,
+      "failed": 0,
+      "log_sha256": "7f594ad9e09327cec8c088adbd096221a739d0bdad6c7e2feea82c8e0ee67285"
+    },
+    "old_causal_only": {
+      "returncode": 1,
+      "passed": 6,
+      "failed": 6,
+      "log_sha256": "11075c26a864653bc720bdeca0e01926498c7e5f9cc3a72a8fc495f73ab3aa24"
+    },
+    "symmetric_pad_before_norm": {
+      "returncode": 1,
+      "passed": 9,
+      "failed": 3,
+      "log_sha256": "39c122914cf36bf5cd4cf975d72b0b81970740ad54a596d70e86ce5bfa1cdb48"
+    }
+  },
+  "model_inference": false,
+  "gpu_inference": false,
+  "issue": 540,
+  "pr": 541,
+  "source": "014f207551d34aaaf9965a4049692e13f1f27e6e",
+  "public_proof": {
+    "revision": "05bb39cc5913ec2ce6b8ca3d83943a691ee3fd12",
+    "path": "dolphin-20261012/noncausal-depthwise-controls-proof.zip",
+    "sha256": "9b94201d6516a41df01854101c97689523a55f02f1faac63077c16127077c4cc",
+    "bytes": 45827,
+    "anonymous_verified": true
+  },
+  "full_checkpoint_run": 38211719379,
+  "full_checkpoint_status": "SUCCESS: both checkpoints and both samples; all stage, decoded speech and automatic session gates",
+  "full_checkpoint_accepted": true,
+  "reporter_clip_reproduced": false,
+  "reporter_kylin_gcc9_reproduced": false,
+  "release_v0843_changed": false,
+  "current_source": "b87235519",
+  "previous_runs": [
+    {
+      "run": 38207601849,
+      "status": "FAILED upstream package installation; fixed isolated setuptools bootstrap"
+    },
+    {
+      "run": 38208703707,
+      "status": "FAILED automatic Session open: dolphin absent from shared architecture map",
+      "nonstream_chinese_diff": "16/16 PASS; exact decoded original raw transcript",
+      "full_checkpoint_accepted": false
+    }
+  ],
+  "full_checkpoint_model_inference": true,
+  "full_checkpoint_independent_verification": {
+    "run": 38211719379,
+    "source": "b87235519ee3db247baee0cc60d023cf5471f5af",
+    "passed": true,
+    "cases": {
+      "small.cn-zh": {
+        "stages": 16,
+        "cosine_min": 0.9999990121537781,
+        "norm_ratio_min": 0.9999902552914292,
+        "norm_ratio_max": 1.0000453928623065,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn-jfk": {
+        "stages": 16,
+        "cosine_min": 0.999986733910269,
+        "norm_ratio_min": 0.9999930996332826,
+        "norm_ratio_max": 1.0000570405541498,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn.streaming-zh": {
+        "stages": 16,
+        "cosine_min": 0.9993513115486191,
+        "norm_ratio_min": 0.9999075719190516,
+        "norm_ratio_max": 1.0000548279270796,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      },
+      "small.cn.streaming-jfk": {
+        "stages": 16,
+        "cosine_min": 0.9994739785588368,
+        "norm_ratio_min": 0.9999665207878113,
+        "norm_ratio_max": 1.000044869570301,
+        "decoded_original_exact": true,
+        "automatic_session_backend": "dolphin",
+        "session_matches_native": true
+      }
+    },
+    "complete_native_reference_arrays_verified": 128,
+    "stages": 64,
+    "ctc_argmax_exact": true,
+    "reporter_clip_reproduced": false,
+    "reporter_kylin_gcc9_reproduced": false,
+    "gpu_tested": false
+  },
+  "full_checkpoint_public_proof": {
+    "revision": "25c38157ab8c698c62cd36c6f34f823c03db2729",
+    "path": "dolphin-20261012/full-checkpoint-proof.zip",
+    "sha256": "e17f4758518b7edb319d5f45bfa23480d05b25082fdad2a7cd90004db7c21fc7",
+    "bytes": 372029735,
+    "anonymous_verified": true
+  },
+  "pr_status": "MERGED after 45 applicable successful checks and one intentional skip",
+  "merge_commit": "065ae1fdd7ba1b4d4923ef8d254957f82a0f4f72",
+  "issue_status": "closed by merged fix"
+}

@@ -1,0 +1,338 @@
+{
+  "archive_integrity_verified": true,
+  "all_receipt_assessments_recomputed": true,
+  "physical_operator_suite_pass": false,
+  "source": "cacd697e37d3aa002d996509ba4de60865003a6a",
+  "ggml": "21acf3162beeb4e51260f0f86deda80995423712",
+  "device": "Ascend 910B3",
+  "sdk": "9.1.0",
+  "architecture": "aarch64",
+  "acl_graph": true,
+  "wrapper_sha256": "c30fb97a5a969e7a279cd6eaae0c83d2ba6f12084d7a3bb5f5a1eda0e64cc2d0",
+  "producer_binary_sha256": "d249adff6733fa454fa5e0709c1927ae7e2552de9ad8944f8f3567995f6bc2a8",
+  "binary_not_in_archive": true,
+  "scope": "Contributor physical operator evidence only. Native Git receipts, actual compilation definitions, all unchanged-wrapper assessments and member/log hashes verified. No independently rehashed binary, full-model, quantized speech or performance acceptance.",
+  "archive": {
+    "url": "https://github.com/user-attachments/files/33421861/crispasr-cann-910b3-official-validation-2026-10-14.tar.gz",
+    "bytes": 33052,
+    "sha256": "d191c69b564ad8b47d8e92e15b0c993bc589359ffa39d1683b20143a45d94ef5",
+    "members": [
+      {
+        "path": "cann-910b-official-evidence/CMakeCache.txt",
+        "bytes": 30824,
+        "sha256": "16cbeeee06c60f8e2caba98a61a8fad27b9a3c03c59149fb105e219e297aa9db"
+      },
+      {
+        "path": "cann-910b-official-evidence/bounded-validation.log",
+        "bytes": 29,
+        "sha256": "121d5c33a61fe334456099cdecec94327ab64259a8e24585f8c8a08521693af1"
+      },
+      {
+        "path": "cann-910b-official-evidence/build-config.txt",
+        "bytes": 148,
+        "sha256": "c059536349940d6d6520ce17ba3c22dc3a510ac0982dc136640f667cca1d28a7"
+      },
+      {
+        "path": "cann-910b-official-evidence/build.log",
+        "bytes": 17726,
+        "sha256": "27c3035aaff606d1dd3585a942361e5728e79d10742227bd20d6961e3de9789a"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-add-proof/add.log",
+        "bytes": 392,
+        "sha256": "9b71105929dd368ffe497498508bcb8051757a10473d317ce4ffe26a0f3cdcec"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-add-proof/receipt.json",
+        "bytes": 1204,
+        "sha256": "640d4087b9bbd97cd63c35cc70141d20ac3a3aef77bdfc63d60d7f363836fe39"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/add.log",
+        "bytes": 13728,
+        "sha256": "5ad4daf9b7e645d15d69c1b65a3245f670258ca3e0284f72000162ff531ad8ab"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/mul_mat.log",
+        "bytes": 317161,
+        "sha256": "0d5a1d9c706925378db191049ab2e06df739345e7813bf27347ea32523e0c608"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+        "bytes": 3524,
+        "sha256": "815e0fd8dd682f4877443983f923c2264350b0ea9980d54569e750bef6c9777f"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/rms_norm.log",
+        "bytes": 4329,
+        "sha256": "bb35c7e448069194c073ebd9c4306599c773aa474267a44b446235f1c870046b"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/rope.log",
+        "bytes": 67743,
+        "sha256": "f7e7f667872a32912d2116761c4677320287e77d07cece0e3153d18d8123bc4f"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-operators-proof/soft_max.log",
+        "bytes": 29685,
+        "sha256": "7805f5da9b2a189bf21f9cf4d6826639be4566b3ab11ff80d48feec920827dcc"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-rope-recheck/receipt.json",
+        "bytes": 1118,
+        "sha256": "4cbd477df7616cc2b2c680d57a3618d0799f5d7a8c3dc3c9d89b3b1bb50d8357"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-910b-rope-recheck/rope.log",
+        "bytes": 67743,
+        "sha256": "12dbf680629e3eedeeb3b104ac9d182a74657a9a190606fe48257a9ff4909b0c"
+      },
+      {
+        "path": "cann-910b-official-evidence/cann-sdk-versions.txt",
+        "bytes": 792,
+        "sha256": "00b3a1e2e9e487537ce8a8c771b4720856d2d72b86a734d91ac7f79cc66511df"
+      },
+      {
+        "path": "cann-910b-official-evidence/compile_commands.json",
+        "bytes": 39877,
+        "sha256": "dc06b70064a9ce91e4ec56bed4106b8c9ee9cb8bd6df36813fe781b96dba7137"
+      },
+      {
+        "path": "cann-910b-official-evidence/configure.log",
+        "bytes": 3280,
+        "sha256": "788bf295ee1831b9f1913e29fe71cbfed03fedf77fcaf3185b45a439a8767404"
+      },
+      {
+        "path": "cann-910b-official-evidence/crispasr-revision.txt",
+        "bytes": 41,
+        "sha256": "62819bced19fbbe2f31b8fe729c2bf6499ee4afb294ea5e9136198cae1b026d3"
+      },
+      {
+        "path": "cann-910b-official-evidence/device-info.txt",
+        "bytes": 1386,
+        "sha256": "28dd8a15e643b6ab3664a55f9242cebfd998072855fbb8da7f51ac68c67a7198"
+      },
+      {
+        "path": "cann-910b-official-evidence/ggml-revision.txt",
+        "bytes": 41,
+        "sha256": "36c036c604ae70742d516136d1aee4e12bbcde38c73508b4d2a31e0fe6c699a9"
+      },
+      {
+        "path": "cann-910b-official-evidence/git-remotes.txt",
+        "bytes": 117,
+        "sha256": "e97fa462d02e57d08a59d3d38fb3b967e4b8126102f41c34e797b2179e79becf"
+      },
+      {
+        "path": "cann-910b-official-evidence/git-status.txt",
+        "bytes": 22,
+        "sha256": "5fbcb2990ad25e368c12219bf3ddca36e464d044e7acac16696fa8cd54159185"
+      },
+      {
+        "path": "cann-910b-official-evidence/rope-recheck.log",
+        "bytes": 34,
+        "sha256": "fe5d085b8892f1cf7d7f044c7aa489021c8678ff9fb12b4206f245e14bceb0a1"
+      },
+      {
+        "path": "cann-910b-official-evidence/routing-test.log",
+        "bytes": 213,
+        "sha256": "a03f0b48bd1583a45a95e8e081e7a730e194f137f6d8e1742afdc5a71164f668"
+      },
+      {
+        "path": "cann-910b-official-evidence/validation.log",
+        "bytes": 178,
+        "sha256": "3655eee35388122e5b7d7fcd87c7324538e12eb3fa41bb7c200f2c1b8f54425d"
+      }
+    ],
+    "scope": "Attachment whole SHA256, safe members and complete uncompressed member hashes only. Hardware/results/source/provenance not yet audited."
+  },
+  "rows": [
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-add-proof/receipt.json",
+      "operator": "ADD",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ADD",
+        "-j",
+        "1",
+        "-p",
+        "^type=f32,ne=\\[1,1,1,1\\],nr=\\[32,1,1,1\\],nf=1,perm1=0,src_overlap=0$"
+      ],
+      "log_sha256": "9b71105929dd368ffe497498508bcb8051757a10473d317ce4ffe26a0f3cdcec",
+      "exit": 0,
+      "selected_backend_completed": true,
+      "cases_passed": 1,
+      "cases_run": 1,
+      "observed_operator_cases": 1,
+      "unsupported_cases": 0,
+      "pass": true
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+      "operator": "ADD",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ADD",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "5ad4daf9b7e645d15d69c1b65a3245f670258ca3e0284f72000162ff531ad8ab",
+      "exit": 0,
+      "selected_backend_completed": true,
+      "cases_passed": 154,
+      "cases_run": 154,
+      "observed_operator_cases": 154,
+      "unsupported_cases": 0,
+      "pass": true
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+      "operator": "RMS_NORM",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "RMS_NORM",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "bb35c7e448069194c073ebd9c4306599c773aa474267a44b446235f1c870046b",
+      "exit": 0,
+      "selected_backend_completed": true,
+      "cases_passed": 51,
+      "cases_run": 51,
+      "observed_operator_cases": 51,
+      "unsupported_cases": 0,
+      "pass": true
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+      "operator": "SOFT_MAX",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "SOFT_MAX",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "7805f5da9b2a189bf21f9cf4d6826639be4566b3ab11ff80d48feec920827dcc",
+      "exit": 0,
+      "selected_backend_completed": true,
+      "cases_passed": 107,
+      "cases_run": 107,
+      "observed_operator_cases": 107,
+      "unsupported_cases": 107,
+      "pass": true
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+      "operator": "ROPE",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ROPE",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "f7e7f667872a32912d2116761c4677320287e77d07cece0e3153d18d8123bc4f",
+      "exit": 1,
+      "selected_backend_completed": false,
+      "cases_passed": 450,
+      "cases_run": 452,
+      "observed_operator_cases": 450,
+      "unsupported_cases": 18,
+      "pass": false
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-operators-proof/receipt.json",
+      "operator": "MUL_MAT",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "MUL_MAT",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "0d5a1d9c706925378db191049ab2e06df739345e7813bf27347ea32523e0c608",
+      "exit": 0,
+      "selected_backend_completed": true,
+      "cases_passed": 927,
+      "cases_run": 927,
+      "observed_operator_cases": 927,
+      "unsupported_cases": 1349,
+      "pass": true
+    },
+    {
+      "receipt": "cann-910b-official-evidence/cann-910b-rope-recheck/receipt.json",
+      "operator": "ROPE",
+      "command": [
+        "/home/developer/CrispASR-official-910b-validation/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ROPE",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "12dbf680629e3eedeeb3b104ac9d182a74657a9a190606fe48257a9ff4909b0c",
+      "exit": 1,
+      "selected_backend_completed": false,
+      "cases_passed": 450,
+      "cases_run": 452,
+      "observed_operator_cases": 450,
+      "unsupported_cases": 18,
+      "pass": false
+    }
+  ],
+  "repeated_rope_failures": [
+    {
+      "log": "cann-910b-official-evidence/cann-910b-operators-proof/rope.log",
+      "failures": [
+        {
+          "error": 0.510861959,
+          "tolerance": 1e-07,
+          "parameters": "ROPE(type=f32,ne_a=[256,8,512,1],n_dims=256,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0,n_offs=0)"
+        },
+        {
+          "error": 0.0974978,
+          "tolerance": 1e-07,
+          "parameters": "ROPE(type=f32,ne_a=[512,8,512,1],n_dims=128,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0,n_offs=0)"
+        }
+      ]
+    },
+    {
+      "log": "cann-910b-official-evidence/cann-910b-rope-recheck/rope.log",
+      "failures": [
+        {
+          "error": 0.510260656,
+          "tolerance": 1e-07,
+          "parameters": "ROPE(type=f32,ne_a=[256,8,512,1],n_dims=256,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0,n_offs=0)"
+        },
+        {
+          "error": 0.098101986,
+          "tolerance": 1e-07,
+          "parameters": "ROPE(type=f32,ne_a=[512,8,512,1],n_dims=128,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0,n_offs=0)"
+        }
+      ]
+    }
+  ]
+}

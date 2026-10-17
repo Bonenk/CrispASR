@@ -1,0 +1,205 @@
+{
+  "candidate": {
+    "source": "e97546f546f8e9e3afcd078e67d86efc8756d7c5",
+    "header_sha256": "46f789b14d0bc7ee1a8c14b52ae11039a86de3408a3a4830e89b86964fc07145",
+    "scope": "Committed header matches the actually tested candidate; no inference/model acceptance"
+  },
+  "receipt": {
+    "scope": "Actual original Torch2.6 top-k/filtering oracle and compiled actual-header regression; real captured CFG corpus preserves baseline probabilities/samples exactly. No new neural inference, quiet-speech/Q4/GPU/performance acceptance.",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "baseline_source": "ad46e17d843a9cdf5791c1de03800f1989644026",
+    "candidate_header_sha256": "46f789b14d0bc7ee1a8c14b52ae11039a86de3408a3a4830e89b86964fc07145",
+    "rows": [
+      {
+        "case": "unique-small-max",
+        "arm": "before",
+        "values": 2,
+        "top_k": 1,
+        "support_mismatches": 1,
+        "nonzero": 2,
+        "maximum_probability_error": 0.5
+      },
+      {
+        "case": "unique-small-max",
+        "arm": "after",
+        "values": 2,
+        "top_k": 1,
+        "support_mismatches": 0,
+        "nonzero": 1,
+        "maximum_probability_error": 0.0
+      },
+      {
+        "case": "rounded-probabilities",
+        "arm": "before",
+        "values": 4,
+        "top_k": 2,
+        "support_mismatches": 1,
+        "nonzero": 3,
+        "maximum_probability_error": 0.3333333333333333
+      },
+      {
+        "case": "rounded-probabilities",
+        "arm": "after",
+        "values": 4,
+        "top_k": 2,
+        "support_mismatches": 0,
+        "nonzero": 2,
+        "maximum_probability_error": 0.0
+      },
+      {
+        "case": "equal-logits-nth",
+        "arm": "before",
+        "values": 8,
+        "top_k": 3,
+        "support_mismatches": 5,
+        "nonzero": 8,
+        "maximum_probability_error": 0.2083333432674408
+      },
+      {
+        "case": "equal-logits-nth",
+        "arm": "after",
+        "values": 8,
+        "top_k": 3,
+        "support_mismatches": 0,
+        "nonzero": 3,
+        "maximum_probability_error": 9.934107481068821e-09
+      },
+      {
+        "case": "equal-logits-partial",
+        "arm": "before",
+        "values": 128,
+        "top_k": 1,
+        "support_mismatches": 127,
+        "nonzero": 128,
+        "maximum_probability_error": 0.9921875
+      },
+      {
+        "case": "equal-logits-partial",
+        "arm": "after",
+        "values": 128,
+        "top_k": 1,
+        "support_mismatches": 0,
+        "nonzero": 1,
+        "maximum_probability_error": 0.0
+      },
+      {
+        "case": "original-control",
+        "complete_rows": 333,
+        "vocab": 1028,
+        "baseline_candidate_probabilities_byte_exact": true,
+        "baseline_candidate_samples_byte_exact": true,
+        "original_support_mismatches": 0,
+        "maximum_probability_error": 1.7881393432617188e-07
+      },
+      {
+        "case": "native",
+        "complete_rows": 333,
+        "vocab": 1028,
+        "baseline_candidate_probabilities_byte_exact": true,
+        "baseline_candidate_samples_byte_exact": true,
+        "original_support_mismatches": 0,
+        "maximum_probability_error": 3.607609151412561e-07
+      }
+    ],
+    "verified_inputs": [
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/probability-probe",
+        "path": "original-control-actual-original-cfg-inputs.f32",
+        "bytes": 1369296,
+        "sha256": "ed8c93e769b92e6e09255b25fb18004ea04d14a6210a82c3442b30b3b8c9c842"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/probability-probe",
+        "path": "native-actual-original-cfg-inputs.f32",
+        "bytes": 1369296,
+        "sha256": "f669ddf1683c6e1a6fee2e1ab4d2789a32ec287adc5ba2eac4cd3a699590f6ad"
+      }
+    ]
+  },
+  "f32_prefix": {
+    "scope": "Full F32 shared-history prefix replay on actual original decoder CFG/masks and actual before/after header observers; no new model run or speech acceptance.",
+    "parent_publication": {
+      "revision": "80f53c2cf181688f41f16784a245997baf5a5c42",
+      "path": "dia-20261014-decoder-boundaries/complete-f32-first-divergence.zip",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/80f53c2cf181688f41f16784a245997baf5a5c42/dia-20261014-decoder-boundaries/complete-f32-first-divergence.zip",
+      "bytes": 131732617,
+      "sha256": "f85c5dc2419546b47539584dcead95861d2d4e080f2886a59791139288d054a2",
+      "payloads": 36,
+      "anonymous_verified": true
+    },
+    "verified_inputs": [
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-f32-first-divergence-20261014",
+        "path": "original-shared-prefix-logits.npy",
+        "bytes": 72461792,
+        "sha256": "b797e5f76f2d3c5043f80bb1b8cb39fcd9ffd3ea1ab35e47bb0b9f193d2504e0"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-f32-first-divergence-20261014",
+        "path": "native-shared-prefix-logits.npy",
+        "bytes": 72461792,
+        "sha256": "ac40ecfb570ee7d1cdb12dde7e34034b7981293f1bb3e1b8e4dc16807b16178b"
+      }
+    ],
+    "rows": [
+      {
+        "case": "f32-original",
+        "steps": 979,
+        "complete_rows": 8811,
+        "vocab": 1028,
+        "baseline_candidate_probabilities_byte_exact": true,
+        "baseline_candidate_samples_byte_exact": true,
+        "original_support_mismatches": 0,
+        "maximum_probability_error": 3.590347584792042e-07
+      },
+      {
+        "case": "f32-native",
+        "steps": 979,
+        "complete_rows": 8811,
+        "vocab": 1028,
+        "baseline_candidate_probabilities_byte_exact": true,
+        "baseline_candidate_samples_byte_exact": true,
+        "original_support_mismatches": 0,
+        "maximum_probability_error": 4.672478444156525e-07
+      }
+    ]
+  },
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "corner_cases": 4,
+    "corner_original_support_matches": true,
+    "complete_preserved_rows": 18288,
+    "f32_prefix_steps_per_owner": 979,
+    "before_after_probabilities_and_samples_byte_exact": true,
+    "unique_max_before_wrong": 34,
+    "unique_max_after_wrong": 0,
+    "scope": "Actual original Torch2.6 top-k/filtering oracle and compiled actual-header regression; real captured CFG corpus preserves baseline probabilities/samples exactly. No new neural inference, quiet-speech/Q4/GPU/performance acceptance."
+  },
+  "publication": {
+    "revision": "a07cb3e4d3f504e8be508a67adfbf8938032ff94",
+    "path": "dia-20261014-sampler/complete-topk-selection-proof.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/a07cb3e4d3f504e8be508a67adfbf8938032ff94/dia-20261014-sampler/complete-topk-selection-proof.zip",
+    "bytes": 86340668,
+    "sha256": "03debc238cd2c75cac4c19ac7cd991c8724a8e333dd30875394fe7ce7d9b9218",
+    "payloads": 74,
+    "anonymous_verified": true
+  },
+  "ci": {
+    "general": 38637379126,
+    "lint": 38637383035,
+    "secret": 38636413855,
+    "status": "success",
+    "general_jobs": 13,
+    "lint_checks": 10,
+    "linux_unit_tests": 2026
+  },
+  "integrated": true,
+  "speech_acceptance": false,
+  "integration": {
+    "runtime_commit": "bd9c9a2d38a00c39032654a6d2448ac572652f78",
+    "tested_source_unchanged": true,
+    "date": "2026-10-15",
+    "scope": "Source and unit-test bytes match the exact tested candidate after rebase; documentation-only conflicts resolved. Main-tip CI is a separate run."
+  }
+}

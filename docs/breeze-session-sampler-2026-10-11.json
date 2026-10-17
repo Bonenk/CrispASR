@@ -1,0 +1,80 @@
+{
+  "source": "a2f58338ef9a86dfee114cdd5cd610dfe7b556c6",
+  "branch": "test/breeze-synthesis-composition",
+  "previous_source": "a59772ba7f510518c9a704992d993faedcccff0e",
+  "fixes": [
+    "Breeze open has independent compile guard",
+    "Open seed is forwarded",
+    "Session temperature and seed call native hooks",
+    "Session token limit calls native hook",
+    "Clearing token limit restores checkpoint metadata default",
+    "Documented --tts-instruct CLI alias accepted"
+  ],
+  "local_controls": {
+    "sampler_controls": {
+      "passed": 8,
+      "seconds": 1.225,
+      "before_errors": 6,
+      "before_tests": 8,
+      "compiled_actual_open_and_setter_bodies": true,
+      "model_inference": false
+    },
+    "mode_dispatch": {
+      "passed": 7,
+      "seconds": 1.364
+    },
+    "ownership_failure": {
+      "passed": 4,
+      "seconds": 2.095
+    },
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 55.242
+    },
+    "syntax": {
+      "full_c_api": true,
+      "native_breeze": true,
+      "warning": "Existing shared attention uses deprecated ggml_mul_mat_set_prec; no compile errors."
+    },
+    "format": "clang-format 18.1.3",
+    "python_compile": true
+  },
+  "ci": {
+    "integration_run": 38159958466,
+    "integration_status_at_recording": "queued",
+    "previous_integration_run": 38156532213,
+    "previous_completed_jobs_observed": 8,
+    "previous_linux_ctests": 2019,
+    "speech_run": 38159960891,
+    "speech_status_at_recording": "queued"
+  },
+  "speech_recipe": {
+    "surface_modes": [
+      "plain",
+      "clone",
+      "design",
+      "direction"
+    ],
+    "sample_rate": 24000,
+    "seed": 7,
+    "reference_seed": 11,
+    "max_frames": 128,
+    "instruction": "Speak clearly and calmly.",
+    "asr_precision": "F16",
+    "asr_revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+    "asr_sha256": "14cbc98df495d8ab452c6a4ac367136d94ab5da55e73afaa96ba4f749dd95d09",
+    "asr_control": "JFK recording before scoring generated speech",
+    "wer_max": 0.2,
+    "speaker_gate": "Resemblyzer clone/reference cosine must exceed no-reference baseline/reference cosine",
+    "speaker_package": "Resemblyzer 0.1.4",
+    "retained": "All PCM arrays, CLI WAV, transcripts, logs, model/build/source hashes and speaker scores"
+  },
+  "limitations": [
+    "No actual model speech result yet.",
+    "Local setter controls compile real dispatch with stubs, not full-model C ABI acceptance.",
+    "Previously failed eight-case exact generated-code gate remains unchanged.",
+    "No original/native full-waveform parity or GPU acceptance.",
+    "Pending model features are outside main and release scope."
+  ]
+}

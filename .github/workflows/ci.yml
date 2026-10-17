@@ -47,9 +47,16 @@ jobs:
       - name: Smoke test - the CPU backend still loads as a module
         run: ./build-dl/bin/crispasr --list-backends
 
-  # ===========================================================================
+      - name: Packaged C ABI discovers adjacent plugins outside the package directory
+        run: |
+          stage="$RUNNER_TEMP/crispasr-plugin-package-é-模型"
+          mkdir -p "$stage"
+          find build-dl \( -type f -o -type l \) -name '*.so*' -exec cp -L {} "$stage/" \;
+          python3 tests/test_packaged_backend_discovery.py --library "$stage/libcrispasr.so"
+
+  # ====================================================================
   # Linux x86_64 (CPU)
-  # ===========================================================================
+  # ====================================================================
   linux-x86_64:
     runs-on: ubuntu-latest
     steps:
@@ -67,7 +74,7 @@ jobs:
         run: cmake --build build --target crispasr-cli crispasr-diff crispasr-quantize -j $(nproc)
 
       - name: Smoke test - help
-        run: ./build/bin/crispasr --help
+        run: ./build/bin/crispasr --tts-top-k 35 --tts-top-p 0.8 --help
 
       - name: Smoke test - list backends
         run: ./build/bin/crispasr --list-backends
@@ -89,11 +96,11 @@ jobs:
       - name: Backend wiring audit
         run: python3 tools/check-backend-wiring.py --crispasr ./build/bin/crispasr
 
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 — AMR opencore FetchContent static build (opt-in gate guard)
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 — the unit test tier
-  # ===========================================================================
+  # ====================================================================
   # 162 of the 192 targets in tests/ are labelled "unit" (weight-free, no models,
   # seconds to run) and CI executed exactly ONE of them before this job existed.
   #
@@ -125,6 +132,18 @@ jobs:
       - name: Install dependencies
         run: bash tools/ci-apt.sh update && bash tools/ci-apt.sh install -y cmake ninja-build g++ libopenblas-dev patchelf
 
+      - name: Install pinned capability-table formatter
+        run: |
+          python3 -m pip install clang-format==18.1.8
+          ln -s "$(command -v clang-format)" "$RUNNER_TEMP/clang-format-18"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      # The generated capability catalogue includes the optional ONNX adapters.
+      # Its exact drift check needs the same complete roster, not a native-only
+      # build that omits four rows. Other platform jobs retain native-only builds.
+      - name: Fetch pinned ONNX Runtime SDK for the complete capability check
+        run: bash scripts/fetch_onnxruntime.sh "$RUNNER_TEMP/onnxruntime-sdk"
+
       # Examples/server stay at their defaults: some tests link `common`, which
       # lives under examples/, so switching them off would break configure.
       - name: Configure (tests ON)
@@ -134,16 +153,69 @@ jobs:
           -DGGML_NATIVE=OFF
           -DGGML_OPENBLAS=ON
           -DCRISPASR_BUILD_TESTS=ON
+          -DCRISPASR_ONNXRUNTIME_ROOT="$RUNNER_TEMP/onnxruntime-sdk"
 
       - name: Build
         run: cmake --build build -j $(nproc)
 
+      # Compare real compiled artifacts; missing CLI/shared library is a failure.
+      - name: Check generated capability table and C ABI
+        run: |
+          python3 tools/gen-backend-caps-table.py --check --crispasr build/bin/crispasr
+          python3 tests/test_backend_caps_abi.py --cli build/bin/crispasr --build-dir build
+
+      - name: Check production GPU backend/device selection without hardware
+        run: python3 tests/test_gpu_backend_selection.py -v
+
+      - name: CANN model validator false-success and archive controls
+        run: python3 tests/test_cann_model_validator.py -v
+
       # -E live: model-dependent tests need weights this job has no business
       # downloading. --timeout: a hung unit test must not eat the runner.
+      - name: Breeze guided acceptance deletion controls
+        run: |
+          python3 -m pip install numpy
+          python3 tests/test_breeze_guided_validation.py -v
+
       - name: Run the unit tier
         run: ctest --test-dir build -L unit -E live --output-on-failure --timeout 300
 
-  # ===========================================================================
+      - name: Dia diagnostic parser, environment, archive and source contracts
+        run: |
+          python3 -m pip install gguf
+          python3 tests/test_dia_dump_step.py -v
+          python3 tests/test_dia_diff_device.py -v
+          python3 tests/test_dia_diff_compare.py -v
+          python3 tests/test_dia_reference_dispatch.py -v
+          python3 tests/test_dia_capture_neutrality.py -v
+          python3 tests/test_dia_sampling_controls.py -v
+
+      - name: Dia original generation and codec-input protocol
+        run: python3 tests/test_dia_output_protocol.py -v
+
+      - name: Omnivoice output allocation guards (literal bodies)
+        run: python3 tests/test_omnivoice_alloc.py -v
+
+      - name: TTS session failure, ownership and conversion contracts
+        run: python3 tests/test_tts_session_contracts.py -v
+
+      - name: Supertonic speaker API null and bounds contracts
+        run: python3 tests/test_supertonic_speaker_contracts.py -v
+
+      - name: UTF-8 loop cleanup under platform ctype classification
+        run: python3 tests/test_ngram_locale.py -v
+
+      - name: Breeze session sampler controls
+        run: python3 tests/test_breeze_session_controls.py -v
+
+      - name: Session result UTF-8 contract (native functions and strict Python decode)
+        run: python3 tests/test_session_utf8.py -v
+
+
+      - name: Breeze session reference and instruction composition
+        run: python3 tests/test_breeze_session_modes.py -v
+
+  # ====================================================================
   # The -DCRISPASR_AMR_FETCH=ON path compiles opencore-amr from source (for
   # platforms without a system libopencore-amr). It is OFF by default, so the
   # rest of the matrix never exercises it — and it silently broke once (§219):
@@ -198,9 +270,9 @@ jobs:
       - name: Decode AMR end-to-end (samples/jfk.amr)
         run: ./build-amr/bin/test-audio-formats "[amr]"
 
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 — Opus FetchContent static build (opt-in gate guard)
-  # ===========================================================================
+  # ====================================================================
   # Sibling of linux-amr-fetch: -DCRISPASR_OPUS_FETCH=ON statically builds
   # ogg + opus + opusfile (for platforms without a system opusfile). OFF by
   # default, so nothing else in the matrix compiles it — same rot risk as the
@@ -236,9 +308,9 @@ jobs:
       - name: Decode Opus-in-WebM end-to-end (samples/jfk.webm)
         run: ./build-opus/bin/test-audio-formats "[webm]"
 
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 — ASan/UBSan on the audio-format decoders (untrusted input)
-  # ===========================================================================
+  # ====================================================================
   # crispasr_audio_load parses untrusted file bytes with hand-rolled decoders
   # (EBML/WebM demux, MP4 box parser, Sun-AU header). The default matrix builds
   # them only in Release, so a heap overflow / UB in that attack surface would
@@ -275,9 +347,9 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ./build-asan/bin/test-audio-formats "[audio]"
 
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 — libFuzzer smoke run over crispasr_audio_load (untrusted input)
-  # ===========================================================================
+  # ====================================================================
   # tests/fuzz/fuzz_audio_load.cpp fuzzes the one entry point that reaches every
   # hand-rolled audio parser (AU/AMR/WebM/MP4 + miniaudio). Build it with clang
   # (Linux clang ships the libFuzzer runtime; Apple Clang does not) and run a
@@ -358,9 +430,9 @@ jobs:
           path: fuzz-artifacts/
           if-no-files-found: ignore
 
-  # ===========================================================================
+  # ====================================================================
   # Linux x86_64 + Vulkan
-  # ===========================================================================
+  # ====================================================================
   linux-vulkan:
     runs-on: ubuntu-latest
     steps:
@@ -388,9 +460,9 @@ jobs:
       - name: Smoke test
         run: ./build/bin/crispasr --list-backends
 
-  # ===========================================================================
+  # ====================================================================
   # macOS (Apple Silicon / x86_64)
-  # ===========================================================================
+  # ====================================================================
   macos:
     runs-on: macos-latest
     steps:
@@ -407,9 +479,9 @@ jobs:
       - name: Smoke test
         run: ./build/bin/crispasr --list-backends
 
-  # ===========================================================================
+  # ====================================================================
   # Windows (MSVC)
-  # ===========================================================================
+  # ====================================================================
   windows:
     runs-on: windows-latest
     steps:
@@ -449,9 +521,9 @@ jobs:
       - name: Run speaker-db unit tests
         run: ctest --test-dir build -C Release -R "speaker|cluster|centroid|whisper_params" -E "live|NOT_BUILT" --output-on-failure --timeout 120
 
-  # ===========================================================================
+  # ====================================================================
   # iOS (cross-compile gate — no runtime test)
-  # ===========================================================================
+  # ====================================================================
   ios:
     runs-on: macos-latest
     steps:
@@ -472,9 +544,9 @@ jobs:
       - name: Build
         run: cmake --build build-ios --target crispasr-lib -j $(sysctl -n hw.logicalcpu)
 
-  # ===========================================================================
+  # ====================================================================
   # Android (cross-compile gate — no runtime test)
-  # ===========================================================================
+  # ====================================================================
   android:
     runs-on: ubuntu-latest
     steps:

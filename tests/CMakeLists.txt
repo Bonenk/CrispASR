@@ -38,6 +38,21 @@ target_include_directories(test-index-echo-batch PRIVATE ${PROJECT_SOURCE_DIR}/s
 target_link_libraries(test-index-echo-batch PRIVATE Catch2::Catch2WithMain crispasr-llama-core)
 catch_discover_tests(test-index-echo-batch PROPERTIES LABELS "unit;index-echo")
 
+# Runtime-owned (llama) scheduler access to the shared activation collector.
+add_executable(test-imatrix-callback
+    test-imatrix-callback.cpp
+    ${PROJECT_SOURCE_DIR}/src/crispasr_imatrix.cpp
+)
+target_include_directories(test-imatrix-callback PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-imatrix-callback PRIVATE Catch2::Catch2WithMain ggml ggml-cpu)
+catch_discover_tests(test-imatrix-callback PROPERTIES LABELS "unit;imatrix")
+
+add_executable(test-index-echo-ffn-capture test-index-echo-ffn-capture.cpp)
+target_include_directories(test-index-echo-ffn-capture PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-index-echo-ffn-capture PRIVATE ggml ggml-cpu)
+add_test(NAME test-index-echo-ffn-capture COMMAND test-index-echo-ffn-capture)
+set_tests_properties(test-index-echo-ffn-capture PROPERTIES LABELS "unit;index-echo")
+
 add_executable(test-index-echo-connector test-index-echo-connector.cpp)
 target_include_directories(test-index-echo-connector PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(test-index-echo-connector PRIVATE Catch2::Catch2WithMain ggml ggml-cpu)
@@ -2136,6 +2151,13 @@ catch_discover_tests(test-speecht5-params
     TEST_SPEC "[unit]"
     PROPERTIES LABELS "unit;speecht5"
 )
+
+# Actual optional Dia CPU head graph; tiny analytic tensors, no model weights.
+add_executable(test-dia-serial-head test-dia-serial-head.cpp)
+target_include_directories(test-dia-serial-head PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-dia-serial-head PRIVATE ggml ggml-cpu)
+add_test(NAME test-dia-serial-head COMMAND test-dia-serial-head)
+set_tests_properties(test-dia-serial-head PROPERTIES LABELS "unit;dia")
 
 # ─── test-dia-params — Catch2 unit tests for dia_tts_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
@@ -4535,6 +4557,31 @@ catch_discover_tests(test-core-bpe
     PROPERTIES LABELS "unit;bpe"
 )
 
+# ─── test-breeze-cfg — core/breeze_cfg.h bt2-tts guidance plan + combine ─────
+# Pins the prompt branches and the logits combine to upstream breeze-tts.
+# No model load, pure CPU.
+add_executable(test-breeze-cfg test-breeze-cfg.cpp)
+target_include_directories(test-breeze-cfg PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-breeze-cfg PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-breeze-cfg
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;breeze-cfg"
+)
+
+# ─── test-breeze-abi — src/breeze_tts_2.h exported C entry points ────────────
+# Compiles and links against the declarations other code depends on. NULL
+# context throughout, no model load.
+if (TARGET breeze_tts_2)
+    add_executable(test-breeze-abi test-breeze-abi.cpp)
+    target_link_libraries(test-breeze-abi PRIVATE breeze_tts_2 Catch2::Catch2WithMain)
+    catch_discover_tests(test-breeze-abi
+        TEST_SPEC "[unit]"
+        PROPERTIES LABELS "unit;breeze-abi"
+    )
+endif()
+
 # ─── test-core-wordpiece — core/wordpiece.h BERT WordPiece tokenizer ─────────
 # Verifies build_map, lookup, cased/uncased detection, BasicTokenizer,
 # WordPiece greedy subword splitting, [UNK] fallback. No model load, pure CPU.
@@ -5573,6 +5620,30 @@ set_tests_properties(test-separate-live PROPERTIES
     LABELS "live;separation"
     TIMEOUT 300)
 
+# #533: compile native finalization/getters and decode via Python ctypes.
+if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME test-session-utf8
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+    add_test(NAME test-breeze-session-modes
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-breeze-session-modes PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
+    add_test(NAME test-breeze-session-controls
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_controls.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-breeze-session-controls PROPERTIES LABELS "unit;session;breeze" TIMEOUT 60)
+    add_test(NAME test-tts-session-contracts
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_tts_session_contracts.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-tts-session-contracts PROPERTIES LABELS "unit;session;tts" TIMEOUT 60)
+    add_test(NAME test-ngram-locale
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ngram_locale.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-ngram-locale PROPERTIES LABELS "unit;session;ngram-loop" TIMEOUT 60)
+endif()
+
 # ─── test-release-workflow — validate release.yml targets (issue #131).
 # Static test: no binary or model needed, just parses YAML.
 add_test(NAME test-release-workflow
@@ -6205,3 +6276,10 @@ if(MSVC)
 endif()
 add_test(NAME test-align-characters COMMAND test-align-characters)
 set_tests_properties(test-align-characters PROPERTIES LABELS "unit;align")
+
+# #540: actual upstream CSGU/merge fixtures, including normalization at edges.
+add_executable(test-dolphin-depthwise test-dolphin-depthwise.cpp)
+target_include_directories(test-dolphin-depthwise PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-dolphin-depthwise PRIVATE ggml ggml-cpu)
+add_test(NAME dolphin-depthwise-checkpoint-padding COMMAND test-dolphin-depthwise)
+set_tests_properties(dolphin-depthwise-checkpoint-padding PROPERTIES LABELS "unit;dolphin")

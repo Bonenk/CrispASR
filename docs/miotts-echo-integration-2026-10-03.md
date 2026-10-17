@@ -46,7 +46,7 @@ full-file oracle and was cancelled before acceptance. The corrected job uses
 separate forced-F32 stage/full-file references and the existing pinned nightly
 driver; no thresholds or expected outputs were changed. Its cancelled log is
 retained with the successful proof artifacts under
-`/mnt/storage/crispasr/miotts-echo-integration-20261003/`.
+`${CRISPASR_STORAGE}/crispasr/miotts-echo-integration-20261003/`.
 
 ## Validation on merged main
 

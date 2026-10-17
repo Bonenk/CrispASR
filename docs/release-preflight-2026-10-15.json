@@ -1,0 +1,440 @@
+{
+  "frozen_source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+  "version": "0.8.43",
+  "final_release_freeze": false,
+  "source_branch": "diag/release-preflight-source-20261015",
+  "cli_run": 38742749435,
+  "library_run": 38742753167,
+  "status": "bounded CLI/library/wheel packaging preflight complete",
+  "no_tag_or_publication_requested": true,
+  "v0844_tag_exists": false,
+  "native_artifact_acceptance": true,
+  "wheel_built": true,
+  "model_inference_acceptance": false,
+  "gpu_acceptance": false,
+  "full_platform_matrix": false,
+  "local_guard_files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "ef1a68991cedf1d3fdb35f33278cce4dcc0e9b9c9e7300d1ff5d616261bf4238",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test_release_workflow.py",
+      "sha256": "08e5a8afc7322fd008f83fd2fcc876b681a674b12329ede246f49223e88775b8",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test-bundle-linux-runtime.sh",
+      "sha256": "a66be2d857f3e63819d495df42b03d7cb6c2486ae50270cf66cdd88dd4b4acec",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tests/test-package-lib-bundle.sh",
+      "sha256": "13e6fb361575f45eaea1e2ef1cd9ba76fa7125039bd0bb92d6c7dad014d5815f",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "scripts/bundle-linux-runtime.sh",
+      "sha256": "24032bd53dce9b5526f046f6503b3db7e0f7a529f71e355a8b0ffb5587e5bf19",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "scripts/check-bundled-deps.py",
+      "sha256": "08d99c3b39ed1eb822d3f668611be880f72eb5ab803d08d2043aa3a3d4a4a346",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/package-lib-bundle.sh",
+      "sha256": "36a492353b7ea7e3ac4fda087bcb990ad75a34f5dfd25a08b63dcd6719acf3b7",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/verify-lib-bundle.sh",
+      "sha256": "5f243ce3eac318db841bc7e5c86712a750e2067eaaaf127fe770763c9a6818aa",
+      "frozen_source_exact": true
+    },
+    {
+      "path": "tools/check-release-portable-cpu.py",
+      "sha256": "c0ad6d0dfbe0933d37f562697ea0bb537a44e31850f6fcddb691ef9e9a8efaa1",
+      "frozen_source_exact": true
+    }
+  ],
+  "local_guard_outputs": {
+    "workflow.log": "test_gpu_artifacts_keep_optimized_cpu_and_legacy_stays_portable (__main__.TestReleaseWorkflow.test_gpu_artifacts_keep_optimized_cpu_and_legacy_stays_portable)\n#302's atomic ggml fix must not slow every prebuilt GPU artifact. ... ok\ntest_linux_arm64_jobs_target_ubuntu_22_04 (__main__.TestReleaseWorkflow.test_linux_arm64_jobs_target_ubuntu_22_04)\nAll Linux ARM64 jobs must use ubuntu-22.04-arm. ... ok\ntest_linux_jobs_target_ubuntu_22_04 (__main__.TestReleaseWorkflow.test_linux_jobs_target_ubuntu_22_04)\nAll Linux x86_64 jobs must use ubuntu-22.04, not ubuntu-latest or 24.04. ... ok\ntest_no_ubuntu_latest_in_linux_jobs (__main__.TestReleaseWorkflow.test_no_ubuntu_latest_in_linux_jobs)\nNo Linux release job should use 'ubuntu-latest' (pins to 24.04). ... ok\ntest_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch (__main__.TestReleaseWorkflow.test_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch) ... ok\ntest_vulkan_linux_job_enables_vulkan (__main__.TestReleaseWorkflow.test_vulkan_linux_job_enables_vulkan)\nThe Vulkan job must pass -DGGML_VULKAN=ON. ... ok\ntest_vulkan_linux_job_exists (__main__.TestReleaseWorkflow.test_vulkan_linux_job_exists)\nA linux-vulkan release job must exist. ... ok\ntest_vulkan_linux_job_produces_tarball (__main__.TestReleaseWorkflow.test_vulkan_linux_job_produces_tarball)\nThe Vulkan job must produce a .tar.gz artifact. ... ok\ntest_windows_cuda_publishes_complete_and_split_assets (__main__.TestReleaseWorkflow.test_windows_cuda_publishes_complete_and_split_assets)\nWindows CUDA releases must support both install styles (#342). ... ok\ntest_yaml_exists (__main__.TestReleaseWorkflow.test_yaml_exists) ... ok\ntest_yaml_parses (__main__.TestReleaseWorkflow.test_yaml_parses)\nrelease.yml must be valid YAML. ... ok\n\n----------------------------------------------------------------------\nRan 11 tests in 0.423s\n\nOK\n",
+    "runtime-bundle.log": "  ok: RUNPATH-only dependency bundled, and the relocated binary runs\n  ok: an unresolvable dependency fails the bundler, by name\n  ok: an absent host-provided runtime is tolerated and not bundled\n  ok: an already-staged dependency is not missing, and resolves once $ORIGIN is set\n  ok: host-toolkit dependency left out of the archive and still resolvable\nPASS: bundle-linux-runtime\n",
+    "library-bundle.log": "  ok: relocated bundle dlopens and calls through to the bundled dependency\n  ok: the host-toolkit RUNPATH survives the bundle's own rpath rewrite\nPASS: package-lib-bundle\n",
+    "portable-cpu.log": "RESULT: PASS \u2014 21 redistributable x86_64 job(s) pin a portable CPU baseline\n"
+  },
+  "glint_fresh": {
+    "source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+    "sync_marker": "77738f3ed9b15f627196cc5bbd7f6406814ba2fb",
+    "upstream_main": "77738f3ed9b15f627196cc5bbd7f6406814ba2fb",
+    "passed": true
+  },
+  "cancelled_superseded_scans": [
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38738121486,
+      "headBranch": "main",
+      "headSha": "f28109efb352c391758c3b001d6bb64dd3b5fd11",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38738584503,
+      "headBranch": "main",
+      "headSha": "b16167fa5d77b006e1502a209888d854e8ac449c",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38739138163,
+      "headBranch": "main",
+      "headSha": "4140c4ad67f40d463976096426b883f488252707",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    },
+    {
+      "conclusion": "cancelled",
+      "databaseId": 38739874212,
+      "headBranch": "fix/omnivoice-utility-split-20261015",
+      "headSha": "a479139977210766cf93860f77fa8fdf99118d38",
+      "status": "completed",
+      "workflowName": "Secret scan"
+    }
+  ],
+  "scope": "Small existing workflow/bundler guards and bounded empty-tag native Release dispatches only; no fresh package/wheel/source promotion.",
+  "cli_artifact_acceptance": true,
+  "cli_audit": {
+    "passed": true,
+    "source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+    "run": 38742749435,
+    "artifact_id": 11980941526,
+    "raw_sha256": "f47b77bcac00e282df49ff575a659089d27a5b7539032364c889300825c3caa3",
+    "archive_sha256": "86235a699fe085545d0601b590ad77db9a0cac58fb832fec699843e2b81ed924",
+    "safe_unique_members": 10,
+    "relocated_startup": [
+      {
+        "binary": "crispasr",
+        "exit": 0,
+        "output": "=== build info ===\n  version       : 0.8.43\n  git sha       : 998f8d18\n  git date      : 2026-10-15T13:10:03Z\n  git subject   : docs-_checkpoint_independently_audited_OmniVoice_utility_split_and_queued_checks\n  build date    : 2026-10-15T14:13:10Z\n  build type    : Release\n  compiler      : gcc 11.4.0\n  os            : linux\n  arch          : x86_64\n  ggml backends : cpu\n\n",
+        "sha256": "47092e1b8603626289bf937b4c42610ae9a9893d2e41b1f9e7fc1a80773df465"
+      },
+      {
+        "binary": "crispasr-quantize",
+        "exit": 1,
+        "output": "usage: /mnt/akademie_storage/crispasr/release-preflight-20261015/cli-38742749435/relocated/crispasr-linux-x86_64/crispasr-quantize model-f16.gguf model-quant.gguf type [--imatrix <file>]\n             [--tensor-type <regex>=<type> ...]\n  input may be F16/F32 OR an already-quantized (e.g. q8_0) GGUF \u2014 a\n  quantized source is dequantized then re-quantized to the target.\n  --imatrix <f>  use an importance-matrix GGUF to steer k-quant/IQ\n                 precision (improves quality, esp. for iq4_* / low-bit).\n  --tensor-type <regex>=<type>  per-tensor precision override (repeatable,\n                 first match wins, overrides the built-in arch guards).\n                 e.g. --tensor-type 'output\\.weight=q8_0' --tensor-type '\\.ffn=q6_k'\n  type = \"iq4_nl\" or 19\n  type = \"iq4_xs\" or 22\n  type = \"q2_k\" or 10\n  type = \"q3_k\" or 11\n  type = \"q4_0\" or 2\n  type = \"q4_1\" or 3\n  type = \"q4_k\" or 12\n  type = \"q5_0\" or 8\n  type = \"q5_1\" or 9\n  type = \"q5_k\" or 13\n  type = \"q6_k\" or 14\n  type = \"q8_0\" or 7\n",
+        "sha256": "e1f2a1c7d9d13607fc215fd7008e2f3fdb0fc6f16b483ef563ddc9fc82d830b4"
+      }
+    ],
+    "dependency_check": "  [ ok ] crispasr  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] crispasr-quantize  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libc2pa_c.so  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgfortran.so.5  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libgomp.so.1  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libopenblas.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libquadmath.so.0  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=2.23 GLIBCXX<=-\n\nscanned 7 ELF file(s); highest glibc requirement: 2.34 (from crispasr)\nOK: every non-system dependency is bundled.\n",
+    "publication_steps_skipped": true,
+    "scope": "Linux CLI packaging preflight only; no model/GPU/full-platform or final release acceptance."
+  },
+  "wheel_installed_and_c_abi_smoke_pass": true,
+  "library_and_wheel_audit": {
+    "preparation": {
+      "frozen_source": "998f8d18e536bf503fbd4c655caa01a1d461836f",
+      "artifact_id": 11981646466,
+      "raw_sha256": "be88c50b50e8e9b7906f1ed9b93cd11c92b50640dc82050d751932376d1d67ce",
+      "tar_sha256": "0e4867ae79d46fb8efa75015546eb0f701d686ffb1c4a12d508c6b6745ecd141",
+      "unique_safe_members": 49,
+      "archive_links": [
+        {
+          "path": "libcrispasr-linux-x86_64/src",
+          "target": "lib",
+          "resolved": "libcrispasr-linux-x86_64/lib",
+          "directory": true
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/ggml/src",
+          "target": "../lib",
+          "resolved": "libcrispasr-linux-x86_64/lib",
+          "directory": true
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libcrispasr.so.1",
+          "target": "libcrispasr.so.0.8.43",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-cpu.so",
+          "target": "libggml-cpu.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "bbdfb069952de3134bf5908a4ffc0d67a23903a8796ec51666f676678db573e7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libwhisper.so",
+          "target": "libcrispasr.so.0.8.43",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libcrispasr.so",
+          "target": "libcrispasr.so.1",
+          "resolved": "libcrispasr-linux-x86_64/lib/libcrispasr.so.0.8.43",
+          "directory": false,
+          "materialized_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0",
+          "target": "libggml-cpu.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-cpu.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "bbdfb069952de3134bf5908a4ffc0d67a23903a8796ec51666f676678db573e7"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml.so.0",
+          "target": "libggml.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "2a202e21fd19d914317cc5a2cf44eaa56be628706e401d27e30f4566b6c2507a"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml.so",
+          "target": "libggml.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "2a202e21fd19d914317cc5a2cf44eaa56be628706e401d27e30f4566b6c2507a"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-base.so",
+          "target": "libggml-base.so.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-base.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "ac5c39a4b50ddb2291f98181658bf92b6eb4a1c6c6572b12b808b73d8b172122"
+        },
+        {
+          "path": "libcrispasr-linux-x86_64/lib/libggml-base.so.0",
+          "target": "libggml-base.so.0.26.0",
+          "resolved": "libcrispasr-linux-x86_64/lib/libggml-base.so.0.26.0",
+          "directory": false,
+          "materialized_sha256": "ac5c39a4b50ddb2291f98181658bf92b6eb4a1c6c6572b12b808b73d8b172122"
+        }
+      ],
+      "materialized_file_aliases": 9,
+      "directory_aliases_preserved_in_raw_archive": true,
+      "extraction_scope": "CIFS wheel-materialized input; not a native symlink-preservation execution test",
+      "frozen_python_source_exact": true,
+      "bundle": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/wheel-materialized-input/libcrispasr-linux-x86_64"
+    },
+    "terminal_library_run": 38742753167,
+    "terminal_library_conclusion": "success",
+    "hosted_original_symlink_bundle_relocated_dlopen_pass": true,
+    "local_materialized_bundle_verification": "verifying bundle rpath closure + load after relocation: ${CRISPASR_STORAGE}/crispasr/release-preflight-20261015/library-38742753167/verify-tmp/tmp.XApIWo42Lh/relocated\n  rpath closure OK: every bundled dependency of 17 libs resolves internally\n  OK: libcrispasr.so.0.8.43 dlopens after relocation; session ABI resolves\n",
+    "wheel": {
+      "name": "crispasr-0.8.43-py3-none-linux_x86_64.whl",
+      "bytes": 53352316,
+      "sha256": "b26d6d1b496e07c318c5bb7171c6da7018f7a2c1550ee8ccda8534c18dcf90c2",
+      "crc_unique_safe_paths_pass": true,
+      "frozen_python_files_exact": true,
+      "installed_library_matches_raw_archive": true,
+      "smoke": {
+        "passed": true,
+        "python": "3.13.11 | packaged by Anaconda, Inc. | (main, Dec 10 2025, 21:28:48) [GCC 14.3.0]",
+        "isolated_environment": true,
+        "installed_package": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/installed-site-packages/crispasr",
+        "library": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/installed-site-packages/crispasr/libcrispasr.so",
+        "library_sha256": "720199dce72c714d2d9b38fe77b4eabb84cdf3e12297ed652bf439aafe2cacb7",
+        "version": "0.8.43",
+        "backend_count": 116,
+        "backends": [
+          "whisper",
+          "parakeet",
+          "reazonspeech",
+          "phonon2",
+          "nemotron",
+          "gigaam",
+          "xasr",
+          "dolphin",
+          "canary",
+          "canary-qwen",
+          "index-echo",
+          "lfm2-audio",
+          "mini-omni2",
+          "sidon",
+          "qwen3",
+          "raon-speech",
+          "higgs-stt",
+          "cohere",
+          "granite",
+          "granite-4.1",
+          "granite-4.1-plus",
+          "granite-4.1-nar",
+          "fastconformer-ctc",
+          "canary-ctc",
+          "voxtral",
+          "voxtral4b",
+          "voxtral-tts",
+          "wav2vec2",
+          "vibevoice",
+          "vibevoice-streaming",
+          "vibevoice-tts",
+          "vibevoice-1.5b",
+          "kugelaudio",
+          "zonos",
+          "qwen3-tts",
+          "miotts",
+          "confucius4-tts",
+          "bt2-tts",
+          "piano-transcription",
+          "basic-pitch",
+          "onsets-and-frames",
+          "hft-transformer",
+          "mt3",
+          "moss-tts",
+          "moss-tts-local",
+          "omnivoice",
+          "glm-asr",
+          "htdemucs",
+          "mel-band-roformer",
+          "crepe",
+          "beat-this",
+          "btc-chords",
+          "tabcnn",
+          "rvc-svc",
+          "kyutai-stt",
+          "firered-asr",
+          "moonshine",
+          "hikari",
+          "moonshine-streaming",
+          "gemma4-e2b",
+          "omniasr",
+          "omniasr-300m",
+          "omniasr-llm",
+          "omniasr-llm-unlimited",
+          "orpheus",
+          "kokoro",
+          "chatterbox",
+          "chatterbox-turbo",
+          "chatterbox-nano",
+          "chatterbox-finnish-nano",
+          "kartoffelbox-turbo",
+          "lahgtna-chatterbox",
+          "bananamind-tts",
+          "tada",
+          "tada-1b",
+          "tada-tts-1b",
+          "tada-3b-ml",
+          "outetts",
+          "csm",
+          "dia",
+          "dots-tts",
+          "fireredtts3",
+          "pocket-tts",
+          "pocket-tts-de",
+          "pocket-tts-es",
+          "pocket-tts-it",
+          "pocket-tts-pt",
+          "pocket-tts-fr",
+          "fastpitch",
+          "speecht5",
+          "bark",
+          "parler-tts",
+          "voxcpm2-tts",
+          "voxcpm2-vae",
+          "cosyvoice3-tts",
+          "cosyvoice3-tts-rl",
+          "indextts",
+          "f5-tts",
+          "irodori-tts",
+          "supertonic",
+          "piper",
+          "melotts",
+          "m2m100",
+          "m2m100-wmt21",
+          "marian",
+          "madlad",
+          "mimo-asr",
+          "ark-asr",
+          "moss-audio",
+          "hojo-asr",
+          "moss-transcribe",
+          "moss-diarize",
+          "mega-asr",
+          "funasr",
+          "paraformer",
+          "sensevoice"
+        ],
+        "helper_dlopen": true,
+        "repeated_c_abi_backend_enumeration_and_missing_model_errors": true,
+        "cwd": "/mnt/akademie_storage/crispasr/release-preflight-20261015/library-38742753167/unrelated-cwd",
+        "loader_overrides_absent": true,
+        "scope": "Actual installed frozen-source wheel and native-library startup; no successful model inference, GPU or dynamic-plugin-registry acceptance."
+      },
+      "dependency_check": "  [ ok ] libcrispasr.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr.so.0.8.43  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr.so.1  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n  [ ok ] libcrispasr_helpers.so  [x86-64]  RUNPATH=$ORIGIN  GLIBC<=- GLIBCXX<=-\n  [ ok ] libgfortran.so.5  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libggml-base.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-base.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-base.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.29 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml-cpu.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.29\n  [ ok ] libggml.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libggml.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libggml.so.0.26.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.26\n  [ ok ] libgomp.so.1  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libopenblas.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=-\n  [ ok ] libquadmath.so.0  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.23 GLIBCXX<=-\n  [ ok ] libwhisper.so  [x86-64]  RUNPATH=$ORIGIN:$ORIGIN/../lib  GLIBC<=2.34 GLIBCXX<=3.4.30\n\nscanned 18 ELF file(s); highest glibc requirement: 2.34 (from libcrispasr.so)\nOK: every non-system dependency is bundled.\n"
+    },
+    "logs": [
+      {
+        "path": "complete.log",
+        "sha256": "0d5792efc64f05cb96540ebb6ee53680e1d811c6caee20e2833024ebc3de5458",
+        "bytes": 916818
+      },
+      {
+        "path": "prepare.py",
+        "sha256": "8c4a97b4580030b5cde2b2860281bd7f3a83a72fcabfab63d82ad597d87db95a",
+        "bytes": 3888
+      },
+      {
+        "path": "preparation.json",
+        "sha256": "7e4e4327e9f66a1cfb09db7b57ee5019152c657da2874f969b0d88e20ff09948",
+        "bytes": 3762
+      },
+      {
+        "path": "stage.log",
+        "sha256": "9f43f87223900a5fd70e593409eaefc12ed2afa6be6de70df409e7d93944e6c9",
+        "bytes": 530
+      },
+      {
+        "path": "wheel-build.log",
+        "sha256": "3da3f8d3a394c7013b08d764b2ef79484bfaad53b475963be5ddfc04120023f2",
+        "bytes": 9729
+      },
+      {
+        "path": "wheel-install.log",
+        "sha256": "1f56eeceb6a5be8588ffac4f07534b37df9e2665c8cd7ebddc56dcf7e0f5520f",
+        "bytes": 206
+      },
+      {
+        "path": "wheel_smoke.py",
+        "sha256": "f7d5fc7fc850cab420b6b2a7d40de51bc758535b170501b69ef5a1ef3a332e99",
+        "bytes": 1923
+      },
+      {
+        "path": "wheel-smoke.log",
+        "sha256": "73a4193737eb159c0f9cc701a755f3ef84044e769f4db4360b5b7ebb0421f22e",
+        "bytes": 3286
+      },
+      {
+        "path": "wheel-smoke.json",
+        "sha256": "009c4715b44251ce540cfe6055d4f80c28af6d14242753cc86d87c6e708237c7",
+        "bytes": 3061
+      },
+      {
+        "path": "verify-bundle.log",
+        "sha256": "b8dadd98ab231bb911d68f1ade63fc0caeb8c2624e354770673d349f701401de",
+        "bytes": 312
+      },
+      {
+        "path": "wheel-dependencies.log",
+        "sha256": "c087911fe6816c428e3e03d93614afee4cb5dbbc3d2c2e28dfeaf518a0927068",
+        "bytes": 1828
+      }
+    ],
+    "test_harness_corrections": [
+      "Quantizer has no version option: expected usage exit1 is verified from frozen source; original invalid-version assertion retained.",
+      "C ABI advertises dia: corrected invalid dia-tts expectation from frozen source; original failed harness/script retained."
+    ],
+    "model_inference_acceptance": false,
+    "gpu_acceptance": false,
+    "full_platform_matrix": false,
+    "final_release_freeze": false
+  }
+}

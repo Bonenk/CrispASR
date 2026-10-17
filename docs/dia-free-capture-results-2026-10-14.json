@@ -1,0 +1,182 @@
+{
+  "independent_audit_pass": true,
+  "source": "eb94d724bc26b7643b5474456dc4fdd1e0200602",
+  "run": 38527734866,
+  "scope": "No forcing; unmarked/marked CLI and C-ABI free generation under fixed F32-cross portable-RNG source-RoPE-off diagnostic recipe. No new production default, Q4, GPU or performance acceptance.",
+  "verified_source_files": [
+    {
+      "path": "examples/cli/crispasr_backend_dia.cpp",
+      "bytes": 5297,
+      "sha256": "5ca2eacb9e5e9f01ddf13a2f8386a630d5b3448cfdf4836f20846f7104271349"
+    },
+    {
+      "path": "src/crispasr_c_api.cpp",
+      "bytes": 585434,
+      "sha256": "632c98246d014548f2c8f5abc75cf084426e3141a0997b5c084cfcaa60b77d95"
+    },
+    {
+      "path": "src/dia_dump_step.h",
+      "bytes": 666,
+      "sha256": "8e8401307b559fa7c64975cf84fd63f0f41a460182caa9248184ae1f62de014a"
+    },
+    {
+      "path": "src/dia_tts.cpp",
+      "bytes": 114800,
+      "sha256": "3ab92b7de64ab4cabe3eedbe78db32d720dd335ed6526817d070b9b0cef739d9"
+    },
+    {
+      "path": "tools/ci-heavy/dia_free_capture_control.py",
+      "bytes": 12372,
+      "sha256": "ffd388c976ef872a9ac58281c5309b9c0d8fca483c87e66de2dd9aaa09c1f3dc"
+    },
+    {
+      "path": "tools/ci-heavy/dia_full_speech.py",
+      "bytes": 11326,
+      "sha256": "494deaa0d77070cc96303741f34c3190bb2478027506293d0dcbba7e6d4bba3b"
+    }
+  ],
+  "verified_payload_count": 261,
+  "rows": [
+    {
+      "surface": "cabi",
+      "arm": "plain",
+      "pcm_values": 563200,
+      "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+      "pcm_byte_exact_to_plain": true
+    },
+    {
+      "surface": "cabi",
+      "arm": "logging",
+      "pcm_values": 563200,
+      "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
+    },
+    {
+      "surface": "cabi",
+      "arm": "common",
+      "pcm_values": 563200,
+      "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b",
+      "boundary_snapshots": 0
+    },
+    {
+      "surface": "cabi",
+      "arm": "boundary",
+      "pcm_values": 563200,
+      "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b",
+      "boundary_snapshots": 16
+    },
+    {
+      "surface": "cabi",
+      "arm": "plain-repeat",
+      "pcm_values": 563200,
+      "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+      "pcm_byte_exact_to_plain": true
+    },
+    {
+      "surface": "cli",
+      "arm": "plain",
+      "pcm_values": 563200,
+      "pcm_sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9",
+      "pcm_byte_exact_to_plain": true
+    },
+    {
+      "surface": "cli",
+      "arm": "logging",
+      "pcm_values": 563200,
+      "pcm_sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
+    },
+    {
+      "surface": "cli",
+      "arm": "common",
+      "pcm_values": 563200,
+      "pcm_sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b",
+      "boundary_snapshots": 0
+    },
+    {
+      "surface": "cli",
+      "arm": "boundary",
+      "pcm_values": 563200,
+      "pcm_sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9",
+      "pcm_byte_exact_to_plain": true,
+      "steps": 1115,
+      "logits_sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15",
+      "inputs_sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753",
+      "sampled_sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b",
+      "boundary_snapshots": 16
+    },
+    {
+      "surface": "cli",
+      "arm": "plain-repeat",
+      "pcm_values": 563200,
+      "pcm_sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9",
+      "pcm_byte_exact_to_plain": true
+    }
+  ],
+  "baseline_quality": [
+    {
+      "surface": "cabi",
+      "transcript": "",
+      "wer": 1.0,
+      "audio_seconds": 12.770975056689343,
+      "rms": 0.00015566750779210037
+    },
+    {
+      "surface": "cli",
+      "transcript": "",
+      "wer": 1.0,
+      "audio_seconds": 12.770975056689343,
+      "rms": 0.00015590219211005063
+    }
+  ],
+  "baseline_roundtrip_pass": false,
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false,
+  "original_delivery_ledger_sha256": "e3c83a702757ab72394f83c83b292922295f27c7a107a053e19c029159020f36",
+  "producer_receipt_sha256": "4b2da1fe724a776ee06df334129146ce35ca7770798fcb80e95d6497c5f24058",
+  "method_sha256": "aab151c3712131a04be53bc8acd64e9332c5f0a8e6a0ef8e3bf9e9232e153841",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "5feaff1755599305758f3f43248a63e71bd87b4b",
+    "files": [
+      {
+        "path": "dia-20261014-free-capture/artifact-11878953458.zip",
+        "bytes": 478636694,
+        "sha256": "ae9626d4020f45125bca0741c166e5e59f73d39781e4f6ea80250fbe6a5bf24e"
+      },
+      {
+        "path": "dia-20261014-free-capture/complete-free-capture-audit.zip",
+        "bytes": 51064,
+        "sha256": "8d48d643a1a2e15118171336bbe40273dd60875fb013c77061e478b4e55beb37"
+      }
+    ],
+    "raw_payload_count": 262,
+    "audit_payload_count": 16,
+    "anonymous_verified": true
+  }
+}

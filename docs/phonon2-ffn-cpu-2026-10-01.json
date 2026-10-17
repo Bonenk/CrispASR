@@ -8256,9 +8256,9 @@
     "blas_q4_same_quant_stages": {
       "mode": "blas",
       "threads": 4,
-      "model": "/mnt/volume1/tmp-overflow/issue481/phonon2-q4_k.gguf",
-      "reference": "/mnt/volume1/tmp-overflow/issue481/cpu-speed/ci-final/full-ref.gguf",
-      "baseline": "/mnt/volume1/tmp-overflow/issue481/ffn-speed/stages-ggml-q4.npz",
+      "model": "${CRISPASR_WORKTREES}/tmp-overflow/issue481/phonon2-q4_k.gguf",
+      "reference": "${CRISPASR_WORKTREES}/tmp-overflow/issue481/cpu-speed/ci-final/full-ref.gguf",
+      "baseline": "${CRISPASR_WORKTREES}/tmp-overflow/issue481/ffn-speed/stages-ggml-q4.npz",
       "stages": [
         {
           "stage": "pre_encode_output",

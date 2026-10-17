@@ -329,7 +329,7 @@
     "after_chunks": 1,
     "after_single_context_gate_passed": true,
     "source": "388a7ad86",
-    "cold_receipt": "/mnt/volume1/tmp-overflow/dia-chunk-policy/receipt.json"
+    "cold_receipt": "${CRISPASR_WORKTREES}/tmp-overflow/dia-chunk-policy/receipt.json"
   },
   "metal_hardware_probe": {
     "run": 36984356005,
@@ -648,7 +648,7 @@
       }
     },
     "tested_source_archive": {
-      "file": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration/tested-sources.bundle",
+      "file": "${CRISPASR_WORKTREES}/tmp-overflow/dia-nemotron-main-integration/tested-sources.bundle",
       "bytes": 58446,
       "sha256": "3aebaf8239e0d8fa49ab51076d91e52914bf47e22a30a033e7e8eb8c431679c6",
       "prerequisite": "b33138b057268f573757ded8258e4afef2461ea8",
@@ -658,7 +658,7 @@
       },
       "verified": true
     },
-    "cold_receipts": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration",
+    "cold_receipts": "${CRISPASR_WORKTREES}/tmp-overflow/dia-nemotron-main-integration",
     "scoped_cppcheck": {
       "run": 36992014618,
       "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36992014618",

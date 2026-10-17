@@ -1,0 +1,937 @@
+{
+  "real_prior_calibration_pass": true,
+  "source": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+  "auditor_sha256": "ad2672b0ad28ed4a9c957dde0cba4d36776d50088c7caed387e41be3913137a2",
+  "layer_rows": 90,
+  "hidden_rows": 5,
+  "logit_rows": 5,
+  "all3_real_capture_encodings_exact": true,
+  "arms": [
+    {
+      "arm": "baseline",
+      "layers": [
+        {
+          "cosine_min": 0.9999999999989716,
+          "mine_norm": 26.297409628609525,
+          "ref_norm": 26.29741036724789,
+          "max_row_norm_error": 1.1333430127713484e-07,
+          "relative_l2": 1.4360987107866917e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999998942,
+          "mine_norm": 32.60581998850903,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.1769340257927752e-07,
+          "relative_l2": 1.45076911286986e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999969691,
+          "mine_norm": 35.42223597608413,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.0133363471129826e-07,
+          "relative_l2": 2.4530929251724008e-06,
+          "max_abs": 7.62939453125e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999927717,
+          "mine_norm": 40.21558981264681,
+          "ref_norm": 40.21557874374189,
+          "max_row_norm_error": 3.114090734168684e-07,
+          "relative_l2": 3.8060020879905298e-06,
+          "max_abs": 1.3232231140136719e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999948748,
+          "mine_norm": 45.74354487089765,
+          "ref_norm": 45.743536616360316,
+          "max_row_norm_error": 2.482480589982572e-07,
+          "relative_l2": 3.1669025951865945e-06,
+          "max_abs": 1.609325408935547e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967821,
+          "mine_norm": 48.66185141008545,
+          "ref_norm": 48.66184977877143,
+          "max_row_norm_error": 1.5346316994957476e-07,
+          "relative_l2": 2.5349196033269417e-06,
+          "max_abs": 1.5974044799804688e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999960749,
+          "mine_norm": 50.11537262925527,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.4638569851020975e-07,
+          "relative_l2": 2.799526602666286e-06,
+          "max_abs": 2.5272369384765625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967895,
+          "mine_norm": 56.37123735940798,
+          "ref_norm": 56.37123732329437,
+          "max_row_norm_error": 1.8081559494120825e-07,
+          "relative_l2": 2.5315591342396796e-06,
+          "max_abs": 2.288818359375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999968737,
+          "mine_norm": 69.94245046218991,
+          "ref_norm": 69.94245100686284,
+          "max_row_norm_error": 7.418959058203001e-08,
+          "relative_l2": 2.4673203839088e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999995535,
+          "mine_norm": 81.50519113955498,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.396133595514385e-08,
+          "relative_l2": 2.9592069591184164e-06,
+          "max_abs": 1.621246337890625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999965227,
+          "mine_norm": 88.70045377890446,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 6.482244008232385e-08,
+          "relative_l2": 2.5728052197002084e-06,
+          "max_abs": 2.86102294921875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976087,
+          "mine_norm": 108.5124960067033,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.0302371156178936e-07,
+          "relative_l2": 2.1820343782648897e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999974387,
+          "mine_norm": 122.70303122044577,
+          "ref_norm": 122.70302095215453,
+          "max_row_norm_error": 1.6435688254823333e-07,
+          "relative_l2": 2.2549087140255015e-06,
+          "max_abs": 2.5987625122070312e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999978069,
+          "mine_norm": 141.82645513093425,
+          "ref_norm": 141.82645167822776,
+          "max_row_norm_error": 6.164380539352976e-08,
+          "relative_l2": 2.045641915754569e-06,
+          "max_abs": 2.944469451904297e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999979489,
+          "mine_norm": 161.09771036979816,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 3.141967230835263e-08,
+          "relative_l2": 1.9987908289230952e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999997987,
+          "mine_norm": 190.0161329884898,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1580587655490859e-07,
+          "relative_l2": 1.9708372687938223e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976613,
+          "mine_norm": 222.3986782204696,
+          "ref_norm": 222.3986945635301,
+          "max_row_norm_error": 8.228349313021965e-08,
+          "relative_l2": 2.1268754755709955e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999969856,
+          "mine_norm": 410.0402527049996,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.84600260031165e-07,
+          "relative_l2": 2.347025692152483e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ],
+      "hidden": {
+        "cosine_min": 0.9999999999973835,
+        "mine_norm": 45.800056345709024,
+        "ref_norm": 45.80004216977575,
+        "max_row_norm_error": 6.052822700830518e-07,
+        "relative_l2": 2.2802126570710846e-06,
+        "max_abs": 1.163780689239502e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999981901,
+        "mine_norm": 989.0276425518854,
+        "ref_norm": 989.0275907882958,
+        "max_row_norm_error": 7.31597370906556e-07,
+        "relative_l2": 1.4132039006110829e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      }
+    },
+    {
+      "arm": "native-control",
+      "layers": [
+        {
+          "cosine_min": 0.9999999999989716,
+          "mine_norm": 26.297409628609525,
+          "ref_norm": 26.29741036724789,
+          "max_row_norm_error": 1.1333430127713484e-07,
+          "relative_l2": 1.4360987107866917e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999998942,
+          "mine_norm": 32.60581998850903,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.1769340257927752e-07,
+          "relative_l2": 1.45076911286986e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999969691,
+          "mine_norm": 35.42223597608413,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.0133363471129826e-07,
+          "relative_l2": 2.4530929251724008e-06,
+          "max_abs": 7.62939453125e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999927717,
+          "mine_norm": 40.21558981264681,
+          "ref_norm": 40.21557874374189,
+          "max_row_norm_error": 3.114090734168684e-07,
+          "relative_l2": 3.8060020879905298e-06,
+          "max_abs": 1.3232231140136719e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999948748,
+          "mine_norm": 45.74354487089765,
+          "ref_norm": 45.743536616360316,
+          "max_row_norm_error": 2.482480589982572e-07,
+          "relative_l2": 3.1669025951865945e-06,
+          "max_abs": 1.609325408935547e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967821,
+          "mine_norm": 48.66185141008545,
+          "ref_norm": 48.66184977877143,
+          "max_row_norm_error": 1.5346316994957476e-07,
+          "relative_l2": 2.5349196033269417e-06,
+          "max_abs": 1.5974044799804688e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999960749,
+          "mine_norm": 50.11537262925527,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.4638569851020975e-07,
+          "relative_l2": 2.799526602666286e-06,
+          "max_abs": 2.5272369384765625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967895,
+          "mine_norm": 56.37123735940798,
+          "ref_norm": 56.37123732329437,
+          "max_row_norm_error": 1.8081559494120825e-07,
+          "relative_l2": 2.5315591342396796e-06,
+          "max_abs": 2.288818359375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999968737,
+          "mine_norm": 69.94245046218991,
+          "ref_norm": 69.94245100686284,
+          "max_row_norm_error": 7.418959058203001e-08,
+          "relative_l2": 2.4673203839088e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999995535,
+          "mine_norm": 81.50519113955498,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.396133595514385e-08,
+          "relative_l2": 2.9592069591184164e-06,
+          "max_abs": 1.621246337890625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999965227,
+          "mine_norm": 88.70045377890446,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 6.482244008232385e-08,
+          "relative_l2": 2.5728052197002084e-06,
+          "max_abs": 2.86102294921875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976087,
+          "mine_norm": 108.5124960067033,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.0302371156178936e-07,
+          "relative_l2": 2.1820343782648897e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999974387,
+          "mine_norm": 122.70303122044577,
+          "ref_norm": 122.70302095215453,
+          "max_row_norm_error": 1.6435688254823333e-07,
+          "relative_l2": 2.2549087140255015e-06,
+          "max_abs": 2.5987625122070312e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999978069,
+          "mine_norm": 141.82645513093425,
+          "ref_norm": 141.82645167822776,
+          "max_row_norm_error": 6.164380539352976e-08,
+          "relative_l2": 2.045641915754569e-06,
+          "max_abs": 2.944469451904297e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999979489,
+          "mine_norm": 161.09771036979816,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 3.141967230835263e-08,
+          "relative_l2": 1.9987908289230952e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999997987,
+          "mine_norm": 190.0161329884898,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1580587655490859e-07,
+          "relative_l2": 1.9708372687938223e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976613,
+          "mine_norm": 222.3986782204696,
+          "ref_norm": 222.3986945635301,
+          "max_row_norm_error": 8.228349313021965e-08,
+          "relative_l2": 2.1268754755709955e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999969856,
+          "mine_norm": 410.0402527049996,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.84600260031165e-07,
+          "relative_l2": 2.347025692152483e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ],
+      "hidden": {
+        "cosine_min": 0.9999999999973835,
+        "mine_norm": 45.800056345709024,
+        "ref_norm": 45.80004216977575,
+        "max_row_norm_error": 6.052822700830518e-07,
+        "relative_l2": 2.2802126570710846e-06,
+        "max_abs": 1.163780689239502e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999981901,
+        "mine_norm": 989.0276425518854,
+        "ref_norm": 989.0275907882958,
+        "max_row_norm_error": 7.31597370906556e-07,
+        "relative_l2": 1.4132039006110829e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      }
+    },
+    {
+      "arm": "original-query",
+      "layers": [
+        {
+          "cosine_min": 0.9999999999926283,
+          "mine_norm": 26.297406096951608,
+          "ref_norm": 26.29741036724789,
+          "max_row_norm_error": 2.824639150356134e-07,
+          "relative_l2": 3.8079766887801723e-06,
+          "max_abs": 6.318092346191406e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999953726,
+          "mine_norm": 32.6058193967748,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.3152397715376907e-07,
+          "relative_l2": 3.0272616573081056e-06,
+          "max_abs": 9.775161743164062e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999936762,
+          "mine_norm": 35.422230483916046,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 1.7787230643939722e-07,
+          "relative_l2": 3.5350857558036652e-06,
+          "max_abs": 1.4439225196838379e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999889682,
+          "mine_norm": 40.21557767397605,
+          "ref_norm": 40.21557874374189,
+          "max_row_norm_error": 1.1420169776510392e-07,
+          "relative_l2": 4.678161680016132e-06,
+          "max_abs": 2.485513687133789e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999921478,
+          "mine_norm": 45.74353303387551,
+          "ref_norm": 45.743536616360316,
+          "max_row_norm_error": 1.7025476406473672e-07,
+          "relative_l2": 3.915936220119046e-06,
+          "max_abs": 1.6689300537109375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999953065,
+          "mine_norm": 48.66184829680654,
+          "ref_norm": 48.66184977877143,
+          "max_row_norm_error": 2.0444752324433324e-07,
+          "relative_l2": 3.0504969284597675e-06,
+          "max_abs": 1.722574234008789e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999947522,
+          "mine_norm": 50.115369592582304,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.2304192714983628e-07,
+          "relative_l2": 3.1844876204298283e-06,
+          "max_abs": 1.6391277313232422e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999956107,
+          "mine_norm": 56.37124171741433,
+          "ref_norm": 56.37123732329437,
+          "max_row_norm_error": 2.983726570260359e-07,
+          "relative_l2": 2.9109414878517956e-06,
+          "max_abs": 2.193450927734375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999995832,
+          "mine_norm": 69.94245676201876,
+          "ref_norm": 69.94245100686284,
+          "max_row_norm_error": 1.7752343506316492e-07,
+          "relative_l2": 2.8001728930313357e-06,
+          "max_abs": 3.266334533691406e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999946848,
+          "mine_norm": 81.5051932517196,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 6.880329284086883e-08,
+          "relative_l2": 3.2013807555383124e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999958505,
+          "mine_norm": 88.70045101505518,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 1.0955809803814276e-07,
+          "relative_l2": 2.8437525335420247e-06,
+          "max_abs": 2.181529998779297e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999970987,
+          "mine_norm": 108.51249633944741,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.1506172059583264e-07,
+          "relative_l2": 2.3988217527966865e-06,
+          "max_abs": 2.956390380859375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999968876,
+          "mine_norm": 122.70302955681518,
+          "ref_norm": 122.70302095215453,
+          "max_row_norm_error": 1.3586120473085828e-07,
+          "relative_l2": 2.4695256871875534e-06,
+          "max_abs": 2.9921531677246094e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.99999999999746,
+          "mine_norm": 141.82645297179886,
+          "ref_norm": 141.82645167822776,
+          "max_row_norm_error": 4.447274348784447e-08,
+          "relative_l2": 2.196043873469345e-06,
+          "max_abs": 3.3020973205566406e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976372,
+          "mine_norm": 161.0977061813381,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 7.497943144141317e-08,
+          "relative_l2": 2.1357012026770348e-06,
+          "max_abs": 3.4332275390625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976841,
+          "mine_norm": 190.01612957780677,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.5055472479819088e-07,
+          "relative_l2": 2.111522659928299e-06,
+          "max_abs": 4.1961669921875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999974635,
+          "mine_norm": 222.39867755181731,
+          "ref_norm": 222.3986945635301,
+          "max_row_norm_error": 7.839351001681649e-08,
+          "relative_l2": 2.2236424463130835e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967645,
+          "mine_norm": 410.0402531469302,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.878255343010451e-07,
+          "relative_l2": 2.4618936553417304e-06,
+          "max_abs": 0.0001430511474609375,
+          "byte_exact": false
+        }
+      ],
+      "hidden": {
+        "cosine_min": 0.9999999999969873,
+        "mine_norm": 45.80006002656571,
+        "ref_norm": 45.80004216977575,
+        "max_row_norm_error": 6.286971312441381e-07,
+        "relative_l2": 2.419362139612452e-06,
+        "max_abs": 1.2308359146118164e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999977511,
+        "mine_norm": 989.0276306802837,
+        "ref_norm": 989.0275907882958,
+        "max_row_norm_error": 6.877843982122656e-07,
+        "relative_l2": 1.4996962744589337e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      }
+    },
+    {
+      "arm": "original-keys",
+      "layers": [
+        {
+          "cosine_min": 0.9999999999913669,
+          "mine_norm": 26.297413565104733,
+          "ref_norm": 26.29741036724789,
+          "max_row_norm_error": 1.8550132541150788e-07,
+          "relative_l2": 4.122860667464502e-06,
+          "max_abs": 7.152557373046875e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999944098,
+          "mine_norm": 32.60582205367051,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.665250548565922e-07,
+          "relative_l2": 3.2829908804677427e-06,
+          "max_abs": 1.0013580322265625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999924523,
+          "mine_norm": 35.42224326139939,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 4.833967224282532e-07,
+          "relative_l2": 3.85395499475671e-06,
+          "max_abs": 1.6033649444580078e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999886072,
+          "mine_norm": 40.21560463069399,
+          "ref_norm": 40.21557874374189,
+          "max_row_norm_error": 6.777155270309976e-07,
+          "relative_l2": 4.8167453060661116e-06,
+          "max_abs": 1.2882053852081299e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999909258,
+          "mine_norm": 45.74355848519159,
+          "ref_norm": 45.743536616360316,
+          "max_row_norm_error": 5.359931454229638e-07,
+          "relative_l2": 4.276985373386966e-06,
+          "max_abs": 3.5643577575683594e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999944045,
+          "mine_norm": 48.66185725613403,
+          "ref_norm": 48.66184977877143,
+          "max_row_norm_error": 2.6364234106956985e-07,
+          "relative_l2": 3.3035697575955365e-06,
+          "max_abs": 3.0279159545898438e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999937347,
+          "mine_norm": 50.11537719605482,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 3.4164403617253924e-07,
+          "relative_l2": 3.4943177704992734e-06,
+          "max_abs": 3.8743019104003906e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999951525,
+          "mine_norm": 56.371235736567066,
+          "ref_norm": 56.37123732329437,
+          "max_row_norm_error": 2.0419293900175717e-07,
+          "relative_l2": 3.062757192470302e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999996051,
+          "mine_norm": 69.94245101434575,
+          "ref_norm": 69.94245100686284,
+          "max_row_norm_error": 5.890828957966221e-08,
+          "relative_l2": 2.784002675588263e-06,
+          "max_abs": 2.8133392333984375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999949759,
+          "mine_norm": 81.5051939513356,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 6.658729234665373e-08,
+          "relative_l2": 3.1619448359497504e-06,
+          "max_abs": 2.6702880859375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999961574,
+          "mine_norm": 88.7004583230024,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 1.1795894860888723e-07,
+          "relative_l2": 2.7016537735195736e-06,
+          "max_abs": 4.00543212890625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999973702,
+          "mine_norm": 108.51249533762055,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 1.1160318003078373e-07,
+          "relative_l2": 2.2683989017732855e-06,
+          "max_abs": 4.57763671875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999972476,
+          "mine_norm": 122.70303020309784,
+          "ref_norm": 122.70302095215453,
+          "max_row_norm_error": 1.4795405323120292e-07,
+          "relative_l2": 2.3227031518086593e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999978302,
+          "mine_norm": 141.82645487689484,
+          "ref_norm": 141.82645167822776,
+          "max_row_norm_error": 3.938519310686672e-08,
+          "relative_l2": 2.0715874127818392e-06,
+          "max_abs": 2.7000904083251953e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999979481,
+          "mine_norm": 161.09771160457706,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 6.014421849442897e-09,
+          "relative_l2": 2.0253451118006576e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999980129,
+          "mine_norm": 190.01613438619276,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 9.406485490526251e-08,
+          "relative_l2": 1.9772849160699984e-06,
+          "max_abs": 4.76837158203125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999975986,
+          "mine_norm": 222.39867757761488,
+          "ref_norm": 222.3986945635301,
+          "max_row_norm_error": 1.0849484177732904e-07,
+          "relative_l2": 2.1642390315048263e-06,
+          "max_abs": 5.14984130859375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999971341,
+          "mine_norm": 410.0402872142616,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.0785299781909146e-07,
+          "relative_l2": 2.2729744541865e-06,
+          "max_abs": 0.000133514404296875,
+          "byte_exact": false
+        }
+      ],
+      "hidden": {
+        "cosine_min": 0.9999999999975365,
+        "mine_norm": 45.80005476143829,
+        "ref_norm": 45.80004216977575,
+        "max_row_norm_error": 5.275709875629531e-07,
+        "relative_l2": 2.250073579973442e-06,
+        "max_abs": 1.0967254638671875e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999984804,
+        "mine_norm": 989.0276927269873,
+        "ref_norm": 989.0275907882958,
+        "max_row_norm_error": 7.25557626202189e-07,
+        "relative_l2": 1.3678654523791841e-06,
+        "max_abs": 5.53131103515625e-05,
+        "byte_exact": false
+      }
+    },
+    {
+      "arm": "original-query-and-keys",
+      "layers": [
+        {
+          "cosine_min": 0.9999999999992555,
+          "mine_norm": 26.297409222677885,
+          "ref_norm": 26.29741036724789,
+          "max_row_norm_error": 1.6360391652536777e-07,
+          "relative_l2": 1.2110657080398447e-06,
+          "max_abs": 6.67572021484375e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999999125,
+          "mine_norm": 32.605820356919146,
+          "ref_norm": 32.60581954484819,
+          "max_row_norm_error": 1.4279661075811134e-07,
+          "relative_l2": 1.3252189329773372e-06,
+          "max_abs": 8.58306884765625e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999970798,
+          "mine_norm": 35.4222371800354,
+          "ref_norm": 35.422229598856255,
+          "max_row_norm_error": 3.442543654585961e-07,
+          "relative_l2": 2.405214070444228e-06,
+          "max_abs": 8.106231689453125e-06,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999928973,
+          "mine_norm": 40.215590400568885,
+          "ref_norm": 40.21557874374189,
+          "max_row_norm_error": 3.4172180329861135e-07,
+          "relative_l2": 3.7663053108828864e-06,
+          "max_abs": 1.33514404296875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999950121,
+          "mine_norm": 45.743545044675514,
+          "ref_norm": 45.743536616360316,
+          "max_row_norm_error": 2.4561835765268825e-07,
+          "relative_l2": 3.132314482848642e-06,
+          "max_abs": 1.4543533325195312e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999968799,
+          "mine_norm": 48.66185200901916,
+          "ref_norm": 48.66184977877143,
+          "max_row_norm_error": 1.71105511093117e-07,
+          "relative_l2": 2.4907922191008484e-06,
+          "max_abs": 1.3589859008789062e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999996105,
+          "mine_norm": 50.11537241863783,
+          "ref_norm": 50.11536836078959,
+          "max_row_norm_error": 2.376813958981927e-07,
+          "relative_l2": 2.7772893256243656e-06,
+          "max_abs": 2.4080276489257812e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999967637,
+          "mine_norm": 56.371237594813266,
+          "ref_norm": 56.37123732329437,
+          "max_row_norm_error": 1.8879028074181292e-07,
+          "relative_l2": 2.5260464305471173e-06,
+          "max_abs": 2.0503997802734375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999968215,
+          "mine_norm": 69.94245125388252,
+          "ref_norm": 69.94245100686284,
+          "max_row_norm_error": 7.005556734718255e-08,
+          "relative_l2": 2.4677871533003547e-06,
+          "max_abs": 2.3365020751953125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999954419,
+          "mine_norm": 81.50519168386221,
+          "ref_norm": 81.50519236601622,
+          "max_row_norm_error": 5.496682287109422e-08,
+          "relative_l2": 2.9570432422076812e-06,
+          "max_abs": 1.811981201171875e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999965726,
+          "mine_norm": 88.70045271175756,
+          "ref_norm": 88.70045346544312,
+          "max_row_norm_error": 7.79809968820544e-08,
+          "relative_l2": 2.5679628386260153e-06,
+          "max_abs": 2.8133392333984375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999976281,
+          "mine_norm": 108.51249416413775,
+          "ref_norm": 108.51249027639966,
+          "max_row_norm_error": 9.851005411398717e-08,
+          "relative_l2": 2.170515190653428e-06,
+          "max_abs": 3.62396240234375e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999975084,
+          "mine_norm": 122.70302896332277,
+          "ref_norm": 122.70302095215453,
+          "max_row_norm_error": 1.3692785705288202e-07,
+          "relative_l2": 2.23326814159969e-06,
+          "max_abs": 2.7120113372802734e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.99999999999785,
+          "mine_norm": 141.82645307584121,
+          "ref_norm": 141.82645167822776,
+          "max_row_norm_error": 2.8637476834347808e-08,
+          "relative_l2": 2.034437075501154e-06,
+          "max_abs": 3.0338764190673828e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999979743,
+          "mine_norm": 161.09770758103204,
+          "ref_norm": 161.09771102483344,
+          "max_row_norm_error": 4.2110125386685127e-08,
+          "relative_l2": 1.9902322126784785e-06,
+          "max_abs": 3.0517578125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999980328,
+          "mine_norm": 190.01613119404547,
+          "ref_norm": 190.01615186590146,
+          "max_row_norm_error": 1.1831227142433676e-07,
+          "relative_l2": 1.9577032507512175e-06,
+          "max_abs": 4.291534423828125e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.999999999997709,
+          "mine_norm": 222.39867973664863,
+          "ref_norm": 222.3986945635301,
+          "max_row_norm_error": 6.860648471551656e-08,
+          "relative_l2": 2.111732868939873e-06,
+          "max_abs": 4.673004150390625e-05,
+          "byte_exact": false
+        },
+        {
+          "cosine_min": 0.9999999999971371,
+          "mine_norm": 410.0402658159768,
+          "ref_norm": 410.04043860126745,
+          "max_row_norm_error": 4.532143582647308e-07,
+          "relative_l2": 2.3040774970615176e-06,
+          "max_abs": 0.0001373291015625,
+          "byte_exact": false
+        }
+      ],
+      "hidden": {
+        "cosine_min": 0.9999999999973831,
+        "mine_norm": 45.80005647299448,
+        "ref_norm": 45.80004216977575,
+        "max_row_norm_error": 5.943611982583974e-07,
+        "relative_l2": 2.275937653282411e-06,
+        "max_abs": 1.1444091796875e-05,
+        "byte_exact": false
+      },
+      "logits": {
+        "cosine_min": 0.9999999999982261,
+        "mine_norm": 989.027632623172,
+        "ref_norm": 989.0275907882958,
+        "max_row_norm_error": 7.31181987401186e-07,
+        "relative_l2": 1.4110887054672845e-06,
+        "max_abs": 5.91278076171875e-05,
+        "byte_exact": false
+      }
+    }
+  ],
+  "new_suffix_result": false
+}

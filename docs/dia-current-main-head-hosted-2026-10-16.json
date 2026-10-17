@@ -1,0 +1,173 @@
+{
+  "source": "d198d7a48742c8424444d9b67dde9eb5d26f590f",
+  "run_id": 38874191736,
+  "official_sha256": "ce9eec4730fb40dabb97c2bb4469bf94624d0f6d10108dcbdb54247e437026b8",
+  "payloads_verified": 57,
+  "source_and_library_identities_exact": true,
+  "fresh_actual_returned_static_library_replay": true,
+  "results": [
+    {
+      "case": "original-hidden",
+      "mode": "off",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "original-hidden",
+      "mode": "identity",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "original-hidden",
+      "mode": "serial",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "original-hidden",
+      "mode": "off",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "original-hidden",
+      "mode": "identity",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "original-hidden",
+      "mode": "serial",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "off",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "identity",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "serial",
+      "threads": 1,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "off",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "identity",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    },
+    {
+      "case": "native-hidden",
+      "mode": "serial",
+      "threads": 4,
+      "values": 18504,
+      "fresh_exact": true
+    }
+  ],
+  "full_generation_acceptance": false,
+  "lint_acceptance": true,
+  "general_ci_acceptance": true,
+  "lint_run": 38874302965,
+  "lint_jobs_passed": 10,
+  "general_ci_run": 38874305718,
+  "general_ci_checkpoint": [
+    {
+      "name": "linux-backend-dl",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-unit",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-amr-fetch (g++)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-asan-audio",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "android",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-amr-fetch (clang++)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-x86_64",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "macos",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-vulkan",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "windows",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-fuzz-smoke",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "ios",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "linux-opus-fetch",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "general_ci_jobs_passed": 13,
+  "general_ci_jobs_total": 13,
+  "artifact_bytes": 74580109,
+  "artifact_id": 12034799042,
+  "integrated_source": "9384c3a5164b21a50badcab27e447eb06410fda7",
+  "production_sources_byte_exact_to_tested_candidate": true
+}

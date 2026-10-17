@@ -1,0 +1,279 @@
+{
+  "observed_at": "2026-10-13T18:46:03.334257+00:00",
+  "scope": "Prepared delivery/source/trajectory audits only; no completed new artifacts or model acceptance",
+  "checks": [
+    {
+      "name": "syntax",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "old-cuda-source-negative",
+      "exit": 1,
+      "expected_exit": 1
+    }
+  ],
+  "runs": [
+    {
+      "conclusion": "",
+      "databaseId": 38438623888,
+      "headSha": "42b111c5e6006e7dcc82afff2b1b43da7c15861c",
+      "jobs": [
+        {
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "databaseId": 115439075062,
+          "name": "run",
+          "startedAt": "2026-10-13T17:50:34Z",
+          "status": "in_progress",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T17:50:36Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T17:50:35Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:50:43Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v4",
+              "number": 2,
+              "startedAt": "2026-10-13T17:50:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:50:43Z",
+              "conclusion": "success",
+              "name": "Validate script path",
+              "number": 3,
+              "startedAt": "2026-10-13T17:50:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:51:44Z",
+              "conclusion": "success",
+              "name": "Free disk and set up scratch (Linux)",
+              "number": 4,
+              "startedAt": "2026-10-13T17:50:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:51:44Z",
+              "conclusion": "skipped",
+              "name": "Set up scratch (macOS)",
+              "number": 5,
+              "startedAt": "2026-10-13T17:51:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:51:44Z",
+              "conclusion": "success",
+              "name": "Set output dir",
+              "number": 6,
+              "startedAt": "2026-10-13T17:51:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:51:45Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v5",
+              "number": 7,
+              "startedAt": "2026-10-13T17:51:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T17:52:42Z",
+              "conclusion": "success",
+              "name": "Install extra pip packages",
+              "number": 8,
+              "startedAt": "2026-10-13T17:51:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run tools/ci-heavy/dia_attention_history_control.py",
+              "number": 9,
+              "startedAt": "2026-10-13T17:52:42Z",
+              "status": "in_progress"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Job summary",
+              "number": 10,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 11,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/setup-python@v5",
+              "number": 21,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/checkout@v4",
+              "number": 22,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            }
+          ],
+          "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38438623888/job/115439075062"
+        }
+      ],
+      "status": "in_progress",
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38438623888"
+    },
+    {
+      "conclusion": "",
+      "databaseId": 38446095504,
+      "headSha": "2328f15ce6f73c05c8aab44fa629a49e2d42c44d",
+      "jobs": [
+        {
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "databaseId": 115464774217,
+          "name": "bundle",
+          "startedAt": "2026-10-13T18:31:19Z",
+          "status": "in_progress",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T18:31:22Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T18:31:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T18:31:29Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-13T18:31:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T18:31:32Z",
+              "conclusion": "success",
+              "name": "Check exact runtime source guards",
+              "number": 3,
+              "startedAt": "2026-10-13T18:31:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T18:31:47Z",
+              "conclusion": "success",
+              "name": "Install build dependencies",
+              "number": 4,
+              "startedAt": "2026-10-13T18:31:32Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T18:33:04Z",
+              "conclusion": "success",
+              "name": "Run Jimver/cuda-toolkit@v0.2.35",
+              "number": 5,
+              "startedAt": "2026-10-13T18:31:47Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T18:33:04Z",
+              "conclusion": "success",
+              "name": "Run actions/cache/restore@v4",
+              "number": 6,
+              "startedAt": "2026-10-13T18:33:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Build targeted CUDA proof and package runtime",
+              "number": 7,
+              "startedAt": "2026-10-13T18:33:04Z",
+              "status": "in_progress"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/cache/save@v4",
+              "number": 8,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/upload-artifact@v4",
+              "number": 9,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/checkout@v6",
+              "number": 18,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            }
+          ],
+          "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38446095504/job/115464774217"
+        }
+      ],
+      "status": "in_progress",
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38446095504"
+    }
+  ],
+  "files": [
+    {
+      "path": "collect.py",
+      "bytes": 3113,
+      "sha256": "67ba7601ba8b31365796223f130ca25ee5d0f0c236b73a7840f2af8ee07130c1"
+    },
+    {
+      "path": "old-cuda-source-negative.log",
+      "bytes": 260,
+      "sha256": "700865c529d65307896853270997e79a4ff131c67a0b46834b8f1343d400ed08"
+    },
+    {
+      "path": "rejected-old-package.log",
+      "bytes": 260,
+      "sha256": "700865c529d65307896853270997e79a4ff131c67a0b46834b8f1343d400ed08"
+    },
+    {
+      "path": "syntax.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "verify_cpu.py",
+      "bytes": 5565,
+      "sha256": "9af363765bef75a43e643b3395e0144278589856f3fe7da8a59a51fa510622d7"
+    },
+    {
+      "path": "verify_cuda.py",
+      "bytes": 4698,
+      "sha256": "0af27d68b2049c028db963fbe9a03a229ae061a97b51a664ad988a6ef88ae982"
+    }
+  ],
+  "storage": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013",
+  "production_defaults_changed": false,
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false
+}

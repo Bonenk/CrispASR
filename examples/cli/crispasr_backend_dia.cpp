@@ -80,6 +80,12 @@ public:
         if (p.temperature > 0.0f) {
             cp.temperature = p.temperature;
         }
+        if (p.tts_top_p >= 0.0f)
+            cp.top_p = p.tts_top_p;
+        if (p.tts_top_k >= 0)
+            cp.top_k = p.tts_top_k;
+        default_top_p_ = cp.top_p;
+        default_top_k_ = cp.top_k;
 
         ctx_ = dia_tts_init_from_file(p.model.c_str(), cp);
         if (!ctx_) {
@@ -125,6 +131,10 @@ public:
         if (params.temperature > 0.0f) {
             dia_tts_set_temperature(ctx_, params.temperature);
         }
+        // The server supplies fresh request params while reusing this context.
+        // An omitted knob restores the configured default after an override.
+        dia_tts_set_top_p(ctx_, params.tts_top_p >= 0.0f ? params.tts_top_p : default_top_p_);
+        dia_tts_set_top_k(ctx_, params.tts_top_k >= 0 ? params.tts_top_k : default_top_k_);
         dia_tts_set_seed(ctx_, params.seed);
 
         int n = 0;
@@ -146,6 +156,8 @@ public:
 
 private:
     dia_tts_context* ctx_ = nullptr;
+    float default_top_p_ = 1.0f;
+    int default_top_k_ = 0;
 };
 
 } // namespace

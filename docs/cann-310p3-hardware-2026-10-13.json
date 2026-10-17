@@ -1,0 +1,407 @@
+{
+  "source_comment": "https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6140622935",
+  "archive_url": "https://github.com/user-attachments/files/33372242/crispasr-cann-310p3-validation-2026-10-13.tar.gz",
+  "archive_bytes": 21260,
+  "archive_sha256": "83cc620570c9345153545c02418a6171f5b5914d5dc43f743dbc4b12a162feb7",
+  "device": "Ascend310P3",
+  "tested_backend": "CANN0",
+  "installed_devices": 2,
+  "architecture": "aarch64",
+  "sdk": "9.1.0",
+  "acl_graph": false,
+  "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "files": [
+    {
+      "path": "validation-results/build-config.txt",
+      "bytes": 84,
+      "sha256": "140c25fa6ba8338ce091e5bdc0b0575129257ff2abb886125aebfbae86bbcf74"
+    },
+    {
+      "path": "validation-results/cann-add-f32-proof/add.log",
+      "bytes": 5129,
+      "sha256": "88aa138a2d72c34294869bda1922eea62352b296566186eacbbaa5628fde7324"
+    },
+    {
+      "path": "validation-results/cann-add-f32-proof/receipt.json",
+      "bytes": 1133,
+      "sha256": "63ab9b28a7f3bedb8ed87ce3468e92adfdcf4823628ea3de21304915bd650f42"
+    },
+    {
+      "path": "validation-results/cann-add-proof/add.log",
+      "bytes": 342,
+      "sha256": "0d95b60a93eea9c6a2a891233c68b7226f575a42799373af973acaddcda8f4a1"
+    },
+    {
+      "path": "validation-results/cann-add-proof/receipt.json",
+      "bytes": 1194,
+      "sha256": "01d47352cb8ca885ba5888b9743750a6e10f0b1d2e0679bd81c7384cd25b61d2"
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f16-f32-proof/mul_mat.log",
+      "bytes": 37803,
+      "sha256": "07861b36ff9e54591355420ec94ecac3a086f59766a3f5a11609e8cfb636b215"
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f16-f32-proof/receipt.json",
+      "bytes": 1157,
+      "sha256": "37a9c62aa77d101277e798a1dd637cb5b0b19dc34ec2257f5be5d359d1ed40ce"
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f32-proof/mul_mat.log",
+      "bytes": 36440,
+      "sha256": "cc695064549fbd3132b8be2874020e9998e9f1515ac861771e1e407893e0c09d"
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f32-proof/receipt.json",
+      "bytes": 1158,
+      "sha256": "61e612178a28f311854020b523949228a5b64bf7dbfe0f4cb491d916bdb5a487"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/add.log",
+      "bytes": 10537,
+      "sha256": "5b4f258de026a61e4bfcd80ca2aa1391cdd400cf96a611c2c24fca156345a3e8"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/mul_mat.log",
+      "bytes": 249565,
+      "sha256": "371e60eeb4417582a73ff077b96096436611ff05fb21620d90b5e914ef9eebff"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/receipt.json",
+      "bytes": 3485,
+      "sha256": "2ba5fa96e5620712e59deb4a80deee968ece70927b157e53718cc150696ce240"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/rms_norm.log",
+      "bytes": 4279,
+      "sha256": "7475afb03c934c8490f8b564117d7ba3a528b08f6d44ffb65499228f0f405a64"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/rope.log",
+      "bytes": 70422,
+      "sha256": "6ae9d86f6294f51418624a4f88ac17c36edb2633983e065a2bcaba80ebc47c4e"
+    },
+    {
+      "path": "validation-results/cann-operators-proof/soft_max.log",
+      "bytes": 29635,
+      "sha256": "c0b434d8356fef1a7076f2e162f19183697474f871a25600d7b4146fc7d89869"
+    },
+    {
+      "path": "validation-results/cann-sdk-versions.txt",
+      "bytes": 792,
+      "sha256": "a8a860541ea7d8ec8bce3dd19fc96dca9faa0d102b3194c2c112cc3077feaac9"
+    },
+    {
+      "path": "validation-results/device-info.txt",
+      "bytes": 1819,
+      "sha256": "a1a293a2bcc4c87acf8056bfcef5fbdbb0b0025185ce29d19c332b2cae8ff196"
+    }
+  ],
+  "reports": [
+    {
+      "path": "validation-results/cann-add-f32-proof/receipt.json",
+      "receipt": {
+        "harness_source": "7852fa3cd93f2fc3d603a2d96ff716d7ebd2717b",
+        "checkout_ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+        "binary_sha256": "7f72411bf92e855bcefdcd61f48246359073cb9e2803a73ebafd4473c37d025b",
+        "system": "Linux",
+        "architecture": "aarch64",
+        "backend": "CANN0",
+        "scope": "Existing ggml operator correctness against CPU reference",
+        "model_inference_validated": false,
+        "quantized_model_quality_validated": false,
+        "performance_validated": false,
+        "runs": [
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 56,
+            "cases_run": 56,
+            "observed_operator_cases": 56,
+            "unsupported_cases": 0,
+            "pass": true,
+            "operator": "ADD",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "ADD",
+              "-j",
+              "1",
+              "-p",
+              "^type=f32"
+            ],
+            "log_sha256": "88aa138a2d72c34294869bda1922eea62352b296566186eacbbaa5628fde7324",
+            "elapsed_seconds": 7.724605020019226
+          }
+        ],
+        "pass": true
+      },
+      "recomputed_acceptance_matches": true
+    },
+    {
+      "path": "validation-results/cann-add-proof/receipt.json",
+      "receipt": {
+        "harness_source": "7852fa3cd93f2fc3d603a2d96ff716d7ebd2717b",
+        "checkout_ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+        "binary_sha256": "7f72411bf92e855bcefdcd61f48246359073cb9e2803a73ebafd4473c37d025b",
+        "system": "Linux",
+        "architecture": "aarch64",
+        "backend": "CANN0",
+        "scope": "Existing ggml operator correctness against CPU reference",
+        "model_inference_validated": false,
+        "quantized_model_quality_validated": false,
+        "performance_validated": false,
+        "runs": [
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 1,
+            "cases_run": 1,
+            "observed_operator_cases": 1,
+            "unsupported_cases": 0,
+            "pass": true,
+            "operator": "ADD",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "ADD",
+              "-j",
+              "1",
+              "-p",
+              "^type=f32,ne=\\[1,1,1,1\\],nr=\\[32,1,1,1\\],nf=1,perm1=0,src_overlap=0$"
+            ],
+            "log_sha256": "0d95b60a93eea9c6a2a891233c68b7226f575a42799373af973acaddcda8f4a1",
+            "elapsed_seconds": 13.731917629949749
+          }
+        ],
+        "pass": true
+      },
+      "recomputed_acceptance_matches": true
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f16-f32-proof/receipt.json",
+      "receipt": {
+        "harness_source": "7852fa3cd93f2fc3d603a2d96ff716d7ebd2717b",
+        "checkout_ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+        "binary_sha256": "7f72411bf92e855bcefdcd61f48246359073cb9e2803a73ebafd4473c37d025b",
+        "system": "Linux",
+        "architecture": "aarch64",
+        "backend": "CANN0",
+        "scope": "Existing ggml operator correctness against CPU reference",
+        "model_inference_validated": false,
+        "quantized_model_quality_validated": false,
+        "performance_validated": false,
+        "runs": [
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 282,
+            "cases_run": 282,
+            "observed_operator_cases": 282,
+            "unsupported_cases": 0,
+            "pass": true,
+            "operator": "MUL_MAT",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "MUL_MAT",
+              "-j",
+              "1",
+              "-p",
+              "^type_a=f16,type_b=f32"
+            ],
+            "log_sha256": "07861b36ff9e54591355420ec94ecac3a086f59766a3f5a11609e8cfb636b215",
+            "elapsed_seconds": 17.33719482005108
+          }
+        ],
+        "pass": true
+      },
+      "recomputed_acceptance_matches": true
+    },
+    {
+      "path": "validation-results/cann-mul-mat-f32-proof/receipt.json",
+      "receipt": {
+        "harness_source": "7852fa3cd93f2fc3d603a2d96ff716d7ebd2717b",
+        "checkout_ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+        "binary_sha256": "7f72411bf92e855bcefdcd61f48246359073cb9e2803a73ebafd4473c37d025b",
+        "system": "Linux",
+        "architecture": "aarch64",
+        "backend": "CANN0",
+        "scope": "Existing ggml operator correctness against CPU reference",
+        "model_inference_validated": false,
+        "quantized_model_quality_validated": false,
+        "performance_validated": false,
+        "runs": [
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 272,
+            "cases_run": 272,
+            "observed_operator_cases": 272,
+            "unsupported_cases": 0,
+            "pass": true,
+            "operator": "MUL_MAT",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "MUL_MAT",
+              "-j",
+              "1",
+              "-p",
+              "^type_a=f32,type_b=f32"
+            ],
+            "log_sha256": "cc695064549fbd3132b8be2874020e9998e9f1515ac861771e1e407893e0c09d",
+            "elapsed_seconds": 12.581850879942067
+          }
+        ],
+        "pass": true
+      },
+      "recomputed_acceptance_matches": true
+    },
+    {
+      "path": "validation-results/cann-operators-proof/receipt.json",
+      "receipt": {
+        "harness_source": "7852fa3cd93f2fc3d603a2d96ff716d7ebd2717b",
+        "checkout_ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+        "binary_sha256": "7f72411bf92e855bcefdcd61f48246359073cb9e2803a73ebafd4473c37d025b",
+        "system": "Linux",
+        "architecture": "aarch64",
+        "backend": "CANN0",
+        "scope": "Existing ggml operator correctness against CPU reference",
+        "model_inference_validated": false,
+        "quantized_model_quality_validated": false,
+        "performance_validated": false,
+        "runs": [
+          {
+            "exit": -6,
+            "selected_backend_completed": false,
+            "cases_passed": null,
+            "cases_run": null,
+            "observed_operator_cases": 92,
+            "unsupported_cases": 0,
+            "pass": false,
+            "operator": "ADD",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "ADD",
+              "-j",
+              "1"
+            ],
+            "log_sha256": "5b4f258de026a61e4bfcd80ca2aa1391cdd400cf96a611c2c24fca156345a3e8",
+            "elapsed_seconds": 11.929983040085062
+          },
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 51,
+            "cases_run": 51,
+            "observed_operator_cases": 51,
+            "unsupported_cases": 0,
+            "pass": true,
+            "operator": "RMS_NORM",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "RMS_NORM",
+              "-j",
+              "1"
+            ],
+            "log_sha256": "7475afb03c934c8490f8b564117d7ba3a528b08f6d44ffb65499228f0f405a64",
+            "elapsed_seconds": 7.224109280039556
+          },
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 107,
+            "cases_run": 107,
+            "observed_operator_cases": 107,
+            "unsupported_cases": 107,
+            "pass": true,
+            "operator": "SOFT_MAX",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "SOFT_MAX",
+              "-j",
+              "1"
+            ],
+            "log_sha256": "c0b434d8356fef1a7076f2e162f19183697474f871a25600d7b4146fc7d89869",
+            "elapsed_seconds": 11.030215880018659
+          },
+          {
+            "exit": 0,
+            "selected_backend_completed": true,
+            "cases_passed": 109,
+            "cases_run": 109,
+            "observed_operator_cases": 109,
+            "unsupported_cases": 361,
+            "pass": true,
+            "operator": "ROPE",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "ROPE",
+              "-j",
+              "1"
+            ],
+            "log_sha256": "6ae9d86f6294f51418624a4f88ac17c36edb2633983e065a2bcaba80ebc47c4e",
+            "elapsed_seconds": 6.9763536299578846
+          },
+          {
+            "exit": -6,
+            "selected_backend_completed": false,
+            "cases_passed": null,
+            "cases_run": null,
+            "observed_operator_cases": 257,
+            "unsupported_cases": 1488,
+            "pass": false,
+            "operator": "MUL_MAT",
+            "command": [
+              "/workspace/new/CrispASR-cann-validation/build-cann-ops/bin/test-backend-ops",
+              "test",
+              "-b",
+              "CANN0",
+              "-o",
+              "MUL_MAT",
+              "-j",
+              "1"
+            ],
+            "log_sha256": "371e60eeb4417582a73ff077b96096436611ff05fb21620d90b5e914ef9eebff",
+            "elapsed_seconds": 10.839459239970893
+          }
+        ],
+        "pass": false
+      },
+      "recomputed_acceptance_matches": true
+    }
+  ],
+  "broad_suite_pass": false,
+  "model_inference_validated": false,
+  "quantized_model_quality_validated": false,
+  "performance_validated": false
+}

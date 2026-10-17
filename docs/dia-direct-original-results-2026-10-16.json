@@ -1,0 +1,201 @@
+{
+  "source": "d41cfb273dc5dda942d11cab20b3285a08585955",
+  "run": 38940468611,
+  "artifact": 12065989037,
+  "sha256": "a6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed",
+  "payloads_verified": 94,
+  "original_source_files_verified": 7,
+  "constructor_provenance_verified": true,
+  "original_methods_decorators_included": true,
+  "results": {
+    "legacy": {
+      "actual_samples": 562688,
+      "captured_samples": 619520,
+      "exact": false,
+      "rms": 0.0001578314803693138,
+      "max_abs_error": null,
+      "actual_sha256": "dacff9bb32f1d2e711411e245115cade15d5003fcd6c27f5334042c344edf831",
+      "captured_sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d",
+      "captured_rms": 0.0735338612890324,
+      "cosine": null,
+      "relative_l2": null,
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 562688
+      }
+    },
+    "hello-42": {
+      "actual_samples": 197120,
+      "captured_samples": 197120,
+      "exact": false,
+      "rms": 0.3703150389567137,
+      "max_abs_error": 4.731118679046631e-07,
+      "actual_sha256": "3795dad4fb0c91e510ab09906aa54ea0e0f008ae6ae28026a84823454e0a757d",
+      "captured_sha256": "d0b81bf6735398ccda749ae04ab0d5302c5b94925315ea795df228894b1760dc",
+      "captured_rms": 0.37031503893257445,
+      "cosine": 0.9999999999999909,
+      "relative_l2": 1.0246285035631653e-07,
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 197120
+      }
+    },
+    "hello-123": {
+      "actual_samples": 128000,
+      "captured_samples": 128000,
+      "exact": false,
+      "rms": 0.18110286817134547,
+      "max_abs_error": 2.384185791015625e-07,
+      "actual_sha256": "781a96ea9f21e90e25ddd0919c5b72276e2c0dabee1ade0a2f91393bb42cac20",
+      "captured_sha256": "45737acedd25e66f87e4e43b0396645a7343496d68388b296e988e1b21c7c216",
+      "captured_rms": 0.18110286820359173,
+      "cosine": 0.9999999999999929,
+      "relative_l2": 1.2263177782982007e-07,
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 128000
+      }
+    },
+    "fox-42": {
+      "actual_samples": 224768,
+      "captured_samples": 224768,
+      "exact": false,
+      "rms": 0.001717923503450699,
+      "max_abs_error": 4.0279701352119446e-08,
+      "actual_sha256": "664e321d5bd13b507125c46642bc1c2aeb7c213cb65c1acecfc2e4c9fc8ba6b2",
+      "captured_sha256": "e2c7c7c2e00725dba1ca72f763b77f6ade529b24b70cbe3e7b158b85d32831fb",
+      "captured_rms": 0.0017179235416331117,
+      "cosine": 0.9999999999883675,
+      "relative_l2": 4.822668354685466e-06,
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 224768
+      }
+    },
+    "fox-123": {
+      "actual_samples": 586752,
+      "captured_samples": 586752,
+      "exact": false,
+      "rms": 0.004573956251836492,
+      "max_abs_error": 1.0896474123001099e-07,
+      "actual_sha256": "08ac071c5eacdfe2c61bf2cc39dbd876bcb2797661721139154df29a7e3bcd2d",
+      "captured_sha256": "b943f26472a77765e234b8916182dd03bc5e61af315f465eb33a7553eff9875c",
+      "captured_rms": 0.004573956282685725,
+      "cosine": 0.9999999999967979,
+      "relative_l2": 2.52432336556998e-06,
+      "asr_at_synthesis_worker_exit": "pending; original worker failed before recognition",
+      "asr": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 586752
+      }
+    }
+  },
+  "all_pcm_exact": false,
+  "worker_complete": false,
+  "failed_prerequisite": "canonical library plus dereferenced SONAME duplicate selected as two candidates",
+  "library_candidates": [
+    "libcrispasr.so.1",
+    "libcrispasr.so.0.8.43"
+  ],
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false,
+  "audit_scope": "Complete 94-payload source/constructor/PCM audit of synthesis-complete ASR-incomplete artifact. No model weights reloaded locally.",
+  "causal_attribution": "Not established: retained legacy reference is from an older host/run without paired explicit CPU dispatch controls; four expanded outputs are extremely close but not byte-exact.",
+  "continuation": {
+    "source": "abeee3e8eb5121e0f80bbe8a4a8f6f245fc8fb3f",
+    "run": 38950148117,
+    "artifact": 12069357826,
+    "sha256": "cb9596666dfe2538d6798afef5b851a7bc25d410d84fbea47321d68f914b24ca",
+    "payloads_verified": 115,
+    "recognition_cells": 7,
+    "controls_wer_zero": true,
+    "results": {
+      "legacy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 562688
+      },
+      "hello-42": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 197120
+      },
+      "hello-123": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 128000
+      },
+      "fox-42": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 224768
+      },
+      "fox-123": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_exact": false,
+        "samples": 586752
+      }
+    },
+    "speech_acceptance": false,
+    "synthesis_repeated": false
+  },
+  "public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "568d0772df782e3933e00bfa3593d53ff67ef873",
+    "parent_revision": "aec1b6abbf0887f1e72943a07e73d067d949f3f0",
+    "files": [
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/raw-synthesis.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/raw-synthesis.zip",
+        "bytes": 55896329,
+        "sha256": "a6460cf55be5b71afc083bf43af7a63ad39d32696c820979b68d50680c2d98ed",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/raw-recognition.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/raw-recognition.zip",
+        "bytes": 55975059,
+        "sha256": "cb9596666dfe2538d6798afef5b851a7bc25d410d84fbea47321d68f914b24ca",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/proof.zip",
+        "bytes": 33029,
+        "sha256": "6c77d079f21f5698f18d97bee6acab80a0c810004f83c4cc7281488c3edbe121",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-direct-original/complete-recognition-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/568d0772df782e3933e00bfa3593d53ff67ef873/dia-20261016-direct-original/complete-recognition-v1/README.md",
+        "bytes": 3039,
+        "sha256": "991669cf011eb4b32e46754fb1feb9c6e955ccc92d8091516c1e478eda9a75f1",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  },
+  "combined_diagnostic_complete": true,
+  "recognition_status": "Complete independently audited; sealed controlsWER0, all five direct clips empty/WER1"
+}

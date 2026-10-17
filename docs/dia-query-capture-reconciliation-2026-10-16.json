@@ -1,0 +1,141 @@
+{
+  "scope": "Read only accepted captures: actual full-model versus prior module/factorial inputs.",
+  "full_original_source": "9ed6cff6f12627fddb61ea0ff7410b50950fd2b3",
+  "prior_factorial_source": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+  "comparisons": [
+    {
+      "comparison": "hosted-factorial-query",
+      "actual_stage": "decoder_sa0_q",
+      "shape": [
+        2,
+        1,
+        16,
+        128
+      ],
+      "actual_sha256": "424e193501b9285d6c81701931090fb66e651abd122bddb184c9a619e47cf2e6",
+      "prior_path": "inputs/original-query-query.f32",
+      "prior_sha256": "97cc81e3ad967f660f63db9ea95a1d1fae94e1152d664a6de3af7588acd6c934",
+      "byte_exact": false,
+      "cos_min": 0.9999999999996788,
+      "relative_l2": 6.902965432665438e-07,
+      "max_abs": 3.5762786865234375e-06,
+      "actual_rms": 0.49242562842003323,
+      "prior_rms": 0.4924255915453125
+    },
+    {
+      "comparison": "hosted-factorial-keys",
+      "actual_stage": "decoder_sa0_k",
+      "shape": [
+        2,
+        979,
+        4,
+        128
+      ],
+      "actual_sha256": "51b1ed5a24422608b078e6d273c35dabb12b738367766ad15df353ed14a28340",
+      "prior_path": "inputs/original-keys.f32",
+      "prior_sha256": "aa8525e4fa50878160f9df8f8b0386e2c3a4fb8e6af257f921b651dfd167f6a2",
+      "byte_exact": true,
+      "cos_min": 0.9999999999999998,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "actual_rms": 0.7759842800627231,
+      "prior_rms": 0.7759842800627231
+    },
+    {
+      "comparison": "module-pre_sa_norm",
+      "actual_stage": "decoder_block0_pre_sa_norm",
+      "shape": [
+        2,
+        1,
+        2048
+      ],
+      "actual_sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e",
+      "prior_path": "original-capacity-pre_sa_norm.npy",
+      "prior_sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e",
+      "byte_exact": true,
+      "cos_min": 1.0000000000000002,
+      "relative_l2": 0.0,
+      "max_abs": 0.0,
+      "actual_rms": 0.041323336759085526,
+      "prior_rms": 0.041323336759085526
+    },
+    {
+      "comparison": "module-pre_rope_query",
+      "actual_stage": "decoder_sa0_pre_q",
+      "shape": [
+        2,
+        1,
+        16,
+        128
+      ],
+      "actual_sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586",
+      "prior_path": "original-capacity-pre_rope_query.npy",
+      "prior_sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6",
+      "byte_exact": false,
+      "cos_min": 0.9999999999997016,
+      "relative_l2": 6.906207656581723e-07,
+      "max_abs": 4.0531158447265625e-06,
+      "actual_rms": 0.49242562799511613,
+      "prior_rms": 0.49242559145579534
+    },
+    {
+      "comparison": "module-query",
+      "actual_stage": "decoder_sa0_q",
+      "shape": [
+        2,
+        1,
+        16,
+        128
+      ],
+      "actual_sha256": "424e193501b9285d6c81701931090fb66e651abd122bddb184c9a619e47cf2e6",
+      "prior_path": "original-capacity-query.npy",
+      "prior_sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023",
+      "byte_exact": false,
+      "cos_min": 0.9999999999996788,
+      "relative_l2": 6.902965432665438e-07,
+      "max_abs": 3.5762786865234375e-06,
+      "actual_rms": 0.49242562842003323,
+      "prior_rms": 0.4924255915453125
+    },
+    {
+      "comparison": "module-sa_attention",
+      "actual_stage": "decoder_sa0_attention",
+      "shape": [
+        2,
+        1,
+        16,
+        128
+      ],
+      "actual_sha256": "c3ff55980d2f76daf67616a2487a7161973f03a2218f2f663a46f0a4315e6514",
+      "prior_path": "original-capacity-sa_attention.npy",
+      "prior_sha256": "743884bf3d231eafe9c569b3f715bfc0dd029cbf79b77e6cde070654d7950ef7",
+      "byte_exact": false,
+      "cos_min": 0.999999999990153,
+      "relative_l2": 9.529530817028522e-07,
+      "max_abs": 1.1026859283447266e-06,
+      "actual_rms": 0.06009667992678833,
+      "prior_rms": 0.060096676578293005
+    },
+    {
+      "comparison": "module-sa_output",
+      "actual_stage": "decoder_block0_sa_output",
+      "shape": [
+        2,
+        1,
+        2048
+      ],
+      "actual_sha256": "c327a62bac8bd3a18371c6a404fca2120b55fe446b1cf90d5eecb31163a59ed8",
+      "prior_path": "original-capacity-sa_output.npy",
+      "prior_sha256": "6110cfd5030e647b4c86a1eab930b3c242edd511bf489a9934500144d0812eee",
+      "byte_exact": false,
+      "cos_min": 0.9999999999994287,
+      "relative_l2": 1.0752962921354859e-06,
+      "max_abs": 1.1920928955078125e-06,
+      "actual_rms": 0.11994627268934514,
+      "prior_rms": 0.11994625871576231
+    }
+  ],
+  "native_speech_acceptance": false,
+  "module_archive_sha256": "33c26a38ca567b0872b90615c25e903c30679db4d7b2a35f6ac144687795c6c3",
+  "module_public_revision": "dce9d23fc048c78e57729e403af04ed97dd78adb"
+}

@@ -1,0 +1,101 @@
+{
+  "scope": "Prepared CUDA worker/kernel and weight-free input/source guards; no GPU or model execution",
+  "checks": [
+    {
+      "test": "test_dia_attention_cuda_inputs.py",
+      "count": 11,
+      "exit": 0,
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-gpu-proof-v5-20261013/shape-repair-tests.log",
+      "log_sha256": "06d3ef928621fcce3a5cccec72a94c7af869f08da07b3943ae33616c9a285188"
+    },
+    {
+      "test": "test_dia_cuda_bundle.py",
+      "count": 4,
+      "exit": 0,
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_cuda_bundle.py.log",
+      "log_sha256": "42932bc9e3b8ab42fe8f88f2bd2856340a6c54ba2f4654592dc9281797d8eab6"
+    },
+    {
+      "test": "test_dia_diff_device.py",
+      "count": 1,
+      "exit": 0,
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_diff_device.py.log",
+      "log_sha256": "8ab07fd445b3711742b09b94ec2a598ca692075fb87ea5646e9b51880aed2637"
+    },
+    {
+      "test": "test_dia_dump_step.py",
+      "count": 2,
+      "exit": 0,
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_dump_step.py.log",
+      "log_sha256": "1193ddbfe1f1697d4cfca27d29a53d2c186057e9ceb3a3e41379e97e40130401"
+    },
+    {
+      "test": "test_dia_rotary_dispatch.py",
+      "count": 1,
+      "exit": 0,
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_rotary_dispatch.py.log",
+      "log_sha256": "2a1d5de710a3c566389fc4caad8aca3cd80b92a63af51a7e72b9dcb42ee519fc"
+    }
+  ],
+  "runtime_bytes_match_cpu_and_package": true,
+  "runtime_sha256": {
+    "src/dia_tts.cpp": "9c7b837e1e08a22eb08d8ebecb5eb03a9dac3ec9dfd86944c1ba58ca5f4781f3",
+    "src/dia_sampling.h": "ad23c213ed9fde411f4ce6648cd3383470dc4fb4504195794bce96b2c655f6cf",
+    "src/dia_exponential_rng.h": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e",
+    "examples/cli/crispasr_dia_diff.h": "08f7d4e54569b15b90f1465d275e80ec1f3bade259aa30b7d757a3a839607b44",
+    "src/crispasr_c_api.cpp": "632c98246d014548f2c8f5abc75cf084426e3141a0997b5c084cfcaa60b77d95",
+    "python/crispasr/_binding.py": "a503bc93652f4fa3c788a1e6e6aeb8b3faa2b130e25bc5ac723fdfd17e0c5ade"
+  },
+  "initial_attempts": [
+    {
+      "check": "symlink root-escape fixture on CIFS",
+      "result": "Errno 5; corrected fixture location on local storage; check not skipped"
+    },
+    {
+      "check": "additional bundle guards",
+      "result": "TMPDIR applied only to first shell command; four setup errors; corrected subprocess environment for every test"
+    }
+  ],
+  "files": [
+    {
+      "path": "tools/ci-heavy/dia_attention_cuda_control.py",
+      "bytes": 17919,
+      "sha256": "7995b7b7b2d6e62e113aaf245eaaf257aee96d8455aad894f0f60e1272a1f28d"
+    },
+    {
+      "path": "tools/kaggle/dia-attention-cuda-control/dia_attention_cuda_control.py",
+      "bytes": 6906,
+      "sha256": "7942b39e1d56bc978d746645ab604d50b588a94496ab958f5e4c52875d68dc34"
+    },
+    {
+      "path": "tools/kaggle/dia-attention-cuda-control/kernel-metadata.json",
+      "bytes": 432,
+      "sha256": "d4de3d122cbb581b3a93d7dcd8a876232d814a7bfc3d762094da2d63871e558b"
+    },
+    {
+      "path": "tests/test_dia_attention_cuda_inputs.py",
+      "bytes": 9145,
+      "sha256": "279502fff014af66d48cefe97a09db110dff9b60057faaf2facb6fe0bd39bcb9"
+    }
+  ],
+  "driver_lookup_repair": {
+    "v4_terminal": "ERROR",
+    "gpu_executed": false,
+    "cause": "Inherited driver library search path replaced; libcuda.so.1 unavailable to CUDA plugin",
+    "real_elf_negative_and_positive_pass": true,
+    "new_input_guards_pass": 9,
+    "runtime_bytes_unchanged": true,
+    "actual_gpu_retest_pending": true
+  },
+  "shape_receipt_repair": {
+    "actual_v5_terminal": "ERROR",
+    "actual_v5_gpu_controls_independently_verified": true,
+    "all_72_saved_snapshots_available": true,
+    "json_uint64_shape_failure_reproduced": true,
+    "explicit_python_integer_shape_roundtrip_pass": true,
+    "uniform_scale_negative_pass": true,
+    "atomic_prior_checkpoint_preserved_on_serialization_failure": true,
+    "all_input_tests_pass": 11,
+    "new_gpu_run_required_for_metadata": false
+  }
+}

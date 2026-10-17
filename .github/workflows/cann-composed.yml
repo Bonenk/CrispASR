@@ -1,0 +1,100 @@
+name: CANN composed graph preparation
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths:
+      - tools/ci-heavy/cann-composed/**
+      - .github/workflows/cann-composed.yml
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-control:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+      - name: Build actual CPU graph control
+        run: |
+          cmake -S tools/ci-heavy/cann-composed -B build-probe \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_CANN=OFF
+          cmake --build build-probe --target cann-composed -j 2
+      - name: Run mathematical, repeat, shape and false-acceptance controls
+        env:
+          PROBE_BINARY: ${{ github.workspace }}/build-probe/bin/cann-composed
+          PROBE_EVIDENCE_DIR: ${{ github.workspace }}/cpu-proof
+        run: python3 tools/ci-heavy/cann-composed/test_probe.py -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cann-composed-cpu-proof
+          path: |
+            cpu-proof/
+            build-probe/CMakeCache.txt
+            build-probe/compile_commands.json
+          if-no-files-found: error
+
+  sdk-compile:
+    needs: cpu-control
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            chip: 910b
+            acl_graph: 'on'
+          - runner: ubuntu-24.04-arm
+            chip: 310p
+            acl_graph: 'off'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CANN_IMAGE: swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-beta.2-${{ matrix.chip }}-openeuler24.03-py3.12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+      - uses: ggml-org/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+      - name: Compile only against official CANN SDK
+        env:
+          SOC_TYPE: ascend${{ matrix.chip }}
+          USE_ACL_GRAPH: ${{ matrix.acl_graph }}
+        run: |
+          HOST_UID=$(id -u)
+          HOST_GID=$(id -g)
+          docker run --rm -v "$PWD:/workspace" -w /workspace \
+            -e SOC_TYPE -e USE_ACL_GRAPH "$CANN_IMAGE" bash -lc '
+              set -euo pipefail
+              git config --global --add safe.directory /workspace
+              export LD_LIBRARY_PATH="${ASCEND_TOOLKIT_HOME}/lib64:${ASCEND_TOOLKIT_HOME}/$(uname -m)-linux/devlib:${LD_LIBRARY_PATH:-}"
+              cmake -S tools/ci-heavy/cann-composed -B build-sdk \
+                -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+                -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DGGML_CANN=ON \
+                -DSOC_TYPE="${SOC_TYPE}" -DUSE_ACL_GRAPH="${USE_ACL_GRAPH}"
+              cmake --build build-sdk --target cann-composed -j "$(nproc)"
+              sha256sum build-sdk/bin/cann-composed > build-sdk/executable.sha256
+              ldd build-sdk/bin/cann-composed > build-sdk/ldd.txt
+              chown -R '"${HOST_UID}"':'"${HOST_GID}"' build-sdk
+            '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cann-composed-sdk-${{ runner.arch }}-${{ matrix.chip }}
+          path: |
+            build-sdk/bin/cann-composed
+            build-sdk/CMakeCache.txt
+            build-sdk/compile_commands.json
+            build-sdk/CMakeFiles/cann-composed.dir/link.txt
+            build-sdk/executable.sha256
+            build-sdk/ldd.txt
+          if-no-files-found: error

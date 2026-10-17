@@ -1,0 +1,1093 @@
+{
+  "scope": "Isolated output-head projections on identical verified retained hidden states, exact original F32 weights, actual pinned Torch2.6 DenseGeneral and actual packaged ggml CPU mul_mat. No full model, GPU, free-speech acceptance or runtime/default change.",
+  "torch_version": "2.6.0+cpu",
+  "torch_config": "PyTorch built with:\n  - GCC 9.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.5.3 (Git Hash 66f0cb9eb66affd2da3bf5f8d897376f04aae6af)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX512\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=2236df1770800ffea5697b11b0bb0d910b2e59e1, CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/c++, CXX_FLAGS= -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=11 -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-type-limits -Wno-array-bounds -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -Wno-missing-braces -fdiagnostics-color=always -faligned-new -Wno-unused-but-set-variable -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.6.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, \n",
+  "cpu": "x86_64",
+  "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "native_package_source": "35945f527c70377e00bf00808235337e130e11fd",
+  "fetch": {
+    "scope": "Only original output-head tensor fetched by strict immutable HTTP ranges; all nine native F32 mapped hashes match the full physical export audit. Whole checkpoint SHA is bound by immutable HF linked ETag; full checkpoint is not downloaded or rehashed here.",
+    "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+    "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "checkpoint_bytes": 6444682848,
+    "header_bytes": 40536,
+    "tensor": {
+      "dtype": "F32",
+      "shape": [
+        2048,
+        9,
+        1028
+      ],
+      "data_offsets": [
+        5361057792,
+        5436850176
+      ]
+    },
+    "ranges": [
+      {
+        "label": "header-length",
+        "offset": 0,
+        "bytes": 8,
+        "sha256": "b2f042649dc57ff463b341d91caab70ec4242987a2f587e8e2d0a2530dcb24bf",
+        "content_range": "bytes 0-7/6444682848"
+      },
+      {
+        "label": "tensor-header",
+        "offset": 8,
+        "bytes": 40536,
+        "sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+        "content_range": "bytes 8-40543/6444682848"
+      },
+      {
+        "label": "decoder.logits_dense.weight",
+        "offset": 5361098336,
+        "bytes": 75792384,
+        "sha256": "347af117c3176bbc2a72057391eafa316461e251d99560e4de7204a1401b74ae",
+        "content_range": "bytes 5361098336-5436890719/6444682848"
+      }
+    ],
+    "verified_mapped_heads": [
+      {
+        "name": "dia.decoder.heads.0",
+        "bytes": 8421376,
+        "sha256": "8854b8064f403297866fe64a819b0477f128609415b7a88a14b693f9e95f4247"
+      },
+      {
+        "name": "dia.decoder.heads.1",
+        "bytes": 8421376,
+        "sha256": "2debf94104696c8ab1eb7cb2fa9eb1457014fab59cec616cd585d155db14603e"
+      },
+      {
+        "name": "dia.decoder.heads.2",
+        "bytes": 8421376,
+        "sha256": "7dbcb7f0e6dad0146a8886e27b00d9c875142d6da585cfec9800fa90457a0ec8"
+      },
+      {
+        "name": "dia.decoder.heads.3",
+        "bytes": 8421376,
+        "sha256": "3c7befc206dee6d760820c546d962ef6f3ebf61da7f6803fb8bdc90a1dfbb4d0"
+      },
+      {
+        "name": "dia.decoder.heads.4",
+        "bytes": 8421376,
+        "sha256": "f136dff4a24a0d4a3c491ef0b6bba7b2c7b79f76d31c4c3e11dd21d800a5d498"
+      },
+      {
+        "name": "dia.decoder.heads.5",
+        "bytes": 8421376,
+        "sha256": "98274bd0a2e4f2bf1c7379c0db44448ce8fefd453e0df22a220ed9b9cd5b30be"
+      },
+      {
+        "name": "dia.decoder.heads.6",
+        "bytes": 8421376,
+        "sha256": "cd6280a6a746a3a2517ed992473f3dafd3be88ef2dfd0af12a33f52c0c4e2607"
+      },
+      {
+        "name": "dia.decoder.heads.7",
+        "bytes": 8421376,
+        "sha256": "24e0c2d6f4b1e173d7e6081971f41c679f69157a6704cb3727cf7793caff68de"
+      },
+      {
+        "name": "dia.decoder.heads.8",
+        "bytes": 8421376,
+        "sha256": "29e1fe53bbc871e6e2a65f2832506113680ac11d94e58760318ddebf2c45d711"
+      }
+    ]
+  },
+  "verified_inputs": [
+    {
+      "path": "original-step978-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "995a1d248725d101af7000546f9cc8c4566b7c8c0b585f56bcdbce59656bf510"
+    },
+    {
+      "path": "late/cpp_final_hidden.f32",
+      "bytes": 16384,
+      "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+    },
+    {
+      "path": "late/logits.f32",
+      "bytes": 90743616,
+      "sha256": "ef6470207b1da62aa4501176ca4bf01f5d698aae86c7d4ae06208b136ad3faf6"
+    }
+  ],
+  "comparisons": [
+    {
+      "input": "original-retained-hidden",
+      "operation": "split-3d",
+      "changed_values": 14808,
+      "values": 18504,
+      "cosine_min": 0.9999999999999848,
+      "max_row_norm_error": 2.120519027037915e-08,
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 1.5379964597673193e-07
+    },
+    {
+      "input": "original-retained-hidden",
+      "operation": "combined-3d",
+      "changed_values": 14808,
+      "values": 18504,
+      "cosine_min": 0.9999999999999848,
+      "max_row_norm_error": 2.120519027037915e-08,
+      "max_abs": 7.62939453125e-06,
+      "relative_l2": 1.5379964597673193e-07
+    },
+    {
+      "input": "original-retained-hidden",
+      "operation": "split-2d",
+      "changed_values": 15321,
+      "values": 18504,
+      "cosine_min": 0.9999999999999806,
+      "max_row_norm_error": 1.871779176099153e-08,
+      "max_abs": 9.5367431640625e-06,
+      "relative_l2": 1.7519605844217063e-07
+    },
+    {
+      "input": "original-retained-hidden",
+      "operation": "combined-2d",
+      "changed_values": 15321,
+      "values": 18504,
+      "cosine_min": 0.9999999999999806,
+      "max_row_norm_error": 1.871779176099153e-08,
+      "max_abs": 9.5367431640625e-06,
+      "relative_l2": 1.7519605844217063e-07
+    },
+    {
+      "input": "original-retained-hidden",
+      "operation": "torch-split",
+      "changed_values": 0,
+      "values": 18504,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "input": "native-retained-hidden",
+      "operation": "split-3d",
+      "changed_values": 14812,
+      "values": 18504,
+      "cosine_min": 0.9999999999999859,
+      "max_row_norm_error": 2.0254100840944034e-08,
+      "max_abs": 9.5367431640625e-06,
+      "relative_l2": 1.552612182902105e-07
+    },
+    {
+      "input": "native-retained-hidden",
+      "operation": "combined-3d",
+      "changed_values": 14812,
+      "values": 18504,
+      "cosine_min": 0.9999999999999859,
+      "max_row_norm_error": 2.0254100840944034e-08,
+      "max_abs": 9.5367431640625e-06,
+      "relative_l2": 1.552612182902105e-07
+    },
+    {
+      "input": "native-retained-hidden",
+      "operation": "split-2d",
+      "changed_values": 15231,
+      "values": 18504,
+      "cosine_min": 0.9999999999999798,
+      "max_row_norm_error": 1.8192950479445358e-08,
+      "max_abs": 1.1444091796875e-05,
+      "relative_l2": 1.7557318617234285e-07
+    },
+    {
+      "input": "native-retained-hidden",
+      "operation": "combined-2d",
+      "changed_values": 15231,
+      "values": 18504,
+      "cosine_min": 0.9999999999999798,
+      "max_row_norm_error": 1.8192950479445358e-08,
+      "max_abs": 1.1444091796875e-05,
+      "relative_l2": 1.7557318617234285e-07
+    },
+    {
+      "input": "native-retained-hidden",
+      "operation": "torch-split",
+      "changed_values": 0,
+      "values": 18504,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    }
+  ],
+  "ggml_split_combined": {
+    "changed_values": 0,
+    "values": 18504,
+    "cosine_min": 0.9999999999999998,
+    "max_row_norm_error": 0.0,
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+  },
+  "original_projection_vs_saved_original": {
+    "changed_values": 17628,
+    "values": 18504,
+    "cosine_min": 0.999999999999708,
+    "max_row_norm_error": 6.747175151922136e-08,
+    "max_abs": 4.76837158203125e-05,
+    "relative_l2": 7.115749364571439e-07
+  },
+  "native_projection_vs_saved_native": {
+    "changed_values": 0,
+    "values": 18504,
+    "cosine_min": 0.9999999999999998,
+    "max_row_norm_error": 0.0,
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+  },
+  "all_original_and_native_repeats_exact": true,
+  "native_batch_flattening": {
+    "changed_values": 13692,
+    "values": 18504,
+    "cosine_min": 0.9999999999999901,
+    "max_row_norm_error": 1.0443986009356365e-08,
+    "max_abs": 5.7220458984375e-06,
+    "relative_l2": 1.240066141955838e-07
+  },
+  "exact_runtime_input_shape": [
+    2048,
+    1,
+    2
+  ],
+  "flattened_input_shape": [
+    2048,
+    2
+  ],
+  "scaled_output_negative": {
+    "changed_values": 18504,
+    "values": 18504,
+    "cosine_min": 0.9999999999999998,
+    "max_row_norm_error": 1.0,
+    "max_abs": 27.06389617919922,
+    "relative_l2": 1.0
+  },
+  "files": [
+    {
+      "path": "bridge",
+      "bytes": 17720,
+      "sha256": "206077517426d9051fa1886dfd5aa61d0c1d1766de9115cda80335f37ddff431"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 1926,
+      "sha256": "b57d2452a90942f660c2f049784ac6618f191f0db7f9225f5f3f856e622624ff"
+    },
+    {
+      "path": "combined-2d-ggml.f32",
+      "bytes": 296064,
+      "sha256": "2ecdff485efab57ec155ee35848e8544fe5b4d376a749c11bb22681a88d4c7ac"
+    },
+    {
+      "path": "combined-2d-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "42f1188c658706bbf93fb723cb42a81a318bdb72788d1833be7c22f8c449cfda"
+    },
+    {
+      "path": "combined-2d-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "8fe569292c6a1da19537ba40730539845439d2db884a467cf46fcef0b62bd00f"
+    },
+    {
+      "path": "combined-3d-ggml.f32",
+      "bytes": 296064,
+      "sha256": "4d9c734bdcde670438e1efe8487df74c7b3d7ab361f630a7a7e52aee47f097c6"
+    },
+    {
+      "path": "combined-3d-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "12ad85cf33f9ad89e57c4bd5f406dff12acb217c1fbde3f0da75a91a379bc9c9"
+    },
+    {
+      "path": "combined-3d-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "ec2b4966413b2de282b8a909f3c015ef9d4892ed3b0a7b38acc8d3c6b76c4dd4"
+    },
+    {
+      "path": "input-hidden.f32",
+      "bytes": 65536,
+      "sha256": "8e170e352c11e186b7fe422db3e597edc09d162d288b649b5783db37ccc18c4d"
+    },
+    {
+      "path": "margin.py",
+      "bytes": 2039,
+      "sha256": "3a5a96fa3d70bb119a628dc0444e08b265ff329ea2d35e37d84da7f99864b19a"
+    },
+    {
+      "path": "native-heads.f32",
+      "bytes": 75792384,
+      "sha256": "85093547a3286e924e0f69753a64fc040a5565083971f94bf28e00efb07c5c70"
+    },
+    {
+      "path": "original-dense-general-thread4.npy",
+      "bytes": 296192,
+      "sha256": "b342ae6cccb44bb216b2da2460fdd9c5b36bb15ab9e2931bbe6c82c33eea9934"
+    },
+    {
+      "path": "original-dense-general.npy",
+      "bytes": 296192,
+      "sha256": "6728b269fe9f1ce6ed2717259ddc136883f26733cdd426890f49251b3906606a"
+    },
+    {
+      "path": "probe.log",
+      "bytes": 3716,
+      "sha256": "b5f3cc99e3f60bf17238f026a76302957f0803366b6ec90c3c423e87ce258644"
+    },
+    {
+      "path": "probe.py",
+      "bytes": 5581,
+      "sha256": "83f84e613d6da29fa85e3880820fe62b81145d6cadcbc92282f683c7bfbb9fae"
+    },
+    {
+      "path": "sample.log",
+      "bytes": 5322,
+      "sha256": "6b9660ffe54c9b8f202f62f501eec4eb2084ae4c56cbd9e559bafdc26cfb23ab"
+    },
+    {
+      "path": "sample.py",
+      "bytes": 4784,
+      "sha256": "3fe74f1e9915ffb03a6e62e4e8b43e394226a009589dfcb7df18280729516aeb"
+    },
+    {
+      "path": "saved-native-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "12ad85cf33f9ad89e57c4bd5f406dff12acb217c1fbde3f0da75a91a379bc9c9"
+    },
+    {
+      "path": "saved-original-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "eb00c877a8779a1060cf12a0616c1800a9d682547fee7594f5dd059e311fc076"
+    },
+    {
+      "path": "split-2d-ggml.f32",
+      "bytes": 296064,
+      "sha256": "2ecdff485efab57ec155ee35848e8544fe5b4d376a749c11bb22681a88d4c7ac"
+    },
+    {
+      "path": "split-2d-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "42f1188c658706bbf93fb723cb42a81a318bdb72788d1833be7c22f8c449cfda"
+    },
+    {
+      "path": "split-2d-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "8fe569292c6a1da19537ba40730539845439d2db884a467cf46fcef0b62bd00f"
+    },
+    {
+      "path": "split-3d-ggml.f32",
+      "bytes": 296064,
+      "sha256": "4d9c734bdcde670438e1efe8487df74c7b3d7ab361f630a7a7e52aee47f097c6"
+    },
+    {
+      "path": "split-3d-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "12ad85cf33f9ad89e57c4bd5f406dff12acb217c1fbde3f0da75a91a379bc9c9"
+    },
+    {
+      "path": "split-3d-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "ec2b4966413b2de282b8a909f3c015ef9d4892ed3b0a7b38acc8d3c6b76c4dd4"
+    },
+    {
+      "path": "thread4.py",
+      "bytes": 2670,
+      "sha256": "2bf1215618519d7a8028aac88c09b9b0f8db3fe2099313561da43b7a0ba76418"
+    },
+    {
+      "path": "torch-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "6ea72341093edbff2257c8caac93167d2381718d9cc9193a9f256c0be1268613"
+    },
+    {
+      "path": "torch-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "e6bf9c3ed0badd7ca4dbbdcdf2aacfaa3444c8756a6e0033b2208b1a2f8bfdac"
+    },
+    {
+      "path": "torch-split-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "6ea72341093edbff2257c8caac93167d2381718d9cc9193a9f256c0be1268613"
+    },
+    {
+      "path": "torch-split-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "e6bf9c3ed0badd7ca4dbbdcdf2aacfaa3444c8756a6e0033b2208b1a2f8bfdac"
+    },
+    {
+      "path": "torch-split-projection.npy",
+      "bytes": 296192,
+      "sha256": "6728b269fe9f1ce6ed2717259ddc136883f26733cdd426890f49251b3906606a"
+    },
+    {
+      "path": "torch-thread4-native-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "ce0faa04ef77162a1f7c0f46e19c2c741339ddcfcbf52f451822480ed33929a1"
+    },
+    {
+      "path": "torch-thread4-original-hidden-original-probabilities.npy",
+      "bytes": 37136,
+      "sha256": "d440d03d54eede4e11c6ed7027f5cb031dae42172d41c6a44beb9b5fdcdc6a63"
+    },
+    {
+      "path": "verified-step978-noise.npy",
+      "bytes": 37136,
+      "sha256": "93900c566ca74d87e822d4cd6b853cdeaa7191a1d5a3b02889a4bdd1774653b4"
+    }
+  ],
+  "first_draw_projection_isolation": {
+    "scope": "Actual pinned original CFG/filter with unchanged verified portable noise at shared-history step978; alternative projection/hidden combinations are causal diagnostics, not free-generation or speech proof.",
+    "source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "full_noise_sha256": "043808949bf0fc51206bc154a5755fb80d44127326bc7419c0ca4c635cf77dba",
+    "rows": [
+      {
+        "arm": "saved-original",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.01790563203394413,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "saved-native",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905911430716515,
+        "head2_token904_probability": 0.004546598996967077,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906250432133675,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-split-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906250432133675,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "split-3d-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906181514263153,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "combined-3d-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906181514263153,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "split-2d-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906159162521362,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "combined-2d-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906159162521362,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.01790587417781353,
+        "head2_token904_probability": 0.004546605050563812,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-split-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.01790587417781353,
+        "head2_token904_probability": 0.004546605050563812,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "split-3d-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905911430716515,
+        "head2_token904_probability": 0.004546598996967077,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "combined-3d-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905911430716515,
+        "head2_token904_probability": 0.004546598996967077,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "split-2d-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905963584780693,
+        "head2_token904_probability": 0.004546607844531536,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "combined-2d-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905963584780693,
+        "head2_token904_probability": 0.004546607844531536,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-thread4-original-hidden",
+        "head2_draw": 877,
+        "all_head_draws": [
+          698,
+          402,
+          877,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017906196415424347,
+        "head2_token904_probability": 0.0,
+        "head2_support_count": 32
+      },
+      {
+        "arm": "torch-thread4-native-hidden",
+        "head2_draw": 904,
+        "all_head_draws": [
+          698,
+          402,
+          904,
+          362,
+          405,
+          516,
+          595,
+          692,
+          380
+        ],
+        "head2_token877_probability": 0.017905859276652336,
+        "head2_token904_probability": 0.004546620417386293,
+        "head2_support_count": 32
+      }
+    ]
+  },
+  "initial_flattened_only_attempt": {
+    "scope": "Initial 2D-only isolated projection probe. Does not reproduce the native runtime batch layout. Preserved before the exact 3D controls.",
+    "torch_version": "2.6.0+cpu",
+    "torch_config": "PyTorch built with:\n  - GCC 9.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.5.3 (Git Hash 66f0cb9eb66affd2da3bf5f8d897376f04aae6af)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX512\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=2236df1770800ffea5697b11b0bb0d910b2e59e1, CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/c++, CXX_FLAGS= -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=11 -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-type-limits -Wno-array-bounds -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -Wno-missing-braces -fdiagnostics-color=always -faligned-new -Wno-unused-but-set-variable -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.6.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, \n",
+    "cpu": "x86_64",
+    "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+    "native_package_source": "35945f527c70377e00bf00808235337e130e11fd",
+    "fetch": {
+      "scope": "Only original output-head tensor fetched by strict immutable HTTP ranges; all nine native F32 mapped hashes match the full physical export audit. Whole checkpoint SHA is bound by immutable HF linked ETag; full checkpoint is not downloaded or rehashed here.",
+      "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+      "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+      "checkpoint_bytes": 6444682848,
+      "header_bytes": 40536,
+      "tensor": {
+        "dtype": "F32",
+        "shape": [
+          2048,
+          9,
+          1028
+        ],
+        "data_offsets": [
+          5361057792,
+          5436850176
+        ]
+      },
+      "ranges": [
+        {
+          "label": "header-length",
+          "offset": 0,
+          "bytes": 8,
+          "sha256": "b2f042649dc57ff463b341d91caab70ec4242987a2f587e8e2d0a2530dcb24bf",
+          "content_range": "bytes 0-7/6444682848"
+        },
+        {
+          "label": "tensor-header",
+          "offset": 8,
+          "bytes": 40536,
+          "sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+          "content_range": "bytes 8-40543/6444682848"
+        },
+        {
+          "label": "decoder.logits_dense.weight",
+          "offset": 5361098336,
+          "bytes": 75792384,
+          "sha256": "347af117c3176bbc2a72057391eafa316461e251d99560e4de7204a1401b74ae",
+          "content_range": "bytes 5361098336-5436890719/6444682848"
+        }
+      ],
+      "verified_mapped_heads": [
+        {
+          "name": "dia.decoder.heads.0",
+          "bytes": 8421376,
+          "sha256": "8854b8064f403297866fe64a819b0477f128609415b7a88a14b693f9e95f4247"
+        },
+        {
+          "name": "dia.decoder.heads.1",
+          "bytes": 8421376,
+          "sha256": "2debf94104696c8ab1eb7cb2fa9eb1457014fab59cec616cd585d155db14603e"
+        },
+        {
+          "name": "dia.decoder.heads.2",
+          "bytes": 8421376,
+          "sha256": "7dbcb7f0e6dad0146a8886e27b00d9c875142d6da585cfec9800fa90457a0ec8"
+        },
+        {
+          "name": "dia.decoder.heads.3",
+          "bytes": 8421376,
+          "sha256": "3c7befc206dee6d760820c546d962ef6f3ebf61da7f6803fb8bdc90a1dfbb4d0"
+        },
+        {
+          "name": "dia.decoder.heads.4",
+          "bytes": 8421376,
+          "sha256": "f136dff4a24a0d4a3c491ef0b6bba7b2c7b79f76d31c4c3e11dd21d800a5d498"
+        },
+        {
+          "name": "dia.decoder.heads.5",
+          "bytes": 8421376,
+          "sha256": "98274bd0a2e4f2bf1c7379c0db44448ce8fefd453e0df22a220ed9b9cd5b30be"
+        },
+        {
+          "name": "dia.decoder.heads.6",
+          "bytes": 8421376,
+          "sha256": "cd6280a6a746a3a2517ed992473f3dafd3be88ef2dfd0af12a33f52c0c4e2607"
+        },
+        {
+          "name": "dia.decoder.heads.7",
+          "bytes": 8421376,
+          "sha256": "24e0c2d6f4b1e173d7e6081971f41c679f69157a6704cb3727cf7793caff68de"
+        },
+        {
+          "name": "dia.decoder.heads.8",
+          "bytes": 8421376,
+          "sha256": "29e1fe53bbc871e6e2a65f2832506113680ac11d94e58760318ddebf2c45d711"
+        }
+      ]
+    },
+    "verified_inputs": [
+      {
+        "path": "original-step978-ref.gguf",
+        "bytes": 99392352,
+        "sha256": "995a1d248725d101af7000546f9cc8c4566b7c8c0b585f56bcdbce59656bf510"
+      },
+      {
+        "path": "late/cpp_final_hidden.f32",
+        "bytes": 16384,
+        "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+      },
+      {
+        "path": "late/logits.f32",
+        "bytes": 90743616,
+        "sha256": "ef6470207b1da62aa4501176ca4bf01f5d698aae86c7d4ae06208b136ad3faf6"
+      }
+    ],
+    "comparisons": [
+      {
+        "input": "original-retained-hidden",
+        "operation": "ggml-split",
+        "changed_values": 15321,
+        "values": 18504,
+        "cosine_min": 0.9999999999999806,
+        "max_row_norm_error": 1.871779176099153e-08,
+        "max_abs": 9.5367431640625e-06,
+        "relative_l2": 1.7519605844217063e-07
+      },
+      {
+        "input": "original-retained-hidden",
+        "operation": "ggml-combined",
+        "changed_values": 15321,
+        "values": 18504,
+        "cosine_min": 0.9999999999999806,
+        "max_row_norm_error": 1.871779176099153e-08,
+        "max_abs": 9.5367431640625e-06,
+        "relative_l2": 1.7519605844217063e-07
+      },
+      {
+        "input": "original-retained-hidden",
+        "operation": "torch-split",
+        "changed_values": 0,
+        "values": 18504,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "input": "native-retained-hidden",
+        "operation": "ggml-split",
+        "changed_values": 15231,
+        "values": 18504,
+        "cosine_min": 0.9999999999999798,
+        "max_row_norm_error": 1.8192950479445358e-08,
+        "max_abs": 1.1444091796875e-05,
+        "relative_l2": 1.7557318617234285e-07
+      },
+      {
+        "input": "native-retained-hidden",
+        "operation": "ggml-combined",
+        "changed_values": 15231,
+        "values": 18504,
+        "cosine_min": 0.9999999999999798,
+        "max_row_norm_error": 1.8192950479445358e-08,
+        "max_abs": 1.1444091796875e-05,
+        "relative_l2": 1.7557318617234285e-07
+      },
+      {
+        "input": "native-retained-hidden",
+        "operation": "torch-split",
+        "changed_values": 0,
+        "values": 18504,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    ],
+    "ggml_split_combined": {
+      "changed_values": 0,
+      "values": 18504,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    "original_projection_vs_saved_original": {
+      "changed_values": 17628,
+      "values": 18504,
+      "cosine_min": 0.999999999999708,
+      "max_row_norm_error": 6.747175151922136e-08,
+      "max_abs": 4.76837158203125e-05,
+      "relative_l2": 7.115749364571439e-07
+    },
+    "native_projection_vs_saved_native": {
+      "changed_values": 13692,
+      "values": 18504,
+      "cosine_min": 0.9999999999999901,
+      "max_row_norm_error": 1.0443986009356365e-08,
+      "max_abs": 5.7220458984375e-06,
+      "relative_l2": 1.240066141955838e-07
+    },
+    "all_original_and_native_repeats_exact": true,
+    "scaled_output_negative": {
+      "changed_values": 18504,
+      "values": 18504,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 27.06389617919922,
+      "relative_l2": 1.0
+    },
+    "files": [
+      {
+        "path": "bridge",
+        "bytes": 17592,
+        "sha256": "f3aed299ecbb01d070e6076fce25e4ea09f18b26ee230b68cfcc9157a60a1a84"
+      },
+      {
+        "path": "bridge.cpp",
+        "bytes": 1739,
+        "sha256": "bd4f1208871f92c3557ce05a41cd7c5812035fb0977d9e4d20d627dfd27d0451"
+      },
+      {
+        "path": "combined-ggml.f32",
+        "bytes": 296064,
+        "sha256": "2ecdff485efab57ec155ee35848e8544fe5b4d376a749c11bb22681a88d4c7ac"
+      },
+      {
+        "path": "fetch-receipt.json",
+        "bytes": 2864,
+        "sha256": "a53db569aaade913bcbb3bb51008c9ba85943511183967ea4e5588e26bc0a0d3"
+      },
+      {
+        "path": "fetch.py",
+        "bytes": 2873,
+        "sha256": "96407eb82adea8e761ee39bfc4a03c1636feff7ec33819806cb2669fa6fc122a"
+      },
+      {
+        "path": "input-hidden.f32",
+        "bytes": 65536,
+        "sha256": "8e170e352c11e186b7fe422db3e597edc09d162d288b649b5783db37ccc18c4d"
+      },
+      {
+        "path": "native-heads.f32",
+        "bytes": 75792384,
+        "sha256": "85093547a3286e924e0f69753a64fc040a5565083971f94bf28e00efb07c5c70"
+      },
+      {
+        "path": "original-dense-general.npy",
+        "bytes": 296192,
+        "sha256": "6728b269fe9f1ce6ed2717259ddc136883f26733cdd426890f49251b3906606a"
+      },
+      {
+        "path": "original-heads.f32",
+        "bytes": 75792384,
+        "sha256": "347af117c3176bbc2a72057391eafa316461e251d99560e4de7204a1401b74ae"
+      },
+      {
+        "path": "original-safetensors-header.json",
+        "bytes": 40536,
+        "sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e"
+      },
+      {
+        "path": "probe.py",
+        "bytes": 5400,
+        "sha256": "da2eddb18ad468ae780078e7aac4baaa34b495c7d9f0c87c28cac91f96f8d21e"
+      },
+      {
+        "path": "split-ggml.f32",
+        "bytes": 296064,
+        "sha256": "2ecdff485efab57ec155ee35848e8544fe5b4d376a749c11bb22681a88d4c7ac"
+      },
+      {
+        "path": "torch-split-projection.npy",
+        "bytes": 296192,
+        "sha256": "6728b269fe9f1ce6ed2717259ddc136883f26733cdd426890f49251b3906606a"
+      }
+    ],
+    "complete_probe_log": {
+      "bytes": 2527,
+      "sha256": "06db30e4dc351ce1ada5c58a47c3eb5d019fa0635ac80ee8da64e1808d03eea2"
+    }
+  },
+  "original_thread_count_control": {
+    "original_hosted_threads": 4,
+    "initial_probe_threads": 1,
+    "threads4_repeat_exact": true,
+    "threads4_vs_saved_original_changed_values": 17633,
+    "threads4_vs_saved_original_max_abs": 5.14984130859375e-05,
+    "threads4_vs_threads1_changed_values": 28542
+  },
+  "hidden_pair_margin_attribution": {
+    "scope": "Float64 linear attribution of retained hidden differences through the exact original head coefficients. No reference rescaling or inference change.",
+    "head": 2,
+    "contrast": "logit[token904] minus logit[token46]",
+    "verified_neural_support_difference_tokens": [
+      46,
+      904
+    ],
+    "original_hidden_exact_weight_margin": -1.9708658774986176e-05,
+    "native_hidden_exact_weight_margin": 2.7488252364649135e-05,
+    "margin_change": 4.719691113963531e-05,
+    "parallel_hidden_error_margin_change": -2.4847634899054447e-07,
+    "orthogonal_hidden_error_margin_change": 4.744538748845515e-05,
+    "parallel_coefficients_unconditional_conditional": [
+      1.6376559821934986e-07,
+      4.215528349287031e-07
+    ],
+    "decomposition_residual": 1.7070763205784267e-16
+  },
+  "summary": {
+    "runtime_layout_saved_native_bit_exact": true,
+    "split_combined_all_inputs_exact": true,
+    "all16_draws_hidden_dependent": true,
+    "original_hidden_draw": 877,
+    "native_hidden_draw": 904,
+    "no_causal_output_head_fix": true,
+    "original_local_vs_hosted_bit_exact": false,
+    "speech_acceptance": false,
+    "runtime_defaults_changed": false
+  },
+  "actual_cpu_library_files": [
+    {
+      "name": "libggml-base.so",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "name": "libggml-base.so.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "name": "libggml-base.so.0.26.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "name": "libggml-cpu.so",
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    {
+      "name": "libggml.so",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "name": "libggml.so.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "name": "libggml.so.0.26.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "name": "libgomp.so.1",
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    }
+  ]
+}

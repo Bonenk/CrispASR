@@ -1,0 +1,33 @@
+{
+  "scope": "Unmerged chip-specific capability predicate repair; no physical candidate execution",
+  "crispasr_candidate": "bfb4943ac1e4488e377257a47163a0edcea7d6cd",
+  "ggml_candidate": "21acf3162beeb4e51260f0f86deda80995423712",
+  "production_ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+  "sdk_compile_run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723",
+  "sdk_compile_conclusion": "success",
+  "routing_scope": "Actual extracted support predicate; real ggml enum/tensor declarations; unexercised helpers abort; no graph or device execution",
+  "cases_per_chip": 13,
+  "candidate_310p_failures": 0,
+  "candidate_910b_failures": 0,
+  "original_310p_failures": 6,
+  "original_910b_failures": 0,
+  "files": [
+    {
+      "name": "baseline-routing.log",
+      "bytes": 1402,
+      "sha256": "f043f1bc7fd55dcf8b2e9e99d356caea22a3fa181ab9ce079c4783b4448c78c9",
+      "full_log": "test_actual_predicate_on_310p_and_910b (__main__.CannBf16RoutingTest.test_actual_predicate_on_310p_and_910b) ... routing mismatch case 2\nrouting mismatch case 3\nrouting mismatch case 4\nrouting mismatch case 5\nrouting mismatch case 9\nrouting mismatch case 10\n\n  test_actual_predicate_on_310p_and_910b (__main__.CannBf16RoutingTest.test_actual_predicate_on_310p_and_910b) (soc='ASCEND_310P') ... ERROR\n\n======================================================================\nERROR: test_actual_predicate_on_310p_and_910b (__main__.CannBf16RoutingTest.test_actual_predicate_on_310p_and_910b) (soc='ASCEND_310P')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"${CRISPASR_STORAGE}/crispasr/cann-310p3-20261013/asr-worktree/tests/test_cann_bf16_routing.py\", line 79, in test_actual_predicate_on_310p_and_910b\n    subprocess.run([str(binary)], check=True)\n    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/opt/miniconda/lib/python3.13/subprocess.py\", line 577, in run\n    raise CalledProcessError(retcode, process.args,\n                             output=stdout, stderr=stderr)\nsubprocess.CalledProcessError: Command '['${CRISPASR_STORAGE}/crispasr/cann-310p3-20261013/cann-routing-_m10bh7k/ASCEND_310P']' returned non-zero exit status 6.\n\n----------------------------------------------------------------------\nRan 1 test in 3.227s\n\nFAILED (errors=1)\n"
+    },
+    {
+      "name": "candidate-routing.log",
+      "bytes": 213,
+      "sha256": "466bd619e001cf930e5c3b24fd1343edec7d285d3be0a7205010cf2ec17505ed",
+      "full_log": "test_actual_predicate_on_310p_and_910b (__main__.CannBf16RoutingTest.test_actual_predicate_on_310p_and_910b) ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 1.456s\n\nOK\n"
+    }
+  ],
+  "physical_candidate_validated": false,
+  "production_pin_changed": false,
+  "model_quality_validated": false,
+  "performance_validated": false,
+  "sdk_compile_receipt": "cann-310p-bf16-compile-2026-10-13.json"
+}

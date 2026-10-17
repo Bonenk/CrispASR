@@ -418,8 +418,15 @@ They are vendored as the generator inputs for src/core/omnivoice_lang_table.h
 voice-design instruct vocabulary) — the two literal vocabularies the OmniVoice
 prompt is conditioned on — so that the CI drift gates are hermetic. The
 generated headers are derived data tables, not translations of any OmniVoice
-source code; the CrispASR runtime is an independent implementation. Licensed
-under the Apache License, Version 2.0; full text at
+source code; the CrispASR runtime is an independent implementation.
+
+src/core/omnivoice_audio.h separately ports the audio/text utilities from
+omnivoice/utils/audio.py and omnivoice/utils/text.py at commit
+08be0b4ccbac3e13e374e86fbfead4b4cac343e2. This standalone utility header is
+currently exercised only by the diagnostic probe/oracle; the production
+speech pipeline does not call it. The oracle retains the original source
+headers and copyright notices. The Apache-2.0 license text is included at
+third_party/omnivoice/LICENSE and is also available at
 http://www.apache.org/licenses/LICENSE-2.0
 
 

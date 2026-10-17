@@ -1,0 +1,93 @@
+{
+  "candidate_source": "69d9eac4b10e1cc857e4e2e90b1101fd40983b6b",
+  "tested_source": "a479139977210766cf93860f77fa8fdf99118d38",
+  "original_authorship_commit": "a140b3d7",
+  "original_pr_commit": "a1ae00dff82185c3ec8a44cef3054a09d3ab70b1",
+  "original_pr_head": "381f3a3aeb5fc9f5e87d8b2408fcdf69875c0f47",
+  "source_bytes_unchanged_after_attribution": true,
+  "integrated": true,
+  "heavy_run": 38739872601,
+  "lint_run": 38739877120,
+  "hosted_status": "success",
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "source": "a479139977210766cf93860f77fa8fdf99118d38",
+    "verified_arrays": 1601,
+    "original_and_native_replayed_calls": 738,
+    "clean_exact": 369,
+    "fade_pass": 369,
+    "max_fade_absolute_error": 0.0,
+    "text_exact": 18,
+    "actual_elf_sha256": "123675aa7f009292c1eac38eee9c4f545c4d8025bbc1c5c1c2c05c796935f583",
+    "negative_controls": [
+      "unprocessed",
+      "scale",
+      "sample_order"
+    ],
+    "runtime_acceptance": false,
+    "speech_acceptance": false,
+    "scope": "Standalone inherited utility header/probe and actual pinned original functions only; no production call/default or full PR acceptance."
+  },
+  "publication": {
+    "revision": "1ac18a4e22a6b23ca7769849e68608cba0eae26a",
+    "path": "omnivoice/utility-split-20261015/complete-utility-split-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1ac18a4e22a6b23ca7769849e68608cba0eae26a/omnivoice/utility-split-20261015/complete-utility-split-v1.zip",
+    "bytes": 37100271,
+    "sha256": "c825004f1e04378d7b7fa99dc7b98bafeabc1d06fcf1e18b9ec42865052f2d1f",
+    "payloads": 1620,
+    "anonymous_full_sha256_verified": true
+  },
+  "runtime_acceptance": false,
+  "speech_acceptance": false,
+  "production_defaults_changed": false,
+  "integration": "5d582d75b71f5e7a29f6728dcdc93aa091ba6dd8",
+  "source_bytes_unchanged_after_rebase": true,
+  "hosted_independent_audit": {
+    "independent_audit_pass": true,
+    "source": "a479139977210766cf93860f77fa8fdf99118d38",
+    "verified_arrays": 1601,
+    "original_and_native_replayed_calls": 738,
+    "clean_exact": 369,
+    "fade_pass": 369,
+    "max_fade_absolute_error": 0.0,
+    "text_exact": 18,
+    "actual_elf_sha256": "123675aa7f009292c1eac38eee9c4f545c4d8025bbc1c5c1c2c05c796935f583",
+    "negative_controls": [
+      "unprocessed",
+      "scale",
+      "sample_order"
+    ],
+    "runtime_acceptance": false,
+    "speech_acceptance": false,
+    "scope": "Standalone inherited utility header/probe and actual pinned original functions only; no production call/default or full PR acceptance."
+  },
+  "hosted_publication": {
+    "revision": "71ef6bdbea06e77f26b2fb2951ea8f371fb5b63f",
+    "path": "omnivoice/utility-split-20261015/complete-hosted-utility-split-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/71ef6bdbea06e77f26b2fb2951ea8f371fb5b63f/omnivoice/utility-split-20261015/complete-hosted-utility-split-v1.zip",
+    "bytes": 32488123,
+    "sha256": "3a60926485cb4354ec0763e829a92fc2ea54558db64ae37cc4fbaef220a30139",
+    "payloads": 11,
+    "anonymous_full_sha256_verified": true
+  },
+  "hosted_artifact": {
+    "id": 11980620391,
+    "node_id": "MDg6QXJ0aWZhY3QxMTk4MDYyMDM5MQ==",
+    "name": "heavy-38739872601",
+    "size_in_bytes": 36669267,
+    "url": "https://api.github.com/repos/CrispStrobe/CrispASR/actions/artifacts/11980620391",
+    "archive_download_url": "https://api.github.com/repos/CrispStrobe/CrispASR/actions/artifacts/11980620391/zip",
+    "expired": false,
+    "digest": "sha256:135b5b6681c32260414305a6eef8d7cabfc4f1b61b83ecfa64cb39d041c4ed65",
+    "created_at": "2026-10-15T14:10:20Z",
+    "updated_at": "2026-10-15T14:10:20Z",
+    "expires_at": "2026-10-29T14:10:14Z",
+    "workflow_run": {
+      "id": 38739872601,
+      "repository_id": 1195602794,
+      "head_repository_id": 1195602794,
+      "head_branch": "fix/omnivoice-utility-split-20261015",
+      "head_sha": "a479139977210766cf93860f77fa8fdf99118d38"
+    }
+  }
+}

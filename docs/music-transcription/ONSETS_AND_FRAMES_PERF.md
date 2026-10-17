@@ -52,7 +52,7 @@ marginal. It is not closed.
 ## The measurement box
 
 Hetzner VPS, 4 vCPU Skylake-SP (AVX-512F, **no** AVX-512 VNNI), 7 GB RAM, 11 GB
-swap, `/mnt/volume1` at 97%. Heavily contended: several agent sessions run
+swap, `${CRISPASR_WORKTREES}` at 97%. Heavily contended: several agent sessions run
 concurrently, and wall-clock swings 2–4× run to run — a 4 s clip that costs
 2.8 CPU-seconds took 19 s of wall time while the F1 job was running. **CPU time
 is the primary metric throughout and wall is reported only as a lower bound.**
@@ -82,21 +82,21 @@ gate (it exits 0 unless the dump subprocess itself fails).
 So the dumper was built first, on the shape §5.3 documents:
 
 ```bash
-PY=/mnt/volume1/miniconda/bin/python
+PY=${CRISPASR_WORKTREES}/miniconda/bin/python
 export MKL_NUM_THREADS=1
 
 # 1. the mel this runtime actually computes
-build/bin/oaf-parity-dump model.gguf audio16k.wav /mnt/storage/oaf-parity/ggml 1
+build/bin/oaf-parity-dump model.gguf audio16k.wav ${CRISPASR_STORAGE}/oaf-parity/ggml 1
 
 # 2. the per-stage reference, run on THAT mel
 $PY tools/reference_backends/onsets_and_frames.py \
-    --onnx   /mnt/storage/tuner-bench/onnx/onsets_and_frames.onnx \
-    --mel    /mnt/storage/oaf-parity/ggml.mel.f32 \
-    --output /mnt/storage/oaf-parity/ref.gguf
+    --onnx   ${CRISPASR_STORAGE}/tuner-bench/onnx/onsets_and_frames.onnx \
+    --mel    ${CRISPASR_STORAGE}/oaf-parity/ggml.mel.f32 \
+    --output ${CRISPASR_STORAGE}/oaf-parity/ref.gguf
 
 # 3. per-stage cosine, gated at COS_THRESHOLD = 0.999
 build/bin/crispasr-diff onsets-and-frames model.gguf \
-    /mnt/storage/oaf-parity/ref.gguf audio16k.wav
+    ${CRISPASR_STORAGE}/oaf-parity/ref.gguf audio16k.wav
 ```
 
 26 stages: `mel`; `{onset,offset,activation,velocity}_{conv0,conv1,conv2,fc}`;

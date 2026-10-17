@@ -1,0 +1,216 @@
+{
+  "scope": "Actual v4 terminal failure from lost host driver lookup; tested wrapper repair and v5 actual GPU submission. No model/GPU acceptance.",
+  "v4_preservation": {
+    "terminal": "ERROR",
+    "source": "bf895ecd652a90ed18ff095c09596f7a27dd4f36",
+    "files": [
+      {
+        "path": "complete-kernel-log.json",
+        "bytes": 18293,
+        "sha256": "cd2a7974b1e891935c14d1fad8945b2346ac634a9c0ba9cdaa89caecfb6109fe"
+      },
+      {
+        "path": "complete-kernel.stdout-stderr.log",
+        "bytes": 9410,
+        "sha256": "ed84eb097522469d0fae6337381b5ec4327c115ffff500da006a1a6d46bb3a32"
+      },
+      {
+        "path": "output/crispasr-dia-cuda-attention-control.log",
+        "bytes": 18293,
+        "sha256": "cd2a7974b1e891935c14d1fad8945b2346ac634a9c0ba9cdaa89caecfb6109fe"
+      },
+      {
+        "path": "output/executed-kernel.py",
+        "bytes": 6987,
+        "sha256": "b4817824f86d779f0521c6a6b15d9e25ed32260468fd3202594800d707c40aac"
+      },
+      {
+        "path": "output/hardware-preflight.json",
+        "bytes": 653,
+        "sha256": "2c674fb6335d57f8b6813fdd281e02e1f7cf77aa4a191f600e1501e59f053bde"
+      },
+      {
+        "path": "output/input-manifest.json",
+        "bytes": 1099,
+        "sha256": "5d072196b68490e0b9eebb9c8da86ca318193db204ad1fe9c09c0d6172d604b5"
+      },
+      {
+        "path": "output/neural-export.log",
+        "bytes": 556,
+        "sha256": "ac574218fe3ace2d88a5d1e07f46519dd19bc754408079773df409b4f0d1a2a6"
+      },
+      {
+        "path": "output/neural-f32-physical-audit.json",
+        "bytes": 99351,
+        "sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368"
+      },
+      {
+        "path": "output/original-gpu-asr.log",
+        "bytes": 4373,
+        "sha256": "f6a24b1eda7aa2df670bfc434ebe4fb66e59d99e1a4cff0ded9e7dde4c5f6151"
+      },
+      {
+        "path": "output/original-late.json",
+        "bytes": 247,
+        "sha256": "bfee85837adbcc326a3c39e0bd4f55285f665897a5b455bdb03cca4a38414405"
+      },
+      {
+        "path": "output/original-late.npy",
+        "bytes": 2478208,
+        "sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d"
+      },
+      {
+        "path": "output/original-source-clone.log",
+        "bytes": 55,
+        "sha256": "fdebd3a9ead408696675892fd538f87deaac2051cb7bd2f3dc271b4a5e24591c"
+      },
+      {
+        "path": "output/original-source-pin.log",
+        "bytes": 69,
+        "sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+      },
+      {
+        "path": "output/physical-codec-audit.json",
+        "bytes": 36108,
+        "sha256": "8832b98c4bb0ec036accd3bd5a6ca151c1ffa04f1465b72b4f6af3a8c8e9970a"
+      },
+      {
+        "path": "output/progress.jsonl",
+        "bytes": 2866,
+        "sha256": "f2b730de9d2bec665b7c322677e6b27cc60472b727814b94201465263bc3394f"
+      },
+      {
+        "path": "output/receipt.json",
+        "bytes": 2275,
+        "sha256": "9fc4fea27b3a4acd0fa957319f8b201eb6b3381a7efd5241de77390c98507ea9"
+      },
+      {
+        "path": "output/sources/examples/cli/crispasr_dia_diff.h",
+        "bytes": 13685,
+        "sha256": "08f7d4e54569b15b90f1465d275e80ec1f3bade259aa30b7d757a3a839607b44"
+      },
+      {
+        "path": "output/sources/src/dia_tts.cpp",
+        "bytes": 111490,
+        "sha256": "9c7b837e1e08a22eb08d8ebecb5eb03a9dac3ec9dfd86944c1ba58ca5f4781f3"
+      },
+      {
+        "path": "output/sources/tools/ci-heavy/dia_attention_cuda_control.py",
+        "bytes": 16233,
+        "sha256": "5e315cd927caf0190e78bb6c34cf0158dca68a086b01dd9c3cd577e8ae1b208a"
+      },
+      {
+        "path": "output/verified-codec-download.log",
+        "bytes": 63,
+        "sha256": "b14a4144a7fdf101ee1656b43acbadabeb9dc3446281e02c4586c68d6eb557ba"
+      }
+    ],
+    "raw_log_entries": 151,
+    "cause": "LD_LIBRARY_PATH replaced inherited NVIDIA driver search path; CUDA plugin failed to resolve libcuda.so.1. ASR fell back to CPU and strict device guard rejected it.",
+    "gpu_executed": false
+  },
+  "v4_receipt": {
+    "source": "bf895ecd652a90ed18ff095c09596f7a27dd4f36",
+    "tracked_worktree_dirty": false,
+    "worker_sha256": "5e315cd927caf0190e78bb6c34cf0158dca68a086b01dd9c3cd577e8ae1b208a",
+    "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+    "capture_source": "42b111c5e6006e7dcc82afff2b1b43da7c15861c",
+    "capture_ledger_sha256": "657d6aaa00ed26726c6efdba12f6d2c1c0b3a8208b846f3a32d14fea251d896d",
+    "package_source": "2328f15ce6f73c05c8aab44fa629a49e2d42c44d",
+    "package_ledger_sha256": "047f5a1bc870ecce0c61279c1fa8cbba6f654fb190b4df1bb8f87f40e646e49a",
+    "runs": [
+      {
+        "name": "original-source-clone",
+        "exit": 0,
+        "log_sha256": "fdebd3a9ead408696675892fd538f87deaac2051cb7bd2f3dc271b4a5e24591c",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      },
+      {
+        "name": "original-source-pin",
+        "exit": 0,
+        "log_sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      },
+      {
+        "name": "neural-export",
+        "exit": 0,
+        "log_sha256": "ac574218fe3ace2d88a5d1e07f46519dd19bc754408079773df409b4f0d1a2a6",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      },
+      {
+        "name": "verified-codec-download",
+        "exit": 0,
+        "log_sha256": "b14a4144a7fdf101ee1656b43acbadabeb9dc3446281e02c4586c68d6eb557ba",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      },
+      {
+        "name": "original-gpu-asr",
+        "exit": 0,
+        "log_sha256": "f6a24b1eda7aa2df670bfc434ebe4fb66e59d99e1a4cff0ded9e7dde4c5f6151",
+        "gpu_peak_mib_lower_bound": 0,
+        "cuda_scheduler_splits": 0
+      }
+    ],
+    "step": 978,
+    "production_defaults_changed": false,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "torch_reinstalled": false,
+    "scope": "Actual CUDA observation/replay diagnostic; native free speech remains independently unaccepted",
+    "model_sha256": "8128132c538e1aef83f2fb5257b4f71d28a67c2a5a0d54d0a1f0a3b0f5d6b73d",
+    "codec_sha256": "6db51da2333868918b6d476008d92036a53400bc816ff7e1d2b1e973499e4135",
+    "original_weights_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26"
+  },
+  "v4_hardware": {
+    "version": "2026-10-13.dia-cuda-attention.4",
+    "source": "bf895ecd652a90ed18ff095c09596f7a27dd4f36",
+    "input_revision": "61eafbd6901d5f8fe72025acf8c86eb078ff5bf9",
+    "manifest_sha256": "5d072196b68490e0b9eebb9c8da86ca318193db204ad1fe9c09c0d6172d604b5",
+    "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+    "kernel_sha256": "b4817824f86d779f0521c6a6b15d9e25ed32260468fd3202594800d707c40aac",
+    "torch_reinstalled": false,
+    "gpu_executed": false,
+    "model_acceptance": false,
+    "worker_sha256": "5e315cd927caf0190e78bb6c34cf0158dca68a086b01dd9c3cd577e8ae1b208a",
+    "cuda_attention_diagnostic_pass": false
+  },
+  "v5_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "8badb32fd919f3087d2e97ee73f309cf66ed135b",
+    "worker_source": "6e1a8bb1074c8dc20952a5e0d1a3cc1e0b1b0bc2",
+    "manifest_sha256": "c3c83dc0958cff1171d4d6dcd471cd48f53df8e0414d8da8e12d43052e5011f4",
+    "manifest_anonymously_verified": true,
+    "payloads_unchanged_from_anonymously_verified_revision": "61eafbd6901d5f8fe72025acf8c86eb078ff5bf9",
+    "large_payload_lfs_sha256_matches": true,
+    "small_ledger_anonymously_verified": true,
+    "prior_terminal_v4_preserved": true
+  },
+  "v5_submission": {
+    "worker_source": "6e1a8bb1074c8dc20952a5e0d1a3cc1e0b1b0bc2",
+    "input_revision": "8badb32fd919f3087d2e97ee73f309cf66ed135b",
+    "manifest_sha256": "c3c83dc0958cff1171d4d6dcd471cd48f53df8e0414d8da8e12d43052e5011f4",
+    "kernel_sha256": "530a11fb5f06ca7d39265c92be17109c629e96183a0dd8d9d4b112e47686536a",
+    "script_version": "2026-10-13.dia-cuda-attention.5",
+    "kernel_version": 5,
+    "submitted": true,
+    "submission_exit": 0,
+    "submitted_at": "2026-10-13T19:50:30.760184+00:00",
+    "kernel_ref": "${KAGGLE_ACCOUNT}/crispasr-dia-cuda-attention-control",
+    "previous_v4_terminal_preserved": true,
+    "status": "KernelWorkerStatus.RUNNING",
+    "status_observed_at": "2026-10-13T19:51:21.973018+00:00",
+    "submitted_source_pulled_verified": true,
+    "pulled_kernel_sha256": "530a11fb5f06ca7d39265c92be17109c629e96183a0dd8d9d4b112e47686536a"
+  },
+  "driver_regression": {
+    "tests": 9,
+    "all_passed": true,
+    "log_sha256": "257e11718b66f90b51f4aa43f03474be7355cf135ca600c436fcf96b0b8185cd"
+  },
+  "runtime_and_model_and_package_bytes_unchanged": true
+}

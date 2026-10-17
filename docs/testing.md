@@ -29,7 +29,7 @@ are gated by env vars and **SKIP cleanly** when the vars are unset
 
 ```bash
 # Point at your local model cache:
-export CRISPASR_MODELS_DIR=/mnt/storage/gguf-models
+export CRISPASR_MODELS_DIR=${CRISPASR_STORAGE}/gguf-models
 
 # Source all env vars at once:
 source tests/env-live-tests.sh
@@ -114,7 +114,7 @@ locations in order:
 5. `~/.cache/huggingface/hub` (HF download cache)
 
 There are deliberately **no** absolute machine-specific defaults in this
-list (`/mnt/storage/gguf-models`, `/Volumes/backups/...` and friends were
+list (`${CRISPASR_STORAGE}/gguf-models`, `/Volumes/backups/...` and friends were
 removed): point `$CRISPASR_MODELS_DIR` at a dedicated model volume instead.
 
 If none of the probed paths has the file, it downloads from HuggingFace.

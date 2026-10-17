@@ -1,0 +1,246 @@
+{
+  "failed_evidence_audit_pass": true,
+  "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+  "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "raw_github_api_digest_matches": true,
+  "payloads_verified": 36,
+  "anonymous_public_files_verified": 37,
+  "source_snapshots_verified": 14,
+  "hidden_workflow_snapshot_recovered_from_verified_public_checkpoint": true,
+  "prior_audit_failure": "v1 assumed GH upload included hidden .github method snapshot; public checkpoint retains it, fully hash/source-verified here",
+  "public_revision": "702d609ab72e54f313f7665d2fa4c2c8a605deba",
+  "public_prefix": "index-echo-9b/owned-ffn-20261017/v1",
+  "build_abi_and_download_steps_pass": true,
+  "hosted_tiny_controls_pass": true,
+  "physical_weight_hash_scope": "All three full SHA checks executed successfully on producer; original neural weights not downloaded or independently rehashed locally",
+  "failure": "First OFF arm lacks block observer, llm_block_0 unavailable",
+  "no_native_9b_arrays_or_original_attribution": true,
+  "complete_model_attribution": false,
+  "q4_acceptance": false,
+  "speech_acceptance": false,
+  "production_changes": false,
+  "files": [
+    {
+      "path": "abi-exports.log",
+      "bytes": 410073,
+      "sha256": "8e349dd0fd5eda51892245782c4b454d8f4b809733d8a5e75cc064b53e2c6398",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "apt-update.log",
+      "bytes": 1803,
+      "sha256": "db275b0215845f99a14fc613174f358b1ab0c78d95764c04ca6d42c5d1a194e8",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "build.log",
+      "bytes": 414595,
+      "sha256": "5085a32bd5b19f637d319bf912efdb441d6d76377a32fd8c47d1a19ccb73f891",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "configure.log",
+      "bytes": 2356,
+      "sha256": "b5e5b9f28da7327efd6d06493d1530a7b7451d91c98eb4b0545beb26bd42d517",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "install-build-tools.log",
+      "bytes": 2487,
+      "sha256": "767bf8b1ff03bc992b570bf5e91fb788ed1c5992cc3b7ba046e3192f51f109d2",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "jfk/audio.wav",
+      "bytes": 352078,
+      "sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libcrispasr.so",
+      "bytes": 25357512,
+      "sha256": "2b0cf2e2f4368708b30e574573b89361dbf36696f10b7a896a552d156c50d733",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libcrispasr.so.0.8.43",
+      "bytes": 25357512,
+      "sha256": "2b0cf2e2f4368708b30e574573b89361dbf36696f10b7a896a552d156c50d733",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libcrispasr.so.1",
+      "bytes": 25357512,
+      "sha256": "2b0cf2e2f4368708b30e574573b89361dbf36696f10b7a896a552d156c50d733",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-base.so",
+      "bytes": 964048,
+      "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-base.so.0",
+      "bytes": 964048,
+      "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-base.so.0.26.0",
+      "bytes": 964048,
+      "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-cpu.so",
+      "bytes": 1431992,
+      "sha256": "91cc102606baf805f0ee84b30899e70a7a0ec12fbe5aaa92c4e268eaf7802cf1",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-cpu.so.0",
+      "bytes": 1431992,
+      "sha256": "91cc102606baf805f0ee84b30899e70a7a0ec12fbe5aaa92c4e268eaf7802cf1",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml-cpu.so.0.26.0",
+      "bytes": 1431992,
+      "sha256": "91cc102606baf805f0ee84b30899e70a7a0ec12fbe5aaa92c4e268eaf7802cf1",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml.so",
+      "bytes": 60720,
+      "sha256": "47bf8a207510923984e1c06ffe35a9db55d4db28d0b7da145be80c1ee072253c",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml.so.0",
+      "bytes": 60720,
+      "sha256": "47bf8a207510923984e1c06ffe35a9db55d4db28d0b7da145be80c1ee072253c",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libggml.so.0.26.0",
+      "bytes": 60720,
+      "sha256": "47bf8a207510923984e1c06ffe35a9db55d4db28d0b7da145be80c1ee072253c",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "libs/libwhisper.so",
+      "bytes": 25357512,
+      "sha256": "2b0cf2e2f4368708b30e574573b89361dbf36696f10b7a896a552d156c50d733",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/.github/workflows/heavy-cpu.yml",
+      "bytes": 7210,
+      "sha256": "1055c1484f83916ab75166d4094c3c59d40af3436c66f2d918a6fb7d8795cb57",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/LICENSE",
+      "bytes": 1184,
+      "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/examples/talk-llama/llama-graph.cpp",
+      "bytes": 93753,
+      "sha256": "5b4dadd2a15d48e00a1db10403a1f3ddbd963a5c40ecde1ee2a43a792e84355e",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/examples/talk-llama/models/qwen35.cpp",
+      "bytes": 15009,
+      "sha256": "56e8cf6d68c7dacce445c65c17e4abec1defc7754ad46c54a73ee22ec77a858b",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/ggml/LICENSE",
+      "bytes": 1078,
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/original-modeling-qwen3_5.py",
+      "bytes": 96454,
+      "sha256": "3e2b6239e4b2c3e512d4f9836a1dba12e975ae652407e84f2d3c2beebf0c9528",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/src/core/index_echo_ffn_capture.h",
+      "bytes": 2785,
+      "sha256": "e0ae298a065c45549f4b337cac1bbc82ec3be1cfa432589702e80b4d58e797cf",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/src/index_echo.cpp",
+      "bytes": 28471,
+      "sha256": "68fdc68d8cf09765e24a6a93056835168f0a9c01419d62ed729ba2608ac6f3dd",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/src/index_echo.h",
+      "bytes": 2586,
+      "sha256": "f2faf09d6d7ff0d38f82f98ffe5d524156312baf04ed3ba97bbea0c913812822",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/tools/ci-heavy/echo-owned-ffn/README.md",
+      "bytes": 2656,
+      "sha256": "83a2b4607275b87bf153cc8b452a2c149060e79381640fc045cc3f6b61617009",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/tools/ci-heavy/echo-owned-ffn/selftest.py",
+      "bytes": 3762,
+      "sha256": "59caed881336ec26238f04989de1f6a0ee0d6d1b6175d3d3c9178afa55d18de8",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/tools/ci-heavy/echo_owned_ffn.py",
+      "bytes": 5750,
+      "sha256": "9906a5582d40448eff012e1bb690831f96fb71189bf4bf538f50e0b6c1fc9fe8",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/tools/ci-heavy/echo_owned_ffn_run.py",
+      "bytes": 16012,
+      "sha256": "c78f5e567ff926289c36d1016cb169ffc05c3375557a07dc007491375d928351",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "method/tools/reference_backends/index_echo_ffn_capture.py",
+      "bytes": 16266,
+      "sha256": "b8e7cd86e11c490dfcec548405a20e78f94d3afe0c276649b65692707e776b65",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "native-jfk.log",
+      "bytes": 54081,
+      "sha256": "c35b1e8d4737ccf54ecf1aab84c2f0e394fb3201a22f89eba93b0b24c9bacb7d",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "physical-decoder.json",
+      "bytes": 54051,
+      "sha256": "5ef3bd484b31e4011cc9d33cd6f8cc2f92bdd4f9961fb7aae4a30f087df24698",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "tiny-controls.log",
+      "bytes": 609,
+      "sha256": "fdba6b56c3f2cf727e2d39a5b1c62b141d1e365d655994d94ff0f6a5a3f7dc0a",
+      "anonymous_full_download_verified": true
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 9795,
+      "sha256": "91c2a89d73c11299507f923ae932cc06145008b0f057f4d92b54f8d0277c1498",
+      "anonymous_full_download_verified": true
+    }
+  ]
+}

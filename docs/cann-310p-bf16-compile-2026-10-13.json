@@ -1,0 +1,152 @@
+{
+  "scope": "SDK 9.2 beta2 CANN compilation and chip-specific source routing controls; physical candidate execution remains pending",
+  "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723",
+  "ggml_source": "21acf3162beeb4e51260f0f86deda80995423712",
+  "result": {
+    "conclusion": "success",
+    "headSha": "bfb4943ac1e4488e377257a47163a0edcea7d6cd",
+    "jobs": [
+      {
+        "completedAt": "2026-10-13T08:35:00Z",
+        "conclusion": "success",
+        "databaseId": 115190081122,
+        "name": "linux-cann (ubuntu-24.04-arm, 310p, off)",
+        "startedAt": "2026-10-13T08:14:00Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-13T08:14:01Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-13T08:14:00Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:14:09Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-13T08:14:01Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:14:09Z",
+            "conclusion": "success",
+            "name": "Check chip-specific float routing",
+            "number": 3,
+            "startedAt": "2026-10-13T08:14:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:16:36Z",
+            "conclusion": "success",
+            "name": "Free disk space",
+            "number": 4,
+            "startedAt": "2026-10-13T08:14:09Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:34:58Z",
+            "conclusion": "success",
+            "name": "Build",
+            "number": 5,
+            "startedAt": "2026-10-13T08:16:36Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:34:59Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-13T08:34:58Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:34:59Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-13T08:34:59Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723/job/115190081122"
+      },
+      {
+        "completedAt": "2026-10-13T08:39:51Z",
+        "conclusion": "success",
+        "databaseId": 115190081315,
+        "name": "linux-cann (ubuntu-24.04, 910b, on)",
+        "startedAt": "2026-10-13T08:15:06Z",
+        "status": "completed",
+        "steps": [
+          {
+            "completedAt": "2026-10-13T08:15:08Z",
+            "conclusion": "success",
+            "name": "Set up job",
+            "number": 1,
+            "startedAt": "2026-10-13T08:15:07Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:15:14Z",
+            "conclusion": "success",
+            "name": "Run actions/checkout@v6",
+            "number": 2,
+            "startedAt": "2026-10-13T08:15:08Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:15:16Z",
+            "conclusion": "success",
+            "name": "Check chip-specific float routing",
+            "number": 3,
+            "startedAt": "2026-10-13T08:15:14Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:17:35Z",
+            "conclusion": "success",
+            "name": "Free disk space",
+            "number": 4,
+            "startedAt": "2026-10-13T08:15:16Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:39:47Z",
+            "conclusion": "success",
+            "name": "Build",
+            "number": 5,
+            "startedAt": "2026-10-13T08:17:35Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:39:48Z",
+            "conclusion": "success",
+            "name": "Post Run actions/checkout@v6",
+            "number": 10,
+            "startedAt": "2026-10-13T08:39:47Z",
+            "status": "completed"
+          },
+          {
+            "completedAt": "2026-10-13T08:39:48Z",
+            "conclusion": "success",
+            "name": "Complete job",
+            "number": 11,
+            "startedAt": "2026-10-13T08:39:48Z",
+            "status": "completed"
+          }
+        ],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38365667723/job/115190081315"
+      }
+    ],
+    "status": "completed"
+  },
+  "complete_log": {
+    "bytes": 1959244,
+    "sha256": "680fa6d61d6430ae3b9451432e44049ac17bd00ab5ce845741c1be5bd6aaf2a5"
+  },
+  "physical_candidate_validated": false,
+  "production_ggml_pin_changed": false
+}

@@ -1,0 +1,19 @@
+{
+  "scope": "Immutable GGUF header range inspection, not a local whole-model rehash or inference result.",
+  "repo": "cstr/moonshine-tiny-GGUF",
+  "revision": "28281de882bac021e9241e640f44a9a289607e03",
+  "file": "moonshine-tiny.gguf",
+  "linked_model_bytes": 108383136,
+  "linked_model_sha256": "64518aaf5535085075b081c8c1c89532e7cb5160efe90272c73937f179cf5f78",
+  "range_start": 0,
+  "range_bytes": 65536,
+  "range_sha256": "8cd5c26e53e50af036ab58775afe37e1de538b4c40f53123220e37366772630a",
+  "tensor_count": 160,
+  "tensor_type_counts": {
+    "F32": 160
+  },
+  "previous_manifest_f16_description_incorrect": true,
+  "first_run": 38554714421,
+  "first_run_conclusion": "cancelled",
+  "first_run_cancelled_before_any_steps": true
+}

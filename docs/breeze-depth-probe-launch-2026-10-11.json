@@ -1,0 +1,25 @@
+{
+  "source": "f4c8cf0c01dfa32f7fd158d40998e82934aa19d6",
+  "run": 38154207238,
+  "status": "queued",
+  "runner": "ubuntu-latest",
+  "original_case": "design-s1 frame zero",
+  "original_archive_revision": "27896a1fab69d45c8b246eb659823f92a5e0e458",
+  "original_archive_sha256": "13d5eed11955e07f2e5fc2f681df123c1b2b35d2f11998416571dbf962d54f33",
+  "variants": [
+    "original BF16 cached",
+    "original BF16 full prefix",
+    "depth-only FP32 arithmetic on BF16-rounded weights/hidden",
+    "native with original hidden",
+    "native backbone with original embeddings",
+    "native with native assembled embeddings"
+  ],
+  "strict_comparator_controls_passed": 8,
+  "syntax_checks_passed": true,
+  "model_free_rank_gap_scale_rows_checked": 90,
+  "secrets_checks_passed": 4,
+  "secrets_checks_skipped": 0,
+  "model_history_controls_tested": false,
+  "full_speech_asr_tested": false,
+  "acceptance": false
+}

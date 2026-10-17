@@ -6,7 +6,9 @@
 #include "core/silero_context.h"
 #include "core/index_echo_batch.h"
 #include "core/index_echo_connector.h"
+#include "core/index_echo_ffn_capture.h"
 #include "crispasr.h"
+#include "crispasr_imatrix.h"
 #include "ggml-alloc.h"
 #include "llama.h"
 
@@ -44,6 +46,8 @@ struct index_echo_context {
     int position = 0;
     llama_token audio_pad = LLAMA_TOKEN_NULL, im_end = LLAMA_TOKEN_NULL;
     bool capture = false;
+    bool capture_ffn = false;
+    ggml_backend_sched_eval_callback imatrix = nullptr;
     bool projection = false;
     std::map<std::string, std::vector<float>> stages;
     std::vector<int32_t> prompt_ids;
@@ -73,6 +77,21 @@ struct Bench {
 };
 
 bool capture_decoder(ggml_tensor* t, bool ask, void* user);
+// Request either observer's tensors, then invoke only the observers that
+// requested this node. Returning false on an unrelated post-compute node
+// would terminate llama's scheduler, so preserve each selected observer's
+// continuation result rather than calling capture unconditionally.
+bool observe_decoder(ggml_tensor* t, bool ask, void* user) {
+    auto* ctx = static_cast<index_echo_context*>(user);
+    const bool collect = ctx->imatrix && ctx->imatrix(t, true, nullptr);
+    const bool capture = capture_decoder(t, true, user);
+    if (ask)
+        return collect || capture;
+    if (collect && !ctx->imatrix(t, false, nullptr))
+        return false;
+    return !capture || capture_decoder(t, false, user);
+}
+
 llama_context* create_decoder(index_echo_context* ctx, uint32_t capacity) {
     auto cp = llama_context_default_params();
     cp.n_ctx = capacity;
@@ -81,7 +100,8 @@ llama_context* create_decoder(index_echo_context* ctx, uint32_t capacity) {
     cp.n_threads = ctx->params.n_threads;
     cp.n_threads_batch = ctx->params.n_threads;
     cp.flash_attn_type = ctx->params.flash_attn ? LLAMA_FLASH_ATTN_TYPE_AUTO : LLAMA_FLASH_ATTN_TYPE_DISABLED;
-    cp.cb_eval = capture_decoder;
+    ctx->imatrix = crispasr_imatrix_callback();
+    cp.cb_eval = ctx->imatrix ? observe_decoder : capture_decoder;
     cp.cb_eval_user_data = ctx;
     return llama_init_from_model(ctx->model, cp);
 }
@@ -116,7 +136,15 @@ float* copy_floats(const float* x, size_t count) {
 // callback reads before scratch reuse; no production synchronization overhead.
 bool capture_decoder(ggml_tensor* t, bool ask, void* user) {
     auto* ctx = (index_echo_context*)user;
-    if (!ctx->capture || strncmp(t->name, "post_ffn-", 9) != 0)
+    if (!ctx->capture)
+        return false;
+    if (ctx->capture_ffn) {
+        std::string key;
+        bool input, output;
+        if (core_index_echo::ffn_capture_name(t->name, key, input, output))
+            return core_index_echo::capture_ffn(t, ask, ctx->stages);
+    }
+    if (strncmp(t->name, "post_ffn-", 9) != 0)
         return false;
     if (ask)
         return true;
@@ -546,11 +574,14 @@ float* index_echo_prefill(index_echo_context* ctx, const float* audio, int rows,
     }
     llama_memory_clear(llama_get_memory(ctx->decoder), true);
     ctx->position = 0;
-    ctx->capture = getenv("CRISPASR_INDEX_ECHO_DUMP_STAGES") != nullptr;
+    const char* ffn = getenv("CRISPASR_INDEX_ECHO_DUMP_FFN");
+    ctx->capture_ffn = ffn && strcmp(ffn, "1") == 0;
+    ctx->capture = ctx->capture_ffn || getenv("CRISPASR_INDEX_ECHO_DUMP_STAGES") != nullptr;
     bool ok =
         decode(ctx, ctx->prompt_ids.data(), nullptr, (int)begin, 0) && decode(ctx, nullptr, audio, rows, dim) &&
         decode(ctx, ctx->prompt_ids.data() + begin + rows, nullptr, (int)(ctx->prompt_ids.size() - begin - rows), 0);
     ctx->capture = false;
+    ctx->capture_ffn = false;
     if (!ok)
         return nullptr;
     *n_vocab = llama_vocab_n_tokens(ctx->vocab);

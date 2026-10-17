@@ -1,0 +1,84 @@
+{
+  "independent_compile_audit_pass": true,
+  "source": "ca4c12c4cfec475c0009f9718a18ffb42d2cda6a",
+  "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "run": 38536737288,
+  "run_url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38536737288",
+  "conclusion": "success",
+  "log_zip_bytes": 385361,
+  "log_zip_sha256": "6c9add26bf34c4e51ddd6d34a690eb4b6b41f25e3ab942192c68442669464af6",
+  "jobs": [
+    {
+      "name": "linux-cann (ubuntu-24.04-arm, 310p, off)",
+      "job_id": 115761380199,
+      "conclusion": "success",
+      "completed_at": "2026-10-14T09:23:29Z",
+      "container_sha256": "c2c20af86d7737ebf2373ebe0bf226edae80896e6de943d82fb50ccd08252a86",
+      "built_target_evidence": {
+        "ggml-cann": "2026-10-14T09:22:56.7648234Z [ 40%] Built target ggml-cann",
+        "crispasr-cli": "2026-10-14T09:22:16.9454330Z [100%] Built target crispasr-cli",
+        "crispasr-lib": "2026-10-14T09:22:51.1366035Z [100%] Built target crispasr-lib",
+        "crispasr-diff": "2026-10-14T09:22:50.3283261Z [100%] Built target crispasr-diff",
+        "crispasr-quantize": "2026-10-14T09:22:56.6661038Z [100%] Built target crispasr-quantize",
+        "test-backend-ops": "2026-10-14T09:23:27.0455807Z [100%] Built target test-backend-ops"
+      },
+      "actual_link_lines": [
+        "2026-10-14T09:17:19.6914150Z [  4%] Linking CXX static library libcrispasr_c2pa_native.a",
+        "2026-10-14T09:17:32.5029649Z [ 12%] Linking CXX shared library libggml-cann.so",
+        "2026-10-14T09:17:56.5869181Z [ 25%] Linking CXX static library libcrispasr-vad-encdec.a",
+        "2026-10-14T09:18:04.3230525Z [ 26%] Linking CXX static library libcrispasr-core.a",
+        "2026-10-14T09:19:52.7686566Z [ 62%] Linking CXX static library libcrispasr-llama-core.a",
+        "2026-10-14T09:20:57.8416390Z [ 82%] Linking CXX shared library libcrispasr.so",
+        "2026-10-14T09:22:19.9807024Z [100%] Linking CXX static library libcrispasr-diff-lib.a",
+        "2026-10-14T09:22:50.0205120Z [100%] Linking CXX executable ../../bin/crispasr-diff",
+        "2026-10-14T09:22:56.3792282Z [100%] Linking CXX executable ../../bin/crispasr-quantize",
+        "2026-10-14T09:23:26.7611416Z [100%] Linking CXX executable ../../bin/test-backend-ops"
+      ],
+      "capacity_tests": 4,
+      "bf16_routing_cases_per_chip": 13,
+      "checkout_ggml_verified": true,
+      "build_log_sha256": "97810fc5658f24af67954e2472a2fa759c764a3eb78a499f61a1abbf237aa420"
+    },
+    {
+      "name": "linux-cann (ubuntu-24.04, 910b, on)",
+      "job_id": 115761380569,
+      "conclusion": "success",
+      "completed_at": "2026-10-14T09:30:19Z",
+      "container_sha256": "0c8097e72727bfcc2f761b11abdceb9a1a54f6b1061341c7d3a78dbcee2dba3a",
+      "built_target_evidence": {
+        "ggml-cann": "2026-10-14T09:29:50.3148107Z [ 40%] Built target ggml-cann",
+        "crispasr-cli": "2026-10-14T09:29:16.6031763Z [100%] Built target crispasr-cli",
+        "crispasr-lib": "2026-10-14T09:29:44.9587236Z [100%] Built target crispasr-lib",
+        "crispasr-diff": "2026-10-14T09:29:43.5057548Z [100%] Built target crispasr-diff",
+        "crispasr-quantize": "2026-10-14T09:29:50.1773085Z [100%] Built target crispasr-quantize",
+        "test-backend-ops": "2026-10-14T09:30:17.0387916Z [100%] Built target test-backend-ops"
+      },
+      "actual_link_lines": [
+        "2026-10-14T09:21:24.2122945Z [  4%] Linking CXX static library libcrispasr_c2pa_native.a",
+        "2026-10-14T09:21:44.9137897Z [ 12%] Linking CXX shared library libggml-cann.so",
+        "2026-10-14T09:22:22.9824396Z [ 25%] Linking CXX static library libcrispasr-vad-encdec.a",
+        "2026-10-14T09:22:37.6468442Z [ 26%] Linking CXX static library libcrispasr-core.a",
+        "2026-10-14T09:25:22.2148169Z [ 62%] Linking CXX static library libcrispasr-llama-core.a",
+        "2026-10-14T09:27:25.9140395Z [ 82%] Linking CXX shared library libcrispasr.so",
+        "2026-10-14T09:29:21.2890642Z [100%] Linking CXX static library libcrispasr-diff-lib.a",
+        "2026-10-14T09:29:43.2382950Z [100%] Linking CXX executable ../../bin/crispasr-diff",
+        "2026-10-14T09:29:49.9135308Z [100%] Linking CXX executable ../../bin/crispasr-quantize",
+        "2026-10-14T09:30:16.7909980Z [100%] Linking CXX executable ../../bin/test-backend-ops"
+      ],
+      "capacity_tests": 4,
+      "bf16_routing_cases_per_chip": 13,
+      "checkout_ggml_verified": true,
+      "build_log_sha256": "d3243b6b90c1a603f55ab7e9cd532c89b0616c06ddeac7ff5b994c61fa9df079"
+    }
+  ],
+  "scope": "SDK9.2 beta2 compilation and source regression controls only; physical SDK9.1 operator proof is separate, model/quantized speech/performance remain unvalidated.",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-rope-capacity/complete-sdk-proof.zip",
+    "bytes": 824796,
+    "sha256": "2f2709468f2ffc7a083f51e8977e33c4789a29cf430a5e87e45c6df1c7916832",
+    "payloads": 9,
+    "anonymous_verified": true,
+    "revision": "2b1a7c30a1ed50a6147ca141715d81b4fe6e5ba7"
+  }
+}

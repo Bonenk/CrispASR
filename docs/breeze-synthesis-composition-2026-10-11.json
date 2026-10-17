@@ -1,0 +1,62 @@
+{
+  "source": "a59772ba7f510518c9a704992d993faedcccff0e",
+  "branch": "test/breeze-synthesis-composition",
+  "integration_ci": 38156532213,
+  "integration_ci_status_at_recording": "queued",
+  "parents": {
+    "main_before_composition": "16b69cab5",
+    "breeze_diagnostics": "f4c8cf0c01dfa32f7fd158d40998e82934aa19d6",
+    "tts_ownership": "e1e504536d3df88286ce51fd908597554d230504",
+    "voice_cache": "1bc158ed979cc6351b77317e7f1cbfc73baf0d86"
+  },
+  "controls": {
+    "breeze_dispatch": {
+      "passed": 7,
+      "seconds": 0.852,
+      "parent_529_errors": 5,
+      "parent_531_errors": 4,
+      "cases": [
+        "plain",
+        "clone",
+        "design",
+        "direction",
+        "reused_context_80_dispatches",
+        "failure_preserves_request_and_zero_output_count",
+        "optional_output_count"
+      ],
+      "backend": "compiled production dispatch with parameter-recording stubs"
+    },
+    "tts_ownership": {
+      "passed": 4,
+      "seconds": 1.833
+    },
+    "session_utf8": {
+      "passed": 4,
+      "seconds": 2.004
+    },
+    "strict_guided_comparator": {
+      "passed": 8,
+      "seconds": 0.44
+    },
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 50.705,
+      "account_environment_set": true
+    },
+    "full_c_api_syntax_check": {
+      "passed": true,
+      "cxx_standard": 17,
+      "c2pa_include": "third_party/c2pa-audio/src",
+      "breeze_backend_enabled": true
+    }
+  },
+  "limitations": [
+    "No real-model synthesis or speech acceptance from dispatch stubs.",
+    "No model/server ASR or speaker validation yet.",
+    "Syntax check enables Breeze; full configured integration builds are pending.",
+    "Generated-code parity remains failed in all eight independent guided cases.",
+    "Pending synthesis features remain outside main and release scope."
+  ],
+  "preserved_contributor_histories": true
+}

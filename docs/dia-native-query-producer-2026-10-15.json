@@ -1,0 +1,712 @@
+{
+  "candidate_source": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+  "integrated": true,
+  "producer": {
+    "scope": "One-step native Q projection/RoPE attribution with exact captured control.\n\nUses only the 16 MiB physically audited query matrix and small owned arrays.\nNo full model, speech, GPU, optimization or default acceptance is performed.\n",
+    "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "producer_sha256": "82041b1b6ae6f3e24e211f0a2fa9b8a140f17f159bdb6347244464633834a52b",
+    "runs": [
+      {
+        "name": "mode-0-threads-1",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-0-threads-1",
+          "0",
+          "1"
+        ]
+      },
+      {
+        "name": "mode-0-threads-1-repeat",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-0-threads-1-repeat",
+          "0",
+          "1"
+        ]
+      },
+      {
+        "name": "mode-0-threads-4",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-0-threads-4",
+          "0",
+          "4"
+        ]
+      },
+      {
+        "name": "mode-0-threads-4-repeat",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-0-threads-4-repeat",
+          "0",
+          "4"
+        ]
+      },
+      {
+        "name": "mode-1-threads-1",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-1-threads-1",
+          "1",
+          "1"
+        ]
+      },
+      {
+        "name": "mode-1-threads-1-repeat",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-1-threads-1-repeat",
+          "1",
+          "1"
+        ]
+      },
+      {
+        "name": "mode-1-threads-4",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-1-threads-4",
+          "1",
+          "4"
+        ]
+      },
+      {
+        "name": "mode-1-threads-4-repeat",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/original-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/mode-1-threads-4-repeat",
+          "1",
+          "4"
+        ]
+      },
+      {
+        "name": "native-owned-control",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/native-owned-control",
+          "1",
+          "4"
+        ]
+      },
+      {
+        "name": "negative-scale",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/scale-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/negative-scale",
+          "1",
+          "4"
+        ]
+      },
+      {
+        "name": "negative-head-order",
+        "exit": 0,
+        "command": [
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/producer",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/native-query-weight.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/normalized.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/inputs/head-order-pre-query.f32",
+          "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/native-query-producer-v1/negative-head-order",
+          "1",
+          "4"
+        ]
+      }
+    ],
+    "native_capture_reproduced": true,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "defaults_changed": false,
+    "actual_binary_sha256": "c1f457a042a2fee418853640d87f2f784aa99823994317cbeee02b3a44c688b2",
+    "native_weight_sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575",
+    "actual_library_hashes": {
+      "libggml.so.0": "2ea6db7a976a5f2106acfe72456deb1ec2cb0338a57fae9e9b67cec67182b3d9",
+      "libggml-cpu.so.0": "a16fc1f0f957e11d07e27fc32a82dfd2e9109f07e3719e24b718be424cb6b989",
+      "libggml-base.so.0": "80ce74fc758dbc2de83db7dc8d336bc2f87906fc43b4461d5a7f27a11874ecd0"
+    },
+    "normalized_input_byte_exact_to_original": true,
+    "repeats_and_threads_exact": true,
+    "native_owned_control_exact": true,
+    "projection_vs_original": {
+      "byte_exact": false,
+      "cosine_min": 0.9999999999999826,
+      "mine_norm": 31.515238451832282,
+      "ref_norm": 31.515237853170902,
+      "max_row_norm_error": 6.988511236372119e-08,
+      "relative_l2": 1.4809603169759184e-07,
+      "max_abs": 9.5367431640625e-07
+    },
+    "full_native_query_vs_original": {
+      "byte_exact": false,
+      "cosine_min": 0.9999999981255697,
+      "mine_norm": 31.515238325278595,
+      "ref_norm": 31.515237858899997,
+      "max_row_norm_error": 6.715343792151884e-08,
+      "relative_l2": 5.370203744715573e-05,
+      "max_abs": 0.0005432665348052979
+    },
+    "original_pre_query_through_native_rope": {
+      "byte_exact": false,
+      "cosine_min": 0.9999999981252684,
+      "mine_norm": 31.515237746931355,
+      "ref_norm": 31.515237858899997,
+      "max_row_norm_error": 2.783383157289876e-08,
+      "relative_l2": 5.371474381784236e-05,
+      "max_abs": 0.0005438625812530518
+    },
+    "negative_controls": {
+      "scale": {
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999998,
+        "mine_norm": 63.03047665055719,
+        "ref_norm": 31.515238325278595,
+        "max_row_norm_error": 1.0,
+        "relative_l2": 1.0,
+        "max_abs": 4.910489559173584
+      },
+      "head-order": {
+        "byte_exact": false,
+        "cosine_min": -0.21275266689064043,
+        "mine_norm": 31.515238325278595,
+        "ref_norm": 31.515238325278595,
+        "max_row_norm_error": 4.614889221474927,
+        "relative_l2": 1.4508357732432768,
+        "max_abs": 5.035614892840385
+      }
+    },
+    "interpretation_limit": "One-step conditional arithmetic attribution only; original Q is module replay, not an earlier full-model capture. No additive causal percentages or speech conclusions.",
+    "payloads": [
+      {
+        "path": "build-command.json",
+        "bytes": 538,
+        "sha256": "5a21d79edc61dac3750d057982a216641c3960c6b2536c9325096c9c6da2a71b"
+      },
+      {
+        "path": "build.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "headers/ggml-alloc.h",
+        "bytes": 3689,
+        "sha256": "d114067f9099c4a0e2bbc0625c676d4894d9cf0ea27168ee072c7de0e71bb51d"
+      },
+      {
+        "path": "headers/ggml-backend.h",
+        "bytes": 25776,
+        "sha256": "5791edae1fb7622027621d15bc7a160198bd3b75ed8f96d06cb7b85e2b873756"
+      },
+      {
+        "path": "headers/ggml-blas.h",
+        "bytes": 586,
+        "sha256": "e76cb8594dc9866d99e7d63191b9fff6ab8b50244b4a28ce3af0f962964a6b5b"
+      },
+      {
+        "path": "headers/ggml-cann.h",
+        "bytes": 4553,
+        "sha256": "2cdb134f27fe5c4ec19d52f1eb58f5355aa42b8f54bf385f0e487501c5df7362"
+      },
+      {
+        "path": "headers/ggml-cpp.h",
+        "bytes": 1652,
+        "sha256": "bc15ba002c68685df23faae42df0d2b3d58032011f88b649021ab92485862c72"
+      },
+      {
+        "path": "headers/ggml-cpu.h",
+        "bytes": 7753,
+        "sha256": "316279e004cdeb8e6ef78599acb602bf79a8abdf897fed9fd1914808c1518c6e"
+      },
+      {
+        "path": "headers/ggml-cuda.h",
+        "bytes": 1565,
+        "sha256": "9cbfcea49f6da4d07f41dc22fa8dbf870825faaa2a68e34e65fe30ea6c41e042"
+      },
+      {
+        "path": "headers/ggml-et.h",
+        "bytes": 887,
+        "sha256": "33118c0642b8059a99ea930fd4e4a045e78ccb41760b173ede221f1297c35977"
+      },
+      {
+        "path": "headers/ggml-hexagon.h",
+        "bytes": 351,
+        "sha256": "b2c12bac390f14707b16bdd27c8c75ce4f075ed509c729ee28fd4f03b17e7375"
+      },
+      {
+        "path": "headers/ggml-metal.h",
+        "bytes": 2141,
+        "sha256": "322f36cd30f3e9e7aad7b5b9bc63078012fd0b7706ac4e24f5721b604f3d8980"
+      },
+      {
+        "path": "headers/ggml-opencl.h",
+        "bytes": 581,
+        "sha256": "8e443e1aa9c8bc6e0cf116c4cc3f42f4858938fa15e65b06bc07b26686e1233a"
+      },
+      {
+        "path": "headers/ggml-openvino.h",
+        "bytes": 1034,
+        "sha256": "c2e3f301e28ad815b4285888aad6130808a77e6acb4e8b558de63a648cf9743e"
+      },
+      {
+        "path": "headers/ggml-opt.h",
+        "bytes": 14040,
+        "sha256": "3586de1bc8a934b5c72339e2b6937b0641e8f149b512231e666f67de0736eea2"
+      },
+      {
+        "path": "headers/ggml-rpc.h",
+        "bytes": 1184,
+        "sha256": "196d2a7434f0abdb01f13c5360e0b118b9f2d66c6452e3a7a844fbecc890205c"
+      },
+      {
+        "path": "headers/ggml-sycl.h",
+        "bytes": 2492,
+        "sha256": "728e4f15d0853d63feb95dd596821c750181c26995fff57fe035e964e70fd85f"
+      },
+      {
+        "path": "headers/ggml-virtgpu.h",
+        "bytes": 194,
+        "sha256": "ed231e7db3f0f58b84073f5ee67f9ec9d63046d1a7ed091c36a6cfe9f685a463"
+      },
+      {
+        "path": "headers/ggml-vulkan.h",
+        "bytes": 952,
+        "sha256": "7eae5dad2cc7bb4d3eca828539f441816d5fd59fdc7b224d49aa229fc7b7248c"
+      },
+      {
+        "path": "headers/ggml-webgpu.h",
+        "bytes": 328,
+        "sha256": "a91d855313a9e85e75ba597ff869a267247dea936a2c0faef03aeb7f1ea6e79c"
+      },
+      {
+        "path": "headers/ggml-zdnn.h",
+        "bytes": 361,
+        "sha256": "13e42214e6743abeb250b1ec9aa4be386a9f778d644001dbbb51e3f778bd84a9"
+      },
+      {
+        "path": "headers/ggml-zendnn.h",
+        "bytes": 498,
+        "sha256": "2cb034b842438281616ce647232d922fb224450323f0d422d2af567c334aa8ff"
+      },
+      {
+        "path": "headers/ggml.h",
+        "bytes": 118159,
+        "sha256": "99b76b94620a61a59cfab0a29dd65ae9f75797bc6053748c794daac9cf88554b"
+      },
+      {
+        "path": "headers/gguf.h",
+        "bytes": 11355,
+        "sha256": "e56714aab702e5ce62ee587a409643c08f7e93e8fbb77f48ef7cc85075f96fa4"
+      },
+      {
+        "path": "inputs/captured-native-query.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "inputs/head-order-pre-query.f32",
+        "bytes": 16384,
+        "sha256": "cff211839588993db41d61782e5294486b7ff2a3265401a25fd2d241b725ec5d"
+      },
+      {
+        "path": "inputs/native-capture-receipt.json",
+        "bytes": 176039,
+        "sha256": "5dfcfe492ba17e240da2120f5e21ef59edf7c3fb7d19db452b8b75f4fa9a92bc"
+      },
+      {
+        "path": "inputs/native-pre-query.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "inputs/native-query-weight.f32",
+        "bytes": 16777216,
+        "sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575"
+      },
+      {
+        "path": "inputs/normalized.f32",
+        "bytes": 16384,
+        "sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd"
+      },
+      {
+        "path": "inputs/original-post-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "inputs/original-pre-query.f32",
+        "bytes": 16384,
+        "sha256": "3ccb1ff5ec7029a660b1b262d31675406090de4478407de5b8dc2ee5be756901"
+      },
+      {
+        "path": "inputs/original-query-receipt.json",
+        "bytes": 16517,
+        "sha256": "fe1e57d7517923e7b930801ab96204f591ad38caf8e9ef8cec71836cd62b9865"
+      },
+      {
+        "path": "inputs/original-query-weight.f32",
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      },
+      {
+        "path": "inputs/physical-coefficients.json",
+        "bytes": 8593,
+        "sha256": "e377c6be57173218572a9bedfd72afc1ea70c10a57b79bc7518043b29c4206f8"
+      },
+      {
+        "path": "inputs/scale-pre-query.f32",
+        "bytes": 16384,
+        "sha256": "d4c05d5fa8b74f478bc940f2b7f58c8229a1e956ad870f658a8d0a455ea535f8"
+      },
+      {
+        "path": "ldd.log",
+        "bytes": 717,
+        "sha256": "b990470380d2dbd4b9262e7469419e4ea2a298d3020044c41adca695087f8dbb"
+      },
+      {
+        "path": "libs/libggml-base.so.0",
+        "bytes": 964048,
+        "sha256": "80ce74fc758dbc2de83db7dc8d336bc2f87906fc43b4461d5a7f27a11874ecd0"
+      },
+      {
+        "path": "libs/libggml-cpu.so.0",
+        "bytes": 1431992,
+        "sha256": "a16fc1f0f957e11d07e27fc32a82dfd2e9109f07e3719e24b718be424cb6b989"
+      },
+      {
+        "path": "libs/libggml.so.0",
+        "bytes": 60720,
+        "sha256": "2ea6db7a976a5f2106acfe72456deb1ec2cb0338a57fae9e9b67cec67182b3d9"
+      },
+      {
+        "path": "literal-runtime-helper.cpp",
+        "bytes": 581,
+        "sha256": "f26a3d0c964a91aacd43b4c37454c0b3a1c19bb5ce3563fb29b4f54281affabe"
+      },
+      {
+        "path": "mode-0-threads-1/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "mode-0-threads-1/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-1/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-1-repeat/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "mode-0-threads-1-repeat/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-1-repeat/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-1-repeat.log",
+        "bytes": 64,
+        "sha256": "cbddc8193e42e3fd2e9f7ddf7adbb051e4aff9a6e978380243b90695b7c937e9"
+      },
+      {
+        "path": "mode-0-threads-1.log",
+        "bytes": 64,
+        "sha256": "cbddc8193e42e3fd2e9f7ddf7adbb051e4aff9a6e978380243b90695b7c937e9"
+      },
+      {
+        "path": "mode-0-threads-4/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "mode-0-threads-4/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-4/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-4-repeat/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "mode-0-threads-4-repeat/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-4-repeat/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-0-threads-4-repeat.log",
+        "bytes": 64,
+        "sha256": "280b4709993886acdb14639b223d8465151cb8611481d84c20d8fcd9053808c6"
+      },
+      {
+        "path": "mode-0-threads-4.log",
+        "bytes": 64,
+        "sha256": "280b4709993886acdb14639b223d8465151cb8611481d84c20d8fcd9053808c6"
+      },
+      {
+        "path": "mode-1-threads-1/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "fd0df05d4effed3e7a99b42a49303fc1e720cbc5eb331f146812747c213209da"
+      },
+      {
+        "path": "mode-1-threads-1/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-1-threads-1/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "3ccb1ff5ec7029a660b1b262d31675406090de4478407de5b8dc2ee5be756901"
+      },
+      {
+        "path": "mode-1-threads-1-repeat/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "fd0df05d4effed3e7a99b42a49303fc1e720cbc5eb331f146812747c213209da"
+      },
+      {
+        "path": "mode-1-threads-1-repeat/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-1-threads-1-repeat/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "3ccb1ff5ec7029a660b1b262d31675406090de4478407de5b8dc2ee5be756901"
+      },
+      {
+        "path": "mode-1-threads-1-repeat.log",
+        "bytes": 64,
+        "sha256": "e12aadc6c4d060bc66b41c29f1e86095a625ac586c201dce79178efaeed17d7c"
+      },
+      {
+        "path": "mode-1-threads-1.log",
+        "bytes": 64,
+        "sha256": "e12aadc6c4d060bc66b41c29f1e86095a625ac586c201dce79178efaeed17d7c"
+      },
+      {
+        "path": "mode-1-threads-4/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "fd0df05d4effed3e7a99b42a49303fc1e720cbc5eb331f146812747c213209da"
+      },
+      {
+        "path": "mode-1-threads-4/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-1-threads-4/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "3ccb1ff5ec7029a660b1b262d31675406090de4478407de5b8dc2ee5be756901"
+      },
+      {
+        "path": "mode-1-threads-4-repeat/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "fd0df05d4effed3e7a99b42a49303fc1e720cbc5eb331f146812747c213209da"
+      },
+      {
+        "path": "mode-1-threads-4-repeat/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "mode-1-threads-4-repeat/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "3ccb1ff5ec7029a660b1b262d31675406090de4478407de5b8dc2ee5be756901"
+      },
+      {
+        "path": "mode-1-threads-4-repeat.log",
+        "bytes": 64,
+        "sha256": "1a9942b380a40135f5c3d7496ae0161a537902826d0434b2783179b04b364c1f"
+      },
+      {
+        "path": "mode-1-threads-4.log",
+        "bytes": 64,
+        "sha256": "1a9942b380a40135f5c3d7496ae0161a537902826d0434b2783179b04b364c1f"
+      },
+      {
+        "path": "native-owned-control/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "native-owned-control/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "native-owned-control/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "native-owned-control.log",
+        "bytes": 64,
+        "sha256": "1a9942b380a40135f5c3d7496ae0161a537902826d0434b2783179b04b364c1f"
+      },
+      {
+        "path": "negative-head-order/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "8b22f9f357411343103e19092b47dca03ad7eed0d5d9dcba46693d63a069b324"
+      },
+      {
+        "path": "negative-head-order/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "negative-head-order/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "cff211839588993db41d61782e5294486b7ff2a3265401a25fd2d241b725ec5d"
+      },
+      {
+        "path": "negative-head-order.log",
+        "bytes": 64,
+        "sha256": "1a9942b380a40135f5c3d7496ae0161a537902826d0434b2783179b04b364c1f"
+      },
+      {
+        "path": "negative-scale/post_rope.f32",
+        "bytes": 16384,
+        "sha256": "ca4cb35c45176ddc4a4c1021c93aeb708c3c2f98ca28e3b2aaca006b4c399336"
+      },
+      {
+        "path": "negative-scale/pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "4f34e8a7ea3f93cb35d05f380c4cbc17aa6e2d35bd486a31cc88df02e5508694"
+      },
+      {
+        "path": "negative-scale/used_pre_rope.f32",
+        "bytes": 16384,
+        "sha256": "d4c05d5fa8b74f478bc940f2b7f58c8229a1e956ad870f658a8d0a455ea535f8"
+      },
+      {
+        "path": "negative-scale.log",
+        "bytes": 64,
+        "sha256": "1a9942b380a40135f5c3d7496ae0161a537902826d0434b2783179b04b364c1f"
+      },
+      {
+        "path": "producer",
+        "bytes": 27240,
+        "sha256": "c1f457a042a2fee418853640d87f2f784aa99823994317cbeee02b3a44c688b2"
+      },
+      {
+        "path": "query_producer.cpp",
+        "bytes": 3746,
+        "sha256": "3a3e835abed05fb78d2bc07174281ff2b857a0b2ee45c09b25a720f025c2a01b"
+      }
+    ]
+  },
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "verified_payloads": 87,
+    "physical_transpose_exact": true,
+    "actual_elf_and_linked_library_hashes_verified": true,
+    "fresh_actual_elf_both_modes_byte_exact": true,
+    "baseline_and_native_owned_control_exact": true,
+    "repeats_and_one_four_threads_exact": true,
+    "projection_relative_l2": 1.4809603169759184e-07,
+    "native_post_relative_l2": 5.370203744715573e-05,
+    "original_pre_through_native_rope_relative_l2": 5.371474381784236e-05,
+    "negative_controls": [
+      "scale",
+      "head-order"
+    ],
+    "scope": "One-step conditional arithmetic attribution only; original Q is module replay, not an earlier full-model capture. No additive causal percentages or speech conclusions."
+  },
+  "publication": {
+    "revision": "2a9a269913d6e4a2fa5df06b29fb14cec45d7db0",
+    "path": "dia-20261015-query-key/complete-native-query-producer-v1.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2a9a269913d6e4a2fa5df06b29fb14cec45d7db0/dia-20261015-query-key/complete-native-query-producer-v1.zip",
+    "bytes": 32621191,
+    "sha256": "3940c5510551ce3bc708093280da8bab994a99c71bc38a27e8267201154d0adc",
+    "payloads": 98,
+    "anonymous_full_sha256_verified": true
+  },
+  "hosted_factorial": {
+    "databaseId": 38764924112,
+    "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+    "status": "completed",
+    "numerical_pass": true
+  },
+  "latest_lint": {
+    "databaseId": 38767820341,
+    "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+    "status": "completed",
+    "completed_jobs": 10,
+    "total_jobs": 10,
+    "conclusion": "success"
+  },
+  "hosted_worker_unchanged_from_factorial_source": true,
+  "public_extracted_replay": {
+    "anonymous_complete_archive_sha256_verified": true,
+    "zip_crc_all_members_pass": true,
+    "fresh_extracted_auditor_exit": 0,
+    "publication": {
+      "revision": "2a9a269913d6e4a2fa5df06b29fb14cec45d7db0",
+      "path": "dia-20261015-query-key/complete-native-query-producer-v1.zip",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2a9a269913d6e4a2fa5df06b29fb14cec45d7db0/dia-20261015-query-key/complete-native-query-producer-v1.zip",
+      "bytes": 32621191,
+      "sha256": "3940c5510551ce3bc708093280da8bab994a99c71bc38a27e8267201154d0adc",
+      "payloads": 98,
+      "anonymous_full_sha256_verified": true
+    }
+  },
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC",
+  "integration": "637800051f7a2498d9830828f2dc435a372465f5",
+  "full_query_key_result": "dia-query-key-results-2026-10-15.json"
+}

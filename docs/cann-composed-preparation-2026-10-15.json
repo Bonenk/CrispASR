@@ -1,0 +1,215 @@
+{
+  "candidate_source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+  "integrated": true,
+  "cpu_source": {
+    "probe_source_sha256": "5a5265c9097a5f4e106843bad5d6f83cb76840e09675da38191545c39ad37b39",
+    "actual_binary_sha256": "51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf",
+    "ggml_source": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "scope": "Actual local CPU compile/control; commit binding is verified separately after candidate commit. No physical CANN execution.",
+    "candidate_source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "committed_source_matches_tested_source": true
+  },
+  "independent_cpu_audit": {
+    "passed": true,
+    "actual_computes": 18,
+    "independently_recalculated_final_values": 12288,
+    "independently_recalculated_matrix_values": 12288,
+    "scope": "CPU graph only; no CANN execution, fallback or ACL capture/replay acceptance"
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261015-composed/complete-cpu-composed-proof.zip",
+    "bytes": 877822,
+    "sha256": "ae34420e8060f414cc015a68ce93e18ae1d880dd4b844ba56156e3038a94ed74",
+    "payloads": 128,
+    "anonymous_verified": true,
+    "revision": "2eff34171877cea00d35fe867de55d16892e218a",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2eff34171877cea00d35fe867de55d16892e218a/cann-20261015-composed/complete-cpu-composed-proof.zip"
+  },
+  "ci": {
+    "composed_cpu_and_sdk": 38698323227,
+    "general": 38698330667,
+    "lint": 38698334091,
+    "secret": 38698323280,
+    "status": "original-cpu-accepted-both-sdk-final-links-failed-original-secret-passed"
+  },
+  "physical_cann_execution": false,
+  "acl_capture_replay_acceptance": false,
+  "model_speech_acceptance": false,
+  "performance_acceptance": false,
+  "hosted_cpu_audit": {
+    "independent_hosted_cpu_audit_pass": true,
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "raw_artifact_bytes": 827670,
+    "raw_artifact_sha256": "6d97f14420389221bfa4703f83cf2cefb9fa47d7d340455376da775fe21e56ce",
+    "github_artifact_digest_matches": true,
+    "actual_computes": 18,
+    "independent_matrix_values": 12288,
+    "independent_final_values": 12288,
+    "scale_negative_controls": 18,
+    "rejected_invalid_requests": 8,
+    "tested_elf_sha256": "5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4",
+    "scope": "Complete hosted CPU raw arrays/executable/negative-request audit; no SDK/NPU/fallback/ACL/model/performance acceptance"
+  },
+  "sdk310p_failed_attempt": {
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "job": 116303015565,
+    "artifact": 11957981850,
+    "artifact_sha256": "c3ceb8cd15476fdb4633201b0618e1a6030b592b56bda9f5d6548eb6d3ca0efc",
+    "failure": "CANN source libraries compiled; standalone static executable linker cannot find ascendcl, nnopbase, opapi and acl_op_compiler. Private ggml-cann SDK link directories do not propagate to the consumer.",
+    "accepted": false
+  },
+  "sdk910b_failed_attempt": {
+    "source": "81d8e279b2e739f85219c15e9ded31895e51d53d",
+    "job": 116303015497,
+    "artifact": 11957628767,
+    "artifact_sha256": "b68db0a1453439da86dde3e492405a7d340d8e96b5fb733c5935163af3675831",
+    "failure": "CANN source libraries compiled; standalone static executable linker cannot find ascendcl, nnopbase, opapi and acl_op_compiler. Private ggml-cann SDK link directories do not propagate to the consumer.",
+    "accepted": false
+  },
+  "repair": {
+    "candidate_source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+    "integrated": true,
+    "scope": "Only standalone consumer CMake SDK search directories, retained link commands and documentation. No production/kernel/default changes.",
+    "independent_local_cpu_audit": {
+      "passed": true,
+      "scope": "Independent fresh local CPU audit after standalone CMake link repair; no CANN SDK or device execution",
+      "actual_computes": 18,
+      "independent_matrix_values": 12288,
+      "independent_final_values": 12288,
+      "scale_negative_controls": 18,
+      "rejected_invalid_requests": 8,
+      "tested_elf_sha256": "51b33f65038c1ac56e51eec4791b035f320a4debf67c7ea6e7a6fad33777ecdf"
+    },
+    "configure_guard": {
+      "passed": true,
+      "scope": "Actual CMake generation only: original final link misses the static backend SDK search directory, corrected consumer includes it. No SDK headers/libraries installed or compiled; no executable or NPU validation.",
+      "rows": [
+        {
+          "method": "original",
+          "command": [
+            "cmake",
+            "-S",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/original",
+            "-B",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/original/build",
+            "-DGGML_CANN=ON",
+            "-DSOC_TYPE=ascend310p",
+            "-DUSE_ACL_GRAPH=OFF",
+            "-DGGML_NATIVE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DCANN_INSTALL_DIR=/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/intentionally-not-installed-sdk"
+          ],
+          "sdk_search_path_present": false,
+          "configure_source_sha256": "bc34fe97d47f49f27ccdc282c8ee6ccfdab7c5cfcfcac3ae4a402cffac59d4dc"
+        },
+        {
+          "method": "fixed",
+          "command": [
+            "cmake",
+            "-S",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/fixed",
+            "-B",
+            "/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/fixed/build",
+            "-DGGML_CANN=ON",
+            "-DSOC_TYPE=ascend310p",
+            "-DUSE_ACL_GRAPH=OFF",
+            "-DGGML_NATIVE=OFF",
+            "-DBUILD_SHARED_LIBS=OFF",
+            "-DCANN_INSTALL_DIR=/mnt/akademie_storage/crispasr/cann-composed-20261015/static-link-configure-v2/intentionally-not-installed-sdk"
+          ],
+          "sdk_search_path_present": true,
+          "configure_source_sha256": "45dc160af7bdc24cf2413a59037591c88baeac3986179a289a49f6da014a7aa1"
+        }
+      ]
+    },
+    "publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "file": "cann-20261015-composed/static-link-repair-v2.zip",
+      "bytes": 988939,
+      "sha256": "7447eee8c9d0d7f53b6df73a93c68378077badeef5d5d8c809a4a9ac7a09ceaf",
+      "payloads": 146,
+      "source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+      "anonymous_verified": true,
+      "revision": "138b0dd326c6746854f00a80b500ed9959920fe4",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/138b0dd326c6746854f00a80b500ed9959920fe4/cann-20261015-composed/static-link-repair-v2.zip"
+    },
+    "ci": {
+      "composed": 38706162449,
+      "general": 38706180793,
+      "lint": 38706184333,
+      "secret": 38706162315,
+      "status": "all3-composed-jobs-all13-general-jobs-all10-lint-jobs-and-secret-pass"
+    },
+    "hosted_cpu_audit": {
+      "independent_hosted_cpu_audit_pass": true,
+      "source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+      "raw_artifact_bytes": 827670,
+      "raw_artifact_sha256": "67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4",
+      "github_artifact_digest_matches": true,
+      "actual_computes": 18,
+      "independent_matrix_values": 12288,
+      "independent_final_values": 12288,
+      "scale_negative_controls": 18,
+      "rejected_invalid_requests": 8,
+      "tested_elf_sha256": "5a692ae229eab7500e7c3cf243313edb9262c2cb5a388e492f150f7ec8f915d4",
+      "scope": "Complete hosted CPU raw arrays/executable/negative-request audit; no SDK/NPU/fallback/ACL/model/performance acceptance"
+    },
+    "hosted_cpu_publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "345ae04fb0bb82876f28df2b9e90f2dad63d7868",
+      "prefix": "cann-20261015-composed/hosted-repaired-cpu-38706162449",
+      "files": 11,
+      "all_files_anonymous_sha256_verified": true,
+      "raw_artifact_bytes": 827670,
+      "raw_artifact_sha256": "67c725dcf5204ff25274ab03aa94cc3b92ce72f9b594296d9483dd77f84242a4",
+      "raw_artifact_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/cpu-artifact.zip",
+      "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/345ae04fb0bb82876f28df2b9e90f2dad63d7868/cann-20261015-composed/hosted-repaired-cpu-38706162449/payload-manifest.json"
+    },
+    "sdk_audit": {
+      "passed": true,
+      "source": "f19d41698eccf951c7aade9769d44f9bd263146a",
+      "workflow": 38706162449,
+      "sdk_compile_and_final_link": [
+        {
+          "chip": "310p",
+          "elf_machine": 183,
+          "acl_compiled": false,
+          "artifact_id": 11960264848,
+          "artifact_bytes": 791272,
+          "artifact_sha256": "b5b1495a66900e616b0012f0ffbfb91578577523d65a6e52b9525df779e3faa4",
+          "executable_sha256": "d886cf931f25d61573e14ed36c6a51a7894f488f06add88df4552a787b8fe369",
+          "final_sdk_link_directory_verified": true,
+          "all_dynamic_dependencies_resolved": true,
+          "driver_resolution": "SDK devlib stub; not physical NPU"
+        },
+        {
+          "chip": "910b",
+          "elf_machine": 62,
+          "acl_compiled": true,
+          "artifact_id": 11961670237,
+          "artifact_bytes": 883025,
+          "artifact_sha256": "bb1e1b3f510ff7623ffaa24a205b5e2a4ad748c7edea2a62afe5e41971c16138",
+          "executable_sha256": "77886718b6350b3569ca12ea16363da7778125cc3b6b244bfa6611945851575a",
+          "final_sdk_link_directory_verified": true,
+          "all_dynamic_dependencies_resolved": true,
+          "driver_resolution": "SDK devlib stub; not physical NPU"
+        }
+      ],
+      "physical_npu_execution": false,
+      "acl_execution": false,
+      "model_or_performance_acceptance": false
+    },
+    "sdk_publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "8f846da635184017792d9b9d3df7f8b4c930637c",
+      "prefix": "cann-20261015-composed/hosted-repaired-sdk-38706162449",
+      "files": 12,
+      "all_files_anonymous_sha256_verified": true,
+      "manifest_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8f846da635184017792d9b9d3df7f8b4c930637c/cann-20261015-composed/hosted-repaired-sdk-38706162449/sdk-payload-manifest.json"
+    },
+    "integrated_source": "5e3145f93fd8f5655f235c7d09810a09b92d4b71",
+    "tested_workflow_and_probe_files_byte_unchanged_after_rebase": true
+  },
+  "integrated_source": "5e3145f93fd8f5655f235c7d09810a09b92d4b71"
+}

@@ -1,0 +1,374 @@
+{
+  "source": "3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b",
+  "run_id": 38870499727,
+  "official_artifact_sha256": "1f7fd84771ce7ce08dcf7f5a3ae8c9fa379f1f4315d4bb4b836f739839916b15",
+  "payloads_verified": 655,
+  "audit_workdir": "audit-serial-head-nhrx689t",
+  "pristine_off_identity_exact": true,
+  "accepted_native_full_trajectory_exact": true,
+  "first_serial_input_difference": 979,
+  "serial_original_inputs_exact": true,
+  "original_dac_relative_l2": 5.570250055146055e-07,
+  "results": {
+    "original": {
+      "canonical-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "pcm_sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 14.048072562358277,
+        "rms": 0.0735338612890324
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "pcm_sha256": "d7f9587e92fb70132336d3a4635a553c307b8c8fd82a7029017cdcd803644c0f",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 14.048072562358277,
+        "rms": 0.07353386837302249
+      }
+    },
+    "pristine": {
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 12.770975056689343,
+        "rms": 0.00015566750779210037
+      }
+    },
+    "off": {
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 12.770975056689343,
+        "rms": 0.00015566750779210037
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_sha256": "9082d22812a315b225cb1b4d12c5db4d274f8a635e43327cb4f57df21eea3c5d",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 12.770975056689343,
+        "rms": 0.00015614702112585685
+      }
+    },
+    "identity": {
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 12.770975056689343,
+        "rms": 0.00015566750779210037
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "pcm_sha256": "9082d22812a315b225cb1b4d12c5db4d274f8a635e43327cb4f57df21eea3c5d",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 12.770975056689343,
+        "rms": 0.00015614702112585685
+      }
+    },
+    "serial": {
+      "native-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "pcm_sha256": "e4aec19473e0165878226f03fe263d9e27c51482d00fd7598ac68b6915ff6ca7",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 14.05968253968254,
+        "rms": 0.07343992135040896
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "pcm_sha256": "d56ac22bfafa4b0bfa869ec6f340a51167843a4c671c42040fa5f17634f14e41",
+        "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+        "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+        "seconds": 14.05968253968254,
+        "rms": 0.07344570884917484
+      }
+    }
+  },
+  "recurrence": {
+    "fresh_original_and_native_hidden_recurrence_exact": true,
+    "actual_selected_serial_head_exact": true,
+    "full_rng_consumption_exact": true,
+    "probe_sha256": "1fc90de87ec4637eb5f9b2cc166cd7fb6be8ab44e317c9fd6a8946ef3a8f17f0"
+  },
+  "experimental_both_decoders_wer_zero": true,
+  "native_speech_acceptance": false,
+  "production_defaults_changed": false,
+  "public_proof": {
+    "revision": "990ff4cf7ee440ecdc239203f93f4093b84c58a8",
+    "prefix": "dia-20261016-serial-head/complete-hosted-serial-head-v1",
+    "repo": "cstr/crispasr-regression-fixtures",
+    "files": [
+      {
+        "path": "raw.zip",
+        "bytes": 904974837,
+        "sha256": "1f7fd84771ce7ce08dcf7f5a3ae8c9fa379f1f4315d4bb4b836f739839916b15",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "run.json",
+        "bytes": 2742,
+        "sha256": "7a6cdbf8c0b4f9a4bd22c48378d2d495363641540a8ba82179a3e158c4acb033",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "lint.json",
+        "bytes": 16070,
+        "sha256": "a684144706d579c0cb41953c4e84fe7348bac1b4ebac00aad6110b7189d8c14a",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "artifacts.json",
+        "bytes": 745,
+        "sha256": "fb41cfc14ebe926dcd827dcc342c6f3bf2a5a04a57ec1200e8405976e9903e22",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "complete.log",
+        "bytes": 106832,
+        "sha256": "666510256ccb215c330311df6056fcdeeb8d2df33e36278c78840fbaa692d3f8",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-v1.log",
+        "bytes": 99,
+        "sha256": "7c5b95e66a4194f52222102ac8610edc049663e2a5b205000612527af8a85b66",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "independent-audit-v1.json",
+        "bytes": 5044,
+        "sha256": "e83f31c03f6e3817f4a620279c4c5de50cc53bfa595317a15dbc2612edff70c8",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "trajectory-audit-v1.py",
+        "bytes": 785,
+        "sha256": "eed5ea86d879c3e114f5ef950a37de6f9e5c3484d28a44cea870bd020d779ca1",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "trajectory-audit-v1.json",
+        "bytes": 385,
+        "sha256": "39c2ff7d80f12cf4dcb93484455369f44b0d039b1f7cd37530b79e4133e281e5",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/audit.py",
+        "bytes": 22828,
+        "sha256": "d52b8026740c91442a28ac2466f99cdc8c6b65ae07642b4e394a73f7ef2d75b0",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/audit_selftest.py",
+        "bytes": 3649,
+        "sha256": "8e6c6a5f347513b2f813faa8a3778fdb25beead890dc8a48cda3bf8e9aae6c1d",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/selftest.py",
+        "bytes": 6856,
+        "sha256": "92f339ef92618eac4e36ca2144414afeeae63b581d78b25379d9ca720b3349b8",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/patch.py",
+        "bytes": 1756,
+        "sha256": "4d5f594c38c8319864d584ed8ca05f807cb2eb5b907c286a76d3425c3255f948",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/head.h",
+        "bytes": 3977,
+        "sha256": "60d8e08cf3f277c38757068e8456b8b55c5dcd0bf029f9b92ed5c4592225c74c",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/probe.cpp",
+        "bytes": 1917,
+        "sha256": "a069f202c54a822096765e8519bf93301886247c76a56e3f729b2fbfc8dc63a7",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-method/README.md",
+        "bytes": 5054,
+        "sha256": "b6709fc0da5c6314724452a29f0b2dabbf1724ee08d2ef417678fa00314fe849",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "CrispASR-LICENSE",
+        "bytes": 1184,
+        "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "Dia-LICENSE",
+        "bytes": 11338,
+        "sha256": "34c1659a3495220f85dffebd4d3a930bcbfd9f216f8a3c5f880a1d4a59a5358d",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "GGML-LICENSE",
+        "bytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "audit-selftest.log",
+        "bytes": 95,
+        "sha256": "8a0029eb5466f961d6eb547f0b3309d72985fff67512a028b52801aafa21deea",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "AUDIT.md",
+        "bytes": 1089,
+        "sha256": "90ecb2b9ccbed547a14240b86e2b3430e24df301ec1dcb3a82de784aeb722d58",
+        "anonymous_full_download": true
+      },
+      {
+        "path": "manifest.json",
+        "bytes": 3342,
+        "sha256": "69cdacbdbafe7fa6e9d7239b5a4e964b087f6d375aeb550bebd14fd6bfa4aa61",
+        "anonymous_full_download": true
+      }
+    ]
+  },
+  "trajectory": {
+    "serial_frames": 1211,
+    "original_frames": 1210,
+    "all_original_code_frames_exact": true,
+    "historical_extra_frames": 1,
+    "previous_forced_restore_native-pcm.npy_byte_exact": true,
+    "previous_forced_restore_original-dac-pcm.npy_byte_exact": false,
+    "previous_forced_restore_native-inputs.i32_byte_exact": true,
+    "previous_forced_restore_native-codes.u32_byte_exact": true
+  },
+  "worker_receipt": {
+    "worker_source": "3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b",
+    "runtime_source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "arms": [
+      {
+        "arm": "pristine",
+        "steps": 1115,
+        "native_asr": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 12.770975056689343,
+          "rms": 0.00015566750779210037
+        },
+        "original_dac_asr": null
+      },
+      {
+        "arm": "off",
+        "steps": 1115,
+        "native_asr": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 12.770975056689343,
+          "rms": 0.00015566750779210037
+        },
+        "original_dac_asr": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "9082d22812a315b225cb1b4d12c5db4d274f8a635e43327cb4f57df21eea3c5d",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 12.770975056689343,
+          "rms": 0.00015614702112585685
+        }
+      },
+      {
+        "arm": "identity",
+        "steps": 1115,
+        "native_asr": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 12.770975056689343,
+          "rms": 0.00015566750779210037
+        },
+        "original_dac_asr": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "9082d22812a315b225cb1b4d12c5db4d274f8a635e43327cb4f57df21eea3c5d",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 12.770975056689343,
+          "rms": 0.00015614702112585685
+        }
+      },
+      {
+        "arm": "serial",
+        "steps": 1226,
+        "native_asr": {
+          "transcript": "We are committed to making it secure.",
+          "wer": 0.0,
+          "pcm_sha256": "e4aec19473e0165878226f03fe263d9e27c51482d00fd7598ac68b6915ff6ca7",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 14.05968253968254,
+          "rms": 0.07343992135040896
+        },
+        "original_dac_asr": {
+          "transcript": "We are committed to making it secure.",
+          "wer": 0.0,
+          "pcm_sha256": "d56ac22bfafa4b0bfa869ec6f340a51167843a4c671c42040fa5f17634f14e41",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+          "seconds": 14.05968253968254,
+          "rms": 0.07344570884917484
+        }
+      }
+    ],
+    "production_defaults_changed": false,
+    "native_speech_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "pristine_lib_sha256": "537cad5879b0bb5aa99067afc8a0fef14242db482aa9fdf2741c8135d2cdf4a3",
+    "model_sha256": "8128132c538e1aef83f2fb5257b4f71d28a67c2a5a0d54d0a1f0a3b0f5d6b73d",
+    "codec_sha256": "6db51da2333868918b6d476008d92036a53400bc816ff7e1d2b1e973499e4135",
+    "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+    "original_dac_positive_relative_l2": 5.570250055146055e-07,
+    "patched_lib_sha256": "6b1cc30b978a552557836263a189b1f3f49fd108644818ef5da64be7ee8f70c4",
+    "pristine_off_identity_exact": true,
+    "first_serial_input_difference": 979,
+    "serial_steps": 1226,
+    "baseline_steps": 1115,
+    "serial_original_inputs_exact": true,
+    "accepted_native_prefix_exact": true,
+    "accepted_native_full_trajectory_exact": true,
+    "all_step_diagnostic_complete": true,
+    "serial_both_decoders_wer_zero": true,
+    "interpretation": "All-step generic serial F32 graph head; sampler/noise/weights/recipe fixed, no reference input or token override. Pinned runtime only; no production promotion."
+  },
+  "auditor_source": "eadfb145",
+  "rebased_methods": "303a7bb3",
+  "rebased_method_files_byte_exact": 8,
+  "lint_run": 38870502430
+}

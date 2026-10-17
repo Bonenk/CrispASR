@@ -1,6 +1,7 @@
 #pragma once
 
 // Private Dia sampler shared by the runtime and its probability regression tests.
+#include "dia_exponential_rng.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -9,7 +10,7 @@
 #include <vector>
 
 static uint32_t dia_sample_token(const float* logits, uint32_t vocab_size, float temperature, float top_p, int top_k,
-                                 std::mt19937& rng) {
+                                 std::mt19937& rng, const float* exponential_noise = nullptr) {
     if (temperature <= 0.0f) {
         // Greedy
         return (uint32_t)(std::max_element(logits, logits + vocab_size) - logits);
@@ -34,17 +35,25 @@ static uint32_t dia_sample_token(const float* logits, uint32_t vocab_size, float
 
     // Top-k filter
     if (top_k > 0 && top_k < (int)vocab_size) {
-        std::vector<std::pair<float, uint32_t>> sorted_probs(vocab_size);
+        // Select exactly k temperature-scaled logit indices, as the original
+        // sampler does. Softmax rounding can collapse distinct logits into
+        // equal probabilities; a probability threshold then retains extra tokens.
+        std::vector<std::pair<float, uint32_t>> ranked_logits(vocab_size);
         for (uint32_t i = 0; i < vocab_size; i++) {
-            sorted_probs[i] = {probs[i], i};
+            ranked_logits[i] = {logits[i] / temperature, i};
         }
-        std::partial_sort(sorted_probs.begin(), sorted_probs.begin() + top_k, sorted_probs.end(),
-                          [](const auto& a, const auto& b) { return a.first > b.first; });
-        float threshold = sorted_probs[top_k - 1].first;
+        const auto greater = [](const auto& a, const auto& b) { return a.first > b.first; };
+        if (static_cast<uint64_t>(top_k) * 64 <= vocab_size) {
+            std::partial_sort(ranked_logits.begin(), ranked_logits.begin() + top_k, ranked_logits.end(), greater);
+        } else {
+            std::nth_element(ranked_logits.begin(), ranked_logits.begin() + top_k - 1, ranked_logits.end(), greater);
+        }
+        std::vector<bool> keep(vocab_size, false);
+        for (int i = 0; i < top_k; ++i)
+            keep[ranked_logits[i].second] = true;
         for (uint32_t i = 0; i < vocab_size; i++) {
-            if (probs[i] < threshold) {
+            if (!keep[i])
                 probs[i] = 0.0f;
-            }
         }
         // Re-normalize
         sum = 0.0f;
@@ -86,6 +95,10 @@ static uint32_t dia_sample_token(const float* logits, uint32_t vocab_size, float
             for (uint32_t i = 0; i < vocab_size; i++)
                 probs[i] /= sum;
         }
+    }
+
+    if (exponential_noise) {
+        return dia_rng::exponential_race(probs.data(), exponential_noise, vocab_size);
     }
 
     // Sample

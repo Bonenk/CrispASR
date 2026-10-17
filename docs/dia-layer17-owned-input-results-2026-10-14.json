@@ -1,0 +1,2004 @@
+{
+  "receipt": {
+    "scope": "Bounded complete decoder layer17 at step978, exact owned inputs/self-prefixes and reconstructed cross-cache producers; same-input operations and inherited drift are distinguished. No full-model, new speech, Q4/GPU/speed acceptance.",
+    "source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "fetch": {
+      "scope": "Complete original layer17 coefficients only, verified immutable ranges and all14 native mapped hashes. Full checkpoint not loaded or locally rehashed.",
+      "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+      "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+      "checkpoint_bytes": 6444682848,
+      "header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+      "mapping_source_sha256": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57",
+      "physical_neural_audit_sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368",
+      "tensors": [
+        {
+          "original_name": "decoder.layers.17.cross_attention.k_proj.weight",
+          "path": "cross_attention.k_proj.weight.original.f32",
+          "shape": [
+            1024,
+            16,
+            128
+          ],
+          "offset": 2718465632,
+          "bytes": 8388608,
+          "sha256": "b2c738d46258892343e37be70f1082078cc690f07344295d1ed3ae5a0c770f02"
+        },
+        {
+          "original_name": "decoder.layers.17.cross_attention.o_proj.weight",
+          "path": "cross_attention.o_proj.weight.original.f32",
+          "shape": [
+            16,
+            128,
+            2048
+          ],
+          "offset": 2726854240,
+          "bytes": 16777216,
+          "sha256": "ccbe7f3786eb302963faca3b08bd021142599cbbc8552d0253bf1a38517d40c5"
+        },
+        {
+          "original_name": "decoder.layers.17.cross_attention.q_proj.weight",
+          "path": "cross_attention.q_proj.weight.original.f32",
+          "shape": [
+            2048,
+            16,
+            128
+          ],
+          "offset": 2743631456,
+          "bytes": 16777216,
+          "sha256": "869765db6bfa9d4424d8a7cde9d6fe08697dd579bcd387026ab176d4de733d2e"
+        },
+        {
+          "original_name": "decoder.layers.17.cross_attention.v_proj.weight",
+          "path": "cross_attention.v_proj.weight.original.f32",
+          "shape": [
+            1024,
+            16,
+            128
+          ],
+          "offset": 2760408672,
+          "bytes": 8388608,
+          "sha256": "b0351ca81d8de50438ff14c85e751d73437889ab6fb9c8085c3754cc7ef63b24"
+        },
+        {
+          "original_name": "decoder.layers.17.mlp.wi_fused.weight",
+          "path": "mlp.wi_fused.weight.original.f32",
+          "shape": [
+            2048,
+            2,
+            8192
+          ],
+          "offset": 2768797280,
+          "bytes": 134217728,
+          "sha256": "af5e570e9402a02be450dc5109908496e492876c8e0fa9657cfd650bc7302612"
+        },
+        {
+          "original_name": "decoder.layers.17.mlp.wo.weight",
+          "path": "mlp.wo.weight.original.f32",
+          "shape": [
+            8192,
+            2048
+          ],
+          "offset": 2903015008,
+          "bytes": 67108864,
+          "sha256": "7f8a30289ac87d66efa2dd212025b49b404dd196849444cc21708f6aaf618df7"
+        },
+        {
+          "original_name": "decoder.layers.17.pre_ca_norm.weight",
+          "path": "pre_ca_norm.weight.original.f32",
+          "shape": [
+            2048
+          ],
+          "offset": 2970123872,
+          "bytes": 8192,
+          "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+        },
+        {
+          "original_name": "decoder.layers.17.pre_mlp_norm.weight",
+          "path": "pre_mlp_norm.weight.original.f32",
+          "shape": [
+            2048
+          ],
+          "offset": 2970132064,
+          "bytes": 8192,
+          "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+        },
+        {
+          "original_name": "decoder.layers.17.pre_sa_norm.weight",
+          "path": "pre_sa_norm.weight.original.f32",
+          "shape": [
+            2048
+          ],
+          "offset": 2970140256,
+          "bytes": 8192,
+          "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+        },
+        {
+          "original_name": "decoder.layers.17.self_attention.k_proj.weight",
+          "path": "self_attention.k_proj.weight.original.f32",
+          "shape": [
+            2048,
+            4,
+            128
+          ],
+          "offset": 2970148448,
+          "bytes": 4194304,
+          "sha256": "8b97f583a8f1c1266262d1d26ace801ba64ef1ed31c8f1650af3ba98ae347a7a"
+        },
+        {
+          "original_name": "decoder.layers.17.self_attention.o_proj.weight",
+          "path": "self_attention.o_proj.weight.original.f32",
+          "shape": [
+            16,
+            128,
+            2048
+          ],
+          "offset": 2974342752,
+          "bytes": 16777216,
+          "sha256": "d25a2f43a14c319738aef34aca3ec45de569cfe16e85fb53aee1f0de2a04915c"
+        },
+        {
+          "original_name": "decoder.layers.17.self_attention.q_proj.weight",
+          "path": "self_attention.q_proj.weight.original.f32",
+          "shape": [
+            2048,
+            16,
+            128
+          ],
+          "offset": 2991119968,
+          "bytes": 16777216,
+          "sha256": "2ac383c68c0eafe86eeac79217b5ede78c7e65414e11011df8f79a463c45ccfc"
+        },
+        {
+          "original_name": "decoder.layers.17.self_attention.v_proj.weight",
+          "path": "self_attention.v_proj.weight.original.f32",
+          "shape": [
+            2048,
+            4,
+            128
+          ],
+          "offset": 3007897184,
+          "bytes": 4194304,
+          "sha256": "f76fcdd36786e92f52de4a003f01e33966e01adada36e43c6739625851c369f7"
+        }
+      ],
+      "mapped": [
+        {
+          "name": "dia.decoder.layers.17.cross_k_proj",
+          "path": "cross_k_proj.native.f32",
+          "shape": [
+            2048,
+            1024
+          ],
+          "bytes": 8388608,
+          "sha256": "5190986007b3c6d1d1f34ef42e4465e37b622e8de7c281fb41e1b818b0b14d7f"
+        },
+        {
+          "name": "dia.decoder.layers.17.cross_o_proj",
+          "path": "cross_o_proj.native.f32",
+          "shape": [
+            2048,
+            2048
+          ],
+          "bytes": 16777216,
+          "sha256": "f10444b188c74fa1dc2a9ace7cdf1c5648778996b0d8f14bdc2fb766a2c472b1"
+        },
+        {
+          "name": "dia.decoder.layers.17.cross_q_proj",
+          "path": "cross_q_proj.native.f32",
+          "shape": [
+            2048,
+            2048
+          ],
+          "bytes": 16777216,
+          "sha256": "39ff8cba7271ca14eb3c82ae1e4158c67ef7d05327fe4d57a714722c02c93f6b"
+        },
+        {
+          "name": "dia.decoder.layers.17.cross_v_proj",
+          "path": "cross_v_proj.native.f32",
+          "shape": [
+            2048,
+            1024
+          ],
+          "bytes": 8388608,
+          "sha256": "ee1ed970e468ea727b4362a6b98721673586b8c9df4acf26721e2dfdb79e4d00"
+        },
+        {
+          "name": "dia.decoder.layers.17.gate",
+          "path": "gate.native.f32",
+          "shape": [
+            8192,
+            2048
+          ],
+          "bytes": 67108864,
+          "sha256": "66650ba25abdb9022d7597844cf512b01f02cecfc46574708a5c1dfdaf77429d"
+        },
+        {
+          "name": "dia.decoder.layers.17.up",
+          "path": "up.native.f32",
+          "shape": [
+            8192,
+            2048
+          ],
+          "bytes": 67108864,
+          "sha256": "72b6e97c1557efddb0960e7d3bbda9e18ede23c7be75357c8de19102c7a09e64"
+        },
+        {
+          "name": "dia.decoder.layers.17.wo",
+          "path": "wo.native.f32",
+          "shape": [
+            2048,
+            8192
+          ],
+          "bytes": 67108864,
+          "sha256": "eff47268b57130fd0fc8b6cff709c8ae223e5ada235326ca87b4743248a3fa75"
+        },
+        {
+          "name": "dia.decoder.layers.17.pre_ca_norm",
+          "path": "pre_ca_norm.native.f32",
+          "shape": [
+            2048
+          ],
+          "bytes": 8192,
+          "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+        },
+        {
+          "name": "dia.decoder.layers.17.pre_mlp_norm",
+          "path": "pre_mlp_norm.native.f32",
+          "shape": [
+            2048
+          ],
+          "bytes": 8192,
+          "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+        },
+        {
+          "name": "dia.decoder.layers.17.pre_sa_norm",
+          "path": "pre_sa_norm.native.f32",
+          "shape": [
+            2048
+          ],
+          "bytes": 8192,
+          "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+        },
+        {
+          "name": "dia.decoder.layers.17.self_k_proj",
+          "path": "self_k_proj.native.f32",
+          "shape": [
+            512,
+            2048
+          ],
+          "bytes": 4194304,
+          "sha256": "e34b4a032a8fb300a36784ed262c33f33599158253d0a9ab51b453f2c70cfe36"
+        },
+        {
+          "name": "dia.decoder.layers.17.self_o_proj",
+          "path": "self_o_proj.native.f32",
+          "shape": [
+            2048,
+            2048
+          ],
+          "bytes": 16777216,
+          "sha256": "bddbe63b15e369d9dc030fd905a354ea4e67c636ef37d6480ca40c60a5e60000"
+        },
+        {
+          "name": "dia.decoder.layers.17.self_q_proj",
+          "path": "self_q_proj.native.f32",
+          "shape": [
+            2048,
+            2048
+          ],
+          "bytes": 16777216,
+          "sha256": "1471dc91d05d223e09d2a2fe7ff8e3fe856082ea841d988ff564803aedef5ac0"
+        },
+        {
+          "name": "dia.decoder.layers.17.self_v_proj",
+          "path": "self_v_proj.native.f32",
+          "shape": [
+            512,
+            2048
+          ],
+          "bytes": 4194304,
+          "sha256": "81aadab5dd422357a6782d7131f5fa65f5de5489c4e602c9a689084b82a51a0a"
+        }
+      ]
+    },
+    "verified_inputs": [
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.k_proj.weight.original.f32",
+        "bytes": 8388608,
+        "sha256": "b2c738d46258892343e37be70f1082078cc690f07344295d1ed3ae5a0c770f02"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "ccbe7f3786eb302963faca3b08bd021142599cbbc8552d0253bf1a38517d40c5"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "869765db6bfa9d4424d8a7cde9d6fe08697dd579bcd387026ab176d4de733d2e"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.v_proj.weight.original.f32",
+        "bytes": 8388608,
+        "sha256": "b0351ca81d8de50438ff14c85e751d73437889ab6fb9c8085c3754cc7ef63b24"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/mlp.wi_fused.weight.original.f32",
+        "bytes": 134217728,
+        "sha256": "af5e570e9402a02be450dc5109908496e492876c8e0fa9657cfd650bc7302612"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/mlp.wo.weight.original.f32",
+        "bytes": 67108864,
+        "sha256": "7f8a30289ac87d66efa2dd212025b49b404dd196849444cc21708f6aaf618df7"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.k_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "8b97f583a8f1c1266262d1d26ace801ba64ef1ed31c8f1650af3ba98ae347a7a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "d25a2f43a14c319738aef34aca3ec45de569cfe16e85fb53aee1f0de2a04915c"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "2ac383c68c0eafe86eeac79217b5ede78c7e65414e11011df8f79a463c45ccfc"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.v_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "f76fcdd36786e92f52de4a003f01e33966e01adada36e43c6739625851c369f7"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_k_proj.native.f32",
+        "bytes": 8388608,
+        "sha256": "5190986007b3c6d1d1f34ef42e4465e37b622e8de7c281fb41e1b818b0b14d7f"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_o_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "f10444b188c74fa1dc2a9ace7cdf1c5648778996b0d8f14bdc2fb766a2c472b1"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_q_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "39ff8cba7271ca14eb3c82ae1e4158c67ef7d05327fe4d57a714722c02c93f6b"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_v_proj.native.f32",
+        "bytes": 8388608,
+        "sha256": "ee1ed970e468ea727b4362a6b98721673586b8c9df4acf26721e2dfdb79e4d00"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/gate.native.f32",
+        "bytes": 67108864,
+        "sha256": "66650ba25abdb9022d7597844cf512b01f02cecfc46574708a5c1dfdaf77429d"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/up.native.f32",
+        "bytes": 67108864,
+        "sha256": "72b6e97c1557efddb0960e7d3bbda9e18ede23c7be75357c8de19102c7a09e64"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/wo.native.f32",
+        "bytes": 67108864,
+        "sha256": "eff47268b57130fd0fc8b6cff709c8ae223e5ada235326ca87b4743248a3fa75"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_k_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "e34b4a032a8fb300a36784ed262c33f33599158253d0a9ab51b453f2c70cfe36"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_o_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "bddbe63b15e369d9dc030fd905a354ea4e67c636ef37d6480ca40c60a5e60000"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_q_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "1471dc91d05d223e09d2a2fe7ff8e3fe856082ea841d988ff564803aedef5ac0"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_v_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "81aadab5dd422357a6782d7131f5fa65f5de5489c4e602c9a689084b82a51a0a"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+        "bytes": 1446416,
+        "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+        "bytes": 317376,
+        "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+        "bytes": 99803232,
+        "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_16.f32",
+        "bytes": 16384,
+        "sha256": "3772ea025b01b02507db44ee74575b166d68b90a86297ad0649c534cd97018e2"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_encoder_output.f32",
+        "bytes": 319488,
+        "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-k.f32",
+        "bytes": 4009984,
+        "sha256": "8b8203eed2ca774cd62d2afced3a5335ffbbcf1703ac3f322dd1ba12514266d4"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-v.f32",
+        "bytes": 4009984,
+        "sha256": "642bbd14b815c810dbf124f20615aad333d4a86018dfc6baa8d3fc6ee8174ecc"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-k.f32",
+        "bytes": 4009984,
+        "sha256": "623a32473e448bce8baf40a0a869e4c7a00c65256ebd93652b5a01d96bd75bb2"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-v.f32",
+        "bytes": 4009984,
+        "sha256": "f20946d9b0df0af6827bdc91dcb638f4ae35f6b18af1dbb94dcd5e84cbcf1ccf"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_17.f32",
+        "bytes": 16384,
+        "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+      }
+    ],
+    "parts": [
+      "input",
+      "pre_sa_norm",
+      "sa_attention",
+      "sa_output",
+      "sa_residual",
+      "pre_ca_norm",
+      "cross_q",
+      "cross_attention",
+      "cross_output",
+      "ca_residual",
+      "pre_mlp_norm",
+      "mlp_gate",
+      "mlp_up",
+      "mlp_hidden",
+      "mlp_output",
+      "output"
+    ],
+    "rows": [
+      {
+        "owner": "original",
+        "part": "cross_cache_k",
+        "comparison": "same-encoder-input-actual-original-vs-native-producer",
+        "byte_exact": false,
+        "values": 159744,
+        "changed_values": 147967,
+        "cosine_min": 0.999999999961369,
+        "max_row_norm_error": 8.993775425514272e-07,
+        "max_abs": 9.816139936447144e-07,
+        "relative_l2": 2.6332025666079e-07
+      },
+      {
+        "owner": "original",
+        "part": "cross_cache_v",
+        "comparison": "same-encoder-input-actual-original-vs-native-producer",
+        "byte_exact": false,
+        "values": 159744,
+        "changed_values": 143741,
+        "cosine_min": 0.9999999999971059,
+        "max_row_norm_error": 4.6969547695674407e-07,
+        "max_abs": 5.960464477539062e-07,
+        "relative_l2": 2.0466588791470606e-07
+      },
+      {
+        "owner": "native",
+        "part": "cross_cache_k",
+        "comparison": "same-encoder-input-actual-original-vs-native-producer",
+        "byte_exact": false,
+        "values": 159744,
+        "changed_values": 147806,
+        "cosine_min": 0.9999999999593499,
+        "max_row_norm_error": 1.2382210601291632e-06,
+        "max_abs": 9.816139936447144e-07,
+        "relative_l2": 2.647223781852644e-07
+      },
+      {
+        "owner": "native",
+        "part": "cross_cache_v",
+        "comparison": "same-encoder-input-actual-original-vs-native-producer",
+        "byte_exact": false,
+        "values": 159744,
+        "changed_values": 143748,
+        "cosine_min": 0.999999999996547,
+        "max_row_norm_error": 4.544254937899339e-07,
+        "max_abs": 4.76837158203125e-07,
+        "relative_l2": 2.0488124079868972e-07
+      },
+      {
+        "owner": "original",
+        "part": "input",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "owner": "original",
+        "part": "pre_sa_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "owner": "original",
+        "part": "sa_attention",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3976,
+        "cosine_min": 0.9999999999735241,
+        "max_row_norm_error": 4.653733290727047e-06,
+        "max_abs": 8.091330528259277e-06,
+        "relative_l2": 3.6089422193575964e-06
+      },
+      {
+        "owner": "original",
+        "part": "sa_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4063,
+        "cosine_min": 0.9999999999923777,
+        "max_row_norm_error": 6.960784539877807e-07,
+        "max_abs": 1.0281801223754883e-05,
+        "relative_l2": 2.6849331521961016e-06
+      },
+      {
+        "owner": "original",
+        "part": "sa_residual",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3963,
+        "cosine_min": 0.9999999999992668,
+        "max_row_norm_error": 2.1708643438422826e-07,
+        "max_abs": 1.0281801223754883e-05,
+        "relative_l2": 8.517012821872458e-07
+      },
+      {
+        "owner": "original",
+        "part": "pre_ca_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3961,
+        "cosine_min": 0.9999999999988842,
+        "max_row_norm_error": 2.990326659624287e-07,
+        "max_abs": 3.3155083656311035e-07,
+        "relative_l2": 8.011953438718972e-07
+      },
+      {
+        "owner": "original",
+        "part": "cross_q",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4049,
+        "cosine_min": 0.9999999995124043,
+        "max_row_norm_error": 4.244719604695746e-07,
+        "max_abs": 3.6969780921936035e-05,
+        "relative_l2": 3.835534175137182e-06
+      },
+      {
+        "owner": "original",
+        "part": "cross_attention",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 2607,
+        "cosine_min": 0.9999999999759395,
+        "max_row_norm_error": 1.056670487553646e-06,
+        "max_abs": 4.1350722312927246e-07,
+        "relative_l2": 1.6888306919309308e-06
+      },
+      {
+        "owner": "original",
+        "part": "cross_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3386,
+        "cosine_min": 0.9999999999975231,
+        "max_row_norm_error": 6.65784240627687e-07,
+        "max_abs": 4.708766937255859e-06,
+        "relative_l2": 9.136131765321095e-07
+      },
+      {
+        "owner": "original",
+        "part": "ca_residual",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3964,
+        "cosine_min": 0.9999999999992858,
+        "max_row_norm_error": 2.1367955160833674e-07,
+        "max_abs": 1.0281801223754883e-05,
+        "relative_l2": 8.507835201047867e-07
+      },
+      {
+        "owner": "original",
+        "part": "pre_mlp_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3958,
+        "cosine_min": 0.999999999999336,
+        "max_row_norm_error": 1.4184108121373384e-07,
+        "max_abs": 1.1324882507324219e-06,
+        "relative_l2": 8.443881759272065e-07
+      },
+      {
+        "owner": "original",
+        "part": "mlp_gate",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15266,
+        "cosine_min": 0.9999999999998135,
+        "max_row_norm_error": 2.1896017143863133e-07,
+        "max_abs": 6.318092346191406e-06,
+        "relative_l2": 4.649537267622156e-07
+      },
+      {
+        "owner": "original",
+        "part": "mlp_up",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15377,
+        "cosine_min": 0.9999999999997087,
+        "max_row_norm_error": 2.8613515901110276e-07,
+        "max_abs": 7.659196853637695e-06,
+        "relative_l2": 4.7495656749369416e-07
+      },
+      {
+        "owner": "original",
+        "part": "mlp_hidden",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15851,
+        "cosine_min": 0.9999999999973327,
+        "max_row_norm_error": 6.431896162339967e-07,
+        "max_abs": 1.2099742889404297e-05,
+        "relative_l2": 8.840251668341364e-07
+      },
+      {
+        "owner": "original",
+        "part": "mlp_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3910,
+        "cosine_min": 0.9999999999997446,
+        "max_row_norm_error": 5.159242871810577e-07,
+        "max_abs": 2.47955322265625e-05,
+        "relative_l2": 6.33333058661775e-07
+      },
+      {
+        "owner": "original",
+        "part": "output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3924,
+        "cosine_min": 0.9999999999996245,
+        "max_row_norm_error": 2.6517444762230724e-07,
+        "max_abs": 2.288818359375e-05,
+        "relative_l2": 6.686367222035768e-07
+      },
+      {
+        "owner": "original",
+        "part": "output",
+        "comparison": "local-original-vs-hosted-own-output",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3963,
+        "cosine_min": 0.9999999999990465,
+        "max_row_norm_error": 5.196111618754884e-07,
+        "max_abs": 6.4849853515625e-05,
+        "relative_l2": 1.0211645272078043e-06
+      },
+      {
+        "owner": "native",
+        "part": "input",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "owner": "native",
+        "part": "pre_sa_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "owner": "native",
+        "part": "sa_attention",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3916,
+        "cosine_min": 0.9999999999720224,
+        "max_row_norm_error": 4.957286703577424e-06,
+        "max_abs": 8.121132850646973e-06,
+        "relative_l2": 3.627484103514549e-06
+      },
+      {
+        "owner": "native",
+        "part": "sa_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4044,
+        "cosine_min": 0.9999999999919695,
+        "max_row_norm_error": 8.48322327051676e-07,
+        "max_abs": 1.0669231414794922e-05,
+        "relative_l2": 2.70666696649844e-06
+      },
+      {
+        "owner": "native",
+        "part": "sa_residual",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3945,
+        "cosine_min": 0.999999999999235,
+        "max_row_norm_error": 2.2618990636047442e-07,
+        "max_abs": 1.0669231414794922e-05,
+        "relative_l2": 8.573741856670133e-07
+      },
+      {
+        "owner": "native",
+        "part": "pre_ca_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3955,
+        "cosine_min": 0.9999999999987728,
+        "max_row_norm_error": 2.012101585346926e-07,
+        "max_abs": 3.427267074584961e-07,
+        "relative_l2": 7.984062819172064e-07
+      },
+      {
+        "owner": "native",
+        "part": "cross_q",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4048,
+        "cosine_min": 0.9999999995117514,
+        "max_row_norm_error": 3.9078113078794274e-07,
+        "max_abs": 3.6969780921936035e-05,
+        "relative_l2": 3.8358749409933385e-06
+      },
+      {
+        "owner": "native",
+        "part": "cross_attention",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 2629,
+        "cosine_min": 0.9999999999734108,
+        "max_row_norm_error": 9.275225991700609e-07,
+        "max_abs": 4.1350722312927246e-07,
+        "relative_l2": 1.752012211883473e-06
+      },
+      {
+        "owner": "native",
+        "part": "cross_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3402,
+        "cosine_min": 0.9999999999978887,
+        "max_row_norm_error": 5.974350383297633e-07,
+        "max_abs": 4.172325134277344e-06,
+        "relative_l2": 8.856877030685625e-07
+      },
+      {
+        "owner": "native",
+        "part": "ca_residual",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3959,
+        "cosine_min": 0.9999999999992423,
+        "max_row_norm_error": 2.3073450705624055e-07,
+        "max_abs": 1.0669231414794922e-05,
+        "relative_l2": 8.548537685759871e-07
+      },
+      {
+        "owner": "native",
+        "part": "pre_mlp_norm",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3941,
+        "cosine_min": 0.9999999999993222,
+        "max_row_norm_error": 1.8522769096307456e-07,
+        "max_abs": 1.0728836059570312e-06,
+        "relative_l2": 8.493122837626157e-07
+      },
+      {
+        "owner": "native",
+        "part": "mlp_gate",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15195,
+        "cosine_min": 0.9999999999997985,
+        "max_row_norm_error": 1.36324403765542e-07,
+        "max_abs": 6.556510925292969e-06,
+        "relative_l2": 4.5426579692292895e-07
+      },
+      {
+        "owner": "native",
+        "part": "mlp_up",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15245,
+        "cosine_min": 0.9999999999997076,
+        "max_row_norm_error": 1.7404598129378002e-07,
+        "max_abs": 7.88271427154541e-06,
+        "relative_l2": 4.5886389835042926e-07
+      },
+      {
+        "owner": "native",
+        "part": "mlp_hidden",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 15810,
+        "cosine_min": 0.9999999999977072,
+        "max_row_norm_error": 6.151925916464407e-07,
+        "max_abs": 1.2248754501342773e-05,
+        "relative_l2": 8.785794798514275e-07
+      },
+      {
+        "owner": "native",
+        "part": "mlp_output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3897,
+        "cosine_min": 0.999999999999782,
+        "max_row_norm_error": 3.081320707476465e-07,
+        "max_abs": 1.0013580322265625e-05,
+        "relative_l2": 5.909662473062586e-07
+      },
+      {
+        "owner": "native",
+        "part": "output",
+        "comparison": "same-owned-input-and-caches-complete-layer",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3920,
+        "cosine_min": 0.9999999999996506,
+        "max_row_norm_error": 1.833348610702501e-07,
+        "max_abs": 1.7404556274414062e-05,
+        "relative_l2": 6.590206464368098e-07
+      },
+      {
+        "owner": "native",
+        "part": "output",
+        "comparison": "local-original-vs-hosted-own-output",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3920,
+        "cosine_min": 0.9999999999996506,
+        "max_row_norm_error": 1.8333489459898544e-07,
+        "max_abs": 1.7404556274414062e-05,
+        "relative_l2": 6.590206489985544e-07
+      },
+      {
+        "owner": "native",
+        "part": "output",
+        "comparison": "local-native-vs-hosted-native",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    ],
+    "controls": [
+      {
+        "owner": "original",
+        "part": "input",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 54.23964309692383,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "pre_sa_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.5346990823745728,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "sa_attention",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.4536776542663574,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "sa_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 10.688584327697754,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "sa_residual",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 47.13854217529297,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "pre_ca_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.4803009033203125,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "cross_q",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 2.075979709625244,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "cross_attention",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 0.09858329594135284,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "cross_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.969126582145691,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "ca_residual",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 46.652923583984375,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "pre_mlp_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 2.590608596801758,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "mlp_gate",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 7.262990951538086,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "mlp_up",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 8.48940658569336,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "mlp_hidden",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 7.242208957672119,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "mlp_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 27.418542861938477,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "original",
+        "part": "output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 65.09846496582031,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "input",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 54.2396354675293,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "pre_sa_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.5346996784210205,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "sa_attention",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.453675389289856,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "sa_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 10.688581466674805,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "sa_residual",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 47.13853454589844,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "pre_ca_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.4803006649017334,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "cross_q",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 2.0759785175323486,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "cross_attention",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 0.0985831767320633,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "cross_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 1.9691262245178223,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "ca_residual",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 46.65291213989258,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "pre_mlp_norm",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 2.590609550476074,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "mlp_gate",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 7.262989044189453,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "mlp_up",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 8.489409446716309,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "mlp_hidden",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 16384,
+        "changed_values": 16384,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 7.242213249206543,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "mlp_output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 27.418521881103516,
+        "relative_l2": 1.0
+      },
+      {
+        "owner": "native",
+        "part": "output",
+        "control": "double-scale",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 1.0,
+        "max_abs": 65.09848022460938,
+        "relative_l2": 1.0
+      }
+    ],
+    "repeats_and_threads_exact": true,
+    "native_reproduces_hosted_output_exact": true,
+    "files": [
+      {
+        "path": "actual-metrics.py",
+        "bytes": 593,
+        "sha256": "53a4713ee35b6a46d72245756877cd53b53813dc07bbd4e706a9524777758fab"
+      },
+      {
+        "path": "actual-native-layer.cpp",
+        "bytes": 11419,
+        "sha256": "24393006c0e03e8b1a1d08db86e5769f67539341af6d65532c72273862cb78cf"
+      },
+      {
+        "path": "actual-original-cross-precompute.py",
+        "bytes": 691,
+        "sha256": "1ac58a8aab373bed0514f10526155c26abed3a36443604fb80ff22067d0e3a7e"
+      },
+      {
+        "path": "actual-original-layers.py",
+        "bytes": 10671,
+        "sha256": "a641ecb839fa62d4e2c230253ebddb017c5ba1a911a5c25506161f01a41209fc"
+      },
+      {
+        "path": "actual-original-state.py",
+        "bytes": 1264,
+        "sha256": "2300f5d5017301f0f1c26df5078ed8c98bbd001237c40586e231034f55ac8735"
+      },
+      {
+        "path": "bridge",
+        "bytes": 36536,
+        "sha256": "568d9e098e96f5e2e192af465d2e0b67355c7c6bd964024e182ba47a83ccf382"
+      },
+      {
+        "path": "bridge.cpp",
+        "bytes": 17121,
+        "sha256": "cd9a3109af716a150af4d214b162d9f2eeb3c38df7398c8d30a60bc27ab0c2c2"
+      },
+      {
+        "path": "build-command.json",
+        "bytes": 433,
+        "sha256": "692a1ebad7eb75e01347c55308003fa826022962b1691dba96e6692646a39ca0"
+      },
+      {
+        "path": "cross_attention.k_proj.weight.original.f32",
+        "bytes": 8388608,
+        "sha256": "b2c738d46258892343e37be70f1082078cc690f07344295d1ed3ae5a0c770f02"
+      },
+      {
+        "path": "cross_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "ccbe7f3786eb302963faca3b08bd021142599cbbc8552d0253bf1a38517d40c5"
+      },
+      {
+        "path": "cross_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "869765db6bfa9d4424d8a7cde9d6fe08697dd579bcd387026ab176d4de733d2e"
+      },
+      {
+        "path": "cross_attention.v_proj.weight.original.f32",
+        "bytes": 8388608,
+        "sha256": "b0351ca81d8de50438ff14c85e751d73437889ab6fb9c8085c3754cc7ef63b24"
+      },
+      {
+        "path": "cross_k_proj.native.f32",
+        "bytes": 8388608,
+        "sha256": "5190986007b3c6d1d1f34ef42e4465e37b622e8de7c281fb41e1b818b0b14d7f"
+      },
+      {
+        "path": "cross_o_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "f10444b188c74fa1dc2a9ace7cdf1c5648778996b0d8f14bdc2fb766a2c472b1"
+      },
+      {
+        "path": "cross_q_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "39ff8cba7271ca14eb3c82ae1e4158c67ef7d05327fe4d57a714722c02c93f6b"
+      },
+      {
+        "path": "cross_v_proj.native.f32",
+        "bytes": 8388608,
+        "sha256": "ee1ed970e468ea727b4362a6b98721673586b8c9df4acf26721e2dfdb79e4d00"
+      },
+      {
+        "path": "fetch-receipt.json",
+        "bytes": 8636,
+        "sha256": "a83bc3e9d8cb48eaad61cb51fde5128412beed9552460276c4b07fce58e7f2ef"
+      },
+      {
+        "path": "fetch.log",
+        "bytes": 1340,
+        "sha256": "cacb9fd6f99da08e0803f496773db984031fa459c3f430a0615a740c6bafa135"
+      },
+      {
+        "path": "fetch.py",
+        "bytes": 4125,
+        "sha256": "5c0c279ac22b95c46a68853fadcd3d4dbe784a2657d8550f037ad0f7f8bf601d"
+      },
+      {
+        "path": "gate.native.f32",
+        "bytes": 67108864,
+        "sha256": "66650ba25abdb9022d7597844cf512b01f02cecfc46574708a5c1dfdaf77429d"
+      },
+      {
+        "path": "mlp.wi_fused.weight.original.f32",
+        "bytes": 134217728,
+        "sha256": "af5e570e9402a02be450dc5109908496e492876c8e0fa9657cfd650bc7302612"
+      },
+      {
+        "path": "mlp.wo.weight.original.f32",
+        "bytes": 67108864,
+        "sha256": "7f8a30289ac87d66efa2dd212025b49b404dd196849444cc21708f6aaf618df7"
+      },
+      {
+        "path": "native-encoder.f32",
+        "bytes": 319488,
+        "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
+      },
+      {
+        "path": "native-layer-inputs.f32",
+        "bytes": 9306112,
+        "sha256": "477b5f982fcbf43543f8c8cf31ee057e09dcb0c003fbcf043cee0e7ac658fa24"
+      },
+      {
+        "path": "native-library-closure.log",
+        "bytes": 703,
+        "sha256": "a6d9ce1e747a706ad1127ff1300d1e0c8fd18e9e26adb4b4b7e7eda0887ab49e"
+      },
+      {
+        "path": "native-native-cross.f32",
+        "bytes": 1277952,
+        "sha256": "8d398c5a0af0399ec67271256795a1cda2dfc585d4baecc8d61968b7b424049f"
+      },
+      {
+        "path": "native-native-layer-t1.f32",
+        "bytes": 409600,
+        "sha256": "7a4f606d3ac4ed2f7c10ce1282c7fdddcce9b6556209a4e3cb46d2fd41379623"
+      },
+      {
+        "path": "native-native-layer-t4.f32",
+        "bytes": 409600,
+        "sha256": "7a4f606d3ac4ed2f7c10ce1282c7fdddcce9b6556209a4e3cb46d2fd41379623"
+      },
+      {
+        "path": "native-original-ca_residual.npy",
+        "bytes": 16512,
+        "sha256": "2d9a2f2a08dbfb5d3578689b8ed1020b6858c8291c9acd2e8f41a986184bf65c"
+      },
+      {
+        "path": "native-original-cross-k.npy",
+        "bytes": 639104,
+        "sha256": "6b3be9d3b633104c1160f8d2115b02071c9a9b9ea0c2db305401b9e20a3ab9c0"
+      },
+      {
+        "path": "native-original-cross-v.npy",
+        "bytes": 639104,
+        "sha256": "52f28c93e42e34f6fa55bb5dbeb66c314fa73f4641492094e741390c9cb3384c"
+      },
+      {
+        "path": "native-original-cross_attention.npy",
+        "bytes": 16512,
+        "sha256": "231522a3194adbf06a5bce21ad4ca20c6ec6b87e958f7f484b1c74ee6edd9217"
+      },
+      {
+        "path": "native-original-cross_output.npy",
+        "bytes": 16512,
+        "sha256": "60081b206f6612f77d56c8631fa066f3f99565ec5a68558b2c44afafb4364851"
+      },
+      {
+        "path": "native-original-cross_q.npy",
+        "bytes": 16512,
+        "sha256": "6860292631e1281810cf91f3136f5408374c3411a0656fb24666876752fabca9"
+      },
+      {
+        "path": "native-original-input.npy",
+        "bytes": 16512,
+        "sha256": "c1a2657a3e72da8b46dc33d1c1674b60b397431409847ac65ad779c407515d7a"
+      },
+      {
+        "path": "native-original-mlp_gate.npy",
+        "bytes": 65664,
+        "sha256": "931fef94759502e29f3c2cde65f056d2ce656fb36d6713d3189ba20cdf22e71f"
+      },
+      {
+        "path": "native-original-mlp_hidden.npy",
+        "bytes": 65664,
+        "sha256": "3f36ac05147410ed2c4998d37b78e10141122434fec7e8819eef73379235e4e0"
+      },
+      {
+        "path": "native-original-mlp_output.npy",
+        "bytes": 16512,
+        "sha256": "dcc43651d310e92c8fe40bc7ddc784719e392db8263d71d96ba186b1443e693c"
+      },
+      {
+        "path": "native-original-mlp_up.npy",
+        "bytes": 65664,
+        "sha256": "8fa96d514a63b3cf87d75bda8dfbbf19597dd755eeee1f094e99af0e54c19866"
+      },
+      {
+        "path": "native-original-output.npy",
+        "bytes": 16512,
+        "sha256": "865d8f86cf34bb3929b891784b529b3c76573bace95dd535520c37126ca6ecea"
+      },
+      {
+        "path": "native-original-pre_ca_norm.npy",
+        "bytes": 16512,
+        "sha256": "7da0a9e4feb3388fe3cc3920b2ac2aff2576fd25be349d78486a081ef68c0dd4"
+      },
+      {
+        "path": "native-original-pre_mlp_norm.npy",
+        "bytes": 16512,
+        "sha256": "9fc58bf0d2dd98f60e7ddc0acdc37684472034dff8530e0bd5baf5376ee3cc94"
+      },
+      {
+        "path": "native-original-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "614de6e6a208077cc40b56ba5760b9a55476dff07a3bbf3c81c767185ff55267"
+      },
+      {
+        "path": "native-original-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "9af5b4068972cfb1659140bd6825b37910dce2019323ff07bcb44b9bb64021a8"
+      },
+      {
+        "path": "native-original-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "244332484045da8a4d5aa92a62a5b44e084403a1980773a27c6589a3dc122791"
+      },
+      {
+        "path": "native-original-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "42c0448426998fe0de1336d6525f45409bf05ccb8a773a8001096e7d1d1db271"
+      },
+      {
+        "path": "original-config.json",
+        "bytes": 941,
+        "sha256": "9140e85fd15b82d7f268c5681a41fb1de68573ec206b87cb3a5862fe5c598d6e"
+      },
+      {
+        "path": "original-encoder.f32",
+        "bytes": 319488,
+        "sha256": "1ba6526d8ec38908a067872b71b9e8ae5ee7715ed5457bf22d0fff40d198e4c1"
+      },
+      {
+        "path": "original-layer-inputs.f32",
+        "bytes": 9306112,
+        "sha256": "0ea34a028a95e90cd54340461718fca86938686e5e4afd38b917d5057cd57aa4"
+      },
+      {
+        "path": "original-native-cross.f32",
+        "bytes": 1277952,
+        "sha256": "4b45b7e786513d786210db253b044bbe8ad91bc61bf1a42c1ae58f9c470c24b7"
+      },
+      {
+        "path": "original-native-layer-t1.f32",
+        "bytes": 409600,
+        "sha256": "eebc8a7791b4ce18dba454d29508b194d7461bfaadf46fabef09897d340c1c9c"
+      },
+      {
+        "path": "original-native-layer-t4.f32",
+        "bytes": 409600,
+        "sha256": "eebc8a7791b4ce18dba454d29508b194d7461bfaadf46fabef09897d340c1c9c"
+      },
+      {
+        "path": "original-original-ca_residual.npy",
+        "bytes": 16512,
+        "sha256": "ce3165ec0cf1bfcd89fc5799e44848bf920825b4cbb31b671172513a194de3be"
+      },
+      {
+        "path": "original-original-cross-k.npy",
+        "bytes": 639104,
+        "sha256": "17b841e65b9d9207af1a46e5dd1ad2c1efa1717bacb0cf90be9a9186d086d646"
+      },
+      {
+        "path": "original-original-cross-v.npy",
+        "bytes": 639104,
+        "sha256": "85031784542e742fc3dadb3b92942ff0b191a74b654082e825ea24df7bdf7e65"
+      },
+      {
+        "path": "original-original-cross_attention.npy",
+        "bytes": 16512,
+        "sha256": "5e0289b7324a98f2c372fd1abed9e735adb89f99d539b3410d039a8b020b9339"
+      },
+      {
+        "path": "original-original-cross_output.npy",
+        "bytes": 16512,
+        "sha256": "c2b4f24025a791421860d839cb68d7f959a34728c4f155dde2f92837d56b15da"
+      },
+      {
+        "path": "original-original-cross_q.npy",
+        "bytes": 16512,
+        "sha256": "1b45609b75765ded666bec3a251fd99c6518b06535a04ae1a33437ac0d84d489"
+      },
+      {
+        "path": "original-original-input.npy",
+        "bytes": 16512,
+        "sha256": "ab440737f452b7ac7accb748dd3d9c7a33f52c59bdbedfb167d13dc3396774ed"
+      },
+      {
+        "path": "original-original-mlp_gate.npy",
+        "bytes": 65664,
+        "sha256": "92d8e690406613f878ec8222e1ad79f184594b87e3e5005c6fb4da86381a0140"
+      },
+      {
+        "path": "original-original-mlp_hidden.npy",
+        "bytes": 65664,
+        "sha256": "3728a56b6101254b0c43bc3d6d877f96815d804103e09106aea234c1d3603d67"
+      },
+      {
+        "path": "original-original-mlp_output.npy",
+        "bytes": 16512,
+        "sha256": "3de62906c8c0ec93da11ccffeac7e41c435d5f733292978558ae9e9ecc734a0a"
+      },
+      {
+        "path": "original-original-mlp_up.npy",
+        "bytes": 65664,
+        "sha256": "1affc970b51962ac3b6fe947badc1ee7a1cbc2ab0956a53214a1167b9c3de918"
+      },
+      {
+        "path": "original-original-output.npy",
+        "bytes": 16512,
+        "sha256": "25f0a2174e6de9fba3b158a0a0e383c258fb36fee2b5b6fc413226f7a6064e57"
+      },
+      {
+        "path": "original-original-pre_ca_norm.npy",
+        "bytes": 16512,
+        "sha256": "a20d0ffd4dbe178609062727def9cdf68a852fa8159f005cf478f664fc8366b8"
+      },
+      {
+        "path": "original-original-pre_mlp_norm.npy",
+        "bytes": 16512,
+        "sha256": "eec9e1d58ba9b5dfb04510a466b83f3d5a4438ae23c8e6614915c6dd7002de68"
+      },
+      {
+        "path": "original-original-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "45feeffff31fbe7802a1ca2222b16d0179e9e464fc3ba4121eb40db8cb7ba818"
+      },
+      {
+        "path": "original-original-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "dba9c0de524b6099686d12743793faf786fc8a5e92577d83eba50bb18b4b2dfa"
+      },
+      {
+        "path": "original-original-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "2ed0450a5040d660bd6b616ec372509e323d2314ef1a721e7631f7b69397fdfc"
+      },
+      {
+        "path": "original-original-sa_residual.npy",
+        "bytes": 16512,
+        "sha256": "9e7a7790df755e1787551bc26e00a6925ed42a6c7adb08e150c7b5fba7073532"
+      },
+      {
+        "path": "pre_ca_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+      },
+      {
+        "path": "pre_ca_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
+      },
+      {
+        "path": "pre_mlp_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+      },
+      {
+        "path": "pre_mlp_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
+      },
+      {
+        "path": "pre_sa_norm.native.f32",
+        "bytes": 8192,
+        "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+      },
+      {
+        "path": "pre_sa_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
+      },
+      {
+        "path": "replay.py",
+        "bytes": 14996,
+        "sha256": "3f2c8db65283f6ba4fc86f2606f1d5479fdbff901683f2acc2a1475aeb08e2ce"
+      },
+      {
+        "path": "self_attention.k_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "8b97f583a8f1c1266262d1d26ace801ba64ef1ed31c8f1650af3ba98ae347a7a"
+      },
+      {
+        "path": "self_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "d25a2f43a14c319738aef34aca3ec45de569cfe16e85fb53aee1f0de2a04915c"
+      },
+      {
+        "path": "self_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "2ac383c68c0eafe86eeac79217b5ede78c7e65414e11011df8f79a463c45ccfc"
+      },
+      {
+        "path": "self_attention.v_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "f76fcdd36786e92f52de4a003f01e33966e01adada36e43c6739625851c369f7"
+      },
+      {
+        "path": "self_k_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "e34b4a032a8fb300a36784ed262c33f33599158253d0a9ab51b453f2c70cfe36"
+      },
+      {
+        "path": "self_o_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "bddbe63b15e369d9dc030fd905a354ea4e67c636ef37d6480ca40c60a5e60000"
+      },
+      {
+        "path": "self_q_proj.native.f32",
+        "bytes": 16777216,
+        "sha256": "1471dc91d05d223e09d2a2fe7ff8e3fe856082ea841d988ff564803aedef5ac0"
+      },
+      {
+        "path": "self_v_proj.native.f32",
+        "bytes": 4194304,
+        "sha256": "81aadab5dd422357a6782d7131f5fa65f5de5489c4e602c9a689084b82a51a0a"
+      },
+      {
+        "path": "up.native.f32",
+        "bytes": 67108864,
+        "sha256": "72b6e97c1557efddb0960e7d3bbda9e18ede23c7be75357c8de19102c7a09e64"
+      },
+      {
+        "path": "wo.native.f32",
+        "bytes": 67108864,
+        "sha256": "eff47268b57130fd0fc8b6cff709c8ae223e5ada235326ca87b4743248a3fa75"
+      }
+    ]
+  },
+  "context_interventions": {
+    "scope": "Eight original whole-layer context interventions at layer17/step978: inherited hidden input, actual self-prefix and reconstructed cross-cache vary independently. No altered neural arithmetic, runtime recipe, sampling or speech acceptance.",
+    "rows": [
+      {
+        "label": "context-000",
+        "hidden_owner": "original",
+        "self_prefix_owner": "original",
+        "cross_cache_owner": "original",
+        "byte_exact": true,
+        "values": 4096,
+        "changed_values": 0,
+        "cosine_min": 0.9999999999999998,
+        "max_row_norm_error": 0.0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      {
+        "label": "context-001",
+        "hidden_owner": "original",
+        "self_prefix_owner": "original",
+        "cross_cache_owner": "native",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 2916,
+        "cosine_min": 0.9999999999999893,
+        "max_row_norm_error": 1.0143779627380667e-07,
+        "max_abs": 9.5367431640625e-06,
+        "relative_l2": 1.1502119739563247e-07
+      },
+      {
+        "label": "context-010",
+        "hidden_owner": "original",
+        "self_prefix_owner": "native",
+        "cross_cache_owner": "original",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3910,
+        "cosine_min": 0.999999999999536,
+        "max_row_norm_error": 2.830465822833972e-07,
+        "max_abs": 3.528594970703125e-05,
+        "relative_l2": 6.210425372383517e-07
+      },
+      {
+        "label": "context-011",
+        "hidden_owner": "original",
+        "self_prefix_owner": "native",
+        "cross_cache_owner": "native",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 3916,
+        "cosine_min": 0.9999999999996395,
+        "max_row_norm_error": 3.9381461958143404e-07,
+        "max_abs": 3.24249267578125e-05,
+        "relative_l2": 6.109496951197834e-07
+      },
+      {
+        "label": "context-100",
+        "hidden_owner": "native",
+        "self_prefix_owner": "original",
+        "cross_cache_owner": "original",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4031,
+        "cosine_min": 0.9999999999966881,
+        "max_row_norm_error": 7.153763084133402e-07,
+        "max_abs": 8.20159912109375e-05,
+        "relative_l2": 1.759955736842002e-06
+      },
+      {
+        "label": "context-101",
+        "hidden_owner": "native",
+        "self_prefix_owner": "original",
+        "cross_cache_owner": "native",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4015,
+        "cosine_min": 0.9999999999969731,
+        "max_row_norm_error": 7.81235460434182e-07,
+        "max_abs": 7.62939453125e-05,
+        "relative_l2": 1.7502453987656976e-06
+      },
+      {
+        "label": "context-110",
+        "hidden_owner": "native",
+        "self_prefix_owner": "native",
+        "cross_cache_owner": "original",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4040,
+        "cosine_min": 0.9999999999954158,
+        "max_row_norm_error": 7.012918977755689e-07,
+        "max_abs": 0.0001087188720703125,
+        "relative_l2": 1.981096680476284e-06
+      },
+      {
+        "label": "context-111",
+        "hidden_owner": "native",
+        "self_prefix_owner": "native",
+        "cross_cache_owner": "native",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4045,
+        "cosine_min": 0.9999999999955762,
+        "max_row_norm_error": 8.019771317036017e-07,
+        "max_abs": 0.00010776519775390625,
+        "relative_l2": 1.984766055211042e-06
+      }
+    ],
+    "negative_controls": [
+      {
+        "control": "reverse-self-heads",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9298812889917181,
+        "max_row_norm_error": 0.19892304029348007,
+        "max_abs": 12.950772285461426,
+        "relative_l2": 0.263621726952081
+      },
+      {
+        "control": "swap-cross-batches",
+        "byte_exact": false,
+        "values": 4096,
+        "changed_values": 4096,
+        "cosine_min": 0.9989991735505194,
+        "max_row_norm_error": 0.03243753380374981,
+        "max_abs": 2.39447021484375,
+        "relative_l2": 0.03543930890816739
+      }
+    ],
+    "repeats_exact": true,
+    "baseline_context_outputs_match_previous_exact": true
+  },
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "verified_initial_payloads": 87,
+    "recalculated_rows": 39,
+    "recalculated_scale_controls": 32,
+    "recalculated_context_rows": 8,
+    "recalculated_wrong_cache_controls": 2,
+    "native_threads_and_hosted_output_exact": true,
+    "all_original_context_repeats_exact": true,
+    "scope": "Bounded complete decoder layer17 at step978, exact owned inputs/self-prefixes and reconstructed cross-cache producers; same-input operations and inherited drift are distinguished. No full-model, new speech, Q4/GPU/speed acceptance."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261014-decoder-boundaries/complete-owned-layer17.zip",
+    "revision": "2da60e115a9c555cfc633b0676a6ee8cce014879",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2da60e115a9c555cfc633b0676a6ee8cce014879/dia-20261014-decoder-boundaries/complete-owned-layer17.zip",
+    "bytes": 592159424,
+    "sha256": "331bc7ba81aec51a684aedba9e5fdf1adf360a883c9aa04a3df9cb2ad516a127",
+    "payloads": 127,
+    "anonymous_verified": true,
+    "ledger_files": [
+      "manifest.json",
+      "license-addendum.json"
+    ],
+    "parent_publication": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "file": "dia-20261014-decoder-boundaries/complete-owned-layer17.zip",
+      "bytes": 592158055,
+      "sha256": "42645d4313114715a5226366c1de8dc7112041bee640fa51cbb263b3ff9bf15e",
+      "payloads": 126,
+      "anonymous_verified": true,
+      "revision": "cbdb22d17bb6cbea04d87d54214948edf64fdc33"
+    }
+  }
+}

@@ -1,0 +1,905 @@
+{
+  "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+  "source_files": [
+    {
+      "path": "src/core/backend_validation.h",
+      "bytes": 4099,
+      "sha256": "5a941f80905a8261fc10f0caffff6ef16e6dda092bba2e6a6044aa3c2901a2c3"
+    },
+    {
+      "path": "src/core/ggml_cpu_backend.h",
+      "bytes": 13201,
+      "sha256": "aa2d261fac1414fad06829dcfbfc38627e9b55b5e07095b7b7abba5307b7e389"
+    },
+    {
+      "path": "src/core/gpu_backend_pref.h",
+      "bytes": 10893,
+      "sha256": "b1fd43cdabf3e74d0eca27215b4fd01dc1b227db5f0fd44c8433b9ed8c9bd792"
+    },
+    {
+      "path": "src/core/sched_prof.h",
+      "bytes": 4077,
+      "sha256": "f6650d09e3fa8664ee5c5328e88abc6585387c7e6393bc0dc63c1902f78c924f"
+    },
+    {
+      "path": "src/core/gguf_loader.h",
+      "bytes": 18586,
+      "sha256": "bfb2a8b5cac51326429ee37789eac8c92b19f56a5536bcb590ed6db88455fbc5"
+    },
+    {
+      "path": "src/core/gguf_loader.cpp",
+      "bytes": 73196,
+      "sha256": "c26f21f34f88875a6900722d6c5c90176b8a71bcbc9b0a5603dc5c1a56dd6fd5"
+    },
+    {
+      "path": "src/moonshine.cpp",
+      "bytes": 68852,
+      "sha256": "c318d146e4c1f0cc9c20889a5b0b2b9ea99fc857c6b9bb35d990db486aac8397"
+    },
+    {
+      "path": "src/moonshine.h",
+      "bytes": 3959,
+      "sha256": "e4c3f4be18a88d6320999e82a05b4d73683d052c1059e358f13978568c61918d"
+    },
+    {
+      "path": "src/moonshine-impl.h",
+      "bytes": 4167,
+      "sha256": "6252091ce5efeb3634f6ee737ba9998c541c2befa10f08adff2b20ae7ed9fb4e"
+    },
+    {
+      "path": "src/moonshine-tokenizer.cpp",
+      "bytes": 5116,
+      "sha256": "fffe6b9a20194b53b0f9e4942a2f7f36f0756abd77006615509982c8b175e375"
+    },
+    {
+      "path": "src/moonshine-tokenizer.h",
+      "bytes": 665,
+      "sha256": "c04fef497c088fdf178fb1b645fb380cb153ab16ceccdd0929e94859f2f06360"
+    },
+    {
+      "path": "examples/cli/crispasr_diff_main.cpp",
+      "bytes": 485963,
+      "sha256": "daf11d3680b75fc7c544ad49e75a2365f66d47837e32b3b0e4ed15c9fbbdc5f0"
+    },
+    {
+      "path": "examples/cli/crispasr_diff.cpp",
+      "bytes": 12913,
+      "sha256": "4706bc1b79181f04ab2b878eaa116868367497877463ecd903b6e40afa2da466"
+    },
+    {
+      "path": "examples/cli/crispasr_diff.h",
+      "bytes": 8329,
+      "sha256": "6ed5307b613dad49bc89878f9404fb5e0035aa1082e11e9b9650daefc45cb023"
+    },
+    {
+      "path": "tests/test-gpu-backend-pref.cpp",
+      "bytes": 5935,
+      "sha256": "098a748cff25c7e23f89baf49b9a84561d04b9b9acc68293a8617cec420556dd"
+    },
+    {
+      "path": "tools/ci-heavy/cann_model_strict.py",
+      "bytes": 5863,
+      "sha256": "d89a5d84fb16b6d82113078621b3d272421cbdccba623e0d1640ef4d23c298b0"
+    }
+  ],
+  "local_native": {
+    "passed": true,
+    "arms": [
+      {
+        "arm": "normal",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "arm": "strict-cpu",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "arm": "missing-gpu",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      },
+      {
+        "arm": "invalid-index",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      },
+      {
+        "arm": "missing-cpu",
+        "exit": 5,
+        "expected": 5,
+        "passed": true
+      }
+    ],
+    "normal_and_strict_cpu_arrays_transcripts_byte_exact_to_accepted_backend": true,
+    "scope": "Actual bounded Moonshine CPU backend and strict rejection controls. No full CLI/C ABI/diff or physical NPU claim."
+  },
+  "stage_controls": {
+    "passed": true,
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "controls": [
+      {
+        "control": "good",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "control": "scale",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "nonfinite",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "wrong-shape",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "changed-pcm",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "control": "missing-stage",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      }
+    ],
+    "scope": "Verbatim actual Moonshine diff dispatch + Ref + native backend; bounded raw PCM loader. Full CLI/C ABI and NPU are not proven by this probe."
+  },
+  "helper_assertions": 13,
+  "builds": "Actual final probe/helper/stage executable builds. CPU libraries reused from the previously independently verified backend proof.",
+  "scope": "Bounded actual backend and verbatim diff-branch proof; full CLI/C ABI and physical NPU acceptance remain pending.",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-strict/complete-local-strict-validation.zip",
+    "bytes": 6572420,
+    "sha256": "686cc4333f2bd3671846a384c79d0aa2d46b9f4551df15a86b38801e996ff0f0",
+    "payloads": 67,
+    "anonymous_verified": true,
+    "revision": "1caca74803027ac1b249250b213617970612b061",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1caca74803027ac1b249250b213617970612b061/cann-20261014-model-strict/complete-local-strict-validation.zip"
+  },
+  "hosted": {
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "model_controls": 38575701613,
+    "ci": 38575706459,
+    "lint": 38575711575,
+    "acceptance": "passed; full returned archive and arrays independently audited"
+  },
+  "hosted_audit": {
+    "passed": true,
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "run": 38575701613,
+    "artifact_sha256": "7d63d2a5b90eb77843aff25107b1d1f70bafcfc1c8f73075e2f5a9a3f87d5e84",
+    "payloads": 49,
+    "all_160_original_coefficients_byte_exact": true,
+    "encoder_metrics": {
+      "cosine_min": 0.999999998826876,
+      "max_row_norm_error": 8.589623501698007e-06,
+      "relative_l2": 8.741357385766627e-06,
+      "max_abs": 0.00022140145301818848
+    },
+    "encoder_repeats_byte_exact": true,
+    "session_transcripts_byte_exact": true,
+    "cli_normalized_words_exact": true,
+    "negative_controls_rejected": 3,
+    "scope": "Full CPU fixture, original dumper, native encoder, crispasr-diff, CLI and C ABI auto/explicit Sessions. No NPU, quant or performance acceptance.",
+    "library_hash_scope": "Producer receipts only: shared-library ELF bytes are absent from this artifact.",
+    "cross_host_original_metrics": {
+      "cosine_min": 0.9999999981492008,
+      "max_row_norm_error": 1.3913002090637505e-05,
+      "relative_l2": 8.881564458566905e-06,
+      "max_abs": 0.0002014636993408203
+    },
+    "cross_host_original_byte_exact": false,
+    "strict_controls": [
+      {
+        "label": "strict-diff",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "strict-cli",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr",
+          "--backend",
+          "moonshine",
+          "-m",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "-f",
+          "/home/runner/work/_temp/out/audio.wav",
+          "--no-gpu",
+          "-t",
+          "4",
+          "-l",
+          "en",
+          "--no-punctuation",
+          "-osrt",
+          "-of",
+          "/home/runner/work/_temp/out/strict-cli"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "strict-session",
+        "command": [
+          "/opt/hostedtoolcache/Python/3.12.15/x64/bin/python",
+          "/home/runner/work/CrispASR/CrispASR/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--model",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/heavy/scratch/cann-model-fixture/build/src/libcrispasr.so",
+          "--audio",
+          "/home/runner/work/_temp/out/audio.wav",
+          "--output",
+          "/home/runner/work/_temp/out/strict-session"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "reject-scale",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/scale-reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "label": "reject-nonfinite",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/nonfinite-reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "label": "reject-wrong-shape",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/wrong-shape-reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "label": "reject-changed-pcm",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/changed-pcm-reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "label": "reject-missing-stage",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/missing-stage-reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "label": "diff-missing-cann",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "label": "diff-invalid-ordinal",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "label": "diff-unavailable-ordinal",
+        "command": [
+          "/mnt/heavy/scratch/cann-model-fixture/build/bin/crispasr-diff",
+          "moonshine",
+          "/home/runner/work/_temp/out/moonshine-tiny.gguf",
+          "/home/runner/work/_temp/out/reference.gguf",
+          "/home/runner/work/_temp/out/audio.wav"
+        ],
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "label": "cli-missing-cann",
+        "exit": 13,
+        "passed": true
+      },
+      {
+        "label": "session-missing-cann",
+        "exit": 1,
+        "passed": true
+      }
+    ],
+    "strict_arrays_and_sessions_byte_exact_to_normal": true,
+    "bad_references_independently_verified": 5
+  },
+  "hosted_publication": {
+    "revision": "9cf29ec347a91d7a96177cfdc048bb235f8c3289",
+    "files": [
+      {
+        "path": "cann-20261014-model-strict/complete-hosted-strict-fixture.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9cf29ec347a91d7a96177cfdc048bb235f8c3289/cann-20261014-model-strict/complete-hosted-strict-fixture.zip",
+        "bytes": 108495214,
+        "sha256": "7d63d2a5b90eb77843aff25107b1d1f70bafcfc1c8f73075e2f5a9a3f87d5e84",
+        "anonymous_verified": true
+      },
+      {
+        "path": "cann-20261014-model-strict/complete-hosted-strict-fixture-audit.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/9cf29ec347a91d7a96177cfdc048bb235f8c3289/cann-20261014-model-strict/complete-hosted-strict-fixture-audit.zip",
+        "bytes": 4301226,
+        "sha256": "b257ca3e737ef9bc52b5c36194c161f1a02922f961afadf0722bb9e71f668b09",
+        "anonymous_verified": true
+      }
+    ]
+  },
+  "ci_audit": {
+    "source": "9e2dd0116dd9f9d8b008b22b4d14e9a91757f61d",
+    "results": [
+      {
+        "run": 38575706459,
+        "workflow": "CI",
+        "jobs": [
+          {
+            "name": "linux-fuzz-smoke",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-asan-audio",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-backend-dl",
+            "conclusion": "success"
+          },
+          {
+            "name": "windows",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-vulkan",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-amr-fetch (g++)",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-unit",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-amr-fetch (clang++)",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-x86_64",
+            "conclusion": "success"
+          },
+          {
+            "name": "linux-opus-fetch",
+            "conclusion": "success"
+          },
+          {
+            "name": "macos",
+            "conclusion": "success"
+          },
+          {
+            "name": "android",
+            "conclusion": "success"
+          },
+          {
+            "name": "ios",
+            "conclusion": "success"
+          }
+        ],
+        "archive": {
+          "bytes": 950039,
+          "sha256": "a8c11428479df0ab81fbca12a4899981dfe05e72b387dd63d27f645cbd8705ba"
+        },
+        "files": [
+          {
+            "path": "0_linux-opus-fetch.txt",
+            "bytes": 641702,
+            "sha256": "24b3307c9c48fb885036df4a001c6c34f4de9566389c2853a3aaefd9fa2a210d"
+          },
+          {
+            "path": "linux-opus-fetch/system.txt",
+            "bytes": 762,
+            "sha256": "d92d5760aa30728eb8267e692e1bb4281366786403d16b8408b8a4b0cf050b47"
+          },
+          {
+            "path": "1_macos.txt",
+            "bytes": 416390,
+            "sha256": "ae43056da8e87b576a61d7edb4cf664aeed7c94be4e4cb6749bf36843023f217"
+          },
+          {
+            "path": "macos/system.txt",
+            "bytes": 749,
+            "sha256": "e41acdf5b4483db7f0533cc75327ba219701c61a7db1d55463623861cf09d735"
+          },
+          {
+            "path": "2_android.txt",
+            "bytes": 427784,
+            "sha256": "08afe9456fb6c71ca306bd8405f71801a98834ffc76b0e1563512cb1ceca73c3"
+          },
+          {
+            "path": "android/system.txt",
+            "bytes": 753,
+            "sha256": "b169ac6924a5287b36ddc50aa48fbc450c7ad90a7660a3dbea41eb6169daf514"
+          },
+          {
+            "path": "3_ios.txt",
+            "bytes": 403924,
+            "sha256": "5bb8da2a0e42056ac4ed4e0ea6016b4c510927b0014d31003c27d4123e9269a0"
+          },
+          {
+            "path": "ios/system.txt",
+            "bytes": 747,
+            "sha256": "d1b974b1d56064c392474c4195c74df9bc0c4f428c8b9b3ea609012325c0941d"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "bytes": 1275005,
+            "sha256": "69ecdb6ed5a86c8afa3bf2982dd189296a5d65cf50d55b8d1132dea6cab2869a"
+          },
+          {
+            "path": "linux-unit/system.txt",
+            "bytes": 754,
+            "sha256": "831c6bbaa226677e5bb4b1a6aadd7ff40becb6e2f5babc56609349662eb7364f"
+          },
+          {
+            "path": "5_linux-x86_64.txt",
+            "bytes": 697115,
+            "sha256": "1f93cf4be1b77dda8be750f3c0fc4ba01d8a2fc8f9196f7eaccba953a4f3e02c"
+          },
+          {
+            "path": "linux-x86_64/system.txt",
+            "bytes": 758,
+            "sha256": "aa2fbd569ef529a46ce5ee922296b1eae70d9f93c15c61dafe54a1ee73e0e4e7"
+          },
+          {
+            "path": "6_linux-vulkan.txt",
+            "bytes": 671504,
+            "sha256": "c5bbb308c27353c04248cc93af49eed94cfc13e0e8b317c78d0903062ec9f3d9"
+          },
+          {
+            "path": "linux-vulkan/system.txt",
+            "bytes": 758,
+            "sha256": "6d602d0c809d6332e817b1f483fe294b469441bf8268bfc43a49bbd68440bc2a"
+          },
+          {
+            "path": "7_linux-amr-fetch (clang++).txt",
+            "bytes": 410445,
+            "sha256": "ff8f9a774126657cc1153210cedabfceae8ab9017e115e8f0eb9b77eedfdef36"
+          },
+          {
+            "path": "linux-amr-fetch (clang++)/system.txt",
+            "bytes": 761,
+            "sha256": "ad659198577a6eb0b2f3a6bb8b3f4077d63d47d598b444ed115189b9720027a0"
+          },
+          {
+            "path": "8_linux-amr-fetch (g++).txt",
+            "bytes": 622899,
+            "sha256": "f82b6fc1d1a3b62c318d39bb87ef0e7162310aa2ad349543360cc84a44fe965d"
+          },
+          {
+            "path": "linux-amr-fetch (g++)/system.txt",
+            "bytes": 761,
+            "sha256": "6f065191f6e60cb53a3f94f532c9ed26656a829e51e894326b5c41548a392676"
+          },
+          {
+            "path": "9_linux-backend-dl.txt",
+            "bytes": 634812,
+            "sha256": "aec9a5a273b0bd1dd18a05b03bd3d919ab5fc077178c716a904e3e88f6e76469"
+          },
+          {
+            "path": "linux-backend-dl/system.txt",
+            "bytes": 762,
+            "sha256": "fcf898bf484f6a4a81660db37fa2d8e491b899353d893622fd5293af8db4d187"
+          },
+          {
+            "path": "10_windows.txt",
+            "bytes": 241588,
+            "sha256": "7110336cd3d1b79a8ad410ebdb4b2d8f044e1d0259130076ca36e892171729ea"
+          },
+          {
+            "path": "windows/system.txt",
+            "bytes": 755,
+            "sha256": "410ff6b2e99b2eb60da233ccd144b54cf025d2da17ba5b929804894ae89291f0"
+          },
+          {
+            "path": "11_linux-asan-audio.txt",
+            "bytes": 584537,
+            "sha256": "d89c5135fc7def9dcc2733ba3d312028a65dcdfb117a7abf64bf572a7ffbf7ee"
+          },
+          {
+            "path": "linux-asan-audio/system.txt",
+            "bytes": 762,
+            "sha256": "d9fbb6cc015e7656e3168eab5d75224966cd0215b977927c29574b8cc07576ad"
+          },
+          {
+            "path": "12_linux-fuzz-smoke.txt",
+            "bytes": 378435,
+            "sha256": "3ffefb1979cd0cec7e10d40009adfbcab9a7e991d0a265ca25541f782264c82c"
+          },
+          {
+            "path": "linux-fuzz-smoke/system.txt",
+            "bytes": 762,
+            "sha256": "8967c02aa187c643ba219729bfc223f40415a2f2220a4afe9e5628501b3c4ecc"
+          }
+        ],
+        "control_lines": [
+          {
+            "path": "0_linux-opus-fetch.txt",
+            "line": "2026-10-14T14:24:54.5054918Z All tests passed (48 assertions in 4 test cases)"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1394003Z           Start  105: backend-validation: exact CPU selection works without GPU permission"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1434511Z  104/2024 Test  #105: backend-validation: exact CPU selection works without GPU permission ...................................   Passed    0.00 sec"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1438476Z           Start  106: backend-validation: absent registry never falls back"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1479143Z  105/2024 Test  #106: backend-validation: absent registry never falls back ...................................................   Passed    0.00 sec"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1483342Z           Start  107: backend-validation: GPU requirement conflicts with CPU-only request"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1507402Z  106/2024 Test  #107: backend-validation: GPU requirement conflicts with CPU-only request ....................................   Passed    0.00 sec"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1511232Z           Start  108: backend-validation: invalid and unavailable device ordinals fail"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:01.1536632Z  107/2024 Test  #108: backend-validation: invalid and unavailable device ordinals fail .......................................   Passed    0.00 sec"
+          },
+          {
+            "path": "4_linux-unit.txt",
+            "line": "2026-10-14T14:04:20.9504558Z 100% tests passed, 0 tests failed out of 2024"
+          },
+          {
+            "path": "7_linux-amr-fetch (clang++).txt",
+            "line": "2026-10-14T14:10:23.8510389Z All tests passed (11 assertions in 1 test case)"
+          },
+          {
+            "path": "8_linux-amr-fetch (g++).txt",
+            "line": "2026-10-14T14:17:38.4898039Z All tests passed (11 assertions in 1 test case)"
+          },
+          {
+            "path": "10_windows.txt",
+            "line": "2026-10-14T14:10:35.8770734Z 100% tests passed out of 42"
+          },
+          {
+            "path": "11_linux-asan-audio.txt",
+            "line": "2026-10-14T14:03:33.1425076Z All tests passed (121 assertions in 17 test cases)"
+          }
+        ]
+      },
+      {
+        "run": 38575711575,
+        "workflow": "Lint",
+        "jobs": [
+          {
+            "name": "clang-tidy (lint / types / security)",
+            "conclusion": "success"
+          },
+          {
+            "name": "README language metadata",
+            "conclusion": "success"
+          },
+          {
+            "name": "model-registry URLs resolve",
+            "conclusion": "success"
+          },
+          {
+            "name": "core_cpu_backend header reachable everywhere",
+            "conclusion": "success"
+          },
+          {
+            "name": "version files agree with VERSION",
+            "conclusion": "success"
+          },
+          {
+            "name": "doc anchors resolve",
+            "conclusion": "success"
+          },
+          {
+            "name": "kaggle_harness bundled-copy sync",
+            "conclusion": "success"
+          },
+          {
+            "name": "clang-format (style)",
+            "conclusion": "success"
+          },
+          {
+            "name": "CUDA runtime ships split from every package",
+            "conclusion": "success"
+          },
+          {
+            "name": "chat ABI bound by every binding",
+            "conclusion": "success"
+          }
+        ],
+        "archive": {
+          "bytes": 3316070,
+          "sha256": "0f616e028494b56043319a42e46f6ad6ccdff30c6dd02269bdad32c6295c7df9"
+        },
+        "files": [
+          {
+            "path": "0_chat ABI bound by every binding.txt",
+            "bytes": 15751,
+            "sha256": "ae0e38de32b4aa776c1172e22825515a6b6c3a30e480d89a45d5afd2299bd9cb"
+          },
+          {
+            "path": "chat ABI bound by every binding/system.txt",
+            "bytes": 769,
+            "sha256": "1ba54198670a6e054765835bdefca896937cedbdf4ea0fc8c7fcf3154348ae97"
+          },
+          {
+            "path": "1_CUDA runtime ships split from every package.txt",
+            "bytes": 16267,
+            "sha256": "da843ac9fbc1986e26e25dfe55d3360501943db87d44dffb5b4b57b9a31417f5"
+          },
+          {
+            "path": "CUDA runtime ships split from every package/system.txt",
+            "bytes": 768,
+            "sha256": "817fb99d860137cbcb89672292409a004693a1b5fb2fdd875e3721b9dfba534e"
+          },
+          {
+            "path": "2_kaggle_harness bundled-copy sync.txt",
+            "bytes": 15547,
+            "sha256": "11a50126d4431e3c6d519e42847a58b44dd7d89e89f0463324f333573eedc377"
+          },
+          {
+            "path": "kaggle_harness bundled-copy sync/system.txt",
+            "bytes": 767,
+            "sha256": "0939041604fd2096387fabd75ea8d9a6b6fade278223e7acaba042b208f4d4d0"
+          },
+          {
+            "path": "3_clang-format (style).txt",
+            "bytes": 25103,
+            "sha256": "662e1c605f41fa3f8b33f05d3f983567667269d061c3011183c40f7d5445c892"
+          },
+          {
+            "path": "clang-format (style)/system.txt",
+            "bytes": 760,
+            "sha256": "a3f1624a1887c88878c442a5bad25606524194df8b5f32163dd8a381d3beeced"
+          },
+          {
+            "path": "4_README language metadata.txt",
+            "bytes": 36078,
+            "sha256": "59f48254c7c3ad7b54a9408c817ee80b1cd8d79cea8438bd12f631c780d69c4f"
+          },
+          {
+            "path": "README language metadata/system.txt",
+            "bytes": 760,
+            "sha256": "bf4b7f21edcddca8833a6285f35de9c24ec8c26bc4304fb8def9fe53eda8a337"
+          },
+          {
+            "path": "5_model-registry URLs resolve.txt",
+            "bytes": 15584,
+            "sha256": "5a5cb24682c6dee15107c18d219774947a5976557fcd3201ebba44b9e5f824c6"
+          },
+          {
+            "path": "model-registry URLs resolve/system.txt",
+            "bytes": 895,
+            "sha256": "5879944ecd4f1cc2621f88f157534f5daae4ce59cae1ec5d62802b845291adcd"
+          },
+          {
+            "path": "6_doc anchors resolve.txt",
+            "bytes": 15373,
+            "sha256": "1401583f7bf7d832512f82c4fdbed378deb3d410b02480f9f0e14c9ab2798b6b"
+          },
+          {
+            "path": "doc anchors resolve/system.txt",
+            "bytes": 759,
+            "sha256": "ec165275786e31ed1363c8d867e1807c4f7ede6d81b6543dcfcf27dcdbae8ca3"
+          },
+          {
+            "path": "7_version files agree with VERSION.txt",
+            "bytes": 15387,
+            "sha256": "1b51e0485604dba0d931c5914fc9d0a06858fce1231d366d9ae775d05a069430"
+          },
+          {
+            "path": "version files agree with VERSION/system.txt",
+            "bytes": 767,
+            "sha256": "2f756030af7992cd15fbf6004d2ccb542100f0e6da79f472ec87bcfa6d038b4e"
+          },
+          {
+            "path": "8_clang-tidy (lint _ types _ security).txt",
+            "bytes": 25673952,
+            "sha256": "3451c042df3703a94b8eff96b395ebff3b32d68594f83cf4ad6e1a3252d22115"
+          },
+          {
+            "path": "clang-tidy (lint _ types _ security)/system.txt",
+            "bytes": 758,
+            "sha256": "00d37d57428a79470e2d9981c830a212f8a058de964ef75e19efc571dacd149f"
+          },
+          {
+            "path": "9_core_cpu_backend header reachable everywhere.txt",
+            "bytes": 15436,
+            "sha256": "78017f9c47a89c36229b281645ea19aa798ecb36eb69009892d89c788239d7f0"
+          },
+          {
+            "path": "core_cpu_backend header reachable everywhere/system.txt",
+            "bytes": 767,
+            "sha256": "a3b934b53d2de34dbe5dcf8b8fe044f2e7f28d884ad797ac030bf5ef82001ed8"
+          }
+        ],
+        "control_lines": []
+      },
+      {
+        "run": 38575703019,
+        "workflow": "Secret scan",
+        "jobs": [
+          {
+            "name": "scan",
+            "conclusion": "success"
+          }
+        ],
+        "archive": {
+          "bytes": 4071,
+          "sha256": "cf7dbdd5f6a010b20125a7b4625b2add21ac2c0f97a348470c745c34718d2ffd"
+        },
+        "files": [
+          {
+            "path": "0_scan.txt",
+            "bytes": 14709,
+            "sha256": "fc60d362b528bb8b46e878ce7df10589df3dd3c62e047f352091ce3b9653d60f"
+          },
+          {
+            "path": "scan/system.txt",
+            "bytes": 759,
+            "sha256": "bbcb91fde4e6bb842ba4b68b6ac0f4ba68be717616948a1eb3be4a857d5e3ef5"
+          }
+        ],
+        "control_lines": []
+      }
+    ]
+  },
+  "integration": {
+    "rebased_commit": "1f71367bbfd1c8768e8e0eae6035362dfda2daf8",
+    "post_hosted_reporting_fix": "b1cd47fdad39fa8514396cd5c11026f15c3fee22",
+    "runtime_files_identical_to_tested_source": true
+  },
+  "post_hosted_diff_controls": {
+    "passed": true,
+    "source": "b1cd47fdad39fa8514396cd5c11026f15c3fee22",
+    "controls": [
+      {
+        "control": "good",
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "control": "scale",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "nonfinite",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "wrong-shape",
+        "exit": 6,
+        "expected": 6,
+        "passed": true
+      },
+      {
+        "control": "changed-pcm",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      },
+      {
+        "control": "missing-stage",
+        "exit": 4,
+        "expected": 4,
+        "passed": true
+      }
+    ],
+    "scope": "Verbatim actual Moonshine diff dispatch + Ref + native backend; bounded raw PCM loader. Full CLI/C ABI and NPU are not proven by this probe."
+  },
+  "post_hosted_reporting_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-strict/complete-cosine-report-controls.zip",
+    "bytes": 4337883,
+    "sha256": "de5a6448242882c038305caa58d3a409b2b25c51c2625055ad340211d7134a3e",
+    "payloads": 22,
+    "revision": "c49233c8753f682cbf3621a5cb2c801fa5eeab1d",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/c49233c8753f682cbf3621a5cb2c801fa5eeab1d/cann-20261014-model-strict/complete-cosine-report-controls.zip",
+    "anonymous_verified": true
+  },
+  "sdk_followup": {
+    "run": 38598516003,
+    "source": "11176e18240bb67b543f06e536f9ed4d88945901",
+    "acceptance": "pending; official SDK compile only"
+  }
+}

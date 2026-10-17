@@ -1,0 +1,479 @@
+{
+  "receipt_summary": {
+    "scope": "F32 unforced CPU shared-history logits only; actual CLI/C ABI arrays identical, no new model/sampling/speech acceptance.",
+    "original_run": 38472367538,
+    "native_run": 38527734866,
+    "first_input_divergence": {
+      "step": 979,
+      "codebook": 2,
+      "original": 877,
+      "native": 904
+    },
+    "previous_step_same_all_input_history": true,
+    "shared_history_steps": 979,
+    "boundary_logit_metrics": {
+      "byte_exact": false,
+      "values": 18504,
+      "changed_values": 18089,
+      "cosine_min": 0.9999999999981901,
+      "max_row_norm_error": 7.31597370906556e-07,
+      "max_abs": 5.91278076171875e-05,
+      "relative_l2": 1.413203900611083e-06
+    },
+    "verified_inputs": [
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
+        "path": "output/original-step978-ref.gguf",
+        "bytes": 99803232,
+        "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging-inputs.i32",
+        "bytes": 40140,
+        "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging-logits.f32",
+        "bytes": 82527840,
+        "sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging-inputs.i32",
+        "bytes": 40140,
+        "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging-logits.f32",
+        "bytes": 82527840,
+        "sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging.npy",
+        "bytes": 2252928,
+        "sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a"
+      }
+    ],
+    "delay_scope": "Literal native reversal of known emitted rows excludes final unknown stopping row; offsets explicitly reported. Diagnostic code/PCM prefix comparisons do not accept speech.",
+    "aligned_code_prefix_comparisons": [
+      {
+        "original_frame_offset": -1,
+        "frames": 963,
+        "exact": false,
+        "mismatched_codes": 8165
+      },
+      {
+        "original_frame_offset": 0,
+        "frames": 963,
+        "exact": true,
+        "mismatched_codes": 0
+      },
+      {
+        "original_frame_offset": 1,
+        "frames": 963,
+        "exact": false,
+        "mismatched_codes": 8165
+      }
+    ],
+    "pcm_prefix_comparisons": [
+      {
+        "original_sample_offset": -512,
+        "samples": 484864,
+        "native_rms": 0.0001520837884286589,
+        "original_rms": 0.000152543844161531,
+        "cosine": 0.427258849323413,
+        "norm_ratio": 0.9969841081729593
+      },
+      {
+        "original_sample_offset": 0,
+        "samples": 484864,
+        "native_rms": 0.00015204794556974982,
+        "original_rms": 0.000152543844161531,
+        "cosine": 0.9999636256581418,
+        "norm_ratio": 0.9967491405863873
+      },
+      {
+        "original_sample_offset": 512,
+        "samples": 484864,
+        "native_rms": 0.00015204794556974982,
+        "original_rms": 0.00015257960346988983,
+        "cosine": 0.4272303208977894,
+        "norm_ratio": 0.9965155375420484
+      }
+    ],
+    "shared_prefix_logit_metrics": {
+      "steps": 979,
+      "minimum_cosine": 0.9999999999769706,
+      "maximum_row_norm_error": 5.0100991091373e-06,
+      "maximum_relative_l2": 5.267250651991993e-06
+    }
+  },
+  "sampling_boundary": {
+    "scope": "Actual original decoder CFG/masking/filtering with retained Torch/portable noise at the first F32 shared-history divergence; multinomial draw replaced only by recorded exponential race. No new neural generation or speech acceptance.",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "step": 978,
+    "head": 2,
+    "reports": [
+      {
+        "owner": "original",
+        "noise": "torch",
+        "selected_code": 877,
+        "head": 2,
+        "step": 978,
+        "support": [
+          41,
+          46,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          907,
+          970,
+          1013
+        ],
+        "top_race": [
+          {
+            "token": 877,
+            "probability": 0.017905425280332565,
+            "noise": 0.006084977183490992,
+            "score": 2.9425623416900635
+          },
+          {
+            "token": 567,
+            "probability": 0.08460474014282227,
+            "noise": 0.10067547857761383,
+            "score": 0.8403708934783936
+          },
+          {
+            "token": 584,
+            "probability": 0.04571634903550148,
+            "noise": 0.10553698986768723,
+            "score": 0.43317845463752747
+          },
+          {
+            "token": 687,
+            "probability": 0.010727984830737114,
+            "noise": 0.034405406564474106,
+            "score": 0.31181102991104126
+          },
+          {
+            "token": 826,
+            "probability": 0.053752560168504715,
+            "noise": 0.20397210121154785,
+            "score": 0.263528972864151
+          }
+        ],
+        "top_two_score_gap": 2.10219144821167
+      },
+      {
+        "owner": "original",
+        "noise": "portable",
+        "selected_code": 877,
+        "head": 2,
+        "step": 978,
+        "support": [
+          41,
+          46,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          907,
+          970,
+          1013
+        ],
+        "top_race": [
+          {
+            "token": 877,
+            "probability": 0.017905425280332565,
+            "noise": 0.006084977183490992,
+            "score": 2.9425623416900635
+          },
+          {
+            "token": 567,
+            "probability": 0.08460474014282227,
+            "noise": 0.10067548602819443,
+            "score": 0.8403708338737488
+          },
+          {
+            "token": 584,
+            "probability": 0.04571634903550148,
+            "noise": 0.10553698986768723,
+            "score": 0.43317845463752747
+          },
+          {
+            "token": 687,
+            "probability": 0.010727984830737114,
+            "noise": 0.034405406564474106,
+            "score": 0.31181102991104126
+          },
+          {
+            "token": 826,
+            "probability": 0.053752560168504715,
+            "noise": 0.20397210121154785,
+            "score": 0.263528972864151
+          }
+        ],
+        "top_two_score_gap": 2.10219144821167
+      },
+      {
+        "owner": "native",
+        "noise": "torch",
+        "selected_code": 904,
+        "head": 2,
+        "step": 978,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ],
+        "top_race": [
+          {
+            "token": 904,
+            "probability": 0.004546598996967077,
+            "noise": 0.0009702381212264299,
+            "score": 4.686065196990967
+          },
+          {
+            "token": 877,
+            "probability": 0.017905911430716515,
+            "noise": 0.006084977183490992,
+            "score": 2.9426422119140625
+          },
+          {
+            "token": 567,
+            "probability": 0.08460916578769684,
+            "noise": 0.10067547857761383,
+            "score": 0.840414822101593
+          },
+          {
+            "token": 584,
+            "probability": 0.04571429640054703,
+            "noise": 0.10553698986768723,
+            "score": 0.4331589937210083
+          },
+          {
+            "token": 687,
+            "probability": 0.010728082619607449,
+            "noise": 0.034405406564474106,
+            "score": 0.3118138611316681
+          }
+        ],
+        "top_two_score_gap": 1.7434229850769043
+      },
+      {
+        "owner": "native",
+        "noise": "portable",
+        "selected_code": 904,
+        "head": 2,
+        "step": 978,
+        "support": [
+          41,
+          76,
+          85,
+          106,
+          222,
+          247,
+          275,
+          291,
+          342,
+          385,
+          444,
+          448,
+          460,
+          505,
+          544,
+          567,
+          571,
+          584,
+          612,
+          627,
+          637,
+          643,
+          679,
+          687,
+          745,
+          826,
+          855,
+          877,
+          904,
+          907,
+          970,
+          1013
+        ],
+        "top_race": [
+          {
+            "token": 904,
+            "probability": 0.004546598996967077,
+            "noise": 0.0009702381212264299,
+            "score": 4.686065196990967
+          },
+          {
+            "token": 877,
+            "probability": 0.017905911430716515,
+            "noise": 0.006084977183490992,
+            "score": 2.9426422119140625
+          },
+          {
+            "token": 567,
+            "probability": 0.08460916578769684,
+            "noise": 0.10067548602819443,
+            "score": 0.8404147624969482
+          },
+          {
+            "token": 584,
+            "probability": 0.04571429640054703,
+            "noise": 0.10553698986768723,
+            "score": 0.4331589937210083
+          },
+          {
+            "token": 687,
+            "probability": 0.010728082619607449,
+            "noise": 0.034405406564474106,
+            "score": 0.3118138611316681
+          }
+        ],
+        "top_two_score_gap": 1.7434229850769043
+      }
+    ],
+    "all_head_support_mismatches": [
+      [
+        2,
+        46
+      ],
+      [
+        2,
+        904
+      ]
+    ],
+    "maximum_probability_error": 0.004546753130853176,
+    "verified_noise": [
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
+        "path": "actual-torch-exponential-noise.f32",
+        "bytes": 45371808,
+        "sha256": "6a64367db8f4ce9ab9efe5b43d00e708ede3e625ac00e18058a51c7c2622fce8"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
+        "path": "portable-exponential-noise.f32",
+        "bytes": 45371808,
+        "sha256": "043808949bf0fc51206bc154a5755fb80d44127326bc7419c0ca4c635cf77dba"
+      }
+    ]
+  },
+  "independent_audit": {
+    "independent_audit_pass": true,
+    "shared_history_steps": 979,
+    "recomputed_complete_logit_steps": 979,
+    "code_prefix_exact_frames": 963,
+    "first_difference": {
+      "step": 979,
+      "codebook": 2,
+      "original": 877,
+      "native": 904
+    },
+    "support_mismatches": [
+      [
+        2,
+        46
+      ],
+      [
+        2,
+        904
+      ]
+    ],
+    "torch_and_portable_races_same_each_owner": true,
+    "pcm_prefix_checks": 3,
+    "scope": "Retained F32 CPU first-divergence localization; no neural runtime fix, new generation or speech acceptance."
+  },
+  "publication": {
+    "revision": "80f53c2cf181688f41f16784a245997baf5a5c42",
+    "path": "dia-20261014-decoder-boundaries/complete-f32-first-divergence.zip",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/80f53c2cf181688f41f16784a245997baf5a5c42/dia-20261014-decoder-boundaries/complete-f32-first-divergence.zip",
+    "bytes": 131732617,
+    "sha256": "f85c5dc2419546b47539584dcead95861d2d4e080f2886a59791139288d054a2",
+    "payloads": 36,
+    "anonymous_verified": true
+  }
+}

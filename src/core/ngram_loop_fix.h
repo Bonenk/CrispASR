@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <cctype>
 #include <cstdint>
 #include <cstdlib>
 #include <string>
@@ -78,15 +77,22 @@ inline std::vector<std::string> collapse(const std::vector<std::string>& w, int 
     return out;
 }
 
-// Split `text` on whitespace into words.
+// UTF-8 bytes must never be classified using the process locale: a ctype
+// implementation can call A0/85 whitespace even when those bytes are part of
+// a different multibyte character (#533). Use the six ASCII whitespace bytes.
+inline bool is_ascii_space(unsigned char c) {
+    return c == ' ' || (c >= '\t' && c <= '\r');
+}
+
+// Split UTF-8 `text` on ASCII whitespace into words.
 inline std::vector<std::string> split_words(const std::string& text) {
     std::vector<std::string> words;
     size_t i = 0;
     while (i < text.size()) {
-        while (i < text.size() && std::isspace((unsigned char)text[i]))
+        while (i < text.size() && is_ascii_space((unsigned char)text[i]))
             i++;
         size_t j = i;
-        while (j < text.size() && !std::isspace((unsigned char)text[j]))
+        while (j < text.size() && !is_ascii_space((unsigned char)text[j]))
             j++;
         if (j > i)
             words.push_back(text.substr(i, j - i));

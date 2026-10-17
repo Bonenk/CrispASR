@@ -1,0 +1,313 @@
+{
+  "candidate": "d8183cf92abc24eeeb6c969db563e968c5345d46",
+  "hermes_local_source": "5020e60dd1939ee3d86ad9b260198962b7d85da7",
+  "status": "Full 2B F16 observer audit passes1946 payloads; complete public proof verified; landingd51b6cf3 CI/lint pending; no9B Q4/GPU/default promotion",
+  "local_actual_original_class_controls": 18,
+  "local_original_provenance": {
+    "python": "3.12.3 (main, Mar 23 2026, 19:04:32) [GCC 13.3.0]",
+    "torch": "2.6.0+cpu",
+    "transformers_import": "5.5.4",
+    "transformers_distribution": "5.5.4",
+    "modeling_path": "${MAINTAINER_HOME}/.local/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "modeling_sha256": "aee59d55ee4e8ce0e50bf0e279796b85c2c66a28dfae55c3fcbb62fa9bcba048",
+    "class_sha256": "c4e763e69d5676e71d222060e36258f6b2cc939a3597118c4207d370d120a265",
+    "scope": "Tiny actual class only; no original checkpoint loaded"
+  },
+  "released_class_crosscheck": {
+    "released_version": "5.6.0",
+    "wheel_sha256": "def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd",
+    "class_sha256": "c4e763e69d5676e71d222060e36258f6b2cc939a3597118c4207d370d120a265",
+    "full_modeling_sha256": "3e2b6239e4b2c3e512d4f9836a1dba12e975ae652407e84f2d3c2beebf0c9528",
+    "same_class_as_independent_torch26_x86_control": true,
+    "full_package_hosted_check_pending": false
+  },
+  "local_native_scheduler": {
+    "scope": "Actual ggml scheduler on a synthetic named graph; not production Qwen FFN completeness. The later verbatim-builder control exposes the missing fused product.",
+    "compile": [
+      "c++",
+      "-std=c++17",
+      "-O2",
+      "-I${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/src",
+      "-I${CRISPASR_WORKTREES}/crispasr-dia-cache-sampler-20261016/ggml/include",
+      "${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
+      "-L${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-l:libggml.so.0",
+      "-l:libggml-cpu.so.0",
+      "-l:libggml-base.so.0",
+      "-o",
+      "${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/test-ffn-final"
+    ],
+    "returncode": 0,
+    "mutant_compile": [
+      "c++",
+      "-std=c++17",
+      "-O2",
+      "-I${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/first-row-mutant",
+      "-I${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/src",
+      "-I${CRISPASR_WORKTREES}/crispasr-dia-cache-sampler-20261016/ggml/include",
+      "${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
+      "-L${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-l:libggml.so.0",
+      "-l:libggml-cpu.so.0",
+      "-l:libggml-base.so.0",
+      "-o",
+      "${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/test-first-row-mutant"
+    ],
+    "mutant_returncode": 1,
+    "source": [
+      {
+        "path": "tests/test-index-echo-ffn-capture.cpp",
+        "sha256": "1bfad6dc77f33d658d905117fe63705e4c1928262b69d43e53c574d41082824b"
+      },
+      {
+        "path": "src/index_echo.cpp",
+        "sha256": "68fdc68d8cf09765e24a6a93056835168f0a9c01419d62ed729ba2608ac6f3dd"
+      },
+      {
+        "path": "tools/reference_backends/index_echo.py",
+        "sha256": "79831ac912a207760bd2a784582fa36a7036c8af73603acfd4a7675507676210"
+      },
+      {
+        "path": "examples/cli/crispasr_diff_main.cpp",
+        "sha256": "5518eb4f39ac08de7ce1527926feff7bfebf8be612e65c0e02b100afd96c8351"
+      },
+      {
+        "path": "src/core/index_echo_ffn_capture.h",
+        "sha256": "37248771b68882190344740468f2dfca3cbbb498e5c3f85efb336713a6a61062"
+      }
+    ],
+    "libraries": {
+      "libggml.so.0": "8779ecf6b1c6a27c53827152d78f10ff5d95b86f7d232346d972aa76830663a3",
+      "libggml-base.so.0.26.0": "4da8ac4e7f4143d83da977015f12e690fff23d0f51b157cdd28c5f3271779873",
+      "libggml.so.0.26.0": "8779ecf6b1c6a27c53827152d78f10ff5d95b86f7d232346d972aa76830663a3",
+      "libggml-cpu.so.0.26.0": "706f55c6a746a9b8abf121641a3c1491cd1f3ef074576130d769921739524409",
+      "libggml-base.so.0": "4da8ac4e7f4143d83da977015f12e690fff23d0f51b157cdd28c5f3271779873",
+      "libggml-cpu.so.0": "706f55c6a746a9b8abf121641a3c1491cd1f3ef074576130d769921739524409"
+    },
+    "earlier_harness_failures": "v1-v4 omitted input reinitialization between scheduler computations; retained logs and executables. Reapplying identical input before each run restores exact OFF/ON/OFF. No tolerance change.",
+    "source_snapshot_scope": "Compiled C++ header/test are exact to candidate; other copied files record an earlier preparation snapshot and are not full-candidate build evidence."
+  },
+  "hosted": {
+    "mac_cpu_tiny": 38920692197,
+    "ci": 38918654236,
+    "lint": 38918655348,
+    "mac_cpu_tiny_conclusion": "success",
+    "independent_audit": {
+      "source": "d8183cf92abc24eeeb6c969db563e968c5345d46",
+      "run": 38920692197,
+      "artifact": 12055666350,
+      "official_sha256": "80ab98d7a56d86e7acc0c73630fa4b5db199ac65a657289dc932e32293249291",
+      "payloads_verified": 29,
+      "python_controls": 18,
+      "native_scheduler_control": true,
+      "actual_released_source": {
+        "version": "5.6.0",
+        "filename": "transformers-5.6.0-py3-none-any.whl",
+        "sha256": "def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd",
+        "url": "https://files.pythonhosted.org/packages/e8/80/ac700df26a83969d2cf8d09d3dd191bb9bbe8156fa4607e614438b1da8c8/transformers-5.6.0-py3-none-any.whl"
+      },
+      "original_class_matches_independent_x86_control": true,
+      "macho_cpu_type": 16777228,
+      "full_model_acceptance": false,
+      "q4_acceptance": false,
+      "gpu_acceptance": false,
+      "production_defaults_changed": false
+    },
+    "retained_audit_failure": "v1 expected older CTest summary wording; v2 verifies actual passing test row plus 100% summary; no producer/gate changes",
+    "ci_conclusion": "success",
+    "lint_conclusion": "success"
+  },
+  "default_graph_math_changed": false,
+  "production_defaults_changed": false,
+  "full_model_acceptance": false,
+  "q4_acceptance": false,
+  "gpu_acceptance": false,
+  "pending": [
+    "fresh corrected-observer CI/lint; hosted tiny audit already passes",
+    "full-model F16 OFF/ON/OFF stage and decoded-output identity",
+    "same-original-input FFN projection attribution before another Q4 recipe"
+  ],
+  "candidate_tiny_control_sources": {
+    "src/core/index_echo_ffn_capture.h": "37248771b68882190344740468f2dfca3cbbb498e5c3f85efb336713a6a61062",
+    "tests/test-index-echo-ffn-capture.cpp": "1bfad6dc77f33d658d905117fe63705e4c1928262b69d43e53c574d41082824b",
+    "tests/test_index_echo_ffn_capture.py": "7b424ac0514d33b228d6ca4d6dac9f9ea6b4cf56a42d7f92fa5a5c015f793cf6",
+    "tools/reference_backends/index_echo_ffn_capture.py": "b8e7cd86e11c490dfcec548405a20e78f94d3afe0c276649b65692707e776b65",
+    "tools/reference_backends/index_echo.py": "3fd2533bfdf5ec9859ce73c0d63f53d9211c27c8fa09fb13c13fcec6dcd28898"
+  },
+  "local_copy_budget": {
+    "torch": "2.6.0+cpu",
+    "actual_original_class_sha256": "c4e763e69d5676e71d222060e36258f6b2cc939a3597118c4207d370d120a265",
+    "all_six_arrays_byte_exact": true,
+    "results": {
+      "old": {
+        "copied_elements": [
+          592,
+          592,
+          592,
+          296,
+          296,
+          296
+        ],
+        "total_elements": 2664,
+        "total_bytes": 10656,
+        "output_exact": true
+      },
+      "new": {
+        "copied_elements": [
+          16,
+          16,
+          16,
+          8,
+          8,
+          8
+        ],
+        "total_elements": 72,
+        "total_bytes": 288,
+        "output_exact": true
+      }
+    },
+    "copied_element_reduction": 37,
+    "scope": "Actual tiny original MLP only; measured copy boundary sizes, no timing/GPU/full-model claim",
+    "old_source_sha256": "7bd3ae1e552f9a73a766911dfe115079a6e1d912fccd06c9b1d846d2045ee527",
+    "new_source_sha256": "b8e7cd86e11c490dfcec548405a20e78f94d3afe0c276649b65692707e776b65"
+  },
+  "cpp_ci_source": "d8ed1979dd42b882df3cee375f76d6f79188dc4c",
+  "candidate_cpp_cmake_sources_byte_exact_to_ci_source": true,
+  "superseded_queued_heavy": {
+    "run": 38918654602,
+    "status": "cancelled before execution",
+    "reason": "Superseded by slice-before-transfer regression fix; old source/worktree/logs preserved"
+  },
+  "fused_product_repair": {
+    "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+    "node": "ffn_swiglu",
+    "explanation": "Actual parallel SiLU branch uses ggml_swiglu_split, then sets gate type to sequential; ffn_gate_par is skipped.",
+    "old_captured_boundaries": 5,
+    "repaired_captured_boundaries": 6,
+    "builder_sha256": "9c29e42d1ebaff37f59199d89daaebb588a2f2711b79fa621cb28264284652b6",
+    "compiled_source_snapshots_byte_exact_to_repair": true,
+    "local_executables": [
+      {
+        "label": "old-helper",
+        "exit": 1,
+        "sha256": "43d6f00167d64834e56b5dea3f1ce5bc472814132a10251990c532c3d273d0ab"
+      },
+      {
+        "label": "fixed-helper",
+        "exit": 0,
+        "sha256": "64a12df94c8166d0835a74dc9d145b010d890722524743290befabfb0c11306c"
+      }
+    ],
+    "hosted": {
+      "tiny": 38929458991,
+      "ci": 38929450279,
+      "lint": 38929454381,
+      "tiny_conclusion": "success"
+    },
+    "fullmodel_composition": "e344c2d064b912e765b0cc74271d88ae845c7bc8",
+    "fullmodel_dispatch_condition": "Corrected hosted tiny official-artifact independent audit must pass; watcher checks exact frozen branch SHA.",
+    "superseded_fullmodel_run": 38928056585,
+    "superseded_fullmodel_conclusion": "cancelled before execution",
+    "independent_audit": {
+      "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+      "run": 38929458991,
+      "artifact": 12058424897,
+      "official_sha256": "ad7a16e617a742c13a2ac8a4d929ab6bb96f2792bb587a87a5d6fab2fae82a2e",
+      "payloads_verified": 52,
+      "python_controls": 18,
+      "native_scheduler_control": true,
+      "verbatim_builder_old_five_fixed_six": true,
+      "actual_released_source": {
+        "version": "5.6.0",
+        "filename": "transformers-5.6.0-py3-none-any.whl",
+        "sha256": "def5aac47b28e2f1386fa64f2f458a5474ba7733ab74c1765e7c67a79d1f1cbd",
+        "url": "https://files.pythonhosted.org/packages/e8/80/ac700df26a83969d2cf8d09d3dd191bb9bbe8156fa4607e614438b1da8c8/transformers-5.6.0-py3-none-any.whl"
+      },
+      "original_class_matches_independent_x86_control": true,
+      "macho_cpu_type": 16777228,
+      "full_model_acceptance": false,
+      "q4_acceptance": false,
+      "gpu_acceptance": false,
+      "production_defaults_changed": false
+    },
+    "fullmodel_run": 38931686491
+  },
+  "fullmodel_followup": {
+    "failed_run": {
+      "source": "e344c2d064b912e765b0cc74271d88ae845c7bc8",
+      "run": 38931686491,
+      "artifact": 12061492453,
+      "sha256": "92c389cdc31d7a657fef22d0bf5ff95735775355a3a972d33adab0f99b1f79a1",
+      "bytes": 260621,
+      "payloads_verified": 24,
+      "repository_snapshots_verified": 14,
+      "worker_selftest_exit": 0,
+      "cases_executed": 0,
+      "model_acceptance": false,
+      "failure": "Missing original audio-loader ffmpeg executable before model downloads or build"
+    },
+    "ffmpeg_repair_source": "890d8cf2e56a3b65b98359ed32cf74e57932a068",
+    "cue_contract_source": "a1d84150a98ef233483f0448768531e7171f7384",
+    "run": 38938983824,
+    "branch": "diag/echo-ffn-fullmodel-v4-20261016",
+    "worktree": "${CRISPASR_WORKTREES}/crispasr-echo-ffn-fullmodel-v4-20261016",
+    "runtime_reference_bytes_unchanged_from": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+    "local_controls": 11,
+    "actual_compiled_cue_formatting": [
+      "src/crispasr_c_api.cpp",
+      "examples/cli/crispasr_backend_index_echo.cpp"
+    ],
+    "old_empty_translation_expectation_rejected": true,
+    "secret_tests_unskipped_passed": 4,
+    "auditor_preparation": {
+      "files": [
+        {
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/audit.py",
+          "bytes": 13435,
+          "sha256": "b4b720db714fbf7682870bcc0700b721ba436f6eceb89624129d7ddb3d84cc55"
+        },
+        {
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.py",
+          "bytes": 2325,
+          "sha256": "7f6ed6e66700f0f6dd3bab9fde5b44e732eef2069c9670e5137892d59b2fb295"
+        },
+        {
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.log",
+          "bytes": 65,
+          "sha256": "24e0bd5a4aebf87526eb07a95aef97daacf2dbb30976e6d719732309d77a5a63"
+        },
+        {
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/watch.py",
+          "bytes": 1101,
+          "sha256": "33e140632284d75bb40cb85fe12ef8026fcbae194b33717f21ced9fb6ab803b0"
+        }
+      ],
+      "gate_selftest": "PASS; not full-model acceptance",
+      "coverage": "69 original and68 native existing stages,144 FFN vectors, complete OFF/ON/OFF inventories/bytes, original/native row cosines and magnitude, greedy IDs, generation prefill, raw decoded text/cues, CLI SRT bytes and metadata-only CABI; exact sources/model ledgers and official ZIP provenance",
+      "physical_ledger_limit": "Internal row checks and pinned producer/model hashes; large model weights not reread locally"
+    },
+    "full_model_acceptance": false,
+    "q4_acceptance": false,
+    "gpu_acceptance": false,
+    "production_defaults_changed": false,
+    "capture_source_validation": {
+      "ci": {
+        "run": 38929450279,
+        "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+        "conclusion": "success",
+        "jobs_passed": 13,
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38929450279"
+      },
+      "lint": {
+        "run": 38929454381,
+        "source": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
+        "conclusion": "success",
+        "jobs_passed": 10,
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38929454381"
+      }
+    }
+  },
+  "fullmodel_audited_result": "echo-ffn-observer-results-2026-10-16.json"
+}

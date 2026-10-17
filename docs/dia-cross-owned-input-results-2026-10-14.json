@@ -1,0 +1,779 @@
+{
+  "scope": "Bounded block-zero self/cross output projections and cross SDPA tail on owned step978 post-rotary Q/K/V and pre-output inputs. Actual pinned text preparation, conditional-derived CFG padding mask, KVCache and DenseGeneral. Arbitrary synthetic padded tails test mask invariance only; original full padded caches are not available. No upstream Q/RoPE recomputation, full model, speech, GPU, Q4 or speed acceptance.",
+  "source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+  "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+  "torch_version": "2.6.0+cpu",
+  "torch_threads": 4,
+  "fetch": {
+    "scope": "Only two complete original block-zero F32 attention output tensors fetched through immutable strict HTTP ranges; both native transposes match the physically audited F32 export. Full checkpoint not loaded or locally rehashed.",
+    "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+    "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "checkpoint_bytes": 6444682848,
+    "header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+    "mapping_source_sha256": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57",
+    "physical_neural_audit_sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368",
+    "tensors": [
+      {
+        "original_name": "decoder.layers.0.self_attention.o_proj.weight",
+        "path": "self-original.f32",
+        "shape": [
+          16,
+          128,
+          2048
+        ],
+        "offset": 331710048,
+        "bytes": 16777216,
+        "sha256": "fd7728e6fe7a235dd8b72e12e8262aa9efff1f3e57a537c69c08fdec0c63df4c"
+      },
+      {
+        "original_name": "decoder.layers.0.cross_attention.o_proj.weight",
+        "path": "cross-original.f32",
+        "shape": [
+          16,
+          128,
+          2048
+        ],
+        "offset": 84221536,
+        "bytes": 16777216,
+        "sha256": "253e796123f77081a504805597d332867c287c044f7d12352ea28d385cca304f"
+      }
+    ],
+    "mapped": [
+      {
+        "name": "dia.decoder.layers.0.self_o_proj",
+        "path": "self_o_proj.native.f32",
+        "shape": [
+          2048,
+          2048
+        ],
+        "bytes": 16777216,
+        "sha256": "095d0b33abb4f14e994a86ef7d0e1d44132d3903e9659e329acc87f1de790139"
+      },
+      {
+        "name": "dia.decoder.layers.0.cross_o_proj",
+        "path": "cross_o_proj.native.f32",
+        "shape": [
+          2048,
+          2048
+        ],
+        "bytes": 16777216,
+        "sha256": "f01416957e113cd563462fc29763286578fef7af7acad1bde7941e7ef7e87d76"
+      }
+    ]
+  },
+  "verified_inputs": [
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+      "bytes": 99803232,
+      "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-cross-owned-replay-20261014/self-original.f32",
+      "bytes": 16777216,
+      "sha256": "fd7728e6fe7a235dd8b72e12e8262aa9efff1f3e57a537c69c08fdec0c63df4c"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-cross-owned-replay-20261014/cross-original.f32",
+      "bytes": 16777216,
+      "sha256": "253e796123f77081a504805597d332867c287c044f7d12352ea28d385cca304f"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-cross-owned-replay-20261014/self_o_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "095d0b33abb4f14e994a86ef7d0e1d44132d3903e9659e329acc87f1de790139"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-cross-owned-replay-20261014/cross_o_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "f01416957e113cd563462fc29763286578fef7af7acad1bde7941e7ef7e87d76"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_attention.f32",
+      "bytes": 16384,
+      "sha256": "451fbe31df7b3d114db882fb4bcab17aef2e090238bf5b61b8e0d4f1e7268e7a"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
+      "bytes": 16384,
+      "sha256": "316fc837b6093dacac2ace287c3ef5737b502be05cddf31ba996ed88675af040"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
+      "bytes": 16384,
+      "sha256": "82d2e41e80ac34a9df59a0a721fc7ae2953b618ffe5c4a28f8eaf1ece57fc006"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_k0.f32",
+      "bytes": 638976,
+      "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_v0.f32",
+      "bytes": 638976,
+      "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_output.f32",
+      "bytes": 16384,
+      "sha256": "dc64aa8e2982553d6c8c2cc3b3b41b69b672ad97b92c0c8b1216bfaaf3e8b4c1"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
+      "bytes": 16384,
+      "sha256": "82d2e41e80ac34a9df59a0a721fc7ae2953b618ffe5c4a28f8eaf1ece57fc006"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
+      "bytes": 16384,
+      "sha256": "98fde59a9122b6b57b763516a160230c581c8445323180746d2e8f751169611a"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
+      "bytes": 16384,
+      "sha256": "98fde59a9122b6b57b763516a160230c581c8445323180746d2e8f751169611a"
+    }
+  ],
+  "original_source_hashes": {
+    "layers.py": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+    "state.py": "83d0ddc651bab76afe91c8851b515f12863d1221778765a6d9d4462581f5d13f",
+    "model.py": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926"
+  },
+  "config_sha256": "9140e85fd15b82d7f268c5681a41fb1de68573ec206b87cb3a5862fe5c598d6e",
+  "text": "[S1] We are committed to making it secure.",
+  "valid_token_length": 39,
+  "original_mask_shape": [
+    2,
+    1,
+    1,
+    1024
+  ],
+  "both_cfg_masks_from_conditional_tokens": true,
+  "original_repeats_exact": true,
+  "native_repeats_and_1_vs_4_threads_exact": true,
+  "native_reproduces_hosted_outputs_exact": true,
+  "rows": [
+    {
+      "part": "sa_output",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3898,
+      "cosine_min": 0.9999999999995697,
+      "max_row_norm_error": 4.93943067336744e-07,
+      "max_abs": 1.0728836059570312e-06,
+      "relative_l2": 7.297686787755686e-07
+    },
+    {
+      "part": "sa_output",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "sa_output",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4060,
+      "cosine_min": 0.9999999999945649,
+      "max_row_norm_error": 6.529845988367811e-07,
+      "max_abs": 1.3709068298339844e-06,
+      "relative_l2": 2.7042138336824794e-06
+    },
+    {
+      "part": "sa_output",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3668,
+      "cosine_min": 0.9999999999999281,
+      "max_row_norm_error": 6.90620021170929e-08,
+      "max_abs": 1.7881393432617188e-07,
+      "relative_l2": 2.5793968309175607e-07
+    },
+    {
+      "part": "sa_output",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3678,
+      "cosine_min": 0.99999999999994,
+      "max_row_norm_error": 1.2042171304571525e-07,
+      "max_abs": 1.7881393432617188e-07,
+      "relative_l2": 2.524595032644625e-07
+    },
+    {
+      "part": "cross_attention",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2845,
+      "cosine_min": 0.9999999999998814,
+      "max_row_norm_error": 4.025802196050421e-07,
+      "max_abs": 2.9802322387695312e-08,
+      "relative_l2": 1.5160259505558653e-07
+    },
+    {
+      "part": "cross_attention",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "cross_attention",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3960,
+      "cosine_min": 0.9999999999692548,
+      "max_row_norm_error": 3.115333775394191e-06,
+      "max_abs": 1.8812716007232666e-07,
+      "relative_l2": 1.3004295598998322e-06
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2957,
+      "cosine_min": 0.9999999999998784,
+      "max_row_norm_error": 2.960240146343551e-07,
+      "max_abs": 2.60770320892334e-08,
+      "relative_l2": 1.4610030488361853e-07
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3014,
+      "cosine_min": 0.9999999999998742,
+      "max_row_norm_error": 3.121181910703541e-07,
+      "max_abs": 2.2351741790771484e-08,
+      "relative_l2": 1.4699608327583187e-07
+    },
+    {
+      "part": "cross_output",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3903,
+      "cosine_min": 0.9999999999995327,
+      "max_row_norm_error": 6.617729658708882e-07,
+      "max_abs": 6.258487701416016e-07,
+      "relative_l2": 6.605608721417724e-07
+    },
+    {
+      "part": "cross_output",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "cross_output",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3713,
+      "cosine_min": 0.9999999999997169,
+      "max_row_norm_error": 2.096076697766236e-07,
+      "max_abs": 1.4901161193847656e-07,
+      "relative_l2": 3.4401481683309753e-07
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3427,
+      "cosine_min": 0.9999999999999696,
+      "max_row_norm_error": 1.400843774312932e-07,
+      "max_abs": 1.1920928955078125e-07,
+      "relative_l2": 1.4478356887974486e-07
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3441,
+      "cosine_min": 0.9999999999999714,
+      "max_row_norm_error": 1.7810020624953182e-07,
+      "max_abs": 1.1920928955078125e-07,
+      "relative_l2": 1.4798110762414263e-07
+    },
+    {
+      "part": "cross_projection",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3902,
+      "cosine_min": 0.9999999999995257,
+      "max_row_norm_error": 6.698784891234766e-07,
+      "max_abs": 6.258487701416016e-07,
+      "relative_l2": 6.597697572258822e-07
+    },
+    {
+      "part": "cross_projection",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "cross_projection",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3687,
+      "cosine_min": 0.9999999999997311,
+      "max_row_norm_error": 2.0069869599570467e-07,
+      "max_abs": 1.4901161193847656e-07,
+      "relative_l2": 3.3488856704703605e-07
+    },
+    {
+      "part": "cross_projection",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3374,
+      "cosine_min": 0.9999999999999681,
+      "max_row_norm_error": 1.3076716853799297e-07,
+      "max_abs": 1.1920928955078125e-07,
+      "relative_l2": 1.4304753081966302e-07
+    },
+    {
+      "part": "cross_projection",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3344,
+      "cosine_min": 0.999999999999974,
+      "max_row_norm_error": 1.6568474370259878e-07,
+      "max_abs": 1.1920928955078125e-07,
+      "relative_l2": 1.404878779778849e-07
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "original",
+      "comparison": "masked-synthetic-padding-invariance",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2372,
+      "cosine_min": 0.9999999999999902,
+      "max_row_norm_error": 1.41569551304066e-07,
+      "max_abs": 1.4901161193847656e-08,
+      "relative_l2": 8.751008227427648e-08
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "original",
+      "comparison": "masked-synthetic-padding-invariance",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2560,
+      "cosine_min": 0.9999999999999963,
+      "max_row_norm_error": 5.746586806409937e-08,
+      "max_abs": 5.960464477539063e-08,
+      "relative_l2": 5.787380992273494e-08
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "native",
+      "comparison": "masked-synthetic-padding-invariance",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2331,
+      "cosine_min": 0.9999999999999953,
+      "max_row_norm_error": 1.7890881442994555e-07,
+      "max_abs": 7.450580596923828e-09,
+      "relative_l2": 6.921740537579685e-08
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "native",
+      "comparison": "masked-synthetic-padding-invariance",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 2299,
+      "cosine_min": 0.9999999999999964,
+      "max_row_norm_error": 4.8302988497894717e-08,
+      "max_abs": 5.960464477539063e-08,
+      "relative_l2": 5.141487747536381e-08
+    }
+  ],
+  "controls": [
+    {
+      "part": "sa_output",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.9479268789291382,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "sa_output",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999999,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.9479262828826904,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.08514004945755005,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.08514004200696945,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.4654899835586548,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.46548992395401,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_projection",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.4654899537563324,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_projection",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 0.46548992395401,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "original",
+      "control": "omit-real-mask-with-synthetic-padding",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3712,
+      "cosine_min": -0.1668406110817876,
+      "max_row_norm_error": 3547.9618117790674,
+      "max_abs": 7.039031356573105,
+      "relative_l2": 540.3797487705503
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "original",
+      "control": "omit-real-mask-with-synthetic-padding",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.5473646580365624,
+      "max_row_norm_error": 66.89128578910007,
+      "max_abs": 14.898981094360352,
+      "relative_l2": 41.470138515547696
+    },
+    {
+      "part": "cross_attention",
+      "input_owner": "native",
+      "control": "omit-real-mask-with-synthetic-padding",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3712,
+      "cosine_min": -0.16684071660697042,
+      "max_row_norm_error": 3547.9630245697595,
+      "max_abs": 7.039031352847815,
+      "relative_l2": 540.3790724837487
+    },
+    {
+      "part": "cross_output",
+      "input_owner": "native",
+      "control": "omit-real-mask-with-synthetic-padding",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.5473641723453115,
+      "max_row_norm_error": 66.89125743752152,
+      "max_abs": 14.898958146572113,
+      "relative_l2": 41.47009683272666
+    }
+  ],
+  "files": [
+    {
+      "path": "actual-native-expressions.cpp",
+      "bytes": 1016,
+      "sha256": "48b95025c9aaae6d515bcde7b5ce43edeb4a54a1ffa79343c1130e730f29cbda"
+    },
+    {
+      "path": "actual-original-attention-tail.py",
+      "bytes": 284,
+      "sha256": "7614848bd1b87334ffdb6725804171ede4f9ca24c9655772a6182a8ff13804bd"
+    },
+    {
+      "path": "actual-original-input-state.py",
+      "bytes": 5809,
+      "sha256": "72fe71bf535bf6b179235fdd63fb7109bfae14d8c47d0b68f5329a8fa4cb7bf8"
+    },
+    {
+      "path": "actual-original-mask.py",
+      "bytes": 259,
+      "sha256": "40f677b906f6f455a1891615692ddd50ee8b6966323bea4556077449565361cd"
+    },
+    {
+      "path": "bridge",
+      "bytes": 16952,
+      "sha256": "10504114a4358f6aab4aaeef8951d49e4db5620af700d6c495d79c9e25763071"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 2838,
+      "sha256": "73d43db3c97e8558b8c951b0e528a56993489eef5e37ecc8761893db73f544b3"
+    },
+    {
+      "path": "build-command.json",
+      "bytes": 447,
+      "sha256": "4330a09d87c283f287e923a5dca58b967ed2de990679137da4914975041ec8b5"
+    },
+    {
+      "path": "config.json",
+      "bytes": 941,
+      "sha256": "9140e85fd15b82d7f268c5681a41fb1de68573ec206b87cb3a5862fe5c598d6e"
+    },
+    {
+      "path": "cross-original.f32",
+      "bytes": 16777216,
+      "sha256": "253e796123f77081a504805597d332867c287c044f7d12352ea28d385cca304f"
+    },
+    {
+      "path": "cross_o_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "f01416957e113cd563462fc29763286578fef7af7acad1bde7941e7ef7e87d76"
+    },
+    {
+      "path": "fetch-receipt.json",
+      "bytes": 1985,
+      "sha256": "ec1520e6b0c6041dd49cdada621b64ceaee465a75cd2b1da17c5446f62592eb2"
+    },
+    {
+      "path": "fetch.log",
+      "bytes": 207,
+      "sha256": "2f22ffad4f74060575b7be5a8a6b8690b2eee9d68d5586af421ef82d5eafeb38"
+    },
+    {
+      "path": "fetch.py",
+      "bytes": 4016,
+      "sha256": "0c1d462c821e20a315244c150695c746f424847cbc901ccb2f5ac997af56a7e1"
+    },
+    {
+      "path": "native-actual-original-cross_attention.npy",
+      "bytes": 16512,
+      "sha256": "4574083b1e5c76ec63854ae462fd00b5c51232189adf9fed416116013753dced"
+    },
+    {
+      "path": "native-actual-original-cross_output.npy",
+      "bytes": 16512,
+      "sha256": "030f6eccb91ae19cedb7f2dca3682dee9bee23dd988d4255a28dffabc4ab5516"
+    },
+    {
+      "path": "native-actual-original-cross_projection.npy",
+      "bytes": 16512,
+      "sha256": "769eae14f694fe46ff9eada3f72705d5f964ec63d5241115b8c0db3ad14fea63"
+    },
+    {
+      "path": "native-actual-original-sa_output.npy",
+      "bytes": 16512,
+      "sha256": "fa38f9e797f5b6ad0b99fcfeb4b3cfe3a1e3f0452a3488d4f786ac5575ec6d9b"
+    },
+    {
+      "path": "native-execution.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "native-library-closure.log",
+      "bytes": 703,
+      "sha256": "18ca214a380e1cb04ea398a0bdf9ba936a790338adb95037e324e4482faaa548"
+    },
+    {
+      "path": "native-t1.f32",
+      "bytes": 262144,
+      "sha256": "03e358abdb4324fbf9055f0b93ebadfeed8794aa179ec820d1d98b0f20a238c1"
+    },
+    {
+      "path": "native-t4.f32",
+      "bytes": 262144,
+      "sha256": "03e358abdb4324fbf9055f0b93ebadfeed8794aa179ec820d1d98b0f20a238c1"
+    },
+    {
+      "path": "original-actual-original-cross_attention.npy",
+      "bytes": 16512,
+      "sha256": "1fdb276d57772ca54d284ff88a0e21a1de426f1b8e49cc8c3430f3e6a85d2819"
+    },
+    {
+      "path": "original-actual-original-cross_output.npy",
+      "bytes": 16512,
+      "sha256": "2838fd99d29d8755beceea3e3038629418e01905624c8aa500b643f4fd7c2091"
+    },
+    {
+      "path": "original-actual-original-cross_projection.npy",
+      "bytes": 16512,
+      "sha256": "88946afe76546c132c6d2a9c03802fe2688584988ad62c64bf42d1bd493b5ada"
+    },
+    {
+      "path": "original-actual-original-sa_output.npy",
+      "bytes": 16512,
+      "sha256": "9cfdab1959a0e541a738ee1fff219f159cbf11ca57dfe5c6ac4d10d520e43413"
+    },
+    {
+      "path": "owned-inputs.f32",
+      "bytes": 5308416,
+      "sha256": "e3e3d692d6d7e0d9d47dd4dcd20e940519a9ccc5cbc332171dbac4185fef4707"
+    },
+    {
+      "path": "replay-initial.log",
+      "bytes": 419,
+      "sha256": "89d3fbed8860084ab9833bcada6c0b68cca21349cca0583b8812b336635f8625"
+    },
+    {
+      "path": "replay.py",
+      "bytes": 14899,
+      "sha256": "a17ab6b82f9b5533376f268c9efb615fd02983f1e846fdf11f70c7d0e2ea6317"
+    },
+    {
+      "path": "self-original.f32",
+      "bytes": 16777216,
+      "sha256": "fd7728e6fe7a235dd8b72e12e8262aa9efff1f3e57a537c69c08fdec0c63df4c"
+    },
+    {
+      "path": "self_o_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "095d0b33abb4f14e994a86ef7d0e1d44132d3903e9659e329acc87f1de790139"
+    }
+  ],
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261014-decoder-boundaries/complete-owned-cross.zip",
+    "bytes": 69532658,
+    "sha256": "b1dd08c3e66f268684ab6bd93a78ba89203d5f08c102f9b62ae91acdf73de49d",
+    "payloads": 40,
+    "anonymous_verified": true,
+    "revision": "c0fec68e9c03f03f5fad13166aed13eea53070dc"
+  }
+}

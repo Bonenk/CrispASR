@@ -1,0 +1,320 @@
+{
+  "result": {
+    "scope": "Actual MiMo layer0 Q4_K gate projection on retained flash/eager normalized inputs; same-weight mathematical and real Q8_K activation-shadow diagnostic only. No whole-model, original checkpoint, speech, PR, speed or default acceptance.",
+    "torch_version": "2.6.0+cpu",
+    "fetch": {
+      "scope": "One immutable GGUF Q4_K tensor range and verified original diagnostic inputs only; full model not locally downloaded or rehashed, no original checkpoint precision recovery.",
+      "model_url": "https://huggingface.co/cstr/mimo-asr-GGUF/resolve/e2d7dfebf0afd8076771903e92958039c5074eab/mimo-asr-q4_k.gguf",
+      "model_linked_sha256": "12dbc7cc7a20c7add6ff00bf8b12bca1c46304e0100a5c5a6e74bdecfc57a306",
+      "model_bytes": 4517988832,
+      "header": {
+        "path": "gguf-header-v2.bin",
+        "offset": 0,
+        "bytes": 8388608,
+        "sha256": "bf3a5fec9f9a99d3f77a14ead1057325bf998ac80e89a8c3a33d2fa0c3ce489a"
+      },
+      "matrix": {
+        "name": "model.layers.0.ffn.gate.weight",
+        "shape": [
+          4096,
+          11008
+        ],
+        "type": 12,
+        "bytes": 25362432,
+        "offset": 941733856,
+        "payload": {
+          "path": "gate.q4_k",
+          "offset": 941733856,
+          "bytes": 25362432,
+          "sha256": "6f8afdeddea9945966cafc6571b12b7a6437d27b85930239d7b73975a4885972"
+        }
+      },
+      "inputs": [
+        {
+          "member": "heavy-37855479658/q4_k/cpu-flash/0/ffn_norm.f32",
+          "path": "cpu-flash-input.f32",
+          "bytes": 1163264,
+          "sha256": "8a6d29593448cddfa903abfc67ba16c7fa2fb64525119577929bd3de0d82ebc5",
+          "zip_crc": 214399112
+        },
+        {
+          "member": "heavy-37855479658/q4_k/cpu-eager/0/ffn_norm.f32",
+          "path": "cpu-eager-input.f32",
+          "bytes": 1163264,
+          "sha256": "7ea3baa89ec9f67d3a361ff8fbcc216c846e5d3a1c14cb55896bd02b2b3d187d",
+          "zip_crc": 4242616721
+        }
+      ],
+      "parent_archive_bytes": 445205014,
+      "parent_archive_sha256": "d8bde5583c89379502e9fa5f288d239221fb9feb3e5482d3cbbde080380d3dae"
+    },
+    "weight_check": {
+      "independent_gguf_vs_native_max_abs": 0.0,
+      "relative_l2": 0.0,
+      "actual_native_float_weight_sha256": "185babab8e215fd2839acf2f38ac57ad585ee01ff8d3d41e3a108dcb2f8e84c0"
+    },
+    "rows": [
+      {
+        "mode": "cpu-flash",
+        "comparison": "default-tiled-vs-explicit-reference-graph",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999502,
+        "ref_norm": 100.87646873764075,
+        "actual_norm": 100.87646874689926,
+        "max_row_norm_error": 1.2129740420907668e-08,
+        "relative_l2": 1.883907623220046e-07,
+        "max_abs": 4.76837158203125e-07
+      },
+      {
+        "mode": "cpu-flash",
+        "comparison": "same-weight-f64-float-input",
+        "byte_exact": false,
+        "cosine_min": 0.9998254526281631,
+        "ref_norm": 100.87227412768658,
+        "actual_norm": 100.87646874689926,
+        "max_row_norm_error": 0.0011575908630731362,
+        "relative_l2": 0.006237397628704068,
+        "max_abs": 0.007666661750488829
+      },
+      {
+        "mode": "cpu-flash",
+        "comparison": "same-weight-f64-q8-shadow",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999953,
+        "ref_norm": 100.87646874675592,
+        "actual_norm": 100.87646874689926,
+        "max_row_norm_error": 4.845796757468189e-09,
+        "relative_l2": 7.850705268330524e-08,
+        "max_abs": 2.1921959492132714e-07
+      },
+      {
+        "mode": "cpu-eager",
+        "comparison": "default-tiled-vs-explicit-reference-graph",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999498,
+        "ref_norm": 100.87651656109448,
+        "actual_norm": 100.87651659227656,
+        "max_row_norm_error": 1.435739823371512e-08,
+        "relative_l2": 1.882402425085251e-07,
+        "max_abs": 7.152557373046875e-07
+      },
+      {
+        "mode": "cpu-eager",
+        "comparison": "same-weight-f64-float-input",
+        "byte_exact": false,
+        "cosine_min": 0.9998254511813115,
+        "ref_norm": 100.87234571506373,
+        "actual_norm": 100.87651659227656,
+        "max_row_norm_error": 0.0011582026768817892,
+        "relative_l2": 0.006237562151239259,
+        "max_abs": 0.007666656036302205
+      },
+      {
+        "mode": "cpu-eager",
+        "comparison": "same-weight-f64-q8-shadow",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999952,
+        "ref_norm": 100.87651658964967,
+        "actual_norm": 100.87651659227656,
+        "max_row_norm_error": 1.0411171490859558e-08,
+        "relative_l2": 7.862852133055752e-08,
+        "max_abs": 4.057569613635792e-07
+      }
+    ],
+    "controls": [
+      {
+        "mode": "cpu-flash",
+        "defect": "double-scale",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999953,
+        "ref_norm": 100.87646874675592,
+        "actual_norm": 201.75293749379853,
+        "max_row_norm_error": 1.000000007833964,
+        "relative_l2": 1.0000000000028402,
+        "max_abs": 2.93110571436618
+      },
+      {
+        "mode": "cpu-flash",
+        "defect": "reverse-output-channels",
+        "byte_exact": false,
+        "cosine_min": -0.007690046994807075,
+        "ref_norm": 100.87646874675592,
+        "actual_norm": 100.87646874689926,
+        "max_row_norm_error": 4.845796757468189e-09,
+        "relative_l2": 1.386875149556003,
+        "max_abs": 2.8693088180621373
+      },
+      {
+        "mode": "cpu-eager",
+        "defect": "double-scale",
+        "byte_exact": false,
+        "cosine_min": 0.9999999999999952,
+        "ref_norm": 100.87651658964967,
+        "actual_norm": 201.75303318455312,
+        "max_row_norm_error": 1.0000000168161438,
+        "relative_l2": 1.0000000000520797,
+        "max_abs": 2.9311062578840366
+      },
+      {
+        "mode": "cpu-eager",
+        "defect": "reverse-output-channels",
+        "byte_exact": false,
+        "cosine_min": -0.0076900453843866045,
+        "ref_norm": 100.87651658964967,
+        "actual_norm": 100.87651659227656,
+        "max_row_norm_error": 1.0411171490859558e-08,
+        "relative_l2": 1.3868749219875294,
+        "max_abs": 2.869309073429145
+      }
+    ],
+    "comparisons": {
+      "input": {
+        "byte_exact": false,
+        "cosine_min": 0.9999998120275757,
+        "ref_norm": 58.12974395653106,
+        "actual_norm": 58.12969657567763,
+        "max_row_norm_error": 1.9576161432420102e-05,
+        "relative_l2": 0.00013772717878478592,
+        "max_abs": 0.000626295804977417
+      },
+      "shadow": {
+        "byte_exact": false,
+        "cosine_min": 0.9999897912440767,
+        "ref_norm": 58.134399940116246,
+        "actual_norm": 58.1343770447979,
+        "max_row_norm_error": 4.347797283341552e-05,
+        "relative_l2": 0.0011844055614634922,
+        "max_abs": 0.008604954928159714
+      },
+      "actual": {
+        "byte_exact": false,
+        "cosine_min": 0.9999952059513478,
+        "ref_norm": 100.87646874689926,
+        "actual_norm": 100.87651659227656,
+        "max_row_norm_error": 0.00012032837990721643,
+        "relative_l2": 0.0007318076558154855,
+        "max_abs": 0.0038571804761886597
+      },
+      "floating": {
+        "byte_exact": false,
+        "cosine_min": 0.9999998327680647,
+        "ref_norm": 100.87227412768658,
+        "actual_norm": 100.87234571506373,
+        "max_row_norm_error": 3.777674005663934e-05,
+        "relative_l2": 0.00013624831758040422,
+        "max_abs": 0.003392374239676893
+      },
+      "quantized": {
+        "byte_exact": false,
+        "cosine_min": 0.9999952059506677,
+        "ref_norm": 100.87646874675592,
+        "actual_norm": 100.87651658964967,
+        "max_row_norm_error": 0.00012033150101755551,
+        "relative_l2": 0.0007318077016705637,
+        "max_abs": 0.0038572057386196956
+      }
+    },
+    "delta_shadow_prediction": {
+      "byte_exact": false,
+      "cosine_min": 0.7145192980971641,
+      "ref_norm": 0.07382217674620589,
+      "actual_norm": 0.07382217212061243,
+      "max_row_norm_error": 0.35046708773996044,
+      "relative_l2": 0.00012199913005187713,
+      "max_abs": 3.715315743946235e-07
+    },
+    "actual_delta_norm": 0.07382217212061243,
+    "float_input_delta_norm": 0.013743677640406633,
+    "delta_amplification": 5.37135503699345,
+    "q8_codes_changed": 486,
+    "q8_codes_total": 290816,
+    "explicit_reference_graph_matches_actual_direct_dot_exact": true,
+    "method_version": 3,
+    "prior_failed_method": "v2 incorrectly assumed default tiled graph and scalar-row vec_dot were byte identical; raw failed results retained separately"
+  },
+  "independent_audit": {
+    "passed": true,
+    "scope": "Actual MiMo layer0 Q4_K gate projection on retained flash/eager normalized inputs; same-weight mathematical and real Q8_K activation-shadow diagnostic only. No whole-model, original checkpoint, speech, PR, speed or default acceptance.",
+    "checks": [
+      {
+        "mode": "cpu-flash",
+        "default_outputs_reproduce_failed_v2_exactly": true,
+        "reference_graph_equals_direct_exactly": true,
+        "q8_oracle_relative_l2": 7.850705268330524e-08,
+        "independent_numpy_vs_torch_f64_max_abs": 4.440892098500626e-16
+      },
+      {
+        "mode": "cpu-eager",
+        "default_outputs_reproduce_failed_v2_exactly": true,
+        "reference_graph_equals_direct_exactly": true,
+        "q8_oracle_relative_l2": 7.862852133055752e-08,
+        "independent_numpy_vs_torch_f64_max_abs": 4.440892098500626e-16
+      }
+    ],
+    "ggml_source": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "ggml_clean": true,
+    "files": [
+      {
+        "path": "probe-v3",
+        "bytes": 1956696,
+        "sha256": "e0b96f82ad64fa75eb1b49bbc27bff2775cb96e3a3ef9a02ced230e51a9c1589"
+      },
+      {
+        "path": "probe-v3.cpp",
+        "bytes": 3991,
+        "sha256": "f8641ca9f571f0e9aac09de753efb7313c062303a0a32c4db4f5ab631a0e99ce"
+      },
+      {
+        "path": "run-v3.py",
+        "bytes": 6572,
+        "sha256": "ff55167985a3adc1dd0b8a64f93da4a9f3531eb4de439b9ed1d7576a10a1b8a4"
+      },
+      {
+        "path": "result-v3.json",
+        "bytes": 8185,
+        "sha256": "7acf5d0c438682b444102495c496fd1df08eadc340ec5a25160f15373db55d8e"
+      },
+      {
+        "path": "fetch-receipt.json",
+        "bytes": 1628,
+        "sha256": "1351b9150697ed579531fe2e04528c81acc67d1b6e619c2827a873df6c338a53"
+      }
+    ],
+    "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "compile_command": [
+      "c++",
+      "-std=c++17",
+      "-O2",
+      "-fopenmp",
+      "-I",
+      "ggml/include",
+      "-I",
+      "ggml/src",
+      "/mnt/akademie_storage/crispasr/mimo-lm-projection-20261015/probe-v3.cpp",
+      "${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu/ggml/src/libggml.a",
+      "${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu/ggml/src/libggml-cpu.a",
+      "${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu/ggml/src/libggml-base.a",
+      "-ldl",
+      "-lpthread",
+      "-o",
+      "/mnt/akademie_storage/crispasr/mimo-lm-projection-20261015/probe-v3"
+    ],
+    "compile_workdir": "${CRISPASR_WORKTREES}/crispasr-cann-composed-20261015",
+    "model_license_declaration": "MIT in the pinned HF model card; no model coefficients redistributed by this proof",
+    "upstream_code_license": "Apache-2.0; distinct from the HF model card",
+    "prior_audit_failure": "v3 numerical checks passed, then rejected the incorrect assumption that the upstream code license was MIT; original failed audit log retained",
+    "upstream_license_git_blob": "c81ec7d5c5d6d6693c26cbe6c8fb3022ad2a53a9",
+    "upstream_license_url": "https://github.com/XiaomiMiMo/MiMo-V2.5-ASR/blob/main/LICENSE"
+  },
+  "cpu_source_equivalence": "git diff c36dab89b662838f0f5d4826c399198c0b90bbfc 0a862076567afd8468822ccc512c97ac6a69b340 -- src/ggml-cpu src/ggml-quants.c src/ggml-quants.h is empty; no CPU quantization/kernel changes between original capture and this primitive experiment",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "mimo-20261015-q4-projection/projection-proof-v3.zip",
+    "bytes": 61407951,
+    "sha256": "3537bef5468dfe87e6921b6ad5d02b2c8d59b2962430beacef9295a110138f68",
+    "payloads": 71,
+    "anonymous_verified": true,
+    "revision": "cb2326740f03ad1b32b952740ddcd485459a8d19",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/cb2326740f03ad1b32b952740ddcd485459a8d19/mimo-20261015-q4-projection/projection-proof-v3.zip"
+  }
+}

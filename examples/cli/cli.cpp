@@ -587,6 +587,21 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
 #undef ARGV_NEXT
 }
 
+// TTS sampling controls shared with the server and Session API.
+static bool whisper_params_parse_arg_tts_sampling(int argc, char** argv, int& i, whisper_params& params) {
+    std::string arg = argv[i];
+#define ARGV_NEXT (((i + 1) < argc) ? argv[++i] : requires_value_error(arg))
+    if (arg == "--tts-top-k") {
+        params.tts_top_k = std::stoi(ARGV_NEXT);
+    } else if (arg == "--tts-top-p") {
+        params.tts_top_p = std::stof(ARGV_NEXT);
+    } else {
+        return false;
+    }
+    return true;
+#undef ARGV_NEXT
+}
+
 // Continuation of whisper_params_parse_arg_backend_vad — split off so the
 // `else if` chain doesn't trip MSVC's C1061 "blocks nested too deeply"
 // limit. MSVC parses `else if` as `else { if ... }`, so each branch adds
@@ -680,7 +695,7 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.align_granularity = ARGV_NEXT;
     } else if (arg == "--text-file") {
         params.text_file = ARGV_NEXT;
-    } else if (arg == "--instruct") {
+    } else if (arg == "--instruct" || arg == "--tts-instruct") {
         params.tts_instruct = ARGV_NEXT;
     } else if (arg == "--tts-phonemes") {
         params.tts_phonemes = ARGV_NEXT;
@@ -1047,6 +1062,9 @@ static bool whisper_params_parse(int argc, char** argv, whisper_params& params) 
         if (whisper_params_parse_arg_backend_vad(argc, argv, i, params)) {
             continue;
         }
+        if (whisper_params_parse_arg_tts_sampling(argc, argv, i, params)) {
+            continue;
+        }
         if (whisper_params_parse_arg_streaming_tts(argc, argv, i, params)) {
             continue;
         }
@@ -1184,9 +1202,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.log_score ? "true" : "false");
     fprintf(out, "  -ng,       --no-gpu               [%-7s] disable GPU\n", params.use_gpu ? "false" : "true");
     fprintf(out, "  -dev N,    --device N             [%-7d] GPU device ID (default: 0)\n", params.gpu_device);
-    fprintf(out,
-            "  --gpu-backend NAME                [%-7s] force GPU backend: cuda|vulkan|metal|cpu (default: auto)\n",
-            params.gpu_backend.empty() ? "auto" : params.gpu_backend.c_str());
+    fprintf(
+        out,
+        "  --gpu-backend NAME                [%-7s] force GPU backend: cuda|vulkan|metal|cann|cpu (default: auto)\n",
+        params.gpu_backend.empty() ? "auto" : params.gpu_backend.c_str());
     fprintf(out, "  -fa,       --flash-attn           [%-7s] enable flash attention\n",
             params.flash_attn ? "true" : "false");
     fprintf(out, "  -nfa,      --no-flash-attn        [%-7s] disable flash attention\n",
@@ -1591,12 +1610,21 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "moss-tts-local). Units are the backend's AR decode step, NOT samples or ms: one codec frame, "
             "12.5 Hz on the shipped models, so 80 ms each and N=25 floors at ~2 s. -1 = model default\n",
             params.tts_min_speech_tokens);
-    fprintf(
-        out,
-        "             --tts-cfg-scale X        [%-7s] TTS CFG guidance scale (vibevoice/chatterbox/f5/tada/irodori; "
-        "irodori: text CFG (default 3.0); speaker CFG via CRISPASR_IRODORI_CFG_SPEAKER; "
-        "vibevoice: 0 = model default, try 1.5 or a new --seed to re-roll BGM onsets)\n",
-        "default");
+    fprintf(out,
+            "             --tts-top-k N            [%-7s] TTS top-k cutoff (dia/tada/chatterbox/moss-tts); "
+            "0 disables filtering\n",
+            "default");
+    fprintf(out,
+            "             --tts-top-p X            [%-7s] TTS nucleus threshold (dia/tada/chatterbox/moss-tts); "
+            "1 disables filtering\n",
+            "default");
+    fprintf(out,
+            "             --tts-cfg-scale X        [%-7s] TTS CFG guidance scale "
+            "(vibevoice/chatterbox/f5/tada/irodori/bt2-tts; "
+            "irodori: text CFG (default 3.0); speaker CFG via CRISPASR_IRODORI_CFG_SPEAKER; "
+            "bt2-tts: applies with --tts-instruct (default 1 = unguided, try 4); "
+            "vibevoice: 0 = model default, try 1.5 or a new --seed to re-roll BGM onsets)\n",
+            "default");
     fprintf(
         out,
         "             --tts-speed X            [%-7.2f] speaking-rate multiplier (kokoro/omnivoice/f5/piper/melotts/"
@@ -2628,6 +2656,9 @@ int main(int argc, char** argv) {
         // never prevented.
         if (!params.gpu_backend.empty()) {
             crispasr_set_gpu_backend_pref(params.gpu_backend.c_str());
+            if (ci_starts_with(params.gpu_backend.c_str(), "cann")) {
+                crispasr_set_gpu_device_pref(params.gpu_device);
+            }
         }
     }
 

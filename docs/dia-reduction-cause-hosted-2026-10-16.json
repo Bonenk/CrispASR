@@ -1,0 +1,46 @@
+{
+  "independent_hosted_array_audit_pass": true,
+  "source": "d868644bda0f0bdc6e6288a564d51a8ff545ff87",
+  "files_closed": true,
+  "payloads_verified": 13,
+  "arrays": [
+    {
+      "name": "query-input",
+      "values": 4096,
+      "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586",
+      "byte_exact": true
+    },
+    {
+      "name": "original-hidden",
+      "values": 18504,
+      "sha256": "fcb8787215135b804f96bce5114c3f893157e4847a774d02d2cafbcc9a315686",
+      "byte_exact": true
+    },
+    {
+      "name": "native-hidden",
+      "values": 18504,
+      "sha256": "bfbb206d36542b51eb4ba6748318909b17e96534062edafc0de9a1950bf74375",
+      "byte_exact": true
+    }
+  ],
+  "full_generation_acceptance": false,
+  "run_id": 38868907653,
+  "run_url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38868907653",
+  "cpu": "Intel Xeon Platinum 8573C",
+  "lint_run": 38868910390,
+  "lint_jobs_passed": 10,
+  "artifact_id": 12032740700,
+  "artifact_bytes": 160994,
+  "artifact_sha256": "06c0c3e62c5ff7c807ac544472b55f9cf1e85006c617888f04b900e04779e4cf",
+  "integration": "61f4ed8c",
+  "rebased_files_byte_exact": 7,
+  "production_defaults_changed": false,
+  "public_proof": {
+    "revision": "76ad11e00728b22963606544dc912a80e5eb833a",
+    "path": "dia-20261016-reduction-cause/complete-hosted-replay-v1/complete-hosted-reduction-cause-v1.zip",
+    "bytes": 178914,
+    "sha256": "8f555522fbcac0c0631bc029cae6ef3c1b2f500b5fa8a5e0327da9c0e6203889",
+    "anonymous_full_download_sha_verified": true,
+    "payloads": 10
+  }
+}

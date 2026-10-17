@@ -1,0 +1,496 @@
+{
+  "status": "OPERATOR_ATTRIBUTION_COMPLETE_NOT_MODEL_FIX",
+  "source": "02bd2aeed3a1461280daaa89756136530ace9676",
+  "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "native_cells": 64,
+  "raw_arrays": 512,
+  "independent_f64_oracle": true,
+  "constant_v_algebraic_invariant": true,
+  "half_accumulator_exact_prediction_cells": 12,
+  "negatives": [
+    "scale-times-two",
+    "channel-order",
+    "shape",
+    "changed-input"
+  ],
+  "representative_constant_v_cells": [
+    {
+      "cell": "p0-t1-n1-f160-ref0",
+      "pattern": 0,
+      "queries": 1,
+      "threads": 1,
+      "half": 0,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 1.0000000000000007,
+          "mine_norm": 0.16783626853314365,
+          "reference_norm": 0.16783627165933776,
+          "relative_l2": 1.862645151486098e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999908,
+          "mine_norm": 0.48379231281673496,
+          "reference_norm": 0.48379232021915236,
+          "relative_l2": 1.3690855011818614e-07,
+          "max_abs": 2.2351741790771484e-08
+        },
+        "flash": {
+          "cosine": 0.9999999999999999,
+          "mine_norm": 0.4837923202191524,
+          "reference_norm": 0.48379232021915236,
+          "relative_l2": 9.634737452231531e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999908,
+          "mine_norm": 0.4837923202191524,
+          "reference_norm": 0.48379231281673496,
+          "relative_l2": 1.3690855262601946e-07,
+          "max_abs": 2.2351741790771484e-08
+        }
+      }
+    },
+    {
+      "cell": "p0-t1-n1-f161-ref0",
+      "pattern": 0,
+      "queries": 1,
+      "threads": 1,
+      "half": 1,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 1.0000000000000007,
+          "mine_norm": 0.16783626853314365,
+          "reference_norm": 0.16783627165933776,
+          "relative_l2": 1.862645151486098e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999977,
+          "mine_norm": 0.4837923085247478,
+          "reference_norm": 0.48379232021915236,
+          "relative_l2": 7.235107658361091e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 0.9999895055406776,
+          "mine_norm": 0.48396438873580994,
+          "reference_norm": 0.48379232021915236,
+          "relative_l2": 0.004595963669287369,
+          "max_abs": 0.0005965977907182451
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999895054677449,
+          "mine_norm": 0.48396438873580994,
+          "reference_norm": 0.4837923085247478,
+          "relative_l2": 0.004595981470350647,
+          "max_abs": 0.0005965828895568848
+        },
+        "half_accumulator_prediction_exact": true
+      }
+    },
+    {
+      "cell": "p0-t63-n1-f160-ref0",
+      "pattern": 0,
+      "queries": 63,
+      "threads": 1,
+      "half": 0,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999943,
+          "mine_norm": 1.3321590825472605,
+          "reference_norm": 1.3321591073606585,
+          "relative_l2": 1.8626451514860982e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 3.8399823815285696,
+          "reference_norm": 3.839982496508408,
+          "relative_l2": 6.89951845833183e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 1.0,
+          "mine_norm": 3.839982496508408,
+          "reference_norm": 3.839982496508408,
+          "relative_l2": 9.63473745223153e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 3.839982496508408,
+          "reference_norm": 3.8399823815285696,
+          "relative_l2": 6.899518648755549e-08,
+          "max_abs": 1.4901161193847656e-08
+        }
+      }
+    },
+    {
+      "cell": "p0-t63-n1-f161-ref0",
+      "pattern": 0,
+      "queries": 63,
+      "threads": 1,
+      "half": 1,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999943,
+          "mine_norm": 1.3321590825472605,
+          "reference_norm": 1.3321591073606585,
+          "relative_l2": 1.8626451514860982e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999984,
+          "mine_norm": 3.8399824036869465,
+          "reference_norm": 3.839982496508408,
+          "relative_l2": 7.23510765836109e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 0.9999895055406781,
+          "mine_norm": 3.841348248019025,
+          "reference_norm": 3.839982496508408,
+          "relative_l2": 0.0045959636692873675,
+          "max_abs": 0.0005965977907182451
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999895054677463,
+          "mine_norm": 3.841348248019025,
+          "reference_norm": 3.8399824036869465,
+          "relative_l2": 0.00459598147035065,
+          "max_abs": 0.0005965828895568848
+        },
+        "half_accumulator_prediction_exact": true
+      }
+    },
+    {
+      "cell": "p0-t64-n1-f160-ref0",
+      "pattern": 0,
+      "queries": 64,
+      "threads": 1,
+      "half": 0,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999942,
+          "mine_norm": 1.3426901482651492,
+          "reference_norm": 1.3426901732747036,
+          "relative_l2": 1.862645151486098e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 3.8703384458644345,
+          "reference_norm": 3.8703385617532193,
+          "relative_l2": 6.89951845833183e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 0.9999999999999999,
+          "mine_norm": 3.8703385617532193,
+          "reference_norm": 3.8703385617532193,
+          "relative_l2": 9.634737452231531e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 3.8703385617532193,
+          "reference_norm": 3.8703384458644345,
+          "relative_l2": 6.899518648755549e-08,
+          "max_abs": 1.4901161193847656e-08
+        }
+      }
+    },
+    {
+      "cell": "p0-t64-n1-f161-ref0",
+      "pattern": 0,
+      "queries": 64,
+      "threads": 1,
+      "half": 1,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999942,
+          "mine_norm": 1.3426901482651492,
+          "reference_norm": 1.3426901732747036,
+          "relative_l2": 1.862645151486098e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999983,
+          "mine_norm": 3.8703384681979798,
+          "reference_norm": 3.8703385617532193,
+          "relative_l2": 7.235107658361088e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 0.9999999999999999,
+          "mine_norm": 3.8703385617532193,
+          "reference_norm": 3.8703385617532193,
+          "relative_l2": 9.634737452231531e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999983,
+          "mine_norm": 3.8703385617532193,
+          "reference_norm": 3.8703384681979798,
+          "relative_l2": 7.235107809285228e-08,
+          "max_abs": 1.4901161193847656e-08
+        }
+      }
+    },
+    {
+      "cell": "p0-t71-n1-f160-ref0",
+      "pattern": 0,
+      "queries": 71,
+      "threads": 1,
+      "half": 0,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999982,
+          "mine_norm": 1.4142135360313146,
+          "reference_norm": 1.414213562373095,
+          "relative_l2": 1.8626451514860966e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999989,
+          "mine_norm": 4.076506427217043,
+          "reference_norm": 4.076506549279075,
+          "relative_l2": 6.899518458331831e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 1.0000000000000002,
+          "mine_norm": 4.076506549279075,
+          "reference_norm": 4.076506549279075,
+          "relative_l2": 9.634737452231531e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999989,
+          "mine_norm": 4.076506549279075,
+          "reference_norm": 4.076506427217043,
+          "relative_l2": 6.899518648755549e-08,
+          "max_abs": 1.4901161193847656e-08
+        }
+      }
+    },
+    {
+      "cell": "p0-t71-n1-f161-ref0",
+      "pattern": 0,
+      "queries": 71,
+      "threads": 1,
+      "half": 1,
+      "reference": 0,
+      "metrics": {
+        "scores": {
+          "cosine": 1.0,
+          "mine_norm": 0.0,
+          "reference_norm": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0
+        },
+        "probabilities": {
+          "cosine": 0.9999999999999982,
+          "mine_norm": 1.4142135360313146,
+          "reference_norm": 1.414213562373095,
+          "relative_l2": 1.8626451514860966e-08,
+          "max_abs": 2.623443875332532e-10
+        },
+        "eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 4.0765064507402675,
+          "reference_norm": 4.076506549279075,
+          "relative_l2": 7.23510765836109e-08,
+          "max_abs": 1.490116136038111e-08
+        },
+        "flash": {
+          "cosine": 1.0000000000000002,
+          "mine_norm": 4.076506549279075,
+          "reference_norm": 4.076506549279075,
+          "relative_l2": 9.634737452231531e-16,
+          "max_abs": 1.6653345369377348e-16
+        },
+        "flash_vs_eager": {
+          "cosine": 0.9999999999999987,
+          "mine_norm": 4.076506549279075,
+          "reference_norm": 4.0765064507402675,
+          "relative_l2": 7.23510780928523e-08,
+          "max_abs": 1.4901161193847656e-08
+        }
+      }
+    }
+  ],
+  "nonuniform_worst_relative_l2": {
+    "scores": 4.5094412579088135e-08,
+    "probabilities": 1.3783291791144213e-07,
+    "eager": 1.818644641286635e-07,
+    "flash": 0.0014147470788592978
+  },
+  "physical_libraries": {
+    "accepted_source": "f242ba80eccbc801a44bebe134486667cf6b127d",
+    "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "files": [
+      {
+        "path": "actual-binaries/ggml/src/libggml-base.so.0.26.0",
+        "bytes": 964048,
+        "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b",
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-base.so.0.26.0"
+      },
+      {
+        "path": "actual-binaries/ggml/src/libggml-cpu.so.0.26.0",
+        "bytes": 1431992,
+        "sha256": "d1d276add014805b04e2d6587196d865ad604cc2c3aac3ff61ba2ce9c1c859d5",
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-cpu.so.0.26.0"
+      },
+      {
+        "path": "actual-binaries/ggml/src/libggml.so.0.26.0",
+        "bytes": 60720,
+        "sha256": "5cce8cd436039e068f9e56979e1940d9f7fe0cc3fc61196371b2d3b6710bbd68",
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml.so.0.26.0"
+      }
+    ],
+    "aliases": "Physical copies; CIFS does not support requested symlink operation; v1 failure retained"
+  },
+  "binary_sha256": "d5ff40a0dd9b6530e4cfd52bd6ce550b80e99448025d10ffaf69dd907b7ac191",
+  "public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "2ffac96dd901bb34e55755eef93094cfa8f8c14d",
+    "prefix": "mimo-20261017-owned-attention/operator-proof-v1",
+    "source": "02bd2aeed3a1461280daaa89756136530ace9676",
+    "payloads": 541,
+    "files": [
+      {
+        "path": "mimo-20261017-owned-attention/operator-proof-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2ffac96dd901bb34e55755eef93094cfa8f8c14d/mimo-20261017-owned-attention/operator-proof-v1/proof.zip",
+        "bytes": 1183435,
+        "sha256": "5bf0b034a37fd0a1ba9b21d56733e622c15c5a07e1d5c396f8b932c2a8161dfb",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "mimo-20261017-owned-attention/operator-proof-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2ffac96dd901bb34e55755eef93094cfa8f8c14d/mimo-20261017-owned-attention/operator-proof-v1/README.md",
+        "bytes": 3647,
+        "sha256": "67ff12a624d70e514d304f6dd5f4a7395c8f702ce7ef0e5fd51e18df5634bd65",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  },
+  "old_capture_acquisition": {
+    "expected_api_sha256": "bb0295cfea2375d7a875e8e66c094d9f3b22927b3578f0fef439ab9db7e7908c",
+    "downloads": [
+      {
+        "path": "original-artifact.zip",
+        "bytes": 442343894,
+        "sha256": "6135c7f42e61e630b95ada149d4759eca7444f33205ea0aabb6384dfb0ce1697",
+        "crc_failures": [
+          {
+            "path": "q4_k/blas-flash/1/ffn_norm.f32",
+            "error": "Bad CRC-32 for file 'q4_k/blas-flash/1/ffn_norm.f32'"
+          },
+          {
+            "path": "q4_k/blas-flash/1/input.f32",
+            "error": "Bad magic number for file header"
+          },
+          {
+            "path": "q4_k/blas-flash/1/mlp_out.f32",
+            "error": "Bad magic number for file header"
+          },
+          {
+            "path": "q4_k/blas-flash/1/output.f32",
+            "error": "Bad magic number for file header"
+          },
+          {
+            "path": "q4_k/blas-flash/1/post_attn.f32",
+            "error": "Bad magic number for file header"
+          }
+        ],
+        "accepted": false
+      },
+      {
+        "path": "second-download.zip",
+        "bytes": 442343894,
+        "sha256": "bb0295cfea2375d7a875e8e66c094d9f3b22927b3578f0fef439ab9db7e7908c",
+        "crc_failures": [],
+        "accepted": true
+      }
+    ],
+    "no_qkv_present": true,
+    "scope": "Second transfer matches API size/SHA and all 463 member CRC/header checks; first failed transfer retained. Neither archive contains raw Q/K/V; no operator replay from them.",
+    "status": "FIRST_REJECTED_SECOND_FULLY_VERIFIED"
+  },
+  "explains_old_71_query_prefill_failure": false,
+  "whole_model_acceptance": false,
+  "speech_acceptance": false,
+  "q4_acceptance": false,
+  "gpu_acceptance": false,
+  "performance_acceptance": false,
+  "runtime_or_default_changes": false,
+  "lint_run": {
+    "id": 39003053402,
+    "status": "success"
+  },
+  "source_integration": "Integrated on main from immutable02bd2aee, preserving original authorship and diagnostic source bytes",
+  "next": "Capture actual same-input Q/K/V, mask, scores/probabilities and pre-output-projection values with OFF/ON/OFF identity before choosing a model-specific numerical repair",
+  "general_ci_run": {
+    "id": 39003202215,
+    "status": "success"
+  }
+}

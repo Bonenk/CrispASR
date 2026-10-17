@@ -1,0 +1,146 @@
+{
+  "ggml_source": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "fixture_sha256": "b092ed027e26480ae4ad6c59d30d216662c7c5afe949f5300c9afafe86163397",
+  "actual_current_graph_pass": true,
+  "tiny_analytic_and_admission_unit_pass": true,
+  "removed_gpu_guard_rejected": true,
+  "native_identity_thread_exact": true,
+  "serial_reference_exact": true,
+  "whole_runtime_syntax_pass": true,
+  "full_generation_acceptance": false,
+  "production_defaults_changed": false,
+  "results": [
+    {
+      "case": "original-hidden",
+      "mode": "off",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "2a467f440ad56d5bd6ab9add6a043f2ed021017e002b0425271cd0e7c9ab379e"
+    },
+    {
+      "case": "original-hidden",
+      "mode": "identity",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "2a467f440ad56d5bd6ab9add6a043f2ed021017e002b0425271cd0e7c9ab379e"
+    },
+    {
+      "case": "original-hidden",
+      "mode": "serial",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "1ac9dcaa35097c9680b27c1be6d0976b3bdb90af3aa7440a19b750dab469335b"
+    },
+    {
+      "case": "original-hidden",
+      "mode": "off",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "2a467f440ad56d5bd6ab9add6a043f2ed021017e002b0425271cd0e7c9ab379e"
+    },
+    {
+      "case": "original-hidden",
+      "mode": "identity",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "2a467f440ad56d5bd6ab9add6a043f2ed021017e002b0425271cd0e7c9ab379e"
+    },
+    {
+      "case": "original-hidden",
+      "mode": "serial",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "1ac9dcaa35097c9680b27c1be6d0976b3bdb90af3aa7440a19b750dab469335b"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "off",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "2474f82a6ef609d45aff426b0d9892e21e1145c5858479d93d55c36933f0c48b"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "identity",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "2474f82a6ef609d45aff426b0d9892e21e1145c5858479d93d55c36933f0c48b"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "serial",
+      "threads": 1,
+      "values": 18504,
+      "sha256": "4f017b23d91327844918f663b6e532af7093b0d16695bc14ae143f131088de7f"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "off",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "2474f82a6ef609d45aff426b0d9892e21e1145c5858479d93d55c36933f0c48b"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "identity",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "2474f82a6ef609d45aff426b0d9892e21e1145c5858479d93d55c36933f0c48b"
+    },
+    {
+      "case": "native-hidden",
+      "mode": "serial",
+      "threads": 4,
+      "values": 18504,
+      "sha256": "4f017b23d91327844918f663b6e532af7093b0d16695bc14ae143f131088de7f"
+    }
+  ],
+  "source_files": [
+    {
+      "path": "src/dia_tts.cpp",
+      "sha256": "c6eaf02b852891e6bdcf40f0fe23ec9d463f9c6fbdf7fd928252d5c4f05b4dcf"
+    },
+    {
+      "path": "src/dia_serial_head.h",
+      "sha256": "0d2dcb3e5a45d5409fdbadb2cc3982f11b559309568333706dc9f701ed7c16e0"
+    },
+    {
+      "path": "tests/test-dia-serial-head.cpp",
+      "sha256": "a0a3f940f9af7132303e5731833a9021ed4885995f8c19fdff33629f85ef9ce2"
+    },
+    {
+      "path": "tests/CMakeLists.txt",
+      "sha256": "3eb1d90887d2d2b33f401150b6180427ea0a608b7f279805d59a24ebdc7798c2"
+    },
+    {
+      "path": "tools/ci-heavy/dia-main-head/preflight.py",
+      "sha256": "1d29d61f2f3e3ce6758c4f5e90271c93b8c95c2c511dba08dbcb3e6d4b042aa4"
+    },
+    {
+      "path": "tools/ci-heavy/dia-main-head/probe.cpp",
+      "sha256": "d4f9cf89134aafcbec89a81daa2d7f120bf1dd2f6db39d8569d3f5a30c975410"
+    }
+  ],
+  "libraries": [
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-cpu.a",
+      "bytes": 1839420,
+      "sha256": "18b454308c901c080b84a17b9c85919469ebff066484a034750b50fcaf320330"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-base.a",
+      "bytes": 1392024,
+      "sha256": "a8392287d96d99b9a376f4952609e7f99d1c3764d52a1a877f6031a6abbb082e"
+    }
+  ],
+  "candidate": "d198d7a48742c8424444d9b67dde9eb5d26f590f",
+  "tiny_checks": 30,
+  "causal_compute_and_apply_functions_byte_exact": true,
+  "heavy_run": 38874191736,
+  "lint_run": 38874302965,
+  "ci_run": 38874305718,
+  "hosted_result_accepted": true,
+  "hosted_audit": "dia-current-main-head-hosted-2026-10-16.json",
+  "general_ci_acceptance": false,
+  "runtime_integrated_on_main": false
+}

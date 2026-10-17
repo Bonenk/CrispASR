@@ -1,0 +1,111 @@
+{
+  "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
+  "integrated": true,
+  "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+  "torch_version": "2.6.0+cpu",
+  "cases": 16,
+  "old_source_failed_cases": 12,
+  "fixed_all_cases_exact": true,
+  "regenerated_fixture_byte_exact": true,
+  "fixture_sha256": "bb3db2bf3d52f419ecad359f5f44fbbd1dff9cb88a3f095c38f979362d0e246f",
+  "mutations": {
+    "passed": true,
+    "mutations": [
+      {
+        "mutation": "restore-stopping",
+        "rejected": true,
+        "failed_cases": 1
+      },
+      {
+        "mutation": "restore-reversal",
+        "rejected": true,
+        "failed_cases": 4
+      },
+      {
+        "mutation": "restore-final-row",
+        "rejected": true,
+        "failed_cases": 10
+      }
+    ]
+  },
+  "native_protocol_build": {
+    "source_sha256": "db15655ddcc1dd8075762daf9280d2a001b153e2b11470666d9e984e4b939da5",
+    "executable_sha256": "2e3559eeda1d7c934d7759326770b8091884e6cf18bc827a9fcc90c8247d7350",
+    "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "command": [
+      "/usr/bin/c++",
+      "-std=c++17",
+      "-O2",
+      "${CRISPASR_STORAGE}/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol.cpp",
+      "-o",
+      "${CRISPASR_STORAGE}/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol"
+    ],
+    "build_stdout": "",
+    "build_stderr": "",
+    "scope": "Actual extracted production protocol; no neural, DAC or speech execution"
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "062b2bed6188680bf3c45677354cf8cd5f22367f",
+    "file": "dia-20261015-output-protocol/complete-output-protocol-v1.zip",
+    "bytes": 183210,
+    "sha256": "442d1a2c6f1d6085892cecac124617acb58f72c74634ddc7db46a1255677cc09",
+    "payloads": 50,
+    "anonymous_full_sha256_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/062b2bed6188680bf3c45677354cf8cd5f22367f/dia-20261015-output-protocol/complete-output-protocol-v1.zip"
+  },
+  "ci": {
+    "general": 38713471171,
+    "lint": 38713474686,
+    "status": "all13-general-and-all10-lint-jobs-pass",
+    "general_protocol_guard_executed": true
+  },
+  "separate_original_dac_run": 38710473906,
+  "full_model_execution": false,
+  "neural_parity_acceptance": false,
+  "speech_acceptance": false,
+  "cuda_acceptance": false,
+  "quantization_acceptance": false,
+  "performance_acceptance": false,
+  "retained_native_protocol": {
+    "passed": true,
+    "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "actual_extracted_protocol_elf_sha256": "2e3559eeda1d7c934d7759326770b8091884e6cf18bc827a9fcc90c8247d7350",
+    "native_source_sha256": "db15655ddcc1dd8075762daf9280d2a001b153e2b11470666d9e984e4b939da5",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "surfaces": [
+      {
+        "surface": "cabi",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      },
+      {
+        "surface": "cli",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      }
+    ],
+    "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
+  },
+  "retained_protocol_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "668196e7450b1ce35bded6355ec58464235deb1e",
+    "file": "dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip",
+    "bytes": 23699070,
+    "sha256": "9ff7dda447d1d8cbd75dcbbbb2316db70d6ad84ba9ad0cc12fed88a74db2862c",
+    "payloads": 117,
+    "anonymous_full_sha256_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip"
+  },
+  "codec_diagnosis_complete": true,
+  "codec_restores_native_speech": false,
+  "integrated_source": "6503408cb95d42e80ad84bee513ae58a67e616c5",
+  "tested_source_files_byte_unchanged_after_rebase": true
+}

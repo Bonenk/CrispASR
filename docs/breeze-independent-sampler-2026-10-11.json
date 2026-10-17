@@ -1,0 +1,35 @@
+{
+  "pr": "https://github.com/CrispStrobe/CrispASR/pull/539",
+  "source": "af26991cf37e6af14276a1ee5d4e124995811bc5",
+  "baseline": "3d085512c",
+  "scope": "Existing Breeze sampler/session wiring; excludes pending guidance/reference-ownership/server-cache features",
+  "old_controls": {
+    "total": 8,
+    "errors": 6,
+    "log_sha256": "35082c586192e2d99e590bea53dbe01bd017d75dcb8853ebaaaf597170b8847c"
+  },
+  "new_controls": {
+    "passed": 8,
+    "seconds": 1.144,
+    "log_sha256": "816b7bdce4eabc5ca1ebdd28a05baad437f30ded44e47b52198aebdb1e27051b"
+  },
+  "no_secrets": {
+    "passed": 4,
+    "skipped": 0,
+    "seconds": 48.462
+  },
+  "format": "clang-format 18.1.3 PASS; four changed C++/header files",
+  "syntax": {
+    "c_api": "g++ C++17 complete translation unit PASS",
+    "native_breeze": "g++ C++17 complete translation unit PASS; existing deprecated attention precision warning"
+  },
+  "ci": "https://github.com/CrispStrobe/CrispASR/actions/runs/38162567542",
+  "ci_observed": "56 SUCCESS; one intentional SKIPPED; no pending/failing checks",
+  "limitations": [
+    "Contract tests compile actual source with recording stubs; no model numerics or speech claimed",
+    "No version bump, tag or publication",
+    "Successful real speech composition proof is separately attributed to a2f58338ef; does not merge pending features"
+  ],
+  "merged": true,
+  "merge_commit": "913266271cf29a052a945373ceeda675ba7acbd2"
+}

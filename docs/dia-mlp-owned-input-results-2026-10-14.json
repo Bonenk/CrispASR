@@ -1,0 +1,688 @@
+{
+  "scope": "Bounded actual original fused MLP and literal native split graph on original/native owned block-zero pre-MLP inputs. Native outputs use byte-verified CPU library; local-vs-hosted differences are measured explicitly. No full-model, speech, GPU, Q4 or performance acceptance.",
+  "torch_version": "2.6.0+cpu",
+  "torch_threads": 4,
+  "source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+  "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+  "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "original_expression_sha256": "08ccc05920749a5539f9b95e3af5f68afcfbe6cbaa14dc1b035c3ed73f9b692e",
+  "native_expression_sha256": "ed79fdd792da3b1c84b55ff1ce6ea1ae7b45cb87685ba8ae4926bf03d67d23ef",
+  "fetch": {
+    "scope": "Only two complete original block-zero F32 MLP tensors fetched through immutable strict HTTP ranges; all three native splits/transposes match the physically audited F32 export. Full checkpoint not loaded or locally rehashed.",
+    "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+    "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "checkpoint_bytes": 6444682848,
+    "header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+    "mapping_source_sha256": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57",
+    "physical_neural_audit_sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368",
+    "tensors": [
+      {
+        "original_name": "decoder.layers.0.mlp.wi_fused.weight",
+        "path": "fused-original.f32",
+        "shape": [
+          2048,
+          2,
+          8192
+        ],
+        "offset": 126164576,
+        "bytes": 134217728,
+        "sha256": "703948703771c705b1d051dd0b8c6a8047009898d6984f03f4a3601a1fb320cb"
+      },
+      {
+        "original_name": "decoder.layers.0.mlp.wo.weight",
+        "path": "wo-original.f32",
+        "shape": [
+          8192,
+          2048
+        ],
+        "offset": 260382304,
+        "bytes": 67108864,
+        "sha256": "1adbef6fd5e0f9d313832358791f668dac2d01268e41129d74e1af7b9445f194"
+      }
+    ],
+    "mapped": [
+      {
+        "name": "dia.decoder.layers.0.gate",
+        "path": "gate.native.f32",
+        "shape": [
+          8192,
+          2048
+        ],
+        "bytes": 67108864,
+        "sha256": "a92acbd104a5133c1b6bbcb62dbaf5e92e4383a4c2fcfd0dfeb82dace4bfc406"
+      },
+      {
+        "name": "dia.decoder.layers.0.up",
+        "path": "up.native.f32",
+        "shape": [
+          8192,
+          2048
+        ],
+        "bytes": 67108864,
+        "sha256": "e80d11c8d4996900c141081e2da4f69abbfa1c3212a8982ddde4c35d0019d82a"
+      },
+      {
+        "name": "dia.decoder.layers.0.wo",
+        "path": "wo.native.f32",
+        "shape": [
+          2048,
+          8192
+        ],
+        "bytes": 67108864,
+        "sha256": "a50453c2a96d77adc42b5c1db1ebc7581c625cc8d1fd439c6399b68ad41e596e"
+      }
+    ]
+  },
+  "verified_inputs": [
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+      "bytes": 99803232,
+      "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_mlp_norm.f32",
+      "bytes": 16384,
+      "sha256": "d2790a133262db809c13ea31d2dcb448a31981defe0b0c56bac5da6aeb1fa60a"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-mlp-owned-replay-20261014/fused-original.f32",
+      "bytes": 134217728,
+      "sha256": "703948703771c705b1d051dd0b8c6a8047009898d6984f03f4a3601a1fb320cb"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-mlp-owned-replay-20261014/wo-original.f32",
+      "bytes": 67108864,
+      "sha256": "1adbef6fd5e0f9d313832358791f668dac2d01268e41129d74e1af7b9445f194"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-mlp-owned-replay-20261014/gate.native.f32",
+      "bytes": 67108864,
+      "sha256": "a92acbd104a5133c1b6bbcb62dbaf5e92e4383a4c2fcfd0dfeb82dace4bfc406"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-mlp-owned-replay-20261014/up.native.f32",
+      "bytes": 67108864,
+      "sha256": "e80d11c8d4996900c141081e2da4f69abbfa1c3212a8982ddde4c35d0019d82a"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-mlp-owned-replay-20261014/wo.native.f32",
+      "bytes": 67108864,
+      "sha256": "a50453c2a96d77adc42b5c1db1ebc7581c625cc8d1fd439c6399b68ad41e596e"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_mlp_gate.f32",
+      "bytes": 65536,
+      "sha256": "b67578f942cb6fb5e1e46cb3519dcb10f00a13f47428e0a0c7fe96b696cd15c1"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_mlp_up.f32",
+      "bytes": 65536,
+      "sha256": "7ea44b1dd9eb003a4afb021a665024c79e577daaf777f36bfb5a04cc3e001813"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_mlp_hidden.f32",
+      "bytes": 65536,
+      "sha256": "cc7e6d397b6297187e34f4d362c251f351087df14492ffd115d3a2717393557f"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_mlp_output.f32",
+      "bytes": 16384,
+      "sha256": "b9e53dd84bf73aaad45a25f1593c02ab39a86641ca3611992a733bcdaba03357"
+    }
+  ],
+  "hosted_independent_audit_sha256": "48cca570a510c6f9a6a2c718c486deba93e54a1fde9ffb25a9801c51809cd04c",
+  "metric_helper_sha256": "5d24a79efc7935f1ae61b0d9c098b9cd545f06a692bdbb6a15af2b95015b7c23",
+  "original_repeats_exact": true,
+  "native_repeats_and_1_vs_4_threads_exact": true,
+  "rows": [
+    {
+      "part": "gate",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 15503,
+      "cosine_min": 0.9999999999997317,
+      "max_row_norm_error": 2.0617889562313252e-07,
+      "max_abs": 1.33514404296875e-05,
+      "relative_l2": 6.146648181598899e-07
+    },
+    {
+      "part": "gate",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 16384,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "gate",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 14768,
+      "cosine_min": 0.999999999999954,
+      "max_row_norm_error": 2.0826132418605425e-07,
+      "max_abs": 5.781650543212891e-06,
+      "relative_l2": 2.73324752410224e-07
+    },
+    {
+      "part": "gate",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 11360,
+      "cosine_min": 0.9999999999999912,
+      "max_row_norm_error": 3.782582180811289e-08,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 1.0949511004771111e-07
+    },
+    {
+      "part": "gate",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 11411,
+      "cosine_min": 0.9999999999999912,
+      "max_row_norm_error": 3.68683717999474e-08,
+      "max_abs": 1.9073486328125e-06,
+      "relative_l2": 1.091352052310319e-07
+    },
+    {
+      "part": "up",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 15790,
+      "cosine_min": 0.999999999999271,
+      "max_row_norm_error": 8.409558145405782e-07,
+      "max_abs": 2.5033950805664062e-06,
+      "relative_l2": 7.188409366725316e-07
+    },
+    {
+      "part": "up",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 16384,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "up",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 15945,
+      "cosine_min": 0.9999999999950454,
+      "max_row_norm_error": 8.360975493060252e-07,
+      "max_abs": 4.112720489501953e-06,
+      "relative_l2": 1.7074909697335129e-06
+    },
+    {
+      "part": "up",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 14131,
+      "cosine_min": 0.9999999999999729,
+      "max_row_norm_error": 1.1014944956144745e-07,
+      "max_abs": 3.5762786865234375e-07,
+      "relative_l2": 1.671890848403435e-07
+    },
+    {
+      "part": "up",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 14133,
+      "cosine_min": 0.9999999999999719,
+      "max_row_norm_error": 9.510030407611225e-08,
+      "max_abs": 2.980232238769531e-07,
+      "relative_l2": 1.650054540698658e-07
+    },
+    {
+      "part": "hidden",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 15950,
+      "cosine_min": 0.9999999999989184,
+      "max_row_norm_error": 1.9502286919825806e-06,
+      "max_abs": 2.2649765014648438e-06,
+      "relative_l2": 9.687386915632684e-07
+    },
+    {
+      "part": "hidden",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 16384,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "hidden",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16082,
+      "cosine_min": 0.9999999999932263,
+      "max_row_norm_error": 2.119317918269914e-06,
+      "max_abs": 1.6689300537109375e-06,
+      "relative_l2": 1.8169339532109315e-06
+    },
+    {
+      "part": "hidden",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 14941,
+      "cosine_min": 0.9999999999999182,
+      "max_row_norm_error": 2.704961832300512e-07,
+      "max_abs": 3.5762786865234375e-07,
+      "relative_l2": 2.0106633601905113e-07
+    },
+    {
+      "part": "hidden",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 14943,
+      "cosine_min": 0.9999999999999314,
+      "max_row_norm_error": 4.312362705816142e-07,
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 2.399061590885435e-07
+    },
+    {
+      "part": "output",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4030,
+      "cosine_min": 0.9999999999981077,
+      "max_row_norm_error": 1.4350855152001074e-06,
+      "max_abs": 6.318092346191406e-06,
+      "relative_l2": 1.431825056413077e-06
+    },
+    {
+      "part": "output",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "part": "output",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4007,
+      "cosine_min": 0.9999999999990569,
+      "max_row_norm_error": 3.3307045144148617e-07,
+      "max_abs": 1.430511474609375e-06,
+      "relative_l2": 8.269263201832873e-07
+    },
+    {
+      "part": "output",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3626,
+      "cosine_min": 0.9999999999999621,
+      "max_row_norm_error": 1.3725525715990727e-07,
+      "max_abs": 7.152557373046875e-07,
+      "relative_l2": 1.9009345110817251e-07
+    },
+    {
+      "part": "output",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3637,
+      "cosine_min": 0.9999999999999586,
+      "max_row_norm_error": 1.259377646611881e-07,
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 1.9113248687787107e-07
+    }
+  ],
+  "controls": [
+    {
+      "part": "gate",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 6.271148204803467,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "gate",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 6.271147727966309,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "up",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.5160796642303467,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "up",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.5160791873931885,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "hidden",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.5811291933059692,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "hidden",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 16384,
+      "changed_values": 16384,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.5811293125152588,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "output",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 2.7257208824157715,
+      "relative_l2": 1.0
+    },
+    {
+      "part": "output",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 2.7257204055786133,
+      "relative_l2": 1.0
+    },
+    {
+      "input_owner": "original",
+      "control": "swap-gate-up-weight-splits",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.7073178399880463,
+      "max_row_norm_error": 3.968938985740426,
+      "max_abs": 9.934019565582275,
+      "relative_l2": 3.362981564733132
+    },
+    {
+      "input_owner": "native",
+      "control": "swap-gate-up-weight-splits",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.7073178494589228,
+      "max_row_norm_error": 3.9689382250315974,
+      "max_abs": 9.934013843536377,
+      "relative_l2": 3.362980670252008
+    }
+  ],
+  "files": [
+    {
+      "path": "actual-native-mlp.cpp",
+      "bytes": 231,
+      "sha256": "ed79fdd792da3b1c84b55ff1ce6ea1ae7b45cb87685ba8ae4926bf03d67d23ef"
+    },
+    {
+      "path": "actual-original-mlp.py",
+      "bytes": 2635,
+      "sha256": "08ccc05920749a5539f9b95e3af5f68afcfbe6cbaa14dc1b035c3ed73f9b692e"
+    },
+    {
+      "path": "bridge",
+      "bytes": 16832,
+      "sha256": "b45bbddd1fb7b7d766015d15c7103ec3d828183b985c7eca57ffd3525c84ec39"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 1797,
+      "sha256": "9daadf0b0b98fdcd379a85c42cce92ebcd1abc3158fa79b6bc92c153fd6bfc00"
+    },
+    {
+      "path": "build-command.json",
+      "bytes": 443,
+      "sha256": "eccb61721e12de83cd624f5a3576f41423c52c0bb221791c09e68e8cdf992e13"
+    },
+    {
+      "path": "fetch-initial.log",
+      "bytes": 332,
+      "sha256": "15b392adc80573686ca8f7851d9edea626cb0e5878d65d69ea0dc64fb7907cfb"
+    },
+    {
+      "path": "fetch-initial.py",
+      "bytes": 4095,
+      "sha256": "e563d2c5c32d5b56a05671f539232a9686e283070e8ee880a1ae6a6182a895f6"
+    },
+    {
+      "path": "fetch-receipt.json",
+      "bytes": 2160,
+      "sha256": "2b3e66a34ea3be10ec07964e84968f450f6352bcc7ecbd9c3917db2c73846a33"
+    },
+    {
+      "path": "fetch.log",
+      "bytes": 177,
+      "sha256": "fe31e61a4acd3206e3a8a73a242ae1d82daed073e4b3611da138e68595e5d105"
+    },
+    {
+      "path": "fetch.py",
+      "bytes": 4091,
+      "sha256": "67c6462deea0154d7ffb0ff269d369b59214c9a923cdd0809d451334e7e30c38"
+    },
+    {
+      "path": "fused-original.f32",
+      "bytes": 134217728,
+      "sha256": "703948703771c705b1d051dd0b8c6a8047009898d6984f03f4a3601a1fb320cb"
+    },
+    {
+      "path": "gate.native.f32",
+      "bytes": 67108864,
+      "sha256": "a92acbd104a5133c1b6bbcb62dbaf5e92e4383a4c2fcfd0dfeb82dace4bfc406"
+    },
+    {
+      "path": "native-actual-original-gate.npy",
+      "bytes": 65664,
+      "sha256": "b0f7753e5d51e75f20d34f93f52697dab85ac76d7a57c3f66617b95d9033463a"
+    },
+    {
+      "path": "native-actual-original-hidden.npy",
+      "bytes": 65664,
+      "sha256": "13f13b043a26516045a3bca3bd4754908b71ac59568b8366260dab55b9cf7f84"
+    },
+    {
+      "path": "native-actual-original-output.npy",
+      "bytes": 16512,
+      "sha256": "ddd879c11b9dadf802759f63a9e9ea4530beda2fd42852179a8cdf80f8768fe0"
+    },
+    {
+      "path": "native-actual-original-up.npy",
+      "bytes": 65664,
+      "sha256": "cf1993a337f2bf2dc126a84cdfd0c786c3d4340208081a69b6723487fa60cf2e"
+    },
+    {
+      "path": "native-execution.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "native-library-closure.log",
+      "bytes": 703,
+      "sha256": "c15c2959df7e92fec1fc92f4874634d7eb0a2ef8c7004e533f3a67733a7bffcd"
+    },
+    {
+      "path": "native-t1-mode0.f32",
+      "bytes": 851968,
+      "sha256": "a75e009fe4792d816ec1b54e18912cabc27febe09ecd996f5ab762c654d3b277"
+    },
+    {
+      "path": "native-t4-mode0.f32",
+      "bytes": 851968,
+      "sha256": "a75e009fe4792d816ec1b54e18912cabc27febe09ecd996f5ab762c654d3b277"
+    },
+    {
+      "path": "native-t4-mode1.f32",
+      "bytes": 851968,
+      "sha256": "352246b8d455bc44137047fcda2b2f3e0d1747730c95e17aebb7ae64ceee2572"
+    },
+    {
+      "path": "original-actual-original-gate.npy",
+      "bytes": 65664,
+      "sha256": "fcac96169df83a25427b1c30b583d320422b6e069c5f58aecbd302f830adfa13"
+    },
+    {
+      "path": "original-actual-original-hidden.npy",
+      "bytes": 65664,
+      "sha256": "fb20fa64b252ed277dcfbe84b6d395b9f9b984169289d83fc720961bbeafe832"
+    },
+    {
+      "path": "original-actual-original-output.npy",
+      "bytes": 16512,
+      "sha256": "7c7a4732b01fc8ac08a1e8528e1a3559a8f44895290bc26e7fa83e00c0bf5358"
+    },
+    {
+      "path": "original-actual-original-up.npy",
+      "bytes": 65664,
+      "sha256": "31cd13b444cfbe6344dc06b6508e6cea89ea558044d67321d6ddae80ab25e644"
+    },
+    {
+      "path": "owned-inputs.f32",
+      "bytes": 65536,
+      "sha256": "b4e70147b307ada60328776d56bd59ea179fe38c45c352e2a39cf0362897169d"
+    },
+    {
+      "path": "replay.py",
+      "bytes": 10811,
+      "sha256": "f25d5d681fb40d2993da8307e6f9dc12270ea89514e41095cdbd19cf60b82416"
+    },
+    {
+      "path": "up.native.f32",
+      "bytes": 67108864,
+      "sha256": "e80d11c8d4996900c141081e2da4f69abbfa1c3212a8982ddde4c35d0019d82a"
+    },
+    {
+      "path": "wo-original.f32",
+      "bytes": 67108864,
+      "sha256": "1adbef6fd5e0f9d313832358791f668dac2d01268e41129d74e1af7b9445f194"
+    },
+    {
+      "path": "wo.native.f32",
+      "bytes": 67108864,
+      "sha256": "a50453c2a96d77adc42b5c1db1ebc7581c625cc8d1fd439c6399b68ad41e596e"
+    }
+  ],
+  "public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261014-decoder-boundaries/complete-owned-mlp.zip",
+    "bytes": 382167825,
+    "sha256": "676d043bcd66e94285aefc143d89891552a8d306dba84520fa038940e401ed24",
+    "payloads": 40,
+    "anonymous_verified": true,
+    "revision": "1bc7d487abad8e14bf4c9ef20ac9ac04b9d0baab"
+  }
+}

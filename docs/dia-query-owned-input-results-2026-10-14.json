@@ -1,0 +1,685 @@
+{
+  "scope": "Bounded CPU block-zero self/cross Q projections and source-RoPE-off rotary on owned step978 pre-norm outputs. Cross Q is checked against full hosted snapshots; no hosted self Q snapshot exists. No full-model, speech, Q4, GPU or speed acceptance.",
+  "source": "8d0ad8862d2cad5d305a48a57f2a99b5024bc39a",
+  "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+  "position": 978,
+  "source_rope": false,
+  "torch_version": "2.6.0+cpu",
+  "fetch": {
+    "scope": "Only two complete original block-zero F32 attention query tensors fetched through immutable strict HTTP ranges; both native transposes match the physically audited F32 export. Full checkpoint not loaded or locally rehashed.",
+    "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+    "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "checkpoint_bytes": 6444682848,
+    "header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+    "mapping_source_sha256": "9c99aa666ad2cead2aa6a4fe9539301fb3eccd2355a0f5f96feef802e59aef57",
+    "physical_neural_audit_sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368",
+    "tensors": [
+      {
+        "original_name": "decoder.layers.0.self_attention.q_proj.weight",
+        "path": "self-original.f32",
+        "shape": [
+          2048,
+          16,
+          128
+        ],
+        "offset": 348487264,
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      },
+      {
+        "original_name": "decoder.layers.0.cross_attention.q_proj.weight",
+        "path": "cross-original.f32",
+        "shape": [
+          2048,
+          16,
+          128
+        ],
+        "offset": 100998752,
+        "bytes": 16777216,
+        "sha256": "f52b1f229d8a1dfa37004a241da4fd8439eaac2f3dda8482692eefe6916997d1"
+      }
+    ],
+    "mapped": [
+      {
+        "name": "dia.decoder.layers.0.self_q_proj",
+        "path": "self_q_proj.native.f32",
+        "shape": [
+          2048,
+          2048
+        ],
+        "bytes": 16777216,
+        "sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575"
+      },
+      {
+        "name": "dia.decoder.layers.0.cross_q_proj",
+        "path": "cross_q_proj.native.f32",
+        "shape": [
+          2048,
+          2048
+        ],
+        "bytes": 16777216,
+        "sha256": "ed63444a6d84473bab36890db69494d11b7d14813ec6c8161188686fa0b8c06e"
+      }
+    ]
+  },
+  "verified_inputs": [
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+      "bytes": 99803232,
+      "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-query-owned-replay-20261014/self-original.f32",
+      "bytes": 16777216,
+      "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-query-owned-replay-20261014/cross-original.f32",
+      "bytes": 16777216,
+      "sha256": "f52b1f229d8a1dfa37004a241da4fd8439eaac2f3dda8482692eefe6916997d1"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-query-owned-replay-20261014/self_q_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575"
+    },
+    {
+      "path": "/mnt/akademie_storage/crispasr/dia-query-owned-replay-20261014/cross_q_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "ed63444a6d84473bab36890db69494d11b7d14813ec6c8161188686fa0b8c06e"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+      "bytes": 983808,
+      "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+      "bytes": 1446416,
+      "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+      "bytes": 55184,
+      "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+      "bytes": 317376,
+      "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_sa_norm.f32",
+      "bytes": 16384,
+      "sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_ca_norm.f32",
+      "bytes": 16384,
+      "sha256": "31bc132bf9e0d3673c2564e2e9fdbb161e5268a1ee921fd72455a48896d3cb41"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
+      "bytes": 16384,
+      "sha256": "316fc837b6093dacac2ace287c3ef5737b502be05cddf31ba996ed88675af040"
+    }
+  ],
+  "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "native_repeats_and_threads_exact": true,
+  "native_cross_reproduces_hosted_exact": true,
+  "rows": [
+    {
+      "kind": "self",
+      "part": "projection",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3262,
+      "cosine_min": 0.9999999999999826,
+      "max_row_norm_error": 6.988511236372119e-08,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 1.4809603169759184e-07
+    },
+    {
+      "kind": "self",
+      "part": "rotary",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3998,
+      "cosine_min": 0.9999999981255697,
+      "max_row_norm_error": 6.715343792151884e-08,
+      "max_abs": 0.0005432665348052979,
+      "relative_l2": 5.370203744715573e-05
+    },
+    {
+      "kind": "self",
+      "part": "projection",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3262,
+      "cosine_min": 0.9999999999999826,
+      "max_row_norm_error": 6.988511236372119e-08,
+      "max_abs": 9.5367431640625e-07,
+      "relative_l2": 1.4809603169759184e-07
+    },
+    {
+      "kind": "self",
+      "part": "rotary",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3998,
+      "cosine_min": 0.9999999981255697,
+      "max_row_norm_error": 6.715343792151884e-08,
+      "max_abs": 0.0005432665348052979,
+      "relative_l2": 5.370203744715573e-05
+    },
+    {
+      "kind": "self",
+      "part": "projection",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "kind": "self",
+      "part": "rotary",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "kind": "cross",
+      "part": "projection",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3294,
+      "cosine_min": 0.9999999999999878,
+      "max_row_norm_error": 5.7251097862476286e-08,
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 1.250922655991565e-07
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "input_owner": "original",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4056,
+      "cosine_min": 0.9999999998529846,
+      "max_row_norm_error": 6.344535863345158e-08,
+      "max_abs": 1.9118189811706543e-05,
+      "relative_l2": 5.166427074415271e-06
+    },
+    {
+      "kind": "cross",
+      "part": "projection",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3368,
+      "cosine_min": 0.9999999999999887,
+      "max_row_norm_error": 3.906661616426277e-08,
+      "max_abs": 4.76837158203125e-07,
+      "relative_l2": 1.211780912778812e-07
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "input_owner": "native",
+      "comparison": "same-input-actual-original-vs-literal-native",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4050,
+      "cosine_min": 0.9999999998529738,
+      "max_row_norm_error": 3.813440185851391e-08,
+      "max_abs": 1.913309097290039e-05,
+      "relative_l2": 5.166126120488222e-06
+    },
+    {
+      "kind": "cross",
+      "part": "projection",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3906,
+      "cosine_min": 0.9999999999995793,
+      "max_row_norm_error": 3.915973735280076e-07,
+      "max_abs": 7.152557373046875e-07,
+      "relative_l2": 3.9443244653787423e-07
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "comparison": "input-drift-only-actual-original-operator",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3880,
+      "cosine_min": 0.9999999999995768,
+      "max_row_norm_error": 3.8712690386688564e-07,
+      "max_abs": 8.344650268554688e-07,
+      "relative_l2": 3.9476257940153174e-07
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "comparison": "local-native-vs-hosted-native-on-native-input",
+      "byte_exact": true,
+      "values": 4096,
+      "changed_values": 0,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "comparison": "local-original-vs-hosted-original-on-original-input",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 3884,
+      "cosine_min": 0.999999999999631,
+      "max_row_norm_error": 2.1454066989612386e-07,
+      "max_abs": 2.2649765014648438e-06,
+      "relative_l2": 6.236266347297774e-07
+    }
+  ],
+  "controls": [
+    {
+      "kind": "self",
+      "part": "projection",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 4.461702823638916,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "self",
+      "part": "rotary",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 4.910489082336426,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "self",
+      "input_owner": "original",
+      "control": "wrong-position-977",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.8501414458147568,
+      "max_row_norm_error": 1.8943973945084736e-08,
+      "max_abs": 3.3321030139923096,
+      "relative_l2": 0.37509758291533773
+    },
+    {
+      "kind": "self",
+      "input_owner": "original",
+      "control": "swapped-rotary-halves",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.41516982009225756,
+      "max_row_norm_error": 1.1102230246251565e-16,
+      "max_abs": 6.022199392318726,
+      "relative_l2": 1.424949990337781
+    },
+    {
+      "kind": "self",
+      "part": "projection",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 4.461702823638916,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "self",
+      "part": "rotary",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 4.910489082336426,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "self",
+      "input_owner": "native",
+      "control": "wrong-position-977",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.8501414458147568,
+      "max_row_norm_error": 1.8943973945084736e-08,
+      "max_abs": 3.3321030139923096,
+      "relative_l2": 0.37509758291533773
+    },
+    {
+      "kind": "self",
+      "input_owner": "native",
+      "control": "swapped-rotary-halves",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.41516982009225756,
+      "max_row_norm_error": 1.1102230246251565e-16,
+      "max_abs": 6.022199392318726,
+      "relative_l2": 1.424949990337781
+    },
+    {
+      "kind": "cross",
+      "part": "projection",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.732846736907959,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "input_owner": "original",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.757174015045166,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "cross",
+      "input_owner": "original",
+      "control": "wrong-position-977",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9915204479150219,
+      "max_row_norm_error": 1.822525252936913e-08,
+      "max_abs": 0.18458015099167824,
+      "relative_l2": 0.029421170325667323
+    },
+    {
+      "kind": "cross",
+      "input_owner": "original",
+      "control": "swapped-rotary-halves",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.5699416310133874,
+      "max_row_norm_error": 2.220446049250313e-16,
+      "max_abs": 3.1984466314315796,
+      "relative_l2": 1.3432578301770748
+    },
+    {
+      "kind": "cross",
+      "part": "projection",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.7328460216522217,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "cross",
+      "part": "rotary",
+      "input_owner": "native",
+      "control": "double-scale",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.9999999999999998,
+      "max_row_norm_error": 1.0,
+      "max_abs": 1.7571735382080078,
+      "relative_l2": 1.0
+    },
+    {
+      "kind": "cross",
+      "input_owner": "native",
+      "control": "wrong-position-977",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": 0.991520443623515,
+      "max_row_norm_error": 1.9529432626619325e-08,
+      "max_abs": 0.18458019196987152,
+      "relative_l2": 0.029421179057361566
+    },
+    {
+      "kind": "cross",
+      "input_owner": "native",
+      "control": "swapped-rotary-halves",
+      "byte_exact": false,
+      "values": 4096,
+      "changed_values": 4096,
+      "cosine_min": -0.5699416308392266,
+      "max_row_norm_error": 0.0,
+      "max_abs": 3.1984459161758423,
+      "relative_l2": 1.3432578390239243
+    }
+  ],
+  "files": [
+    {
+      "path": "actual-native-query-rotary.cpp",
+      "bytes": 1196,
+      "sha256": "b74894e15bb3aea2fb08207667a8ded23da810fd80e102f1644d17c94d065682"
+    },
+    {
+      "path": "actual-original-query-driving.py",
+      "bytes": 92,
+      "sha256": "d2b99aaba1bbdc8828135011981dddafebdb78b19b9773ea061610c5930dcf38"
+    },
+    {
+      "path": "actual-original-query-rotary.py",
+      "bytes": 3275,
+      "sha256": "548754ef9b5a384c5597f14621fc49db26ee134610eef4af5ad6143bd4b07c06"
+    },
+    {
+      "path": "bridge",
+      "bytes": 16976,
+      "sha256": "ef983b4672932f1c0d046a43bd00a121ce7b3b33f9a0544244e2845fcee3a693"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 3010,
+      "sha256": "522c1d3731063dfc907365c45f57c1b2d474cbe04b27e4aa85d9001924f0ebf0"
+    },
+    {
+      "path": "build-command.json",
+      "bytes": 447,
+      "sha256": "b18da12b0c72fd4fba9dbe9aef6031a3c74ed647f07d34027a109b1a2919f95f"
+    },
+    {
+      "path": "cross-original.f32",
+      "bytes": 16777216,
+      "sha256": "f52b1f229d8a1dfa37004a241da4fd8439eaac2f3dda8482692eefe6916997d1"
+    },
+    {
+      "path": "cross_q_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "ed63444a6d84473bab36890db69494d11b7d14813ec6c8161188686fa0b8c06e"
+    },
+    {
+      "path": "fetch-receipt.json",
+      "bytes": 1985,
+      "sha256": "f3456728d371a4ee7f3d6fdb9227d2b8f3092e2ba95b4e0cd666efc0780e5b37"
+    },
+    {
+      "path": "fetch.log",
+      "bytes": 205,
+      "sha256": "b87568b437682586230d88f1b156e3551e2fc074e2e595fd90e66d47fa01910e"
+    },
+    {
+      "path": "fetch.py",
+      "bytes": 4014,
+      "sha256": "b6fa3f22eb69dbd5074e0909208ae58eb9aeae698d392eac88ab7238d01ce391"
+    },
+    {
+      "path": "native-cross-projection.npy",
+      "bytes": 16512,
+      "sha256": "440a0424f40f31eeaf0f7acf5bc274d7d49b1a27a04e6c7fd6db76f192c985f7"
+    },
+    {
+      "path": "native-cross-rotary.npy",
+      "bytes": 16512,
+      "sha256": "7494d1a5a13c14f59343817e4cde9a292f760bb8e5d7863565f1733087935ac2"
+    },
+    {
+      "path": "native-execution.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "native-library-closure.log",
+      "bytes": 703,
+      "sha256": "86eae4c69255796b5e39ecbbd5893a88d2974397b2ff2b7f760eb94ce6b76d12"
+    },
+    {
+      "path": "native-self-projection.npy",
+      "bytes": 16512,
+      "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+    },
+    {
+      "path": "native-self-rotary.npy",
+      "bytes": 16512,
+      "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+    },
+    {
+      "path": "native-t1.f32",
+      "bytes": 262144,
+      "sha256": "a89252d0eb2b6903eb033ec2eb1ab930fabe561e50036dfb3a0825fa27e54bac"
+    },
+    {
+      "path": "native-t4.f32",
+      "bytes": 262144,
+      "sha256": "a89252d0eb2b6903eb033ec2eb1ab930fabe561e50036dfb3a0825fa27e54bac"
+    },
+    {
+      "path": "original-cross-projection.npy",
+      "bytes": 16512,
+      "sha256": "2b036cd16aecdd2bff3e20ae89baccdc50e4e8d5fd93891bab585e97f8a156ea"
+    },
+    {
+      "path": "original-cross-rotary.npy",
+      "bytes": 16512,
+      "sha256": "d1d39644fd8bdfdf843e761807b321afb6990201042e1c927fe5407f52faaf00"
+    },
+    {
+      "path": "original-self-projection.npy",
+      "bytes": 16512,
+      "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+    },
+    {
+      "path": "original-self-rotary.npy",
+      "bytes": 16512,
+      "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+    },
+    {
+      "path": "owned-inputs.f32",
+      "bytes": 131072,
+      "sha256": "844cdd2b1dfe994bb7d662db95845d033e05d99bfc5ebad1689e522c5b8b09b2"
+    },
+    {
+      "path": "replay.py",
+      "bytes": 11228,
+      "sha256": "a26c2a11f82e47d0b7ca31e148b15a926e9d6c85bf67a5e1799800a46ed00aa1"
+    },
+    {
+      "path": "self-original.f32",
+      "bytes": 16777216,
+      "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+    },
+    {
+      "path": "self_q_proj.native.f32",
+      "bytes": 16777216,
+      "sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575"
+    }
+  ],
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261014-decoder-boundaries/complete-owned-query.zip",
+    "bytes": 65258290,
+    "sha256": "2895afedee72ccae36f1b81ea06408ddf5de70cdd7a1900d852fa8e6a30bdf90",
+    "payloads": 43,
+    "anonymous_verified": true,
+    "revision": "ae150c8ebb57a3474371b493e2a0aae6b1ae2b1c"
+  },
+  "independent_audit": {
+    "independent_recalculation_pass": true,
+    "scope": "Bounded CPU block-zero self/cross Q projections and source-RoPE-off rotary on owned step978 pre-norm outputs. Cross Q is checked against full hosted snapshots; no hosted self Q snapshot exists. No full-model, speech, Q4, GPU or speed acceptance.",
+    "verified_payloads": 27,
+    "recalculated_same_input_rows": 8,
+    "total_rows": 14,
+    "negative_controls": 16,
+    "native_repeats_and_threads_exact": true
+  }
+}

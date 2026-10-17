@@ -1,0 +1,113 @@
+{
+  "source": "acb956c74c04083e6ae4915d664ed7082b529da5",
+  "public_revision": "36d27f2a0938283321e088e360da1cb6e5daee26",
+  "prefix": "dia-20261016-original-cuda/f16-defaults-v2",
+  "payloads_verified": 81,
+  "public_files_full_anonymous_hash_verified": 82,
+  "original_dia_source_files_verified": 7,
+  "recognition_cells": 7,
+  "controls_wer_zero": true,
+  "gpu": "Tesla T4",
+  "capability": [
+    7,
+    5
+  ],
+  "torch": "2.11.0+cu128",
+  "cuda": "12.8",
+  "results": {
+    "legacy": {
+      "samples": 517120,
+      "rms": 0.00014440477487098554,
+      "cuda_peak_allocated": 5757486592,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "dd3f9f12e1303b85a11495f808cf9f291b1c2ae901daed463b60d6778afd6737",
+      "lag512_relative_l2": 3.389403744126443e-05,
+      "lag512_max_abs": 4.912726581096649e-08
+    },
+    "hello-42": {
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 4932690432,
+      "seed": 42,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f",
+      "lag512_relative_l2": 4.483201904360704e-05,
+      "lag512_max_abs": 4.284083843231201e-08
+    },
+    "hello-123": {
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 4928316416,
+      "seed": 123,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc",
+      "lag512_relative_l2": 4.2944640688770125e-05,
+      "lag512_max_abs": 4.423782229423523e-08
+    },
+    "fox-42": {
+      "samples": 524288,
+      "rms": 0.09770538715311772,
+      "cuda_peak_allocated": 5930783232,
+      "seed": 42,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "67ac2f3af3513b0b9ca277304ed9ab56f8366f6a7e99159a73d3a17804476112",
+      "lag512_relative_l2": 1.355129881071191,
+      "lag512_max_abs": 1.5466399192810059
+    },
+    "fox-123": {
+      "samples": 357376,
+      "rms": 0.0871937551802259,
+      "cuda_peak_allocated": 4844111360,
+      "seed": 123,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "fd639cff6b489d10fbe2b2bc5aa2c9f7c9eb0495105183446bdf0fd2088950c4",
+      "lag512_relative_l2": 1.407974165852946,
+      "lag512_max_abs": 1.2671517431735992
+    }
+  },
+  "all_wer_zero": false,
+  "speech_acceptance": false,
+  "native_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false,
+  "scope": "Retained payload/source/control/PCM/WAV/raw-ASR audit; no model weights reread, no GPU inference replay or cross-version ffmpeg byte replay",
+  "audit_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "5cafb56f8d373a1dd41df6794c1455d0468326d0",
+    "parent_revision": "36d27f2a0938283321e088e360da1cb6e5daee26",
+    "raw_revision": "36d27f2a0938283321e088e360da1cb6e5daee26",
+    "files": [
+      {
+        "path": "dia-20261016-original-cuda/f16-defaults-v2-audit-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5cafb56f8d373a1dd41df6794c1455d0468326d0/dia-20261016-original-cuda/f16-defaults-v2-audit-v1/proof.zip",
+        "bytes": 7318021,
+        "sha256": "94549cdb6167a79f61866ec3b8d3bb25a68c07daeb42a9e108bf61e1c64ea9ea",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-original-cuda/f16-defaults-v2-audit-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/5cafb56f8d373a1dd41df6794c1455d0468326d0/dia-20261016-original-cuda/f16-defaults-v2-audit-v1/README.md",
+        "bytes": 3136,
+        "sha256": "37dc4b250fb4d3aaaca54000b5b3ccc113279ac5d4ee1d6da5921651aeb69833",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  },
+  "terminal_status": "ERROR at final speech-quality assertion after complete experiment and publication",
+  "interpretation": {
+    "passing_cases": 2,
+    "total_cases": 5,
+    "recipe": "Original README F16, F32 norms, temperature 1.3, top-k 35, top-p 0.95, CFG 3; untouched original generate and DAC",
+    "causal_attribution": false,
+    "confounds": "CPU comparison also changes precision, Torch version, device and sampling recipe; isolate these before assigning a cause.",
+    "next_hypothesis": "Quiet clips are almost periodic at the DAC 512-sample hop. Capture raw delayed codes, post-delay RVQ inputs and codec latents with OFF/ON/OFF identity controls to test code/latent collapse. Periodicity alone does not establish its cause.",
+    "parameter_schema": "343 original named parameters: 263 F16 and 80 F32 norm parameters. Verified against the actual original constructor on meta; converted GGUF tensor count is a different schema."
+  }
+}

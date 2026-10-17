@@ -1,0 +1,135 @@
+{
+  "status": "FIRST_ATTEMPT_FAILED_REPAIR_DISPATCHED",
+  "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+  "branch": "diag/echo-9b-owned-ffn-20261017",
+  "heavy_run": 39001786227,
+  "lint_run": 39001788270,
+  "local_checks": [
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v1.log",
+      "bytes": 6363,
+      "sha256": "8316182dcb876c61cf8a8d523fd903560fd6d083efd4adc46e60dd19f7900a3f"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v2.log",
+      "bytes": 611,
+      "sha256": "d68a844f9e6efc9001659be6cf98963b2fd214c6a141b4af1fd4ea5fd450ff86"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v3-final.log",
+      "bytes": 610,
+      "sha256": "4237eff2a2d7072e87e173c4e871b5b53b9c907b83de0d76e6f106ff2f64bfae"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/secrets-final.log",
+      "bytes": 509,
+      "sha256": "f58cbc7162718294b4ae3a21a0ac92a78935a69215db0d96bc74cbf1addfeb2e"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-torch26-v1.log",
+      "bytes": 610,
+      "sha256": "83cea24f26e31dbd3daad822a639b89a1143e1750c9a56c7f1db2e39ed256849"
+    },
+    {
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/repair-local-v2/actual-controls-v2.log",
+      "bytes": 725,
+      "sha256": "d25e69984f6a348c7f9bcf071a198f6d296a6ac79d29dff13e8f668f5504bd11"
+    }
+  ],
+  "local_environment": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.6.0 extracted released wheel; shared environment unchanged"
+  },
+  "local_results": {
+    "final_actual_mlp_controls": "5/5 PASS",
+    "secret_guard": "4/4 PASS, none skipped",
+    "earliest_attempt": "Rejected shared Transformers 5.13.0.dev0, as intended by pinned-source guard",
+    "torch26_actual_mlp_controls": "5/5 PASS on Python 3.12, Torch 2.6.0+cpu and isolated released Transformers 5.6.0; existing safetensors 0.7.0, hosted pins 0.6.2"
+  },
+  "hosted_packages": "torch==2.6.0 numpy==1.26.4 transformers==5.6.0 safetensors==0.6.2 gguf==0.18.0 soundfile==0.13.1 huggingface_hub==1.10.1",
+  "scope": "Existing failed plain calibrated Q4 decoder; same-native-input prefill FFN attribution on JFK and ZH, actual original MLP one layer at a time; no full original decoder instantiated",
+  "public_checkpoint_prefix": "index-echo-9b/owned-ffn-20261017/v1",
+  "speech_acceptance": false,
+  "q4_acceptance": false,
+  "gpu_acceptance": false,
+  "performance_acceptance": false,
+  "production_defaults_changed": false,
+  "local_static_checks": {
+    "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "tools/check-workflow-run-blocks.py"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-workflow-run-blocks.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-release-portable-cpu.py"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-release-portable-cpu.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-doc-anchors.py"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-doc-anchors.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-chat-binding-coverage.py"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-chat-binding-coverage.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-kaggle-harness-sync.py"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-kaggle-harness-sync.log"
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/sync-version.py",
+          "--check"
+        ],
+        "exit": 0,
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/sync-version.log"
+      }
+    ]
+  },
+  "attempts": [
+    {
+      "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+      "heavy_run": 39001786227,
+      "conclusion": "failure",
+      "failure": "First OFF arm did not enable block observer; llm_block_0 absent",
+      "lint_run": 39001788270,
+      "lint_result": "10/10 PASS",
+      "failed_evidence_receipt": "index-echo-owned-ffn-failed-2026-10-17.json",
+      "complete_model_attribution": false
+    },
+    {
+      "source": "c2deea373f9bd27f526f873bc01cb97068e1bff7",
+      "branch": "diag/echo-9b-owned-ffn-repair-20261017",
+      "heavy_run": 39008086579,
+      "lint_run": 39008088033,
+      "status": "dispatched",
+      "public_checkpoint_prefix": "index-echo-9b/owned-ffn-20261017/v2",
+      "repair": "Block observer stays enabled in every arm; only FFN capture toggles. Runtime math and all acceptance gates unchanged",
+      "local_torch26_controls": "6/6 PASS",
+      "secret_guard": "4/4 PASS, none skipped"
+    }
+  ],
+  "source_integration": "Worker967a62e0 and observer repairc2deea37 integrated on main with source bytes and authorship preserved; full model result remains pending"
+}

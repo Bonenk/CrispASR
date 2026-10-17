@@ -388,6 +388,8 @@ CRISPASR_SESSION_API int crispasr_registry_default_bundle_artifact_abi(const cha
                                                                        int32_t url_cap, char* out_size,
                                                                        int32_t size_cap);
 CRISPASR_SESSION_API int crispasr_session_result_n_segments(crispasr_session_result* r);
+// Result text is valid UTF-8. Malformed decoded bytes are replaced with U+FFFD
+// after token assembly; valid text, word counts, timings and confidence survive.
 CRISPASR_SESSION_API const char* crispasr_session_result_segment_text(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int64_t crispasr_session_result_segment_t0(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int64_t crispasr_session_result_segment_t1(crispasr_session_result* r, int i);

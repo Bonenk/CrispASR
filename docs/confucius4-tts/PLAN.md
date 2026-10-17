@@ -57,7 +57,7 @@ Fully native `--voice` roundtrip on CUDA: **8/8, transcript verbatim, 183.2 s
 vs 685.2 s CPU control = 3.74×** — with zero code changes (the all-gallocr
 single-backend graphs ran as-is). GPU+persist 185.7 s (neutral → persist
 stays gated everywhere). Kernel: `${KAGGLE_ACCOUNT}/crispasr-confucius4-gpu-verify`.
-GPU-effort doc: `/mnt/volume1/conf4gpu.md`.
+GPU-effort doc: `${CRISPASR_WORKTREES}/conf4gpu.md`.
 
 **Open (perf, optional):** CFG cond+uncond fusion in one DiT pass
 (seq-concat + block-diagonal mask — now the biggest CUDA lever); bucketed-Lk

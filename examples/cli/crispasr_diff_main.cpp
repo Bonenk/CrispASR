@@ -34,6 +34,8 @@
 #include <cmath>
 
 #include "crispasr_diff.h"
+#include "crispasr_dia_diff.h"
+#include "core/backend_validation.h"
 #include "gguf.h"
 
 #include "voxtral.h"
@@ -956,8 +958,9 @@ static StageResult moonshine_encoder_r(moonshine_context* ctx, const float* samp
 } // namespace
 
 
-static void print_row(const char* name, const crispasr_diff::Report& r, float cos_threshold, const char* extra = "") {
-    const char* tag = r.found ? (r.is_pass(cos_threshold) ? "[PASS]" : "[FAIL]") : "[SKIP]";
+static void print_row(const char* name, const crispasr_diff::Report& r, float cos_threshold, const char* extra = "",
+                      bool additional_pass = true) {
+    const char* tag = r.found ? ((r.is_pass(cos_threshold) && additional_pass) ? "[PASS]" : "[FAIL]") : "[SKIP]";
     std::string shape_str = "[";
     for (size_t i = 0; i < r.shape.size(); i++) {
         shape_str += std::to_string(r.shape[i]);
@@ -980,7 +983,7 @@ static void print_row(const char* name, const crispasr_diff::Report& r, float co
     // Where the worst row is, and whether it is a near-silent (tiny-norm) row
     // whose cosine is ill-conditioned or a real divergence. FAIL rows only, so
     // passing output keeps its format.
-    if (!r.is_pass(cos_threshold) && r.cos_min_row >= 0)
+    if ((!r.is_pass(cos_threshold) || !additional_pass) && r.cos_min_row >= 0)
         printf("       worst row %lld of %lld: |cpp|=%.4g |ref|=%.4g\n", (long long)r.cos_min_row, (long long)r.n_rows,
                r.cos_min_norm_cpp, r.cos_min_norm_ref);
 }
@@ -1394,6 +1397,81 @@ static void put_i(const std::string& dir, const char* name, const int32_t* d, st
     fflush(stdout);
 }
 
+const int k_n_cb = 16;
+const int k_cb0_logits = 2052;
+const int k_max_prompt = 1024;
+const int k_guided_frames = 24;
+
+const char* const SYN = "The quick brown fox jumps over the lazy dog.";
+const char* const REF = "And so my fellow Americans, ask not what your country can do for you, "
+                        "ask what you can do for your country.";
+// The fixture is ref_edit_tata's POSITIVE branch, which wraps an
+// instruction in <ins_bos>/<ins_eos> before the target text — its segment 2
+// literally contains ids 262156 and 262157. Omitting this makes
+// prompt_input_ids unmatchable regardless of tokenizer quality, which is
+// how run 1 reported L=208 vs 185 and sent the blame to the tokenizer
+// alone.
+const char* const INSTR = "Speak clearly and naturally.";
+
+// One request shape of the guided matrix. The names are the fixture
+// subdirectories tools/kaggle/breeze-refdump writes under guided/.
+struct GuidedCase {
+    const char* name;
+    bool ref;
+    bool ins;
+    float scale;
+};
+
+// Ordered so the branch count changes between neighbours: the caches of a
+// two-branch run must not leak into the one-branch run after it.
+const GuidedCase k_guided_cases[] = {
+    {"plain", false, false, 1.0f},    {"design-s4", false, true, 4.0f}, {"design-s1", false, true, 1.0f},
+    {"design-s0", false, true, 0.0f}, {"clone", true, false, 1.0f},     {"direct-s4", true, true, 4.0f},
+    {"direct-s1", true, true, 1.0f},  {"direct-s0", true, true, 0.0f},
+};
+
+// Greedy codes of one case at `scale`, row-major [n_frames * 16]; empty on
+// failure.
+static std::vector<int32_t> guided_codes(breeze_tts_2_context* ctx, const GuidedCase& gc, float scale,
+                                         const Npy& ref_codes, float* cb0_logits) {
+    std::vector<int32_t> codes((size_t)k_guided_frames * k_n_cb, 0);
+    const int nf = breeze_tts_2_run_generate_codes_guided(
+        ctx, SYN, gc.ins ? INSTR : nullptr, scale, gc.ref ? REF : nullptr, gc.ref ? ref_codes.i.data() : nullptr,
+        gc.ref ? (int)ref_codes.shape[0] : 0, codes.data(), k_guided_frames, cb0_logits);
+    codes.resize((size_t)std::max(nf, 0) * k_n_cb);
+    return codes;
+}
+
+static void put_prompt_ids(breeze_tts_2_context* ctx, const std::string& dir, const char* name, const GuidedCase& gc,
+                           bool with_ins, int ref_frames) {
+    std::vector<int32_t> ids(k_max_prompt);
+    const int L = breeze_tts_2_run_prompt_dump(ctx, SYN, gc.ref ? REF : nullptr, gc.ref ? ref_frames : 0,
+                                               with_ins ? INSTR : nullptr, ids.data(), nullptr, nullptr, k_max_prompt,
+                                               0, nullptr);
+    if (L > 0 && L <= k_max_prompt)
+        put_i(dir, name, ids.data(), {L});
+}
+
+// Run one case and write its stages under <out_dir>/guided/<name>/.
+static std::vector<int32_t> guided_dump_case(breeze_tts_2_context* ctx, const GuidedCase& gc, const Npy& ref_codes,
+                                             const std::string& out_dir) {
+    const std::string dir = out_dir + "/guided/" + gc.name;
+    std::filesystem::create_directories(dir);
+    printf("bt2-tts-guided: case %s\n", gc.name);
+    std::vector<float> logits(k_cb0_logits);
+    const std::vector<int32_t> codes = guided_codes(ctx, gc, gc.scale, ref_codes, logits.data());
+    if (codes.empty()) {
+        fprintf(stderr, "bt2-tts-guided: %s produced no frames\n", gc.name);
+        return codes;
+    }
+    put_i(dir, "codes", codes.data(), {(int64_t)codes.size() / k_n_cb, k_n_cb});
+    put_f(dir, "backbone_logits_frame0", logits.data(), {k_cb0_logits});
+    put_prompt_ids(ctx, dir, "prompt_input_ids", gc, gc.ins, (int)ref_codes.shape[0]);
+    if (gc.ins && gc.scale != 1.0f)
+        put_prompt_ids(ctx, dir, "neg_prompt_input_ids", gc, false, (int)ref_codes.shape[0]);
+    return codes;
+}
+
 } // namespace bt2diff
 
 static int bt2_tts_dump(const std::string& model_path, const std::string& fixture_dir, const std::string& out_dir) {
@@ -1486,17 +1564,7 @@ static int bt2_tts_dump(const std::string& model_path, const std::string& fixtur
         return 1;
     }
 
-    const int n_cb = 16, d_te = 1152, d_bb = 2048, v_dd = 2051, n_bb_layers = 28;
-    const char* SYN = "The quick brown fox jumps over the lazy dog.";
-    const char* REF = "And so my fellow Americans, ask not what your country can do for you, "
-                      "ask what you can do for your country.";
-    // The fixture is ref_edit_tata's POSITIVE branch, which wraps an
-    // instruction in <ins_bos>/<ins_eos> before the target text — its segment 2
-    // literally contains ids 262156 and 262157. Omitting this makes
-    // prompt_input_ids unmatchable regardless of tokenizer quality, which is
-    // how run 1 reported L=208 vs 185 and sent the blame to the tokenizer
-    // alone.
-    const char* INSTR = "Speak clearly and naturally.";
+    const int n_cb = k_n_cb, d_te = 1152, d_bb = 2048, v_dd = 2051, n_bb_layers = 28;
 
     // ---- STAGE 1 — prompt ids (our tokenizer vs the oracle's) ---------------
     {
@@ -1525,7 +1593,25 @@ static int bt2_tts_dump(const std::string& model_path, const std::string& fixtur
                 continue;
             const int seg_len = pos - start;
             std::vector<float> h((size_t)seg_len * d_te);
-            if (breeze_tts_2_run_text_encoder_dump(ctx, &f_ids.i[start], seg_len, h.data(), nullptr, 0) == seg_len) {
+            // The pinned oracle includes embedding + all 26 TE layers.
+            // Keep every boundary so the first numerical divergence is visible.
+            const int n_te_slots = 27;
+            std::vector<std::vector<float>> layers(n_te_slots, std::vector<float>((size_t)seg_len * d_te));
+            std::vector<float*> layer_ptrs(n_te_slots);
+            for (int j = 0; j < n_te_slots; ++j)
+                layer_ptrs[j] = layers[j].data();
+            if (breeze_tts_2_run_text_encoder_dump(ctx, &f_ids.i[start], seg_len, h.data(), layer_ptrs.data(),
+                                                   n_te_slots) == seg_len) {
+                for (int j = 0; j < n_te_slots; ++j) {
+                    char layer_name[48];
+                    std::snprintf(layer_name, sizeof(layer_name), "te_seg%d_layer%d", k, j);
+                    // HF hidden_states ends with the normalized final state;
+                    // the native layer dump retains the pre-norm residual.
+                    put_f(out_dir, layer_name, j == n_te_slots - 1 ? h.data() : layers[j].data(), {seg_len, d_te});
+                }
+                char raw_name[48];
+                std::snprintf(raw_name, sizeof(raw_name), "te_seg%d_final_pre_norm", k);
+                put_f(out_dir, raw_name, layers.back().data(), {seg_len, d_te});
                 char nm[32];
                 std::snprintf(nm, sizeof(nm), "te_seg%d_hidden", k);
                 put_f(out_dir, nm, h.data(), {seg_len, d_te});
@@ -1617,11 +1703,78 @@ static int bt2_tts_dump(const std::string& model_path, const std::string& fixtur
     return 0;
 }
 
+// ===========================================================================
+// bt2-tts guided paths: Voice Design / Voice Direction and their controls.
+//
+// Usage:  crispasr-diff bt2-tts-guided <model.gguf> <fixture_dir> <out_dir>
+//         BREEZE_CODEC=/path/to/qwen3-tts-tokenizer-12hz.gguf
+//
+// Writes <out_dir>/guided/<case>/<stage>.npy for the Python comparator
+// (tools/reference_backends/breeze_tts_2.py --guided), which holds every case
+// to the original's greedy codes. On top of that it checks what needs no
+// reference, and exits non-zero when one fails:
+//
+//   * every case repeats exactly when the whole matrix is run a second time
+//     on the SAME context, so no branch count leaves state behind;
+//   * scale 0 is the instruction-free prompt, i.e. the plain / clone case;
+//   * two branches at a scale one ulp above 1 reproduce the one-branch run,
+//     which a stale or shared second KV slice cannot do.
+//
+// Only ref_codes is read from the fixture: the clone reference must be the
+// oracle's own codes, or the resampler and the codec enter the comparison.
+// ===========================================================================
+static int bt2_tts_guided_dump(const std::string& model_path, const std::string& fixture_dir,
+                               const std::string& out_dir) {
+    using namespace bt2diff;
+    const char* codec_env = std::getenv("BREEZE_CODEC");
+    Npy ref_codes;
+    if (!codec_env || !*codec_env || !npy_read(fixture_dir + "/ref_codes.npy", ref_codes)) {
+        fprintf(stderr, "bt2-tts-guided: set BREEZE_CODEC and provide ref_codes.npy in %s\n", fixture_dir.c_str());
+        return 1;
+    }
+    auto bp = breeze_tts_2_context_default_params();
+    bp.n_threads = 8;
+    bp.verbosity = 1;
+    bp.use_gpu = true;
+    bp.codec_path = codec_env;
+    breeze_tts_2_context* ctx = breeze_tts_2_init_from_file(model_path.c_str(), bp);
+    if (!ctx) {
+        fprintf(stderr, "bt2-tts-guided: model init failed\n");
+        return 1;
+    }
+
+    int failures = 0;
+    auto expect_same = [&](const std::string& what, const std::vector<int32_t>& a, const std::vector<int32_t>& b) {
+        const bool ok = !a.empty() && a == b;
+        printf("bt2-tts-guided: %-58s %s\n", what.c_str(), ok ? "ok" : "MISMATCH");
+        failures += ok ? 0 : 1;
+    };
+    std::map<std::string, std::vector<int32_t>> first;
+    for (const GuidedCase& gc : k_guided_cases)
+        first[gc.name] = guided_dump_case(ctx, gc, ref_codes, out_dir);
+    for (const GuidedCase& gc : k_guided_cases)
+        expect_same(std::string(gc.name) + " repeats on the reused context", first[gc.name],
+                    guided_codes(ctx, gc, gc.scale, ref_codes, nullptr));
+    expect_same("design-s0 is the plain prompt", first["design-s0"], first["plain"]);
+    expect_same("direct-s0 is the clone prompt", first["direct-s0"], first["clone"]);
+    const float near_one = std::nextafter(1.0f, 2.0f);
+    for (const GuidedCase& gc : k_guided_cases)
+        if (gc.ins && gc.scale == 1.0f)
+            expect_same(std::string(gc.name) + " equals two branches at scale 1+ulp", first[gc.name],
+                        guided_codes(ctx, gc, near_one, ref_codes, nullptr));
+
+    breeze_tts_2_free(ctx);
+    printf("bt2-tts-guided: dump complete -> %s/guided, %d self-check failure(s)\n", out_dir.c_str(), failures);
+    return failures ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
     // #333: madlad/t5 is a TEXT model — there is no audio to pass, so it is
     // dispatched before the 5-arg gate rather than made to carry a dummy path.
     if (argc >= 4) {
         const std::string b = argv[1];
+        if (b == "dia")
+            return dia_diff::run(argv[2], argv[3]);
         if (b == "madlad" || b == "t5")
             return t5_translate_diff(argv[2], argv[3], /*verbosity=*/2);
         // #412. Dispatched here because its 3rd and 4th args are a fixture
@@ -1630,6 +1783,8 @@ int main(int argc, char** argv) {
         // reference is inside the fixture).
         if ((b == "bt2-tts" || b == "breeze-tts-2") && argc >= 5)
             return bt2_tts_dump(argv[2], argv[3], argv[4]);
+        if (b == "bt2-tts-guided" && argc >= 5)
+            return bt2_tts_guided_dump(argv[2], argv[3], argv[4]);
     }
     if (argc < 5) {
         fprintf(stderr,
@@ -1642,8 +1797,9 @@ int main(int argc, char** argv) {
                 "granite-nle, parakeet, gigaam, wespeaker, chatterbox, voxcpm2-tts, "
                 "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-onnx, "
                 "moonshine-streaming, "
-                "kyutai-stt, parler-tts, moss-audio, madlad\n"
+                "kyutai-stt, parler-tts, moss-audio, madlad, dia\n"
                 "                (madlad/t5 is a text model: pass only <model.gguf> <reference.gguf>)\n"
+                "                (dia is text-only: pass <model.gguf> <reference.gguf>; optional DIA_CODEC)\n"
                 "  model.gguf    crispasr-compatible model weights\n"
                 "  reference.gguf  archive produced by tools/dump_reference.py\n"
                 "  audio.wav     16 kHz mono WAV\n",
@@ -1942,8 +2098,8 @@ int main(int argc, char** argv) {
             auto report = ref.compare(name, data, count, crispasr_diff::Ref::COS_FIRST_DIM);
             const bool frontend =
                 name == "mel_spectrogram" || name == "conv1_out" || name == "conv2_out" || name == "conv3_out";
-            const bool decoder_stage =
-                name == "llm_logits" || name == "teacherforced_logits" || name.compare(0, 10, "llm_block_") == 0;
+            const bool decoder_stage = name == "llm_logits" || name == "teacherforced_logits" ||
+                                       name.compare(0, 10, "llm_block_") == 0 || name.compare(0, 8, "llm_ffn_") == 0;
             // Decoder stages also inherit error from quantized audio inputs.
             const bool quantized = audio_quantized || (decoder_stage && decoder_quantized);
             // The guide's F16-vs-F32 range is .998-.999. Cached weak logits
@@ -1981,6 +2137,14 @@ int main(int argc, char** argv) {
         const char* old_audio = getenv("CRISP_AUDIO_DUMP_STAGES");
         const char* old_decoder = getenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
         std::string saved_audio = old_audio ? old_audio : "", saved_decoder = old_decoder ? old_decoder : "";
+        const char* old_ffn = getenv("CRISPASR_INDEX_ECHO_DUMP_FFN");
+        const std::string saved_ffn = old_ffn ? old_ffn : "";
+        for (int i = 0; i < index_echo_decoder_layers(ctx.get()); ++i) {
+            if (ref.has("llm_ffn_" + std::to_string(i) + "_mlp_in")) {
+                setenv("CRISPASR_INDEX_ECHO_DUMP_FFN", "1", 1);
+                break;
+            }
+        }
         setenv("CRISP_AUDIO_DUMP_STAGES", directory, 1);
         setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", directory, 1);
         int mels = 0, frames = 0, rows = 0, dim = 0, vocab = 0;
@@ -2042,6 +2206,13 @@ int main(int argc, char** argv) {
             std::string name = "llm_block_" + std::to_string(i);
             const float* data = index_echo_stage(ctx.get(), name.c_str(), &count);
             check(name, data, data ? count : 0);
+            for (const char* suffix : {"mlp_in", "gate_out", "up_out", "down_in", "down_out", "mlp_out"}) {
+                const std::string ffn_name = "llm_ffn_" + std::to_string(i) + "_" + suffix;
+                if (ref.has(ffn_name)) {
+                    data = index_echo_stage(ctx.get(), ffn_name.c_str(), &count);
+                    check(ffn_name, data, data ? count : 0);
+                }
+            }
         }
         if (ref.has("teacherforced_logits") && logits) {
             auto generated = ref.get_f32("generated_ids");
@@ -2087,6 +2258,10 @@ int main(int argc, char** argv) {
             setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", saved_decoder.c_str(), 1);
         else
             unsetenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
+        if (old_ffn)
+            setenv("CRISPASR_INDEX_ECHO_DUMP_FFN", saved_ffn.c_str(), 1);
+        else
+            unsetenv("CRISPASR_INDEX_ECHO_DUMP_FFN");
         std::filesystem::remove_all(directory);
     } else if (backend_name == "voxtral") {
         auto cp = voxtral_context_default_params();
@@ -6534,6 +6709,19 @@ int main(int argc, char** argv) {
         mp.model_path = model_path.c_str();
         mp.tokenizer_path = nullptr;
         mp.n_threads = 4;
+        const core_backend_validation::Request required(std::getenv("CRISPASR_MOONSHINE_REQUIRE_BACKEND"),
+                                                        std::getenv("CRISPASR_MOONSHINE_REQUIRE_DEVICE"));
+        mp.use_gpu = required.active() && !required.cpu();
+        auto input = ref.get_f32("raw_audio");
+        if (!input.first || input.second != samples.size() ||
+            !std::equal(samples.begin(), samples.end(), input.first)) {
+            fprintf(stderr, "moonshine: reference input PCM differs; refusing stage comparison\n");
+            return 4;
+        }
+        if (!ref.get_f32("encoder_output").first) {
+            fprintf(stderr, "moonshine: required encoder reference missing or empty; refusing stage comparison\n");
+            return 4;
+        }
         moonshine_context* ctx = moonshine_init_with_params(mp);
         if (!ctx) {
             fprintf(stderr, "failed to load moonshine model '%s'\n", model_path.c_str());
@@ -6542,9 +6730,43 @@ int main(int argc, char** argv) {
 
         auto enc_r = moonshine_encoder_r(ctx, samples.data(), (int)samples.size());
         if (enc_r.ok) {
-            auto rep = ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size());
-            print_row("encoder_output", rep, COS_THRESHOLD);
-            record(rep);
+            auto rep =
+                ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size(), crispasr_diff::Ref::COS_FIRST_DIM);
+            auto expected = ref.get_f32("encoder_output");
+            const auto expected_shape = ref.shape("encoder_output");
+            bool magnitude_ok = expected.first && expected.second == enc_r.data.size() &&
+                                expected_shape == std::vector<int64_t>{enc_r.shape[1], enc_r.shape[0]};
+            double max_row_norm_error = 0.0, squared_error = 0.0, squared_reference = 0.0;
+            if (magnitude_ok) {
+                const size_t dim = (size_t)enc_r.shape[1];
+                for (size_t row = 0; row < enc_r.data.size() / dim; ++row) {
+                    double mine = 0.0, original = 0.0;
+                    for (size_t col = 0; col < dim; ++col) {
+                        const size_t i = row * dim + col;
+                        const double a = enc_r.data[i], b = expected.first[i];
+                        mine += a * a;
+                        original += b * b;
+                        squared_error += (a - b) * (a - b);
+                    }
+                    squared_reference += original;
+                    if (!(mine > 0.0) || !(original > 0.0))
+                        magnitude_ok = false;
+                    else
+                        max_row_norm_error = std::max(max_row_norm_error, std::abs(std::sqrt(mine / original) - 1.0));
+                }
+            }
+            const double relative_l2 =
+                squared_reference > 0.0 ? std::sqrt(squared_error / squared_reference) : INFINITY;
+            magnitude_ok = magnitude_ok && std::isfinite(max_row_norm_error) && std::isfinite(relative_l2) &&
+                           max_row_norm_error <= .01 && relative_l2 <= .01;
+            char detail[256];
+            std::snprintf(detail, sizeof(detail), "|mine|/|ref|=%.9g row_norm_error=%.9g relative_l2=%.9g magnitude=%s",
+                          rep.norm_ratio, max_row_norm_error, relative_l2, magnitude_ok ? "PASS" : "FAIL");
+            print_row("encoder_output", rep, COS_THRESHOLD, detail, magnitude_ok);
+            if (magnitude_ok)
+                record(rep);
+            else
+                n_fail++;
         } else {
             printf("[ERR ] encoder_output          %s\n", enc_r.note.c_str());
             n_fail++;
@@ -9320,27 +9542,53 @@ int main(int argc, char** argv) {
             printf("transcript: %s\n", r->text);
         }
 
-        // Compare encoder_output if present in ref
-        if (ref.has("encoder_output")) {
-            int n_mels = 0, T_mel = 0;
-            float* mel = nemotron_compute_mel(ctx, samples.data(), (int)samples.size(), &n_mels, &T_mel);
-            if (mel) {
+        int n_mels = 0, T_mel = 0;
+        float* mel = nemotron_compute_mel(ctx, samples.data(), (int)samples.size(), &n_mels, &T_mel);
+        auto compare_stage = [&](const char* name, const float* data, int width, int rows) {
+            if (ref.shape(name) != std::vector<int64_t>{width, rows}) {
+                printf("[ERR ] %-24s native/reference shape mismatch\n", name);
+                n_fail++;
+                return;
+            }
+            auto rep = ref.compare(name, data, (size_t)width * rows);
+            print_row(name, rep, COS_THRESHOLD);
+            record(rep);
+        };
+        if (mel) {
+            if (ref.has("mel_spectrogram")) {
+                // NeMo stores [n_mels, T_mel]; native input is [T_mel, n_mels].
+                std::vector<float> frequency_major((size_t)n_mels * T_mel);
+                for (int m = 0; m < n_mels; ++m)
+                    for (int t = 0; t < T_mel; ++t)
+                        frequency_major[(size_t)m * T_mel + t] = mel[(size_t)t * n_mels + m];
+                compare_stage("mel_spectrogram", frequency_major.data(), T_mel, n_mels);
+            }
+            if (ref.has("pre_encode_output")) {
                 int T_enc = 0, d_model = 0;
-                float* enc = nemotron_run_encoder_ext(ctx, mel, n_mels, T_mel, &T_enc, &d_model);
-                free(mel);
-                if (enc) {
-                    auto rep = ref.compare("encoder_output", enc, (size_t)T_enc * d_model);
-                    print_row("encoder_output", rep, COS_THRESHOLD);
-                    record(rep);
-                    free(enc);
+                float* pre = nemotron_run_preencode_ext(ctx, mel, n_mels, T_mel, &T_enc, &d_model);
+                if (pre) {
+                    compare_stage("pre_encode_output", pre, d_model, T_enc);
+                    free(pre);
                 } else {
-                    printf("[ERR ] encoder_output          nemotron_run_encoder_ext returned null\n");
+                    printf("[ERR ] pre_encode_output        nemotron_run_preencode_ext returned null\n");
                     n_fail++;
                 }
-            } else {
-                printf("[ERR ] encoder_output          nemotron_compute_mel returned null\n");
-                n_fail++;
             }
+            if (ref.has("encoder_output")) {
+                int T_enc = 0, d_model = 0;
+                float* enc = nemotron_run_encoder_ext(ctx, mel, n_mels, T_mel, &T_enc, &d_model);
+                if (enc) {
+                    compare_stage("encoder_output", enc, d_model, T_enc);
+                    free(enc);
+                } else {
+                    printf("[ERR ] encoder_output           nemotron_run_encoder_ext returned null\n");
+                    n_fail++;
+                }
+            }
+            free(mel);
+        } else {
+            printf("[ERR ] frontend                 nemotron_compute_mel returned null\n");
+            n_fail++;
         }
 
         nemotron_result_free(r);

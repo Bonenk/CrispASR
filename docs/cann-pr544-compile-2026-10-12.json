@@ -1,0 +1,95 @@
+{
+  "date": "2026-10-12",
+  "pr": 544,
+  "head": "4149be6261b599a1a4e64fdc1d1e13e14454d801",
+  "compiled_source": "76017342e3bd56c891fa0c79e88843e094d3e43d",
+  "production_files_and_compile_job_byte_identical": true,
+  "run": 38252679792,
+  "completed_x86_job": 114826508116,
+  "x86_64_910b": {
+    "conclusion": "success",
+    "soc_type": "ascend910b",
+    "use_acl_graph": "on",
+    "image": "swr.cn-south-1.myhuaweicloud.com/ascendhub/cann:9.2.0-beta.2-910b-openeuler24.03-py3.12",
+    "image_digest": "sha256:0c8097e72727bfcc2f761b11abdceb9a1a54f6b1061341c7d3a78dbcee2dba3a",
+    "compiled_targets": [
+      "ggml-cann",
+      "crispasr-cli",
+      "crispasr-lib",
+      "crispasr-diff",
+      "crispasr-quantize"
+    ],
+    "log_bytes": 679188,
+    "log_sha256": "96a8844b0bd4de7945c464f5d6725840b2d32a2b046c4170da50ddfba5298a35"
+  },
+  "arm64_310p": {
+    "status": "superseded_while_queued",
+    "job": 114865630227,
+    "soc_type": "ascend310p",
+    "use_acl_graph": "off"
+  },
+  "source_routing_controls": {
+    "pass": 10,
+    "previous_helper_failures": 4,
+    "actual_npu_inference": false
+  },
+  "physical_ascend_validation": false,
+  "performance_claim": false,
+  "refreshed_source_validation": {
+    "source": "4149be6261b599a1a4e64fdc1d1e13e14454d801",
+    "validation_commit": "03e605b64447228a193cb72a9565a54ee60baf70",
+    "run": 38266299769,
+    "changed_files": [
+      ".github/workflows/ci.yml"
+    ],
+    "compile_job_definition_equal": true,
+    "jobs": [
+      {
+        "id": 114869220977,
+        "architecture": "arm64",
+        "chip": "310p",
+        "acl_graph": "off",
+        "status": "completed",
+        "conclusion": "success",
+        "log_bytes": 992014,
+        "log_sha256": "41ecf99c968ffa89fbf74a9e8290f89feeeec7207217baeeb110aef4a7027549",
+        "compiled_targets": [
+          "ggml-cann",
+          "crispasr-cli",
+          "crispasr-lib",
+          "crispasr-diff",
+          "crispasr-quantize"
+        ],
+        "image_digests": [
+          "sha256:c2c20af86d7737ebf2373ebe0bf226edae80896e6de943d82fb50ccd08252a86"
+        ]
+      },
+      {
+        "id": 114869221253,
+        "architecture": "x86_64",
+        "chip": "910b",
+        "acl_graph": "on",
+        "status": "completed",
+        "conclusion": "success",
+        "log_bytes": 962729,
+        "log_sha256": "a1d28ff181867015a1ed5bf527db443e17d6896307e88baea777a2a5cdda3a38",
+        "compiled_targets": [
+          "ggml-cann",
+          "crispasr-cli",
+          "crispasr-lib",
+          "crispasr-diff",
+          "crispasr-quantize"
+        ],
+        "image_digests": [
+          "sha256:0c8097e72727bfcc2f761b11abdceb9a1a54f6b1061341c7d3a78dbcee2dba3a"
+        ]
+      }
+    ],
+    "secret_checks": {
+      "passed": 4,
+      "skips": 0,
+      "seconds": 51.2
+    },
+    "conclusion": "success"
+  }
+}

@@ -1,0 +1,480 @@
+{
+  "candidate_source": "168384d47ba462ae72858042ffc13188b143cca1",
+  "candidate_branch": "diag/cann-model-validator-20261014",
+  "flag_controls": {
+    "passed": true,
+    "runs": [
+      {
+        "label": "cpu-false",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cpu-false"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "cpu-true",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cpu-true",
+          "--use-gpu"
+        ],
+        "exit": 0,
+        "expected": 0,
+        "passed": true
+      },
+      {
+        "label": "cann-false",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cann-false"
+        ],
+        "exit": 1,
+        "expected": 1,
+        "passed": true
+      },
+      {
+        "label": "cann-true",
+        "command": [
+          "/opt/miniconda/bin/python3",
+          "${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014/tools/ci-heavy/cann_model_fixture.py",
+          "--native",
+          "--encoder-only",
+          "--model",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/moonshine-tiny.gguf",
+          "--lib",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/libmoonshine-probe.so",
+          "--audio",
+          "${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted/output/audio.wav",
+          "--output",
+          "/mnt/akademie_storage/crispasr/cann-model-validator-20261014/cann-true",
+          "--use-gpu"
+        ],
+        "exit": 1,
+        "expected": 1,
+        "passed": true
+      }
+    ],
+    "encoder_cpu_flags_byte_exact_to_accepted_fixture": true,
+    "scope": "Actual GPU flag forwarding and CPU encoder-only capture; shared probe omits Session/CLI. No full validator or NPU acceptance."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-validator/complete-native-gpu-flag-controls.zip",
+    "bytes": 2208646,
+    "sha256": "de8965041d6e8cf88659c75ff676b243f09581fe31adc698b7e03defdaa0a7ea",
+    "payloads": 30,
+    "revision": "8b16f924c00fc285001f12060b7a24945708d9b8",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/8b16f924c00fc285001f12060b7a24945708d9b8/cann-20261014-model-validator/complete-native-gpu-flag-controls.zip",
+    "anonymous_verified": true
+  },
+  "unit_guards": 8,
+  "full_validator_acceptance": "passed CPU command interface and unavailable-CANN controls; physical NPU acceptance remains pending",
+  "hosted_model_run": 38602252235,
+  "ci_run": 38602256898,
+  "sdk_run": 38598516003,
+  "scope": "Actual bounded public encoder GPU argument controls and safe validation wrapper scaffolding. Full CLI/C ABI runner and physical NPU acceptance are pending.",
+  "integration_commit": "8f6aaca14f36bb2ba58e090b189f8f8a10bf2d01",
+  "hosted_audit": {
+    "passed": true,
+    "source": "168384d47ba462ae72858042ffc13188b143cca1",
+    "run": 38602252235,
+    "artifact_sha256": "254a0036250ba07704e1427feab9d7f280b90060225a4a68a3e1c4cfa5a71bba",
+    "payloads": 171,
+    "all_160_original_coefficients_byte_exact": true,
+    "encoder_metrics": {
+      "cosine_min": 0.999999999852265,
+      "max_row_norm_error": 3.600500153355668e-06,
+      "relative_l2": 2.1930546468585046e-06,
+      "max_abs": 5.170702934265137e-05
+    },
+    "encoder_repeats_byte_exact": true,
+    "session_transcripts_byte_exact": true,
+    "cli_normalized_words_exact": true,
+    "negative_controls_rejected": 3,
+    "scope": "Full CPU fixture, original dumper, native encoder, crispasr-diff, CLI and C ABI auto/explicit Sessions. No NPU, quant or performance acceptance.",
+    "library_hash_scope": "Actual ELF snapshots included, fully rehashed against each receipt; this does not independently prove supplied binaries were compiled from the harness checkout.",
+    "cross_host_original_metrics": {
+      "cosine_min": 0.999999999968956,
+      "max_row_norm_error": 1.7227527253638186e-06,
+      "relative_l2": 1.1940218724077615e-06,
+      "max_abs": 2.7418136596679688e-05
+    },
+    "cross_host_original_byte_exact": false,
+    "portable_runner_arms": [
+      {
+        "arm": "portable-cpu",
+        "pass_status": true,
+        "cpu_preflight_passed": true,
+        "binary_snapshots_rehashed": 15,
+        "encoder_metrics": {
+          "cosine_min": 0.999999999852265,
+          "max_row_norm_error": 3.600500153355668e-06,
+          "relative_l2": 2.1930546468585046e-06,
+          "max_abs": 5.170702934265137e-05
+        }
+      },
+      {
+        "arm": "portable-missing-cann",
+        "pass_status": false,
+        "cpu_preflight_passed": true,
+        "binary_snapshots_rehashed": 15,
+        "encoder_metrics": {
+          "cosine_min": 0.999999999852265,
+          "max_row_norm_error": 3.600500153355668e-06,
+          "relative_l2": 2.1930546468585046e-06,
+          "max_abs": 5.170702934265137e-05
+        }
+      }
+    ],
+    "gpu_true_device_lookup_rejection_verified": true,
+    "unit_guards_executed": 8
+  },
+  "hosted_publication": {
+    "revision": "e53a3693849d07ba0d3d234f2a6b9345dd8cbbfa",
+    "files": [
+      {
+        "path": "cann-20261014-model-validator/complete-hosted-portable-validator.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e53a3693849d07ba0d3d234f2a6b9345dd8cbbfa/cann-20261014-model-validator/complete-hosted-portable-validator.zip",
+        "bytes": 350235628,
+        "sha256": "254a0036250ba07704e1427feab9d7f280b90060225a4a68a3e1c4cfa5a71bba",
+        "anonymous_verified": true
+      },
+      {
+        "path": "cann-20261014-model-validator/complete-hosted-portable-validator-audit.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e53a3693849d07ba0d3d234f2a6b9345dd8cbbfa/cann-20261014-model-validator/complete-hosted-portable-validator-audit.zip",
+        "bytes": 34743,
+        "sha256": "3b86ca79e573e34693e551f3954cae32fe49e011c85e5cc781306d6bf7978f84",
+        "anonymous_verified": true
+      }
+    ]
+  },
+  "sdk_audit": {
+    "passed": true,
+    "run": 38598516003,
+    "source": "11176e18240bb67b543f06e536f9ed4d88945901",
+    "jobs": [
+      {
+        "job_log": "0_linux-cann (ubuntu-24.04, 910b, on).txt",
+        "actual_linked_targets": [
+          {
+            "target": "libggml-cann.so",
+            "line": "2026-10-14T17:02:08.4308612Z [ 12%] Linking CXX shared library libggml-cann.so"
+          },
+          {
+            "target": "libcrispasr.so",
+            "line": "2026-10-14T17:07:59.7351992Z [ 82%] Linking CXX shared library libcrispasr.so"
+          },
+          {
+            "target": "bin/crispasr",
+            "line": "2026-10-14T17:09:55.1896726Z [100%] Linking CXX executable ../../bin/crispasr"
+          },
+          {
+            "target": "bin/crispasr-diff",
+            "line": "2026-10-14T17:10:25.4511128Z [100%] Linking CXX executable ../../bin/crispasr-diff"
+          },
+          {
+            "target": "bin/crispasr-quantize",
+            "line": "2026-10-14T17:10:32.6873216Z [100%] Linking CXX executable ../../bin/crispasr-quantize"
+          },
+          {
+            "target": "bin/test-backend-ops",
+            "line": "2026-10-14T17:11:02.2860540Z [100%] Linking CXX executable ../../bin/test-backend-ops"
+          }
+        ],
+        "bf16_routing_unit_tests": 1,
+        "rotary_capacity_cases": 4
+      },
+      {
+        "job_log": "1_linux-cann (ubuntu-24.04-arm, 310p, off).txt",
+        "actual_linked_targets": [
+          {
+            "target": "libggml-cann.so",
+            "line": "2026-10-14T16:47:57.5072726Z [ 12%] Linking CXX shared library libggml-cann.so"
+          },
+          {
+            "target": "libcrispasr.so",
+            "line": "2026-10-14T16:51:27.6498984Z [ 82%] Linking CXX shared library libcrispasr.so"
+          },
+          {
+            "target": "bin/crispasr",
+            "line": "2026-10-14T16:52:48.3869795Z [100%] Linking CXX executable ../../bin/crispasr"
+          },
+          {
+            "target": "bin/crispasr-diff",
+            "line": "2026-10-14T16:53:23.2283302Z [100%] Linking CXX executable ../../bin/crispasr-diff"
+          },
+          {
+            "target": "bin/crispasr-quantize",
+            "line": "2026-10-14T16:53:29.8542594Z [100%] Linking CXX executable ../../bin/crispasr-quantize"
+          },
+          {
+            "target": "bin/test-backend-ops",
+            "line": "2026-10-14T16:53:59.9636907Z [100%] Linking CXX executable ../../bin/test-backend-ops"
+          }
+        ],
+        "bf16_routing_unit_tests": 1,
+        "rotary_capacity_cases": 4
+      }
+    ],
+    "complete_log_zip_sha256": "1247ea770844840a8559898bc4c6ebcae51856aa4c32e8ed55d072ed8ee91891",
+    "members": [
+      {
+        "path": "0_linux-cann (ubuntu-24.04, 910b, on).txt",
+        "bytes": 681288,
+        "sha256": "05156e225ff012b257d249dd478d0dee41a28cc9968fac5b661c3b8ea940bb40"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/system.txt",
+        "bytes": 581,
+        "sha256": "e96e8a97ad7e9731714dbfb9c42fac8a79d62538184352a7f92bc8268e8ec179"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/1_Set up job.txt",
+        "bytes": 2058,
+        "sha256": "aeb27de00a7e428ca15d7f53a253ba45ddeb0e1a52b85624149b0ad4f318105b"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/2_Run actions_checkout@v6.txt",
+        "bytes": 12599,
+        "sha256": "2b7e1583e3e140605526486e07a3a68e072a881db67f71a591094cc28e07e4ea"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/3_Check chip-specific float routing.txt",
+        "bytes": 822,
+        "sha256": "0ab7d879ceccbc7e988ef56c09c172c282421a5a28ae7df14f9841e5497a8b2a"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/4_CANN rotary cache-capacity controls.txt",
+        "bytes": 1278,
+        "sha256": "83e1ad1867ea72deb9a67e773949f55a021e95bdd91d944396bedcd4360c2cc2"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/5_Free disk space.txt",
+        "bytes": 150564,
+        "sha256": "6548d56bfeffa0bf2adbe16c9410d4dd9489e4be6390ca09c1f064da86e01c75"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/6_Build.txt",
+        "bytes": 505953,
+        "sha256": "8f9104a99a99393d544ca45e5710f4f74d4a0c7df61974659511753a87d32c45"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/12_Post Run actions_checkout@v6.txt",
+        "bytes": 7974,
+        "sha256": "b77e5b4029187e523592391c16b982b9cb35d3b73809cd5ba144454a0cc4c5f7"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04, 910b, on)/13_Complete job.txt",
+        "bytes": 61,
+        "sha256": "aa702c2d398f2a9d046754a19e55dcf460d92bd9a73334afe6f0acc3927b8899"
+      },
+      {
+        "path": "1_linux-cann (ubuntu-24.04-arm, 310p, off).txt",
+        "bytes": 681207,
+        "sha256": "877bce1675a388aabf98df20783fb6e4cc74bf31d5504152fb90b2dade2021a7"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/system.txt",
+        "bytes": 743,
+        "sha256": "a23eb18babf31245d829e02403c554b347c13f40e505605f87f7d4e7292cdebc"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/1_Set up job.txt",
+        "bytes": 2086,
+        "sha256": "1608641b5c21eaad09dd3313bffb110f19fd42bdeac96e6e4df2a258d1e01acd"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/2_Run actions_checkout@v6.txt",
+        "bytes": 12599,
+        "sha256": "672b0c4940687a9ee2fe939f2c2f5e6a157bc2a276b9025f725353fbf5d395b9"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/3_Check chip-specific float routing.txt",
+        "bytes": 822,
+        "sha256": "65113771815c0f7fb1ab9000f3f31523150aaf93809fb0dd03770905d27db0df"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/4_CANN rotary cache-capacity controls.txt",
+        "bytes": 1278,
+        "sha256": "1186108a23d8043e01c660ced43b6b6cc05267f17af234cf6fc5185353aefac3"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/5_Free disk space.txt",
+        "bytes": 145734,
+        "sha256": "b52d131acc86be11ab2349352138d01feed091a941ecf20e98e8825a7c8a7f10"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/6_Build.txt",
+        "bytes": 510674,
+        "sha256": "e24f91fd55479f67c9b8cb1b8c5ce25bc7bbf17fb344127838ee02d5dfbe6516"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/12_Post Run actions_checkout@v6.txt",
+        "bytes": 7974,
+        "sha256": "bc8fa586b54a670ae8195b5759cdfc3e71cbb9ce897c92a37f0bd3ea50f550cf"
+      },
+      {
+        "path": "linux-cann (ubuntu-24.04-arm, 310p, off)/13_Complete job.txt",
+        "bytes": 61,
+        "sha256": "f345422217bb0a1bbd1400c87a34f13fc3b4c2290077396eaba8c700ba824e28"
+      }
+    ],
+    "artifact_count": 0,
+    "scope": "Both official SDK builds and all six actual target links per chip; real CPU routing/capacity controls. Requested chip/ACL settings are workflow inputs, not independently read compiler definitions. Legacy workflow did not retain CMakeCache or compilation commands. No NPU inference/ACL replay/quant/speed acceptance."
+  },
+  "sdk_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-validator/complete-strict-routing-sdk-logs.zip",
+    "bytes": 401056,
+    "sha256": "49b201145a16c7b8ff96b4366e75823d1b0de82d37462eeb94a3a4173c88b6a3",
+    "payloads": 14,
+    "revision": "1c6a10cf554a54344294c6e734d313cf93ae3b1d",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1c6a10cf554a54344294c6e734d313cf93ae3b1d/cann-20261014-model-validator/complete-strict-routing-sdk-logs.zip",
+    "anonymous_verified": true
+  },
+  "metadata_followup": {
+    "run": 38605386237,
+    "source": "230d7e490b243e1ecd47606467782e47bd254fe3",
+    "state": "success; independently audited",
+    "jobs": [
+      {
+        "chip": "310p",
+        "arch": "ARM64",
+        "compiler": {
+          "cann_translation_units": [
+            "/workspace/ggml/src/ggml-cann/acl_tensor.cpp",
+            "/workspace/ggml/src/ggml-cann/aclnn_ops.cpp",
+            "/workspace/ggml/src/ggml-cann/ggml-cann.cpp"
+          ],
+          "total_compile_commands": 566,
+          "chip_definition": "ASCEND_310P",
+          "acl_graph_definition": false
+        },
+        "cache_flags": {
+          "GGML_CANN": "ON",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "SOC_TYPE": "ascend310p",
+          "USE_ACL_GRAPH": "off"
+        },
+        "linked_targets": [
+          "libggml-cann.so",
+          "libcrispasr.so",
+          "bin/crispasr",
+          "bin/crispasr-diff",
+          "bin/crispasr-quantize",
+          "bin/test-backend-ops"
+        ],
+        "artifact": {
+          "path": "artifact-11917192488.zip",
+          "bytes": 25050,
+          "sha256": "ce272afecbb9154ff507105a120b0636a9cb85404bc81d27c0a3a63a4edb1895",
+          "payloads": [
+            {
+              "path": "CMakeCache.txt",
+              "bytes": 43902,
+              "sha256": "f8f294f9e6521e45d271c5f9c332e8eaa1aa87cc36cba0cf9c49a86a0e68a4b1"
+            },
+            {
+              "path": "compile_commands.json",
+              "bytes": 448499,
+              "sha256": "365563cc5e26462f90a71ef6963e92b899243a7db127fc8113727858b0030a22"
+            }
+          ]
+        }
+      },
+      {
+        "chip": "910b",
+        "arch": "X64",
+        "compiler": {
+          "cann_translation_units": [
+            "/workspace/ggml/src/ggml-cann/acl_tensor.cpp",
+            "/workspace/ggml/src/ggml-cann/aclnn_ops.cpp",
+            "/workspace/ggml/src/ggml-cann/ggml-cann.cpp"
+          ],
+          "total_compile_commands": 566,
+          "chip_definition": "ASCEND_910B",
+          "acl_graph_definition": true
+        },
+        "cache_flags": {
+          "GGML_CANN": "ON",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+          "SOC_TYPE": "ascend910b",
+          "USE_ACL_GRAPH": "on"
+        },
+        "linked_targets": [
+          "libggml-cann.so",
+          "libcrispasr.so",
+          "bin/crispasr",
+          "bin/crispasr-diff",
+          "bin/crispasr-quantize",
+          "bin/test-backend-ops"
+        ],
+        "artifact": {
+          "path": "artifact-11918115506.zip",
+          "bytes": 24778,
+          "sha256": "534dae0209967ac7aaf057f52c735249c62c91ba405a881bca40abafd299ba04",
+          "payloads": [
+            {
+              "path": "CMakeCache.txt",
+              "bytes": 42575,
+              "sha256": "7f4cbf31a117c196274618c295440e3c2393a2278eb4496d20e8a0fa87005015"
+            },
+            {
+              "path": "compile_commands.json",
+              "bytes": 446694,
+              "sha256": "f0f610905b9e933192cf2d07588b9286af0cf91a6bac43cf67784315cbd9b27d"
+            }
+          ]
+        }
+      }
+    ],
+    "audit_controls": {
+      "positive": 2,
+      "negative": 16,
+      "scope": "Synthetic controls only"
+    },
+    "scope": "Actual SDK compiler chip/ACL definitions and six successful links per chip, plus CPU routing/capacity controls. Metadata and complete logs only: no retained ELF bytes, NPU inference, ACL execution, quant or performance acceptance.",
+    "publication": {
+      "revision": "dc70b6f1abc67addaf0fae824cbcd2872ab39809",
+      "path": "cann-20261014-model-validator/complete-sdk-compiler-metadata-proof.zip",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dc70b6f1abc67addaf0fae824cbcd2872ab39809/cann-20261014-model-validator/complete-sdk-compiler-metadata-proof.zip",
+      "bytes": 455549,
+      "sha256": "0eaa653ab99d7eb47101b17dfeaa2038cae4e86563e1aa27e24da943b7c2e42c",
+      "anonymous_verified": true,
+      "payloads": 14
+    }
+  }
+}

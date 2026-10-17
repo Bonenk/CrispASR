@@ -27,6 +27,7 @@
 #include <vector>
 #include "core/ggml_cpu_backend.h"
 #include "core/sched_prof.h"
+#include "core/backend_validation.h"
 
 // ===========================================================================
 // Bench instrumentation — `MOONSHINE_BENCH=1` for per-stage timings.
@@ -71,6 +72,7 @@ struct moonshine_context {
 
     int n_threads = 4;
     bool use_gpu = false;
+    bool validate_backend = false;
     float temperature = 0.0f; // 0 = greedy argmax; > 0 = multinomial sampling
     int beam_size = 1;        // 1 = greedy/sampled; >1 = beam search (deterministic)
     // #292: ceiling on generated tokens. Moonshine is a short-form model, so the
@@ -212,10 +214,20 @@ struct moonshine_context* moonshine_init_with_params(struct moonshine_init_param
     }
     core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
 
-    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : ctx->backend_cpu;
+    const core_backend_validation::Request required(std::getenv("CRISPASR_MOONSHINE_REQUIRE_BACKEND"),
+                                                    std::getenv("CRISPASR_MOONSHINE_REQUIRE_DEVICE"));
+    ctx->validate_backend = required.active();
+    ctx->backend = required.active() ? core_backend_validation::init(required, params.use_gpu)
+                                     : (params.use_gpu ? crispasr_init_gpu_backend() : ctx->backend_cpu);
+    if (!ctx->backend && required.active()) {
+        moonshine_free(ctx);
+        return nullptr;
+    }
     if (!ctx->backend)
         ctx->backend = ctx->backend_cpu;
-    ctx->use_gpu = (ctx->backend != ctx->backend_cpu);
+    ctx->use_gpu = !core_cpu_backend::is_cpu(ctx->backend);
+    if (!ctx->use_gpu)
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
 
     // ── Pass 2: load weights via core_gguf (mmap, backend buffer) ──
     //
@@ -692,12 +704,29 @@ static int moonshine_run_encoder(struct moonshine_context* ctx, const float* aud
     }
     ggml_backend_tensor_set(pos, pos_data.data(), 0, seq_len * sizeof(int32_t));
 
+    // Query assignments only after alloc_graph. Keep the original graph and
+    // scheduler execution intact; eval callbacks would perturb execution.
+    core_backend_validation::Placement placement =
+        ctx->validate_backend ? core_backend_validation::Placement(ctx->sched, graph, ctx->backend)
+                              : core_backend_validation::Placement{};
+    if (ctx->validate_backend && !placement.valid()) {
+        placement.dump("moonshine.encoder", false);
+        fprintf(stderr, "%s: required backend has no complete encoder assignment; refusing validation\n", __func__);
+        if (transient_ctx)
+            ggml_free(transient_ctx);
+        return -1;
+    }
     if (core_sched_prof::compute(ctx->sched, graph, "moonshine") != GGML_STATUS_SUCCESS) {
+        if (ctx->validate_backend)
+            placement.dump("moonshine.encoder", false);
         fprintf(stderr, "%s: graph compute failed\n", __func__);
         if (transient_ctx)
             ggml_free(transient_ctx);
         return -1;
     }
+
+    if (ctx->validate_backend)
+        placement.dump("moonshine.encoder", true);
 
     struct ggml_tensor* enc_output = ggml_graph_get_tensor(graph, "encoder_output");
     const int hidden_dim = (int)enc_output->ne[0];

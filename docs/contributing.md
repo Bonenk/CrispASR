@@ -605,7 +605,7 @@ env-var-gated — they SKIP cleanly when the env vars are unset.
 **Quick start:**
 ```bash
 # Point at your local model cache (auto-download also probes this):
-export CRISPASR_MODELS_DIR=/mnt/storage/gguf-models
+export CRISPASR_MODELS_DIR=${CRISPASR_STORAGE}/gguf-models
 
 # Source all env vars at once:
 source tests/env-live-tests.sh

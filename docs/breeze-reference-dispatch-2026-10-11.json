@@ -1,0 +1,143 @@
+{
+  "run": 38172976584,
+  "source": "fd2f9b2fa",
+  "status": "FAILED before native comparison",
+  "arrays_independently_verified": 8,
+  "original_equivalence": {
+    "prompt_byte_exact": true,
+    "logits_byte_exact": false,
+    "finite": true,
+    "shape": [
+      2052
+    ],
+    "expected_shape": [
+      2052
+    ],
+    "cosine": 0.9999910750191624,
+    "norm_ratio": 1.0012624604937135,
+    "relative_l2": 0.004412063354583565,
+    "maximum_error": 0.0625,
+    "unequal_values": 1469,
+    "actual_argmax": 404,
+    "expected_argmax": 404
+  },
+  "successful_control_run": 38163903250,
+  "successful_cpu": "AMD EPYC 7763; PyTorch AVX2",
+  "failed_cpu": "Intel Xeon Platinum 8573C; PyTorch AVX512",
+  "checkpoint_hashes_identical": true,
+  "package_versions_identical": true,
+  "prompt_ids_and_text_mask_identical": true,
+  "original_embeds_relative_l2_between_runs": 0.013288041856014612,
+  "original_hidden_relative_l2_between_runs": 0.007485532407333442,
+  "public_proof": {
+    "revision": "3b29c7086ee7d6002ca87d024277f8079152e14f",
+    "path": "breeze-guided-20261011/precision-original-control-failed-proof.zip",
+    "sha256": "b2871f9f54cf034bbe97d1a57e4b637aebf7077a4c04faeadcaf6ceb2b871ad3",
+    "bytes": 95739,
+    "anonymous_verified": true
+  },
+  "limits": [
+    "CPU/dispatch difference correlates with original mismatch; not yet established as cause",
+    "No native alternative-hidden decision result; no strict byte or generation gate waiver"
+  ],
+  "next_control": "Same-host original default versus explicitly AVX2-capped PyTorch/oneDNN/MKL, with both arrays and unchanged immutable byte gate retained",
+  "dispatch_documentation": [
+    "https://uxlfoundation.github.io/oneDNN/dev_guide_cpu_dispatcher_control.html",
+    "https://www.intel.com/content/www/us/en/docs/onemkl/developer-guide-linux/2024-2/instruction-set-specific-dispatch-on-intel-archs.html"
+  ],
+  "same_host_control": {
+    "run": 38174972934,
+    "source": "0fbdbeff8040cf3bc6192ce14cfca2964c266627",
+    "status": "FAILED before model loading: both subprocesses cannot import sibling breeze_guided_reference",
+    "script": "tools/ci-heavy/breeze_reference_cpu_dispatch.py",
+    "original_only": true,
+    "variants": [
+      "default",
+      "AVX2-capped PyTorch/oneDNN/MKL"
+    ],
+    "seed": 42,
+    "unchanged_byte_gate": true,
+    "both_variants_retained_on_failure": true,
+    "acceptance": "Both variants must pass the unchanged original byte control; a failed branch keeps the job failed. Same-host control does not accept native generation.",
+    "arrays_produced": 0,
+    "diagnostic_inconclusive": true,
+    "repair": "Add script directory to sys.path before runpy; preserve all existing byte gates"
+  },
+  "same_host_retry": {
+    "run": 38198367653,
+    "source": "7bcf259d2ff2d2297831834cd63df23165d7a7a8",
+    "status": "SUCCESS",
+    "repair": "Bootstrap adds the script directory to sys.path before runpy",
+    "actual_controls": "Old sibling import failure reproduced; new default/AVX2 fresh processes import sibling, preserve argv and seeded RNG; selected capability AVX2",
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 136.166
+    },
+    "strict_original_gate_waived": false,
+    "independently_verified_arrays": 106,
+    "default_avx2_array_pairs_byte_equal": 53,
+    "torch_capabilities": [
+      "AVX2",
+      "AVX2"
+    ],
+    "cpu": "AMD EPYC 7763",
+    "original_prompt_and_logits_byte_exact_both_variants": true,
+    "public_proof": {
+      "revision": "1c331e1b4c853c7be4ae97fd25e91e4ea61adf40",
+      "path": "breeze-guided-20261012/cpu-dispatch-proof.zip",
+      "sha256": "3924a6992efa3a0621ad3a9360453021a757fe4aa63a4c885e1020aae263d367",
+      "bytes": 712407,
+      "anonymous_verified": true
+    },
+    "limitations": "Same host already AVX2; no AVX512 contrast and no causal explanation of earlier Intel mismatch; native not executed"
+  },
+  "precision_avx2_retry": {
+    "run": 38199379678,
+    "source": "8ed327bc53f8eb9d86df62ecacec54908175b6a1",
+    "status": "SUCCESS",
+    "script": "tools/ci-heavy/breeze_precision_avx2.py",
+    "dispatch": {
+      "ATEN_CPU_CAPABILITY": "avx2",
+      "ONEDNN_MAX_CPU_ISA": "AVX2",
+      "MKL_ENABLE_INSTRUCTIONS": "AVX2"
+    },
+    "opt_in_initialization_seed": 42,
+    "original_probe_default_unchanged": true,
+    "strict_original_and_native_gates_unchanged": true,
+    "actual_model_free_controls": [
+      "Entrypoint selects AVX2 before first Torch import and forwards precision argv",
+      "Reference phase preserves ordinary RNG and sets opt-in initialization before first checkpoint download"
+    ],
+    "no_secrets": {
+      "passed": 4,
+      "skipped": 0,
+      "seconds": 49.997
+    },
+    "independently_verified_arrays": 268,
+    "independently_verified_decisions": 135,
+    "original_prompt_logits_byte_exact": true,
+    "public_proof": {
+      "revision": "69745d157e33564827caeb906565bf4d79acab29",
+      "path": "breeze-guided-20261012/precision-decisions-proof.zip",
+      "sha256": "df574f37a415853ea82ad7e608d4121f9611956a4d4ed1c9564a9c70cddb6f7a",
+      "bytes": 2278983,
+      "anonymous_verified": true
+    },
+    "first_codebook5_control": {
+      "canonical_bf16": 193,
+      "original_promoted_backbone_bf16_depth": 193,
+      "original_promoted_backbone_fp32_depth": 936,
+      "native_same_promoted_hidden": 936,
+      "same_hidden_matching_codebooks": 15,
+      "same_hidden_minimum_cosine": 0.9999997543595904
+    },
+    "conclusion": "Original-only promoted backbone + FP32 depth reproduces native first codebook-5 pick 936 instead of canonical BF16 193; BF16 depth with promoted backbone retains 193. Joint arithmetic sensitivity is sufficient for this isolated flip.",
+    "limitations": [
+      "Same original teacher-forced frame/history, not a full free-generation acceptance",
+      "Eight strict full-generation failures remain recorded and unchanged",
+      "No GPU or additional decoded speech executed in this diagnostic",
+      "Does not establish the cause of the earlier Intel original-only mismatch"
+    ]
+  }
+}

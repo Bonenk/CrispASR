@@ -1,0 +1,209 @@
+{
+  "method": {
+    "scope": "Compile actual CANN allocation/cache code; test byte capacity, not RoPE math.\n\nCPU malloc/free instrument only requested buffer sizes. No ACL device operation\nor numerical reference is simulated. Run with TMPDIR on the storage volume.\nCANN_CAPACITY_OUT retains complete source, executable and per-case JSON rows.\n",
+    "command": [
+      "c++",
+      "-std=c++17",
+      "-O0",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-regression/actual-capacity.cpp",
+      "-o",
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-regression/capacity-probe"
+    ],
+    "operations_sha256": "cfc3f4e0aacf8e32ba07087498dca26f13e773448704efae7fea6f0e28d466b0",
+    "common_sha256": "62d6e79993222918dcd89e0f25b8f1366b7062e1e6ba82cab131ab1dc2868bb3",
+    "allocation_sha256": "cf0860b5121665358f20d24ca8419a8fa30f51de5fc12d7965ed476f04fb5a31",
+    "metadata_sha256": "a5e820b8ba92546fe3b15b2b274aafa0896fc6d573300c2b1938a060a764bbba",
+    "probe_source_sha256": "00b4cc02644ed7a82c164118f1c78371fdc37ea0e0b7666178689ea0a4eb5f1d",
+    "probe_binary_sha256": "eb305ad042851de5b64240c89d8e7cf278c888e8bfc1b6e93d45164882b69ce0"
+  },
+  "result": {
+    "tested_ggml": "21acf3162beeb4e51260f0f86deda80995423712",
+    "verified_original_operations_git_blob": "902d2eda693837c7ea636840facb6725ab0f7746",
+    "verified_original_common_git_blob": "1c6e685c38cac5de85bf70914a95ce3afc90488b",
+    "test_source": "7b77e0b0a29f2e754a64a5eae06c6911cda371c2",
+    "test_result": "Two expected original-source capacity failures and two successful controls. No candidate applied; no RoPE arithmetic/NPU/full-model validation.",
+    "files": [
+      {
+        "path": "actual-capacity.cpp",
+        "bytes": 6596,
+        "sha256": "00b4cc02644ed7a82c164118f1c78371fdc37ea0e0b7666178689ea0a4eb5f1d"
+      },
+      {
+        "path": "capacity-probe",
+        "bytes": 50488,
+        "sha256": "eb305ad042851de5b64240c89d8e7cf278c888e8bfc1b6e93d45164882b69ce0"
+      },
+      {
+        "path": "ggml-LICENSE",
+        "bytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      },
+      {
+        "path": "method.json",
+        "bytes": 1183,
+        "sha256": "5fb2fedead6420e4163ee8b146037db101cdfed83cbaf07ced67bc8e2dfe6f08"
+      },
+      {
+        "path": "original-aclnn_ops.cpp",
+        "bytes": 217271,
+        "sha256": "cfc3f4e0aacf8e32ba07087498dca26f13e773448704efae7fea6f0e28d466b0"
+      },
+      {
+        "path": "original-common.h",
+        "bytes": 23341,
+        "sha256": "62d6e79993222918dcd89e0f25b8f1366b7062e1e6ba82cab131ab1dc2868bb3"
+      },
+      {
+        "path": "position-growth.jsonl",
+        "bytes": 239,
+        "sha256": "0d5663068f5b3cde82c967183a24f95b6c018ede880eb3eff0b78f0f53e5fc28"
+      },
+      {
+        "path": "reported-width-sequence.jsonl",
+        "bytes": 500,
+        "sha256": "b69e259076f608691956267355a813bdd22f49d48e13a0a05170ca706ccaacd5"
+      },
+      {
+        "path": "same-bytes-different-shapes.jsonl",
+        "bytes": 249,
+        "sha256": "b449c301aff865fed824c65ca6753809200dd4f3dcbced3a523c9b6561f65ce0"
+      },
+      {
+        "path": "secret-scan.log",
+        "bytes": 509,
+        "sha256": "b42209ed85a7866f0b74bddeae39eb97672f5b540df46f0216fbf10eff2374a1"
+      },
+      {
+        "path": "test_cann_rope_capacity.py",
+        "bytes": 5728,
+        "sha256": "eb8bbb26a2af969395c92f5ef71bd1a9ce4c84a17bd73a8c645e501da1dc38d1"
+      },
+      {
+        "path": "unittest.log",
+        "bytes": 2615,
+        "sha256": "b8f63f4341d4e39b0b72ac6869024cc17ad84c66d8b793a29b68e4822404d858"
+      },
+      {
+        "path": "width-growth-fewer-positions.jsonl",
+        "bytes": 250,
+        "sha256": "bce8db14ef28dabe6545f082648863ad2f937e7f63b4e06be13e6e0441b803bc"
+      }
+    ]
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-rope-capacity/complete-pre-fix-capacity.zip",
+    "bytes": 69043,
+    "sha256": "372b92c65abf9bcc854b0af2e07cc8c9d207ac83a9903f3fdec97714d4f792f8",
+    "payloads": 14,
+    "anonymous_verified": true,
+    "revision": "7e683151a7eab8d6b115fb305ff3d7a0fe0dd0a9"
+  },
+  "cases": {
+    "position-growth": [
+      {
+        "frame": 0,
+        "rotary_dims": 128,
+        "positions": 1,
+        "required_bytes_each": 512,
+        "sin_bytes": 512,
+        "cos_bytes": 512,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 128,
+        "positions": 512,
+        "required_bytes_each": 262144,
+        "sin_bytes": 262144,
+        "cos_bytes": 262144,
+        "safe": true
+      }
+    ],
+    "reported-width-sequence": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 2,
+        "rotary_dims": 256,
+        "positions": 512,
+        "required_bytes_each": 524288,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": false
+      },
+      {
+        "frame": 3,
+        "rotary_dims": 128,
+        "positions": 512,
+        "required_bytes_each": 262144,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": false
+      }
+    ],
+    "same-bytes-different-shapes": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 128,
+        "positions": 256,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      }
+    ],
+    "width-growth-fewer-positions": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 256,
+        "positions": 256,
+        "required_bytes_each": 262144,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": false
+      }
+    ]
+  },
+  "unit_tests_run": 4,
+  "unit_tests_passed": 2,
+  "unit_tests_failed": 2,
+  "scope": "Expected failing pre-fix capacity regression on literal original CANN allocation and cache metadata. CPU allocator records requested sizes; no RoPE arithmetic/device simulation. No repaired candidate applied and no NPU/full-model acceptance."
+}

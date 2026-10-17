@@ -281,7 +281,7 @@ The guard was checked to FAIL rather than merely pass — forcing
 `CRISPASR_BASIC_PITCH_CONV_ISA=avx2fma` (a kernel known to differ) produces
 `REQUIRE( std::memcmp(...) == 0 )` … `-6 == 0` on `contour_conv`.
 
-End-to-end on `/mnt/storage/tuner-bench/datasets/audio/00_BN1-129-Eb_comp_mic.wav`
+End-to-end on `${CRISPASR_STORAGE}/tuner-bench/datasets/audio/00_BN1-129-Eb_comp_mic.wav`
 through the real `basic_pitch_transcribe`, comparing the **raw heads** (before
 peak-picking, per the dev-harness preference) by FNV-1a over the raw float bits
 *and* the L2 norm (HARD RULE 2b — cosine is scale-blind), plus every note event:
@@ -401,7 +401,7 @@ A recommendation with its evidence, not work done:
 ## Reproducing
 
 ```bash
-export CRISPASR_MODELS_DIR=/mnt/storage/gguf-models
+export CRISPASR_MODELS_DIR=${CRISPASR_STORAGE}/gguf-models
 ctest --test-dir build -R test-basic-pitch-conv --output-on-failure   # byte-equality
 CRISPASR_BASIC_PITCH_TIMING=1 build/bin/crispasr --backend basic-pitch <wav>   # stage split
 CRISPASR_BASIC_PITCH_FASTCONV=1 build/bin/crispasr --backend basic-pitch <wav> # fast path

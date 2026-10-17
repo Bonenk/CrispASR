@@ -6,6 +6,8 @@ Wraps the whisper.h C API from crispasr / CrispASR.
 
 import codecs
 import contextlib
+import math
+import operator
 import ctypes
 import os
 import platform
@@ -16,6 +18,83 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
+
+
+def _resample_pcm_numpy(pcm: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
+    """Older-library fallback matching core/audio_resample.cpp, without SciPy.
+
+    Kaiser beta 8.6, 14 zero crossings, float32 coefficients and double
+    accumulation. Chunking bounds temporary memory independently of duration.
+    Input validation belongs to _prepare_asr_pcm.
+    """
+    divisor = math.gcd(source_rate, target_rate)
+    up, down = target_rate // divisor, source_rate // divisor
+    half = 14 * max(up, down)
+    coefficients = np.empty(2 * half + 1, dtype=np.float32)
+    beta = float(np.float32(8.6))
+    scale = np.i0(beta)
+    for begin in range(0, len(coefficients), 16384):
+        end = min(begin + 16384, len(coefficients))
+        k = np.arange(begin, end, dtype=np.float64) - half
+        window = np.i0(beta * np.sqrt(np.maximum(0.0, 1.0 - (k / half) ** 2))) / scale
+        coefficients[begin:end] = np.sinc(k / max(up, down)) * window / max(up, down)
+    count = (len(pcm) * target_rate + source_rate - 1) // source_rate
+    result = np.empty(count, dtype=np.float32)
+    span = half // up + 1
+    for begin in range(0, count, 4096):
+        end = min(begin + 4096, count)
+        position = np.arange(begin, end, dtype=np.int64) * down
+        centers, phases = position // up, position % up
+        sums = np.zeros(end - begin, dtype=np.float64)
+        # Ascending input order matches the native double accumulation.
+        for offset in range(-span, span + 1):
+            indices = centers + offset
+            taps = phases - offset * up + half
+            valid = ((indices >= 0) & (indices < len(pcm)) &
+                     (taps >= 0) & (taps < len(coefficients)))
+            sums[valid] += (pcm[indices[valid]].astype(np.float64) *
+                            coefficients[taps[valid]].astype(np.float64))
+        result[begin:end] = sums * up
+    return result
+
+
+def _prepare_asr_pcm(lib, pcm: np.ndarray, sample_rate: int) -> np.ndarray:
+    """Contiguous mono float32 at 16 kHz, using native band-limited conversion."""
+    try:
+        rate = operator.index(sample_rate)
+    except TypeError as exc:
+        raise ValueError("sample_rate must be a positive integer <= 384000 Hz") from exc
+    if isinstance(sample_rate, (bool, np.bool_)) or not 0 < rate <= 384000:
+        raise ValueError("sample_rate must be a positive integer <= 384000 Hz")
+    samples = np.asarray(pcm, dtype=np.float32)
+    if samples.ndim != 1:
+        raise ValueError("pcm must be one-dimensional mono audio")
+    samples = np.ascontiguousarray(samples)
+    count = (len(samples) * 16000 + rate - 1) // rate
+    if len(samples) > np.iinfo(np.int32).max or count > np.iinfo(np.int32).max or count > len(samples) * 64:
+        raise ValueError("resampling exceeds the sample-count or 64x expansion limit")
+    if rate == 16000 or len(samples) == 0:
+        return samples
+    if not hasattr(lib, "crispasr_audio_resample") or not hasattr(lib, "crispasr_audio_free"):
+        return _resample_pcm_numpy(samples, rate, 16000)
+    fn = lib.crispasr_audio_resample
+    float_ptr = ctypes.POINTER(ctypes.c_float)
+    fn.argtypes = [float_ptr, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                   ctypes.POINTER(float_ptr), ctypes.POINTER(ctypes.c_int)]
+    fn.restype = ctypes.c_int
+    lib.crispasr_audio_free.argtypes = [float_ptr]
+    lib.crispasr_audio_free.restype = None
+    output = float_ptr()
+    length = ctypes.c_int()
+    try:
+        rc = fn(samples.ctypes.data_as(float_ptr), len(samples), rate, 16000,
+                ctypes.byref(output), ctypes.byref(length))
+        if rc != 0 or not output or length.value != count:
+            raise RuntimeError(f"crispasr_audio_resample failed (code {rc}, samples {length.value})")
+        return np.ctypeslib.as_array(output, shape=(length.value,)).copy()
+    finally:
+        if output:
+            lib.crispasr_audio_free(output)
 
 
 @dataclass
@@ -144,14 +223,19 @@ class CrispASR:
 
     def __init__(self, model_path: str, lib_path: Optional[str] = None,
                  helpers_lib_path: Optional[str] = None):
-        self._lib = ctypes.CDLL(lib_path or _find_lib())
+        resolved_lib_path = lib_path or _find_lib()
+        self._lib = ctypes.CDLL(resolved_lib_path)
         self._setup_signatures()
 
         # Load helpers library (provides pointer-based wrappers for by-value struct APIs)
+        helpers_name = {
+            "Darwin": "libcrispasr_helpers.dylib",
+            "Windows": "crispasr_helpers.dll",
+        }.get(platform.system(), "libcrispasr_helpers.so")
         helpers_search = [
             helpers_lib_path,
-            str(Path(lib_path).parent / "libcrispasr_helpers.so") if lib_path else None,
-            str(Path(__file__).parent.parent.parent / "build" / "libcrispasr_helpers.so"),
+            str(Path(resolved_lib_path).parent / helpers_name),
+            str(Path(__file__).parent.parent.parent / "build" / helpers_name),
         ]
         self._helpers = None
         for hp in helpers_search:
@@ -359,14 +443,7 @@ class CrispASR:
         Returns:
             List of Segment objects.
         """
-        if sample_rate != 16000:
-            # Simple resampling via linear interpolation
-            ratio = 16000 / sample_rate
-            new_len = int(len(pcm) * ratio)
-            indices = np.linspace(0, len(pcm) - 1, new_len)
-            pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-
-        pcm = pcm.astype(np.float32)
+        pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
         # Get default params
@@ -437,13 +514,8 @@ class CrispASR:
                 # Convert stereo to mono
                 if wf.getnchannels() == 2:
                     pcm = pcm.reshape(-1, 2).mean(axis=1)
-                # Resample if needed
-                if wf.getframerate() != 16000:
-                    ratio = 16000 / wf.getframerate()
-                    new_len = int(len(pcm) * ratio)
-                    indices = np.linspace(0, len(pcm) - 1, new_len)
-                    pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-                return pcm
+                # Preserve the static loader API and support older libraries.
+                return _prepare_asr_pcm(None, pcm, wf.getframerate())
         else:
             raise ValueError(f"Unsupported audio format: {path}. Use .wav or pass raw PCM via transcribe_pcm().")
 
@@ -1629,12 +1701,7 @@ class Session:
         cohere, voxtral, voxtral4b) honour it; others ignore silently.
         ``None`` preserves each backend's historical default.
         """
-        if sample_rate != 16000:
-            ratio = 16000 / sample_rate
-            new_len = int(len(pcm) * ratio)
-            indices = np.linspace(0, len(pcm) - 1, new_len)
-            pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-        pcm = np.asarray(pcm, dtype=np.float32)
+        pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
         if language and hasattr(self._lib, "crispasr_session_transcribe_lang"):
@@ -1700,12 +1767,7 @@ class Session:
         """
         if not hasattr(self._lib, "crispasr_session_transcribe_chunked_lang"):
             return self.transcribe(pcm, sample_rate, language=language)  # old dylib
-        if sample_rate != 16000:
-            ratio = 16000 / sample_rate
-            new_len = int(len(pcm) * ratio)
-            indices = np.linspace(0, len(pcm) - 1, new_len)
-            pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-        pcm = np.asarray(pcm, dtype=np.float32)
+        pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
         lang_c = language.encode("utf-8") if language else None
 
@@ -1807,12 +1869,7 @@ class Session:
                 "crispasr_session_transcribe_vad not in loaded library — "
                 "rebuild CrispASR 0.4.3+ or call transcribe() instead."
             )
-        if sample_rate != 16000:
-            ratio = 16000 / sample_rate
-            new_len = int(len(pcm) * ratio)
-            indices = np.linspace(0, len(pcm) - 1, new_len)
-            pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-        pcm = np.asarray(pcm, dtype=np.float32)
+        pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
         # ABI struct layout must match crispasr_vad_abi_opts (crispasr_c_api.cpp):
@@ -1915,13 +1972,8 @@ class Session:
         if len(pcm) == 0:
             return segs, None
 
+        pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         self.set_return_logits(True)
-        if sample_rate != 16000:
-            ratio = 16000 / sample_rate
-            new_len = int(len(pcm) * ratio)
-            indices = np.linspace(0, len(pcm) - 1, new_len)
-            pcm = np.interp(indices, np.arange(len(pcm)), pcm).astype(np.float32)
-        pcm = np.asarray(pcm, dtype=np.float32)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
         if language and hasattr(self._lib, "crispasr_session_transcribe_lang"):
@@ -2113,7 +2165,7 @@ class Session:
             raise RuntimeError(f"set_speaker_id failed (rc={rc}) for backend {self.backend!r}")
 
     def set_instruct(self, instruct: str) -> None:
-        """Set the voice description / style instruct (qwen3-tts, parler, omnivoice).
+        """Set the voice description / style instruct (qwen3-tts, parler, omnivoice, bt2-tts).
 
         VoiceDesign generates speech in a voice **described by a
         natural-language instruction** — no reference WAV, no preset
@@ -2323,6 +2375,7 @@ class Session:
         (canary, cohere, parakeet, nemotron, moonshine). Other backends silently no-op.
 
         ``seed`` is the RNG seed for sampling; pass 0 for time-based.
+        Breeze (bt2-tts) forwards temperature and seed to its native sampler.
         Returns silently when no backend in the session honours the
         setter (so it's safe to call for any session)."""
         if not hasattr(self._lib, "crispasr_session_set_temperature"):
@@ -2375,7 +2428,7 @@ class Session:
 
     def set_tts_steps(self, steps: int) -> None:
         """Set the diffusion / CFM / masked-iterative step count for step-based
-        TTS backends (chatterbox, vibevoice, kugelaudio, tada, irodori, omnivoice, supertonic).
+        TTS backends (chatterbox, vibevoice, kugelaudio, tada, irodori, omnivoice, supertonic, voxcpm2).
 
         Higher = better fidelity, slower. Soft no-op (rc=-2) when the active
         backend has no step-based stage.
@@ -2404,7 +2457,7 @@ class Session:
             raise RuntimeError(f"set_tts_num_candidates failed (rc={rc})")
 
     def set_top_p(self, top_p: float) -> None:
-        """Set the top-p nucleus-sampling threshold. Honoured by chatterbox."""
+        """Set the top-p nucleus threshold. Honoured by chatterbox, TADA and Dia."""
         if not hasattr(self._lib, "crispasr_session_set_top_p"):
             return
         self._lib.crispasr_session_set_top_p.argtypes = [ctypes.c_void_p, ctypes.c_float]
@@ -2414,7 +2467,7 @@ class Session:
             raise RuntimeError(f"set_top_p failed (rc={rc})")
 
     def set_top_k(self, top_k: int) -> None:
-        """Set the top-k sampling cutoff (0 = disabled). Honoured by TADA."""
+        """Set the top-k sampling cutoff (0 = disabled). Honoured by TADA and Dia."""
         if not hasattr(self._lib, "crispasr_session_set_top_k"):
             return
         self._lib.crispasr_session_set_top_k.argtypes = [ctypes.c_void_p, ctypes.c_int]
@@ -2985,9 +3038,10 @@ class Session:
         Branch via :meth:`is_voice_design` / :meth:`is_custom_voice` —
         Base if neither returns True. For orpheus call
         :meth:`set_codec_path` (SNAC GGUF) and :meth:`set_speaker_name`.
-        voxcpm2-tts runs zero-shot today — the CLI ``--voice`` flag is
-        accepted but ignored (the adapter prints a warning and falls back
-        to the default voice; cloning hookup is still pending).
+        VoxCPM2 supports zero-shot synthesis and reference-audio cloning via
+        :meth:`set_voice`; query :meth:`output_sample_rate` for its native 48 kHz.
+        Its CFM step count defaults to ten and can be changed with
+        :meth:`set_tts_steps`.
         """
         if not hasattr(self._lib, "crispasr_session_synthesize"):
             raise RuntimeError("TTS API not present in this libcrispasr build")

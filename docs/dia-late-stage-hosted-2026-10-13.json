@@ -1,0 +1,992 @@
+{
+  "scope": "Complete original/native late-layer teacher replay accepted as a diagnostic only: all 120 stage rows pass, default/late/default arrays exact and all three negatives reject; original ASR passes. No native free-speech/GPU/Q4 acceptance.",
+  "run": "https://github.com/CrispStrobe/CrispASR/actions/runs/38382527357",
+  "receipt": {
+    "source": "ead5a5d5dab77e8d2e2c22a4fbb7450d44abc492",
+    "worktree_dirty": false,
+    "worker_sha256": "76b37497e71eeff560443d10c9a8b0a74d5182350adf0bd7d36079e68c0a9f99",
+    "step": 978,
+    "runs": [
+      {
+        "name": "canonical-download",
+        "exit": 0,
+        "log_sha256": "7e06e988a9ded421d818dac8df5f86feea8b02489c31b8b07f2bda29bc01217a"
+      },
+      {
+        "name": "original-source-clone",
+        "exit": 0,
+        "log_sha256": "571a93ec73f7315903ea1fa9fabbefc82c4cb76b0161250b9b50c148629b3628"
+      },
+      {
+        "name": "original-source-pin",
+        "exit": 0,
+        "log_sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+      },
+      {
+        "name": "capture-index-contracts",
+        "exit": 0,
+        "log_sha256": "7993e7b1e2a5b06a8d12dd6c7d159787ef9955a2dbb157b51a99a7231d95c115"
+      },
+      {
+        "name": "original-hook-contracts",
+        "exit": 0,
+        "log_sha256": "7620077685d442e82061f778eaaca20d1b54408a6b61a277e8f4cbe0ebdc6f74"
+      },
+      {
+        "name": "original-late-capture",
+        "exit": 0,
+        "log_sha256": "ff6c69b36d355050cb2e6793e42147e83a5d07960472fd717aa99e99040da6ea"
+      },
+      {
+        "name": "neural-export",
+        "exit": 0,
+        "log_sha256": "ac574218fe3ace2d88a5d1e07f46519dd19bc754408079773df409b4f0d1a2a6"
+      },
+      {
+        "name": "codec-export",
+        "exit": 0,
+        "log_sha256": "5e8986143eb5d51da28cb39cb725dad16c0e3ffa4644aab4699a0880ba220ca6"
+      },
+      {
+        "name": "build-dependencies-update",
+        "exit": 0,
+        "log_sha256": "2c05a5975f6be6ddbbea8de7a8c40095529457cc915c382c14e00a35b3522209"
+      },
+      {
+        "name": "build-dependencies-install",
+        "exit": 0,
+        "log_sha256": "b310542134d319bb91a539157fcd5a17642d3cd0448b255c1bd1270e3d8cd948"
+      },
+      {
+        "name": "configure",
+        "exit": 0,
+        "log_sha256": "0518d548937406244b17b328879fe2148e5c66201b4d338d6f88641b72192056"
+      },
+      {
+        "name": "build",
+        "exit": 0,
+        "log_sha256": "45de6f7188923965847e9ac976b90a4475e26a77547cefd95013bca7f525e56c"
+      },
+      {
+        "name": "original-asr",
+        "exit": 0,
+        "log_sha256": "1909472dd8130006e99d0b31516e7e7c9efae5b9c0522fd63e5c054b110f4f2d"
+      },
+      {
+        "name": "default-diff",
+        "exit": 0,
+        "log_sha256": "7c73bc12baa43ff9b2f419898d36a7beeddbb7d88ebf6fda5b92151ee1471e2a"
+      },
+      {
+        "name": "late-diff",
+        "exit": 0,
+        "log_sha256": "c2911707e480d6e7f643d9bd160a921f4c1035124cd982f256267227c370aba7"
+      },
+      {
+        "name": "repeat-default-diff",
+        "exit": 0,
+        "log_sha256": "34438eef94d12f452b7d0e415cc8f28b26d14c05c6608cee732716504e98c987"
+      },
+      {
+        "name": "scaled-step978-negative",
+        "exit": 1,
+        "log_sha256": "d4cd9bbaf35d8bb69769d3088cc4aa679f92b70235fdd495cc969fe064f2bfa9"
+      },
+      {
+        "name": "negative-step-negative",
+        "exit": 1,
+        "log_sha256": "b9f79e34dad9b96ae3b3b12c2770205ef95f51809a3be95d2562926de54fe332"
+      },
+      {
+        "name": "out-of-history-step-negative",
+        "exit": 1,
+        "log_sha256": "b9f79e34dad9b96ae3b3b12c2770205ef95f51809a3be95d2562926de54fe332"
+      }
+    ],
+    "production_defaults_changed": false,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "scope": "Original/native layer and complete-logit teacher replay with default/late/default capture controls",
+    "canonical_reference_sha256": "3db6f8923abffd612e6c83d7036debebd10ed28b77c3eb9ec3d91fec1ce1a542",
+    "library_sha256": "ae6711ae313ba6b7f310f23f427b24926a85f4359f08247c1e3781f0622f7831",
+    "diff_sha256": "16b5079992d29f699957799bb7cafb6c81396ed41aa41f9f06644a0b17a7c62f",
+    "model_sha256": "8128132c538e1aef83f2fb5257b4f71d28a67c2a5a0d54d0a1f0a3b0f5d6b73d",
+    "codec_sha256": "6db51da2333868918b6d476008d92036a53400bc816ff7e1d2b1e973499e4135",
+    "native_capture_off_on_off_complete_arrays_exact": true,
+    "late_layer_diagnostic_pass": true
+  },
+  "capture_controls": [
+    {
+      "arm": "default",
+      "stage_passes": 40,
+      "actual_capture_step": 0
+    },
+    {
+      "arm": "late",
+      "stage_passes": 40,
+      "actual_capture_step": 978
+    },
+    {
+      "arm": "repeat-default",
+      "stage_passes": 40,
+      "actual_capture_step": 0
+    }
+  ],
+  "files": [
+    {
+      "path": "build-dependencies-install.log",
+      "bytes": 2502,
+      "sha256": "b310542134d319bb91a539157fcd5a17642d3cd0448b255c1bd1270e3d8cd948"
+    },
+    {
+      "path": "build-dependencies-update.log",
+      "bytes": 2453,
+      "sha256": "2c05a5975f6be6ddbbea8de7a8c40095529457cc915c382c14e00a35b3522209"
+    },
+    {
+      "path": "build.log",
+      "bytes": 419050,
+      "sha256": "45de6f7188923965847e9ac976b90a4475e26a77547cefd95013bca7f525e56c"
+    },
+    {
+      "path": "canonical-download.log",
+      "bytes": 53,
+      "sha256": "7e06e988a9ded421d818dac8df5f86feea8b02489c31b8b07f2bda29bc01217a"
+    },
+    {
+      "path": "canonical-ref.gguf",
+      "bytes": 99392768,
+      "sha256": "3db6f8923abffd612e6c83d7036debebd10ed28b77c3eb9ec3d91fec1ce1a542"
+    },
+    {
+      "path": "capture-index-contracts.log",
+      "bytes": 520,
+      "sha256": "7993e7b1e2a5b06a8d12dd6c7d159787ef9955a2dbb157b51a99a7231d95c115"
+    },
+    {
+      "path": "codec-export.log",
+      "bytes": 723,
+      "sha256": "5e8986143eb5d51da28cb39cb725dad16c0e3ffa4644aab4699a0880ba220ca6"
+    },
+    {
+      "path": "configure.log",
+      "bytes": 2348,
+      "sha256": "0518d548937406244b17b328879fe2148e5c66201b4d338d6f88641b72192056"
+    },
+    {
+      "path": "default/capture-step.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "default/codes.i32",
+      "bytes": 43560,
+      "sha256": "193d973a6cccbba0800f20e0332036cb6297d83d41bb7d8633ca180a2798122a"
+    },
+    {
+      "path": "default/cpp_ca0_out.f32",
+      "bytes": 16384,
+      "sha256": "36affd8498d8e6442c1b41eb2bc5076bd8b4cf292794319999b73c4034347236"
+    },
+    {
+      "path": "default/cpp_cross_k0.f32",
+      "bytes": 638976,
+      "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
+    },
+    {
+      "path": "default/cpp_cross_v0.f32",
+      "bytes": 638976,
+      "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
+    },
+    {
+      "path": "default/cpp_decoder_layer_0.f32",
+      "bytes": 16384,
+      "sha256": "105955745945c0e2d9d8ef0d3c5ff3d6344cf67efeedc76223ece5afc050412c"
+    },
+    {
+      "path": "default/cpp_decoder_layer_1.f32",
+      "bytes": 16384,
+      "sha256": "2ca03c4f265d628540bca5ecb59cc87f038cc682d265cfae15787d99636fe0a6"
+    },
+    {
+      "path": "default/cpp_decoder_layer_10.f32",
+      "bytes": 16384,
+      "sha256": "448a6d6a2f96d8aeaf74b52f3a05bf3888a6c9f887bb8cbbe79cd780117b69e0"
+    },
+    {
+      "path": "default/cpp_decoder_layer_11.f32",
+      "bytes": 16384,
+      "sha256": "db4c24c1fbdcccf4eafe36106242ff8ec0bcc76a8e5edd4add09d930b7d95cac"
+    },
+    {
+      "path": "default/cpp_decoder_layer_12.f32",
+      "bytes": 16384,
+      "sha256": "2c0a9f56452e6e382a0346be5837ef078f1293ce605958a9a43800bbf1887b61"
+    },
+    {
+      "path": "default/cpp_decoder_layer_13.f32",
+      "bytes": 16384,
+      "sha256": "bb910cb4d257b088d54c337ff23a4b7f3f4047d45fdb177c3a172131d2587bb1"
+    },
+    {
+      "path": "default/cpp_decoder_layer_14.f32",
+      "bytes": 16384,
+      "sha256": "c42857586d567a982c6c0a4e500315a15cea2dfb5131cbcacbf6081659311137"
+    },
+    {
+      "path": "default/cpp_decoder_layer_15.f32",
+      "bytes": 16384,
+      "sha256": "73563d032ac634ef793c80608b3af59643f6099c6eb2ef4010083d5c86da37b8"
+    },
+    {
+      "path": "default/cpp_decoder_layer_16.f32",
+      "bytes": 16384,
+      "sha256": "f1c60b9a1dfd09e10116e560d53cfe992c63bb6b5bf813c604b6941753de9608"
+    },
+    {
+      "path": "default/cpp_decoder_layer_17.f32",
+      "bytes": 16384,
+      "sha256": "d850185bde30b7c0bd42c1adc70a0bf795b4b30d7c418c1fca99c671497e7498"
+    },
+    {
+      "path": "default/cpp_decoder_layer_2.f32",
+      "bytes": 16384,
+      "sha256": "90ba73737937f96f9a399429f1622bdfa3cd1e43b16998f8347f5fb232e97b5d"
+    },
+    {
+      "path": "default/cpp_decoder_layer_3.f32",
+      "bytes": 16384,
+      "sha256": "5f27018ae82747381d6d61049c761ab159c4e7a56d95af8db35c315ea54b0eb7"
+    },
+    {
+      "path": "default/cpp_decoder_layer_4.f32",
+      "bytes": 16384,
+      "sha256": "a113807acc03e6b5654db50300c8275697523e5ced8885fdfe88fb65cf3a57d0"
+    },
+    {
+      "path": "default/cpp_decoder_layer_5.f32",
+      "bytes": 16384,
+      "sha256": "2cbb5cb37e8ca642482846f2436c14893a11fc9509a0101363f92e992a2c1f10"
+    },
+    {
+      "path": "default/cpp_decoder_layer_6.f32",
+      "bytes": 16384,
+      "sha256": "8fd440327e82a84550c3fee1e522916b8abd462ec7deac4b6265560f7342b52d"
+    },
+    {
+      "path": "default/cpp_decoder_layer_7.f32",
+      "bytes": 16384,
+      "sha256": "2d5043371bfadc1944dcb3c4bd9bfa993e59ac09adee1e247ecb4091b0ab6397"
+    },
+    {
+      "path": "default/cpp_decoder_layer_8.f32",
+      "bytes": 16384,
+      "sha256": "579eace2b294bdca2c29c9f2701bbb3313a8e65a0c6f2e3e00ebca433369fee5"
+    },
+    {
+      "path": "default/cpp_decoder_layer_9.f32",
+      "bytes": 16384,
+      "sha256": "fc5544a39548d5feba269ac115035f017ac9d184d39d598f268ca587c95d9a8a"
+    },
+    {
+      "path": "default/cpp_encoder_embedding.f32",
+      "bytes": 319488,
+      "sha256": "86d2e1e39687a2dbb4854263ef7b4aea8b362da7d8217b03ae4cc7c4e7883af6"
+    },
+    {
+      "path": "default/cpp_encoder_layer_0.f32",
+      "bytes": 319488,
+      "sha256": "a42fdb42b529f49011149f37f88cd4a2a1b6a27161af8fc61fc639f204be3b4f"
+    },
+    {
+      "path": "default/cpp_encoder_layer_1.f32",
+      "bytes": 319488,
+      "sha256": "c30c4e9d66ce23e23148954c5d9d3ca11ad60da6c954b3d352ef847920befb0e"
+    },
+    {
+      "path": "default/cpp_encoder_layer_10.f32",
+      "bytes": 319488,
+      "sha256": "6e2dde73a2ef46641340b09090068bf6e21b202f758f57190df8f408a68e7a06"
+    },
+    {
+      "path": "default/cpp_encoder_layer_11.f32",
+      "bytes": 319488,
+      "sha256": "0dbd2614dbe6f4fe241a6e448180b3d0762fbef05bc7a37ae9ec16c2fd0f6948"
+    },
+    {
+      "path": "default/cpp_encoder_layer_2.f32",
+      "bytes": 319488,
+      "sha256": "1b1ef09a4020e5b15a05192faae9678ce1ac62c4445d84887adda2d0741b6246"
+    },
+    {
+      "path": "default/cpp_encoder_layer_3.f32",
+      "bytes": 319488,
+      "sha256": "5c8a8a4e59c2dcb4991da398c889178bd28a77e26491ceece90b0ed2c6de6acf"
+    },
+    {
+      "path": "default/cpp_encoder_layer_4.f32",
+      "bytes": 319488,
+      "sha256": "c921b9783da411d2b6c0ad85b5d26042a71d84bebe1665070284d2a89217aab5"
+    },
+    {
+      "path": "default/cpp_encoder_layer_5.f32",
+      "bytes": 319488,
+      "sha256": "8a424dc8c7786026de6d0ca9eff9d685254452b0bb3d6bbe6f690e88d2d0054d"
+    },
+    {
+      "path": "default/cpp_encoder_layer_6.f32",
+      "bytes": 319488,
+      "sha256": "5ffa0f5198c99b97ecac5eb59c4b17baa13efeeaf5e062fb5e702cb132fe2d07"
+    },
+    {
+      "path": "default/cpp_encoder_layer_7.f32",
+      "bytes": 319488,
+      "sha256": "b46c84246df63074059bb59f5994caa93ea1a77147fa3450b335512aecbc4b9d"
+    },
+    {
+      "path": "default/cpp_encoder_layer_8.f32",
+      "bytes": 319488,
+      "sha256": "6ab04e57e9bc1ef3ef029ce4695a85526ac9fcee550ac52a12762884660a0221"
+    },
+    {
+      "path": "default/cpp_encoder_layer_9.f32",
+      "bytes": 319488,
+      "sha256": "f1525ecb126998ec2b229b03bf9f3d226ffb482f67d5960a11691f6d772f87f6"
+    },
+    {
+      "path": "default/cpp_encoder_output.f32",
+      "bytes": 319488,
+      "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
+    },
+    {
+      "path": "default/cpp_encoder_tokens.f32",
+      "bytes": 312,
+      "sha256": "c3d4f6a170dc9c6c4826a6c2e57ebf2c956c2fc208dbc7e26d22a7fe0baefa7b"
+    },
+    {
+      "path": "default/cpp_final_hidden.f32",
+      "bytes": 16384,
+      "sha256": "09606b60bad752106fe4eb12a02d7251c937259d670503c9e0f7f1de67846c11"
+    },
+    {
+      "path": "default/cpp_step0_cond.f32",
+      "bytes": 37008,
+      "sha256": "b65150e8e6c4f276cff4a622a746b11a661e5eaee3aa38388211711ae1b8e352"
+    },
+    {
+      "path": "default/cpp_step0_uncond.f32",
+      "bytes": 37008,
+      "sha256": "9e1f0475cd8f0cad291fe935d791732cbaa693ff0371b84d377e8cef22f753d2"
+    },
+    {
+      "path": "default/decoded_audio.f32",
+      "bytes": 2478080,
+      "sha256": "986c8a1282b0b75d548f976f6981ba1b7434712d68ca038c339f252600e8f3bc"
+    },
+    {
+      "path": "default/feedback.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "default/inputs.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "default/logits.f32",
+      "bytes": 90743616,
+      "sha256": "ef6470207b1da62aa4501176ca4bf01f5d698aae86c7d4ae06208b136ad3faf6"
+    },
+    {
+      "path": "default-diff.log",
+      "bytes": 5891,
+      "sha256": "7c73bc12baa43ff9b2f419898d36a7beeddbb7d88ebf6fda5b92151ee1471e2a"
+    },
+    {
+      "path": "late/capture-step.txt",
+      "bytes": 4,
+      "sha256": "266d03f0b80055fc5063194a29f42f682eeaa9d1b928bc26a2e06529f70e6490"
+    },
+    {
+      "path": "late/codes.i32",
+      "bytes": 43560,
+      "sha256": "193d973a6cccbba0800f20e0332036cb6297d83d41bb7d8633ca180a2798122a"
+    },
+    {
+      "path": "late/cpp_ca0_out.f32",
+      "bytes": 16384,
+      "sha256": "98fde59a9122b6b57b763516a160230c581c8445323180746d2e8f751169611a"
+    },
+    {
+      "path": "late/cpp_cross_k0.f32",
+      "bytes": 638976,
+      "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
+    },
+    {
+      "path": "late/cpp_cross_v0.f32",
+      "bytes": 638976,
+      "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
+    },
+    {
+      "path": "late/cpp_decoder_layer_0.f32",
+      "bytes": 16384,
+      "sha256": "9ef27b99502f18e398ebd7b8affcc47510168d0bb56e957c028467379ae4c057"
+    },
+    {
+      "path": "late/cpp_decoder_layer_1.f32",
+      "bytes": 16384,
+      "sha256": "9e75ec1b4b7b1b8a777b87f327499fd484aa6b16044c00baa876fab1978899e2"
+    },
+    {
+      "path": "late/cpp_decoder_layer_10.f32",
+      "bytes": 16384,
+      "sha256": "b910bf23da5225f4de1b72dcccd89fecfc559b9c6b21c115615a882b22060cb7"
+    },
+    {
+      "path": "late/cpp_decoder_layer_11.f32",
+      "bytes": 16384,
+      "sha256": "ca0dbb5694ccdc256d625da8e9210d323f4ba2daaebcd221ac3f7e18dd60dc7c"
+    },
+    {
+      "path": "late/cpp_decoder_layer_12.f32",
+      "bytes": 16384,
+      "sha256": "e1f1d11a71d42897034ffa1217bfd9601b0fd122820ff15ddb99234c14859974"
+    },
+    {
+      "path": "late/cpp_decoder_layer_13.f32",
+      "bytes": 16384,
+      "sha256": "04e390f4ce8e56216410309c83bacb7bc2a651ff8a68936fc8c1b016220ed6b0"
+    },
+    {
+      "path": "late/cpp_decoder_layer_14.f32",
+      "bytes": 16384,
+      "sha256": "0903df503fa7fc551049809096f86a102a700222765b35be6589117fbf8c1303"
+    },
+    {
+      "path": "late/cpp_decoder_layer_15.f32",
+      "bytes": 16384,
+      "sha256": "62a7d7261ae4efc212d950f5f8a075cb62b1ccd6d668149ca4c3c49ae90dc5ec"
+    },
+    {
+      "path": "late/cpp_decoder_layer_16.f32",
+      "bytes": 16384,
+      "sha256": "3772ea025b01b02507db44ee74575b166d68b90a86297ad0649c534cd97018e2"
+    },
+    {
+      "path": "late/cpp_decoder_layer_17.f32",
+      "bytes": 16384,
+      "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+    },
+    {
+      "path": "late/cpp_decoder_layer_2.f32",
+      "bytes": 16384,
+      "sha256": "7e719dc1186fba201d0901835d9e5c78850d8f178dc72ca9b9d84e03f0485149"
+    },
+    {
+      "path": "late/cpp_decoder_layer_3.f32",
+      "bytes": 16384,
+      "sha256": "cdbd5c16ca5110d9a81c92aeeca101de2b8432233b232b22a72cd366222ad226"
+    },
+    {
+      "path": "late/cpp_decoder_layer_4.f32",
+      "bytes": 16384,
+      "sha256": "e618d8188a0b64cf85a07f99e556ff06fd7879f0e38d0cc589d31984bca183b3"
+    },
+    {
+      "path": "late/cpp_decoder_layer_5.f32",
+      "bytes": 16384,
+      "sha256": "a1c9ea1b5b85bf380934bba3bead9d66c33368429be57df84e1a887bae8d2cc0"
+    },
+    {
+      "path": "late/cpp_decoder_layer_6.f32",
+      "bytes": 16384,
+      "sha256": "bc20bc11cef8f70a5dec200a20537094cd0d186f4e522689d3e048c6eea3d73d"
+    },
+    {
+      "path": "late/cpp_decoder_layer_7.f32",
+      "bytes": 16384,
+      "sha256": "15fb0e15b0d505bf813ddf518abf170538378782b2fee64c7bef82085028dff4"
+    },
+    {
+      "path": "late/cpp_decoder_layer_8.f32",
+      "bytes": 16384,
+      "sha256": "014f251e33924a4505658362e1e9809f25c9208032aa96658e2bff885dce4af5"
+    },
+    {
+      "path": "late/cpp_decoder_layer_9.f32",
+      "bytes": 16384,
+      "sha256": "23e024be7d09f7896834689f850950d9b151562c9cc3c144934ccc60699aeaaa"
+    },
+    {
+      "path": "late/cpp_encoder_embedding.f32",
+      "bytes": 319488,
+      "sha256": "86d2e1e39687a2dbb4854263ef7b4aea8b362da7d8217b03ae4cc7c4e7883af6"
+    },
+    {
+      "path": "late/cpp_encoder_layer_0.f32",
+      "bytes": 319488,
+      "sha256": "a42fdb42b529f49011149f37f88cd4a2a1b6a27161af8fc61fc639f204be3b4f"
+    },
+    {
+      "path": "late/cpp_encoder_layer_1.f32",
+      "bytes": 319488,
+      "sha256": "c30c4e9d66ce23e23148954c5d9d3ca11ad60da6c954b3d352ef847920befb0e"
+    },
+    {
+      "path": "late/cpp_encoder_layer_10.f32",
+      "bytes": 319488,
+      "sha256": "6e2dde73a2ef46641340b09090068bf6e21b202f758f57190df8f408a68e7a06"
+    },
+    {
+      "path": "late/cpp_encoder_layer_11.f32",
+      "bytes": 319488,
+      "sha256": "0dbd2614dbe6f4fe241a6e448180b3d0762fbef05bc7a37ae9ec16c2fd0f6948"
+    },
+    {
+      "path": "late/cpp_encoder_layer_2.f32",
+      "bytes": 319488,
+      "sha256": "1b1ef09a4020e5b15a05192faae9678ce1ac62c4445d84887adda2d0741b6246"
+    },
+    {
+      "path": "late/cpp_encoder_layer_3.f32",
+      "bytes": 319488,
+      "sha256": "5c8a8a4e59c2dcb4991da398c889178bd28a77e26491ceece90b0ed2c6de6acf"
+    },
+    {
+      "path": "late/cpp_encoder_layer_4.f32",
+      "bytes": 319488,
+      "sha256": "c921b9783da411d2b6c0ad85b5d26042a71d84bebe1665070284d2a89217aab5"
+    },
+    {
+      "path": "late/cpp_encoder_layer_5.f32",
+      "bytes": 319488,
+      "sha256": "8a424dc8c7786026de6d0ca9eff9d685254452b0bb3d6bbe6f690e88d2d0054d"
+    },
+    {
+      "path": "late/cpp_encoder_layer_6.f32",
+      "bytes": 319488,
+      "sha256": "5ffa0f5198c99b97ecac5eb59c4b17baa13efeeaf5e062fb5e702cb132fe2d07"
+    },
+    {
+      "path": "late/cpp_encoder_layer_7.f32",
+      "bytes": 319488,
+      "sha256": "b46c84246df63074059bb59f5994caa93ea1a77147fa3450b335512aecbc4b9d"
+    },
+    {
+      "path": "late/cpp_encoder_layer_8.f32",
+      "bytes": 319488,
+      "sha256": "6ab04e57e9bc1ef3ef029ce4695a85526ac9fcee550ac52a12762884660a0221"
+    },
+    {
+      "path": "late/cpp_encoder_layer_9.f32",
+      "bytes": 319488,
+      "sha256": "f1525ecb126998ec2b229b03bf9f3d226ffb482f67d5960a11691f6d772f87f6"
+    },
+    {
+      "path": "late/cpp_encoder_output.f32",
+      "bytes": 319488,
+      "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
+    },
+    {
+      "path": "late/cpp_encoder_tokens.f32",
+      "bytes": 312,
+      "sha256": "c3d4f6a170dc9c6c4826a6c2e57ebf2c956c2fc208dbc7e26d22a7fe0baefa7b"
+    },
+    {
+      "path": "late/cpp_final_hidden.f32",
+      "bytes": 16384,
+      "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+    },
+    {
+      "path": "late/cpp_step978_cond.f32",
+      "bytes": 37008,
+      "sha256": "c3ccbcf04a04ecfcceef6e55c8304e3d18a2a5251a819a9fbdea9802bfce2ebf"
+    },
+    {
+      "path": "late/cpp_step978_uncond.f32",
+      "bytes": 37008,
+      "sha256": "947e016498d2668007e81d631926a37b39841f18f8808d8e57e96e71d7e3a439"
+    },
+    {
+      "path": "late/decoded_audio.f32",
+      "bytes": 2478080,
+      "sha256": "986c8a1282b0b75d548f976f6981ba1b7434712d68ca038c339f252600e8f3bc"
+    },
+    {
+      "path": "late/feedback.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "late/inputs.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "late/logits.f32",
+      "bytes": 90743616,
+      "sha256": "ef6470207b1da62aa4501176ca4bf01f5d698aae86c7d4ae06208b136ad3faf6"
+    },
+    {
+      "path": "late-diff.log",
+      "bytes": 5907,
+      "sha256": "c2911707e480d6e7f643d9bd160a921f4c1035124cd982f256267227c370aba7"
+    },
+    {
+      "path": "negative-step-negative.log",
+      "bytes": 48,
+      "sha256": "b9f79e34dad9b96ae3b3b12c2770205ef95f51809a3be95d2562926de54fe332"
+    },
+    {
+      "path": "negative-step-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "ce0ad3a556319076babfea1d33953a5f8c386ebc28ff059d0975685a1eb7dc5e"
+    },
+    {
+      "path": "neural-export.log",
+      "bytes": 556,
+      "sha256": "ac574218fe3ace2d88a5d1e07f46519dd19bc754408079773df409b4f0d1a2a6"
+    },
+    {
+      "path": "neural-f32-physical-audit.json",
+      "bytes": 99351,
+      "sha256": "7f2f4331dec3bbcaf6dfb5d5ac3ccb2405f12c148a9c33c00177938fe22c2368"
+    },
+    {
+      "path": "original-asr.log",
+      "bytes": 710,
+      "sha256": "1909472dd8130006e99d0b31516e7e7c9efae5b9c0522fd63e5c054b110f4f2d"
+    },
+    {
+      "path": "original-hook-contracts.log",
+      "bytes": 1553,
+      "sha256": "7620077685d442e82061f778eaaca20d1b54408a6b61a277e8f4cbe0ebdc6f74"
+    },
+    {
+      "path": "original-late-capture.log",
+      "bytes": 555,
+      "sha256": "ff6c69b36d355050cb2e6793e42147e83a5d07960472fd717aa99e99040da6ea"
+    },
+    {
+      "path": "original-late-provenance.json",
+      "bytes": 1318,
+      "sha256": "6768286d33cc9c58ec49d8c785035059093d3639bf42d097f08996af5a6e807c"
+    },
+    {
+      "path": "original-late.json",
+      "bytes": 356,
+      "sha256": "03354371084cce59303cb6307e65b6671cecd6c48c67d7f1f2ad2b4b7dd3af71"
+    },
+    {
+      "path": "original-late.npy",
+      "bytes": 2478208,
+      "sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d"
+    },
+    {
+      "path": "original-source-clone.log",
+      "bytes": 50,
+      "sha256": "571a93ec73f7315903ea1fa9fabbefc82c4cb76b0161250b9b50c148629b3628"
+    },
+    {
+      "path": "original-source-pin.log",
+      "bytes": 69,
+      "sha256": "f0942a9cddd60829668ddd4ba0579d062f9c02c3ad16981bca0e3b81fb7c1e35"
+    },
+    {
+      "path": "original-step978-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "1bdc38831a5866ce0430822bf88cc53fdcca897605e5c2f889a7bfb3879fc785"
+    },
+    {
+      "path": "out-of-history-step-negative.log",
+      "bytes": 48,
+      "sha256": "b9f79e34dad9b96ae3b3b12c2770205ef95f51809a3be95d2562926de54fe332"
+    },
+    {
+      "path": "out-of-history-step-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "5bc86e550c1d533baa98739e637a77a985aeae75dcdc6cd4678e2d1da51653ec"
+    },
+    {
+      "path": "physical-codec-audit.json",
+      "bytes": 36108,
+      "sha256": "8832b98c4bb0ec036accd3bd5a6ca151c1ffa04f1465b72b4f6af3a8c8e9970a"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 3887,
+      "sha256": "37899ce0f4166ba5a39b5d94e049593ea3fb57b0e602aceb3623bcf181b0f9e2"
+    },
+    {
+      "path": "repeat-default/capture-step.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "repeat-default/codes.i32",
+      "bytes": 43560,
+      "sha256": "193d973a6cccbba0800f20e0332036cb6297d83d41bb7d8633ca180a2798122a"
+    },
+    {
+      "path": "repeat-default/cpp_ca0_out.f32",
+      "bytes": 16384,
+      "sha256": "36affd8498d8e6442c1b41eb2bc5076bd8b4cf292794319999b73c4034347236"
+    },
+    {
+      "path": "repeat-default/cpp_cross_k0.f32",
+      "bytes": 638976,
+      "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
+    },
+    {
+      "path": "repeat-default/cpp_cross_v0.f32",
+      "bytes": 638976,
+      "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_0.f32",
+      "bytes": 16384,
+      "sha256": "105955745945c0e2d9d8ef0d3c5ff3d6344cf67efeedc76223ece5afc050412c"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_1.f32",
+      "bytes": 16384,
+      "sha256": "2ca03c4f265d628540bca5ecb59cc87f038cc682d265cfae15787d99636fe0a6"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_10.f32",
+      "bytes": 16384,
+      "sha256": "448a6d6a2f96d8aeaf74b52f3a05bf3888a6c9f887bb8cbbe79cd780117b69e0"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_11.f32",
+      "bytes": 16384,
+      "sha256": "db4c24c1fbdcccf4eafe36106242ff8ec0bcc76a8e5edd4add09d930b7d95cac"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_12.f32",
+      "bytes": 16384,
+      "sha256": "2c0a9f56452e6e382a0346be5837ef078f1293ce605958a9a43800bbf1887b61"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_13.f32",
+      "bytes": 16384,
+      "sha256": "bb910cb4d257b088d54c337ff23a4b7f3f4047d45fdb177c3a172131d2587bb1"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_14.f32",
+      "bytes": 16384,
+      "sha256": "c42857586d567a982c6c0a4e500315a15cea2dfb5131cbcacbf6081659311137"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_15.f32",
+      "bytes": 16384,
+      "sha256": "73563d032ac634ef793c80608b3af59643f6099c6eb2ef4010083d5c86da37b8"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_16.f32",
+      "bytes": 16384,
+      "sha256": "f1c60b9a1dfd09e10116e560d53cfe992c63bb6b5bf813c604b6941753de9608"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_17.f32",
+      "bytes": 16384,
+      "sha256": "d850185bde30b7c0bd42c1adc70a0bf795b4b30d7c418c1fca99c671497e7498"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_2.f32",
+      "bytes": 16384,
+      "sha256": "90ba73737937f96f9a399429f1622bdfa3cd1e43b16998f8347f5fb232e97b5d"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_3.f32",
+      "bytes": 16384,
+      "sha256": "5f27018ae82747381d6d61049c761ab159c4e7a56d95af8db35c315ea54b0eb7"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_4.f32",
+      "bytes": 16384,
+      "sha256": "a113807acc03e6b5654db50300c8275697523e5ced8885fdfe88fb65cf3a57d0"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_5.f32",
+      "bytes": 16384,
+      "sha256": "2cbb5cb37e8ca642482846f2436c14893a11fc9509a0101363f92e992a2c1f10"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_6.f32",
+      "bytes": 16384,
+      "sha256": "8fd440327e82a84550c3fee1e522916b8abd462ec7deac4b6265560f7342b52d"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_7.f32",
+      "bytes": 16384,
+      "sha256": "2d5043371bfadc1944dcb3c4bd9bfa993e59ac09adee1e247ecb4091b0ab6397"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_8.f32",
+      "bytes": 16384,
+      "sha256": "579eace2b294bdca2c29c9f2701bbb3313a8e65a0c6f2e3e00ebca433369fee5"
+    },
+    {
+      "path": "repeat-default/cpp_decoder_layer_9.f32",
+      "bytes": 16384,
+      "sha256": "fc5544a39548d5feba269ac115035f017ac9d184d39d598f268ca587c95d9a8a"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_embedding.f32",
+      "bytes": 319488,
+      "sha256": "86d2e1e39687a2dbb4854263ef7b4aea8b362da7d8217b03ae4cc7c4e7883af6"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_0.f32",
+      "bytes": 319488,
+      "sha256": "a42fdb42b529f49011149f37f88cd4a2a1b6a27161af8fc61fc639f204be3b4f"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_1.f32",
+      "bytes": 319488,
+      "sha256": "c30c4e9d66ce23e23148954c5d9d3ca11ad60da6c954b3d352ef847920befb0e"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_10.f32",
+      "bytes": 319488,
+      "sha256": "6e2dde73a2ef46641340b09090068bf6e21b202f758f57190df8f408a68e7a06"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_11.f32",
+      "bytes": 319488,
+      "sha256": "0dbd2614dbe6f4fe241a6e448180b3d0762fbef05bc7a37ae9ec16c2fd0f6948"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_2.f32",
+      "bytes": 319488,
+      "sha256": "1b1ef09a4020e5b15a05192faae9678ce1ac62c4445d84887adda2d0741b6246"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_3.f32",
+      "bytes": 319488,
+      "sha256": "5c8a8a4e59c2dcb4991da398c889178bd28a77e26491ceece90b0ed2c6de6acf"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_4.f32",
+      "bytes": 319488,
+      "sha256": "c921b9783da411d2b6c0ad85b5d26042a71d84bebe1665070284d2a89217aab5"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_5.f32",
+      "bytes": 319488,
+      "sha256": "8a424dc8c7786026de6d0ca9eff9d685254452b0bb3d6bbe6f690e88d2d0054d"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_6.f32",
+      "bytes": 319488,
+      "sha256": "5ffa0f5198c99b97ecac5eb59c4b17baa13efeeaf5e062fb5e702cb132fe2d07"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_7.f32",
+      "bytes": 319488,
+      "sha256": "b46c84246df63074059bb59f5994caa93ea1a77147fa3450b335512aecbc4b9d"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_8.f32",
+      "bytes": 319488,
+      "sha256": "6ab04e57e9bc1ef3ef029ce4695a85526ac9fcee550ac52a12762884660a0221"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_layer_9.f32",
+      "bytes": 319488,
+      "sha256": "f1525ecb126998ec2b229b03bf9f3d226ffb482f67d5960a11691f6d772f87f6"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_output.f32",
+      "bytes": 319488,
+      "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
+    },
+    {
+      "path": "repeat-default/cpp_encoder_tokens.f32",
+      "bytes": 312,
+      "sha256": "c3d4f6a170dc9c6c4826a6c2e57ebf2c956c2fc208dbc7e26d22a7fe0baefa7b"
+    },
+    {
+      "path": "repeat-default/cpp_final_hidden.f32",
+      "bytes": 16384,
+      "sha256": "09606b60bad752106fe4eb12a02d7251c937259d670503c9e0f7f1de67846c11"
+    },
+    {
+      "path": "repeat-default/cpp_step0_cond.f32",
+      "bytes": 37008,
+      "sha256": "b65150e8e6c4f276cff4a622a746b11a661e5eaee3aa38388211711ae1b8e352"
+    },
+    {
+      "path": "repeat-default/cpp_step0_uncond.f32",
+      "bytes": 37008,
+      "sha256": "9e1f0475cd8f0cad291fe935d791732cbaa693ff0371b84d377e8cef22f753d2"
+    },
+    {
+      "path": "repeat-default/decoded_audio.f32",
+      "bytes": 2478080,
+      "sha256": "986c8a1282b0b75d548f976f6981ba1b7434712d68ca038c339f252600e8f3bc"
+    },
+    {
+      "path": "repeat-default/feedback.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "repeat-default/inputs.i32",
+      "bytes": 44136,
+      "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+    },
+    {
+      "path": "repeat-default/logits.f32",
+      "bytes": 90743616,
+      "sha256": "ef6470207b1da62aa4501176ca4bf01f5d698aae86c7d4ae06208b136ad3faf6"
+    },
+    {
+      "path": "repeat-default-diff.log",
+      "bytes": 5898,
+      "sha256": "34438eef94d12f452b7d0e415cc8f28b26d14c05c6608cee732716504e98c987"
+    },
+    {
+      "path": "scaled-step978-negative.log",
+      "bytes": 5808,
+      "sha256": "d4cd9bbaf35d8bb69769d3088cc4aa679f92b70235fdd495cc969fe064f2bfa9"
+    },
+    {
+      "path": "scaled-step978-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "411ec8399334a8e717abf6a51d6a6580d59fda0e5d3da0228b245a6a9642d6ec"
+    },
+    {
+      "path": "sources/examples/cli/crispasr_dia_diff.h",
+      "bytes": 12832,
+      "sha256": "3100c9183fa47bbe12f805da4ae0ac04f98626cfec74356d9f62e9a644594672"
+    },
+    {
+      "path": "sources/src/dia_dump_step.h",
+      "bytes": 666,
+      "sha256": "8e8401307b559fa7c64975cf84fd63f0f41a460182caa9248184ae1f62de014a"
+    },
+    {
+      "path": "sources/src/dia_tts.cpp",
+      "bytes": 109132,
+      "sha256": "b403a704ac8ce15c2f81c80c1e1b6e808359435682bff00c31d93d826d084a17"
+    },
+    {
+      "path": "sources/tools/ci-heavy/dia_late_stage_control.py",
+      "bytes": 9865,
+      "sha256": "76b37497e71eeff560443d10c9a8b0a74d5182350adf0bd7d36079e68c0a9f99"
+    },
+    {
+      "path": "sources/tools/reference_backends/dia_tts_reference.py",
+      "bytes": 15271,
+      "sha256": "d82d05b2a32c088b356d1564fc5decdfd5b85c9d67ae68ebc11514ae0c1b71a7"
+    }
+  ],
+  "complete_log": {
+    "bytes": 86436,
+    "sha256": "94866fc0d610cb262316a8205c84de7fc2099319c2ef553f83fe957419293783"
+  }
+}

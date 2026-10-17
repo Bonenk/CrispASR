@@ -1,0 +1,535 @@
+{
+  "source": "4d622e7e9574c360c0f38154797a3453f26e2096",
+  "public_revision": "7bc65637442e50bd17f8a6abb5139781f7ba9883",
+  "prefix": "dia-20261016-original-cuda/sampler-device-v1",
+  "payloads_verified": 288,
+  "public_files_full_anonymous_hash_verified": 289,
+  "original_dia_source_files_verified": 7,
+  "recognition_cells": 17,
+  "controls_wer_zero": true,
+  "gpu": "Tesla T4",
+  "capability": [
+    7,
+    5
+  ],
+  "torch": "2.11.0+cu128",
+  "cuda": "12.8",
+  "arm_plan": {
+    "cuda-draw": {
+      "precision": "float32",
+      "temperature": 1.2,
+      "top_k": 45,
+      "draw": "input"
+    },
+    "cpu-draw": {
+      "precision": "float32",
+      "temperature": 1.2,
+      "top_k": 45,
+      "draw": "cpu"
+    },
+    "cuda-draw-anchor": {
+      "precision": "float32",
+      "temperature": 1.2,
+      "top_k": 45,
+      "draw": "input"
+    }
+  },
+  "results": {
+    "cuda-draw/legacy": {
+      "arm": "cuda-draw",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.00014440477487098554,
+      "cuda_peak_allocated": 9512798720,
+      "seed": 42,
+      "draw_calls": 1026,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "dd3f9f12e1303b85a11495f808cf9f291b1c2ae901daed463b60d6778afd6737"
+    },
+    "cuda-draw/hello-42": {
+      "arm": "cuda-draw",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 8687946752,
+      "seed": 42,
+      "draw_calls": 381,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "cuda-draw/hello-123": {
+      "arm": "cuda-draw",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 8682870784,
+      "seed": 123,
+      "draw_calls": 314,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "cuda-draw/fox-42": {
+      "arm": "cuda-draw",
+      "case": "fox-42",
+      "samples": 463360,
+      "rms": 0.07713114245011828,
+      "cuda_peak_allocated": 9685115392,
+      "seed": 42,
+      "draw_calls": 921,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7bc59d851f0cbb90b19050277863bd9508eb6f9c6471d7324d1294898e7dd1ab"
+    },
+    "cuda-draw/fox-123": {
+      "arm": "cuda-draw",
+      "case": "fox-123",
+      "samples": 481792,
+      "rms": 0.08692789185058837,
+      "cuda_peak_allocated": 9685809664,
+      "seed": 123,
+      "draw_calls": 957,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7ebd85297d85ab24183693bdde1b53c8ea4bd16585e835efd8d2816dda59ac31"
+    },
+    "cpu-draw/legacy": {
+      "arm": "cpu-draw",
+      "case": "legacy",
+      "samples": 523776,
+      "rms": 0.00014380908034653336,
+      "cuda_peak_allocated": 9686035968,
+      "seed": 42,
+      "draw_calls": 1039,
+      "transfer_checks": 1039,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "feb78ae8629b8f492a3365c9ead18bd5386523b10e8dd537dc8f5fa263f90534"
+    },
+    "cpu-draw/hello-42": {
+      "arm": "cpu-draw",
+      "case": "hello-42",
+      "samples": 284160,
+      "rms": 0.1083786285214177,
+      "cuda_peak_allocated": 8486123520,
+      "seed": 42,
+      "draw_calls": 571,
+      "transfer_checks": 571,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "44ad613e676ca3ed11eb75bd03d6d2bb80ceb7aa30c1d6f01f35abf877ce400a"
+    },
+    "cpu-draw/hello-123": {
+      "arm": "cpu-draw",
+      "case": "hello-123",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 8688241664,
+      "seed": 123,
+      "draw_calls": 381,
+      "transfer_checks": 381,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "cpu-draw/fox-42": {
+      "arm": "cpu-draw",
+      "case": "fox-42",
+      "samples": 736256,
+      "rms": 0.0007381513955830313,
+      "cuda_peak_allocated": 9690569216,
+      "seed": 42,
+      "draw_calls": 1454,
+      "transfer_checks": 1454,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "You",
+      "wer": 1.0,
+      "pcm_sha256": "e37b2d81680266d5ca2394c2dc1ce3817c786fdba13c2fce7d9a8ba3ef82a089"
+    },
+    "cpu-draw/fox-123": {
+      "arm": "cpu-draw",
+      "case": "fox-123",
+      "samples": 509440,
+      "rms": 0.001208051457281511,
+      "cuda_peak_allocated": 9685842944,
+      "seed": 123,
+      "draw_calls": 1011,
+      "transfer_checks": 1011,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "b88cce72feccbb4e463b5769f0d90a32d7b8b9bda74450922c3740ee1726836b"
+    },
+    "cuda-draw-anchor/legacy": {
+      "arm": "cuda-draw-anchor",
+      "case": "legacy",
+      "samples": 517120,
+      "rms": 0.0001444050719414704,
+      "cuda_peak_allocated": 9686693376,
+      "seed": 42,
+      "draw_calls": 1026,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "c1a7a0280f5ed6850bcfc6bc476eb473586ec2252d6c28492ca5ce2d871bff8d"
+    },
+    "cuda-draw-anchor/hello-42": {
+      "arm": "cuda-draw-anchor",
+      "case": "hello-42",
+      "samples": 186880,
+      "rms": 0.00014729338884646796,
+      "cuda_peak_allocated": 8688274432,
+      "seed": 42,
+      "draw_calls": 381,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "21e64222e8afc2127395fd15c163c68f327ea301e6085d020f5a734ecfeeb44f"
+    },
+    "cuda-draw-anchor/hello-123": {
+      "arm": "cuda-draw-anchor",
+      "case": "hello-123",
+      "samples": 152576,
+      "rms": 0.00014829708738194465,
+      "cuda_peak_allocated": 8682838016,
+      "seed": 123,
+      "draw_calls": 314,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "",
+      "wer": 1.0,
+      "pcm_sha256": "22dfdc26600497b0fbad16782ae739c6c1e4d93f96788e9bfe20de24daf90dcc"
+    },
+    "cuda-draw-anchor/fox-42": {
+      "arm": "cuda-draw-anchor",
+      "case": "fox-42",
+      "samples": 463360,
+      "rms": 0.07713114245011828,
+      "cuda_peak_allocated": 9685148160,
+      "seed": 42,
+      "draw_calls": 921,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7bc59d851f0cbb90b19050277863bd9508eb6f9c6471d7324d1294898e7dd1ab"
+    },
+    "cuda-draw-anchor/fox-123": {
+      "arm": "cuda-draw-anchor",
+      "case": "fox-123",
+      "samples": 481792,
+      "rms": 0.08692789185058837,
+      "cuda_peak_allocated": 9685965312,
+      "seed": 123,
+      "draw_calls": 957,
+      "transfer_checks": 0,
+      "inactive_rng_unchanged": true,
+      "active_rng_advanced": true,
+      "transcript": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "pcm_sha256": "7ebd85297d85ab24183693bdde1b53c8ea4bd16585e835efd8d2816dda59ac31"
+    }
+  },
+  "tiny_device_comparisons": {
+    "uniform-42": {
+      "exact": false,
+      "identical_ids": 0,
+      "total_ids": 72
+    },
+    "uniform-123": {
+      "exact": false,
+      "identical_ids": 0,
+      "total_ids": 72
+    },
+    "linear-42": {
+      "exact": false,
+      "identical_ids": 0,
+      "total_ids": 72
+    },
+    "linear-123": {
+      "exact": false,
+      "identical_ids": 0,
+      "total_ids": 72
+    },
+    "onehot-42": {
+      "exact": true,
+      "identical_ids": 72,
+      "total_ids": 72
+    },
+    "onehot-123": {
+      "exact": true,
+      "identical_ids": 72,
+      "total_ids": 72
+    }
+  },
+  "initial_rng_exact_across_arms": true,
+  "anchors": {
+    "legacy": {
+      "same_shape": true,
+      "pcm_exact": false,
+      "cosine": 0.9999999977021555,
+      "first_norm": 0.10384299877480836,
+      "final_norm": 0.10384321240133167,
+      "relative_l2": 6.782278770870514e-05,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "hello-42": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 1.0000000000000002,
+      "first_norm": 0.06367437151095579,
+      "final_norm": 0.06367437151095579,
+      "relative_l2": 0.0,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "hello-123": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 0.9999999999999999,
+      "first_norm": 0.0579262926329289,
+      "final_norm": 0.0579262926329289,
+      "relative_l2": 0.0,
+      "first_wer": 1.0,
+      "final_wer": 1.0
+    },
+    "fox-42": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 0.9999999999999999,
+      "first_norm": 52.50359414877831,
+      "final_norm": 52.50359414877831,
+      "relative_l2": 0.0,
+      "first_wer": 0.0,
+      "final_wer": 0.0
+    },
+    "fox-123": {
+      "same_shape": true,
+      "pcm_exact": true,
+      "cosine": 1.0000000000000002,
+      "first_norm": 60.33772614692947,
+      "final_norm": 60.33772614692947,
+      "relative_l2": 0.0,
+      "first_wer": 0.0,
+      "final_wer": 0.0
+    }
+  },
+  "anchor_quality_matches": true,
+  "source_fox_controls_pass": true,
+  "all_wer_zero": false,
+  "speech_acceptance": false,
+  "native_acceptance": false,
+  "q4_acceptance": false,
+  "production_defaults_changed": false,
+  "scope": "Payload/source/dtype/control/PCM/WAV/raw-ASR/RNG/anchor audit; no neural weights reread, no GPU inference or cross-version ffmpeg replay",
+  "draw_replay": {
+    "torch": "2.11.0+cu130",
+    "torch_source": "70d99e998b4955e0049d13a98d77ae1b14db1f45",
+    "cases": {
+      "legacy": {
+        "cpu_first64_draws_exact": true,
+        "actual_original_generate_feedback_replay": true,
+        "replayed_cpu_ids": 576,
+        "anchor_all_preoverride_ids_exact": true,
+        "anchor_first64_probabilities_exact": true,
+        "initial_probabilities_exact": true,
+        "first_applied_feedback_difference": [
+          1,
+          0
+        ],
+        "first_probability_difference": [
+          1,
+          0,
+          35
+        ],
+        "feedback_values": {
+          "cuda": 568,
+          "cpu": 698
+        },
+        "causal_draw_step": 0,
+        "causal_input": {
+          "probabilities_exact": true,
+          "cosine": 1.0,
+          "cuda_norm": 0.5734147553611192,
+          "cpu_norm": 0.5734147553611192,
+          "relative_l2": 0.0,
+          "cuda_selected_probability": 0.5480422377586365,
+          "cpu_selected_probability": 0.11682265996932983
+        }
+      },
+      "hello-42": {
+        "cpu_first64_draws_exact": true,
+        "actual_original_generate_feedback_replay": true,
+        "replayed_cpu_ids": 576,
+        "anchor_all_preoverride_ids_exact": true,
+        "anchor_first64_probabilities_exact": true,
+        "initial_probabilities_exact": true,
+        "first_applied_feedback_difference": [
+          1,
+          0
+        ],
+        "first_probability_difference": [
+          1,
+          0,
+          121
+        ],
+        "feedback_values": {
+          "cuda": 568,
+          "cpu": 698
+        },
+        "causal_draw_step": 0,
+        "causal_input": {
+          "probabilities_exact": true,
+          "cosine": 1.0,
+          "cuda_norm": 0.41379578005866635,
+          "cpu_norm": 0.41379578005866635,
+          "relative_l2": 0.0,
+          "cuda_selected_probability": 0.3583544194698334,
+          "cpu_selected_probability": 0.16645126044750214
+        }
+      },
+      "hello-123": {
+        "cpu_first64_draws_exact": true,
+        "actual_original_generate_feedback_replay": true,
+        "replayed_cpu_ids": 576,
+        "anchor_all_preoverride_ids_exact": true,
+        "anchor_first64_probabilities_exact": true,
+        "initial_probabilities_exact": true,
+        "first_applied_feedback_difference": [
+          15,
+          8
+        ],
+        "first_probability_difference": null,
+        "feedback_values": {
+          "cuda": 344,
+          "cpu": 21
+        },
+        "causal_draw_step": 14,
+        "causal_input": {
+          "probabilities_exact": true,
+          "cosine": 0.9999999999999998,
+          "cuda_norm": 0.19135474889207055,
+          "cpu_norm": 0.19135474889207055,
+          "relative_l2": 0.0,
+          "cuda_selected_probability": 0.024128325283527374,
+          "cpu_selected_probability": 0.01701737567782402
+        }
+      },
+      "fox-42": {
+        "cpu_first64_draws_exact": true,
+        "actual_original_generate_feedback_replay": true,
+        "replayed_cpu_ids": 576,
+        "anchor_all_preoverride_ids_exact": true,
+        "anchor_first64_probabilities_exact": true,
+        "initial_probabilities_exact": true,
+        "first_applied_feedback_difference": [
+          1,
+          0
+        ],
+        "first_probability_difference": [
+          1,
+          0,
+          92
+        ],
+        "feedback_values": {
+          "cuda": 568,
+          "cpu": 330
+        },
+        "causal_draw_step": 0,
+        "causal_input": {
+          "probabilities_exact": true,
+          "cosine": 0.9999999999999999,
+          "cuda_norm": 0.4532867645557735,
+          "cpu_norm": 0.4532867645557735,
+          "relative_l2": 0.0,
+          "cuda_selected_probability": 0.4140741527080536,
+          "cpu_selected_probability": 0.04925467446446419
+        }
+      },
+      "fox-123": {
+        "cpu_first64_draws_exact": true,
+        "actual_original_generate_feedback_replay": true,
+        "replayed_cpu_ids": 576,
+        "anchor_all_preoverride_ids_exact": true,
+        "anchor_first64_probabilities_exact": true,
+        "initial_probabilities_exact": true,
+        "first_applied_feedback_difference": [
+          15,
+          8
+        ],
+        "first_probability_difference": null,
+        "feedback_values": {
+          "cuda": 344,
+          "cpu": 21
+        },
+        "causal_draw_step": 14,
+        "causal_input": {
+          "probabilities_exact": true,
+          "cosine": 1.0,
+          "cuda_norm": 0.1800659888776871,
+          "cpu_norm": 0.1800659888776871,
+          "relative_l2": 0.0,
+          "cuda_selected_probability": 0.023218171671032906,
+          "cpu_selected_probability": 0.01893761195242405
+        }
+      }
+    },
+    "replayed_cpu_ids": 2880,
+    "scope": "First64 actual CPU probability inputs and pre-override sampled IDs replayed; feedback reconstruction cross-checked through actual original generate with stubbed neural step/codec output on all15 trajectories; not newly observed neural inputs. No neural weights or CUDA replay."
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "747f8d0bcc9effdc21be513a11321b1ecd53dce9",
+    "parent_revision": "7bc65637442e50bd17f8a6abb5139781f7ba9883",
+    "raw_revision": "7bc65637442e50bd17f8a6abb5139781f7ba9883",
+    "files": [
+      {
+        "path": "dia-20261016-original-cuda/sampler-device-v1-audit-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/747f8d0bcc9effdc21be513a11321b1ecd53dce9/dia-20261016-original-cuda/sampler-device-v1-audit-v1/proof.zip",
+        "bytes": 7310291,
+        "sha256": "3f3ae481d2fc7a70bbf2d8eb78483fec5a9383e66bd386d6c993954e9f931a09",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-original-cuda/sampler-device-v1-audit-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/747f8d0bcc9effdc21be513a11321b1ecd53dce9/dia-20261016-original-cuda/sampler-device-v1-audit-v1/README.md",
+        "bytes": 4387,
+        "sha256": "7653b68770e6c8dcb015fe2969562a63dc01b9ac14bd4b8e2ac34348cff2646a",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  }
+}

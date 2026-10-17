@@ -1,0 +1,576 @@
+{
+  "candidate_source": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+  "integrated": true,
+  "runs": {
+    "heavy": {
+      "databaseId": 38764924112,
+      "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_jobs": 1,
+      "total_jobs": 1
+    },
+    "previous_lint": {
+      "databaseId": 38764928533,
+      "headSha": "ff7e07c0f5ec846ff7de569c117c1d0b30af404d",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "superseded_by": 38767820341
+    },
+    "lint": {
+      "databaseId": 38767820341,
+      "headSha": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "success",
+      "completed_jobs": 10,
+      "total_jobs": 10
+    }
+  },
+  "producer": {
+    "scope": "Capture actual pinned original self-attention Q with owned-input controls.\n\nThis loads five layer0 tensors, never the full neural model. The original\nself-attention forward and RoPE are executed unchanged; hooks only own copies.\nA module replay is explicitly distinguished from the earlier full-model run.\n",
+    "source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "producer_sha256": "773a4f5d469facb3734cd36637e320ddd809bc3cc91bb25c6d559c0de6c41ac7",
+    "numpy_version": "1.26.4",
+    "torch_version": "2.6.0+cpu",
+    "torch_build_configuration": "PyTorch built with:\n  - GCC 9.3\n  - C++ Version: 201703\n  - Intel(R) oneAPI Math Kernel Library Version 2024.2-Product Build 20240605 for Intel(R) 64 architecture applications\n  - Intel(R) MKL-DNN v3.5.3 (Git Hash 66f0cb9eb66affd2da3bf5f8d897376f04aae6af)\n  - OpenMP 201511 (a.k.a. OpenMP 4.5)\n  - LAPACK is enabled (usually provided by MKL)\n  - NNPACK is enabled\n  - CPU capability usage: AVX512\n  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, COMMIT_SHA=2236df1770800ffea5697b11b0bb0d910b2e59e1, CXX_COMPILER=/opt/rh/devtoolset-9/root/usr/bin/c++, CXX_FLAGS= -D_GLIBCXX_USE_CXX11_ABI=0 -fabi-version=11 -fvisibility-inlines-hidden -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DLIBKINETO_NOXPUPTI=ON -DUSE_FBGEMM -DUSE_PYTORCH_QNNPACK -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE -O2 -fPIC -Wall -Wextra -Werror=return-type -Werror=non-virtual-dtor -Werror=bool-operation -Wnarrowing -Wno-missing-field-initializers -Wno-type-limits -Wno-array-bounds -Wno-unknown-pragmas -Wno-unused-parameter -Wno-strict-overflow -Wno-strict-aliasing -Wno-stringop-overflow -Wsuggest-override -Wno-psabi -Wno-error=old-style-cast -Wno-missing-braces -fdiagnostics-color=always -faligned-new -Wno-unused-but-set-variable -Wno-maybe-uninitialized -fno-math-errno -fno-trapping-math -Werror=format -Wno-stringop-overflow, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, TORCH_VERSION=2.6.0, USE_CUDA=0, USE_CUDNN=OFF, USE_CUSPARSELT=OFF, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_GLOO=ON, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=ON, USE_OPENMP=ON, USE_ROCM=OFF, USE_ROCM_KERNEL_ASSERT=OFF, \n",
+    "coefficient_bytes": 41951232,
+    "verified_inputs": [
+      {
+        "path": "inputs/physical-coefficients.json",
+        "bytes": 8593,
+        "sha256": "e377c6be57173218572a9bedfd72afc1ea70c10a57b79bc7518043b29c4206f8"
+      },
+      {
+        "path": "inputs/prior-receipt.json",
+        "bytes": 54079,
+        "sha256": "7b7a1d7cb9bbf92da9b621b48432abe5f7913d858365b666a29de2e9edb2ed17"
+      },
+      {
+        "path": "inputs/pre_sa_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "aa94916f5b9bb77e33c3df398519de3dc6c448c9dccbaa99d6b465dfea5da920"
+      },
+      {
+        "path": "inputs/self_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      },
+      {
+        "path": "inputs/self_attention.k_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
+      },
+      {
+        "path": "inputs/self_attention.v_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
+      },
+      {
+        "path": "inputs/self_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "fd7728e6fe7a235dd8b72e12e8262aa9efff1f3e57a537c69c08fdec0c63df4c"
+      },
+      {
+        "path": "inputs/config.json",
+        "bytes": 941,
+        "sha256": "9140e85fd15b82d7f268c5681a41fb1de68573ec206b87cb3a5862fe5c598d6e"
+      },
+      {
+        "path": "inputs/original-state.py",
+        "bytes": 7205,
+        "sha256": "83d0ddc651bab76afe91c8851b515f12863d1221778765a6d9d4462581f5d13f"
+      },
+      {
+        "path": "inputs/original-layers.py",
+        "bytes": 21750,
+        "sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024"
+      },
+      {
+        "path": "inputs/hidden.npy",
+        "bytes": 16512,
+        "sha256": "fef33af2925d66037315d389491dc50927f3d565a704b6c61894f29d0810ca3c"
+      },
+      {
+        "path": "inputs/pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "inputs/sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "743884bf3d231eafe9c569b3f715bfc0dd029cbf79b77e6cde070654d7950ef7"
+      },
+      {
+        "path": "inputs/sa_output.npy",
+        "bytes": 16512,
+        "sha256": "6110cfd5030e647b4c86a1eab930b3c242edd511bf489a9934500144d0812eee"
+      },
+      {
+        "path": "inputs/original-full-k.f32",
+        "bytes": 4009984,
+        "sha256": "aa8525e4fa50878160f9df8f8b0386e2c3a4fb8e6af257f921b651dfd167f6a2"
+      },
+      {
+        "path": "inputs/original-full-v.f32",
+        "bytes": 4009984,
+        "sha256": "f43f90b12fc57062582b531dbdee4a8b7058348fad0f5b84103fb25c2f65995c"
+      },
+      {
+        "path": "inputs/native-query.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      }
+    ],
+    "canonical_reference_sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78",
+    "prior_module_replay": {
+      "pre_sa_norm": {
+        "byte_exact": true,
+        "cosine_min": 1.0000000000000002,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      "sa_attention": {
+        "byte_exact": true,
+        "cosine_min": 0.9999999999999999,
+        "mine_norm": 3.8461873010107523,
+        "ref_norm": 3.8461873010107523,
+        "max_row_norm_error": 0.0,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      "sa_output": {
+        "byte_exact": true,
+        "cosine_min": 0.9999999999999999,
+        "mine_norm": 7.676560557808786,
+        "ref_norm": 7.676560557808786,
+        "max_row_norm_error": 0.0,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      }
+    },
+    "full_original_reference": {
+      "pre_sa_norm": {
+        "byte_exact": true,
+        "cosine_min": 1.0000000000000002,
+        "mine_norm": 2.6446935525814737,
+        "ref_norm": 2.6446935525814737,
+        "max_row_norm_error": 0.0,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      "sa_attention": {
+        "byte_exact": false,
+        "cosine_min": 0.999999999990153,
+        "mine_norm": 3.8461873010107523,
+        "ref_norm": 3.846187515314453,
+        "max_row_norm_error": 1.2862188925044649e-06,
+        "relative_l2": 9.529530817028522e-07,
+        "max_abs": 1.1026859283447266e-06
+      },
+      "sa_output": {
+        "byte_exact": false,
+        "cosine_min": 0.9999999999994287,
+        "mine_norm": 7.676560557808786,
+        "ref_norm": 7.676561452118088,
+        "max_row_norm_error": 1.164986831447834e-07,
+        "relative_l2": 1.0752962921354859e-06,
+        "max_abs": 1.1920928955078125e-06
+      }
+    },
+    "negative_controls": {
+      "scale-control": {
+        "byte_exact": false,
+        "cosine_min": 0.9967401803147815,
+        "mine_norm": 7.663460535029251,
+        "ref_norm": 7.676560557808786,
+        "max_row_norm_error": 0.0017064963769757302,
+        "relative_l2": 0.0806934059223978,
+        "max_abs": 0.03508294001221657
+      },
+      "head-order-control": {
+        "byte_exact": false,
+        "cosine_min": 0.6593698202890909,
+        "mine_norm": 7.283806896597605,
+        "ref_norm": 7.676560557808786,
+        "max_row_norm_error": 0.051162712552519696,
+        "relative_l2": 0.8056195470785358,
+        "max_abs": 0.7557240575551987
+      }
+    },
+    "repeats_exact": true,
+    "native_vs_replayed_original_query": {
+      "byte_exact": false,
+      "cosine_min": 0.9999999981255697,
+      "mine_norm": 31.515238325278595,
+      "ref_norm": 31.515237858899997,
+      "max_row_norm_error": 6.715343792151884e-08,
+      "relative_l2": 5.370203744715573e-05,
+      "max_abs": 0.0005432665348052979
+    },
+    "cache_capacity_does_not_change_query": true,
+    "full_original_self_query_previously_captured": false,
+    "full_reference_reconstruction_gate_pass": true,
+    "full_reference_all_stages_byte_exact": false,
+    "prior_module_replay_byte_exact": true,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "interpretation_limit": "Observed Q belongs to actual pinned original module replay. It is not relabeled as an earlier full-model captured query.",
+    "files": [
+      {
+        "path": "full-reference-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "full-reference-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "c3ff55980d2f76daf67616a2487a7161973f03a2218f2f663a46f0a4315e6514"
+      },
+      {
+        "path": "full-reference-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "c327a62bac8bd3a18371c6a404fca2120b55fe446b1cf90d5eecb31163a59ed8"
+      },
+      {
+        "path": "head-order-control-current_key.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "head-order-control-pre_rope_query.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "head-order-control-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "head-order-control-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "head-order-control-query_positions.npy",
+        "bytes": 136,
+        "sha256": "12bdbb82d00c72333e2dab51ca0c89c5d7b1b7236cec3137036fa82ebcc84116"
+      },
+      {
+        "path": "head-order-control-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "0901b5e86626e747f9683902ec67633e5ed559d2bd5a29fd907398b4c829908e"
+      },
+      {
+        "path": "head-order-control-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "4fa9c45d74dcd0dfb158893d87e774d75d9e0a10fb37838f2879ec4b98dc447c"
+      },
+      {
+        "path": "inputs/config.json",
+        "bytes": 941,
+        "sha256": "9140e85fd15b82d7f268c5681a41fb1de68573ec206b87cb3a5862fe5c598d6e"
+      },
+      {
+        "path": "inputs/hidden.npy",
+        "bytes": 16512,
+        "sha256": "fef33af2925d66037315d389491dc50927f3d565a704b6c61894f29d0810ca3c"
+      },
+      {
+        "path": "inputs/native-query.f32",
+        "bytes": 16384,
+        "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
+      },
+      {
+        "path": "inputs/original-full-k.f32",
+        "bytes": 4009984,
+        "sha256": "aa8525e4fa50878160f9df8f8b0386e2c3a4fb8e6af257f921b651dfd167f6a2"
+      },
+      {
+        "path": "inputs/original-full-v.f32",
+        "bytes": 4009984,
+        "sha256": "f43f90b12fc57062582b531dbdee4a8b7058348fad0f5b84103fb25c2f65995c"
+      },
+      {
+        "path": "inputs/original-layers.py",
+        "bytes": 21750,
+        "sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024"
+      },
+      {
+        "path": "inputs/original-state.py",
+        "bytes": 7205,
+        "sha256": "83d0ddc651bab76afe91c8851b515f12863d1221778765a6d9d4462581f5d13f"
+      },
+      {
+        "path": "inputs/physical-coefficients.json",
+        "bytes": 8593,
+        "sha256": "e377c6be57173218572a9bedfd72afc1ea70c10a57b79bc7518043b29c4206f8"
+      },
+      {
+        "path": "inputs/pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "inputs/pre_sa_norm.weight.original.f32",
+        "bytes": 8192,
+        "sha256": "aa94916f5b9bb77e33c3df398519de3dc6c448c9dccbaa99d6b465dfea5da920"
+      },
+      {
+        "path": "inputs/prior-receipt.json",
+        "bytes": 54079,
+        "sha256": "7b7a1d7cb9bbf92da9b621b48432abe5f7913d858365b666a29de2e9edb2ed17"
+      },
+      {
+        "path": "inputs/sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "743884bf3d231eafe9c569b3f715bfc0dd029cbf79b77e6cde070654d7950ef7"
+      },
+      {
+        "path": "inputs/sa_output.npy",
+        "bytes": 16512,
+        "sha256": "6110cfd5030e647b4c86a1eab930b3c242edd511bf489a9934500144d0812eee"
+      },
+      {
+        "path": "inputs/self_attention.k_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
+      },
+      {
+        "path": "inputs/self_attention.o_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "fd7728e6fe7a235dd8b72e12e8262aa9efff1f3e57a537c69c08fdec0c63df4c"
+      },
+      {
+        "path": "inputs/self_attention.q_proj.weight.original.f32",
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      },
+      {
+        "path": "inputs/self_attention.v_proj.weight.original.f32",
+        "bytes": 4194304,
+        "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
+      },
+      {
+        "path": "native-query.npy",
+        "bytes": 16512,
+        "sha256": "de641663e15e26f626fe8a75108e52eebdf8ebd09ee2d725ba9f9385453b6985"
+      },
+      {
+        "path": "original-capacity-current_key.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "original-capacity-pre_rope_query.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "original-capacity-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "original-capacity-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "original-capacity-query_positions.npy",
+        "bytes": 136,
+        "sha256": "12bdbb82d00c72333e2dab51ca0c89c5d7b1b7236cec3137036fa82ebcc84116"
+      },
+      {
+        "path": "original-capacity-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "743884bf3d231eafe9c569b3f715bfc0dd029cbf79b77e6cde070654d7950ef7"
+      },
+      {
+        "path": "original-capacity-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "6110cfd5030e647b4c86a1eab930b3c242edd511bf489a9934500144d0812eee"
+      },
+      {
+        "path": "prior-capacity-current_key.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "prior-capacity-pre_rope_query.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "prior-capacity-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "prior-capacity-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "prior-capacity-query_positions.npy",
+        "bytes": 136,
+        "sha256": "12bdbb82d00c72333e2dab51ca0c89c5d7b1b7236cec3137036fa82ebcc84116"
+      },
+      {
+        "path": "prior-capacity-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "743884bf3d231eafe9c569b3f715bfc0dd029cbf79b77e6cde070654d7950ef7"
+      },
+      {
+        "path": "prior-capacity-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "6110cfd5030e647b4c86a1eab930b3c242edd511bf489a9934500144d0812eee"
+      },
+      {
+        "path": "scale-control-current_key.npy",
+        "bytes": 4224,
+        "sha256": "37fe14faa90e03f743f4e98c2a3ccea559c3827bacd73b2bc9593c3b2e4e2099"
+      },
+      {
+        "path": "scale-control-pre_rope_query.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "scale-control-pre_sa_norm.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "scale-control-query.npy",
+        "bytes": 16512,
+        "sha256": "6bcb27e8e94289ac4788689364d38c258af2108cabad984a7f150c92ff73d023"
+      },
+      {
+        "path": "scale-control-query_positions.npy",
+        "bytes": 136,
+        "sha256": "12bdbb82d00c72333e2dab51ca0c89c5d7b1b7236cec3137036fa82ebcc84116"
+      },
+      {
+        "path": "scale-control-sa_attention.npy",
+        "bytes": 16512,
+        "sha256": "e3653b5f3198989e4f14f7a5b14cbb2af5f8beacf6828eb7be9bcdfe00146ceb"
+      },
+      {
+        "path": "scale-control-sa_output.npy",
+        "bytes": 16512,
+        "sha256": "903dfd2fc8a7673f9b04f5b6b3e22497e9248fb9d22f54b07b954d57c3790fba"
+      }
+    ]
+  },
+  "independent_producer_audit": {
+    "independent_audit_pass": true,
+    "all_payloads_verified": 49,
+    "query_and_pre_rope_exact": true,
+    "actual_original_projection_and_rotary_replayed": true,
+    "all_baseline_and_negative_attention_arrays_reproduced_exactly": true,
+    "full_original_stage_metrics": {
+      "pre_sa_norm": {
+        "relative_l2": 0.0,
+        "max_row_norm_error": 0.0,
+        "cosine_min": 1.0000000000000002
+      },
+      "sa_attention": {
+        "relative_l2": 9.529530817028522e-07,
+        "max_row_norm_error": 1.2862188925044649e-06,
+        "cosine_min": 0.999999999990153
+      },
+      "sa_output": {
+        "relative_l2": 1.0752962921354859e-06,
+        "max_row_norm_error": 1.164986831447834e-07,
+        "cosine_min": 0.9999999999994287
+      }
+    },
+    "original_full_model_self_query_captured": false,
+    "scope": "Actual original module replay Q is qualified for a conditional intervention; full-model query was not retained and full-model stages are not byte-exact. No speech/GPU acceptance."
+  },
+  "publication": {
+    "revision": "dce9d23fc048c78e57729e403af04ed97dd78adb",
+    "files": [
+      {
+        "path": "dia-20261015-query-key/complete-original-query-replay-v1.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dce9d23fc048c78e57729e403af04ed97dd78adb/dia-20261015-query-key/complete-original-query-replay-v1.zip",
+        "bytes": 46884243,
+        "sha256": "33c26a38ca567b0872b90615c25e903c30679db4d7b2a35f6ac144687795c6c3"
+      },
+      {
+        "path": "dia-20261015-query-key/query-inputs-v1.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dce9d23fc048c78e57729e403af04ed97dd78adb/dia-20261015-query-key/query-inputs-v1.zip",
+        "bytes": 26217,
+        "sha256": "7b20c5f07250621ae9fde8e4aec9e8ba1ab114f420dd95b30d70aea27381affb"
+      }
+    ],
+    "anonymous_all_full_sha256_verified": true,
+    "complete_payloads": 59,
+    "scope": "Actual original module replay Q is qualified for a conditional intervention; full-model query was not retained and full-model stages are not byte-exact. No speech/GPU acceptance."
+  },
+  "local_guards": {
+    "factorial_and_malformed_array_controls_pass": true,
+    "actual_cpp_query_and_key_file_loaders_pass": true,
+    "full_patched_runtime_syntax_pass": true,
+    "actual_hosted_ggml_query_key_graph_pass": true,
+    "graph_guard_sha256": "10ae11e539ee7e279e82c2b53d98ff43f9f8edc984788a76288e53107eaa9613",
+    "graph_guard_log": "DIA_QUERY_KEY_GRAPH_GUARD_PASS: renamed Q/K leaves, pruned producer, consumed inputs and dot products exact\n",
+    "commands": [
+      [
+        "c++",
+        "-std=c++17",
+        "-fsyntax-only",
+        "-I",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
+        "-I",
+        "${CRISPASR_WORKTREES}/crispasr-dia-decoder-boundary-20261013/src",
+        "-I",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v1",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v1/dia_tts.cpp"
+      ],
+      [
+        "c++",
+        "-std=c++17",
+        "-O2",
+        "-I",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
+        "${CRISPASR_WORKTREES}/crispasr-dia-query-key-20261015/tools/ci-heavy/dia-query-key-intervention/graph_guard.cpp",
+        "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs",
+        "${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-cpu.so.0",
+        "${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-base.so.0",
+        "-o",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/graph-guard"
+      ]
+    ],
+    "header_revision": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "initial_include_directory_failure_retained": "local-guards-v1/0.log; corrected to exact c36 public headers in local-guards-v2"
+  },
+  "full_model_intervention_complete": true,
+  "speech_acceptance": false,
+  "gpu_acceptance": false,
+  "production_defaults_changed": false,
+  "latest_candidate_source": "b1de56284867dfcd45bc90289aadbb34a189f4e2",
+  "hosted_worker_unchanged_from_candidate_source": true,
+  "native_query_probe_receipt": "dia-native-query-producer-2026-10-15.json",
+  "hosted_status_checkpoint_utc": "2026-10-15 17:15 UTC",
+  "hosted_audit_preparation": {
+    "audit_sha256": "c6336245a26871f1cd027daaad0a8103d7e622f2ff44b082c0e8a9b99215cea6",
+    "calibration_source": "fc8f652fac1a602a2a9e7fbc645dc6795cd8f0e4",
+    "calibration_artifact_sha256": "83db2618e48dd329f58da66dfd1ff2e3f493adfb6177cee1e1104c6838efe02c",
+    "calibration_verified_payloads": 720,
+    "calibration_key_only_pass": true,
+    "new_query_key_checks_executed": true,
+    "full_query_key_audit_pass": true,
+    "storage_directory": "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015",
+    "scope": "Prepared independent archive/source/raw-array/sampler audit passes previous real key-only proof; pending Q/K artifact is not yet audited."
+  },
+  "integration": "637800051f7a2498d9830828f2dc435a372465f5",
+  "full_query_key_result": "dia-query-key-results-2026-10-15.json"
+}

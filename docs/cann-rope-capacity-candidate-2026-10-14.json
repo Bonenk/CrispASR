@@ -1,0 +1,243 @@
+{
+  "method": {
+    "scope": "Compile actual CANN allocation/cache code; test byte capacity, not RoPE math.\n\nCPU malloc/free instrument only requested buffer sizes. No ACL device operation\nor numerical reference is simulated. Run with TMPDIR on the storage volume.\nCANN_CAPACITY_OUT retains complete source, executable and per-case JSON rows.\n",
+    "command": [
+      "c++",
+      "-std=c++17",
+      "-O0",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-candidate/actual-capacity.cpp",
+      "-o",
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-candidate/capacity-probe"
+    ],
+    "operations_sha256": "2c0c91c70e8da880612e8e649d1fc71bbcc48558192cf7a8120d4b870440b306",
+    "common_sha256": "af716ff6965a4f65d1cb954f54a3fb4dc01801bb94a37eb3c6d8650105dbaf13",
+    "allocation_sha256": "ae25cdd92de4708f6ad5ed7c46f7fab693309163512554256a87c6763380e0f7",
+    "metadata_sha256": "966b2de361b56f6a7f15281cbc0a8551358ca70f5616c168ec42d62dad66dcb3",
+    "probe_source_sha256": "daa4aec57097f08b2a165c2a895ddf943efe498f1f043176898d81f9c0571e8f",
+    "probe_binary_sha256": "9583ca41a5c6cbcba8d5ce27d424fa80235607509f5cc806dbb0f87b54c67bca"
+  },
+  "candidate": {
+    "candidate": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "base": "21acf3162beeb4e51260f0f86deda80995423712",
+    "sdk_source": "ca4c12c4cfec475c0009f9718a18ffb42d2cda6a",
+    "sdk_run": 38536737288,
+    "unit_result": "Four unchanged allocation regressions pass; old two failing controls retained separately.",
+    "scope": "Candidate requested-byte capacity only. No NPU numerical/model/quality/performance acceptance. Production pin unchanged.",
+    "files": [
+      {
+        "path": "actual-capacity.cpp",
+        "bytes": 6652,
+        "sha256": "daa4aec57097f08b2a165c2a895ddf943efe498f1f043176898d81f9c0571e8f"
+      },
+      {
+        "path": "candidate-aclnn_ops.cpp",
+        "bytes": 217216,
+        "sha256": "2c0c91c70e8da880612e8e649d1fc71bbcc48558192cf7a8120d4b870440b306"
+      },
+      {
+        "path": "candidate-common.h",
+        "bytes": 23452,
+        "sha256": "af716ff6965a4f65d1cb954f54a3fb4dc01801bb94a37eb3c6d8650105dbaf13"
+      },
+      {
+        "path": "candidate.patch",
+        "bytes": 2189,
+        "sha256": "2a17694cbe178d310d7377920f158344aab8c9f4da5190ada90cd420b8c417bd"
+      },
+      {
+        "path": "capacity-probe",
+        "bytes": 50488,
+        "sha256": "9583ca41a5c6cbcba8d5ce27d424fa80235607509f5cc806dbb0f87b54c67bca"
+      },
+      {
+        "path": "ggml-LICENSE",
+        "bytes": 1078,
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+      },
+      {
+        "path": "ggml-secret-scan.log",
+        "bytes": 564,
+        "sha256": "f7095e227e6ded5831b3776d01cb32f4c34d63c52831b36f961b5f94954614fd"
+      },
+      {
+        "path": "method.json",
+        "bytes": 1181,
+        "sha256": "ac33fc1086a80006b8942ead36c45dacca0608d06e92b2357167d9d8cad61833"
+      },
+      {
+        "path": "position-growth.jsonl",
+        "bytes": 239,
+        "sha256": "0d5663068f5b3cde82c967183a24f95b6c018ede880eb3eff0b78f0f53e5fc28"
+      },
+      {
+        "path": "reported-width-sequence.jsonl",
+        "bytes": 498,
+        "sha256": "edfea7cb542b902bc7aaf0cb708d36f3c4f0325047516317dcf03f503c7d1453"
+      },
+      {
+        "path": "same-bytes-different-shapes.jsonl",
+        "bytes": 249,
+        "sha256": "b449c301aff865fed824c65ca6753809200dd4f3dcbced3a523c9b6561f65ce0"
+      },
+      {
+        "path": "test_cann_rope_capacity.py",
+        "bytes": 5728,
+        "sha256": "eb8bbb26a2af969395c92f5ef71bd1a9ce4c84a17bd73a8c645e501da1dc38d1"
+      },
+      {
+        "path": "unittest.log",
+        "bytes": 580,
+        "sha256": "8f855d488cb1322baab7b6ca15bb4aa12ae0970afaff96884ce44f2aa29398b1"
+      },
+      {
+        "path": "width-growth-fewer-positions.jsonl",
+        "bytes": 249,
+        "sha256": "fb68ad10b2e92957ebeddb96c22218fcf4ac84f05164ac525ec9914d13ff939d"
+      }
+    ]
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-rope-capacity/complete-candidate-capacity.zip",
+    "bytes": 69611,
+    "sha256": "b4f7cfc5273fffd4702d89fbbab79edd46c2a54fcd728907e9ece1bb7e606929",
+    "payloads": 15,
+    "anonymous_verified": true,
+    "revision": "4658a96c2b67c22c793f5f9be22a4c18234e0473"
+  },
+  "cases": {
+    "position-growth": [
+      {
+        "frame": 0,
+        "rotary_dims": 128,
+        "positions": 1,
+        "required_bytes_each": 512,
+        "sin_bytes": 512,
+        "cos_bytes": 512,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 128,
+        "positions": 512,
+        "required_bytes_each": 262144,
+        "sin_bytes": 262144,
+        "cos_bytes": 262144,
+        "safe": true
+      }
+    ],
+    "reported-width-sequence": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 2,
+        "rotary_dims": 256,
+        "positions": 512,
+        "required_bytes_each": 524288,
+        "sin_bytes": 524288,
+        "cos_bytes": 524288,
+        "safe": true
+      },
+      {
+        "frame": 3,
+        "rotary_dims": 128,
+        "positions": 512,
+        "required_bytes_each": 262144,
+        "sin_bytes": 524288,
+        "cos_bytes": 524288,
+        "safe": true
+      }
+    ],
+    "same-bytes-different-shapes": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 128,
+        "positions": 256,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      }
+    ],
+    "width-growth-fewer-positions": [
+      {
+        "frame": 0,
+        "rotary_dims": 64,
+        "positions": 512,
+        "required_bytes_each": 131072,
+        "sin_bytes": 131072,
+        "cos_bytes": 131072,
+        "safe": true
+      },
+      {
+        "frame": 1,
+        "rotary_dims": 256,
+        "positions": 256,
+        "required_bytes_each": 262144,
+        "sin_bytes": 262144,
+        "cos_bytes": 262144,
+        "safe": true
+      }
+    ]
+  },
+  "capacity_tests_pass": 4,
+  "bf16_routing_cases_per_chip": 13,
+  "production_pin_unchanged": true,
+  "physical_device_candidate_pass": false,
+  "sdk_submission": {
+    "conclusion": "",
+    "headSha": "ca4c12c4cfec475c0009f9718a18ffb42d2cda6a",
+    "jobs": [
+      {
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "databaseId": 115761380199,
+        "name": "linux-cann (ubuntu-24.04-arm, 310p, off)",
+        "startedAt": "2026-10-14T08:40:14Z",
+        "status": "queued",
+        "steps": [],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38536737288/job/115761380199"
+      },
+      {
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "databaseId": 115761380569,
+        "name": "linux-cann (ubuntu-24.04, 910b, on)",
+        "startedAt": "2026-10-14T08:40:14Z",
+        "status": "queued",
+        "steps": [],
+        "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38536737288/job/115761380569"
+      }
+    ],
+    "status": "queued",
+    "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/38536737288"
+  }
+}

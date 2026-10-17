@@ -1,0 +1,135 @@
+{
+  "run": 38154207238,
+  "source": "f4c8cf0c01dfa32f7fd158d40998e82934aa19d6",
+  "complete": true,
+  "arrays_independently_verified": 106,
+  "decision_rows": 90,
+  "original": {
+    "upstream": "58ec70ce5fa4cc361bdebf77ec40d1365da00ab2",
+    "model_revision": "3e28c5151381a722f1d8661b4118c298caa77aa4",
+    "reviewed_loader_sha256": "09c26e31a63ec36d852f2918415929c6148e5d1c750a68f9a5cb8e49819b4761",
+    "template": "tts_instruction",
+    "canonical_precision": "BF16 eager CPU",
+    "history": "original design-s1 frame zero",
+    "promoted_control": "depth-only FP32 arithmetic, BF16-rounded weights/hidden",
+    "prompt_and_backbone_logits_byte_exact": true
+  },
+  "native": {
+    "library_sha256": "dc4d5e4cf71f931c7dd02deec2dac2d8916b5b22ed0490e65eda1ea77a51a258",
+    "model_sha256": "08ea3fbffe9701a3d04a4a63554876841d923fdd21e20add36d28f3ac3447da7",
+    "device": "CPU; GPU backends OFF",
+    "invalid_history_controls_passed": 2,
+    "ordinary_history_exact_control_passed": true,
+    "changed_history_causal_control_passed": true
+  },
+  "proof": {
+    "revision": "dcaddf36f66d4932ec6f5391ec0e8239cc5cc61a",
+    "path": "breeze-guided-20261011/original-history-depth-proof.zip",
+    "bytes": 1140836,
+    "sha256": "8d10e90a0dc8a3da5ff6028753ce2b8ca641e2254feb5ca3a9049f3667d128fd",
+    "anonymous_verified": true
+  },
+  "variants": {
+    "bf16_cached": {
+      "exact_original_picks": 15,
+      "total": 15,
+      "minimum_cosine": 0.9999999403953552,
+      "norm_ratio_range": [
+        1.0,
+        1.0
+      ],
+      "mismatches": []
+    },
+    "bf16_full": {
+      "exact_original_picks": 15,
+      "total": 15,
+      "minimum_cosine": 0.9999999403953552,
+      "norm_ratio_range": [
+        1.0,
+        1.0
+      ],
+      "mismatches": []
+    },
+    "native_embeds": {
+      "exact_original_picks": 14,
+      "total": 15,
+      "minimum_cosine": 0.9999169111251831,
+      "norm_ratio_range": [
+        0.9970851540565491,
+        1.0017614364624023
+      ],
+      "mismatches": [
+        {
+          "codebook": 5,
+          "variant": "native_embeds",
+          "original_generated_pick": 193,
+          "pick": 936,
+          "original_pick_rank": 1,
+          "gap_to_best": 0.01799488067626953,
+          "cos_to_bf16_cached": 0.9999655485153198,
+          "norm_ratio": 1.0000041723251343
+        }
+      ]
+    },
+    "oracle_embeds": {
+      "exact_original_picks": 14,
+      "total": 15,
+      "minimum_cosine": 0.999916672706604,
+      "norm_ratio_range": [
+        0.9969674348831177,
+        1.0017094612121582
+      ],
+      "mismatches": [
+        {
+          "codebook": 5,
+          "variant": "oracle_embeds",
+          "original_generated_pick": 193,
+          "pick": 936,
+          "original_pick_rank": 1,
+          "gap_to_best": 0.01671886444091797,
+          "cos_to_bf16_cached": 0.9999693632125854,
+          "norm_ratio": 1.00006902217865
+        }
+      ]
+    },
+    "oracle_hidden": {
+      "exact_original_picks": 15,
+      "total": 15,
+      "minimum_cosine": 0.9999182224273682,
+      "norm_ratio_range": [
+        0.9970130324363708,
+        1.0014925003051758
+      ],
+      "mismatches": []
+    },
+    "promoted_depth_f32_full": {
+      "exact_original_picks": 15,
+      "total": 15,
+      "minimum_cosine": 0.9999173879623413,
+      "norm_ratio_range": [
+        0.9970994591712952,
+        1.0015252828598022
+      ],
+      "mismatches": []
+    }
+  },
+  "interpretation": "For design-s1 frame zero under original forced history, native depth with original hidden preserves all picks. Native backbone states flip codebook 5, ranking the original pick second with gap below 0.018. Backbone state differences localize this first flip; precision cause still requires backbone-layer controls.",
+  "limitations": [
+    "One case/frame under original forced history, not free-running generation.",
+    "Full eight-case exact generated-code gate remains failed.",
+    "No decoded speech, ASR, speaker or GPU acceptance.",
+    "FP32 depth promotion is a diagnostic control with BF16-rounded weights, not a replacement canonical oracle."
+  ],
+  "next_backbone_probe": {
+    "run": 38158762302,
+    "source": "e7219be4b",
+    "status_at_recording": "queued",
+    "superseded_run": 38158522850,
+    "superseded_run_cancelled_before_execution": true,
+    "mixed_dtype_restore_control": {
+      "old_source_preserves_dtypes_and_bytes": false,
+      "corrected_source_preserves_dtypes_and_bytes": true
+    },
+    "no_production_arithmetic_changes": true
+  }
+}

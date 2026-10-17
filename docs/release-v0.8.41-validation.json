@@ -93,7 +93,7 @@
     "seed": 0,
     "result": "CLI synthesis is valid WAV; Whisper reads quick-brim Fox instead of quick brown fox and existing gate rejects.",
     "wav_sha256": "0e32632abc9905d1e6f33284755515c262be3cbf0db96aa4854bbf24b9ddb935",
-    "cold_audio": "/mnt/volume1/tmp-overflow/cuda-483-proof/piper-failed-wav/cori-cli.wav",
+    "cold_audio": "${CRISPASR_WORKTREES}/tmp-overflow/cuda-483-proof/piper-failed-wav/cori-cli.wav",
     "same_commit_green_control": "https://github.com/CrispStrobe/CrispASR/actions/runs/37016731265"
   },
   "other_proofs": [

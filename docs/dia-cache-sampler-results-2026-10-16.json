@@ -1,0 +1,715 @@
+{
+  "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+  "official_artifact_id": 12049198423,
+  "official_sha256": "d4753346f6f98088e28d098fe014c12b960a05ff8acbbed1648d90b7854ad25c",
+  "payloads_verified": 535,
+  "independently_indexed_nested_receipts": [
+    {
+      "path": "original-tiny/receipt.json",
+      "bytes": 1374,
+      "sha256": "8eeb525f31cb35f78789c2038d83f4ce4ff04cbd91afc2c70a199a81a21c0e1e"
+    }
+  ],
+  "pristine_off_identity_exact": true,
+  "results": {
+    "off": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 1,
+      "original_inputs_exact": false,
+      "original_codes_exact": false,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "off",
+        "CRISPASR_DIA_PORTABLE_RNG": "0",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "0"
+      },
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.0001781026809299541
+      }
+    },
+    "identity": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 1,
+      "original_inputs_exact": false,
+      "original_codes_exact": false,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "identity",
+        "CRISPASR_DIA_PORTABLE_RNG": "0",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "0"
+      },
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      }
+    },
+    "serial-f16-standard": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 1,
+      "original_inputs_exact": false,
+      "original_codes_exact": false,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "serial",
+        "CRISPASR_DIA_PORTABLE_RNG": "0",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "0"
+      },
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017074594060200991
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017081531980748526
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.0001781026809299541
+      }
+    },
+    "serial-f16-portable": {
+      "steps": 1115,
+      "frames": 1099,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 865,
+      "original_inputs_exact": false,
+      "original_codes_exact": false,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "serial",
+        "CRISPASR_DIA_PORTABLE_RNG": "1",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "0"
+      },
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 12.759365079365079,
+        "rms": 0.00015749310930688554
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 12.759365079365079,
+        "rms": 0.00015797002467857237
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 12.759365079365079,
+        "rms": 0.00015772831204176487
+      }
+    },
+    "serial-f32-standard": {
+      "steps": 1439,
+      "frames": 1423,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 1,
+      "original_inputs_exact": false,
+      "original_codes_exact": false,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "serial",
+        "CRISPASR_DIA_PORTABLE_RNG": "0",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "1"
+      },
+      "native-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017077140355883192
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017084057863260305
+      },
+      "cli-pcm.npy": {
+        "transcript": "",
+        "wer": 1.0,
+        "seconds": 16.520997732426302,
+        "rms": 0.00017813211576740774
+      }
+    },
+    "serial-f32-portable": {
+      "steps": 1226,
+      "frames": 1210,
+      "decode_replay_exact": true,
+      "original_input_prefix_rows": 1226,
+      "original_inputs_exact": true,
+      "original_codes_exact": true,
+      "controls": {
+        "CRISPASR_DIA_SERIAL_HEAD": "serial",
+        "CRISPASR_DIA_PORTABLE_RNG": "1",
+        "CRISPASR_DIA_CROSS_CACHE_F32": "1"
+      },
+      "native-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "seconds": 14.048072562358277,
+        "rms": 0.07352807645541116
+      },
+      "original-dac-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "seconds": 14.048072562358277,
+        "rms": 0.0735338612890324
+      },
+      "cli-pcm.npy": {
+        "transcript": "We are committed to making it secure.",
+        "wer": 0.0,
+        "seconds": 14.048072562358277,
+        "rms": 0.07352585168279228
+      }
+    }
+  },
+  "metrics": [
+    {
+      "arm": "off",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999782154388,
+      "mine_norm": 37.52583508624022,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 0.00020874627710897278,
+      "norm_relative_error": 2.404476169948211e-06,
+      "max_abs": 0.00048792362213134766,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999787029192,
+      "mine_norm": 10.205319816873645,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 0.00020641250511750224,
+      "norm_relative_error": 3.4798711602279653e-06,
+      "max_abs": 0.0002186298370361328,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999995597658,
+      "mine_norm": 3.529273902488053,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 2.982985612170518e-05,
+      "norm_relative_error": 3.0576221992095753e-06,
+      "max_abs": 1.2248754501342773e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999997666187,
+      "mine_norm": 17.977738743137326,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 2.168022536277081e-05,
+      "norm_relative_error": 1.80771289293169e-06,
+      "max_abs": 5.5789947509765625e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999969479,
+      "mine_norm": 272.98661685549905,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 2.5682020508916117e-06,
+      "norm_relative_error": 6.978503561683169e-07,
+      "max_abs": 4.38690185546875e-05,
+      "pass": true
+    },
+    {
+      "arm": "off",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999643095,
+      "mine_norm": 295.99235664759306,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 1.0827058760359395e-05,
+      "norm_relative_error": 6.7704148933867e-06,
+      "max_abs": 0.0001373291015625,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999782154388,
+      "mine_norm": 37.52583508624022,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 0.00020874627710897278,
+      "norm_relative_error": 2.404476169948211e-06,
+      "max_abs": 0.00048792362213134766,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999787029192,
+      "mine_norm": 10.205319816873645,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 0.00020641250511750224,
+      "norm_relative_error": 3.4798711602279653e-06,
+      "max_abs": 0.0002186298370361328,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999995597658,
+      "mine_norm": 3.529273902488053,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 2.982985612170518e-05,
+      "norm_relative_error": 3.0576221992095753e-06,
+      "max_abs": 1.2248754501342773e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999997666187,
+      "mine_norm": 17.977738743137326,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 2.168022536277081e-05,
+      "norm_relative_error": 1.80771289293169e-06,
+      "max_abs": 5.5789947509765625e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.999999999996903,
+      "mine_norm": 272.98661325908785,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 2.589382959342727e-06,
+      "norm_relative_error": 7.110246602604064e-07,
+      "max_abs": 4.57763671875e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-standard",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.999999999964136,
+      "mine_norm": 295.9923557800641,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 1.0841246621019412e-05,
+      "norm_relative_error": 6.767483956782172e-06,
+      "max_abs": 0.00013780593872070312,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999782154388,
+      "mine_norm": 37.52583508624022,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 0.00020874627710897278,
+      "norm_relative_error": 2.404476169948211e-06,
+      "max_abs": 0.00048792362213134766,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999787029192,
+      "mine_norm": 10.205319816873645,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 0.00020641250511750224,
+      "norm_relative_error": 3.4798711602279653e-06,
+      "max_abs": 0.0002186298370361328,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999995597658,
+      "mine_norm": 3.529273902488053,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 2.982985612170518e-05,
+      "norm_relative_error": 3.0576221992095753e-06,
+      "max_abs": 1.2248754501342773e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999997666187,
+      "mine_norm": 17.977738743137326,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 2.168022536277081e-05,
+      "norm_relative_error": 1.80771289293169e-06,
+      "max_abs": 5.5789947509765625e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.999999999996903,
+      "mine_norm": 272.98661325908785,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 2.589382959342727e-06,
+      "norm_relative_error": 7.110246602604064e-07,
+      "max_abs": 4.57763671875e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f16-portable",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.999999999964136,
+      "mine_norm": 295.9923557800641,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 1.0841246621019412e-05,
+      "norm_relative_error": 6.767483956782172e-06,
+      "max_abs": 0.00013780593872070312,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999999999128,
+      "mine_norm": 37.52574715953797,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 4.211305386025708e-07,
+      "norm_relative_error": 6.137271957307178e-08,
+      "max_abs": 1.1846423149108887e-06,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999999998826,
+      "mine_norm": 10.20535578250289,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 4.861801371945938e-07,
+      "norm_relative_error": 4.4320607850423244e-08,
+      "max_abs": 2.980232238769531e-07,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999999997292,
+      "mine_norm": 3.529262825138417,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 7.401734693373545e-07,
+      "norm_relative_error": 8.109239546527647e-08,
+      "max_abs": 8.940696716308594e-07,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999999985001,
+      "mine_norm": 17.9777015700722,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 1.7516245011952427e-06,
+      "norm_relative_error": 2.600183638401532e-07,
+      "max_abs": 4.291534423828125e-06,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999996536,
+      "mine_norm": 272.98669136387036,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 9.374661014809292e-07,
+      "norm_relative_error": 4.249127295574695e-07,
+      "max_abs": 1.33514404296875e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-standard",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999996534,
+      "mine_norm": 295.9902864697438,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 8.65104279586854e-07,
+      "norm_relative_error": 2.2365714513750135e-07,
+      "max_abs": 2.09808349609375e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "cross_k0",
+      "values": 159744,
+      "cosine": 0.9999999999999128,
+      "mine_norm": 37.52574715953797,
+      "reference_norm": 37.525744856480955,
+      "relative_l2": 4.211305386025708e-07,
+      "norm_relative_error": 6.137271957307178e-08,
+      "max_abs": 1.1846423149108887e-06,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "cross_v0",
+      "values": 159744,
+      "cosine": 0.9999999999998826,
+      "mine_norm": 10.20535578250289,
+      "reference_norm": 10.205355330195339,
+      "relative_l2": 4.861801371945938e-07,
+      "norm_relative_error": 4.4320607850423244e-08,
+      "max_abs": 2.980232238769531e-07,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "decoder_ca0",
+      "values": 4096,
+      "cosine": 0.9999999999997292,
+      "mine_norm": 3.529262825138417,
+      "reference_norm": 3.5292631113348167,
+      "relative_l2": 7.401734693373545e-07,
+      "norm_relative_error": 8.109239546527647e-08,
+      "max_abs": 8.940696716308594e-07,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "decoder_hidden",
+      "values": 4096,
+      "cosine": 0.9999999999985001,
+      "mine_norm": 17.9777015700722,
+      "reference_norm": 17.97770624460596,
+      "relative_l2": 1.7516245011952427e-06,
+      "norm_relative_error": 2.600183638401532e-07,
+      "max_abs": 4.291534423828125e-06,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "uncond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999996536,
+      "mine_norm": 272.98669136387036,
+      "reference_norm": 272.9868073594398,
+      "relative_l2": 9.374661014809292e-07,
+      "norm_relative_error": 4.249127295574695e-07,
+      "max_abs": 1.33514404296875e-05,
+      "pass": true
+    },
+    {
+      "arm": "serial-f32-portable",
+      "stage": "cond_logits",
+      "values": 9252,
+      "cosine": 0.9999999999996534,
+      "mine_norm": 295.9902864697438,
+      "reference_norm": 295.99035267010106,
+      "relative_l2": 8.65104279586854e-07,
+      "norm_relative_error": 2.2365714513750135e-07,
+      "max_abs": 2.09808349609375e-05,
+      "pass": true
+    }
+  ],
+  "factorial_speech_pass": {
+    "serial-f16-standard": false,
+    "serial-f16-portable": false,
+    "serial-f32-standard": false,
+    "serial-f32-portable": true
+  },
+  "actual_native_original_sampler_replay": {
+    "serial-f16-portable": {
+      "decisions": 10035,
+      "exact": 10035,
+      "mismatches": []
+    },
+    "serial-f32-portable": {
+      "decisions": 11034,
+      "exact": 11034,
+      "mismatches": []
+    }
+  },
+  "stage_gate_pass": true,
+  "production_defaults_changed": false,
+  "production_speech_acceptance": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false,
+  "run_id": 38892690744,
+  "integration_commit": "ad0d15468b960f735445b9b08e9ee0f884ca2307",
+  "all_13_ci_pass": true,
+  "all_10_lint_pass": true,
+  "tested_runtime_sources_byte_exact": true,
+  "scope": "one fixed prompt/seed, disabled-by-default CPU recipe; broader speech, GPU, Q4 and performance remain unaccepted",
+  "public_complete_proof": {
+    "path": "dia-20261016-cache-sampler/complete-factorial-v1/complete-cache-sampler-factorial-v1.zip",
+    "bytes": 1248008904,
+    "sha256": "3d11b3c3a5d9e35862c1f8a2507d5da2b15e8367602c897fb61a027f37d7ede7",
+    "payloads": 17,
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "b1e02825d4fdb91b8b702accdcfb252798d475ee",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/b1e02825d4fdb91b8b702accdcfb252798d475ee/dia-20261016-cache-sampler/complete-factorial-v1/complete-cache-sampler-factorial-v1.zip",
+    "anonymous_full_download_verified": true
+  },
+  "actual_logit_nucleus_boundary": {
+    "receipt": {
+      "source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+      "step": 864,
+      "head": 6,
+      "original_token": 55,
+      "f16_token": 938,
+      "actual_original_sampler_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+      "torch": "2.6.0+cpu",
+      "input_prefix_exact": true,
+      "rows": [
+        {
+          "logits_source": "original",
+          "head": 6,
+          "selected": 55,
+          "probability_55": 0.015385376289486885,
+          "probability_938": 0.01616036146879196,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 2.840468406677246,
+          "score_938": 1.9911116361618042,
+          "score_margin_55_minus_938": 0.8493567705154419,
+          "retained_by_topk_and_nucleus_55": true,
+          "retained_by_topk_and_nucleus_938": true
+        },
+        {
+          "logits_source": "f16",
+          "head": 6,
+          "selected": 938,
+          "probability_55": 0.0,
+          "probability_938": 0.01616131328046322,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 0.0,
+          "score_938": 1.9912289381027222,
+          "score_margin_55_minus_938": -1.9912289381027222,
+          "retained_by_topk_and_nucleus_55": false,
+          "retained_by_topk_and_nucleus_938": true
+        },
+        {
+          "logits_source": "f32",
+          "head": 6,
+          "selected": 55,
+          "probability_55": 0.01538544986397028,
+          "probability_938": 0.016160504892468452,
+          "noise_55": 0.005416492465883493,
+          "noise_938": 0.008116250857710838,
+          "score_55": 2.840481996536255,
+          "score_938": 1.9911292791366577,
+          "score_margin_55_minus_938": 0.8493527173995972,
+          "retained_by_topk_and_nucleus_55": true,
+          "retained_by_topk_and_nucleus_938": true
+        }
+      ],
+      "scope": "Actual original sampler and exponential noise on captured original/native logits, no model run or reference injection",
+      "rank_crossing_token": 1008,
+      "nucleus": [
+        {
+          "source": "original",
+          "token55_scaled_logit": -2.657008647918701,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570236682891846,
+          "unscaled_margin_55_minus_competitor": 1.811981201171875e-05,
+          "rank55": 42,
+          "probability55_after_top45": 0.014717267826199532,
+          "cumulative_probability_before55": 0.9418578147888184,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": true,
+          "actual_cpp_probability55": 0.015385376289486885,
+          "actual_cpp_probability938": 0.01616036333143711,
+          "actual_cpp_token": 55
+        },
+        {
+          "source": "f16",
+          "token55_scaled_logit": -2.6570417881011963,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570329666137695,
+          "unscaled_margin_55_minus_competitor": -1.0728836059570312e-05,
+          "rank55": 43,
+          "probability55_after_top45": 0.014717302285134792,
+          "cumulative_probability_before55": 0.9565715193748474,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": false,
+          "actual_cpp_probability55": 0.0,
+          "actual_cpp_probability938": 0.01616131328046322,
+          "actual_cpp_token": 938
+        },
+        {
+          "source": "f32",
+          "token55_scaled_logit": -2.656989812850952,
+          "competing_token": 1008,
+          "competing_scaled_logit": -2.6570231914520264,
+          "unscaled_margin_55_minus_competitor": 4.00543212890625e-05,
+          "rank55": 42,
+          "probability55_after_top45": 0.014717352576553822,
+          "cumulative_probability_before55": 0.9418586492538452,
+          "cutoff": 0.95,
+          "retained_by_shifted_nucleus": true,
+          "actual_cpp_probability55": 0.015385450795292854,
+          "actual_cpp_probability938": 0.016160503029823303,
+          "actual_cpp_token": 55
+        }
+      ],
+      "actual_cpp_sampler_sha256": "60eef3589f084cdb4d0e9361d0640c4dc535eab52dcddb38233785d689dcc6e1",
+      "actual_cpp_noise_sha256": "e2d42a64b8b4d0bbc3948c4da29b8395d42f20b4df10b80bec1b101c41b7df0e"
+    },
+    "public_proof": {
+      "path": "dia-20261016-cache-sampler/actual-logit-nucleus-v1/dia-actual-logit-nucleus-proof-v1.zip",
+      "bytes": 501619,
+      "sha256": "d3207e3cc5b0798bb834172fcf85e76b54d762336418e893cfd82e61862fee38",
+      "payloads": 41,
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "c0ccddf211ad0e5d9b9c5108def4d5062b4f4342",
+      "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/c0ccddf211ad0e5d9b9c5108def4d5062b4f4342/dia-20261016-cache-sampler/actual-logit-nucleus-v1/dia-actual-logit-nucleus-proof-v1.zip",
+      "anonymous_full_download_verified": true
+    },
+    "portable_reproduction_all_27_head_decisions_exact": true
+  }
+}

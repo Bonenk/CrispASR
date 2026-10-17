@@ -13,6 +13,7 @@
 // by default.
 
 #include "core/gpu_backend_pref.h"
+#include "core/backend_validation.h"
 #include "core/metal_pipeline_cache_policy.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -119,4 +120,33 @@ TEST_CASE("metal-pipeline-cache-policy: MAX_MB=0 means uncapped", "[unit]") {
     REQUIRE(!core_metal_cache::apply());
     REQUIRE(std::getenv("GGML_METAL_PIPELINE_CACHE_DISABLE") == nullptr);
 #endif
+}
+
+TEST_CASE("backend-validation: exact CPU selection works without GPU permission", "[unit]") {
+    core_backend_validation::Request request("CPU", "0");
+    auto backend = core_backend_validation::init(request, false);
+    REQUIRE(backend != nullptr);
+    REQUIRE(ggml_backend_is_cpu(backend));
+    ggml_backend_free(backend);
+}
+
+TEST_CASE("backend-validation: absent registry never falls back", "[unit]") {
+    core_backend_validation::Request request("crispasr-nonexistent-device", "0");
+    REQUIRE(core_backend_validation::init(request, true) == nullptr);
+}
+
+TEST_CASE("backend-validation: GPU requirement conflicts with CPU-only request", "[unit]") {
+    core_backend_validation::Request request("cann", "0");
+    REQUIRE(core_backend_validation::init(request, false) == nullptr);
+}
+
+TEST_CASE("backend-validation: invalid and unavailable device ordinals fail", "[unit]") {
+    for (const char* ordinal : {"", "-1", "+0", "1x", "2147483648", "99999999999999999999999"}) {
+        core_backend_validation::Request request("cpu", ordinal);
+        REQUIRE_FALSE(request.valid);
+        REQUIRE(core_backend_validation::init(request, false) == nullptr);
+    }
+    core_backend_validation::Request request("cpu", "1");
+    REQUIRE(request.valid);
+    REQUIRE(core_backend_validation::init(request, false) == nullptr);
 }

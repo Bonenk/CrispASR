@@ -1,0 +1,270 @@
+{
+  "native_cpu_backend_pass": true,
+  "source": "a149749ee492c4ea9fa80b682d0248090f9bb6af",
+  "source_library_verification": {
+    "source": "a149749ee492c4ea9fa80b682d0248090f9bb6af",
+    "ggml_library_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
+    "ggml_current": "0a862076567afd8468822ccc512c97ac6a69b340",
+    "cpu_core_sources_identical": true,
+    "ggml_changed_files": [
+      "src/ggml-cann/aclnn_ops.cpp",
+      "src/ggml-cann/common.h",
+      "src/ggml-cann/ggml-cann.cpp"
+    ],
+    "files": [
+      {
+        "path": "src/moonshine.cpp",
+        "bytes": 67345,
+        "sha256": "4396d330930eb57919ad77954568465c2132d6070e428b3296db9eb6c7cfc5d1"
+      },
+      {
+        "path": "src/moonshine.h",
+        "bytes": 3959,
+        "sha256": "e4c3f4be18a88d6320999e82a05b4d73683d052c1059e358f13978568c61918d"
+      },
+      {
+        "path": "src/moonshine-impl.h",
+        "bytes": 4167,
+        "sha256": "6252091ce5efeb3634f6ee737ba9998c541c2befa10f08adff2b20ae7ed9fb4e"
+      },
+      {
+        "path": "src/moonshine-tokenizer.cpp",
+        "bytes": 5116,
+        "sha256": "fffe6b9a20194b53b0f9e4942a2f7f36f0756abd77006615509982c8b175e375"
+      },
+      {
+        "path": "src/moonshine-tokenizer.h",
+        "bytes": 665,
+        "sha256": "c04fef497c088fdf178fb1b645fb380cb153ab16ceccdd0929e94859f2f06360"
+      },
+      {
+        "path": "src/core/gguf_loader.cpp",
+        "bytes": 73196,
+        "sha256": "c26f21f34f88875a6900722d6c5c90176b8a71bcbc9b0a5603dc5c1a56dd6fd5"
+      },
+      {
+        "path": "src/core/gguf_loader.h",
+        "bytes": 18586,
+        "sha256": "bfb2a8b5cac51326429ee37789eac8c92b19f56a5536bcb590ed6db88455fbc5"
+      }
+    ],
+    "libraries": [
+      {
+        "path": "libs/libggml-base.so",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "libs/libggml-base.so.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "libs/libggml-base.so.0.26.0",
+        "bytes": 983808,
+        "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
+      },
+      {
+        "path": "libs/libggml-cpu.so",
+        "bytes": 1446416,
+        "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
+      },
+      {
+        "path": "libs/libggml.so",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "libs/libggml.so.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "libs/libggml.so.0.26.0",
+        "bytes": 55184,
+        "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
+      },
+      {
+        "path": "libs/libgomp.so.1",
+        "bytes": 317376,
+        "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
+      }
+    ]
+  },
+  "encoder_shape": [
+    457,
+    288
+  ],
+  "same_input_encoder_metrics": {
+    "cosine_min": 0.9999999997296947,
+    "max_row_norm_error": 5.323259081535525e-06,
+    "relative_l2": 2.1074627915260832e-06,
+    "max_abs": 4.9054622650146484e-05
+  },
+  "encoder_repeats_byte_exact": true,
+  "transcripts": [
+    "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+    "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+  ],
+  "original_transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.",
+  "normalized_zero_wer": true,
+  "raw_transcript_exact": [
+    true,
+    true
+  ],
+  "negative_controls_rejected": [
+    "double-scale",
+    "nonfinite",
+    "wrong-shape"
+  ],
+  "scope": "Actual unchanged Moonshine encoder and full backend transcription on CPU, with source/hash verified existing ggml CPU libraries whose CPU/core sources match current pin. No complete CLI/C ABI wiring, NPU, quant or performance acceptance.",
+  "files": [
+    {
+      "path": "audio.f32",
+      "bytes": 704000,
+      "sha256": "ebd52851100536db02d12c49fddd010372dcdc70243562e057553d476b706ae0"
+    },
+    {
+      "path": "build-missing-loader.log",
+      "bytes": 2495,
+      "sha256": "3995617c803266e916d1d37bfd2861806c6c3e4febc91e5e2d15c343643fa4ff"
+    },
+    {
+      "path": "build-missing-private-include.log",
+      "bytes": 1464,
+      "sha256": "0ea6acfe111b677eabd454cde0ab27c0cce1410d72e4ac1ea4e30da00ec88de5"
+    },
+    {
+      "path": "build.log",
+      "bytes": 1271,
+      "sha256": "6f96adcc7d7121cee76003f9e878bf5c85a9a59b2f6b16b9cf77b507e6680b69"
+    },
+    {
+      "path": "encoder-0.f32",
+      "bytes": 526464,
+      "sha256": "cdd9708f8bdd6e1078a65518e754e0a6b2190b9261616347780f46c0b4e1625d"
+    },
+    {
+      "path": "encoder-1.f32",
+      "bytes": 526464,
+      "sha256": "cdd9708f8bdd6e1078a65518e754e0a6b2190b9261616347780f46c0b4e1625d"
+    },
+    {
+      "path": "library-closure.log",
+      "bytes": 808,
+      "sha256": "28fcbb72e1b6b5e4809fb0242963a64ceab63f902bbde1185853266b73911fa9"
+    },
+    {
+      "path": "moonshine-impl.h",
+      "bytes": 4167,
+      "sha256": "6252091ce5efeb3634f6ee737ba9998c541c2befa10f08adff2b20ae7ed9fb4e"
+    },
+    {
+      "path": "moonshine-tokenizer.cpp",
+      "bytes": 5116,
+      "sha256": "fffe6b9a20194b53b0f9e4942a2f7f36f0756abd77006615509982c8b175e375"
+    },
+    {
+      "path": "moonshine-tokenizer.h",
+      "bytes": 665,
+      "sha256": "c04fef497c088fdf178fb1b645fb380cb153ab16ceccdd0929e94859f2f06360"
+    },
+    {
+      "path": "moonshine.cpp",
+      "bytes": 67345,
+      "sha256": "4396d330930eb57919ad77954568465c2132d6070e428b3296db9eb6c7cfc5d1"
+    },
+    {
+      "path": "moonshine.h",
+      "bytes": 3959,
+      "sha256": "e4c3f4be18a88d6320999e82a05b4d73683d052c1059e358f13978568c61918d"
+    },
+    {
+      "path": "native-symbols.log",
+      "bytes": 260,
+      "sha256": "4877fc13461fbd77426d889b53fbae28bcc58f33afc9cce641f8283c6a901e8c"
+    },
+    {
+      "path": "native.log",
+      "bytes": 322,
+      "sha256": "6f4d4c9cee41050a5091ef6aa0199776dcd98e1677e7752c321de8817d2615bc"
+    },
+    {
+      "path": "probe",
+      "bytes": 414896,
+      "sha256": "01bbd451744d2c5961cf74ff6ac90f75a92664063e6e1f617e3f6ce867c58c77"
+    },
+    {
+      "path": "probe.cpp",
+      "bytes": 1786,
+      "sha256": "d13ac183476717961e56c84dc07b9d8b102f36f386adbb28d362b8de4bdaf715"
+    },
+    {
+      "path": "source-library-verification.json",
+      "bytes": 2746,
+      "sha256": "759445beb0bceaff20b32e80c92dc2bc042d364e0df22d70789241ec29e37337"
+    },
+    {
+      "path": "src/core/gguf_loader.cpp",
+      "bytes": 73196,
+      "sha256": "c26f21f34f88875a6900722d6c5c90176b8a71bcbc9b0a5603dc5c1a56dd6fd5"
+    },
+    {
+      "path": "src/core/gguf_loader.h",
+      "bytes": 18586,
+      "sha256": "bfb2a8b5cac51326429ee37789eac8c92b19f56a5536bcb590ed6db88455fbc5"
+    },
+    {
+      "path": "tokenizer.bin",
+      "bytes": 251254,
+      "sha256": "0e90e02b765a10f0fa35b7d67877df29dd22a1fd4890899c9b1b203a19bc8999"
+    },
+    {
+      "path": "transcript-0.txt",
+      "bytes": 106,
+      "sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec"
+    },
+    {
+      "path": "transcript-1.txt",
+      "bytes": 106,
+      "sha256": "dfe1af694958a82c9d89d31bf0378075a10d40f715e670b6e5169042c8680cec"
+    }
+  ],
+  "build_command": [
+    "c++",
+    "-std=c++17",
+    "-O2",
+    "-I",
+    "src",
+    "-I",
+    "ggml/include",
+    "-I",
+    "ggml/src",
+    "${CRISPASR_STORAGE}/crispasr/cann-model-fixture-native-backend-20261014/probe.cpp",
+    "src/moonshine.cpp",
+    "src/moonshine-tokenizer.cpp",
+    "src/core/gguf_loader.cpp",
+    "-L",
+    "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
+    "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
+    "-lggml",
+    "-lggml-cpu",
+    "-lggml-base",
+    "-o",
+    "${CRISPASR_STORAGE}/crispasr/cann-model-fixture-native-backend-20261014/probe"
+  ],
+  "build_workdir": "${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014",
+  "probe_sha256": "01bbd451744d2c5961cf74ff6ac90f75a92664063e6e1f617e3f6ce867c58c77",
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "cann-20261014-model-fixture/complete-native-moonshine-backend.zip",
+    "bytes": 3649899,
+    "sha256": "5b99d8ca092ac86db19b0c652d7ba5323e90052974dacfd49052c1f2a1f6613c",
+    "payloads": 33,
+    "anonymous_verified": true,
+    "revision": "5afafd2e40d3941b49979c41a3960b175bfe71a4"
+  },
+  "original_receipt": "moonshine-original-fixture-audit-2026-10-14.json",
+  "hosted_wiring_run": 38555394740,
+  "hosted_wiring_status": "in_progress"
+}

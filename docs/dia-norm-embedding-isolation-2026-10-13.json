@@ -1,0 +1,389 @@
+{
+  "scope": "Bounded weighted final-RMSNorm and decoder embedding input alignment using complete audited original tensors, actual original decoder entry capture and actual native graph helpers. Identity downstream stubs affect only code after the captured embedding; no full model, CUDA or free-speech acceptance.",
+  "torch_version": "2.6.0+cpu",
+  "torch_threads": 4,
+  "original_source_sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024",
+  "native_source": {
+    "source": "2954c5a7c0b120d7aec8ae3d76b3ca283c0ba4f8",
+    "runtime_sha256": "b403a704ac8ce15c2f81c80c1e1b6e808359435682bff00c31d93d826d084a17",
+    "actual_native_helpers_sha256": "e80f96834dae006871cd17abf0003fb7cd3292e67d1758dbe991669429d5e2bc"
+  },
+  "fetch": {
+    "scope": "Ten complete original F32 tensors fetched through strictly validated immutable HTTP ranges, each hash matched to full physical export audit. Full checkpoint not downloaded or rehashed locally.",
+    "url": "https://huggingface.co/nari-labs/Dia-1.6B/resolve/257bc72f9b78182ccc6fa07675a9ae4c1a44e2cd/model.safetensors",
+    "checkpoint_linked_sha256": "caba289b60f6d7d1e58fc744f4dc25aae88995fcca46be3d05e220b971486a26",
+    "checkpoint_bytes": 6444682848,
+    "verified_original_header_sha256": "a78ce3b4211bbeeae94d228c984b30ee3784cfb188cd09e757135798ae134c8e",
+    "tensors": [
+      {
+        "original_name": "decoder.norm.weight",
+        "native_name": "dia.decoder.norm",
+        "path": "norm.f32",
+        "shape": [
+          2048
+        ],
+        "offset": 5436890720,
+        "bytes": 8192,
+        "sha256": "c8139498eec51ca3c458bb8da25c820dc379f7122ffc09edddb3bdadb2491c8e"
+      },
+      {
+        "original_name": "decoder.embeddings.0.weight",
+        "native_name": "dia.decoder.embeddings.0",
+        "path": "embedding-0.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 40544,
+        "bytes": 8421376,
+        "sha256": "e15b1746ea48bca8299d15b1fc4f0ffd654a653cc873f642a3ab4b72dca92bbe"
+      },
+      {
+        "original_name": "decoder.embeddings.1.weight",
+        "native_name": "dia.decoder.embeddings.1",
+        "path": "embedding-1.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 8461920,
+        "bytes": 8421376,
+        "sha256": "94e09a9e197b77836eab3764cd7d734d83f5331d944c0a1e39d63c5517fd188e"
+      },
+      {
+        "original_name": "decoder.embeddings.2.weight",
+        "native_name": "dia.decoder.embeddings.2",
+        "path": "embedding-2.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 16883296,
+        "bytes": 8421376,
+        "sha256": "916a462b6fe99867b6cf680228e0a392b0721659f259838aeb1b7fc4322b8a03"
+      },
+      {
+        "original_name": "decoder.embeddings.3.weight",
+        "native_name": "dia.decoder.embeddings.3",
+        "path": "embedding-3.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 25304672,
+        "bytes": 8421376,
+        "sha256": "a1d80526e4ba42a7f11ee6901e6cad744d51291fa60aa70d28eac1ef8ee9d3cd"
+      },
+      {
+        "original_name": "decoder.embeddings.4.weight",
+        "native_name": "dia.decoder.embeddings.4",
+        "path": "embedding-4.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 33726048,
+        "bytes": 8421376,
+        "sha256": "851448b1c8840a42932aaf3cf8f49c212dd9de06faf39b3d1cdfa8933f27e750"
+      },
+      {
+        "original_name": "decoder.embeddings.5.weight",
+        "native_name": "dia.decoder.embeddings.5",
+        "path": "embedding-5.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 42147424,
+        "bytes": 8421376,
+        "sha256": "e4855e94e5369cc449049dd600a828946ea968d3e4adc484093cf0d6973eae1d"
+      },
+      {
+        "original_name": "decoder.embeddings.6.weight",
+        "native_name": "dia.decoder.embeddings.6",
+        "path": "embedding-6.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 50568800,
+        "bytes": 8421376,
+        "sha256": "bfd20073ac2f307c6b105fe7be5495e4101c0f6ab4ac7bba50f3015b510eebc9"
+      },
+      {
+        "original_name": "decoder.embeddings.7.weight",
+        "native_name": "dia.decoder.embeddings.7",
+        "path": "embedding-7.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 58990176,
+        "bytes": 8421376,
+        "sha256": "deb364f22736bc4c66dce87acb3997ca605452ce68bb7ce9315d475964717413"
+      },
+      {
+        "original_name": "decoder.embeddings.8.weight",
+        "native_name": "dia.decoder.embeddings.8",
+        "path": "embedding-8.f32",
+        "shape": [
+          1028,
+          2048
+        ],
+        "offset": 67411552,
+        "bytes": 8421376,
+        "sha256": "b70899411ce53af9819f6ba9051a8e729314f34177c1bf65cddc34b1c449fc2e"
+      }
+    ]
+  },
+  "verified_inputs": [
+    {
+      "path": "original-step978-ref.gguf",
+      "bytes": 99392352,
+      "sha256": "995a1d248725d101af7000546f9cc8c4566b7c8c0b585f56bcdbce59656bf510"
+    },
+    {
+      "path": "late/cpp_decoder_layer_17.f32",
+      "bytes": 16384,
+      "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
+    },
+    {
+      "path": "late/cpp_final_hidden.f32",
+      "bytes": 16384,
+      "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+    }
+  ],
+  "verified_feedback_input": {
+    "path": "original-control-inputs.i32",
+    "bytes": 44136,
+    "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"
+  },
+  "norm_comparisons": [
+    {
+      "input": "original-layer17",
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "input": "native-layer17",
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    }
+  ],
+  "original_weighted_norm_vs_saved_original": {
+    "changed_values": 0,
+    "values": 4096,
+    "cosine_min": 1.0,
+    "max_row_norm_error": 0.0,
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+  },
+  "native_weighted_norm_vs_saved_native": {
+    "changed_values": 0,
+    "values": 4096,
+    "cosine_min": 1.0000000000000002,
+    "max_row_norm_error": 0.0,
+    "max_abs": 0.0,
+    "relative_l2": 0.0
+  },
+  "weighted_norm_cross_input_differences": {
+    "changed_values": 4035,
+    "values": 4096,
+    "cosine_min": 0.9999999999973557,
+    "max_row_norm_error": 4.215549276320729e-07,
+    "max_abs": 1.2755393981933594e-05,
+    "relative_l2": 2.1985807935983264e-06
+  },
+  "embedding_comparisons": [
+    {
+      "step": 0,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "step": 76,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "step": 864,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    {
+      "step": 978,
+      "changed_values": 0,
+      "values": 4096,
+      "cosine_min": 1.0000000000000002,
+      "max_row_norm_error": 0.0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    }
+  ],
+  "original_and_native_repeats_exact": true,
+  "scaled_norm_output_negative": {
+    "changed_values": 4096,
+    "values": 4096,
+    "cosine_min": 1.0,
+    "max_row_norm_error": 1.0,
+    "max_abs": 4.372095108032227,
+    "relative_l2": 1.0
+  },
+  "changed_feedback_negative_max_abs": 0.29201042652130127,
+  "files": [
+    {
+      "path": "actual-native-helpers.cpp",
+      "bytes": 1277,
+      "sha256": "e80f96834dae006871cd17abf0003fb7cd3292e67d1758dbe991669429d5e2bc"
+    },
+    {
+      "path": "bridge",
+      "bytes": 26600,
+      "sha256": "c04207b5f47ed02dadac472b3e7895ac921a105cd9ff8dd6d594892d4331dd68"
+    },
+    {
+      "path": "bridge.cpp",
+      "bytes": 3014,
+      "sha256": "f702d620a14e55171762679102713c1620ccda5e6c53adf0c9c092aab99d607d"
+    },
+    {
+      "path": "embedding-0.f32",
+      "bytes": 8421376,
+      "sha256": "e15b1746ea48bca8299d15b1fc4f0ffd654a653cc873f642a3ab4b72dca92bbe"
+    },
+    {
+      "path": "embedding-1.f32",
+      "bytes": 8421376,
+      "sha256": "94e09a9e197b77836eab3764cd7d734d83f5331d944c0a1e39d63c5517fd188e"
+    },
+    {
+      "path": "embedding-2.f32",
+      "bytes": 8421376,
+      "sha256": "916a462b6fe99867b6cf680228e0a392b0721659f259838aeb1b7fc4322b8a03"
+    },
+    {
+      "path": "embedding-3.f32",
+      "bytes": 8421376,
+      "sha256": "a1d80526e4ba42a7f11ee6901e6cad744d51291fa60aa70d28eac1ef8ee9d3cd"
+    },
+    {
+      "path": "embedding-4.f32",
+      "bytes": 8421376,
+      "sha256": "851448b1c8840a42932aaf3cf8f49c212dd9de06faf39b3d1cdfa8933f27e750"
+    },
+    {
+      "path": "embedding-5.f32",
+      "bytes": 8421376,
+      "sha256": "e4855e94e5369cc449049dd600a828946ea968d3e4adc484093cf0d6973eae1d"
+    },
+    {
+      "path": "embedding-6.f32",
+      "bytes": 8421376,
+      "sha256": "bfd20073ac2f307c6b105fe7be5495e4101c0f6ab4ac7bba50f3015b510eebc9"
+    },
+    {
+      "path": "embedding-7.f32",
+      "bytes": 8421376,
+      "sha256": "deb364f22736bc4c66dce87acb3997ca605452ce68bb7ce9315d475964717413"
+    },
+    {
+      "path": "embedding-8.f32",
+      "bytes": 8421376,
+      "sha256": "b70899411ce53af9819f6ba9051a8e729314f34177c1bf65cddc34b1c449fc2e"
+    },
+    {
+      "path": "embedding-inputs.i32",
+      "bytes": 648,
+      "sha256": "167eaa014d991455c8d9482abab525b904fecff8f5dd7df9d56a79929009d27b"
+    },
+    {
+      "path": "fetch-receipt.json",
+      "bytes": 3895,
+      "sha256": "7ccf88b166a03cd3fc29277b256a5090bb00be08895eb994b59ebdcc14bf3f5c"
+    },
+    {
+      "path": "fetch.log",
+      "bytes": 569,
+      "sha256": "5867159c57c62fb0ad638c28e3ca3d0afd2304f193595c3a73e170cef04e6964"
+    },
+    {
+      "path": "fetch.py",
+      "bytes": 2481,
+      "sha256": "0ab69c8e9ef9177827c67a32e2fce9d206ef8a339aa5ac8baa3c6a276c84dffc"
+    },
+    {
+      "path": "native-embedding.f32",
+      "bytes": 147456,
+      "sha256": "a3ab2dbd43341f2891f853b5ac90640a1cf9846f10290469222a7a8804cd9851"
+    },
+    {
+      "path": "native-weighted-norm.f32",
+      "bytes": 65536,
+      "sha256": "8e170e352c11e186b7fe422db3e597edc09d162d288b649b5783db37ccc18c4d"
+    },
+    {
+      "path": "norm-inputs.f32",
+      "bytes": 65536,
+      "sha256": "4dfe3448c86850783478de75817e42dd6d9d867d1bf345f8acfd6e2c93b7a338"
+    },
+    {
+      "path": "norm.f32",
+      "bytes": 8192,
+      "sha256": "c8139498eec51ca3c458bb8da25c820dc379f7122ffc09edddb3bdadb2491c8e"
+    },
+    {
+      "path": "original-embedding.npy",
+      "bytes": 147584,
+      "sha256": "8c20cf815c9c042a4193ed78c1b18fb285d5f2026157f0a9af8ce427e08f3b3a"
+    },
+    {
+      "path": "original-weighted-norm.npy",
+      "bytes": 65664,
+      "sha256": "e679168f4bc2b988b79221c705226a318110faf889c691be8211c72dc257bdd5"
+    },
+    {
+      "path": "probe.log",
+      "bytes": 1698,
+      "sha256": "9e3808d2e5d0476e1a973cbfc39a525ef5d71c0792b95c9313d64cf8321883f1"
+    },
+    {
+      "path": "probe.py",
+      "bytes": 6812,
+      "sha256": "5475c5f1d1791df18748a84b1b92e02910b8bf41469e38191dd12383727e49af"
+    },
+    {
+      "path": "source-receipt.json",
+      "bytes": 249,
+      "sha256": "6e1e3fad6b1133e360fc4c73f0d2f4f1e069f6a1d97843b7933d302d62b9434d"
+    }
+  ],
+  "summary": {
+    "norm_same_input_byte_exact": true,
+    "both_saved_hidden_states_reproduced_byte_exact": true,
+    "all_four_embedding_checkpoints_byte_exact": true,
+    "repeats_exact": true,
+    "negatives_reject": true,
+    "speech_acceptance": false,
+    "runtime_defaults_changed": false
+  }
+}

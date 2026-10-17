@@ -1,0 +1,294 @@
+{
+  "independent_audit_pass": true,
+  "scope": "Physical 910B3 SDK9.1 broad operator correctness and independent full RoPE repeat; no NPU model inference, quantized speech, performance or executed ACL-graph capture acceptance.",
+  "source": "ca4c12c4cfec475c0009f9718a18ffb42d2cda6a",
+  "ggml": "0a862076567afd8468822ccc512c97ac6a69b340",
+  "archive": {
+    "archive_sha256": "b200279b56ab5289fb7ceefe8574c03e14c576b6f7e70258df7e23082a0e83e6",
+    "bytes": 32355,
+    "members": [
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/CMakeCache.txt",
+        "bytes": 30779,
+        "sha256": "7ac7e6f3e4e9349f1bc0d6394435efe53e069da33973072158f50dbd8b4f5ea9"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/build-config.txt",
+        "bytes": 180,
+        "sha256": "2f7df824f5141d8c45452099c60f71e75e18ab379ba09bf2f85471dfbd4ae715"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/build.log",
+        "bytes": 17267,
+        "sha256": "fcfdcc6b7814468423ccdc7b9552862b38e5fb672444ab71ce86bb58aa5e7aed"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-package-version.txt",
+        "bytes": 792,
+        "sha256": "00b3a1e2e9e487537ce8a8c771b4720856d2d72b86a734d91ac7f79cc66511df"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/add.log",
+        "bytes": 13728,
+        "sha256": "5ad4daf9b7e645d15d69c1b65a3245f670258ca3e0284f72000162ff531ad8ab"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/mul_mat.log",
+        "bytes": 317161,
+        "sha256": "1bdaceb96f745c8d618e4849feda1c2b152b32666ade59386f3ba3f985875a9a"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/receipt.json",
+        "bytes": 3474,
+        "sha256": "4f2612727b103399dc1e6a9a6e0e41a5240e98faab3695e8f856e04786da3ee9"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/rms_norm.log",
+        "bytes": 4329,
+        "sha256": "bb35c7e448069194c073ebd9c4306599c773aa474267a44b446235f1c870046b"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/rope.log",
+        "bytes": 67385,
+        "sha256": "5e63af66ef6fffa0d0fd6080692379bf5f2b4920736d2458d56796c19b6d842a"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-proof/soft_max.log",
+        "bytes": 29685,
+        "sha256": "7805f5da9b2a189bf21f9cf4d6826639be4566b3ab11ff80d48feec920827dcc"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-repeat/receipt.json",
+        "bytes": 1105,
+        "sha256": "40b9405b459edb7a38438af702eab0fb2f543dae18fa41499ff96f9bf018c0b1"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/cann-rope-candidate-repeat/rope.log",
+        "bytes": 67385,
+        "sha256": "21a36b2d775d071725f1115a10efd4eb983f50a5a5b34a30ea6cdf7afb99dd2c"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/capacity-test.log",
+        "bytes": 580,
+        "sha256": "ebc51b14480874421abbbe7775d37cbb3d8bbe18968fb27a142d9ac3af4ec289"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/compile_commands.json",
+        "bytes": 37420,
+        "sha256": "579c1b306771c850016ab22d0a291060c36508c66676d7cd0ef7c5e9d86bf2d9"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/configure.log",
+        "bytes": 3271,
+        "sha256": "eb0ec56fc462eb24cd03b4e359d7192f0f8514c4c06ba6838b95613f1fbe47ec"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/npu-smi-info.txt",
+        "bytes": 1386,
+        "sha256": "8a0e66681296dd42014044627b4213b6381008ee000d55918dfef678fba273c1"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/revisions.txt",
+        "bytes": 276,
+        "sha256": "7f3b1b3a3f837217a095199bd3b9be2733b4c10fed5005e5e5a200f06907578e"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/rope-repeat.log",
+        "bytes": 34,
+        "sha256": "2824b45fafb5898a3a998e3b9a02ad70a71f2400e61f92adf72812b8045bad7e"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/routing-test.log",
+        "bytes": 213,
+        "sha256": "f7d79fa95eee3d082d9c34c02c95cfbabcb27f7cfbf828227ae59a7875059253"
+      },
+      {
+        "path": "crispasr-cann-910b3-rope-candidate-2026-10-14/validation.log",
+        "bytes": 178,
+        "sha256": "8448acced5aff65fe471c614fd1f13c74d37e92a9eaddfdf9e7145fe220e96d7"
+      }
+    ]
+  },
+  "producer_binary_sha256": "1742eb812d3abe1b9c16813ecaff9721c6de7ac3bc406c47fe52e0d43b5e79e0",
+  "binary_locally_rehashed": false,
+  "wrapper_sha256": "c30fb97a5a969e7a279cd6eaae0c83d2ba6f12084d7a3bb5f5a1eda0e64cc2d0",
+  "chip": "910B3",
+  "sdk": "9.1.0",
+  "architecture": "aarch64",
+  "acl_graph_compiled": true,
+  "compile_commands_cann_count": 3,
+  "runs": [
+    {
+      "directory": "cann-rope-candidate-proof",
+      "operator": "ADD",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 154,
+        "cases_run": 154,
+        "observed_operator_cases": 154,
+        "unsupported_cases": 0,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ADD",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "5ad4daf9b7e645d15d69c1b65a3245f670258ca3e0284f72000162ff531ad8ab"
+    },
+    {
+      "directory": "cann-rope-candidate-proof",
+      "operator": "RMS_NORM",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 51,
+        "cases_run": 51,
+        "observed_operator_cases": 51,
+        "unsupported_cases": 0,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "RMS_NORM",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "bb35c7e448069194c073ebd9c4306599c773aa474267a44b446235f1c870046b"
+    },
+    {
+      "directory": "cann-rope-candidate-proof",
+      "operator": "SOFT_MAX",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 107,
+        "cases_run": 107,
+        "observed_operator_cases": 107,
+        "unsupported_cases": 107,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "SOFT_MAX",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "7805f5da9b2a189bf21f9cf4d6826639be4566b3ab11ff80d48feec920827dcc"
+    },
+    {
+      "directory": "cann-rope-candidate-proof",
+      "operator": "ROPE",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 452,
+        "cases_run": 452,
+        "observed_operator_cases": 452,
+        "unsupported_cases": 18,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ROPE",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "5e63af66ef6fffa0d0fd6080692379bf5f2b4920736d2458d56796c19b6d842a"
+    },
+    {
+      "directory": "cann-rope-candidate-proof",
+      "operator": "MUL_MAT",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 927,
+        "cases_run": 927,
+        "observed_operator_cases": 927,
+        "unsupported_cases": 1349,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "MUL_MAT",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "1bdaceb96f745c8d618e4849feda1c2b152b32666ade59386f3ba3f985875a9a"
+    },
+    {
+      "directory": "cann-rope-candidate-repeat",
+      "operator": "ROPE",
+      "assessment": {
+        "exit": 0,
+        "selected_backend_completed": true,
+        "cases_passed": 452,
+        "cases_run": 452,
+        "observed_operator_cases": 452,
+        "unsupported_cases": 18,
+        "pass": true
+      },
+      "command": [
+        "/home/developer/CrispASR-cann-rope-proof/build-cann-ops/bin/test-backend-ops",
+        "test",
+        "-b",
+        "CANN0",
+        "-o",
+        "ROPE",
+        "-j",
+        "1"
+      ],
+      "log_sha256": "21a36b2d775d071725f1115a10efd4eb983f50a5a5b34a30ea6cdf7afb99dd2c"
+    }
+  ],
+  "broad_cases_passed": 1691,
+  "broad_cases_run": 1691,
+  "broad_unsupported": 1474,
+  "repeat_cases_passed": 452,
+  "repeat_unsupported": 18,
+  "formerly_failing_cases_verified": [
+    {
+      "directory": "cann-rope-candidate-proof",
+      "line": "ROPE(type=f32,ne_a=[256,8,512,1],n_dims=256,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0,n_offs=0): OK"
+    },
+    {
+      "directory": "cann-rope-candidate-proof",
+      "line": "ROPE(type=f32,ne_a=[512,8,512,1],n_dims=128,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0,n_offs=0): OK"
+    },
+    {
+      "directory": "cann-rope-candidate-repeat",
+      "line": "ROPE(type=f32,ne_a=[256,8,512,1],n_dims=256,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=0,v=0,inplace=0,n_offs=0): OK"
+    },
+    {
+      "directory": "cann-rope-candidate-repeat",
+      "line": "ROPE(type=f32,ne_a=[512,8,512,1],n_dims=128,mode=2,n_ctx=512,fs=1.000000,ef=0.000000,af=1.000000,ff=1,v=0,inplace=0,n_offs=0): OK"
+    }
+  ],
+  "comment": "https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6164970290",
+  "attachment": "https://github.com/user-attachments/files/33427308/crispasr-cann-910b3-rope-candidate-2026-10-14.tar.gz",
+  "sdk_run": 38536737288,
+  "sdk_status_at_audit": "in_progress",
+  "integration_status": "pending_sdk_and_composed_ci"
+}

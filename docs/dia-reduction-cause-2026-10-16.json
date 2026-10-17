@@ -1,0 +1,1150 @@
+{
+  "scope": "Pointwise F32 projection rounding cause; no full-generation repair claim.",
+  "method_source": "71d5a6ec",
+  "dispatch": {
+    "scope": "Owned-input CPU dispatch experiment; no full model or production recipe change.",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "consumed": [
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/blueprint/dia/layers.py",
+        "retained": "layers.py",
+        "bytes": 21750,
+        "sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/hosted-38818571466-v1/out/arms/on/array-storage.json",
+        "retained": "full-storage.json",
+        "bytes": 157201,
+        "sha256": "5930e663f267ca4c76e1106c733c0acfc41a0af73d76967abd3c54f929d4b9a9"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/hosted-38818571466-v1/out/arms/on/decoder_block0_pre_sa_norm.npy",
+        "retained": "query-input.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/hosted-38818571466-v1/out/arms/on/decoder_sa0_pre_q.npy",
+        "retained": "captured-query.npy",
+        "bytes": 16512,
+        "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/hosted-38818571466-v1/out/arms/off/decoder_hidden.npy",
+        "retained": "original-hidden.npy",
+        "bytes": 16512,
+        "sha256": "9a709e26ccb5c56508383b91c4bb60fc88ffe25193be7a04fd137e2f6e970f42"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/hosted-38818571466-v1/out/arms/off/decoder_step_logits.npy",
+        "retained": "captured-logits.npy",
+        "bytes": 90743744,
+        "sha256": "ea68641f7ede6a4350f18cd5de885c2c235b1b70a75dfa3ea640fc39d01e3150"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/query-replay-v2/inputs/self_attention.q_proj.weight.original.f32",
+        "retained": "query-weight.f32",
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-head-probe-20261013/original-heads.f32",
+        "retained": "head-weight.f32",
+        "bytes": 75792384,
+        "sha256": "347af117c3176bbc2a72057391eafa316461e251d99560e4de7204a1401b74ae"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-head-probe-20261013/fetch-receipt.json",
+        "retained": "head-physical-fetch.json",
+        "bytes": 2864,
+        "sha256": "a53db569aaade913bcbb3bb51008c9ba85943511183967ea4e5588e26bc0a0d3"
+      },
+      {
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-terminal-20261015/hosted-38805728288-v1/out/baseline/cpp_final_hidden.f32",
+        "retained": "native-hidden.f32",
+        "bytes": 16384,
+        "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+      }
+    ],
+    "modes": [
+      {
+        "mode": "AUTO",
+        "query": {
+          "byte_exact": false,
+          "relative_l2": 6.906207656581723e-07,
+          "max_abs": 4.0531158447265625e-06,
+          "changed": 3894,
+          "mine_norm": 31.515237853170902,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 2.47955322265625e-05,
+            "byte_exact": false,
+            "relative_l2": 7.041631220460975e-07,
+            "max_abs": 4.76837158203125e-05,
+            "changed": 17604,
+            "mine_norm": 989.0275847833686,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": -3.3855438232421875e-05
+          }
+        }
+      },
+      {
+        "mode": "COMPATIBLE",
+        "query": {
+          "byte_exact": true,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "changed": 0,
+          "mine_norm": 31.515240191687436,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 4.6253204345703125e-05,
+            "byte_exact": true,
+            "relative_l2": 0.0,
+            "max_abs": 0.0,
+            "changed": 0,
+            "mine_norm": 989.0275907882956,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": 2.0503997802734375e-05
+          }
+        }
+      },
+      {
+        "mode": "SSE4_2",
+        "query": {
+          "byte_exact": true,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "changed": 0,
+          "mine_norm": 31.515240191687436,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 4.6253204345703125e-05,
+            "byte_exact": true,
+            "relative_l2": 0.0,
+            "max_abs": 0.0,
+            "changed": 0,
+            "mine_norm": 989.0275907882956,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": 2.0503997802734375e-05
+          }
+        }
+      },
+      {
+        "mode": "AVX",
+        "query": {
+          "byte_exact": true,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "changed": 0,
+          "mine_norm": 31.515240191687436,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 4.6253204345703125e-05,
+            "byte_exact": true,
+            "relative_l2": 0.0,
+            "max_abs": 0.0,
+            "changed": 0,
+            "mine_norm": 989.0275907882956,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": 2.0503997802734375e-05
+          }
+        }
+      },
+      {
+        "mode": "AVX2",
+        "query": {
+          "byte_exact": false,
+          "relative_l2": 6.90107062933762e-07,
+          "max_abs": 4.0531158447265625e-06,
+          "changed": 3912,
+          "mine_norm": 31.515238715326596,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 1.33514404296875e-05,
+            "byte_exact": false,
+            "relative_l2": 7.028108243301693e-07,
+            "max_abs": 4.76837158203125e-05,
+            "changed": 17614,
+            "mine_norm": 989.0275851888694,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": -3.4809112548828125e-05
+          }
+        }
+      },
+      {
+        "mode": "AVX512",
+        "query": {
+          "byte_exact": false,
+          "relative_l2": 6.906207656581723e-07,
+          "max_abs": 4.0531158447265625e-06,
+          "changed": 3894,
+          "mine_norm": 31.515237853170902,
+          "ref_norm": 31.515240191687436
+        },
+        "heads": {
+          "original-hidden": {
+            "margin_46_minus_904": 2.47955322265625e-05,
+            "byte_exact": false,
+            "relative_l2": 7.041631220460975e-07,
+            "max_abs": 4.76837158203125e-05,
+            "changed": 17604,
+            "mine_norm": 989.0275847833686,
+            "ref_norm": 989.0275907882956
+          },
+          "native-hidden": {
+            "margin_46_minus_904": -3.3855438232421875e-05
+          }
+        }
+      }
+    ],
+    "production_defaults_changed": false,
+    "native_speech_acceptance": false,
+    "exact_product_sums": {
+      "original-hidden": {
+        "logits": [
+          [
+            6.598801812746569,
+            6.27752143149648
+          ],
+          [
+            6.647004835110645,
+            6.406039783595813
+          ]
+        ],
+        "margin_46_minus_904": 1.9062309062789495e-05
+      },
+      "native-hidden": {
+        "logits": [
+          [
+            6.598802062655487,
+            6.277518848464975
+          ],
+          [
+            6.647006215873228,
+            6.406050677293435
+          ]
+        ],
+        "margin_46_minus_904": -2.7488252364094024e-05
+      }
+    },
+    "files": [
+      {
+        "path": "AUTO/environment.json",
+        "bytes": 1801,
+        "sha256": "650cfcfd01589924f0b2e559b555fbede98ca5bcdfa2bac7a922aca0ba585ddc"
+      },
+      {
+        "path": "AUTO/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "f2dd4dd923d7f882e8ff8c26836fe849ddbe5d480d16363659a922365f41edae"
+      },
+      {
+        "path": "AUTO/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "b5546eb1eeebb5be74866e7a4b23affde1784ae35c2ac4a2462ffae9876ad9ab"
+      },
+      {
+        "path": "AUTO/query-input.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "AUTO.log",
+        "bytes": 1433,
+        "sha256": "9e73212fada7efdcc3e43aedd52baad773a10ae23072b7d83355a74aa45d9ed9"
+      },
+      {
+        "path": "AVX/environment.json",
+        "bytes": 1800,
+        "sha256": "191263ec56b3ad52b3dcf890fabcc1d8f53a54bdcb2a2549aeea3b6e35930a7f"
+      },
+      {
+        "path": "AVX/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "bfbb206d36542b51eb4ba6748318909b17e96534062edafc0de9a1950bf74375"
+      },
+      {
+        "path": "AVX/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "fcb8787215135b804f96bce5114c3f893157e4847a774d02d2cafbcc9a315686"
+      },
+      {
+        "path": "AVX/query-input.npy",
+        "bytes": 16512,
+        "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586"
+      },
+      {
+        "path": "AVX.log",
+        "bytes": 1451,
+        "sha256": "1a7f160e1f7fd87f6aee005790e2048d37d31f2c7b65cbe43556b3442ad3215e"
+      },
+      {
+        "path": "AVX2/environment.json",
+        "bytes": 1801,
+        "sha256": "b7d2a5a58e9965827a6009fa40e7ed065d85aadc0e3cc8fda61a1cfe5cd7b102"
+      },
+      {
+        "path": "AVX2/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "cb3d0a946f0b464f6595f24c8bd5e3a47ea0626c18879e1b39c8cc1445cd425f"
+      },
+      {
+        "path": "AVX2/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "3396fd3a224a1d0674dd8d584b9c48ffe55d54aa6fda104ee3481f5c7af26750"
+      },
+      {
+        "path": "AVX2/query-input.npy",
+        "bytes": 16512,
+        "sha256": "9de539f9aaa3f637fc00c097fd14938294b7fc1e3bda54ecc87d49c9e2f3d61b"
+      },
+      {
+        "path": "AVX2.log",
+        "bytes": 1439,
+        "sha256": "68c56900b3f0e1fab233a40f506692622231bd6d332c17d2ae1e9b04947f1d85"
+      },
+      {
+        "path": "AVX512/environment.json",
+        "bytes": 1803,
+        "sha256": "c314c90d12b8566973bd7673db5ac84c45e78f37fb70559a363d6c632d71ef20"
+      },
+      {
+        "path": "AVX512/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "f2dd4dd923d7f882e8ff8c26836fe849ddbe5d480d16363659a922365f41edae"
+      },
+      {
+        "path": "AVX512/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "b5546eb1eeebb5be74866e7a4b23affde1784ae35c2ac4a2462ffae9876ad9ab"
+      },
+      {
+        "path": "AVX512/query-input.npy",
+        "bytes": 16512,
+        "sha256": "58439d9106383ba884c0eca2f60a5b629075e35ade34a4e75a540fa0773621d6"
+      },
+      {
+        "path": "AVX512.log",
+        "bytes": 1456,
+        "sha256": "b36b250f047a1806e5fe233bed317cef9ccb372765511bdf74e03e6b20700c53"
+      },
+      {
+        "path": "COMPATIBLE/environment.json",
+        "bytes": 1807,
+        "sha256": "393dd401e134580601b09f0412b1a4a9e3a38cedc12d3ce7ad97160702b455dc"
+      },
+      {
+        "path": "COMPATIBLE/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "bfbb206d36542b51eb4ba6748318909b17e96534062edafc0de9a1950bf74375"
+      },
+      {
+        "path": "COMPATIBLE/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "fcb8787215135b804f96bce5114c3f893157e4847a774d02d2cafbcc9a315686"
+      },
+      {
+        "path": "COMPATIBLE/query-input.npy",
+        "bytes": 16512,
+        "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586"
+      },
+      {
+        "path": "COMPATIBLE.log",
+        "bytes": 1422,
+        "sha256": "c40bfc08a2b0319316af2009cf70238217fad0b0f126b3c330969909913724d1"
+      },
+      {
+        "path": "SSE4_2/environment.json",
+        "bytes": 1803,
+        "sha256": "0f969f02214d2e9503e2bc4bdd822e688378d6cd11de70f0aa9fd399916a9784"
+      },
+      {
+        "path": "SSE4_2/native-hidden.npy",
+        "bytes": 74144,
+        "sha256": "bfbb206d36542b51eb4ba6748318909b17e96534062edafc0de9a1950bf74375"
+      },
+      {
+        "path": "SSE4_2/original-hidden.npy",
+        "bytes": 74144,
+        "sha256": "fcb8787215135b804f96bce5114c3f893157e4847a774d02d2cafbcc9a315686"
+      },
+      {
+        "path": "SSE4_2/query-input.npy",
+        "bytes": 16512,
+        "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586"
+      },
+      {
+        "path": "SSE4_2.log",
+        "bytes": 1452,
+        "sha256": "e851b751d4248bef921fda754c0f8d35ceb95e92a54c6d9f7bd63b6f691fa03a"
+      },
+      {
+        "path": "inputs/captured-logits.npy",
+        "bytes": 90743744,
+        "sha256": "ea68641f7ede6a4350f18cd5de885c2c235b1b70a75dfa3ea640fc39d01e3150"
+      },
+      {
+        "path": "inputs/captured-query.npy",
+        "bytes": 16512,
+        "sha256": "20712f361177f0973eae2ed186d33eb995b6bea2d057a66dc8cd8b6fa39f0586"
+      },
+      {
+        "path": "inputs/full-storage.json",
+        "bytes": 157201,
+        "sha256": "5930e663f267ca4c76e1106c733c0acfc41a0af73d76967abd3c54f929d4b9a9"
+      },
+      {
+        "path": "inputs/head-physical-fetch.json",
+        "bytes": 2864,
+        "sha256": "a53db569aaade913bcbb3bb51008c9ba85943511183967ea4e5588e26bc0a0d3"
+      },
+      {
+        "path": "inputs/head-weight.f32",
+        "bytes": 75792384,
+        "sha256": "347af117c3176bbc2a72057391eafa316461e251d99560e4de7204a1401b74ae"
+      },
+      {
+        "path": "inputs/layers.py",
+        "bytes": 21750,
+        "sha256": "9b77d590101783a7e570bd9889afb09b85912d05072313c32a984dbfe9323024"
+      },
+      {
+        "path": "inputs/native-hidden.f32",
+        "bytes": 16384,
+        "sha256": "30e0080835a98b73613cb32cc9ea9e88c90dbb956164e3f476f36e0ef344cbba"
+      },
+      {
+        "path": "inputs/native-hidden.npy",
+        "bytes": 16512,
+        "sha256": "d5a7e69b26f607372cf8fa5bc976655d434b9ab7bab53c02664e695780804389"
+      },
+      {
+        "path": "inputs/original-hidden.npy",
+        "bytes": 16512,
+        "sha256": "9a709e26ccb5c56508383b91c4bb60fc88ffe25193be7a04fd137e2f6e970f42"
+      },
+      {
+        "path": "inputs/query-input.npy",
+        "bytes": 16512,
+        "sha256": "bbca327b6a97781c49a515c64b6eb87248fe864f58146c28ce8759105608567e"
+      },
+      {
+        "path": "inputs/query-weight.f32",
+        "bytes": 16777216,
+        "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
+      }
+    ]
+  },
+  "order": {
+    "scope": "Identify the exact multiply/add recurrence; replay the unchanged original filter.",
+    "results": [
+      {
+        "input": "original-hidden",
+        "all_18504_serial_logits_byte_exact": true,
+        "serial": {
+          "draws": [
+            698,
+            402,
+            877,
+            362,
+            405,
+            516,
+            595,
+            692,
+            380
+          ],
+          "head2_support": [
+            41,
+            46,
+            76,
+            85,
+            106,
+            222,
+            247,
+            275,
+            291,
+            342,
+            385,
+            444,
+            448,
+            460,
+            505,
+            544,
+            567,
+            571,
+            584,
+            612,
+            627,
+            637,
+            643,
+            679,
+            687,
+            745,
+            826,
+            855,
+            877,
+            907,
+            970,
+            1013
+          ],
+          "head2_draw": 877
+        },
+        "mode_draws": {
+          "AUTO": {
+            "draws": [
+              698,
+              402,
+              877,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              46,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 877
+          },
+          "COMPATIBLE": {
+            "draws": [
+              698,
+              402,
+              877,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              46,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 877
+          },
+          "AVX2": {
+            "draws": [
+              698,
+              402,
+              877,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              46,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 877
+          },
+          "AVX512": {
+            "draws": [
+              698,
+              402,
+              877,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              46,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 877
+          }
+        },
+        "actual_ggml_dot_recurrence": [
+          {
+            "batch": 0,
+            "token": 46,
+            "ggml": 6.598801612854004,
+            "explicit_fma_recurrence": 6.598801612854004
+          },
+          {
+            "batch": 0,
+            "token": 904,
+            "ggml": 6.277522087097168,
+            "explicit_fma_recurrence": 6.277522087097168
+          },
+          {
+            "batch": 1,
+            "token": 46,
+            "ggml": 6.647005081176758,
+            "explicit_fma_recurrence": 6.647005081176758
+          },
+          {
+            "batch": 1,
+            "token": 904,
+            "ggml": 6.406039237976074,
+            "explicit_fma_recurrence": 6.406039237976074
+          }
+        ]
+      },
+      {
+        "input": "native-hidden",
+        "all_18504_serial_logits_byte_exact": true,
+        "serial": {
+          "draws": [
+            698,
+            402,
+            877,
+            362,
+            405,
+            516,
+            595,
+            692,
+            380
+          ],
+          "head2_support": [
+            41,
+            46,
+            76,
+            85,
+            106,
+            222,
+            247,
+            275,
+            291,
+            342,
+            385,
+            444,
+            448,
+            460,
+            505,
+            544,
+            567,
+            571,
+            584,
+            612,
+            627,
+            637,
+            643,
+            679,
+            687,
+            745,
+            826,
+            855,
+            877,
+            907,
+            970,
+            1013
+          ],
+          "head2_draw": 877
+        },
+        "mode_draws": {
+          "AUTO": {
+            "draws": [
+              698,
+              402,
+              904,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              904,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 904
+          },
+          "COMPATIBLE": {
+            "draws": [
+              698,
+              402,
+              877,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              46,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 877
+          },
+          "AVX2": {
+            "draws": [
+              698,
+              402,
+              904,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              904,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 904
+          },
+          "AVX512": {
+            "draws": [
+              698,
+              402,
+              904,
+              362,
+              405,
+              516,
+              595,
+              692,
+              380
+            ],
+            "head2_support": [
+              41,
+              76,
+              85,
+              106,
+              222,
+              247,
+              275,
+              291,
+              342,
+              385,
+              444,
+              448,
+              460,
+              505,
+              544,
+              567,
+              571,
+              584,
+              612,
+              627,
+              637,
+              643,
+              679,
+              687,
+              745,
+              826,
+              855,
+              877,
+              904,
+              907,
+              970,
+              1013
+            ],
+            "head2_draw": 904
+          }
+        },
+        "actual_ggml_dot_recurrence": [
+          {
+            "batch": 0,
+            "token": 46,
+            "ggml": 6.59880256652832,
+            "explicit_fma_recurrence": 6.59880256652832
+          },
+          {
+            "batch": 0,
+            "token": 904,
+            "ggml": 6.277519226074219,
+            "explicit_fma_recurrence": 6.277519226074219
+          },
+          {
+            "batch": 1,
+            "token": 46,
+            "ggml": 6.647006511688232,
+            "explicit_fma_recurrence": 6.647006511688232
+          },
+          {
+            "batch": 1,
+            "token": 904,
+            "ggml": 6.406050682067871,
+            "explicit_fma_recurrence": 6.406050682067871
+          }
+        ]
+      }
+    ],
+    "all_4096_query_values_serial_exact": true,
+    "tiny_fma_witness": {
+      "separate": 0.0,
+      "fused": -1.4210854715202004e-14,
+      "exact": -1.4210854715202004e-14
+    },
+    "native_dot_matches_hosted_logits": true,
+    "ggml_library_sha256": "a16fc1f0f957e11d07e27fc32a82dfd2e9109f07e3719e24b718be424cb6b989",
+    "sampler_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "noise_sha256": "043808949bf0fc51206bc154a5755fb80d44127326bc7419c0ca4c635cf77dba",
+    "native_speech_acceptance": false
+  },
+  "independent_audit": {
+    "independent_saved_array_audit_pass": true,
+    "dispatch_modes": 6,
+    "physical_head_mappings": 9,
+    "serial_query_values": 4096,
+    "serial_head_values_per_hidden": 18504,
+    "hidden_inputs": 2,
+    "separate_cumulative_sum_reconstruction": true,
+    "metrics": [
+      {
+        "mode": "AUTO",
+        "tensor": "query",
+        "cosine_min": 0.9999999999997016,
+        "mine_norm": 31.515237853170902,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 6.906207656581723e-07,
+        "max_abs": 4.0531158447265625e-06
+      },
+      {
+        "mode": "AUTO",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999997102,
+        "mine_norm": 989.0275847833686,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 7.041631220460975e-07,
+        "max_abs": 4.76837158203125e-05
+      },
+      {
+        "mode": "COMPATIBLE",
+        "tensor": "query",
+        "cosine_min": 0.9999999999999998,
+        "mine_norm": 31.515240191687436,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "COMPATIBLE",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999999999,
+        "mine_norm": 989.0275907882956,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "SSE4_2",
+        "tensor": "query",
+        "cosine_min": 0.9999999999999998,
+        "mine_norm": 31.515240191687436,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "SSE4_2",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999999999,
+        "mine_norm": 989.0275907882956,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "AVX",
+        "tensor": "query",
+        "cosine_min": 0.9999999999999998,
+        "mine_norm": 31.515240191687436,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "AVX",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999999999,
+        "mine_norm": 989.0275907882956,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 0.0,
+        "max_abs": 0.0
+      },
+      {
+        "mode": "AVX2",
+        "tensor": "query",
+        "cosine_min": 0.9999999999996968,
+        "mine_norm": 31.515238715326596,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 6.90107062933762e-07,
+        "max_abs": 4.0531158447265625e-06
+      },
+      {
+        "mode": "AVX2",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999997026,
+        "mine_norm": 989.0275851888694,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 7.028108243301693e-07,
+        "max_abs": 4.76837158203125e-05
+      },
+      {
+        "mode": "AVX512",
+        "tensor": "query",
+        "cosine_min": 0.9999999999997016,
+        "mine_norm": 31.515237853170902,
+        "ref_norm": 31.515240191687436,
+        "relative_l2": 6.906207656581723e-07,
+        "max_abs": 4.0531158447265625e-06
+      },
+      {
+        "mode": "AVX512",
+        "tensor": "heads",
+        "cosine_min": 0.9999999999997102,
+        "mine_norm": 989.0275847833686,
+        "ref_norm": 989.0275907882956,
+        "relative_l2": 7.041631220460975e-07,
+        "max_abs": 4.76837158203125e-05
+      }
+    ],
+    "native_sample_904_to_877": true,
+    "full_generation_acceptance": false,
+    "production_defaults_changed": false
+  },
+  "publication": {
+    "revision": "81d18136133e7bad61961813f45afa58301fe32e",
+    "path": "dia-20261016-reduction-cause/complete-reduction-cause-v1.zip",
+    "bytes": 170121121,
+    "sha256": "b092ed027e26480ae4ad6c59d30d216662c7c5afe949f5300c9afafe86163397",
+    "anonymous_full_download_sha_verified": true,
+    "payloads": 79
+  },
+  "hosted_replay_pending": true
+}

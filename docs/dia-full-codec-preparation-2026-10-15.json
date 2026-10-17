@@ -1,0 +1,435 @@
+{
+  "preparation": {
+    "passed": true,
+    "scope": "Exact stopping/BOS/delay replay on retained raw native predictions, including actual final emitted row; no neural execution or codec acceptance yet.",
+    "native_source": "eb94d724bc26b7643b5474456dc4fdd1e0200602",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+    "compile_command": [
+      "c++",
+      "-std=c++17",
+      "-O2",
+      "/mnt/akademie_storage/crispasr/dia-full-codec-crossdecode-20261015/inputs-v1/literal-native-replay.cpp",
+      "-o",
+      "/mnt/akademie_storage/crispasr/dia-full-codec-crossdecode-20261015/inputs-v1/literal-native-replay"
+    ],
+    "bridge_sha256": "84a05ad8fadcf8d2dc3d4512b9e9ecdeb16b944cd521fe6aaa3e6babb9bef6c2",
+    "native_source_sha256": "3ab92b7de64ab4cabe3eedbe78db32d720dd335ed6526817d070b9b0cef739d9",
+    "literal_function_sha256": "33eff467c782ae42a36f8a94c942cb83aeaf2e530a4d167be1bdc69de81b4d7a",
+    "all_feedback_rows": 1115,
+    "complete_native_code_frames": 1100,
+    "complete_native_pcm_samples": 563200,
+    "cli_cabi_aligned_codes_exact": true,
+    "original_code_frames": 1210,
+    "corrupted_raw_prediction_rejected": true,
+    "verified_parent_payloads": [
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging-inputs.i32",
+        "bytes": 40140,
+        "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging-sampled.i32",
+        "bytes": 40140,
+        "sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging-generate.log",
+        "bytes": 59732,
+        "sha256": "7ce46175671fa739c0a3bbe71890da4f99b6f68c9741a915e41827da2ed0aa62"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging-inputs.i32",
+        "bytes": 40140,
+        "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging-sampled.i32",
+        "bytes": 40140,
+        "sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging-generate.log",
+        "bytes": 61734,
+        "sha256": "16585296f4a8b7e638da5b92b69e651b532ebeb2daf354116f90001773f80da3"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging.npy",
+        "bytes": 2252928,
+        "sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-logging.json",
+        "bytes": 274,
+        "sha256": "434cfb44b41ee1aace634132bb25d18c5683c43d8b854909f075a0b8e163617d"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cabi-baseline-asr.log",
+        "bytes": 1156,
+        "sha256": "9236bf52836d8ca4b30ebf3eb1fef19cf801e16b6712032bd33be219505062ac"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging.npy",
+        "bytes": 2252928,
+        "sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-logging.json",
+        "bytes": 175,
+        "sha256": "fb8a83774c22d50d2103ea1ab902fc17001d712fc2e49d2610b837e14de99467"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/cli-baseline-asr.log",
+        "bytes": 978,
+        "sha256": "77550733c2b686e7fcae95cbccf6beafb7ddfb896379585c858136c68a5b051b"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
+        "path": "output/sources/src/dia_tts.cpp",
+        "bytes": 114800,
+        "sha256": "3ab92b7de64ab4cabe3eedbe78db32d720dd335ed6526817d070b9b0cef739d9"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
+        "path": "output/original-step978-ref.gguf",
+        "bytes": 99803232,
+        "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
+        "path": "output/original-late.npy",
+        "bytes": 2478208,
+        "sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d"
+      },
+      {
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
+        "path": "output/on-original-provenance.json",
+        "bytes": 1446,
+        "sha256": "c486291127a44aaa5e3ec254601d7f8f38a0a53788a2c681e1bcc4f51a57be3a"
+      }
+    ]
+  },
+  "original_protocol": {
+    "passed": true,
+    "scope": "Literal pinned original generation/BOS/update/output-slice protocol on retained raw native predictions; neural step intentionally replaced, no new neural generation, DAC or speech acceptance.",
+    "torch_version": "2.6.0+cpu",
+    "original_model_source_sha256": "6bc51e6e5ff58ca9ed66431773df6cda954afee3d4b7ea515c1363b73ca82926",
+    "literal_extracted_methods_sha256": "544ae158469e1b438a163d179bb57aa6aed0fae9b96d6e3139ef7c203fb5d31b",
+    "all_known_feedback_rows_exact": 1115,
+    "native_emitted_rows": 1115,
+    "original_returned_rows": 1114,
+    "extra_native_trailing_rows": 1,
+    "shared_emitted_rows_exact": true,
+    "whole_port_accepted": false
+  },
+  "inputs": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261015-full-codec/retained-inputs-v1.zip",
+    "bytes": 5220208,
+    "sha256": "b711e33d4bb60f6c421397a3ca2eaf8600facd196a23c03e2bce20bafbee6126",
+    "payloads": 42,
+    "anonymous_verified": true,
+    "revision": "e22cb7451fa0b073e3b497273266338913243831",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/e22cb7451fa0b073e3b497273266338913243831/dia-20261015-full-codec/retained-inputs-v1.zip"
+  },
+  "publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "file": "dia-20261015-full-codec/complete-protocol-preparation-v1.zip",
+    "bytes": 5261390,
+    "sha256": "63baa2f12bc1da0775e511d274fbadbd0d2aa0cf059ed2299dcd0817e3bb3b9d",
+    "payloads": 14,
+    "anonymous_verified": true,
+    "revision": "ea07987236fd47882f62c348dad2f80d764229b1",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ea07987236fd47882f62c348dad2f80d764229b1/dia-20261015-full-codec/complete-protocol-preparation-v1.zip"
+  },
+  "candidate_source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+  "hosted_run": 38710473906,
+  "hosted_codec_status": "completed: independently audited, diagnostic worker integrated",
+  "production_changes": false,
+  "model_speech_acceptance": false,
+  "local_original_dac_diagnosis": {
+    "independent_audit_pass": true,
+    "execution_location": "local VPS CPU; actual unchanged hosted worker, GH still queued",
+    "worker_source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "verified_raw_payloads": 77,
+    "torch_version": "2.6.0+cpu",
+    "original_positive_pcm": {
+      "cosine": 0.9999999999998493,
+      "relative_l2": 5.572414191420105e-07,
+      "norm_error": 9.646688758913058e-08,
+      "mine_norm": 57.878208379921595,
+      "ref_norm": 57.878202796591516,
+      "max_abs": 1.0281801223754883e-06
+    },
+    "same_native_codes_original_vs_native_pcm": {
+      "cosine": 0.9999649845707721,
+      "relative_l2": 0.008929457910565085,
+      "norm_error": 0.0030803635461189582,
+      "mine_norm": 0.1171831111846523,
+      "ref_norm": 0.11682325309448102,
+      "max_abs": 7.190275937318802e-06
+    },
+    "pcm": {
+      "original-codes": {
+        "samples": 619520,
+        "rms": 0.07353386838261514,
+        "peak": 0.9937424659729004
+      },
+      "native-complete-codes": {
+        "samples": 563200,
+        "rms": 0.00015614702030842249,
+        "peak": 0.008120466023683548
+      },
+      "native-original-return-slice": {
+        "samples": 562688,
+        "rms": 0.00015765062414028555,
+        "peak": 0.009593318216502666
+      }
+    },
+    "asr": {
+      "original-codes": {
+        "text": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "native-complete-codes": {
+        "text": "You",
+        "wer": 1.0
+      },
+      "native-original-return-slice": {
+        "text": "You",
+        "wer": 1.0
+      }
+    },
+    "shared_code_prefix_frames": 965,
+    "shared_code_prefix_seconds": 11.203628117913832,
+    "original_energy_fraction_after_prefix": 0.9999965666573893,
+    "original_dac_rescues_native_speech": false,
+    "whole_model_accepted": false
+  },
+  "local_diagnosis_publication": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "668196e7450b1ce35bded6355ec58464235deb1e",
+    "file": "dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip",
+    "bytes": 23699070,
+    "sha256": "9ff7dda447d1d8cbd75dcbbbb2316db70d6ad84ba9ad0cc12fed88a74db2862c",
+    "payloads": 117,
+    "anonymous_full_sha256_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/668196e7450b1ce35bded6355ec58464235deb1e/dia-20261015-full-codec/complete-original-dac-diagnosis-v1.zip"
+  },
+  "upstream_license_publication": {
+    "revision": "949b03fd276ecf968ba589e336c2788f80a4e445",
+    "file": "dia-20261015-full-codec/Dia-LICENSE",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/949b03fd276ecf968ba589e336c2788f80a4e445/dia-20261015-full-codec/Dia-LICENSE",
+    "sha256": "34c1659a3495220f85dffebd4d3a930bcbfd9f216f8a3c5f880a1d4a59a5358d",
+    "anonymous_verified": true
+  },
+  "repaired_retained_protocol": {
+    "passed": true,
+    "candidate_source": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "actual_extracted_protocol_elf_sha256": "2e3559eeda1d7c934d7759326770b8091884e6cf18bc827a9fcc90c8247d7350",
+    "native_source_sha256": "db15655ddcc1dd8075762daf9280d2a001b153e2b11470666d9e984e4b939da5",
+    "original_source": "4a9e29b1bdbfe1be721353ec034a8c66c9f0a1a8",
+    "torch_version": "2.6.0+cpu",
+    "surfaces": [
+      {
+        "surface": "cabi",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      },
+      {
+        "surface": "cli",
+        "feedback_rows": 1115,
+        "returned_rows": 1114,
+        "aligned_frames": 1099,
+        "expected_pcm_samples": 562688,
+        "all_arrays_exact": true
+      }
+    ],
+    "scope": "Actual captured CLI/C-ABI neural predictions through repaired production protocol and actual original delay reversal; no new neural, DAC or speech execution"
+  },
+  "hosted_run_status": "run38723274160 succeeded; independent80-payload PCM/ASR audit passes; original WER0, both native WER1",
+  "diagnosis_complete": true,
+  "hosted_failed_attempt": {
+    "passed": true,
+    "source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "failure": "Hosted dispatch omitted huggingface_hub; original source import fails before protocol replay, DAC or ASR",
+    "artifacts": [
+      {
+        "artifact": 11962046723,
+        "sha256": "a13b5dd6a3c78472f8d23c82917ac128775188651feff2d2d3cdee42031f7709",
+        "bytes": 10351853
+      }
+    ]
+  },
+  "hosted_failed_attempt_publication": {
+    "revision": "f972cead2a3695c421e14cef9032292d92c3c2ea",
+    "file": "dia-20261015-full-codec/complete-hosted-dependency-failure-v1.zip",
+    "bytes": 10326196,
+    "sha256": "2683740004fa6c32093f4f4edd6b9642c094cc9b46744cf91063d332737706bc",
+    "payloads": 10,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/f972cead2a3695c421e14cef9032292d92c3c2ea/dia-20261015-full-codec/complete-hosted-dependency-failure-v1.zip"
+  },
+  "corrected_hosted_dispatch": {
+    "run": 38716091962,
+    "source": "7b42071f41e5814f957d7397d8c73615b2cd7c9a",
+    "added_dependency": "huggingface_hub==1.10.1",
+    "status": "failed: ffmpeg missing before ASR; retained independently audited PCM",
+    "worker_code_changed": false,
+    "readme_command_repair": "87a11e3dace40c5b2da5d19f44c053c630f07c50"
+  },
+  "second_hosted_failed_attempt": {
+    "raw_artifacts_verified": true,
+    "job": 116359021574,
+    "run": 38716091962,
+    "failure": "ffmpeg missing before ASR; strict original positive PCM passed",
+    "asr_ran": false,
+    "artifacts": [
+      {
+        "id": 11966906249,
+        "bytes": 22828110,
+        "sha256": "e74d6a025bf0a89fcdcf4e1bfe1544fc9443ae87f538a77a70bca61657fa6bb0"
+      }
+    ]
+  },
+  "second_hosted_partial_pcm_audit": {
+    "independent_partial_pcm_audit_pass": true,
+    "original_positive": {
+      "cosine": 0.9999999999998495,
+      "relative_l2": 5.571704739253249e-07,
+      "norm_error": 9.64232058642267e-08
+    },
+    "pcm": [
+      {
+        "name": "original-codes",
+        "samples": 619520,
+        "rms": 0.07353386837940307
+      },
+      {
+        "name": "native-complete-codes",
+        "samples": 563200,
+        "rms": 0.00015614702051855393
+      },
+      {
+        "name": "native-original-return-slice",
+        "samples": 562688,
+        "rms": 0.00015765062395714174
+      }
+    ],
+    "asr_ran": false,
+    "diagnosis_complete": false,
+    "whole_model_acceptance": false
+  },
+  "second_hosted_failure_publication": {
+    "revision": "0c3be77b4ed30830bce1f949d7f71dc014e0b2cf",
+    "file": "dia-20261015-full-codec/complete-hosted-ffmpeg-failure-v1.zip",
+    "bytes": 22807538,
+    "sha256": "2e5afdfbe19754de03ac18b7e4e0791bb74fe8c594c61b0f1ba21cc0ded87761",
+    "payloads": 13,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/0c3be77b4ed30830bce1f949d7f71dc014e0b2cf/dia-20261015-full-codec/complete-hosted-ffmpeg-failure-v1.zip"
+  },
+  "hosted_prerequisite_repair": {
+    "source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "run": 38723274160,
+    "status": "completed-success: independently audited",
+    "scope": "Check/provision actual ffmpeg only on GitHub-hosted Linux before expensive reference decode; no numerical/ASR recipe or threshold changes",
+    "artifact": 11967984300
+  },
+  "protocol_runtime_integration": {
+    "source": "6503408cb95d42e80ad84bee513ae58a67e616c5",
+    "tested_candidate": "fc1b05c922edfeece675a32f1b7855f588276968",
+    "all13_general_and10_lint_pass": true,
+    "tested_source_byte_unchanged": true,
+    "speech_acceptance": false
+  },
+  "hosted_independent_audit": {
+    "independent_audit_pass": true,
+    "execution_location": "GH hosted CPU run38723274160; full raw artifact digest/CRC verified separately",
+    "worker_source": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "verified_raw_payloads": 80,
+    "torch_version": "2.6.0+cpu",
+    "original_positive_pcm": {
+      "cosine": 0.9999999999998496,
+      "relative_l2": 5.570250055146055e-07,
+      "norm_error": 9.63364354955587e-08,
+      "mine_norm": 57.87820837237126,
+      "ref_norm": 57.878202796591516,
+      "max_abs": 1.0281801223754883e-06
+    },
+    "same_native_codes_original_vs_native_pcm": {
+      "cosine": 0.9999649845293928,
+      "relative_l2": 0.008929464390920282,
+      "norm_error": 0.0030803687972749128,
+      "mine_norm": 0.11718311179810942,
+      "ref_norm": 0.11682325309448102,
+      "max_abs": 7.190275937318802e-06
+    },
+    "pcm": {
+      "original-codes": {
+        "samples": 619520,
+        "rms": 0.07353386837302249,
+        "peak": 0.9937424659729004
+      },
+      "native-complete-codes": {
+        "samples": 563200,
+        "rms": 0.00015614702112585685,
+        "peak": 0.008120466023683548
+      },
+      "native-original-return-slice": {
+        "samples": 562688,
+        "rms": 0.00015765062388326632,
+        "peak": 0.009593318216502666
+      }
+    },
+    "asr": {
+      "original-codes": {
+        "text": "We are committed to making it secure.",
+        "wer": 0.0
+      },
+      "native-complete-codes": {
+        "text": "You",
+        "wer": 1.0
+      },
+      "native-original-return-slice": {
+        "text": "You",
+        "wer": 1.0
+      }
+    },
+    "shared_code_prefix_frames": 965,
+    "shared_code_prefix_seconds": 11.203628117913832,
+    "original_energy_fraction_after_prefix": 0.9999965666573766,
+    "original_dac_rescues_native_speech": false,
+    "whole_model_accepted": false
+  },
+  "hosted_complete_publication": {
+    "revision": "6ac1bbd6072c031d546a07354c9b79c832406162",
+    "file": "dia-20261015-full-codec/complete-hosted-codec-diagnosis-v1.zip",
+    "bytes": 23296826,
+    "sha256": "3a01150147bfad341d8383600dcd5a68379d4d100851b85ae85c67150ef604d9",
+    "payloads": 11,
+    "anonymous_verified": true,
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/6ac1bbd6072c031d546a07354c9b79c832406162/dia-20261015-full-codec/complete-hosted-codec-diagnosis-v1.zip"
+  },
+  "worker_integration": {
+    "source": "7a9345b442708f4dbe84784a536736c7a674cc50",
+    "tested_candidate": "a40755b7e96b5bc10380af7dd00b3feb6358b96b",
+    "tested_worker_bytes_unchanged": true,
+    "scope": "diagnostic worker and README only; production runtime unchanged"
+  }
+}

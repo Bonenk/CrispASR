@@ -6,6 +6,12 @@ auto-generated list is [`docs/feature-matrix.md`](feature-matrix.md) — behind
 the same `crispasr` binary, each with a distinct voice / quality / footprint
 trade-off:
 
+VoxCPM2 returns native 48 kHz mono PCM through the CLI and session API.
+Bindings should use the output sample rate getter when playing or saving PCM.
+Its CFM solver defaults to ten steps; explicit CLI `--tts-steps` and session
+`set_tts_steps` overrides apply to the next synthesis call. Lower step counts
+can reduce speech quality.
+
 ## Contents
 
 - [dots.tts](#dotstts--voice-cloning-and-performance) — voice cloning, mixed quant, flow-match knobs
@@ -124,12 +130,46 @@ object pipeline. To test raw streaming in `cmd.exe`, request
 | **`lfm2-audio`** | LiquidAI LFM2.5-Audio 1.5B: FastConformer encoder + LFM2 hybrid conv+attention backbone + 6L depthformer (8-codebook Mimi) + ISTFT detokenizer → 24 kHz. Interleaved text+audio generation. Also does ASR and speech-to-speech. LFM Open License v1.0 ($10M revenue cap). | No | ~1.5 GB Q4_K (JP) / ~1.6 GB Q5_K (EN) + ~157 MB detokenizer companion |
 | [`dots-tts`](#dotstts--voice-cloning-and-performance) | rednote-hilab dots.tts-soar: Qwen2.5-1.5B LLM + 24L VAESemanticEncoder + 18L DiT flow-matching head (16-step Euler CFG) + BigVGAN vocoder → 48 kHz. Continuous-latent AR (patch-by-patch). Apache-2.0. **The CFG flow-match needs an F16 DiT — a full-q8 core derails; use the mixed quant (`crispasr-quantize` keeps the DiT at F16, quantizes the LLM+PatchEncoder to Q8_0 or Q4_K).** CAM++ reference-WAV voice cloning is supported when the speaker companion is present. | Yes (`--voice ref.wav --i-have-rights`) | ~3.1 GB mixed-Q8 / ~2.2 GB mixed-Q4_K core + 330–345 MB vocoder companion |
 | [`fireredtts3`](architecture.md#fireredtts3) | FireRedTeam/FireRedTTS3: Qwen3-1.7B LLM + 8L PatchEncoder + 11L DiT flow head over continuous 64-d 25 Hz RedAE latents; RedAE Qwen3 encoder/decoder + Vocos ISTFT head -> 24 kHz; CAM++ 512-d speaker encoder. Zero-shot ICL voice cloning (24 languages + 21 Chinese dialects): `--voice ref.wav --ref-text "<transcript>"` (auto-transcribed when --ref-text is absent); without `--voice`, a default English prompt baked into the core GGUF is used. Apache-2.0. **Like dots-tts, the DiT flow head must stay F16 — `crispasr-quantize` quantizes only the LLM backbone.** | Yes (`--voice ref.wav --i-have-rights`) | ~1.6 GB mixed-Q4_K core + ~1.0 GB RedAE companion |
-| **`bt2-tts`** | MediaTek Breeze-TTS-2 (BreezeBlue): T5Gemma2 text encoder + Sesame-style backbone/depth AR decoder over qwen3-tts-tokenizer-12hz codec codes (16 codebooks @ 12 Hz) → 24 kHz. Plain TTS, Voice Clone (reference clip + its transcript) and Voice Design (natural-language style instruction). **NON-COMMERCIAL use only** — BreezeBlue Research and Non-Commercial License v1.1; quantization is a Derivative Model under §1.3, so the GGUFs inherit the terms. Default q4_k: an A/B against q8_0 and f16 found q4_k and q8_0 perceptually indistinguishable (f16 is published for reference quality), so the extra 1.14 GiB buys code exactness that does not reach the audio. | Yes (`--voice ref.wav --ref-text <transcript> --i-have-rights`) | ~2.2 GB Q4_K + ~60 MB codec via `-m auto` |
+| **`bt2-tts`** | MediaTek Breeze-TTS-2 (BreezeBlue): T5Gemma2 text encoder + Sesame-style backbone/depth AR decoder over qwen3-tts-tokenizer-12hz codec codes (16 codebooks @ 12 Hz) → 24 kHz. Plain TTS, Voice Clone (reference clip + its transcript), Voice Design (`--tts-instruct "<style prose>"`) and Voice Direction (both together). `--tts-cfg-scale` is upstream's `--cfg-scale`: unset or 1 runs the instruction prompt alone, 4 is upstream's suggestion to strengthen instruction-following and doubles the decode cost. **NON-COMMERCIAL use only** — BreezeBlue Research and Non-Commercial License v1.1; quantization is a Derivative Model under §1.3, so the GGUFs inherit the terms. Default q4_k: an A/B against q8_0 and f16 found q4_k and q8_0 perceptually indistinguishable (f16 is published for reference quality), so the extra 1.14 GiB buys code exactness that does not reach the audio. | Yes (`--voice ref.wav --ref-text <transcript> --i-have-rights`; in the server a per-request `voice` naming a WAV in `--voice-dir`, transcript from `ref_text`, else `<voice>.txt`, else auto-transcribed) | ~2.2 GB Q4_K + ~60 MB codec via `-m auto` |
 | **`confucius4-tts`** | NetEase Youdao Confucius4-TTS: GPT-2 T2S (24L/1280d, beam-sample num_beams=3, LlamaTokenizer vocab baked) + flow-matching DiT+WaveNet S2A (25-step Euler CFG 0.7, native w2v-BERT + CAMPPlus style/reference-mel conditioning) + BigVGAN vocoder → 22.05 kHz. Zero-shot voice cloning; 14 languages via Chinese `LANGUAGE_TOKEN_MAP` prompts (`-l <lang>`). Apache-2.0. **Zero-shot only: without `--voice` conditioning the output is unintelligible by design.** | Yes (`--voice ref.wav --i-have-rights`) | ~376 MB Q4_K T2S + ~135 MB S2A + ~214 MB BigVGAN + w2v companion via `-m auto` |
 | **`mini-omni2`** | gpt-omni/mini-omni2: Whisper-small encoder + Qwen2-0.5B LLM with 8-stream architecture + SNAC 24 kHz decoder → 24 kHz. Also does ASR and speech-to-speech. MIT license. Requires `--codec-model snac-24khz.gguf` companion. | No | ~1.0 GB Q4_K + ~80 MB SNAC companion |
 | **`voxtral-tts`** | Mistral Voxtral-4B-TTS-2603: Ministral-3B AR backbone (26L GQA, NORMAL/adjacent-pair RoPE) + 3L bidirectional flow-matching acoustic transformer (8-step Euler ODE + CFG α=1.2, no positional encoding) + Voxtral codec decoder (ALiBi sliding-window attention + reflect-causal conv + ConvTranspose upsampling) → 24 kHz. 20 preset voices across 9 languages (en/fr/de/es/it/pt/nl/ar/hi); strong on French technical text. CC-BY-NC-4.0. | No (20 preset voices via `--voice <name>`, e.g. `fr_female`) | ~2.4 GB Q4_K / ~4.3 GB Q8_0 / ~8.2 GB F16 via `-m auto` |
 
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts/confucius4-tts, 16 kHz for speecht5, 44.1 kHz for melotts/dia/parler-tts/zonos-tts/supertonic, 48 kHz for voxcpm2-tts/dots-tts/irodori-tts/moss-tts-local/sidon, 24 kHz for most others). Programmatic callers don't need this table: `crispasr_session_output_sample_rate()` returns the active backend's output rate, with `crispasr_session_input_channels()` / `output_channels()` alongside (everything is mono today) — #332.
+
+Dia sampling overrides use `--tts-top-k` / `--tts-top-p` on the CLI and
+`Session.set_top_k()` / `Session.set_top_p()` through the C ABI. Zero top-k
+disables that filter; top-p 1 disables nucleus filtering. Current native defaults
+remain temperature 1.2, top-k 45 and top-p 0.95. The pinned original Python
+generator defaults to temperature 1.3/top-k 35; testing that recipe remains
+pending and does not establish broader speech acceptance.
+
+Dia's explicit [DAC companion conversion](dia-dac-conversion.md) preserves
+critical original F32 output weights with a 1,312-byte size increase. Numerical
+startup and full-history checks pass; registry companion pins are unchanged.
+
+The following CPU diagnostic controls are integrated and disabled by default:
+
+- `CRISPASR_DIA_SERIAL_HEAD=serial` uses separately rounded F32 products and
+  sequential addition on actual native head weights/hidden. `off` is the
+  default; `identity` controls the extra node. It requires CPU and F32 head
+  weights, retains the ordinary matmul dependency and is intentionally slower.
+- `CRISPASR_DIA_CROSS_CACHE_F32=1` keeps projected cross-attention K/V in F32.
+  It increases cross-cache memory, without changing model-file precision.
+- `CRISPASR_DIA_PORTABLE_RNG=1` uses the pinned original PyTorch2.6 MKL CPU
+  exponential sampling recipe. Only the literal value `1` enables either
+  boolean control; unset/`0` preserves existing behavior.
+
+With all three controls, an explicitly converted full-F32 neural model and
+F32-output DAC, the fixed prompt `[S1] We are committed to making it secure.`
+(seed42, temperature1.2, top_p0.95, top_k45, CFG3) restores all1226 original
+input rows/1210 code frames and WER0 through native DAC, original DAC and CLI.
+The other cache/sampler combinations fail this same control. These controls
+are not an accepted general recipe for the published model or `-m auto`.
+Additional texts/seeds are in validation; GPU/Q4 and performance are separate.
+[Results, complete public proofs and first-fork diagnosis](dia-cache-sampler-results-2026-10-16.md).
+The public original dumper and text-only `crispasr-diff` route now cover the
+complete neural/codec stage map; [wiring proof](dia-reference-wire-composed-2026-10-16.json).
 
 ## dots.tts — voice cloning and performance
 
@@ -2279,3 +2319,51 @@ crispasr --backend supertonic -m auto --tts "Guten Tag, wie geht es dir?" \
 - Long text is chunked at sentence boundaries (300 chars; 120 for ko/ja) and
   joined with 0.3 s silences, matching the upstream SDK.
 - Env: `SUPERTONIC_BENCH=1` prints per-stage timings.
+
+
+Dia cache precision checkpoint (2026-10-13): full F32 weights and F32 cross
+caches still reject the unchanged short seed-42 control through CLI and C ABI
+(empty transcript/WER 1), despite 40/40 canonical stage passes. No default or
+model pin was promoted; see [the complete OFF/ON/OFF receipt](dia-cross-cache-hosted-2026-10-13.json).
+
+
+Actual T4 CUDA cache controls (2026-10-13) are complete: all 120 canonical
+replay stages pass with real scheduler splits and sampled process GPU memory
+8,528–8,734 MiB. All six native CLI/C-ABI speech checks still reject with empty
+transcripts/WER 1. F16 cache shares 353 original input steps; F32 shares 979
+and reaches the same step-978/head-2 divergence as CPU. OFF/repeat full arrays
+match exactly. These are correctness diagnostics, not accepted native speech
+or performance measurements. [Complete physical CUDA proof](dia-cuda-cache-physical-2026-10-13.json).
+
+
+Actual T4 original-timescale OFF/ON/OFF control (2026-10-13) is complete
+and rejects speech. All 120 stage rows pass and all six CLI/C-ABI speech checks
+remain empty/WER 1. Canonical original audio passes the same GPU ASR at WER 0
+with 25 actual CUDA splits, separating the recognition control from native TTS.
+OFF/repeat full arrays match exactly. ON changes input histories, logits and
+both PCM arrays, but shortens the original shared input prefix from 979 to 865
+steps: first differing draw moves from 978/head 2 to 864/head 6. The model SHA
+matches the CPU auxiliary model; complete physical audits and downloaded source
+files match their immutable controls. Nine TTS executions show actual CUDA
+splits and sampled allocation 8,528–8,734 MiB. This rejects the numerical
+candidate; it establishes no native speech, Q4 or speed acceptance.
+[Complete physical rotary proof](dia-original-rope-cuda-physical-2026-10-13.json).
+
+
+The exact-shape output-head probe reproduces every retained native step-978
+logit byte-for-byte. Combining the heads changes nothing; flattening batch
+shape changes rounding but does not restore the differing draw. All 16
+original-filter controls choose token 877 with original hidden states and 904
+with native hidden states. The cause at this boundary precedes the output
+head. This is isolated numerical evidence, not accepted speech or speed; the
+local original projection is not byte-identical to the hosted original one.
+[Projection audit](dia-head-projection-isolation-2026-10-13.json).
+
+
+The learned final norm is byte-identical on retained original/native layer-17
+inputs and reproduces both saved hidden states exactly. Decoder embedding
+captures also match exactly at four checkpoints, including step 978. Repeats
+and changed-feedback/scaled-output negatives pass. The remaining hidden
+variation is inside the decoder blocks or their attention inputs; these
+isolated controls do not accept native speech, Q4 or speed.
+[Norm/input audit](dia-norm-embedding-isolation-2026-10-13.json).

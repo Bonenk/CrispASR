@@ -1,0 +1,399 @@
+{
+  "version": "2026-10-12.canary-ctc-cuda.1",
+  "source": "eb633d908120cc5f44b8af8cd4aeb1191f16bfd8",
+  "package_sha256": "abeb01ea8c5183685ef05d5f167ee2b51dfcf83a67aedfbdd2e0802683f0a178",
+  "model_sha256": "d16dbf18f9a66f59c0ceb61b204caca5dda21742d6e9dc304c9d0518c81ee38c",
+  "model_revision": "2b22dc9aff585bc8368a5228173c8afe22c155b7",
+  "cpu_proof_revision": "2cfe9f89b0d64a3450e03023b87f5178fbdc949a",
+  "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+  "entry_sha256": "a80a890f76c9a3b4aa964b336227ba56fad05da7c02b341e1a3f68faece7d017",
+  "original_parity": false,
+  "reporter_recording_reproduced": false,
+  "allocation_crash_reproduced": false,
+  "complete": true,
+  "passed": true,
+  "buckets": [
+    {
+      "bucket": 0,
+      "returncode": 0,
+      "result": {
+        "bucket": 0,
+        "passed": true,
+        "complete": true,
+        "gpu_allocations": "100, 520",
+        "cuda_plugin_sha256": "18e90585fedc427e665de340540c57e54d3755396f1587c45dc67a00023d7cf1",
+        "cases": [
+          {
+            "seq": 0,
+            "seconds": 11,
+            "shape": [
+              138,
+              16385
+            ],
+            "sha256": "e668f20e490829a6b32f7aea36a8d56fdcc1462ae8fcf4411db3b2ffd50ce0a2",
+            "finite": true,
+            "fresh_reused_exact": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9877091254811121,
+              "norm_ratio": 0.9964654329123595,
+              "relative_l2": 0.02719775349382371,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 1,
+            "seconds": 4,
+            "shape": [
+              51,
+              16385
+            ],
+            "sha256": "f4306072dc37d438cf0cbed88c42d9f49d924a3b15fab77dbdb0c5c1bbe0bcbf",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9894268759284692,
+              "norm_ratio": 1.0145206258683057,
+              "relative_l2": 0.0375530668737381,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 2,
+            "seconds": 33,
+            "shape": [
+              413,
+              16385
+            ],
+            "sha256": "6ff45cc6139b7e98ca04bde627bc7605fd19aa4b63f3de50842ee21080e8bfcf",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9897590605532672,
+              "norm_ratio": 1.0062385847355906,
+              "relative_l2": 0.019728002206366856,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 3,
+            "seconds": 90,
+            "shape": [
+              1126,
+              16385
+            ],
+            "sha256": "a3028af1a81337ce9af5f86aa7eb06da6d216f261b2e8f5d6e928c2d63f4489f",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9813332353595235,
+              "norm_ratio": 1.0089635777367694,
+              "relative_l2": 0.0284831273610748,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 4,
+            "seconds": 11,
+            "shape": [
+              138,
+              16385
+            ],
+            "sha256": "e668f20e490829a6b32f7aea36a8d56fdcc1462ae8fcf4411db3b2ffd50ce0a2",
+            "finite": true,
+            "fresh_reused_exact": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9877091254811121,
+              "norm_ratio": 0.9964654329123595,
+              "relative_l2": 0.02719775349382371,
+              "argmax_exact": false
+            }
+          }
+        ],
+        "current": {
+          "seq": 4,
+          "seconds": 11,
+          "phase": "native computation"
+        }
+      }
+    },
+    {
+      "bucket": 128,
+      "returncode": 0,
+      "result": {
+        "bucket": 128,
+        "passed": true,
+        "complete": true,
+        "gpu_allocations": "114, 520",
+        "cuda_plugin_sha256": "18e90585fedc427e665de340540c57e54d3755396f1587c45dc67a00023d7cf1",
+        "cases": [
+          {
+            "seq": 0,
+            "seconds": 11,
+            "shape": [
+              138,
+              16385
+            ],
+            "sha256": "1eb4a5041ba28f37ce644e1e96e064b93a5ccafd1c614ed8c04aae7e6f0d9d8b",
+            "finite": true,
+            "fresh_reused_exact": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9996709396707051,
+              "norm_ratio": 0.997204857532695,
+              "relative_l2": 0.015347219215688991,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 1,
+            "seconds": 4,
+            "shape": [
+              51,
+              16385
+            ],
+            "sha256": "f4306072dc37d438cf0cbed88c42d9f49d924a3b15fab77dbdb0c5c1bbe0bcbf",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9929156300962437,
+              "norm_ratio": 1.0078209146201011,
+              "relative_l2": 0.028771794222992645,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 2,
+            "seconds": 33,
+            "shape": [
+              413,
+              16385
+            ],
+            "sha256": "e04936db0836083cc0c973a6264d5d449809df557118cdcb50ba15040b3565f6",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9961305034303716,
+              "norm_ratio": 1.0068554668841458,
+              "relative_l2": 0.01960183378473968,
+              "argmax_exact": true
+            }
+          },
+          {
+            "seq": 3,
+            "seconds": 90,
+            "shape": [
+              1126,
+              16385
+            ],
+            "sha256": "a3028af1a81337ce9af5f86aa7eb06da6d216f261b2e8f5d6e928c2d63f4489f",
+            "finite": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9813332353595235,
+              "norm_ratio": 1.0089635777367694,
+              "relative_l2": 0.0284831273610748,
+              "argmax_exact": false
+            }
+          },
+          {
+            "seq": 4,
+            "seconds": 11,
+            "shape": [
+              138,
+              16385
+            ],
+            "sha256": "1eb4a5041ba28f37ce644e1e96e064b93a5ccafd1c614ed8c04aae7e6f0d9d8b",
+            "finite": true,
+            "fresh_reused_exact": true,
+            "cpu_gpu_diagnostic": {
+              "row_cosine_min": 0.9996709396707051,
+              "norm_ratio": 0.997204857532695,
+              "relative_l2": 0.015347219215688991,
+              "argmax_exact": false
+            }
+          }
+        ],
+        "current": {
+          "seq": 4,
+          "seconds": 11,
+          "phase": "native computation"
+        }
+      }
+    }
+  ],
+  "issue": 532,
+  "worker_source": "78f0c269d",
+  "runtime_fix_applied": false,
+  "gpu_quant_parity_accepted": false,
+  "independent_verification": {
+    "passed_allocation_and_returning_shape": true,
+    "original_parity": false,
+    "reporter_crash_reproduced": false,
+    "complete_arrays_verified": 10,
+    "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+    "cpu_gpu_diagnostics": {
+      "0": [
+        {
+          "seconds": 11,
+          "shape": [
+            138,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9877091254811121,
+            "norm_ratio": 0.9964654329123595,
+            "relative_l2": 0.02719775349382371,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 4,
+          "shape": [
+            51,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9894268759284692,
+            "norm_ratio": 1.0145206258683057,
+            "relative_l2": 0.0375530668737381,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 33,
+          "shape": [
+            413,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9897590605532672,
+            "norm_ratio": 1.0062385847355906,
+            "relative_l2": 0.019728002206366856,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 90,
+          "shape": [
+            1126,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9813332353595235,
+            "norm_ratio": 1.0089635777367694,
+            "relative_l2": 0.0284831273610748,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 11,
+          "shape": [
+            138,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9877091254811121,
+            "norm_ratio": 0.9964654329123595,
+            "relative_l2": 0.02719775349382371,
+            "argmax_exact": false
+          }
+        }
+      ],
+      "128": [
+        {
+          "seconds": 11,
+          "shape": [
+            138,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9996709396707051,
+            "norm_ratio": 0.997204857532695,
+            "relative_l2": 0.015347219215688991,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 4,
+          "shape": [
+            51,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9929156300962437,
+            "norm_ratio": 1.0078209146201011,
+            "relative_l2": 0.028771794222992645,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 33,
+          "shape": [
+            413,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9961305034303716,
+            "norm_ratio": 1.0068554668841458,
+            "relative_l2": 0.01960183378473968,
+            "argmax_exact": true
+          }
+        },
+        {
+          "seconds": 90,
+          "shape": [
+            1126,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9813332353595235,
+            "norm_ratio": 1.0089635777367694,
+            "relative_l2": 0.0284831273610748,
+            "argmax_exact": false
+          }
+        },
+        {
+          "seconds": 11,
+          "shape": [
+            138,
+            16385
+          ],
+          "cpu_gpu_diagnostic": {
+            "row_cosine_min": 0.9996709396707051,
+            "norm_ratio": 0.997204857532695,
+            "relative_l2": 0.015347219215688991,
+            "argmax_exact": false
+          }
+        }
+      ]
+    }
+  },
+  "public_proof": {
+    "revision": "182a2bd457f3533dddfce1a4d7e09318503bfcc7",
+    "path": "canary/ctc-allocation-cuda-20261012/proof.zip",
+    "sha256": "b9e61df6f1044a4c97be573d74d9e0c3253260c1027cf30337b1da7997194522",
+    "bytes": 213199402,
+    "anonymous_verified": true
+  },
+  "cached_same_bucket_followup": {
+    "worker_source": "9132234df",
+    "version": "2026-10-12.canary-ctc-cuda.2",
+    "status": "COMPLETE PASS",
+    "source_pull_byte_equal": true,
+    "complete_arrays_verified": 16,
+    "same_bucket_cases": 6,
+    "original_parity": false,
+    "reporter_crash_reproduced": false,
+    "independent_verification": {
+      "passed_allocation_and_returning_shape": true,
+      "original_parity": false,
+      "reporter_crash_reproduced": false,
+      "complete_arrays_verified": 16,
+      "same_bucket_cases": 6,
+      "all_ten_initial_arrays_byte_equal_prior_independently_verified_gpu_run": true,
+      "all_same_bucket_returning_shapes_exact": true,
+      "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04"
+    },
+    "public_proof": {
+      "revision": "29d14881fa96021d0f41cdb3e6f1670307b298b0",
+      "path": "canary/ctc-allocation-cuda-cached-20261012/proof.zip",
+      "sha256": "bff8914b2d881d023ecb4b56d66ea827c11e50aa6c4dd33aa11be2c55ba4c389",
+      "bytes": 260796315,
+      "anonymous_verified": true
+    }
+  },
+  "cpu_gpu_comparison_scope": "Diagnostic against earlier pinned CPU Q4 outputs; argmax differences and minimum cosine .981333 are not original parity acceptance"
+}

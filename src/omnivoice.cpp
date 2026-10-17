@@ -3617,6 +3617,10 @@ int32_t* omnivoice_synthesize_codes(struct omnivoice_context* ctx, const char* t
 
     int n = (int)result.codes.size();
     int32_t* out = (int32_t*)malloc(n * sizeof(int32_t));
+    if (!out) {
+        *out_n_codes = 0;
+        return nullptr;
+    }
     std::memcpy(out, result.codes.data(), n * sizeof(int32_t));
     *out_n_codes = n;
     return out;

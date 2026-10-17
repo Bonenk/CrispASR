@@ -546,22 +546,22 @@ With `/Volumes/backups` absent, large local model/live tests remain postponed.
 Safe work completed without writing large local files:
 
 - VPS service envs now force scratch/cache paths away from `/tmp`:
-  `cb-api.service` uses `/mnt/storage/cb_api_scratch` and
-  `/mnt/storage/hf-cache`; `vps-worker.service` uses
-  `/mnt/storage/cloudworker/scratch/...`; `face-rec.service` uses
-  `/mnt/storage/crisplens/scratch/...`.
+  `cb-api.service` uses `${CRISPASR_STORAGE}/cb_api_scratch` and
+  `${CRISPASR_STORAGE}/hf-cache`; `vps-worker.service` uses
+  `${CRISPASR_STORAGE}/cloudworker/scratch/...`; `face-rec.service` uses
+  `${CRISPASR_STORAGE}/crisplens/scratch/...`.
 - Config backups were written to
-  `/mnt/storage/config-backups/20260516T103345Z`.
+  `${CRISPASR_STORAGE}/config-backups/20260516T103345Z`.
 - Existing large VPS `/tmp` artifacts were moved to storage, not left on the
   root volume. Symlink-heavy trees were stored as verified tar archives because
   the CIFS Storage Box mount does not reliably recreate Unix symlinks as
   directories. Relevant migration locations:
-  `/mnt/storage/tmp-migrated/20260516T103212Z`,
-  `/mnt/storage/tmp-migrated/20260516T103441Z`, and
-  `/mnt/storage/tmp-migrated/20260516T111528Z`.
+  `${CRISPASR_STORAGE}/tmp-migrated/20260516T103212Z`,
+  `${CRISPASR_STORAGE}/tmp-migrated/20260516T103441Z`, and
+  `${CRISPASR_STORAGE}/tmp-migrated/20260516T111528Z`.
 - `/tmp` on the VPS was reduced to small residual files only, with the large
   regenerated `hf-cache`, `jina-nano-regen`, and build trees archived under
-  `/mnt/storage/tmp-migrated/20260516T111528Z`.
+  `${CRISPASR_STORAGE}/tmp-migrated/20260516T111528Z`.
 - CrispLens v4 cloud-drive downloads no longer use `os.tmpdir()`; they use
   `CRISPLENS_SCRATCH_DIR`, `CRISP_SCRATCH_DIR`, or app-local scratch.
 
@@ -614,7 +614,7 @@ checks were expanded:
   CrispLens v4, and found by transcript search for `Detektivarbeit`.
 - cloud-backup live API checks ran via SSH against VPS localhost `cb-api`.
   The master catalog was backed up first under
-  `/mnt/storage/cloudworker/backups/master_catalog/live-tests/`. Manifest
+  `${CRISPASR_STORAGE}/cloudworker/backups/master_catalog/live-tests/`. Manifest
   push/pull, FTS search, embedding push/query, and v2 search succeeded.
 - Production renderer preview smoke served `/`, `manifest.webmanifest`,
   `sw.js`, `assets/index.js`, and `assets/jeep-sqlite.entry.js` from the built

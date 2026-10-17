@@ -1,0 +1,3911 @@
+{
+  "source": "17a7aedc508be885cce0024199bd48525d3fc41b",
+  "run": 38913941927,
+  "artifact": 12057273677,
+  "sha256": "75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90",
+  "payloads_verified": 1829,
+  "results": {
+    "hello-42": {
+      "passed": false,
+      "outputs": {
+        "canonical-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "d0b81bf6735398ccda749ae04ab0d5302c5b94925315ea795df228894b1760dc",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 4.46984126984127,
+          "rms": 0.37031503893257445
+        },
+        "native-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "35285bd17d54dc9b4e716899ca2db38c3fbeb326aad6c71b24ee1cfa0609e53b",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 4.46984126984127,
+          "rms": 0.3703221388817722
+        },
+        "original-dac-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "87f8dd177982afdbc4f41586530d07cb68f118bb89a0f13b14a33360140b8050",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 4.46984126984127,
+          "rms": 0.3703150516081932
+        },
+        "cli-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "fa63c6d2c3ac04f5aa20ceb8d24e490546dd48a9ccb664b83f223cecb10a6c54",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 4.46984126984127,
+          "rms": 0.3703106657592369
+        }
+      },
+      "stages": {
+        "cross_k0": {
+          "values": 159744,
+          "cos_min": 0.9999999999868119,
+          "mine_norm": 37.55399878929682,
+          "reference_norm": 37.553996564213875,
+          "max_row_norm_error": 6.755388226586945e-07,
+          "relative_l2": 5.775470250157356e-07,
+          "max_abs": 1.9371509552001953e-06,
+          "pass": true
+        },
+        "cross_v0": {
+          "values": 159744,
+          "cos_min": 0.9999999999937558,
+          "mine_norm": 10.667443250658843,
+          "reference_norm": 10.667442683393526,
+          "max_row_norm_error": 4.113604208377808e-07,
+          "relative_l2": 6.606646152067303e-07,
+          "max_abs": 1.2218952178955078e-06,
+          "pass": true
+        },
+        "decoder_block0_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997694,
+          "mine_norm": 13.137942931574852,
+          "reference_norm": 13.137940503230702,
+          "max_row_norm_error": 1.896457477723601e-07,
+          "relative_l2": 6.961004400879203e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999720869,
+          "mine_norm": 0.7028047726012039,
+          "reference_norm": 0.702804795499212,
+          "max_row_norm_error": 2.31140832995802e-06,
+          "relative_l2": 6.730626479721477e-07,
+          "max_abs": 1.2852251529693604e-07,
+          "pass": true
+        },
+        "decoder_block0_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997031,
+          "mine_norm": 3.704850377017643,
+          "reference_norm": 3.704850912098677,
+          "max_row_norm_error": 2.9850197769132336e-07,
+          "relative_l2": 7.670272595942064e-07,
+          "max_abs": 1.0132789611816406e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999997662,
+          "mine_norm": 21.607224448947623,
+          "reference_norm": 21.607230511918708,
+          "max_row_norm_error": 4.4956351186176136e-07,
+          "relative_l2": 4.930120698186294e-07,
+          "max_abs": 1.3113021850585938e-06,
+          "pass": true
+        },
+        "decoder_block0_input": {
+          "values": 4096,
+          "cos_min": 1.0,
+          "mine_norm": 8.665460761713922,
+          "reference_norm": 8.665460761713922,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999998805,
+          "mine_norm": 369.3214240417822,
+          "reference_norm": 369.32151994617783,
+          "max_row_norm_error": 2.6419124443677333e-07,
+          "relative_l2": 5.531622314330179e-07,
+          "max_abs": 9.059906005859375e-06,
+          "pass": true
+        },
+        "decoder_block0_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999995283,
+          "mine_norm": 19.044195577436465,
+          "reference_norm": 19.044187690118058,
+          "max_row_norm_error": 1.3609160387506591e-06,
+          "relative_l2": 1.3888669240362393e-06,
+          "max_abs": 1.8596649169921875e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999986203,
+          "mine_norm": 60.39247875647697,
+          "reference_norm": 60.39246308324739,
+          "max_row_norm_error": 1.7492911714711568e-06,
+          "relative_l2": 2.0016278320402093e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999994519,
+          "mine_norm": 13.822635580582176,
+          "reference_norm": 13.822634993694043,
+          "max_row_norm_error": 2.256521589583116e-07,
+          "relative_l2": 9.539414467462152e-07,
+          "max_abs": 6.9141387939453125e-06,
+          "pass": true
+        },
+        "decoder_block0_output": {
+          "values": 4096,
+          "cos_min": 0.99999999999887,
+          "mine_norm": 68.96585883586437,
+          "reference_norm": 68.96583936242406,
+          "max_row_norm_error": 1.5745359680519044e-06,
+          "relative_l2": 1.7746812938692101e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_block0_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998626,
+          "mine_norm": 4.668420473892338,
+          "reference_norm": 4.668420601314798,
+          "max_row_norm_error": 2.7294554505452595e-08,
+          "relative_l2": 5.25180830214903e-07,
+          "max_abs": 6.556510925292969e-07,
+          "pass": true
+        },
+        "decoder_block0_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998324,
+          "mine_norm": 8.735530197935924,
+          "reference_norm": 8.73552950213115,
+          "max_row_norm_error": 1.3833942169583224e-07,
+          "relative_l2": 5.771973292496506e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block0_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999999998,
+          "mine_norm": 2.8916193182122187,
+          "reference_norm": 2.8916193182122187,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_block0_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997414,
+          "mine_norm": 11.797614717626148,
+          "reference_norm": 11.797612803945656,
+          "max_row_norm_error": 1.6220912857356495e-07,
+          "relative_l2": 7.370719435691323e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997599,
+          "mine_norm": 11.972390983306987,
+          "reference_norm": 11.972388365122386,
+          "max_row_norm_error": 2.186852381402815e-07,
+          "relative_l2": 7.268047531676877e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999993565,
+          "mine_norm": 145.28001364497553,
+          "reference_norm": 145.28003012554598,
+          "max_row_norm_error": 2.400035609140261e-07,
+          "relative_l2": 1.10714192863928e-06,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_block17_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999990813,
+          "mine_norm": 2.1451122063740327,
+          "reference_norm": 2.1451122541426746,
+          "max_row_norm_error": 1.054776850306638e-06,
+          "relative_l2": 7.969088026655333e-07,
+          "max_abs": 3.6135315895080566e-07,
+          "pass": true
+        },
+        "decoder_block17_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999994629,
+          "mine_norm": 17.169027248740242,
+          "reference_norm": 17.169029792949292,
+          "max_row_norm_error": 2.9441742299685103e-07,
+          "relative_l2": 9.367921185547143e-07,
+          "max_abs": 3.0994415283203125e-06,
+          "pass": true
+        },
+        "decoder_block17_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999994285,
+          "mine_norm": 45.56450655961664,
+          "reference_norm": 45.56450803495974,
+          "max_row_norm_error": 5.036059873564369e-07,
+          "relative_l2": 5.863183386401315e-07,
+          "max_abs": 4.5299530029296875e-06,
+          "pass": true
+        },
+        "decoder_block17_input": {
+          "values": 4096,
+          "cos_min": 0.9999999999994553,
+          "mine_norm": 148.98895944289026,
+          "reference_norm": 148.9889828844979,
+          "max_row_norm_error": 2.6220316762248785e-07,
+          "relative_l2": 1.0175230722568475e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999994733,
+          "mine_norm": 130.42879565173482,
+          "reference_norm": 130.42875875078147,
+          "max_row_norm_error": 3.962402841395374e-07,
+          "relative_l2": 1.0438304751815045e-06,
+          "max_abs": 1.71661376953125e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999997999,
+          "mine_norm": 74.94486701584927,
+          "reference_norm": 74.94481079109111,
+          "max_row_norm_error": 7.750211110657546e-07,
+          "relative_l2": 9.596211432999151e-07,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999986575,
+          "mine_norm": 240.0848609064704,
+          "reference_norm": 240.08481565056513,
+          "max_row_norm_error": 6.361716440306253e-07,
+          "relative_l2": 1.5245448357744082e-06,
+          "max_abs": 0.000152587890625,
+          "pass": true
+        },
+        "decoder_block17_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.99999999999926,
+          "mine_norm": 91.3372185446371,
+          "reference_norm": 91.33719834937534,
+          "max_row_norm_error": 4.2208303163704386e-07,
+          "relative_l2": 1.2308212715959462e-06,
+          "max_abs": 6.4373016357421875e-06,
+          "pass": true
+        },
+        "decoder_block17_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999991779,
+          "mine_norm": 342.66607944035263,
+          "reference_norm": 342.6660649654732,
+          "max_row_norm_error": 3.672726338610488e-07,
+          "relative_l2": 1.2472727286483307e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_block17_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.999999999999594,
+          "mine_norm": 6.806126263688701,
+          "reference_norm": 6.8061262178871145,
+          "max_row_norm_error": 1.656718362497145e-08,
+          "relative_l2": 8.19879064385149e-07,
+          "max_abs": 1.7881393432617188e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999988171,
+          "mine_norm": 12.08298269697101,
+          "reference_norm": 12.082980093471244,
+          "max_row_norm_error": 2.4805906173597236e-07,
+          "relative_l2": 1.5307718863952528e-06,
+          "max_abs": 2.9802322387695312e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999989493,
+          "mine_norm": 7.375213649897477,
+          "reference_norm": 7.3752129309874,
+          "max_row_norm_error": 2.619966390504658e-07,
+          "relative_l2": 1.4365122339867817e-06,
+          "max_abs": 1.7285346984863281e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 10.124753474402103,
+          "reference_norm": 10.124752258900271,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999990374,
+          "mine_norm": 39.37790903349694,
+          "reference_norm": 39.37790444053055,
+          "max_row_norm_error": 3.3109213459781017e-07,
+          "relative_l2": 1.380359988760789e-06,
+          "max_abs": 3.933906555175781e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999993291,
+          "mine_norm": 142.99883750422399,
+          "reference_norm": 142.99885759455037,
+          "max_row_norm_error": 2.605797347898786e-07,
+          "relative_l2": 1.1285994786012732e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_ca0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997031,
+          "mine_norm": 3.704850377017643,
+          "reference_norm": 3.704850912098677,
+          "max_row_norm_error": 2.9850197769132336e-07,
+          "relative_l2": 7.670272595942064e-07,
+          "max_abs": 1.0132789611816406e-06,
+          "pass": true
+        },
+        "decoder_hidden": {
+          "values": 4096,
+          "cos_min": 0.9999999999983076,
+          "mine_norm": 17.832960004098453,
+          "reference_norm": 17.832954999730738,
+          "max_row_norm_error": 3.884130708176059e-07,
+          "relative_l2": 1.8380891874953172e-06,
+          "max_abs": 3.159046173095703e-06,
+          "pass": true
+        },
+        "decoder_layer_0": {
+          "values": 4096,
+          "cos_min": 0.99999999999887,
+          "mine_norm": 68.96585883586437,
+          "reference_norm": 68.96583936242406,
+          "max_row_norm_error": 1.5745359680519044e-06,
+          "relative_l2": 1.7746812938692101e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_layer_1": {
+          "values": 4096,
+          "cos_min": 0.9999999999994348,
+          "mine_norm": 81.28946629787225,
+          "reference_norm": 81.28944177865938,
+          "max_row_norm_error": 1.2273674581120275e-06,
+          "relative_l2": 1.3069640215602667e-06,
+          "max_abs": 6.4849853515625e-05,
+          "pass": true
+        },
+        "decoder_layer_10": {
+          "values": 4096,
+          "cos_min": 0.9999999999996998,
+          "mine_norm": 103.70429738856238,
+          "reference_norm": 103.70426190406738,
+          "max_row_norm_error": 7.488616819983918e-07,
+          "relative_l2": 9.272385954177304e-07,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_11": {
+          "values": 4096,
+          "cos_min": 0.9999999999996815,
+          "mine_norm": 112.40061792155629,
+          "reference_norm": 112.4005983098342,
+          "max_row_norm_error": 3.740366190108091e-07,
+          "relative_l2": 7.978113149355651e-07,
+          "max_abs": 3.0517578125e-05,
+          "pass": true
+        },
+        "decoder_layer_12": {
+          "values": 4096,
+          "cos_min": 0.9999999999996629,
+          "mine_norm": 114.34734008971276,
+          "reference_norm": 114.34732095394192,
+          "max_row_norm_error": 3.591845847417119e-07,
+          "relative_l2": 7.983948995742108e-07,
+          "max_abs": 3.0517578125e-05,
+          "pass": true
+        },
+        "decoder_layer_13": {
+          "values": 4096,
+          "cos_min": 0.9999999999995335,
+          "mine_norm": 117.21110050984996,
+          "reference_norm": 117.21109913195737,
+          "max_row_norm_error": 1.713913992951177e-07,
+          "relative_l2": 9.207818095077418e-07,
+          "max_abs": 2.6702880859375e-05,
+          "pass": true
+        },
+        "decoder_layer_14": {
+          "values": 4096,
+          "cos_min": 0.9999999999994793,
+          "mine_norm": 122.76115222026746,
+          "reference_norm": 122.76116175801727,
+          "max_row_norm_error": 1.8674084512060318e-07,
+          "relative_l2": 9.971936341508413e-07,
+          "max_abs": 3.24249267578125e-05,
+          "pass": true
+        },
+        "decoder_layer_15": {
+          "values": 4096,
+          "cos_min": 0.9999999999994726,
+          "mine_norm": 131.75586948035422,
+          "reference_norm": 131.7558803383149,
+          "max_row_norm_error": 1.6686299164625495e-07,
+          "relative_l2": 9.8261552907479e-07,
+          "max_abs": 3.62396240234375e-05,
+          "pass": true
+        },
+        "decoder_layer_16": {
+          "values": 4096,
+          "cos_min": 0.9999999999994553,
+          "mine_norm": 148.98895944289026,
+          "reference_norm": 148.9889828844979,
+          "max_row_norm_error": 2.6220316762248785e-07,
+          "relative_l2": 1.0175230722568475e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_17": {
+          "values": 4096,
+          "cos_min": 0.9999999999991779,
+          "mine_norm": 342.66607944035263,
+          "reference_norm": 342.6660649654732,
+          "max_row_norm_error": 3.672726338610488e-07,
+          "relative_l2": 1.2472727286483307e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_layer_2": {
+          "values": 4096,
+          "cos_min": 0.9999999999994981,
+          "mine_norm": 84.33467503466134,
+          "reference_norm": 84.33464456491029,
+          "max_row_norm_error": 1.2492337790881436e-06,
+          "relative_l2": 1.252839450163479e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_3": {
+          "values": 4096,
+          "cos_min": 0.9999999999994637,
+          "mine_norm": 81.89384908864126,
+          "reference_norm": 81.89381126500354,
+          "max_row_norm_error": 1.4454730972168761e-06,
+          "relative_l2": 1.3620571115651976e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_4": {
+          "values": 4096,
+          "cos_min": 0.9999999999994614,
+          "mine_norm": 83.8569551454047,
+          "reference_norm": 83.85691944728093,
+          "max_row_norm_error": 1.339299311009512e-06,
+          "relative_l2": 1.3018484734173462e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_5": {
+          "values": 4096,
+          "cos_min": 0.999999999999437,
+          "mine_norm": 74.96342075409584,
+          "reference_norm": 74.96337684707302,
+          "max_row_norm_error": 1.4338200631236475e-06,
+          "relative_l2": 1.3785857292703164e-06,
+          "max_abs": 5.53131103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_6": {
+          "values": 4096,
+          "cos_min": 0.999999999999456,
+          "mine_norm": 75.64583472921508,
+          "reference_norm": 75.64579303096276,
+          "max_row_norm_error": 1.1943659685709207e-06,
+          "relative_l2": 1.257379146539002e-06,
+          "max_abs": 5.14984130859375e-05,
+          "pass": true
+        },
+        "decoder_layer_7": {
+          "values": 4096,
+          "cos_min": 0.9999999999995695,
+          "mine_norm": 79.38978760163107,
+          "reference_norm": 79.38974381717763,
+          "max_row_norm_error": 1.049428866917168e-06,
+          "relative_l2": 1.1171336167858387e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_8": {
+          "values": 4096,
+          "cos_min": 0.9999999999996441,
+          "mine_norm": 87.56776412646073,
+          "reference_norm": 87.56771953783952,
+          "max_row_norm_error": 8.291357012080169e-07,
+          "relative_l2": 1.0005387713553103e-06,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_layer_9": {
+          "values": 4096,
+          "cos_min": 0.9999999999997238,
+          "mine_norm": 101.46761921311514,
+          "reference_norm": 101.46758433256771,
+          "max_row_norm_error": 6.931972387214103e-07,
+          "relative_l2": 8.786871373589147e-07,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_sa0_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa0_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999997575,
+          "mine_norm": 59.7298313388064,
+          "reference_norm": 59.729829023741935,
+          "max_row_norm_error": 2.1665104132928548e-07,
+          "relative_l2": 6.416450986229953e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_sa0_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999995934,
+          "mine_norm": 24.811897081368162,
+          "reference_norm": 24.81189720494981,
+          "max_row_norm_error": 7.583788266263269e-07,
+          "relative_l2": 7.494545830572695e-07,
+          "max_abs": 3.5762786865234375e-06,
+          "pass": true
+        },
+        "decoder_sa0_v": {
+          "values": 1024,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 2.4900030221209386,
+          "reference_norm": 2.4900028230090947,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa17_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 10.124753474402103,
+          "reference_norm": 10.124752258900271,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "decoder_sa17_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999990757,
+          "mine_norm": 11.470758342804512,
+          "reference_norm": 11.470757878779466,
+          "max_row_norm_error": 7.45937454360579e-07,
+          "relative_l2": 8.698678729668796e-07,
+          "max_abs": 2.6226043701171875e-06,
+          "pass": true
+        },
+        "decoder_sa17_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999991922,
+          "mine_norm": 36.548850972618276,
+          "reference_norm": 36.54884805352534,
+          "max_row_norm_error": 6.588557353026658e-07,
+          "relative_l2": 6.697903882925424e-07,
+          "max_abs": 8.106231689453125e-06,
+          "pass": true
+        },
+        "decoder_sa17_v": {
+          "values": 1024,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 5.062376737201052,
+          "reference_norm": 5.0623761294501355,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "encoder_embedding": {
+          "values": 79872,
+          "cos_min": 0.9999999999999999,
+          "mine_norm": 7.6993468489184185,
+          "reference_norm": 7.6993468489184185,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "encoder_layer_0": {
+          "values": 79872,
+          "cos_min": 0.9999999999999659,
+          "mine_norm": 59.98271186195204,
+          "reference_norm": 59.98271395620248,
+          "max_row_norm_error": 1.8951192060079336e-07,
+          "relative_l2": 1.4816009989983916e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_1": {
+          "values": 79872,
+          "cos_min": 0.999999999999854,
+          "mine_norm": 64.87904147639992,
+          "reference_norm": 64.87904413440845,
+          "max_row_norm_error": 2.2633481355782692e-07,
+          "relative_l2": 1.7434046588768508e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_10": {
+          "values": 79872,
+          "cos_min": 0.9999999999949482,
+          "mine_norm": 710.0315886540758,
+          "reference_norm": 710.031556582658,
+          "max_row_norm_error": 4.457155078352315e-07,
+          "relative_l2": 5.090495666626808e-07,
+          "max_abs": 1.8358230590820312e-05,
+          "pass": true
+        },
+        "encoder_layer_11": {
+          "values": 79872,
+          "cos_min": 0.9999999999957465,
+          "mine_norm": 28030.336105186845,
+          "reference_norm": 28030.334879506645,
+          "max_row_norm_error": 1.7847408311233437e-06,
+          "relative_l2": 2.733225733897114e-07,
+          "max_abs": 0.0006103515625,
+          "pass": true
+        },
+        "encoder_layer_2": {
+          "values": 79872,
+          "cos_min": 0.9999999999996525,
+          "mine_norm": 69.67760372689894,
+          "reference_norm": 69.67760537941675,
+          "max_row_norm_error": 2.1674699812734843e-07,
+          "relative_l2": 2.396190308538035e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_3": {
+          "values": 79872,
+          "cos_min": 0.9999999999993849,
+          "mine_norm": 75.57277129807483,
+          "reference_norm": 75.57277235246258,
+          "max_row_norm_error": 1.990514837402202e-07,
+          "relative_l2": 2.725549578442522e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_4": {
+          "values": 79872,
+          "cos_min": 0.9999999999993917,
+          "mine_norm": 178.30410550612447,
+          "reference_norm": 178.3040813257501,
+          "max_row_norm_error": 2.2207326377809977e-07,
+          "relative_l2": 3.8215885696225405e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "encoder_layer_5": {
+          "values": 79872,
+          "cos_min": 0.9999999999994832,
+          "mine_norm": 182.169443074769,
+          "reference_norm": 182.16941959426873,
+          "max_row_norm_error": 2.1867476296399957e-07,
+          "relative_l2": 3.7839379518735547e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "encoder_layer_6": {
+          "values": 79872,
+          "cos_min": 0.9999999999995512,
+          "mine_norm": 201.57866876651462,
+          "reference_norm": 201.57864419366098,
+          "max_row_norm_error": 2.1505362224338853e-07,
+          "relative_l2": 3.7791832963260525e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_7": {
+          "values": 79872,
+          "cos_min": 0.999999999999521,
+          "mine_norm": 219.666260987042,
+          "reference_norm": 219.66623823748284,
+          "max_row_norm_error": 1.9876971157906098e-07,
+          "relative_l2": 3.884078635321553e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_8": {
+          "values": 79872,
+          "cos_min": 0.9999999999996418,
+          "mine_norm": 314.50091857249026,
+          "reference_norm": 314.5009040442728,
+          "max_row_norm_error": 3.4409911675581384e-07,
+          "relative_l2": 3.4536786793613464e-07,
+          "max_abs": 5.7220458984375e-06,
+          "pass": true
+        },
+        "encoder_layer_9": {
+          "values": 79872,
+          "cos_min": 0.9999999999984411,
+          "mine_norm": 375.42967775872404,
+          "reference_norm": 375.4296655374202,
+          "max_row_norm_error": 2.061853549006898e-07,
+          "relative_l2": 4.249689856848258e-07,
+          "max_abs": 7.152557373046875e-06,
+          "pass": true
+        },
+        "encoder_output": {
+          "values": 79872,
+          "cos_min": 0.999999999991838,
+          "mine_norm": 19.714478660327806,
+          "reference_norm": 19.714477669606584,
+          "max_row_norm_error": 3.705898773409544e-07,
+          "relative_l2": 7.316706978878902e-07,
+          "max_abs": 1.2777745723724365e-06,
+          "pass": true
+        },
+        "encoder_tokens": {
+          "values": 78,
+          "cos_min": 1.0,
+          "mine_norm": 590.0974495793047,
+          "reference_norm": 590.0974495793047,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "uncond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999991902,
+          "mine_norm": 272.9866913638707,
+          "reference_norm": 272.98679957762056,
+          "max_row_norm_error": 6.290746856763008e-07,
+          "relative_l2": 9.255413126470893e-07,
+          "max_abs": 1.430511474609375e-05,
+          "pass": true
+        },
+        "cond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999992872,
+          "mine_norm": 290.8668491667874,
+          "reference_norm": 290.86698036275317,
+          "max_row_norm_error": 5.789238350928372e-07,
+          "relative_l2": 9.653789735723077e-07,
+          "max_abs": 2.002716064453125e-05,
+          "pass": true
+        },
+        "dac_block_0_own_codes": {
+          "values": 2365440,
+          "cos_min": 0.9999994199169233,
+          "mine_norm": 1588.1408014463505,
+          "reference_norm": 1588.1424725606446,
+          "max_row_norm_error": 0.0004147030668560925,
+          "relative_l2": 0.0002844905814443939,
+          "max_abs": 0.0023207664489746094,
+          "pass": true
+        },
+        "dac_block_1_own_codes": {
+          "values": 9461760,
+          "cos_min": 0.9999988844262948,
+          "mine_norm": 1982.4537176023723,
+          "reference_norm": 1982.5171306938475,
+          "max_row_norm_error": 0.0007028026650849339,
+          "relative_l2": 0.00033081448069077144,
+          "max_abs": 0.005435824394226074,
+          "pass": true
+        },
+        "dac_block_2_own_codes": {
+          "values": 18923520,
+          "cos_min": 0.9999996652757482,
+          "mine_norm": 3016.369888635339,
+          "reference_norm": 3016.3640916411573,
+          "max_row_norm_error": 0.0004421735646212843,
+          "relative_l2": 0.00015216374258215394,
+          "max_abs": 0.009095489978790283,
+          "pass": true
+        },
+        "dac_block_3_own_codes": {
+          "values": 18923520,
+          "cos_min": 0.999999967092638,
+          "mine_norm": 3605.5916517634073,
+          "reference_norm": 3605.596458672353,
+          "max_row_norm_error": 0.000201104395559204,
+          "relative_l2": 0.0001441394665810088,
+          "max_abs": 0.0040624141693115234,
+          "pass": true
+        },
+        "dac_input_conv_own_codes": {
+          "values": 591360,
+          "cos_min": 0.9999998325928563,
+          "mine_norm": 3146.0783144988413,
+          "reference_norm": 3146.0792678988055,
+          "max_row_norm_error": 0.00011008529981615389,
+          "relative_l2": 0.0001986113804887154,
+          "max_abs": 0.00693511962890625,
+          "pass": true
+        },
+        "dac_latent_own_codes": {
+          "values": 394240,
+          "cos_min": 0.9999999177167588,
+          "mine_norm": 2305.546473601921,
+          "reference_norm": 2305.5495126638857,
+          "max_row_norm_error": 0.00017058117822987828,
+          "relative_l2": 0.0002784046670082157,
+          "max_abs": 0.005501866340637207,
+          "pass": true
+        },
+        "dac_output_conv_own_codes": {
+          "values": 197120,
+          "cos_min": 0.9999999828116055,
+          "mine_norm": 211.34407754050122,
+          "reference_norm": 211.34945864913303,
+          "max_row_norm_error": 2.5460716418179707e-05,
+          "relative_l2": 0.00018714743434997965,
+          "max_abs": 0.0015211105346679688,
+          "pass": true
+        },
+        "dac_output_snake_own_codes": {
+          "values": 18923520,
+          "cos_min": 0.9999999065683969,
+          "mine_norm": 2464.1145344475635,
+          "reference_norm": 2464.1467711696423,
+          "max_row_norm_error": 0.0001659291902578186,
+          "relative_l2": 0.00020871954454408732,
+          "max_abs": 0.007783353328704834,
+          "pass": true
+        },
+        "decoded_audio_own_codes": {
+          "values": 197120,
+          "cos_min": 0.99997414326449,
+          "mine_norm": 164.41635705714233,
+          "reference_norm": 164.41321043537448,
+          "max_row_norm_error": 1.9138497201698357e-05,
+          "relative_l2": 0.007191302178336611,
+          "max_abs": 0.016117513179779053,
+          "pass": true
+        }
+      },
+      "steps": 401,
+      "frames": 385,
+      "prefix": 401,
+      "original_inputs_exact": true,
+      "original_codes_exact": true,
+      "all_actual_sampler_decisions_exact": 3609
+    },
+    "hello-123": {
+      "passed": false,
+      "outputs": {
+        "canonical-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "45737acedd25e66f87e4e43b0396645a7343496d68388b296e988e1b21c7c216",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 2.9024943310657596,
+          "rms": 0.18110286820359173
+        },
+        "native-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "6c07177b28f2729eb5d6d3c9b73a12eb5ca42d78c2e63a893c29cfe82f98c224",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 2.9024943310657596,
+          "rms": 0.18110815463478777
+        },
+        "original-dac-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "74311da5d7dd5fd8fe16c2c3d563d10d188fcc4d88d9eb6f5369c7e351c6db90",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 2.9024943310657596,
+          "rms": 0.18110287691251706
+        },
+        "cli-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "61e8432539e9d2a04a8f779beff2a976f36abbccedffce77967552cdc1fd82c4",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 2.9024943310657596,
+          "rms": 0.1811026614509421
+        }
+      },
+      "stages": {
+        "cross_k0": {
+          "values": 159744,
+          "cos_min": 0.9999999999868119,
+          "mine_norm": 37.55399878929682,
+          "reference_norm": 37.553996564213875,
+          "max_row_norm_error": 6.755388226586945e-07,
+          "relative_l2": 5.775470250157356e-07,
+          "max_abs": 1.9371509552001953e-06,
+          "pass": true
+        },
+        "cross_v0": {
+          "values": 159744,
+          "cos_min": 0.9999999999937558,
+          "mine_norm": 10.667443250658843,
+          "reference_norm": 10.667442683393526,
+          "max_row_norm_error": 4.113604208377808e-07,
+          "relative_l2": 6.606646152067303e-07,
+          "max_abs": 1.2218952178955078e-06,
+          "pass": true
+        },
+        "decoder_block0_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997694,
+          "mine_norm": 13.137942931574852,
+          "reference_norm": 13.137940503230702,
+          "max_row_norm_error": 1.896457477723601e-07,
+          "relative_l2": 6.961004400879203e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999720869,
+          "mine_norm": 0.7028047726012039,
+          "reference_norm": 0.702804795499212,
+          "max_row_norm_error": 2.31140832995802e-06,
+          "relative_l2": 6.730626479721477e-07,
+          "max_abs": 1.2852251529693604e-07,
+          "pass": true
+        },
+        "decoder_block0_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997031,
+          "mine_norm": 3.704850377017643,
+          "reference_norm": 3.704850912098677,
+          "max_row_norm_error": 2.9850197769132336e-07,
+          "relative_l2": 7.670272595942064e-07,
+          "max_abs": 1.0132789611816406e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999997662,
+          "mine_norm": 21.607224448947623,
+          "reference_norm": 21.607230511918708,
+          "max_row_norm_error": 4.4956351186176136e-07,
+          "relative_l2": 4.930120698186294e-07,
+          "max_abs": 1.3113021850585938e-06,
+          "pass": true
+        },
+        "decoder_block0_input": {
+          "values": 4096,
+          "cos_min": 1.0,
+          "mine_norm": 8.665460761713922,
+          "reference_norm": 8.665460761713922,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999998805,
+          "mine_norm": 369.3214240417822,
+          "reference_norm": 369.32151994617783,
+          "max_row_norm_error": 2.6419124443677333e-07,
+          "relative_l2": 5.531622314330179e-07,
+          "max_abs": 9.059906005859375e-06,
+          "pass": true
+        },
+        "decoder_block0_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999995283,
+          "mine_norm": 19.044195577436465,
+          "reference_norm": 19.044187690118058,
+          "max_row_norm_error": 1.3609160387506591e-06,
+          "relative_l2": 1.3888669240362393e-06,
+          "max_abs": 1.8596649169921875e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999986203,
+          "mine_norm": 60.39247875647697,
+          "reference_norm": 60.39246308324739,
+          "max_row_norm_error": 1.7492911714711568e-06,
+          "relative_l2": 2.0016278320402093e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999994519,
+          "mine_norm": 13.822635580582176,
+          "reference_norm": 13.822634993694043,
+          "max_row_norm_error": 2.256521589583116e-07,
+          "relative_l2": 9.539414467462152e-07,
+          "max_abs": 6.9141387939453125e-06,
+          "pass": true
+        },
+        "decoder_block0_output": {
+          "values": 4096,
+          "cos_min": 0.99999999999887,
+          "mine_norm": 68.96585883586437,
+          "reference_norm": 68.96583936242406,
+          "max_row_norm_error": 1.5745359680519044e-06,
+          "relative_l2": 1.7746812938692101e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_block0_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998626,
+          "mine_norm": 4.668420473892338,
+          "reference_norm": 4.668420601314798,
+          "max_row_norm_error": 2.7294554505452595e-08,
+          "relative_l2": 5.25180830214903e-07,
+          "max_abs": 6.556510925292969e-07,
+          "pass": true
+        },
+        "decoder_block0_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998324,
+          "mine_norm": 8.735530197935924,
+          "reference_norm": 8.73552950213115,
+          "max_row_norm_error": 1.3833942169583224e-07,
+          "relative_l2": 5.771973292496506e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block0_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999999998,
+          "mine_norm": 2.8916193182122187,
+          "reference_norm": 2.8916193182122187,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_block0_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997414,
+          "mine_norm": 11.797614717626148,
+          "reference_norm": 11.797612803945656,
+          "max_row_norm_error": 1.6220912857356495e-07,
+          "relative_l2": 7.370719435691323e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997599,
+          "mine_norm": 11.972390983306987,
+          "reference_norm": 11.972388365122386,
+          "max_row_norm_error": 2.186852381402815e-07,
+          "relative_l2": 7.268047531676877e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999993565,
+          "mine_norm": 145.28001364497553,
+          "reference_norm": 145.28003012554598,
+          "max_row_norm_error": 2.400035609140261e-07,
+          "relative_l2": 1.10714192863928e-06,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_block17_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999990813,
+          "mine_norm": 2.1451122063740327,
+          "reference_norm": 2.1451122541426746,
+          "max_row_norm_error": 1.054776850306638e-06,
+          "relative_l2": 7.969088026655333e-07,
+          "max_abs": 3.6135315895080566e-07,
+          "pass": true
+        },
+        "decoder_block17_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999994629,
+          "mine_norm": 17.169027248740242,
+          "reference_norm": 17.169029792949292,
+          "max_row_norm_error": 2.9441742299685103e-07,
+          "relative_l2": 9.367921185547143e-07,
+          "max_abs": 3.0994415283203125e-06,
+          "pass": true
+        },
+        "decoder_block17_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999994285,
+          "mine_norm": 45.56450655961664,
+          "reference_norm": 45.56450803495974,
+          "max_row_norm_error": 5.036059873564369e-07,
+          "relative_l2": 5.863183386401315e-07,
+          "max_abs": 4.5299530029296875e-06,
+          "pass": true
+        },
+        "decoder_block17_input": {
+          "values": 4096,
+          "cos_min": 0.9999999999994553,
+          "mine_norm": 148.98895944289026,
+          "reference_norm": 148.9889828844979,
+          "max_row_norm_error": 2.6220316762248785e-07,
+          "relative_l2": 1.0175230722568475e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999994733,
+          "mine_norm": 130.42879565173482,
+          "reference_norm": 130.42875875078147,
+          "max_row_norm_error": 3.962402841395374e-07,
+          "relative_l2": 1.0438304751815045e-06,
+          "max_abs": 1.71661376953125e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999997999,
+          "mine_norm": 74.94486701584927,
+          "reference_norm": 74.94481079109111,
+          "max_row_norm_error": 7.750211110657546e-07,
+          "relative_l2": 9.596211432999151e-07,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999986575,
+          "mine_norm": 240.0848609064704,
+          "reference_norm": 240.08481565056513,
+          "max_row_norm_error": 6.361716440306253e-07,
+          "relative_l2": 1.5245448357744082e-06,
+          "max_abs": 0.000152587890625,
+          "pass": true
+        },
+        "decoder_block17_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.99999999999926,
+          "mine_norm": 91.3372185446371,
+          "reference_norm": 91.33719834937534,
+          "max_row_norm_error": 4.2208303163704386e-07,
+          "relative_l2": 1.2308212715959462e-06,
+          "max_abs": 6.4373016357421875e-06,
+          "pass": true
+        },
+        "decoder_block17_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999991779,
+          "mine_norm": 342.66607944035263,
+          "reference_norm": 342.6660649654732,
+          "max_row_norm_error": 3.672726338610488e-07,
+          "relative_l2": 1.2472727286483307e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_block17_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.999999999999594,
+          "mine_norm": 6.806126263688701,
+          "reference_norm": 6.8061262178871145,
+          "max_row_norm_error": 1.656718362497145e-08,
+          "relative_l2": 8.19879064385149e-07,
+          "max_abs": 1.7881393432617188e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999988171,
+          "mine_norm": 12.08298269697101,
+          "reference_norm": 12.082980093471244,
+          "max_row_norm_error": 2.4805906173597236e-07,
+          "relative_l2": 1.5307718863952528e-06,
+          "max_abs": 2.9802322387695312e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999989493,
+          "mine_norm": 7.375213649897477,
+          "reference_norm": 7.3752129309874,
+          "max_row_norm_error": 2.619966390504658e-07,
+          "relative_l2": 1.4365122339867817e-06,
+          "max_abs": 1.7285346984863281e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 10.124753474402103,
+          "reference_norm": 10.124752258900271,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999990374,
+          "mine_norm": 39.37790903349694,
+          "reference_norm": 39.37790444053055,
+          "max_row_norm_error": 3.3109213459781017e-07,
+          "relative_l2": 1.380359988760789e-06,
+          "max_abs": 3.933906555175781e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999993291,
+          "mine_norm": 142.99883750422399,
+          "reference_norm": 142.99885759455037,
+          "max_row_norm_error": 2.605797347898786e-07,
+          "relative_l2": 1.1285994786012732e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_ca0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997031,
+          "mine_norm": 3.704850377017643,
+          "reference_norm": 3.704850912098677,
+          "max_row_norm_error": 2.9850197769132336e-07,
+          "relative_l2": 7.670272595942064e-07,
+          "max_abs": 1.0132789611816406e-06,
+          "pass": true
+        },
+        "decoder_hidden": {
+          "values": 4096,
+          "cos_min": 0.9999999999983076,
+          "mine_norm": 17.832960004098453,
+          "reference_norm": 17.832954999730738,
+          "max_row_norm_error": 3.884130708176059e-07,
+          "relative_l2": 1.8380891874953172e-06,
+          "max_abs": 3.159046173095703e-06,
+          "pass": true
+        },
+        "decoder_layer_0": {
+          "values": 4096,
+          "cos_min": 0.99999999999887,
+          "mine_norm": 68.96585883586437,
+          "reference_norm": 68.96583936242406,
+          "max_row_norm_error": 1.5745359680519044e-06,
+          "relative_l2": 1.7746812938692101e-06,
+          "max_abs": 8.392333984375e-05,
+          "pass": true
+        },
+        "decoder_layer_1": {
+          "values": 4096,
+          "cos_min": 0.9999999999994348,
+          "mine_norm": 81.28946629787225,
+          "reference_norm": 81.28944177865938,
+          "max_row_norm_error": 1.2273674581120275e-06,
+          "relative_l2": 1.3069640215602667e-06,
+          "max_abs": 6.4849853515625e-05,
+          "pass": true
+        },
+        "decoder_layer_10": {
+          "values": 4096,
+          "cos_min": 0.9999999999996998,
+          "mine_norm": 103.70429738856238,
+          "reference_norm": 103.70426190406738,
+          "max_row_norm_error": 7.488616819983918e-07,
+          "relative_l2": 9.272385954177304e-07,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_11": {
+          "values": 4096,
+          "cos_min": 0.9999999999996815,
+          "mine_norm": 112.40061792155629,
+          "reference_norm": 112.4005983098342,
+          "max_row_norm_error": 3.740366190108091e-07,
+          "relative_l2": 7.978113149355651e-07,
+          "max_abs": 3.0517578125e-05,
+          "pass": true
+        },
+        "decoder_layer_12": {
+          "values": 4096,
+          "cos_min": 0.9999999999996629,
+          "mine_norm": 114.34734008971276,
+          "reference_norm": 114.34732095394192,
+          "max_row_norm_error": 3.591845847417119e-07,
+          "relative_l2": 7.983948995742108e-07,
+          "max_abs": 3.0517578125e-05,
+          "pass": true
+        },
+        "decoder_layer_13": {
+          "values": 4096,
+          "cos_min": 0.9999999999995335,
+          "mine_norm": 117.21110050984996,
+          "reference_norm": 117.21109913195737,
+          "max_row_norm_error": 1.713913992951177e-07,
+          "relative_l2": 9.207818095077418e-07,
+          "max_abs": 2.6702880859375e-05,
+          "pass": true
+        },
+        "decoder_layer_14": {
+          "values": 4096,
+          "cos_min": 0.9999999999994793,
+          "mine_norm": 122.76115222026746,
+          "reference_norm": 122.76116175801727,
+          "max_row_norm_error": 1.8674084512060318e-07,
+          "relative_l2": 9.971936341508413e-07,
+          "max_abs": 3.24249267578125e-05,
+          "pass": true
+        },
+        "decoder_layer_15": {
+          "values": 4096,
+          "cos_min": 0.9999999999994726,
+          "mine_norm": 131.75586948035422,
+          "reference_norm": 131.7558803383149,
+          "max_row_norm_error": 1.6686299164625495e-07,
+          "relative_l2": 9.8261552907479e-07,
+          "max_abs": 3.62396240234375e-05,
+          "pass": true
+        },
+        "decoder_layer_16": {
+          "values": 4096,
+          "cos_min": 0.9999999999994553,
+          "mine_norm": 148.98895944289026,
+          "reference_norm": 148.9889828844979,
+          "max_row_norm_error": 2.6220316762248785e-07,
+          "relative_l2": 1.0175230722568475e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_17": {
+          "values": 4096,
+          "cos_min": 0.9999999999991779,
+          "mine_norm": 342.66607944035263,
+          "reference_norm": 342.6660649654732,
+          "max_row_norm_error": 3.672726338610488e-07,
+          "relative_l2": 1.2472727286483307e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_layer_2": {
+          "values": 4096,
+          "cos_min": 0.9999999999994981,
+          "mine_norm": 84.33467503466134,
+          "reference_norm": 84.33464456491029,
+          "max_row_norm_error": 1.2492337790881436e-06,
+          "relative_l2": 1.252839450163479e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_3": {
+          "values": 4096,
+          "cos_min": 0.9999999999994637,
+          "mine_norm": 81.89384908864126,
+          "reference_norm": 81.89381126500354,
+          "max_row_norm_error": 1.4454730972168761e-06,
+          "relative_l2": 1.3620571115651976e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_4": {
+          "values": 4096,
+          "cos_min": 0.9999999999994614,
+          "mine_norm": 83.8569551454047,
+          "reference_norm": 83.85691944728093,
+          "max_row_norm_error": 1.339299311009512e-06,
+          "relative_l2": 1.3018484734173462e-06,
+          "max_abs": 6.103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_5": {
+          "values": 4096,
+          "cos_min": 0.999999999999437,
+          "mine_norm": 74.96342075409584,
+          "reference_norm": 74.96337684707302,
+          "max_row_norm_error": 1.4338200631236475e-06,
+          "relative_l2": 1.3785857292703164e-06,
+          "max_abs": 5.53131103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_6": {
+          "values": 4096,
+          "cos_min": 0.999999999999456,
+          "mine_norm": 75.64583472921508,
+          "reference_norm": 75.64579303096276,
+          "max_row_norm_error": 1.1943659685709207e-06,
+          "relative_l2": 1.257379146539002e-06,
+          "max_abs": 5.14984130859375e-05,
+          "pass": true
+        },
+        "decoder_layer_7": {
+          "values": 4096,
+          "cos_min": 0.9999999999995695,
+          "mine_norm": 79.38978760163107,
+          "reference_norm": 79.38974381717763,
+          "max_row_norm_error": 1.049428866917168e-06,
+          "relative_l2": 1.1171336167858387e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_8": {
+          "values": 4096,
+          "cos_min": 0.9999999999996441,
+          "mine_norm": 87.56776412646073,
+          "reference_norm": 87.56771953783952,
+          "max_row_norm_error": 8.291357012080169e-07,
+          "relative_l2": 1.0005387713553103e-06,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_layer_9": {
+          "values": 4096,
+          "cos_min": 0.9999999999997238,
+          "mine_norm": 101.46761921311514,
+          "reference_norm": 101.46758433256771,
+          "max_row_norm_error": 6.931972387214103e-07,
+          "relative_l2": 8.786871373589147e-07,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_sa0_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa0_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999997575,
+          "mine_norm": 59.7298313388064,
+          "reference_norm": 59.729829023741935,
+          "max_row_norm_error": 2.1665104132928548e-07,
+          "relative_l2": 6.416450986229953e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_sa0_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999995934,
+          "mine_norm": 24.811897081368162,
+          "reference_norm": 24.81189720494981,
+          "max_row_norm_error": 7.583788266263269e-07,
+          "relative_l2": 7.494545830572695e-07,
+          "max_abs": 3.5762786865234375e-06,
+          "pass": true
+        },
+        "decoder_sa0_v": {
+          "values": 1024,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 2.4900030221209386,
+          "reference_norm": 2.4900028230090947,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa17_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 10.124753474402103,
+          "reference_norm": 10.124752258900271,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "decoder_sa17_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999990757,
+          "mine_norm": 11.470758342804512,
+          "reference_norm": 11.470757878779466,
+          "max_row_norm_error": 7.45937454360579e-07,
+          "relative_l2": 8.698678729668796e-07,
+          "max_abs": 2.6226043701171875e-06,
+          "pass": true
+        },
+        "decoder_sa17_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999991922,
+          "mine_norm": 36.548850972618276,
+          "reference_norm": 36.54884805352534,
+          "max_row_norm_error": 6.588557353026658e-07,
+          "relative_l2": 6.697903882925424e-07,
+          "max_abs": 8.106231689453125e-06,
+          "pass": true
+        },
+        "decoder_sa17_v": {
+          "values": 1024,
+          "cos_min": 0.9999999999849803,
+          "mine_norm": 5.062376737201052,
+          "reference_norm": 5.0623761294501355,
+          "max_row_norm_error": 5.990897371521697e-07,
+          "relative_l2": 2.219110561998776e-06,
+          "max_abs": 1.2405216693878174e-06,
+          "pass": true
+        },
+        "encoder_embedding": {
+          "values": 79872,
+          "cos_min": 0.9999999999999999,
+          "mine_norm": 7.6993468489184185,
+          "reference_norm": 7.6993468489184185,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "encoder_layer_0": {
+          "values": 79872,
+          "cos_min": 0.9999999999999659,
+          "mine_norm": 59.98271186195204,
+          "reference_norm": 59.98271395620248,
+          "max_row_norm_error": 1.8951192060079336e-07,
+          "relative_l2": 1.4816009989983916e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_1": {
+          "values": 79872,
+          "cos_min": 0.999999999999854,
+          "mine_norm": 64.87904147639992,
+          "reference_norm": 64.87904413440845,
+          "max_row_norm_error": 2.2633481355782692e-07,
+          "relative_l2": 1.7434046588768508e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_10": {
+          "values": 79872,
+          "cos_min": 0.9999999999949482,
+          "mine_norm": 710.0315886540758,
+          "reference_norm": 710.031556582658,
+          "max_row_norm_error": 4.457155078352315e-07,
+          "relative_l2": 5.090495666626808e-07,
+          "max_abs": 1.8358230590820312e-05,
+          "pass": true
+        },
+        "encoder_layer_11": {
+          "values": 79872,
+          "cos_min": 0.9999999999957465,
+          "mine_norm": 28030.336105186845,
+          "reference_norm": 28030.334879506645,
+          "max_row_norm_error": 1.7847408311233437e-06,
+          "relative_l2": 2.733225733897114e-07,
+          "max_abs": 0.0006103515625,
+          "pass": true
+        },
+        "encoder_layer_2": {
+          "values": 79872,
+          "cos_min": 0.9999999999996525,
+          "mine_norm": 69.67760372689894,
+          "reference_norm": 69.67760537941675,
+          "max_row_norm_error": 2.1674699812734843e-07,
+          "relative_l2": 2.396190308538035e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_3": {
+          "values": 79872,
+          "cos_min": 0.9999999999993849,
+          "mine_norm": 75.57277129807483,
+          "reference_norm": 75.57277235246258,
+          "max_row_norm_error": 1.990514837402202e-07,
+          "relative_l2": 2.725549578442522e-07,
+          "max_abs": 9.5367431640625e-07,
+          "pass": true
+        },
+        "encoder_layer_4": {
+          "values": 79872,
+          "cos_min": 0.9999999999993917,
+          "mine_norm": 178.30410550612447,
+          "reference_norm": 178.3040813257501,
+          "max_row_norm_error": 2.2207326377809977e-07,
+          "relative_l2": 3.8215885696225405e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "encoder_layer_5": {
+          "values": 79872,
+          "cos_min": 0.9999999999994832,
+          "mine_norm": 182.169443074769,
+          "reference_norm": 182.16941959426873,
+          "max_row_norm_error": 2.1867476296399957e-07,
+          "relative_l2": 3.7839379518735547e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "encoder_layer_6": {
+          "values": 79872,
+          "cos_min": 0.9999999999995512,
+          "mine_norm": 201.57866876651462,
+          "reference_norm": 201.57864419366098,
+          "max_row_norm_error": 2.1505362224338853e-07,
+          "relative_l2": 3.7791832963260525e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_7": {
+          "values": 79872,
+          "cos_min": 0.999999999999521,
+          "mine_norm": 219.666260987042,
+          "reference_norm": 219.66623823748284,
+          "max_row_norm_error": 1.9876971157906098e-07,
+          "relative_l2": 3.884078635321553e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_8": {
+          "values": 79872,
+          "cos_min": 0.9999999999996418,
+          "mine_norm": 314.50091857249026,
+          "reference_norm": 314.5009040442728,
+          "max_row_norm_error": 3.4409911675581384e-07,
+          "relative_l2": 3.4536786793613464e-07,
+          "max_abs": 5.7220458984375e-06,
+          "pass": true
+        },
+        "encoder_layer_9": {
+          "values": 79872,
+          "cos_min": 0.9999999999984411,
+          "mine_norm": 375.42967775872404,
+          "reference_norm": 375.4296655374202,
+          "max_row_norm_error": 2.061853549006898e-07,
+          "relative_l2": 4.249689856848258e-07,
+          "max_abs": 7.152557373046875e-06,
+          "pass": true
+        },
+        "encoder_output": {
+          "values": 79872,
+          "cos_min": 0.999999999991838,
+          "mine_norm": 19.714478660327806,
+          "reference_norm": 19.714477669606584,
+          "max_row_norm_error": 3.705898773409544e-07,
+          "relative_l2": 7.316706978878902e-07,
+          "max_abs": 1.2777745723724365e-06,
+          "pass": true
+        },
+        "encoder_tokens": {
+          "values": 78,
+          "cos_min": 1.0,
+          "mine_norm": 590.0974495793047,
+          "reference_norm": 590.0974495793047,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "uncond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999991902,
+          "mine_norm": 272.9866913638707,
+          "reference_norm": 272.98679957762056,
+          "max_row_norm_error": 6.290746856763008e-07,
+          "relative_l2": 9.255413126470893e-07,
+          "max_abs": 1.430511474609375e-05,
+          "pass": true
+        },
+        "cond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999992872,
+          "mine_norm": 290.8668491667874,
+          "reference_norm": 290.86698036275317,
+          "max_row_norm_error": 5.789238350928372e-07,
+          "relative_l2": 9.653789735723077e-07,
+          "max_abs": 2.002716064453125e-05,
+          "pass": true
+        },
+        "dac_block_0_own_codes": {
+          "values": 1536000,
+          "cos_min": 0.9999995405036476,
+          "mine_norm": 1342.1843661003916,
+          "reference_norm": 1342.174737964239,
+          "max_row_norm_error": 0.000472334260457119,
+          "relative_l2": 0.0002788932655198563,
+          "max_abs": 0.0035130977630615234,
+          "pass": true
+        },
+        "dac_block_1_own_codes": {
+          "values": 6144000,
+          "cos_min": 0.999999636112796,
+          "mine_norm": 1451.7799513107936,
+          "reference_norm": 1451.7667208154,
+          "max_row_norm_error": 0.00047038203709148796,
+          "relative_l2": 0.00032682565215450194,
+          "max_abs": 0.004767477512359619,
+          "pass": true
+        },
+        "dac_block_2_own_codes": {
+          "values": 12288000,
+          "cos_min": 0.99999952202303,
+          "mine_norm": 2295.2576075668007,
+          "reference_norm": 2295.2114262550003,
+          "max_row_norm_error": 0.0003072323129426069,
+          "relative_l2": 0.00015485173861898855,
+          "max_abs": 0.0019134283065795898,
+          "pass": true
+        },
+        "dac_block_3_own_codes": {
+          "values": 12288000,
+          "cos_min": 0.9999999878767598,
+          "mine_norm": 2605.7231032544632,
+          "reference_norm": 2605.717773471319,
+          "max_row_norm_error": 0.0002319489334194902,
+          "relative_l2": 8.586815006120364e-05,
+          "max_abs": 0.0016894340515136719,
+          "pass": true
+        },
+        "dac_input_conv_own_codes": {
+          "values": 384000,
+          "cos_min": 0.9999995911665005,
+          "mine_norm": 2406.235285040985,
+          "reference_norm": 2406.2275583502155,
+          "max_row_norm_error": 0.00013681245478225357,
+          "relative_l2": 0.00021453692057445885,
+          "max_abs": 0.006781578063964844,
+          "pass": true
+        },
+        "dac_latent_own_codes": {
+          "values": 256000,
+          "cos_min": 0.9999999035404864,
+          "mine_norm": 1801.4471708159656,
+          "reference_norm": 1801.4410882142192,
+          "max_row_norm_error": 0.0001819458951428654,
+          "relative_l2": 0.0002889294531376455,
+          "max_abs": 0.005862712860107422,
+          "pass": true
+        },
+        "dac_output_conv_own_codes": {
+          "values": 128000,
+          "cos_min": 0.9999999923779105,
+          "mine_norm": 72.96135800185333,
+          "reference_norm": 72.96052351643858,
+          "max_row_norm_error": 1.14374921467153e-05,
+          "relative_l2": 0.0001239966517510802,
+          "max_abs": 0.0004744529724121094,
+          "pass": true
+        },
+        "dac_output_snake_own_codes": {
+          "values": 12288000,
+          "cos_min": 0.9999999819292983,
+          "mine_norm": 1322.3913973214933,
+          "reference_norm": 1322.3867043938296,
+          "max_row_norm_error": 0.00011559031447105905,
+          "relative_l2": 9.598029908979286e-05,
+          "max_abs": 0.0031871795654296875,
+          "pass": true
+        },
+        "decoded_audio_own_codes": {
+          "values": 128000,
+          "cos_min": 0.9999710706985019,
+          "mine_norm": 64.79522320686866,
+          "reference_norm": 64.79333499154646,
+          "max_row_norm_error": 2.9142122757619404e-05,
+          "relative_l2": 0.0076066509307309476,
+          "max_abs": 0.01373620331287384,
+          "pass": true
+        }
+      },
+      "steps": 266,
+      "frames": 250,
+      "prefix": 266,
+      "original_inputs_exact": true,
+      "original_codes_exact": true,
+      "all_actual_sampler_decisions_exact": 2394
+    },
+    "fox-42": {
+      "passed": false,
+      "outputs": {
+        "canonical-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "e2c7c7c2e00725dba1ca72f763b77f6ade529b24b70cbe3e7b158b85d32831fb",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 5.0967800453514736,
+          "rms": 0.0017179235416331117
+        },
+        "native-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "e1f8d4ff24772e6dcb4292fcad5e5280ebbe189909d32e7cbf1d399d3a5415de",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 5.0967800453514736,
+          "rms": 0.0017174297268288878
+        },
+        "original-dac-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "d15b01891f9ba11accd2c385cd78eb6a35d0f9a376e8d9d409630ff70b5cf09a",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 5.0967800453514736,
+          "rms": 0.0017179235102695364
+        },
+        "cli-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "a93de3f16fb484a8fca5fe8b1fd0745063f1a4c14dbac29b1b4a5fce717d6b2b",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 5.0967800453514736,
+          "rms": 0.0017174465601597605
+        }
+      },
+      "stages": {
+        "cross_k0": {
+          "values": 188416,
+          "cos_min": 0.999999999999344,
+          "mine_norm": 39.780531749367405,
+          "reference_norm": 39.78052911579124,
+          "max_row_norm_error": 4.819293850655271e-07,
+          "relative_l2": 4.799055444972897e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "cross_v0": {
+          "values": 188416,
+          "cos_min": 0.9999999999997272,
+          "mine_norm": 11.36850714407531,
+          "reference_norm": 11.368506511309201,
+          "max_row_norm_error": 4.104697152174097e-07,
+          "relative_l2": 4.890101992122938e-07,
+          "max_abs": 2.980232238769531e-07,
+          "pass": true
+        },
+        "decoder_block0_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997694,
+          "mine_norm": 13.221773157365657,
+          "reference_norm": 13.221771135003078,
+          "max_row_norm_error": 1.7951956188255735e-07,
+          "relative_l2": 6.914789537620576e-07,
+          "max_abs": 2.1457672119140625e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999993158,
+          "mine_norm": 0.7328916034638251,
+          "reference_norm": 0.7328917719097898,
+          "max_row_norm_error": 7.555670205050546e-07,
+          "relative_l2": 4.688011206938193e-07,
+          "max_abs": 1.043081283569336e-07,
+          "pass": true
+        },
+        "decoder_block0_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997012,
+          "mine_norm": 3.841846304914778,
+          "reference_norm": 3.8418468283002443,
+          "max_row_norm_error": 2.5438404616107135e-07,
+          "relative_l2": 7.692358039545686e-07,
+          "max_abs": 1.0728836059570312e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999997662,
+          "mine_norm": 21.607224448947623,
+          "reference_norm": 21.607230511918708,
+          "max_row_norm_error": 4.4956351186176136e-07,
+          "relative_l2": 4.930120698186294e-07,
+          "max_abs": 1.3113021850585938e-06,
+          "pass": true
+        },
+        "decoder_block0_input": {
+          "values": 4096,
+          "cos_min": 1.0,
+          "mine_norm": 8.665460761713922,
+          "reference_norm": 8.665460761713922,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999998757,
+          "mine_norm": 374.630089366966,
+          "reference_norm": 374.63018988836905,
+          "max_row_norm_error": 2.9072001472840725e-07,
+          "relative_l2": 5.628775920709316e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_block0_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999996169,
+          "mine_norm": 18.978851033286386,
+          "reference_norm": 18.978840074986483,
+          "max_row_norm_error": 1.2810700238397033e-06,
+          "relative_l2": 1.2489367485200246e-06,
+          "max_abs": 1.811981201171875e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999996482,
+          "mine_norm": 60.151131807372536,
+          "reference_norm": 60.151064648506775,
+          "max_row_norm_error": 1.677768532104551e-06,
+          "relative_l2": 1.46912310226506e-06,
+          "max_abs": 4.673004150390625e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999994643,
+          "mine_norm": 13.76736667105331,
+          "reference_norm": 13.767366565383815,
+          "max_row_norm_error": 2.0869337369333607e-07,
+          "relative_l2": 9.874951145864428e-07,
+          "max_abs": 6.67572021484375e-06,
+          "pass": true
+        },
+        "decoder_block0_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997122,
+          "mine_norm": 68.79429080768287,
+          "reference_norm": 68.79422292678348,
+          "max_row_norm_error": 1.5020935448806227e-06,
+          "relative_l2": 1.3148388291257071e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_block0_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998626,
+          "mine_norm": 4.668420473892338,
+          "reference_norm": 4.668420601314798,
+          "max_row_norm_error": 2.7294554505452595e-08,
+          "relative_l2": 5.25180830214903e-07,
+          "max_abs": 6.556510925292969e-07,
+          "pass": true
+        },
+        "decoder_block0_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998195,
+          "mine_norm": 8.741635680643107,
+          "reference_norm": 8.7416352904534,
+          "max_row_norm_error": 1.3828542244631592e-07,
+          "relative_l2": 5.996648674815638e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block0_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999999998,
+          "mine_norm": 2.8916193182122187,
+          "reference_norm": 2.8916193182122187,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_block0_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997414,
+          "mine_norm": 11.797614717626148,
+          "reference_norm": 11.797612803945656,
+          "max_row_norm_error": 1.6220912857356495e-07,
+          "relative_l2": 7.370719435691323e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997599,
+          "mine_norm": 11.972390983306987,
+          "reference_norm": 11.972388365122386,
+          "max_row_norm_error": 2.186852381402815e-07,
+          "relative_l2": 7.268047531676877e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999992705,
+          "mine_norm": 144.87541915544858,
+          "reference_norm": 144.8754207247327,
+          "max_row_norm_error": 1.0826875351810372e-07,
+          "relative_l2": 1.1068272651674729e-06,
+          "max_abs": 5.340576171875e-05,
+          "pass": true
+        },
+        "decoder_block17_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999962355,
+          "mine_norm": 2.751742089443222,
+          "reference_norm": 2.7517419175302393,
+          "max_row_norm_error": 1.0501677157881417e-06,
+          "relative_l2": 5.088621842167002e-07,
+          "max_abs": 4.0978193283081055e-07,
+          "pass": true
+        },
+        "decoder_block17_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999995273,
+          "mine_norm": 18.660802781918548,
+          "reference_norm": 18.66080454548313,
+          "max_row_norm_error": 2.999433209582847e-07,
+          "relative_l2": 9.136647652772876e-07,
+          "max_abs": 3.0994415283203125e-06,
+          "pass": true
+        },
+        "decoder_block17_cross_q": {
+          "values": 4096,
+          "cos_min": 0.999999999999463,
+          "mine_norm": 45.7090252899186,
+          "reference_norm": 45.70902744946391,
+          "max_row_norm_error": 5.045127338121347e-07,
+          "relative_l2": 5.847917322609189e-07,
+          "max_abs": 4.291534423828125e-06,
+          "pass": true
+        },
+        "decoder_block17_input": {
+          "values": 4096,
+          "cos_min": 0.999999999999376,
+          "mine_norm": 148.7220360607878,
+          "reference_norm": 148.72205445904143,
+          "max_row_norm_error": 1.9933798156568372e-07,
+          "relative_l2": 1.038349481308602e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999995359,
+          "mine_norm": 130.53184903660664,
+          "reference_norm": 130.53182954304683,
+          "max_row_norm_error": 3.5058948189004013e-07,
+          "relative_l2": 9.72938535647447e-07,
+          "max_abs": 1.430511474609375e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999998108,
+          "mine_norm": 73.27029541597732,
+          "reference_norm": 73.27027279322937,
+          "max_row_norm_error": 1.249472328046508e-06,
+          "relative_l2": 1.2321131814969446e-06,
+          "max_abs": 6.866455078125e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999984626,
+          "mine_norm": 237.39569804134518,
+          "reference_norm": 237.39571399459422,
+          "max_row_norm_error": 7.767834485639113e-07,
+          "relative_l2": 1.7032307063083846e-06,
+          "max_abs": 0.000156402587890625,
+          "pass": true
+        },
+        "decoder_block17_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999993255,
+          "mine_norm": 91.37974798144678,
+          "reference_norm": 91.37973106936528,
+          "max_row_norm_error": 3.5941622433810494e-07,
+          "relative_l2": 1.179029339995643e-06,
+          "max_abs": 8.58306884765625e-06,
+          "pass": true
+        },
+        "decoder_block17_output": {
+          "values": 4096,
+          "cos_min": 0.999999999999202,
+          "mine_norm": 339.4045489045106,
+          "reference_norm": 339.404580075517,
+          "max_row_norm_error": 5.12993039158971e-07,
+          "relative_l2": 1.3063161726536192e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_block17_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.999999999999531,
+          "mine_norm": 6.804509258029479,
+          "reference_norm": 6.804509472362629,
+          "max_row_norm_error": 7.947355751269924e-08,
+          "relative_l2": 8.572427997139791e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999988652,
+          "mine_norm": 12.115492803197297,
+          "reference_norm": 12.11549137176421,
+          "max_row_norm_error": 2.0976918557735758e-07,
+          "relative_l2": 1.5008645274050144e-06,
+          "max_abs": 4.887580871582031e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999989169,
+          "mine_norm": 7.378818039742975,
+          "reference_norm": 7.3788172759978155,
+          "max_row_norm_error": 1.5957137233790775e-07,
+          "relative_l2": 1.4242935694433046e-06,
+          "max_abs": 2.7418136596679688e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 10.130957511997225,
+          "reference_norm": 10.130958118827646,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999988162,
+          "mine_norm": 39.11235880481291,
+          "reference_norm": 39.11236990019792,
+          "max_row_norm_error": 5.209774348591267e-07,
+          "relative_l2": 1.505740036135477e-06,
+          "max_abs": 1.811981201171875e-05,
+          "pass": true
+        },
+        "decoder_block17_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999992443,
+          "mine_norm": 143.15403057156587,
+          "reference_norm": 143.1540336720928,
+          "max_row_norm_error": 1.4000294268345925e-07,
+          "relative_l2": 1.125566289946272e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_ca0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997012,
+          "mine_norm": 3.841846304914778,
+          "reference_norm": 3.8418468283002443,
+          "max_row_norm_error": 2.5438404616107135e-07,
+          "relative_l2": 7.692358039545686e-07,
+          "max_abs": 1.0728836059570312e-06,
+          "pass": true
+        },
+        "decoder_hidden": {
+          "values": 4096,
+          "cos_min": 0.9999999999982467,
+          "mine_norm": 18.061290172403712,
+          "reference_norm": 18.061283828297363,
+          "max_row_norm_error": 4.069101875447956e-07,
+          "relative_l2": 1.795617545044537e-06,
+          "max_abs": 5.364418029785156e-06,
+          "pass": true
+        },
+        "decoder_layer_0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997122,
+          "mine_norm": 68.79429080768287,
+          "reference_norm": 68.79422292678348,
+          "max_row_norm_error": 1.5020935448806227e-06,
+          "relative_l2": 1.3148388291257071e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_1": {
+          "values": 4096,
+          "cos_min": 0.9999999999997777,
+          "mine_norm": 81.17209369339979,
+          "reference_norm": 81.17202874669373,
+          "max_row_norm_error": 1.1635186556446797e-06,
+          "relative_l2": 1.0953972513759785e-06,
+          "max_abs": 4.57763671875e-05,
+          "pass": true
+        },
+        "decoder_layer_10": {
+          "values": 4096,
+          "cos_min": 0.9999999999997348,
+          "mine_norm": 103.49719064108479,
+          "reference_norm": 103.49714601260885,
+          "max_row_norm_error": 5.699995968555527e-07,
+          "relative_l2": 7.911001437296849e-07,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_layer_11": {
+          "values": 4096,
+          "cos_min": 0.9999999999997095,
+          "mine_norm": 112.4102407745599,
+          "reference_norm": 112.41022197684526,
+          "max_row_norm_error": 2.1846514108858628e-07,
+          "relative_l2": 7.07638887220136e-07,
+          "max_abs": 2.574920654296875e-05,
+          "pass": true
+        },
+        "decoder_layer_12": {
+          "values": 4096,
+          "cos_min": 0.9999999999996606,
+          "mine_norm": 114.03661507570152,
+          "reference_norm": 114.03659698189524,
+          "max_row_norm_error": 2.53545347161932e-07,
+          "relative_l2": 7.623364625436066e-07,
+          "max_abs": 2.86102294921875e-05,
+          "pass": true
+        },
+        "decoder_layer_13": {
+          "values": 4096,
+          "cos_min": 0.9999999999995023,
+          "mine_norm": 117.213616906221,
+          "reference_norm": 117.21360952144767,
+          "max_row_norm_error": 7.982540939366345e-08,
+          "relative_l2": 9.009268272462579e-07,
+          "max_abs": 3.62396240234375e-05,
+          "pass": true
+        },
+        "decoder_layer_14": {
+          "values": 4096,
+          "cos_min": 0.9999999999993731,
+          "mine_norm": 123.0032982371417,
+          "reference_norm": 123.00330063103162,
+          "max_row_norm_error": 1.2464210374929507e-07,
+          "relative_l2": 9.79265307978749e-07,
+          "max_abs": 4.9591064453125e-05,
+          "pass": true
+        },
+        "decoder_layer_15": {
+          "values": 4096,
+          "cos_min": 0.9999999999993756,
+          "mine_norm": 131.66163981585387,
+          "reference_norm": 131.66165476941742,
+          "max_row_norm_error": 2.3833043438781232e-07,
+          "relative_l2": 9.9379900594456e-07,
+          "max_abs": 5.53131103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_16": {
+          "values": 4096,
+          "cos_min": 0.999999999999376,
+          "mine_norm": 148.7220360607878,
+          "reference_norm": 148.72205445904143,
+          "max_row_norm_error": 1.9933798156568372e-07,
+          "relative_l2": 1.038349481308602e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_layer_17": {
+          "values": 4096,
+          "cos_min": 0.999999999999202,
+          "mine_norm": 339.4045489045106,
+          "reference_norm": 339.404580075517,
+          "max_row_norm_error": 5.12993039158971e-07,
+          "relative_l2": 1.3063161726536192e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_layer_2": {
+          "values": 4096,
+          "cos_min": 0.9999999999998311,
+          "mine_norm": 83.86622948746393,
+          "reference_norm": 83.86616200959794,
+          "max_row_norm_error": 1.1094686194201842e-06,
+          "relative_l2": 1.0347084230759257e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_3": {
+          "values": 4096,
+          "cos_min": 0.9999999999998107,
+          "mine_norm": 81.47726451577303,
+          "reference_norm": 81.47718472262659,
+          "max_row_norm_error": 1.3934993594588718e-06,
+          "relative_l2": 1.2170174172533975e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_layer_4": {
+          "values": 4096,
+          "cos_min": 0.9999999999998159,
+          "mine_norm": 83.81471432733059,
+          "reference_norm": 83.81464053208731,
+          "max_row_norm_error": 1.291453267215914e-06,
+          "relative_l2": 1.1249089141546324e-06,
+          "max_abs": 5.340576171875e-05,
+          "pass": true
+        },
+        "decoder_layer_5": {
+          "values": 4096,
+          "cos_min": 0.9999999999997067,
+          "mine_norm": 75.26199356819055,
+          "reference_norm": 75.26192388302513,
+          "max_row_norm_error": 1.3434344081630911e-06,
+          "relative_l2": 1.2129594497158308e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_6": {
+          "values": 4096,
+          "cos_min": 0.9999999999996921,
+          "mine_norm": 75.61371923292309,
+          "reference_norm": 75.61366326916271,
+          "max_row_norm_error": 1.1429627984060886e-06,
+          "relative_l2": 1.0973439123878931e-06,
+          "max_abs": 4.38690185546875e-05,
+          "pass": true
+        },
+        "decoder_layer_7": {
+          "values": 4096,
+          "cos_min": 0.9999999999997632,
+          "mine_norm": 78.98751118390558,
+          "reference_norm": 78.98746090151809,
+          "max_row_norm_error": 9.286119271312288e-07,
+          "relative_l2": 9.488401305695506e-07,
+          "max_abs": 4.00543212890625e-05,
+          "pass": true
+        },
+        "decoder_layer_8": {
+          "values": 4096,
+          "cos_min": 0.9999999999997119,
+          "mine_norm": 87.3590278212038,
+          "reference_norm": 87.35898192903402,
+          "max_row_norm_error": 7.363997771570041e-07,
+          "relative_l2": 9.00483578274036e-07,
+          "max_abs": 3.4332275390625e-05,
+          "pass": true
+        },
+        "decoder_layer_9": {
+          "values": 4096,
+          "cos_min": 0.999999999999745,
+          "mine_norm": 101.13145182934251,
+          "reference_norm": 101.1314101386324,
+          "max_row_norm_error": 5.233024824580212e-07,
+          "relative_l2": 7.704112400852335e-07,
+          "max_abs": 3.4332275390625e-05,
+          "pass": true
+        },
+        "decoder_sa0_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa0_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999997575,
+          "mine_norm": 59.7298313388064,
+          "reference_norm": 59.729829023741935,
+          "max_row_norm_error": 2.1665104132928548e-07,
+          "relative_l2": 6.416450986229953e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_sa0_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999995934,
+          "mine_norm": 24.811897081368162,
+          "reference_norm": 24.81189720494981,
+          "max_row_norm_error": 7.583788266263269e-07,
+          "relative_l2": 7.494545830572695e-07,
+          "max_abs": 3.5762786865234375e-06,
+          "pass": true
+        },
+        "decoder_sa0_v": {
+          "values": 1024,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 2.4900030221209386,
+          "reference_norm": 2.4900028230090947,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa17_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 10.130957511997225,
+          "reference_norm": 10.130958118827646,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_sa17_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999989099,
+          "mine_norm": 11.468302156326944,
+          "reference_norm": 11.468301656368874,
+          "max_row_norm_error": 4.437419734992787e-07,
+          "relative_l2": 8.232123951286044e-07,
+          "max_abs": 2.0265579223632812e-06,
+          "pass": true
+        },
+        "decoder_sa17_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999992821,
+          "mine_norm": 36.5460697730235,
+          "reference_norm": 36.54606890137521,
+          "max_row_norm_error": 6.710718767344304e-07,
+          "relative_l2": 6.285523224881303e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "decoder_sa17_v": {
+          "values": 1024,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 5.065478755998613,
+          "reference_norm": 5.065479059413823,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_embedding": {
+          "values": 94208,
+          "cos_min": 0.9999999999999999,
+          "mine_norm": 8.790399697421382,
+          "reference_norm": 8.790399697421382,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "encoder_layer_0": {
+          "values": 94208,
+          "cos_min": 0.999999999999965,
+          "mine_norm": 65.26212844016055,
+          "reference_norm": 65.26213089815832,
+          "max_row_norm_error": 1.3407622312389122e-07,
+          "relative_l2": 1.4670092544666988e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "encoder_layer_1": {
+          "values": 94208,
+          "cos_min": 0.9999999999999423,
+          "mine_norm": 70.73064617296204,
+          "reference_norm": 70.73064943100844,
+          "max_row_norm_error": 2.563124021914831e-07,
+          "relative_l2": 1.6636801692733313e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "encoder_layer_10": {
+          "values": 94208,
+          "cos_min": 0.9999999999995722,
+          "mine_norm": 766.4344802250255,
+          "reference_norm": 766.4344476517487,
+          "max_row_norm_error": 2.578692159804774e-07,
+          "relative_l2": 4.4674306064017863e-07,
+          "max_abs": 1.52587890625e-05,
+          "pass": true
+        },
+        "encoder_layer_11": {
+          "values": 94208,
+          "cos_min": 0.999999999999508,
+          "mine_norm": 30432.92988316177,
+          "reference_norm": 30432.928871958793,
+          "max_row_norm_error": 3.324291248940625e-07,
+          "relative_l2": 2.706530059909865e-07,
+          "max_abs": 0.0006103515625,
+          "pass": true
+        },
+        "encoder_layer_2": {
+          "values": 94208,
+          "cos_min": 0.999999999998546,
+          "mine_norm": 76.31367054797157,
+          "reference_norm": 76.31367282552318,
+          "max_row_norm_error": 2.2293614165835862e-07,
+          "relative_l2": 2.561112131685532e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_layer_3": {
+          "values": 94208,
+          "cos_min": 0.9999999999982767,
+          "mine_norm": 82.92861045946084,
+          "reference_norm": 82.92861220120068,
+          "max_row_norm_error": 2.4332439729768396e-07,
+          "relative_l2": 2.8721647438278475e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_layer_4": {
+          "values": 94208,
+          "cos_min": 0.9999999999985716,
+          "mine_norm": 193.892939012466,
+          "reference_norm": 193.89291176771434,
+          "max_row_norm_error": 2.691619394035172e-07,
+          "relative_l2": 3.8390664811932864e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_5": {
+          "values": 94208,
+          "cos_min": 0.9999999999988086,
+          "mine_norm": 197.92314631423673,
+          "reference_norm": 197.92311971543015,
+          "max_row_norm_error": 2.654804649449005e-07,
+          "relative_l2": 3.8042075464127996e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_6": {
+          "values": 94208,
+          "cos_min": 0.9999999999985973,
+          "mine_norm": 219.3925368549612,
+          "reference_norm": 219.39250890507364,
+          "max_row_norm_error": 2.9106552212887493e-07,
+          "relative_l2": 3.8472525206797277e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_7": {
+          "values": 94208,
+          "cos_min": 0.99999999999847,
+          "mine_norm": 239.6907020695046,
+          "reference_norm": 239.69067477724514,
+          "max_row_norm_error": 5.906351496776097e-07,
+          "relative_l2": 4.014400701985973e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_8": {
+          "values": 94208,
+          "cos_min": 0.9999999999984498,
+          "mine_norm": 338.56535281626753,
+          "reference_norm": 338.5653317691881,
+          "max_row_norm_error": 4.4507827867690253e-07,
+          "relative_l2": 3.441630421630474e-07,
+          "max_abs": 5.7220458984375e-06,
+          "pass": true
+        },
+        "encoder_layer_9": {
+          "values": 94208,
+          "cos_min": 0.9999999999991367,
+          "mine_norm": 400.060876150258,
+          "reference_norm": 400.0608567272064,
+          "max_row_norm_error": 4.6437123990550333e-07,
+          "relative_l2": 3.843374996204671e-07,
+          "max_abs": 6.67572021484375e-06,
+          "pass": true
+        },
+        "encoder_output": {
+          "values": 94208,
+          "cos_min": 0.9999999999995937,
+          "mine_norm": 20.95403556027758,
+          "reference_norm": 20.95403448340083,
+          "max_row_norm_error": 3.7107946604386655e-07,
+          "relative_l2": 5.511512676003621e-07,
+          "max_abs": 9.834766387939453e-07,
+          "pass": true
+        },
+        "encoder_tokens": {
+          "values": 92,
+          "cos_min": 1.0,
+          "mine_norm": 653.0421119652239,
+          "reference_norm": 653.0421119652239,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "uncond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999989184,
+          "mine_norm": 272.98669897866154,
+          "reference_norm": 272.9868237155508,
+          "max_row_norm_error": 6.838332817782344e-07,
+          "relative_l2": 9.414333710326523e-07,
+          "max_abs": 1.33514404296875e-05,
+          "pass": true
+        },
+        "cond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999996083,
+          "mine_norm": 309.317281079075,
+          "reference_norm": 309.31714677610444,
+          "max_row_norm_error": 6.104544665319622e-07,
+          "relative_l2": 8.752376829652416e-07,
+          "max_abs": 2.288818359375e-05,
+          "pass": true
+        },
+        "dac_block_0_own_codes": {
+          "values": 2697216,
+          "cos_min": 0.9999984023964059,
+          "mine_norm": 1760.0747635124035,
+          "reference_norm": 1760.0508732754452,
+          "max_row_norm_error": 0.0004885509675949251,
+          "relative_l2": 0.0002977952247059528,
+          "max_abs": 0.004878520965576172,
+          "pass": true
+        },
+        "dac_block_1_own_codes": {
+          "values": 10788864,
+          "cos_min": 0.9999987726725457,
+          "mine_norm": 2088.9854251146894,
+          "reference_norm": 2089.067325927431,
+          "max_row_norm_error": 0.0011519406131090815,
+          "relative_l2": 0.0003464488184561954,
+          "max_abs": 0.003802776336669922,
+          "pass": true
+        },
+        "dac_block_2_own_codes": {
+          "values": 21577728,
+          "cos_min": 0.9999989739633702,
+          "mine_norm": 3125.40151705274,
+          "reference_norm": 3125.4168822815377,
+          "max_row_norm_error": 0.0008556340441594479,
+          "relative_l2": 0.00016937629034299568,
+          "max_abs": 0.002198636531829834,
+          "pass": true
+        },
+        "dac_block_3_own_codes": {
+          "values": 21577728,
+          "cos_min": 0.9999999927290937,
+          "mine_norm": 3607.6291629158154,
+          "reference_norm": 3607.6213317442366,
+          "max_row_norm_error": 0.0002752096943345883,
+          "relative_l2": 8.174867107703122e-05,
+          "max_abs": 0.00030541419982910156,
+          "pass": true
+        },
+        "dac_input_conv_own_codes": {
+          "values": 674304,
+          "cos_min": 0.999999397279463,
+          "mine_norm": 3337.313920159286,
+          "reference_norm": 3337.26002273416,
+          "max_row_norm_error": 0.0003680023652563591,
+          "relative_l2": 0.00020717551752623826,
+          "max_abs": 0.00717926025390625,
+          "pass": true
+        },
+        "dac_latent_own_codes": {
+          "values": 449536,
+          "cos_min": 0.9999998019739041,
+          "mine_norm": 2524.500565094851,
+          "reference_norm": 2524.4607229320695,
+          "max_row_norm_error": 0.00023662942378277485,
+          "relative_l2": 0.00027781605123533955,
+          "max_abs": 0.0050334930419921875,
+          "pass": true
+        },
+        "dac_output_conv_own_codes": {
+          "values": 224768,
+          "cos_min": 0.9999995765462995,
+          "mine_norm": 0.8142559800946078,
+          "reference_norm": 0.814466667775327,
+          "max_row_norm_error": 0.0002586817718331913,
+          "relative_l2": 0.0009558266479670228,
+          "max_abs": 8.571892976760864e-06,
+          "pass": true
+        },
+        "dac_output_snake_own_codes": {
+          "values": 21577728,
+          "cos_min": 0.9999999954552469,
+          "mine_norm": 1554.7000676797265,
+          "reference_norm": 1554.6988476841273,
+          "max_row_norm_error": 0.0001477103236291466,
+          "relative_l2": 2.852074952055502e-05,
+          "max_abs": 0.00013977289199829102,
+          "pass": true
+        },
+        "decoded_audio_own_codes": {
+          "values": 224768,
+          "cos_min": 0.9999626557505078,
+          "mine_norm": 0.8142283438538285,
+          "reference_norm": 0.8144624451197032,
+          "max_row_norm_error": 0.0002874303993726235,
+          "relative_l2": 0.008645787845765338,
+          "max_abs": 0.00016350997611880302,
+          "pass": true
+        }
+      },
+      "steps": 455,
+      "frames": 439,
+      "prefix": 455,
+      "original_inputs_exact": true,
+      "original_codes_exact": true,
+      "all_actual_sampler_decisions_exact": 4095
+    },
+    "fox-123": {
+      "passed": false,
+      "outputs": {
+        "canonical-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "b943f26472a77765e234b8916182dd03bc5e61af315f465eb33a7553eff9875c",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 13.305034013605443,
+          "rms": 0.004573956282685725
+        },
+        "native-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "4c535526e570cc2c51e952617b9c7e4b570afa3b5816327d7fef3b03cbf5588e",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 13.305034013605443,
+          "rms": 0.004572637074171801
+        },
+        "original-dac-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "308b15e968a3a0f63f42dd0938883c480b9db922a962bb25d9438a909f3a4e41",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 13.305034013605443,
+          "rms": 0.004573956350903232
+        },
+        "cli-pcm.npy": {
+          "transcript": "",
+          "wer": 1.0,
+          "pcm_sha256": "d811890494b24a53dbfd915afbbc5ba20bfe00def4d9e0a480407caf1390104d",
+          "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+          "library_sha256": "631a7d89f2e0bcc0e30758e534226f1ea413ef5698ac130271f9d4f2fc4444c5",
+          "seconds": 13.305034013605443,
+          "rms": 0.004572758638083396
+        }
+      },
+      "stages": {
+        "cross_k0": {
+          "values": 188416,
+          "cos_min": 0.999999999999344,
+          "mine_norm": 39.780531749367405,
+          "reference_norm": 39.78052911579124,
+          "max_row_norm_error": 4.819293850655271e-07,
+          "relative_l2": 4.799055444972897e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "cross_v0": {
+          "values": 188416,
+          "cos_min": 0.9999999999997272,
+          "mine_norm": 11.36850714407531,
+          "reference_norm": 11.368506511309201,
+          "max_row_norm_error": 4.104697152174097e-07,
+          "relative_l2": 4.890101992122938e-07,
+          "max_abs": 2.980232238769531e-07,
+          "pass": true
+        },
+        "decoder_block0_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997694,
+          "mine_norm": 13.221773157365657,
+          "reference_norm": 13.221771135003078,
+          "max_row_norm_error": 1.7951956188255735e-07,
+          "relative_l2": 6.914789537620576e-07,
+          "max_abs": 2.1457672119140625e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999993158,
+          "mine_norm": 0.7328916034638251,
+          "reference_norm": 0.7328917719097898,
+          "max_row_norm_error": 7.555670205050546e-07,
+          "relative_l2": 4.688011206938193e-07,
+          "max_abs": 1.043081283569336e-07,
+          "pass": true
+        },
+        "decoder_block0_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997012,
+          "mine_norm": 3.841846304914778,
+          "reference_norm": 3.8418468283002443,
+          "max_row_norm_error": 2.5438404616107135e-07,
+          "relative_l2": 7.692358039545686e-07,
+          "max_abs": 1.0728836059570312e-06,
+          "pass": true
+        },
+        "decoder_block0_cross_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999997662,
+          "mine_norm": 21.607224448947623,
+          "reference_norm": 21.607230511918708,
+          "max_row_norm_error": 4.4956351186176136e-07,
+          "relative_l2": 4.930120698186294e-07,
+          "max_abs": 1.3113021850585938e-06,
+          "pass": true
+        },
+        "decoder_block0_input": {
+          "values": 4096,
+          "cos_min": 1.0,
+          "mine_norm": 8.665460761713922,
+          "reference_norm": 8.665460761713922,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999998757,
+          "mine_norm": 374.630089366966,
+          "reference_norm": 374.63018988836905,
+          "max_row_norm_error": 2.9072001472840725e-07,
+          "relative_l2": 5.628775920709316e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_block0_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999996169,
+          "mine_norm": 18.978851033286386,
+          "reference_norm": 18.978840074986483,
+          "max_row_norm_error": 1.2810700238397033e-06,
+          "relative_l2": 1.2489367485200246e-06,
+          "max_abs": 1.811981201171875e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999996482,
+          "mine_norm": 60.151131807372536,
+          "reference_norm": 60.151064648506775,
+          "max_row_norm_error": 1.677768532104551e-06,
+          "relative_l2": 1.46912310226506e-06,
+          "max_abs": 4.673004150390625e-05,
+          "pass": true
+        },
+        "decoder_block0_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999994643,
+          "mine_norm": 13.76736667105331,
+          "reference_norm": 13.767366565383815,
+          "max_row_norm_error": 2.0869337369333607e-07,
+          "relative_l2": 9.874951145864428e-07,
+          "max_abs": 6.67572021484375e-06,
+          "pass": true
+        },
+        "decoder_block0_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997122,
+          "mine_norm": 68.79429080768287,
+          "reference_norm": 68.79422292678348,
+          "max_row_norm_error": 1.5020935448806227e-06,
+          "relative_l2": 1.3148388291257071e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_block0_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998626,
+          "mine_norm": 4.668420473892338,
+          "reference_norm": 4.668420601314798,
+          "max_row_norm_error": 2.7294554505452595e-08,
+          "relative_l2": 5.25180830214903e-07,
+          "max_abs": 6.556510925292969e-07,
+          "pass": true
+        },
+        "decoder_block0_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999998195,
+          "mine_norm": 8.741635680643107,
+          "reference_norm": 8.7416352904534,
+          "max_row_norm_error": 1.3828542244631592e-07,
+          "relative_l2": 5.996648674815638e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block0_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999999998,
+          "mine_norm": 2.8916193182122187,
+          "reference_norm": 2.8916193182122187,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "decoder_block0_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_block0_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999997414,
+          "mine_norm": 11.797614717626148,
+          "reference_norm": 11.797612803945656,
+          "max_row_norm_error": 1.6220912857356495e-07,
+          "relative_l2": 7.370719435691323e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block0_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999997599,
+          "mine_norm": 11.972390983306987,
+          "reference_norm": 11.972388365122386,
+          "max_row_norm_error": 2.186852381402815e-07,
+          "relative_l2": 7.268047531676877e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_ca_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999992705,
+          "mine_norm": 144.87541915544858,
+          "reference_norm": 144.8754207247327,
+          "max_row_norm_error": 1.0826875351810372e-07,
+          "relative_l2": 1.1068272651674729e-06,
+          "max_abs": 5.340576171875e-05,
+          "pass": true
+        },
+        "decoder_block17_cross_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999962355,
+          "mine_norm": 2.751742089443222,
+          "reference_norm": 2.7517419175302393,
+          "max_row_norm_error": 1.0501677157881417e-06,
+          "relative_l2": 5.088621842167002e-07,
+          "max_abs": 4.0978193283081055e-07,
+          "pass": true
+        },
+        "decoder_block17_cross_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999995273,
+          "mine_norm": 18.660802781918548,
+          "reference_norm": 18.66080454548313,
+          "max_row_norm_error": 2.999433209582847e-07,
+          "relative_l2": 9.136647652772876e-07,
+          "max_abs": 3.0994415283203125e-06,
+          "pass": true
+        },
+        "decoder_block17_cross_q": {
+          "values": 4096,
+          "cos_min": 0.999999999999463,
+          "mine_norm": 45.7090252899186,
+          "reference_norm": 45.70902744946391,
+          "max_row_norm_error": 5.045127338121347e-07,
+          "relative_l2": 5.847917322609189e-07,
+          "max_abs": 4.291534423828125e-06,
+          "pass": true
+        },
+        "decoder_block17_input": {
+          "values": 4096,
+          "cos_min": 0.999999999999376,
+          "mine_norm": 148.7220360607878,
+          "reference_norm": 148.72205445904143,
+          "max_row_norm_error": 1.9933798156568372e-07,
+          "relative_l2": 1.038349481308602e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_gate": {
+          "values": 16384,
+          "cos_min": 0.9999999999995359,
+          "mine_norm": 130.53184903660664,
+          "reference_norm": 130.53182954304683,
+          "max_row_norm_error": 3.5058948189004013e-07,
+          "relative_l2": 9.72938535647447e-07,
+          "max_abs": 1.430511474609375e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_hidden": {
+          "values": 16384,
+          "cos_min": 0.9999999999998108,
+          "mine_norm": 73.27029541597732,
+          "reference_norm": 73.27027279322937,
+          "max_row_norm_error": 1.249472328046508e-06,
+          "relative_l2": 1.2321131814969446e-06,
+          "max_abs": 6.866455078125e-05,
+          "pass": true
+        },
+        "decoder_block17_mlp_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999984626,
+          "mine_norm": 237.39569804134518,
+          "reference_norm": 237.39571399459422,
+          "max_row_norm_error": 7.767834485639113e-07,
+          "relative_l2": 1.7032307063083846e-06,
+          "max_abs": 0.000156402587890625,
+          "pass": true
+        },
+        "decoder_block17_mlp_up": {
+          "values": 16384,
+          "cos_min": 0.9999999999993255,
+          "mine_norm": 91.37974798144678,
+          "reference_norm": 91.37973106936528,
+          "max_row_norm_error": 3.5941622433810494e-07,
+          "relative_l2": 1.179029339995643e-06,
+          "max_abs": 8.58306884765625e-06,
+          "pass": true
+        },
+        "decoder_block17_output": {
+          "values": 4096,
+          "cos_min": 0.999999999999202,
+          "mine_norm": 339.4045489045106,
+          "reference_norm": 339.404580075517,
+          "max_row_norm_error": 5.12993039158971e-07,
+          "relative_l2": 1.3063161726536192e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_block17_pre_ca_norm": {
+          "values": 4096,
+          "cos_min": 0.999999999999531,
+          "mine_norm": 6.804509258029479,
+          "reference_norm": 6.804509472362629,
+          "max_row_norm_error": 7.947355751269924e-08,
+          "relative_l2": 8.572427997139791e-07,
+          "max_abs": 2.384185791015625e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_mlp_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999988652,
+          "mine_norm": 12.115492803197297,
+          "reference_norm": 12.11549137176421,
+          "max_row_norm_error": 2.0976918557735758e-07,
+          "relative_l2": 1.5008645274050144e-06,
+          "max_abs": 4.887580871582031e-06,
+          "pass": true
+        },
+        "decoder_block17_pre_sa_norm": {
+          "values": 4096,
+          "cos_min": 0.9999999999989169,
+          "mine_norm": 7.378818039742975,
+          "reference_norm": 7.3788172759978155,
+          "max_row_norm_error": 1.5957137233790775e-07,
+          "relative_l2": 1.4242935694433046e-06,
+          "max_abs": 2.7418136596679688e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 10.130957511997225,
+          "reference_norm": 10.130958118827646,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_block17_sa_output": {
+          "values": 4096,
+          "cos_min": 0.9999999999988162,
+          "mine_norm": 39.11235880481291,
+          "reference_norm": 39.11236990019792,
+          "max_row_norm_error": 5.209774348591267e-07,
+          "relative_l2": 1.505740036135477e-06,
+          "max_abs": 1.811981201171875e-05,
+          "pass": true
+        },
+        "decoder_block17_sa_residual": {
+          "values": 4096,
+          "cos_min": 0.9999999999992443,
+          "mine_norm": 143.15403057156587,
+          "reference_norm": 143.1540336720928,
+          "max_row_norm_error": 1.4000294268345925e-07,
+          "relative_l2": 1.125566289946272e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_ca0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997012,
+          "mine_norm": 3.841846304914778,
+          "reference_norm": 3.8418468283002443,
+          "max_row_norm_error": 2.5438404616107135e-07,
+          "relative_l2": 7.692358039545686e-07,
+          "max_abs": 1.0728836059570312e-06,
+          "pass": true
+        },
+        "decoder_hidden": {
+          "values": 4096,
+          "cos_min": 0.9999999999982467,
+          "mine_norm": 18.061290172403712,
+          "reference_norm": 18.061283828297363,
+          "max_row_norm_error": 4.069101875447956e-07,
+          "relative_l2": 1.795617545044537e-06,
+          "max_abs": 5.364418029785156e-06,
+          "pass": true
+        },
+        "decoder_layer_0": {
+          "values": 4096,
+          "cos_min": 0.9999999999997122,
+          "mine_norm": 68.79429080768287,
+          "reference_norm": 68.79422292678348,
+          "max_row_norm_error": 1.5020935448806227e-06,
+          "relative_l2": 1.3148388291257071e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_1": {
+          "values": 4096,
+          "cos_min": 0.9999999999997777,
+          "mine_norm": 81.17209369339979,
+          "reference_norm": 81.17202874669373,
+          "max_row_norm_error": 1.1635186556446797e-06,
+          "relative_l2": 1.0953972513759785e-06,
+          "max_abs": 4.57763671875e-05,
+          "pass": true
+        },
+        "decoder_layer_10": {
+          "values": 4096,
+          "cos_min": 0.9999999999997348,
+          "mine_norm": 103.49719064108479,
+          "reference_norm": 103.49714601260885,
+          "max_row_norm_error": 5.699995968555527e-07,
+          "relative_l2": 7.911001437296849e-07,
+          "max_abs": 3.814697265625e-05,
+          "pass": true
+        },
+        "decoder_layer_11": {
+          "values": 4096,
+          "cos_min": 0.9999999999997095,
+          "mine_norm": 112.4102407745599,
+          "reference_norm": 112.41022197684526,
+          "max_row_norm_error": 2.1846514108858628e-07,
+          "relative_l2": 7.07638887220136e-07,
+          "max_abs": 2.574920654296875e-05,
+          "pass": true
+        },
+        "decoder_layer_12": {
+          "values": 4096,
+          "cos_min": 0.9999999999996606,
+          "mine_norm": 114.03661507570152,
+          "reference_norm": 114.03659698189524,
+          "max_row_norm_error": 2.53545347161932e-07,
+          "relative_l2": 7.623364625436066e-07,
+          "max_abs": 2.86102294921875e-05,
+          "pass": true
+        },
+        "decoder_layer_13": {
+          "values": 4096,
+          "cos_min": 0.9999999999995023,
+          "mine_norm": 117.213616906221,
+          "reference_norm": 117.21360952144767,
+          "max_row_norm_error": 7.982540939366345e-08,
+          "relative_l2": 9.009268272462579e-07,
+          "max_abs": 3.62396240234375e-05,
+          "pass": true
+        },
+        "decoder_layer_14": {
+          "values": 4096,
+          "cos_min": 0.9999999999993731,
+          "mine_norm": 123.0032982371417,
+          "reference_norm": 123.00330063103162,
+          "max_row_norm_error": 1.2464210374929507e-07,
+          "relative_l2": 9.79265307978749e-07,
+          "max_abs": 4.9591064453125e-05,
+          "pass": true
+        },
+        "decoder_layer_15": {
+          "values": 4096,
+          "cos_min": 0.9999999999993756,
+          "mine_norm": 131.66163981585387,
+          "reference_norm": 131.66165476941742,
+          "max_row_norm_error": 2.3833043438781232e-07,
+          "relative_l2": 9.9379900594456e-07,
+          "max_abs": 5.53131103515625e-05,
+          "pass": true
+        },
+        "decoder_layer_16": {
+          "values": 4096,
+          "cos_min": 0.999999999999376,
+          "mine_norm": 148.7220360607878,
+          "reference_norm": 148.72205445904143,
+          "max_row_norm_error": 1.9933798156568372e-07,
+          "relative_l2": 1.038349481308602e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_layer_17": {
+          "values": 4096,
+          "cos_min": 0.999999999999202,
+          "mine_norm": 339.4045489045106,
+          "reference_norm": 339.404580075517,
+          "max_row_norm_error": 5.12993039158971e-07,
+          "relative_l2": 1.3063161726536192e-06,
+          "max_abs": 0.00016021728515625,
+          "pass": true
+        },
+        "decoder_layer_2": {
+          "values": 4096,
+          "cos_min": 0.9999999999998311,
+          "mine_norm": 83.86622948746393,
+          "reference_norm": 83.86616200959794,
+          "max_row_norm_error": 1.1094686194201842e-06,
+          "relative_l2": 1.0347084230759257e-06,
+          "max_abs": 4.1961669921875e-05,
+          "pass": true
+        },
+        "decoder_layer_3": {
+          "values": 4096,
+          "cos_min": 0.9999999999998107,
+          "mine_norm": 81.47726451577303,
+          "reference_norm": 81.47718472262659,
+          "max_row_norm_error": 1.3934993594588718e-06,
+          "relative_l2": 1.2170174172533975e-06,
+          "max_abs": 5.7220458984375e-05,
+          "pass": true
+        },
+        "decoder_layer_4": {
+          "values": 4096,
+          "cos_min": 0.9999999999998159,
+          "mine_norm": 83.81471432733059,
+          "reference_norm": 83.81464053208731,
+          "max_row_norm_error": 1.291453267215914e-06,
+          "relative_l2": 1.1249089141546324e-06,
+          "max_abs": 5.340576171875e-05,
+          "pass": true
+        },
+        "decoder_layer_5": {
+          "values": 4096,
+          "cos_min": 0.9999999999997067,
+          "mine_norm": 75.26199356819055,
+          "reference_norm": 75.26192388302513,
+          "max_row_norm_error": 1.3434344081630911e-06,
+          "relative_l2": 1.2129594497158308e-06,
+          "max_abs": 4.76837158203125e-05,
+          "pass": true
+        },
+        "decoder_layer_6": {
+          "values": 4096,
+          "cos_min": 0.9999999999996921,
+          "mine_norm": 75.61371923292309,
+          "reference_norm": 75.61366326916271,
+          "max_row_norm_error": 1.1429627984060886e-06,
+          "relative_l2": 1.0973439123878931e-06,
+          "max_abs": 4.38690185546875e-05,
+          "pass": true
+        },
+        "decoder_layer_7": {
+          "values": 4096,
+          "cos_min": 0.9999999999997632,
+          "mine_norm": 78.98751118390558,
+          "reference_norm": 78.98746090151809,
+          "max_row_norm_error": 9.286119271312288e-07,
+          "relative_l2": 9.488401305695506e-07,
+          "max_abs": 4.00543212890625e-05,
+          "pass": true
+        },
+        "decoder_layer_8": {
+          "values": 4096,
+          "cos_min": 0.9999999999997119,
+          "mine_norm": 87.3590278212038,
+          "reference_norm": 87.35898192903402,
+          "max_row_norm_error": 7.363997771570041e-07,
+          "relative_l2": 9.00483578274036e-07,
+          "max_abs": 3.4332275390625e-05,
+          "pass": true
+        },
+        "decoder_layer_9": {
+          "values": 4096,
+          "cos_min": 0.999999999999745,
+          "mine_norm": 101.13145182934251,
+          "reference_norm": 101.1314101386324,
+          "max_row_norm_error": 5.233024824580212e-07,
+          "relative_l2": 7.704112400852335e-07,
+          "max_abs": 3.4332275390625e-05,
+          "pass": true
+        },
+        "decoder_sa0_attention": {
+          "values": 4096,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 4.980006044241877,
+          "reference_norm": 4.980005646018189,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa0_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999997575,
+          "mine_norm": 59.7298313388064,
+          "reference_norm": 59.729829023741935,
+          "max_row_norm_error": 2.1665104132928548e-07,
+          "relative_l2": 6.416450986229953e-07,
+          "max_abs": 9.5367431640625e-06,
+          "pass": true
+        },
+        "decoder_sa0_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999995934,
+          "mine_norm": 24.811897081368162,
+          "reference_norm": 24.81189720494981,
+          "max_row_norm_error": 7.583788266263269e-07,
+          "relative_l2": 7.494545830572695e-07,
+          "max_abs": 3.5762786865234375e-06,
+          "pass": true
+        },
+        "decoder_sa0_v": {
+          "values": 1024,
+          "cos_min": 0.999999999999737,
+          "mine_norm": 2.4900030221209386,
+          "reference_norm": 2.4900028230090947,
+          "max_row_norm_error": 2.9017803027109323e-07,
+          "relative_l2": 6.695147041186083e-07,
+          "max_abs": 5.364418029785156e-07,
+          "pass": true
+        },
+        "decoder_sa17_attention": {
+          "values": 4096,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 10.130957511997225,
+          "reference_norm": 10.130958118827646,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "decoder_sa17_k": {
+          "values": 1024,
+          "cos_min": 0.9999999999989099,
+          "mine_norm": 11.468302156326944,
+          "reference_norm": 11.468301656368874,
+          "max_row_norm_error": 4.437419734992787e-07,
+          "relative_l2": 8.232123951286044e-07,
+          "max_abs": 2.0265579223632812e-06,
+          "pass": true
+        },
+        "decoder_sa17_q": {
+          "values": 4096,
+          "cos_min": 0.9999999999992821,
+          "mine_norm": 36.5460697730235,
+          "reference_norm": 36.54606890137521,
+          "max_row_norm_error": 6.710718767344304e-07,
+          "relative_l2": 6.285523224881303e-07,
+          "max_abs": 3.814697265625e-06,
+          "pass": true
+        },
+        "decoder_sa17_v": {
+          "values": 1024,
+          "cos_min": 0.9999999999865016,
+          "mine_norm": 5.065478755998613,
+          "reference_norm": 5.065479059413823,
+          "max_row_norm_error": 7.295044576194343e-07,
+          "relative_l2": 2.1908999508550824e-06,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_embedding": {
+          "values": 94208,
+          "cos_min": 0.9999999999999999,
+          "mine_norm": 8.790399697421382,
+          "reference_norm": 8.790399697421382,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "encoder_layer_0": {
+          "values": 94208,
+          "cos_min": 0.999999999999965,
+          "mine_norm": 65.26212844016055,
+          "reference_norm": 65.26213089815832,
+          "max_row_norm_error": 1.3407622312389122e-07,
+          "relative_l2": 1.4670092544666988e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "encoder_layer_1": {
+          "values": 94208,
+          "cos_min": 0.9999999999999423,
+          "mine_norm": 70.73064617296204,
+          "reference_norm": 70.73064943100844,
+          "max_row_norm_error": 2.563124021914831e-07,
+          "relative_l2": 1.6636801692733313e-07,
+          "max_abs": 1.1920928955078125e-06,
+          "pass": true
+        },
+        "encoder_layer_10": {
+          "values": 94208,
+          "cos_min": 0.9999999999995722,
+          "mine_norm": 766.4344802250255,
+          "reference_norm": 766.4344476517487,
+          "max_row_norm_error": 2.578692159804774e-07,
+          "relative_l2": 4.4674306064017863e-07,
+          "max_abs": 1.52587890625e-05,
+          "pass": true
+        },
+        "encoder_layer_11": {
+          "values": 94208,
+          "cos_min": 0.999999999999508,
+          "mine_norm": 30432.92988316177,
+          "reference_norm": 30432.928871958793,
+          "max_row_norm_error": 3.324291248940625e-07,
+          "relative_l2": 2.706530059909865e-07,
+          "max_abs": 0.0006103515625,
+          "pass": true
+        },
+        "encoder_layer_2": {
+          "values": 94208,
+          "cos_min": 0.999999999998546,
+          "mine_norm": 76.31367054797157,
+          "reference_norm": 76.31367282552318,
+          "max_row_norm_error": 2.2293614165835862e-07,
+          "relative_l2": 2.561112131685532e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_layer_3": {
+          "values": 94208,
+          "cos_min": 0.9999999999982767,
+          "mine_norm": 82.92861045946084,
+          "reference_norm": 82.92861220120068,
+          "max_row_norm_error": 2.4332439729768396e-07,
+          "relative_l2": 2.8721647438278475e-07,
+          "max_abs": 1.430511474609375e-06,
+          "pass": true
+        },
+        "encoder_layer_4": {
+          "values": 94208,
+          "cos_min": 0.9999999999985716,
+          "mine_norm": 193.892939012466,
+          "reference_norm": 193.89291176771434,
+          "max_row_norm_error": 2.691619394035172e-07,
+          "relative_l2": 3.8390664811932864e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_5": {
+          "values": 94208,
+          "cos_min": 0.9999999999988086,
+          "mine_norm": 197.92314631423673,
+          "reference_norm": 197.92311971543015,
+          "max_row_norm_error": 2.654804649449005e-07,
+          "relative_l2": 3.8042075464127996e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_6": {
+          "values": 94208,
+          "cos_min": 0.9999999999985973,
+          "mine_norm": 219.3925368549612,
+          "reference_norm": 219.39250890507364,
+          "max_row_norm_error": 2.9106552212887493e-07,
+          "relative_l2": 3.8472525206797277e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_7": {
+          "values": 94208,
+          "cos_min": 0.99999999999847,
+          "mine_norm": 239.6907020695046,
+          "reference_norm": 239.69067477724514,
+          "max_row_norm_error": 5.906351496776097e-07,
+          "relative_l2": 4.014400701985973e-07,
+          "max_abs": 4.76837158203125e-06,
+          "pass": true
+        },
+        "encoder_layer_8": {
+          "values": 94208,
+          "cos_min": 0.9999999999984498,
+          "mine_norm": 338.56535281626753,
+          "reference_norm": 338.5653317691881,
+          "max_row_norm_error": 4.4507827867690253e-07,
+          "relative_l2": 3.441630421630474e-07,
+          "max_abs": 5.7220458984375e-06,
+          "pass": true
+        },
+        "encoder_layer_9": {
+          "values": 94208,
+          "cos_min": 0.9999999999991367,
+          "mine_norm": 400.060876150258,
+          "reference_norm": 400.0608567272064,
+          "max_row_norm_error": 4.6437123990550333e-07,
+          "relative_l2": 3.843374996204671e-07,
+          "max_abs": 6.67572021484375e-06,
+          "pass": true
+        },
+        "encoder_output": {
+          "values": 94208,
+          "cos_min": 0.9999999999995937,
+          "mine_norm": 20.95403556027758,
+          "reference_norm": 20.95403448340083,
+          "max_row_norm_error": 3.7107946604386655e-07,
+          "relative_l2": 5.511512676003621e-07,
+          "max_abs": 9.834766387939453e-07,
+          "pass": true
+        },
+        "encoder_tokens": {
+          "values": 92,
+          "cos_min": 1.0,
+          "mine_norm": 653.0421119652239,
+          "reference_norm": 653.0421119652239,
+          "max_row_norm_error": 0.0,
+          "relative_l2": 0.0,
+          "max_abs": 0.0,
+          "pass": true
+        },
+        "uncond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999989184,
+          "mine_norm": 272.98669897866154,
+          "reference_norm": 272.9868237155508,
+          "max_row_norm_error": 6.838332817782344e-07,
+          "relative_l2": 9.414333710326523e-07,
+          "max_abs": 1.33514404296875e-05,
+          "pass": true
+        },
+        "cond_logits": {
+          "values": 9252,
+          "cos_min": 0.9999999999996083,
+          "mine_norm": 309.317281079075,
+          "reference_norm": 309.31714677610444,
+          "max_row_norm_error": 6.104544665319622e-07,
+          "relative_l2": 8.752376829652416e-07,
+          "max_abs": 2.288818359375e-05,
+          "pass": true
+        },
+        "dac_block_0_own_codes": {
+          "values": 7041024,
+          "cos_min": 0.9999973650053455,
+          "mine_norm": 4819.056868785341,
+          "reference_norm": 4818.797340799611,
+          "max_row_norm_error": 0.0012841443274955733,
+          "relative_l2": 0.00024303327651286282,
+          "max_abs": 0.0034241676330566406,
+          "pass": true
+        },
+        "dac_block_1_own_codes": {
+          "values": 28164096,
+          "cos_min": 0.9999995621957116,
+          "mine_norm": 6258.290955152111,
+          "reference_norm": 6258.852546450527,
+          "max_row_norm_error": 0.0014505792883474644,
+          "relative_l2": 0.000304517074355848,
+          "max_abs": 0.003747701644897461,
+          "pass": true
+        },
+        "dac_block_2_own_codes": {
+          "values": 56328192,
+          "cos_min": 0.9999999519039411,
+          "mine_norm": 7236.484092816627,
+          "reference_norm": 7236.436182829816,
+          "max_row_norm_error": 0.0003996872486075054,
+          "relative_l2": 0.00014726586276727661,
+          "max_abs": 0.001970916986465454,
+          "pass": true
+        },
+        "dac_block_3_own_codes": {
+          "values": 56328192,
+          "cos_min": 0.9999999890595755,
+          "mine_norm": 6890.630259710771,
+          "reference_norm": 6890.720546605636,
+          "max_row_norm_error": 0.0003095294394749315,
+          "relative_l2": 9.531067764316589e-05,
+          "max_abs": 0.0006209611892700195,
+          "pass": true
+        },
+        "dac_input_conv_own_codes": {
+          "values": 1760256,
+          "cos_min": 0.9999988792548445,
+          "mine_norm": 5476.454695044202,
+          "reference_norm": 5475.984871501989,
+          "max_row_norm_error": 0.0009041443972599428,
+          "relative_l2": 0.0002154124865292081,
+          "max_abs": 0.00815582275390625,
+          "pass": true
+        },
+        "dac_latent_own_codes": {
+          "values": 1173504,
+          "cos_min": 0.999998466953699,
+          "mine_norm": 4110.052091168944,
+          "reference_norm": 4109.71188595878,
+          "max_row_norm_error": 0.0009491157927177252,
+          "relative_l2": 0.0002800349925374677,
+          "max_abs": 0.005223274230957031,
+          "pass": true
+        },
+        "dac_output_conv_own_codes": {
+          "values": 586752,
+          "cos_min": 0.9999997933442732,
+          "mine_norm": 3.5042880291238725,
+          "reference_norm": 3.504456015375008,
+          "max_row_norm_error": 4.793504338440613e-05,
+          "relative_l2": 0.0006446622429798362,
+          "max_abs": 5.871430039405823e-05,
+          "pass": true
+        },
+        "dac_output_snake_own_codes": {
+          "values": 56328192,
+          "cos_min": 0.9999999900513008,
+          "mine_norm": 2572.9773940022624,
+          "reference_norm": 2572.9787172897804,
+          "max_row_norm_error": 4.863767052154522e-05,
+          "relative_l2": 3.896725231325372e-05,
+          "max_abs": 0.0009940862655639648,
+          "pass": true
+        },
+        "decoded_audio_own_codes": {
+          "values": 586752,
+          "cos_min": 0.9999620016016156,
+          "mine_norm": 3.502628059795058,
+          "reference_norm": 3.5036386223267417,
+          "max_row_norm_error": 0.0002884322958549568,
+          "relative_l2": 0.008721127795777717,
+          "max_abs": 0.0007673623040318489,
+          "pass": true
+        }
+      },
+      "steps": 1162,
+      "frames": 1146,
+      "prefix": 1162,
+      "original_inputs_exact": true,
+      "original_codes_exact": true,
+      "all_actual_sampler_decisions_exact": 10458
+    }
+  },
+  "all_four_cases_pass": false,
+  "defaults_changed": false,
+  "gpu_acceptance": false,
+  "q4_acceptance": false,
+  "scope": "Verified numerical/token diagnostic; all original/native speech quality gates failed. No broader speech/default/F16/Q4/GPU promotion.",
+  "artifact_bytes": 3022635432,
+  "runtime_source": "5e04955e580b798b3cd45d870d407a3dd7600c4e",
+  "model_sha256": "8128132c538e1aef83f2fb5257b4f71d28a67c2a5a0d54d0a1f0a3b0f5d6b73d",
+  "codec_sha256": "6db51da2333868918b6d476008d92036a53400bc816ff7e1d2b1e973499e4135",
+  "asr_sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2",
+  "compared_stage_rows": 352,
+  "actual_original_sampler_decisions": 20556,
+  "pending": "Direct original constructor/generate control without added observers, repaired source d41cfb27/run38940468611; then predeclared original/native inference-recipe controls. Existing failed speech gates remain unchanged.",
+  "complete_public_proof": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "revision": "4500d64ef00a0e2902a4e5411ccdac2bc2c056c3",
+    "parent_revision": "0fdb91b317771d5910714ed9e61fd6545e5d171e",
+    "files": [
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/raw.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/raw.zip",
+        "bytes": 3022635432,
+        "sha256": "75d9f3ec9d4fa96f1e284d2cf602afcf8b288d5cbdaa5bea5bf88532eda26c90",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/proof.zip",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/proof.zip",
+        "bytes": 131244,
+        "sha256": "9eab7483f24349991aafac4d08455c508ca5677724b513836c3094a1d102b093",
+        "anonymous_full_download_verified": true
+      },
+      {
+        "path": "dia-20261016-broader-speech/complete-failed-four-case-v1/README.md",
+        "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/4500d64ef00a0e2902a4e5411ccdac2bc2c056c3/dia-20261016-broader-speech/complete-failed-four-case-v1/README.md",
+        "bytes": 2376,
+        "sha256": "615ce9ac941a800f88c8050aa7cb6e2b7b17e869486e3ca59574c6ded63c93da",
+        "anonymous_full_download_verified": true
+      }
+    ],
+    "complete": true
+  },
+  "crossed_recognizer_replay": {
+    "source": "30e75dcdd8df573ed1f73e9c97b17f192b82d7af",
+    "run": 38930760374,
+    "artifact": 12060029304,
+    "sha256": "fdaa4da6e39a86ca52ddca48de50bc8c93de77f8d7bcfd906aab765517fee416",
+    "payloads_verified": 54,
+    "upload_dereferenced_aliases_verified": 8,
+    "pcm_inputs_verified": 6,
+    "recognition_cells_verified": 12,
+    "recognizers_agree": true,
+    "legacy_and_jfk_wer_zero_both_libraries": true,
+    "new_case_transcripts_empty_both_libraries": true,
+    "new_cases_wer_zero": false,
+    "speech_acceptance": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false,
+    "production_defaults_changed": false,
+    "complete_public_proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6",
+      "parent_revision": "4500d64ef00a0e2902a4e5411ccdac2bc2c056c3",
+      "files": [
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/raw.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/raw.zip",
+          "bytes": 50159711,
+          "sha256": "fdaa4da6e39a86ca52ddca48de50bc8c93de77f8d7bcfd906aab765517fee416",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/proof.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/proof.zip",
+          "bytes": 16576,
+          "sha256": "58e45ef0a8ab893b703ea732c363ed77406f7832529c6ea28852053cfd89a612",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/crossed-asr-v1/README.md",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/951fa9f714dd2fc5346f8e5e9eadc0fdf9f3fed6/dia-20261016-broader-speech/crossed-asr-v1/README.md",
+          "bytes": 1795,
+          "sha256": "2565dac9e29d25e2dba7320272986d4c850990d39ee4e3a0e48693b006639559",
+          "anonymous_full_download_verified": true
+        }
+      ],
+      "complete": true
+    }
+  },
+  "independent_whisper_recognition": {
+    "source": "0a62782e01084c84da20df1072f2577504436765",
+    "recognizer_source": "31243bad24cc746f07d4c8bfdd2d974872cb1803",
+    "model_sha256": "25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead",
+    "torch": "2.11.0+cu130",
+    "options": {
+      "language": "en",
+      "task": "transcribe",
+      "temperature": 0.0,
+      "condition_on_previous_text": false,
+      "initial_prompt": null,
+      "fp16": false,
+      "verbose": null
+    },
+    "payloads_verified": 77,
+    "original_loader_replays_exact": 18,
+    "controls_wer_zero": true,
+    "broader_all_wer_zero": false,
+    "twelve_expanded_views_wer": 1.0,
+    "four_fox42_views_wer": 24.77777777777778,
+    "cases": {
+      "hello-42": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "",
+        "full_transcript_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "hello-123": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "I'm not sure.",
+        "full_transcript_sha256": "1438ebe71a34e577d2e8b89633280e5941d59f66b6f328bbab304278b9e8f6d2"
+      },
+      "fox-42": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 24.77777777777778,
+          "native": 24.77777777777778,
+          "original-dac": 24.77777777777778,
+          "cli": 24.77777777777778
+        },
+        "transcript_preview": "I'm going to go ahead and get a little bit of a little bit of a little bit of a little bit of a little bit of a little b",
+        "full_transcript_sha256": "84fbdfdbb539fff476dba5fdacd4d8cf4f184f161d577276ba01af2c93784536"
+      },
+      "fox-123": {
+        "views": 4,
+        "all_view_transcripts_equal": true,
+        "wer_by_view": {
+          "original": 1.0,
+          "native": 1.0,
+          "original-dac": 1.0,
+          "cli": 1.0
+        },
+        "transcript_preview": "...",
+        "full_transcript_sha256": "ab5df625bc76dbd4e163bed2dd888df828f90159bb93556525c31821b6541d46"
+      }
+    },
+    "complete_public_proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "eeadb3f56a3db3ba0232bafb55ef8bc7d1389801",
+      "parent_revision": "aaaefb0745efd5bb7871957f1bf71d62bb48ddc9",
+      "files": [
+        {
+          "path": "dia-20261016-broader-speech/independent-whisper-base-en-v2/proof.zip",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/eeadb3f56a3db3ba0232bafb55ef8bc7d1389801/dia-20261016-broader-speech/independent-whisper-base-en-v2/proof.zip",
+          "bytes": 36241894,
+          "sha256": "5ad0e46849c53a97fdc04e6a7e220093ab717f9f30c16497931be28a9832a9bc",
+          "anonymous_full_download_verified": true
+        },
+        {
+          "path": "dia-20261016-broader-speech/independent-whisper-base-en-v2/README.md",
+          "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/eeadb3f56a3db3ba0232bafb55ef8bc7d1389801/dia-20261016-broader-speech/independent-whisper-base-en-v2/README.md",
+          "bytes": 2382,
+          "sha256": "e7c9edb975bd227d2c5cce25055a07bc304b25d308cadfeee238000ca9b97bde",
+          "anonymous_full_download_verified": true
+        }
+      ],
+      "complete": true
+    },
+    "speech_acceptance": false,
+    "production_defaults_changed": false,
+    "gpu_acceptance": false,
+    "q4_acceptance": false
+  }
+}
