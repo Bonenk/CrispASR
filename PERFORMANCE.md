@@ -1563,7 +1563,7 @@ every chunk/overlap combination tested — the global z-norm makes chunk
 boundaries transparent to the TDT decoder.
 
 > **Caveat (added 2026-05-24).** The "identical to single-pass" column
-> below is only true on the cached MP3-derived audio (`/mnt/storage/
+> below is only true on the cached MP3-derived audio (`${CRISPASR_STORAGE}/
 > samples/o_9dWkRPYC0.mp3` → `yt_60s.wav`). On a fresh `yt-dlp` extract
 > of the same YouTube video, single-pass collapses to ~20 s of output
 > while streamed still covers the whole clip — see the "single-pass
@@ -1660,13 +1660,13 @@ Results collected with `tests/benchmark_asr.py`:
 python tests/benchmark_asr.py --audio myfile.wav --backend parakeet
 
 # Full matrix across backends and settings:
-python tests/benchmark_asr.py --corpus /mnt/storage/test-audio/corpus.json --all-settings
+python tests/benchmark_asr.py --corpus ${CRISPASR_STORAGE}/test-audio/corpus.json --all-settings
 
 # Build the test audio corpus (en/de/ja/zh × 4 durations from FLEURS):
 python tests/benchmark_corpus.py
 ```
 
-Results are stored in `/mnt/storage/benchmark-results/runs.jsonl` (JSONL,
+Results are stored in `${CRISPASR_STORAGE}/benchmark-results/runs.jsonl` (JSONL,
 one line per run). The framework computes: word count, char count,
 first/last timestamp, time coverage %, gap count/size, wall time, and
 realtime factor. See `tests/benchmark_metrics.py` for the metric

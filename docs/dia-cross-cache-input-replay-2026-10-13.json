@@ -59,37 +59,37 @@
       "sha256": "be23f42a3a6f98e6d9eaa929e0ed258773b0fd3f8dd0746102e78efad89844c3"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/original-step978-ref.gguf",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/original-step978-ref.gguf",
       "bytes": 244346912,
       "sha256": "70fba5173a147fb706e6bbc7d4d730b388423e05d67b572b66c4cd0aa71414bd"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_encoder_output.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_encoder_output.f32",
       "bytes": 319488,
       "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_cross_k0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_cross_k0.f32",
       "bytes": 638976,
       "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_cross_v0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on/cpp_cross_v0.f32",
       "bytes": 638976,
       "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_encoder_output.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_encoder_output.f32",
       "bytes": 319488,
       "sha256": "6ec9ffe37c2a83f1716f88a20848e7226b7ddbc2be50dd13c78115928ec79ec8"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_cross_k0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_cross_k0.f32",
       "bytes": 638976,
       "sha256": "d82209d399c258cc77fbf4283381c7cda7ab9806a0b728b1f9d396ff440010a5"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_cross_v0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-gpu-proof-v5-20261013/output/attention-on/cpp_cross_v0.f32",
       "bytes": 638976,
       "sha256": "a9cc63e7db39da85f6224eb6da30f230c7623167cc1c04ef5790057938e0773b"
     }

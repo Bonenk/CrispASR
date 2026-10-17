@@ -3741,7 +3741,7 @@
   },
   "same_input_replay": {
     "scope": "Weight-free actual-source same-input attention history consumer. Validated on audited real original prefix 0-3; hosted data consumed only after capture transparency succeeds. No full model/GPU/speech acceptance.",
-    "capture_path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
+    "capture_path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
     "native_source": "42b111c5e6006e7dcc82afff2b1b43da7c15861c",
     "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
     "native_package_source": "35945f527c70377e00bf00808235337e130e11fd",
@@ -3758,493 +3758,493 @@
     "production_cache_capacity": 3072,
     "verified_inputs_and_libraries": [
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml-base.so",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml-base.so.0",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml-base.so.0.26.0",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml-cpu.so",
         "bytes": 1446416,
         "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml.so",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml.so.0",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libggml.so.0.26.0",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
         "path": "libs/libgomp.so.1",
         "bytes": 317376,
         "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
         "path": "receipt.json",
         "bytes": 37098,
         "sha256": "3be65a705743a1da95350e80f7794a67f3cb09af02f70258fe136f2b941ac942"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122",
         "path": "original-step978-ref.gguf",
         "bytes": 244346912,
         "sha256": "70fba5173a147fb706e6bbc7d4d730b388423e05d67b572b66c4cd0aa71414bd"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa0_q.f32",
         "bytes": 16384,
         "sha256": "d7761777e81ec69d6afcf03112edca94ad639f1c94671cd2536d7545c928a2ec"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa0_k.f32",
         "bytes": 4009984,
         "sha256": "6248c71f5cb7fc16dc5b93c7d7cef59a2dab91a06e2445e16975df3e0f31da1f"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa0_v.f32",
         "bytes": 4009984,
         "sha256": "b3b9bea1f781f5764eef02a26f46e0266ee613604663f74af394ca1254cd2b04"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa0_attention.f32",
         "bytes": 16384,
         "sha256": "451fbe31df7b3d114db882fb4bcab17aef2e090238bf5b61b8e0d4f1e7268e7a"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa1_q.f32",
         "bytes": 16384,
         "sha256": "456371ffa596b2bc37879a92c015f5aa5661733f63ae9ce452a04a736f030593"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa1_k.f32",
         "bytes": 4009984,
         "sha256": "38044fafbfb56bbe1955083193a09de29722128be8edaa3c512e0b1e38c494f6"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa1_v.f32",
         "bytes": 4009984,
         "sha256": "b0711f2f901ef70101fdf3d61fee2d187f476136eb0dbb8ec80d95c3f55ffb13"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa1_attention.f32",
         "bytes": 16384,
         "sha256": "bbdfa5e0f14c59013b20a4d43904bb5ff80d06f13530fff091aa83b4a62b5763"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa2_q.f32",
         "bytes": 16384,
         "sha256": "b990bbcd5f72d0a8dad2673b3af68ee14665d6a549826c9713dc24001f143279"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa2_k.f32",
         "bytes": 4009984,
         "sha256": "0f40626d955e30748fbd3c26373431980999c9f772e800352b1f52263595f40e"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa2_v.f32",
         "bytes": 4009984,
         "sha256": "eb19119650ad7c901d4d7220152bbf3ecbd14c0c34f695e6933abb41792f7ad4"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa2_attention.f32",
         "bytes": 16384,
         "sha256": "ebd4b2115ee43b4f7d790238d1a21431dbb8b531dfcfcf8e81c2810e280fea55"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa3_q.f32",
         "bytes": 16384,
         "sha256": "ab46f584e799f42d237ebb0f25c1a1ea47782a0b1371235dc1f2f6d53e8ad089"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa3_k.f32",
         "bytes": 4009984,
         "sha256": "250655613a8571f7904140418b2b6d8fbc9e8fcabe973216f58c005c287149da"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa3_v.f32",
         "bytes": 4009984,
         "sha256": "013cd528b5a943cc0c8357e896e2df7a8e30082dc6b8e535c7ceac1765746583"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa3_attention.f32",
         "bytes": 16384,
         "sha256": "60e69ba328ec30c7b2d92484c174615db5109eb588e94364da8b7067d175eded"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa4_q.f32",
         "bytes": 16384,
         "sha256": "91a6515360cc90417bd3a08b1275a2825c69fdac120c1924cf3c4003528b7fbe"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa4_k.f32",
         "bytes": 4009984,
         "sha256": "8bef749e72611e420d6d4598c94cffe7038d5df924d9e92da5d42ca28f662e9b"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa4_v.f32",
         "bytes": 4009984,
         "sha256": "7e605a35595a3c31997e6bbbf0a66ff42083111ec717da592eed6534d6d61264"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa4_attention.f32",
         "bytes": 16384,
         "sha256": "b1a0d28218deadca17a69172ad5cd0745e29a999a7bd1f2e7dbe57128346ad39"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa5_q.f32",
         "bytes": 16384,
         "sha256": "bd5712d9fb3828acad16c405b993ba7225105fb266d98e397784621d376a920d"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa5_k.f32",
         "bytes": 4009984,
         "sha256": "4259b28c63a88d88887397cfae431cda16a36bfcb741fe87f56f5d9b9be4757c"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa5_v.f32",
         "bytes": 4009984,
         "sha256": "13f7b514523e6c5f39eaf5b08ec6c5b273cf722e09f390ea78bf41cf16c2a02f"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa5_attention.f32",
         "bytes": 16384,
         "sha256": "aa3ff338513a8df7e4e376f0df7c372c95cbeba93e4fe7b71a35fbe62d4e40b6"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa6_q.f32",
         "bytes": 16384,
         "sha256": "fa3d7674df06065a9203f4e955c9456dbe98a18cf84b83fbd1b02e26446f4ca2"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa6_k.f32",
         "bytes": 4009984,
         "sha256": "a3debad113572a5c44e221aee789aa664e2431329aff3e6588987cfbb476dc2d"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa6_v.f32",
         "bytes": 4009984,
         "sha256": "f7f92bfe7707a36a7387b07d054841c8610271eca4efc7aca4cd8fb457292a2b"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa6_attention.f32",
         "bytes": 16384,
         "sha256": "34b6ed3cd0700cb1030145026d9c6725b6c3cfff96b5b68cbd35240d91e7b4a4"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa7_q.f32",
         "bytes": 16384,
         "sha256": "6fef342bf22cfa81c8c48e8381c0bd2c70e15cd5ce0523afa2dc3b8a8f0db785"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa7_k.f32",
         "bytes": 4009984,
         "sha256": "2cf1b3316e86b9cc4e8d17a4fb886fa69a56bf9573716c4cd3b72b9f0fc5a4e8"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa7_v.f32",
         "bytes": 4009984,
         "sha256": "adfb9b311ef7cdedad94ff39d350592f29b508ff7e9f74222d161de5dca6d740"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa7_attention.f32",
         "bytes": 16384,
         "sha256": "8c9b04634f02edbdac69692036d76833451cd5f858bf2e24741a19897d70eacc"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa8_q.f32",
         "bytes": 16384,
         "sha256": "3857c03a7fdb80e178a2b495c896a09a3442818a2e18a834e343b3943ad19aae"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa8_k.f32",
         "bytes": 4009984,
         "sha256": "56742735e62a78bbaf13b869cecd8996eb33c391c48abd95ac8d29d2c056a3ff"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa8_v.f32",
         "bytes": 4009984,
         "sha256": "88fb45ceb81dc793f265b0bab0bf3e57b3f5e8d3f28eaa1bbfa9755b4559c2e2"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa8_attention.f32",
         "bytes": 16384,
         "sha256": "731fe72ad80cb0284429c3999290d4ba9a693958b1d0316295218145d5b47319"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa9_q.f32",
         "bytes": 16384,
         "sha256": "a8d31ccdb0a76257242a72aa513cb6aa9179bbd9208aa6487b134be9beafc655"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa9_k.f32",
         "bytes": 4009984,
         "sha256": "4b8ba6d8d996706656b87ac01674a9f3846ce4f66d2f302838ab22fdbbf5065c"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa9_v.f32",
         "bytes": 4009984,
         "sha256": "7811f1ed009e2ee7f5a0ca5c97569796b0531a08682d40afcf9d20e3dd07c1a2"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa9_attention.f32",
         "bytes": 16384,
         "sha256": "a43849073b8b73f916a17aba5d427e5f29c1639dd00bfbb604fc70d830e63577"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa10_q.f32",
         "bytes": 16384,
         "sha256": "93f40ddbe53718d33ee5e44734b3515f03b6c8fc866647c324b8d40814b4e3d4"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa10_k.f32",
         "bytes": 4009984,
         "sha256": "abced973a596469a7bc0630903f487c2b7f95881582c39bd8538fef1769e54e4"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa10_v.f32",
         "bytes": 4009984,
         "sha256": "bf7aadcb1ff3a89e9bf205bb8a75b703cc6111f690847f0e2f43e313094332af"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa10_attention.f32",
         "bytes": 16384,
         "sha256": "16c6bef1e4710f53f633bebf7751f9462fdb859dc2630d6dc42ca534290bcc3a"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa11_q.f32",
         "bytes": 16384,
         "sha256": "d258dcb48eec1411c461913009eda3635a07b553431401bc5ef9806657d3276e"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa11_k.f32",
         "bytes": 4009984,
         "sha256": "13838f77ad7e0312223d1bec462e77fed8815c5913abf4f30021f8e3526eef81"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa11_v.f32",
         "bytes": 4009984,
         "sha256": "0150eb4b162ae0d0771f032533f43be1843ed642c6eb7b725a5f8e38fc4a21ec"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa11_attention.f32",
         "bytes": 16384,
         "sha256": "320a8c890a083548b988638e09b76fa2ba937b12a3bc7c16e2af5941a5254f10"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa12_q.f32",
         "bytes": 16384,
         "sha256": "d43ef2615d59bac157eb52ae015e49aa97105ef8e2c6bb800dcd2b6a1395fb99"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa12_k.f32",
         "bytes": 4009984,
         "sha256": "a5fc9d74ad5c3197f63ae11b6bb301c61b3a24f9737fd7b6666073631a992024"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa12_v.f32",
         "bytes": 4009984,
         "sha256": "d95d8d89f7d4258220b2b3a587eebcc23bc8306f581c2dc64794496d70c5b3f8"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa12_attention.f32",
         "bytes": 16384,
         "sha256": "d441578934e0b807d37462c654e8fa411d36571c35eb86dca94ff46e86b9937c"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa13_q.f32",
         "bytes": 16384,
         "sha256": "d20b1a8c24a2354b9e1392e601f0c4d4b51178773c1526986bfdc2b959720c38"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa13_k.f32",
         "bytes": 4009984,
         "sha256": "4f6954ce6bfa3db09df18713b7ebed65ca071d49389906fe9049997e7c65f9ce"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa13_v.f32",
         "bytes": 4009984,
         "sha256": "26a60fb9f2aaab39241637c308634528f39247ca8d2b79fce4f6dfd65980ac8c"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa13_attention.f32",
         "bytes": 16384,
         "sha256": "989bfb3c7186d21933eb63b70fe361630fe1df643c718a36daeb33816f0e91ab"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa14_q.f32",
         "bytes": 16384,
         "sha256": "7c65c479f83143035165993e37e86bd47fa5317b2e5270d8d3860f187e89083d"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa14_k.f32",
         "bytes": 4009984,
         "sha256": "42e828864712613a4fe945f574b1a460b374e2009ec9153986b2a538ad812c08"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa14_v.f32",
         "bytes": 4009984,
         "sha256": "538ea758c7fa85e2c7a56cae1775abad73e41fd52e689f58b502e4aedfdf1840"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa14_attention.f32",
         "bytes": 16384,
         "sha256": "ec5cc52f54e3078733e8bb6152ff5c31256caff2c8a1ce6689d842a25ae25b34"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa15_q.f32",
         "bytes": 16384,
         "sha256": "c10bb9bb205e3118e2a27828f4dfc84bb516c6209529111e2bfb46355cb9953e"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa15_k.f32",
         "bytes": 4009984,
         "sha256": "295a5d44b598dc4dc19995fbcbfdc32d80bb05b6a27a971fc78946e26ce0990a"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa15_v.f32",
         "bytes": 4009984,
         "sha256": "fd99e77fb1edcd5f283a91b4e91074e3cc216e746f91a7eb07edf09404546689"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa15_attention.f32",
         "bytes": 16384,
         "sha256": "29dceb7319094afc5b3521eaa00e9d4ed89cf2282026a75de77de4d6526ca131"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa16_q.f32",
         "bytes": 16384,
         "sha256": "f69eb9ee14ea3d8906a53839b1e080e97a1686c27ae8c1ea3c0bf4dd1452fcac"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa16_k.f32",
         "bytes": 4009984,
         "sha256": "19d14314a845afbe1e04ee99576c02c2f6d2a46c41389b9016aa99ef74e1bf68"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa16_v.f32",
         "bytes": 4009984,
         "sha256": "adb190123691558a74a68461dad0eb8bf1f8fe2dad5c4fce0975c2c4ce2b8193"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa16_attention.f32",
         "bytes": 16384,
         "sha256": "b8d6741d33dbf05734b02b466efc8bfc392d447b86c58683581b1425f2b00e04"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa17_q.f32",
         "bytes": 16384,
         "sha256": "842e1efcf964da8cf4a46503aa49c846bae1fd839c7dbcd5dbb658ed09783714"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa17_k.f32",
         "bytes": 4009984,
         "sha256": "623a32473e448bce8baf40a0a869e4c7a00c65256ebd93652b5a01d96bd75bb2"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa17_v.f32",
         "bytes": 4009984,
         "sha256": "f20946d9b0df0af6827bdc91dcb638f4ae35f6b18af1dbb94dcd5e84cbcf1ccf"
       },
       {
-        "directory": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
+        "directory": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/artifact-11841560122/attention-on",
         "path": "attention-on/cpp_decoder_sa17_attention.f32",
         "bytes": 16384,
         "sha256": "320eea4b7277a7a80d715279f37e429f179249432b27acff7c9dfcfe8025a650"
@@ -8467,27 +8467,27 @@
   "worker_source": "bf895ecd652a90ed18ff095c09596f7a27dd4f36",
   "logs": [
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/independent-cpu-audit.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/independent-cpu-audit.log",
       "bytes": 80,
       "sha256": "d5aec3285955cd025dc3a91cdab94ec70d919956fafd2a72e8d7c6e96bd6ff0e"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/independent-cuda-audit.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/independent-cuda-audit.log",
       "bytes": 60,
       "sha256": "6ea423fcb0406265ec268f74e2e2b1d838317ca3023cd59db1f5adc3971d1101"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38438623888/complete.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38438623888/complete.log",
       "bytes": 100541,
       "sha256": "a9647f3965ad92c92026628c2717f2619211b656b191b62184f9cde1ba3b9a53"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-delivery-20261013/38446095504/complete.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/38446095504/complete.log",
       "bytes": 87083,
       "sha256": "40829cf5e13fd112da5cf56e55ff5a248984c6f16a0a8ca61c4a0ad151807682"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-attention-late-replay-20261013/replay.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/replay.log",
       "bytes": 26165,
       "sha256": "4a44c273d76934b5447c3b2d94d4c85a8d10cbdc91dfcb1a4c202d2e805750d4"
     }

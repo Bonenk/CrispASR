@@ -8,9 +8,9 @@
       "-Wall",
       "-Wextra",
       "-Werror",
-      "/mnt/storage/crispasr/cann-910b3-official-20261014/capacity-candidate/actual-capacity.cpp",
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-candidate/actual-capacity.cpp",
       "-o",
-      "/mnt/storage/crispasr/cann-910b3-official-20261014/capacity-candidate/capacity-probe"
+      "${CRISPASR_STORAGE}/crispasr/cann-910b3-official-20261014/capacity-candidate/capacity-probe"
     ],
     "operations_sha256": "2c0c91c70e8da880612e8e649d1fc71bbcc48558192cf7a8120d4b870440b306",
     "common_sha256": "af716ff6965a4f65d1cb954f54a3fb4dc01801bb94a37eb3c6d8650105dbaf13",

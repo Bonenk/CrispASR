@@ -141,7 +141,7 @@ per-stage harness was re-run against native onnxruntime on the rebuilt binary.
 
 **Onsets & Frames, `crispasr-diff onsets-and-frames`, 26 stages, gated at cosine
 0.999** — `onsets-and-frames-f32.gguf` against
-`/mnt/storage/tuner-bench/onnx/onsets_and_frames.onnx`, 3 s clip:
+`${CRISPASR_STORAGE}/tuner-bench/onnx/onsets_and_frames.onnx`, 3 s clip:
 
 ```
 onsets-and-frames diff: PASS (0 of 26 stages failing)

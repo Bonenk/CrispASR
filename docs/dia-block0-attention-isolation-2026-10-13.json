@@ -11,181 +11,181 @@
   "ggml_source": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
   "verified_inputs_and_tools": [
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "bridge",
       "bytes": 26600,
       "sha256": "c04207b5f47ed02dadac472b3e7895ac921a105cd9ff8dd6d594892d4331dd68"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "actual-native-helpers.cpp",
       "bytes": 1277,
       "sha256": "e80f96834dae006871cd17abf0003fb7cd3292e67d1758dbe991669429d5e2bc"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-0.f32",
       "bytes": 8421376,
       "sha256": "e15b1746ea48bca8299d15b1fc4f0ffd654a653cc873f642a3ab4b72dca92bbe"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-1.f32",
       "bytes": 8421376,
       "sha256": "94e09a9e197b77836eab3764cd7d734d83f5331d944c0a1e39d63c5517fd188e"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-2.f32",
       "bytes": 8421376,
       "sha256": "916a462b6fe99867b6cf680228e0a392b0721659f259838aeb1b7fc4322b8a03"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-3.f32",
       "bytes": 8421376,
       "sha256": "a1d80526e4ba42a7f11ee6901e6cad744d51291fa60aa70d28eac1ef8ee9d3cd"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-4.f32",
       "bytes": 8421376,
       "sha256": "851448b1c8840a42932aaf3cf8f49c212dd9de06faf39b3d1cdfa8933f27e750"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-5.f32",
       "bytes": 8421376,
       "sha256": "e4855e94e5369cc449049dd600a828946ea968d3e4adc484093cf0d6973eae1d"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-6.f32",
       "bytes": 8421376,
       "sha256": "bfd20073ac2f307c6b105fe7be5495e4101c0f6ab4ac7bba50f3015b510eebc9"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-7.f32",
       "bytes": 8421376,
       "sha256": "deb364f22736bc4c66dce87acb3997ca605452ce68bb7ce9315d475964717413"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-norm-embed-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013",
       "path": "embedding-8.f32",
       "bytes": 8421376,
       "sha256": "b70899411ce53af9819f6ba9051a8e729314f34177c1bf65cddc34b1c449fc2e"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "bridge",
       "bytes": 16792,
       "sha256": "5ac10b3f20259491cf7474f0f128df5807cead5fabc7350f12250a3318ce16bf"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "norm.f32",
       "bytes": 8192,
       "sha256": "aa94916f5b9bb77e33c3df398519de3dc6c448c9dccbaa99d6b465dfea5da920"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "q-original.f32",
       "bytes": 16777216,
       "sha256": "63da7f82eeb19a61b192a5ef6ee6c33b36f380583f120a7a7943f1dbc9a1e1e3"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "k-original.f32",
       "bytes": 4194304,
       "sha256": "48d15ad15b626b6edceb966177e5458c44b074d0d58892fbf2f0981f551178b2"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "v-original.f32",
       "bytes": 4194304,
       "sha256": "dbe09879b470c7bb4f3acea36f4cc00afd517ae18ad8faa7105247ba3f3bc573"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "self_q_proj.native.f32",
       "bytes": 16777216,
       "sha256": "17d07c13004926d7c7f99c1df2ee57e33b584ae01105dfef77ec08462e7e7575"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "self_k_proj.native.f32",
       "bytes": 4194304,
       "sha256": "1ea9ddddf63e3383facdd22462e6df3f23d5b652e73972a0a72ca6fbd33a009b"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013",
       "path": "self_v_proj.native.f32",
       "bytes": 4194304,
       "sha256": "a801f5a783f81a5620a6886b677e15056232ab5a25d25245d67c66b616cf33d2"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-rope-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-rope-probe-20261013",
       "path": "bridge",
       "bytes": 16712,
       "sha256": "3b11d890577f17e55994bd03631ebbd52a4c276cbf661b601f41ea13fc4a38c3"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-rope-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-rope-probe-20261013",
       "path": "original-timescales.f32",
       "bytes": 256,
       "sha256": "0f38c9ea2be251a9e979929d91834881afa4ce2a70209326e4a419b1630c0a2b"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so.0.26.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-cpu.so",
       "bytes": 1446416,
       "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so.0.26.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libgomp.so.1",
       "bytes": 317376,
       "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-short-20261012/portable-speech-hosted-proof/heavy-38317327337",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/portable-speech-hosted-proof/heavy-38317327337",
       "path": "original-control-inputs.i32",
       "bytes": 44136,
       "sha256": "e7b946e6f8679a887e56127306fed09bce3dadc58f3d635614539f4464f4fb88"

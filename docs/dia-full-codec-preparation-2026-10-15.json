@@ -24,97 +24,97 @@
     "corrupted_raw_prediction_rejected": true,
     "verified_parent_payloads": [
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging-inputs.i32",
         "bytes": 40140,
         "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging-sampled.i32",
         "bytes": 40140,
         "sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging-generate.log",
         "bytes": 59732,
         "sha256": "7ce46175671fa739c0a3bbe71890da4f99b6f68c9741a915e41827da2ed0aa62"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging-inputs.i32",
         "bytes": 40140,
         "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging-sampled.i32",
         "bytes": 40140,
         "sha256": "07d879ca593cea0c623a8e43ccb5852fd10a5648c88be778c13d6d63fc8b8a1b"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging-generate.log",
         "bytes": 61734,
         "sha256": "16585296f4a8b7e638da5b92b69e651b532ebeb2daf354116f90001773f80da3"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging.npy",
         "bytes": 2252928,
         "sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging.json",
         "bytes": 274,
         "sha256": "434cfb44b41ee1aace634132bb25d18c5683c43d8b854909f075a0b8e163617d"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-baseline-asr.log",
         "bytes": 1156,
         "sha256": "9236bf52836d8ca4b30ebf3eb1fef19cf801e16b6712032bd33be219505062ac"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging.npy",
         "bytes": 2252928,
         "sha256": "bae83a449aacdff6168dc24e9cef029d565e5047c0d353840cc30de1c3fd03a9"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging.json",
         "bytes": 175,
         "sha256": "fb8a83774c22d50d2103ea1ab902fc17001d712fc2e49d2610b837e14de99467"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-baseline-asr.log",
         "bytes": 978,
         "sha256": "77550733c2b686e7fcae95cbccf6beafb7ddfb896379585c858136c68a5b051b"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/sources/src/dia_tts.cpp",
         "bytes": 114800,
         "sha256": "3ab92b7de64ab4cabe3eedbe78db32d720dd335ed6526817d070b9b0cef739d9"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
         "path": "output/original-step978-ref.gguf",
         "bytes": 99803232,
         "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
         "path": "output/original-late.npy",
         "bytes": 2478208,
         "sha256": "5c4331e165afa1e5342cf4cf3f9c50e7100e3a192a4835beb8e7c66d4fa13d6d"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
         "path": "output/on-original-provenance.json",
         "bytes": 1446,
         "sha256": "c486291127a44aaa5e3ec254601d7f8f38a0a53788a2c681e1bcc4f51a57be3a"

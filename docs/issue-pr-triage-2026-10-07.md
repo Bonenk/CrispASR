@@ -2,7 +2,7 @@
 
 Pulled `main` at `3f4ca9372`. The review snapshot contains 11 open issues and
 4 open PRs, with descriptions, all issue comments, PR reviews and inline
-comments archived in `/mnt/storage/crispasr/triage-20261007/`.
+comments archived in `${CRISPASR_STORAGE}/crispasr/triage-20261007/`.
 The [receipt](issue-pr-triage-2026-10-07.json) distinguishes offline checks,
 previous PR CI and queued fresh hosted checks. No release or new GPU
 performance claim is made here.
@@ -326,11 +326,11 @@ US-ASCII before the explicit UTF-8 binding option and passes afterward.
 reruns real Arabic CLI/reference/Python/Java acceptance with that host encoding
 forced. #516 remains unmerged pending full acceptance.
 
-Cold-file migration recovered 1.43 GB on root and 0.53 GB on `/mnt/volume1`.
+Cold-file migration recovered 1.43 GB on root and 0.53 GB on `${CRISPASR_WORKTREES}`.
 Each source was unused for over five hours and had no open descriptor; SHA-256
 was verified before atomically replacing its path with a symlink. Native
 executables/shared libraries were retained. Receipts live under
-`/mnt/storage/crispasr/storage-cleanup-20261008/`.
+`${CRISPASR_STORAGE}/crispasr/storage-cleanup-20261008/`.
 
 ## PR #492 numerical acceptance started — 2026-10-08
 
@@ -483,7 +483,7 @@ remains in progress. No release tag yet.
 now passes: both configurations discover and actually execute both lifecycle
 and disable-env cases without skipping. This is not compute PSO serialization
 or performance evidence. Cold shared/static logs are archived under
-`/mnt/storage/crispasr/metal-cache-20261008/proof/`.
+`${CRISPASR_STORAGE}/crispasr/metal-cache-20261008/proof/`.
 
 [F16 MiMo](https://github.com/CrispStrobe/CrispASR/actions/runs/37761799417)
 completes but fails the shipped Q4 tokenizer's pooling/RVQ gates. All five F16
@@ -502,7 +502,7 @@ is not original-checkpoint certification. No numerical gate was relaxed.
 PR #492 remains unmerged and excluded from the release draft.
 
 Storage follow-up: another 281,881,417 bytes of cold DEB/TAR proof/package
-archives moved to `/mnt/storage` (261,681,999 bytes from root; 20,199,418
+archives moved to `${CRISPASR_STORAGE}` (261,681,999 bytes from root; 20,199,418
 from volume1). All were unused for over five hours, had no open descriptor,
 and matched SHA-256 before atomic replacement with symlinks at the original
 paths. The receipt is `storage-cleanup-20261008/moved-next.json` under the

@@ -74,7 +74,7 @@
   },
   "cmake_negative_control": {
     "passed": true,
-    "actual_target": "/mnt/storage/crispasr/pr492-acceptance-20261008/proof/cmake-target-path-smoke/build/bin/mimo_attention_probe",
+    "actual_target": "${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/proof/cmake-target-path-smoke/build/bin/mimo_attention_probe",
     "old_assumption_exists": false,
     "actual_executable_passed": true
   },

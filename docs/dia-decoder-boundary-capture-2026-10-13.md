@@ -39,7 +39,7 @@ Local checks: three native parser/scratch/environment guards, two C++ syntax
 checks and Python compilation pass. Local original-model tests were interrupted
 by unavailable CIFS reference libraries and are not claimed green. They are
 mandatory in the hosted worker before model inference. Source-only temporary
-worktrees on /mnt/volume1 use about 230 MiB plus ggml; all weights, builds and
+worktrees on ${CRISPASR_WORKTREES} use about 230 MiB plus ggml; all weights, builds and
 full captures stay on storage/CI. The shared main checkout remains untouched.
 
 Full hosted controls have passed and are independently audited; see

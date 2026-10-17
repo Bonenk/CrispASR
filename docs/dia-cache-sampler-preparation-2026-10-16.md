@@ -42,7 +42,7 @@ counts distinguish the first sampling difference from later numerical drift.
 
 Single collectors and independent auditors retain official raw ZIP digests,
 all source/physical pins and complete arrays under
-/mnt/storage/crispasr/dia-cache-sampler-20261016. Audit code is prepared, not yet
+${CRISPASR_STORAGE}/crispasr/dia-cache-sampler-20261016. Audit code is prepared, not yet
 accepted against future artifacts. Broader prompts/seeds, real GPU/Q4, profiling
 and default promotion remain blocked on unforced speech acceptance. Per the
 sibling kaggle_usage.md this CPU recipe belongs on GitHub, with Kaggle reserved

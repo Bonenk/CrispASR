@@ -22,37 +22,37 @@
     },
     "verified_inputs": [
       {
-        "root": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014",
         "path": "output/original-step978-ref.gguf",
         "bytes": 99803232,
         "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging-inputs.i32",
         "bytes": 40140,
         "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging-logits.f32",
         "bytes": 82527840,
         "sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging-inputs.i32",
         "bytes": 40140,
         "sha256": "0db507ee2c496c6ceee2517c8a5937f4705ac3ac7d14e54832966c9335171753"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cli-logging-logits.f32",
         "bytes": 82527840,
         "sha256": "47ca0c2f69a4c99f86256a8534026b2e1e1e7994f535188552bef38c0eafbc15"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-free-capture-delivery-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014",
         "path": "output/cabi-logging.npy",
         "bytes": 2252928,
         "sha256": "9ce006c62361bf96991fe543268d827204e718010f3fcbbed759aac74f58029a"
@@ -429,13 +429,13 @@
     "maximum_probability_error": 0.004546753130853176,
     "verified_noise": [
       {
-        "root": "/mnt/storage/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
         "path": "actual-torch-exponential-noise.f32",
         "bytes": 45371808,
         "sha256": "6a64367db8f4ce9ab9efe5b43d00e708ede3e625ac00e18058a51c7c2622fce8"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/portable-random-hosted-proof/heavy-38317325099",
         "path": "portable-exponential-noise.f32",
         "bytes": 45371808,
         "sha256": "043808949bf0fc51206bc154a5755fb80d44127326bc7419c0ca4c635cf77dba"

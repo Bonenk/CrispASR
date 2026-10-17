@@ -14,12 +14,12 @@ written without re-reading Python.
 
 Sources used, both pinned locally during this work:
 
-* `github.com/magenta/mt3` @ depth-1 clone → `/mnt/volume1/tmp-overflow/mt3-src`
+* `github.com/magenta/mt3` @ depth-1 clone → `${CRISPASR_WORKTREES}/tmp-overflow/mt3-src`
   (Apache-2.0). All `mt3/*.py:NNN` citations below refer to that tree.
-* `gs://mt3/checkpoints/mt3` → `/mnt/storage/gguf-models/mt3-src/`
+* `gs://mt3/checkpoints/mt3` → `${CRISPASR_STORAGE}/gguf-models/mt3-src/`
   (295 files, 171.6 MB, anonymous HTTPS, Apache-2.0).
 * Oracle weights `mt3.pth` (kunato/mt3-pytorch, re-hosted at
-  `huggingface.co/gudgud1014/MR-MT3`) → `/mnt/storage/gguf-models/mt3-oracle/`,
+  `huggingface.co/gudgud1014/MR-MT3`) → `${CRISPASR_STORAGE}/gguf-models/mt3-oracle/`,
   sha256 `b8a3807e…5398f` (matches openmirlab/mt3-infer's
   `config/checkpoints.toml`).
 
@@ -29,22 +29,22 @@ Reproduce:
 # 1. checkpoint (296 objects, anonymous, no gsutil)
 curl -s 'https://storage.googleapis.com/storage/v1/b/mt3/o?prefix=checkpoints/mt3/&maxResults=1000'
 #    then GET https://storage.googleapis.com/mt3/<name> for each object
-#    -> /mnt/storage/gguf-models/mt3-src/mt3/
+#    -> ${CRISPASR_STORAGE}/gguf-models/mt3-src/mt3/
 
 # 2. convert
 python3 models/convert-mt3-to-gguf.py \
-    --input  /mnt/storage/gguf-models/mt3-src/mt3 \
-    --output /mnt/storage/gguf-models/mt3-f16.gguf
+    --input  ${CRISPASR_STORAGE}/gguf-models/mt3-src/mt3 \
+    --output ${CRISPASR_STORAGE}/gguf-models/mt3-f16.gguf
 
 # 3. reference dump + self-checks (numpy only, ~40 s)
 python3 tools/reference_backends/mt3.py \
-    --audio <16 kHz wav> -o /mnt/volume1/tmp-overflow/mt3-ref \
+    --audio <16 kHz wav> -o ${CRISPASR_WORKTREES}/tmp-overflow/mt3-ref \
     --max-segments 2 --decode-steps 48
 
 # 4. optional: weight + encoder parity vs the PyTorch conversion (needs torch)
-/mnt/volume1/miniconda/bin/python tools/reference_backends/mt3.py \
-    --audio <wav> -o /mnt/volume1/tmp-overflow/mt3-ref \
-    --torch-oracle /mnt/storage/gguf-models/mt3-oracle/mt3.pth
+${CRISPASR_WORKTREES}/miniconda/bin/python tools/reference_backends/mt3.py \
+    --audio <wav> -o ${CRISPASR_WORKTREES}/tmp-overflow/mt3-ref \
+    --torch-oracle ${CRISPASR_STORAGE}/gguf-models/mt3-oracle/mt3.pth
 ```
 
 ---
@@ -304,13 +304,13 @@ The names deliberately match `models/convert-madlad-to-gguf.py` /
 
 ```
 $ python3 models/convert-mt3-to-gguf.py \
-    --input  /mnt/storage/gguf-models/mt3-src/mt3 \
-    --output /mnt/storage/gguf-models/mt3-f16.gguf
+    --input  ${CRISPASR_STORAGE}/gguf-models/mt3-src/mt3 \
+    --output ${CRISPASR_STORAGE}/gguf-models/mt3-f16.gguf
 MT3 -> GGUF   variant=mt3
   codec classes : 1388  (+3 special +100 extra_ids -> padded vocab 1536)
   checkpoint    : 147 zarr params + 42 inline msgpack params = 189 total
   tensors: 190  (F16 147, F32 43)
-  wrote /mnt/storage/gguf-models/mt3-f16.gguf  (96.0 MB)
+  wrote ${CRISPASR_STORAGE}/gguf-models/mt3-f16.gguf  (96.0 MB)
 ```
 
 Zero unmapped parameters, zero missing. **96.0 MB F16** — the memo's ~120 MB

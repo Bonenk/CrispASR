@@ -52,7 +52,7 @@
   "independent_review": "No blocking finding. Input self-comparison deliberately validates F32, finite, nonempty 1-D PCM; cross-phase equality is checked separately.",
   "hardware_and_full_model_results": "Pending; unsupported GPU returns inconclusive without a fallback or automatic retry.",
   "prelaunch": "One recent account session verified terminal after API rate-limit cooldown; one submission. No account/quota changes.",
-  "storage": "/mnt/storage/crispasr/dia-cuda-trace-20261016",
+  "storage": "${CRISPASR_STORAGE}/crispasr/dia-cuda-trace-20261016",
   "independent_integer_replay_controls": {
     "status": "PASS",
     "torch": "2.6.0+cpu",

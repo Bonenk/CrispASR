@@ -1,3 +1,31 @@
+## Diagnostic integration and portable maintainer handoff — 2026-10-17
+
+Integrated the unchanged attention diagnostic from02bd2aee (all13 CI39003202215
+and10 lint39003053402 jobs pass), plus Echo owned-input worker967a62e0 and its
+locally controlled observer repairc2deea37. Original authorship and frozen
+experimental branches remain intact. Echo heavy39008086579 and lint39008088033
+still require terminal result audit; no9B numerical/quant/speech acceptance is
+inferred. No inference graph, quant recipe, runtime default, version or release
+tag changes. Combined-main CI/lint remain the final integration checks.
+
+Public documentation and receipt locations now use portable aliases; numeric
+results, source/input hashes and immutable public artifact pins are preserved.
+A new documentation-privacy test was first observed failing and then passing.
+The full secret/privacy suite retains the account guard. Actual worktree/storage
+locations, collectors, local environments and the original location inventory
+are in ignored maintainer notes; AGENTS.md points local maintainers there.
+Historical commits and immutable proof archives are not rewritten. The VibeVoice
+reference helper now locates its installed package without executing __init__,
+replacing a developer-home literal; isolated discovery/missing-package controls
+pass without loading a model.
+
+[Public maintainer handoff](docs/maintenance-handoff.md) scopes each active front
+with entry points, acceptance gates and external dependencies. New issue547 was
+read completely (no comments then); exact reporter fixtures/Windows evidence
+remain pending, and existing reset calls do not prove its proposed cache cause.
+No speculative Nemotron patch or new unbounded experiment was started. PLAN.md
+contains remaining actions; completed work remains archived here.
+
 ## Echo9B first hosted FFN run audited; observer setup repaired — 2026-10-17
 
 Frozen967a62e0 heavy39001786227 built successfully, passed actual pinned-source
@@ -524,7 +552,7 @@ CI38946681937/lint38946685918 target exact
 7d0f68f322d503962d28c1e38f3eb07ac06a03f7; acceptance and integration remain pending
 in PLAN.md. Every branch/main push passed all four unskipped secrets checks.
 Local positive/negative receipts, review reports and terminal-log collector live
-under /mnt/storage/crispasr/dia-sampling-controls-20261016. Fresh issue/PR inventory
+under ${CRISPASR_STORAGE}/crispasr/dia-sampling-controls-20261016. Fresh issue/PR inventory
 is unchanged: eight open issues and only draftPR521; no new comments or closures.
 
 ## Dia second-ASR recognition audit completed — 2026-10-16
@@ -534,7 +562,7 @@ source31243bad24cc746f07d4c8bfdd2d974872cb1803 and fixed checkpoint25a8566e….
 It verifies installed Python/asset bytes against the retained original source,
 then recognizes all18 preregistered clips: old legacy/JFK controls and four
 expanded cases through original/native/original-DAC/CLI. Existing packages stay
-unchanged; the single145MB CPU checkpoint and all data live under /mnt/storage.
+unchanged; the single145MB CPU checkpoint and all data live under ${CRISPASR_STORAGE}.
 
 Independent audit verifies77 payloads and18 exact original ffmpeg-loader replays.
 Both controls have WER0; all16 expanded views fail. Twelve have WER1; all four
@@ -1053,7 +1081,7 @@ all18,504 serial outputs, one/four threads and native/identity controls. The
 registered tiny graph test passes30 checks; isolated removal of the GPU guard
 is detected. Whole current runtime syntax and format18 pass. Failed CIFS
 shared-library symlink build remains intact; accepted static proof is under
-/mnt/storage/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
+${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
 Hosted build38874191736 and independent57-payload audit now pass; fresh
 compilation against returned actual static libraries reproduces all12 head
 replays exactly. Artifact12034799042 is74580109 bytes, SHA256
@@ -1972,7 +2000,7 @@ Actual macOS run `37762956547` at integrated `ff33461e0` passes shared job
 lifecycle/disable-env tests without skipping (shared 24.53/0.08 s, static
 26.35/0.07 s). This validates initialization, teardown, reinitialization and
 the cache-disable path. It does not prove compute PSO serialization or speed.
-Cold logs: `/mnt/storage/crispasr/metal-cache-20261008/proof/`.
+Cold logs: `${CRISPASR_STORAGE}/crispasr/metal-cache-20261008/proof/`.
 
 ## 2026-10-08 — Moonshine ONNX destructor cleanup
 
@@ -2269,7 +2297,7 @@ and runtime proofs, and separated released fixes from measured/pending hardware
 results. At posting, v0.8.41 was tagged but binary builds were still pending.
 Issue and PR states were preserved. Existing answered/confirmation-only closed
 threads received no duplicate update. Full reads, drafts and verified URL/hash
-receipts are cold under `/mnt/storage/crispasr/issue485-9b/github-replies-20261002/`.
+receipts are cold under `${CRISPASR_STORAGE}/crispasr/issue485-9b/github-replies-20261002/`.
 
 | Thread | Published reply |
 |---|---|
@@ -2582,7 +2610,7 @@ revision `b34538267099a6769111aada860d57f312894510` and fixture revision
 and mandatory C++ stage/magnitude/cache gates pass. Broad CI `36918938903`
 passes all 13 platform/build jobs; lint `36918943060` passes all 10 jobs after
 retrying a tool-install timeout. Large source captures, original failed exact
-diagnostics and CI/Kaggle artifacts stay under `/mnt/storage/crispasr/issue485/`.
+diagnostics and CI/Kaggle artifacts stay under `${CRISPASR_STORAGE}/crispasr/issue485/`.
 
 Merged port `cf8bcf098` also passes CI `36959052427` (13/13), lint
 `36959052406` (10/10) and the entire selected nightly regression `36959052457`,
@@ -2680,7 +2708,7 @@ pass, including Windows, macOS, ASAN, fuzz and backend-DL.
 
 The first two runs exposed parity and harness failures; they are retained
 for diagnosis and are not reported as full passes. Local receipts live under
-`/mnt/volume1/tmp-overflow/issue478-ralm/`; `PERFORMANCE.md`, the environment
+`${CRISPASR_WORKTREES}/tmp-overflow/issue478-ralm/`; `PERFORMANCE.md`, the environment
 reference and `docs/voxcpm2-ralm-prefill-2026-10-01.json` record the final scope.
 
 ## DONE 2026-10-01 — Phonon-2 gated FFN CPU experiments (#481)
@@ -2737,7 +2765,7 @@ Linux CPU, Windows, macOS, iOS and lint (remaining jobs were superseded).
 The standalone proof, manual CI bundle workflow and pinned private-HF transfer
 kernel remain available for reruns. GPU receipts are in `cuda-gpu-v1/`; all
 build logs, CPU receipts and parity probe are under
-`/mnt/volume1/tmp-overflow/issue482/`.
+`${CRISPASR_WORKTREES}/tmp-overflow/issue482/`.
 
 ## DONE 2026-10-01 — Phonon-2 CPU decoder optimization (#481)
 
@@ -2809,7 +2837,7 @@ The macOS runner has an Apple Paravirtual GPU without SIMD-group matrix support;
 its timings are retained as CI measurements, not physical M1/M5 performance or
 a comparison with the upstream MLX engine. `PERFORMANCE.md`, `docs/phonon2.md`
 and the checked-in JSON receipt retain measurements and scope. Full logs and
-traces: `/mnt/volume1/tmp-overflow/issue481/wiring-profile`; no release tag.
+traces: `${CRISPASR_WORKTREES}/tmp-overflow/issue481/wiring-profile`; no release tag.
 
 ## DONE 2026-09-30 — #481 Phonon-2
 
@@ -2839,7 +2867,7 @@ using checksum-verified HTTP downloads after an initial corrupted Xet cache
 copy was isolated. Six container, eight selection and 60 registry tests pass;
 workflow lint/shell syntax and driver-schema checks pass. Details and commands
 are in `docs/phonon2.md`; logs/artifacts in
-`/mnt/volume1/tmp-overflow/issue481`. No new release tag.
+`${CRISPASR_WORKTREES}/tmp-overflow/issue481`. No new release tag.
 
 ## Published 2026-09-30 — v0.8.39
 
@@ -3151,7 +3179,7 @@ issue stays OPEN on evidence, not on shipping.
 
 Verification routes for the exact path, all three now closed with evidence:
 - *local Vulkan* — one build away, glslc solved (LunarG SDK shaderc v2026.3 at
-  /mnt/volume1/tmp-overflow/1.4.357.1/x86_64/bin/glslc; configure prints
+  ${CRISPASR_WORKTREES}/tmp-overflow/1.4.357.1/x86_64/bin/glslc; configure prints
   "GL_EXT_integer_dot_product supported by glslc"). Blocked on memory: ggml's
   generated mul_mm.comp.cpp is a 122 MB single TU needing ~2-3 GB, while the box
   holds ~4.3 GB across 17 Claude sessions AND SwapFree sits at ~1%, so
@@ -12384,7 +12412,7 @@ no GPU): build clean, `s3gen_mel cos_min = 0.918695,
 cos_mean = 0.992655` in diff harness; intelligible TTS in smoke. The
 production fix runs the same on Linux as on macOS. Branch
 `plan-83-r9-s3gen-gpu-prec-hints` on the VPS at
-`/mnt/storage/whisper.cpp`.
+`${CRISPASR_STORAGE}/whisper.cpp`.
 
 Updated: PLAN.md #57/#83 status, LEARNINGS Round 9.
 
@@ -12593,7 +12621,7 @@ crispasr -m parakeet-tdt-0.6b-ja.gguf -l ja -f yt60.wav -osrt
   → output stops at 00:00:20.080 (33 % coverage, not 99.5 %)
 ```
 
-Same crispasr binary on `/mnt/storage/test-audio/ja/yt_60s.wav` (the file the 2026-05-23 benchmark was actually run against, cached on the VPS): full 60 s coverage. Both WAVs have identical duration, 16 kHz mono pcm_s16le, ~0.3 % RMS difference, **0.9977 zero-lag waveform correlation**. The "99.5 %" benchmark was run against the cached MP3-derived copy, not a fresh `yt-dlp` extract of the same YouTube video; the doc wording was misleading.
+Same crispasr binary on `${CRISPASR_STORAGE}/test-audio/ja/yt_60s.wav` (the file the 2026-05-23 benchmark was actually run against, cached on the VPS): full 60 s coverage. Both WAVs have identical duration, 16 kHz mono pcm_s16le, ~0.3 % RMS difference, **0.9977 zero-lag waveform correlation**. The "99.5 %" benchmark was run against the cached MP3-derived copy, not a fresh `yt-dlp` extract of the same YouTube video; the doc wording was misleading.
 
 **Diff harness against NeMo on the bad audio:** our pipeline tracks NeMo bit-for-bit through the entire encoder.
 
@@ -12787,7 +12815,7 @@ decoder sees a single continuous sequence (no LSTM reset).
 `CRISPASR_PARAKEET_STREAM_OVERLAP` (default 2 s).
 
 **Benchmark framework.** New `tests/benchmark_asr.py` driver + audio
-corpus in `/mnt/storage/test-audio/` (en/de/ja/zh × 4 durations from
+corpus in `${CRISPASR_STORAGE}/test-audio/` (en/de/ja/zh × 4 durations from
 FLEURS + reporter's audio).  14 pytest unit tests for metric computation
 (`tests/test_benchmark_metrics.py`).
 
@@ -21440,7 +21468,7 @@ Then ASR-roundtrip an English + a German FLEURS clip (verbatim text gate).
 Both local volumes are ~full (`/Volumes/backups` 7.5 GB free, `/Users` 9.9 GB).
 The 8.14 GB safetensors + ~6 GB F16 GGUF do not fit. Scaffolding + graph code is
 done on the M1; **download + conversion + diff validation must run on the VPS**
-(`/mnt/storage`, `/mnt/akademie_storage`) or after freeing local space.
+(`${CRISPASR_STORAGE}`, `/mnt/akademie_storage`) or after freeing local space.
 
 ## §222 Aligner model expansion — permissive-license fleet (OPEN)
 
@@ -24940,7 +24968,7 @@ produced and validated everything. Reference archive:
 Closing the loop on the entry below. The pa-in/fr answers reproduced after
 all — but only when the caller loads `silero-lid-95-q8_0.gguf` /
 `-q5_0.gguf` (CrisperWeaver's live-test runner preferred q8_0 from
-/mnt/storage and silently overrode the caller's f32 choice; both bugs
+${CRISPASR_STORAGE} and silently overrode the caller's f32 choice; both bugs
 fixed on their side). Native A/B on jfk.wav, one variable at a time:
 
     f32   ggml en 0.9985   legacy en 0.9985
@@ -24961,11 +24989,11 @@ failures only.
 
 Follow-ups CLOSED 2026-09-02:
 - The broken `silero-lid-95-q8_0/q5_0.gguf` existed only in
-  /mnt/storage/gguf-models (verified: HF `cstr/silero-lid-lang95-GGUF`
+  ${CRISPASR_STORAGE}/gguf-models (verified: HF `cstr/silero-lid-lang95-GGUF`
   never carried them — it hosts the f32 alone) — deleted after
   confirming their contents (silero_lid arch, 34 quantized tensors
   each). No copies elsewhere on the box (`~/.cache/crispasr` and
-  /mnt/volume1 scanned). The old-name `silero-lid-95.gguf` is
+  ${CRISPASR_WORKTREES} scanned). The old-name `silero-lid-95.gguf` is
   byte-identical to the canonical f32 and was kept.
 - Hermetic regression test landed as
   `tests/test-silero-lid-quant-refusal.cpp`: a stub GGUF with one
@@ -25041,7 +25069,7 @@ Receipt: `docs/mimo-pr492-full-rvq-cpu-2026-10-08.json`.
 Moved four week-old trace files and the inactive sccache to CIFS after checking
 all file access/modification times exceed five hours. Verified every destination
 hash before removing redundant local copies; all original paths remain symlinks.
-Reclaimed 2,746,798,353 bytes on /mnt/volume1. No live model/server relocation.
+Reclaimed 2,746,798,353 bytes on ${CRISPASR_WORKTREES}. No live model/server relocation.
 Receipt: `docs/cold-storage-cleanup-2026-10-08.json`.
 
 ## 2026-10-08 — Exact original-Q4 CUDA tokenizer codes
@@ -25152,14 +25180,14 @@ Implementation and proof are archived in HISTORY and
 `docs/ctc-characters-2026-10-08.json`.
 
 Storage checkpoint: 2,244,872,573 bytes of cold archives/JARs moved to
-`/mnt/storage/cold-files-20261008`, each checksum-verified before atomic
+`${CRISPASR_STORAGE}/cold-files-20261008`, each checksum-verified before atomic
 replacement with a symlink at its original path. No active executables or
 shared-library trees moved. Receipts/scripts:
-`/mnt/storage/crispasr/storage-cleanup-20261008/`.
+`${CRISPASR_STORAGE}/crispasr/storage-cleanup-20261008/`.
 
 ## 2026-10-08 — PR #492 diagnostic checkpoints (PR remains open)
 
-Worktree: `/mnt/storage/crispasr/pr492-acceptance-20261008/worktree`, internal
+Worktree: `${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/worktree`, internal
 branch `review/pr492-acceptance`, latest diagnostic source `7551b12de`;
 completed F16 runtime/harness source remains `c50c50061`.
 Original numerical source: `fae7e22419b8c797dfa2759a9d4884a8f426bf63`.
@@ -25366,7 +25394,7 @@ not full-model/quantized speech or speed. [Integration receipt](docs/cann-310p-b
 ## CLAIMED 2026-10-13 — Audit physical Ascend 310P3 report from PR #544
 
 Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`. Read the complete PR discussion,
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`. Read the complete PR discussion,
 including new contributor comment `6140622935` and its complete attached archive.
 Verify archive/member/log hashes and recompute operator acceptance with the
 unchanged wrapper. Preserve both successful scoped controls and broad-suite
@@ -25385,7 +25413,7 @@ unconditionally, while MUL_MAT guards weights but not the activation input on
 on the existing two-architecture GH CANN matrix. Keep the production submodule
 pin unchanged until physical rerun and required validation accept the repair.
 Candidate pushed: shared ggml `21acf3162` and CrispASR `bfb4943ac` in
-`/mnt/storage/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
+`${CRISPASR_STORAGE}/crispasr/cann-310p3-20261013/{ggml-worktree,asr-worktree}`.
 Two-architecture SDK matrix `38365667723` is submitted, including the real
 `test-backend-ops` target and actual predicate controls. No production pin
 changed. The bounded physical rerun procedure is documented beside the verified
@@ -25396,7 +25424,7 @@ original receipt. Candidate secret scans pass all four checks without skips.
 
 Whole PR description, comments and three contributor commits read at head
 `b80272710ab378c6fd821c3c7142dceabc65a131`. Use the separate storage worktree
-`/mnt/storage/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/cann-pr544`. Fix its formatting gate,
 check requested CANN device selection with production-source controls, and run
 the opt-in x86_64/910B and arm64/310P container compile jobs on GitHub. Preserve
 contributor history; compilation is not Ascend hardware/model acceptance.
@@ -25427,7 +25455,7 @@ candidate; it establishes no native speech, Q4 or speed acceptance.
 ## CLAIMED 2026-10-13 — Actual-GPU original-timescale control preparation
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-rope-cuda-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/dia-rope-cuda-20261013`, branch
 `prepare/dia-rope-cuda-20261013`. The completed actual T4 cache v2 reaches the
 same step-978/head-2 divergence as CPU; its full terminal logs/output are saved
 and durably public before any replacement. Compose the immutable original-RoPE
@@ -25469,8 +25497,8 @@ Its source was tested on actual T4, where native speech remains rejected.
 ## CLAIMED 2026-10-13 — Actual RMSNorm primitive audit on retained Dia inputs
 
 Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded weight-free probe in
-`/mnt/storage/crispasr/dia-rmsnorm-probe-20261013`. Both CPU and actual T4
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; bounded weight-free probe in
+`${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013`. Both CPU and actual T4
 rotary controls reject speech; actual original/native filters agree on identical
 logits. Compare actual Torch2.6 RMSNorm and existing ggml RMSNorm on verified
 retained decoder inputs, with default/negative controls and magnitude errors.
@@ -25499,8 +25527,8 @@ local original projection is not byte-identical to the hosted original one.
 ## CLAIMED 2026-10-13 — Dia output projection isolation on identical hidden states
 
 Owner: this maintainer session, controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
-`/mnt/storage/crispasr/dia-head-probe-20261013`. Fetch only the pinned original
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; bounded probe directory
+`${CRISPASR_STORAGE}/crispasr/dia-head-probe-20261013`. Fetch only the pinned original
 output-head tensor by validated HTTP ranges, requiring every mapped F32 head
 hash to match the existing full physical export audit. Compare the actual
 original Torch2.6 DenseGeneral and actual packaged ggml CPU projections on
@@ -25532,8 +25560,8 @@ Both final-main SDK compile architectures pass; [complete job/log receipt](docs/
 ## CLAIMED 2026-10-13 — Dia final normalization and decoder input alignment
 
 Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded probe directory
-`/mnt/storage/crispasr/dia-norm-embed-probe-20261013`. Output-head isolation shows
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; bounded probe directory
+`${CRISPASR_STORAGE}/crispasr/dia-norm-embed-probe-20261013`. Output-head isolation shows
 that step-978 draw changes follow hidden states rather than the head kernel.
 Fetch only original final-norm and nine embedding tensors by validated pinned
 ranges, checking every complete tensor against the existing physical audit.
@@ -25564,8 +25592,8 @@ with native speech still unaccepted.
 ## CLAIMED 2026-10-13 — Dia first decoder normalization and QKV primitive isolation
 
 Owner: this maintainer session, storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded next probe directory
-`/mnt/storage/crispasr/dia-block0-probe-20261013`. Verified decoder embedding and
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; bounded next probe directory
+`${CRISPASR_STORAGE}/crispasr/dia-block0-probe-20261013`. Verified decoder embedding and
 learned final norm are byte-exact on matching inputs, while hidden direction
 already changes the output-head draw. Fetch only audited first pre-SA norm and
 Q/K/V weights by pinned validated ranges. Run actual Torch2.6 modules and actual
@@ -25592,8 +25620,8 @@ full-model speech controls; production defaults remain unchanged.
 ## CLAIMED 2026-10-13 — Dia rotary replay on audited block-zero Q/K
 
 Owner: this maintainer session. Tiny storage probe directory
-`/mnt/storage/crispasr/dia-block0-rope-probe-20261013`; controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`. Resume pending numerical
+`${CRISPASR_STORAGE}/crispasr/dia-block0-rope-probe-20261013`; controller worktree
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`. Resume pending numerical
 triage using verified block-zero projections at steps 0/76/864/978. Compare
 actual original RotaryEmbedding with the actual packaged ggml CPU NEOX RoPE
 operator on identical original/native Q/K inputs, then measure projection plus
@@ -25625,8 +25653,8 @@ and actual speech acceptance remain pending.
 ## CLAIMED 2026-10-13 — Dia bounded block-zero cache and attention replay
 
 Owner: this maintainer session, controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`, tiny probe directory
-`/mnt/storage/crispasr/dia-block0-attention-probe-20261013`. Use audited original
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`, tiny probe directory
+`${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013`. Use audited original
 feedback for contiguous steps 0–3 and the already audited embedding/pre-SA/QKV
 weights. Execute actual original decoder embedding entry, Attention.forward
 and KVCache.update; capture before the output projection. Compare literal native
@@ -25675,8 +25703,8 @@ cross-host/build arithmetic identity is measured, not assumed.
 ## CLAIMED 2026-10-13 — Prepare same-input Dia attention history replay
 
 Owner: this maintainer session. Storage controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; bounded replay probe directory
-`/mnt/storage/crispasr/dia-attention-input-replay-20261013`. GH late-history
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; bounded replay probe directory
+`${CRISPASR_STORAGE}/crispasr/dia-attention-input-replay-20261013`. GH late-history
 capture 38438623888 remains queued at frozen source 42b111c5e; leave its source
 and reference unchanged. Prepare a weight-free consumer of post-rotation Q and
 complete K/V history: execute the actual original attention call extracted from
@@ -26052,7 +26080,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `## CLAIMED 2026-10-13 — Matching CUDA package for late-history capture
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-attention-cuda-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/dia-attention-cuda-20261013`, branch
 `prepare/dia-attention-cuda-20261013`, based on immutable capture source
 42b111c5e. While GH CPU capture 38438623888 queues, prepare the existing CUDA
 12.4 SM60/75 bundle with exact hashes of this already syntax/test-validated
@@ -26067,8 +26095,8 @@ No local heavy build/model; all files/artifacts live on storage.
 #### CLAIMED 2026-10-13 — Dia late-history self-attention capture on GH
 
 Owner: this maintainer session. Controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; new diagnostic worktree
-`/mnt/storage/crispasr/dia-attention-capture-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; new diagnostic worktree
+`${CRISPASR_STORAGE}/crispasr/dia-attention-capture-20261013`, branch
 `diag/dia-attention-capture-20261013`, based on immutable CUDA/source-rotary
 candidate 2954c5a7c. Production main still has its original reference backend;
 do not mistake the rejected diagnostic branch's newer hooks for shipped code.
@@ -26091,7 +26119,7 @@ it goes stale for more than a day.
 #### CLAIMED 2026-10-13 — Preserve original rotary timescales in a gated full-model control
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-original-rope-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/dia-original-rope-20261013`, branch
 `fix/dia-original-rope-20261013`, based on late-capture candidate `b14fd8a4c`.
 The tiny actual-source probe shows position-978 rotary coefficient error drops
 from 1.2040138e-4 to 5.9604645e-8 using the original timescales with existing
@@ -26110,7 +26138,7 @@ and unmodified late-layer job continue independently.
 #### CLAIMED 2026-10-13 — Tiny actual-source rotary coefficient diagnostic
 
 Owner: this maintainer session. Private storage probe directory
-`/mnt/storage/crispasr/dia-short-20261012/rotary-coefficient-probe`.
+`${CRISPASR_STORAGE}/crispasr/dia-short-20261012/rotary-coefficient-probe`.
 While late-layer GH and corrected actual-GPU controls run, compare the pinned
 original Float32 RotaryEmbedding with the actual pinned ggml CPU rotary-cache
 helper at positions 0/38/864/978/1225. Use the source helper itself, not a
@@ -26125,7 +26153,7 @@ convert/dump/diff A/B experiment.
 #### CLAIMED 2026-10-13 — Correct explicit Dia CUDA diff device request
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-cuda-device-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/dia-cuda-device-20261013`, branch
 `fix/dia-cuda-replay-device-20261013`, based on composed CUDA source `3595fa25b`.
 The submitted v1 worker requires actual CUDA allocation/scheduler splits, but
 inspection shows the diff Environment guard clears TTS_GPU and params force
@@ -26141,7 +26169,7 @@ fixed CPU rejection. This is validation plumbing, not a speech fix.
 #### CLAIMED 2026-10-13 — Dia decoder stage capture at the first remaining divergence
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-late-stage-20261013`, diagnostic branch
+`${CRISPASR_STORAGE}/crispasr/dia-late-stage-20261013`, diagnostic branch
 `diag/dia-late-stage-20261013`, based on the fixed cache source `2205d920d`.
 CPU OFF/ON/OFF control is complete and rejected; first remaining shared-history
 sample difference is step 978/head 2 with F32 weights/cross cache. Add an
@@ -26158,8 +26186,8 @@ free-speech acceptance. Actual T4 model controls continue unchanged.
 #### CLAIMED 2026-10-13 — Ordered maintenance roadmap and Dia F32 cache control
 
 Owner: this maintainer session. Controller worktree
-`/mnt/storage/crispasr/triage-20261007/worktree`; Dia runtime worktree
-`/mnt/storage/crispasr/dia-short-20261012/reference-worktree`, branch
+`${CRISPASR_STORAGE}/crispasr/triage-20261007/worktree`; Dia runtime worktree
+`${CRISPASR_STORAGE}/crispasr/dia-short-20261012/reference-worktree`, branch
 `fix/dia-pinned-diff`. User authorizes the following order and corresponding
 Markdown updates; each acceptance gate precedes the dependent step.
 
@@ -26212,7 +26240,7 @@ The ordered roadmap is not a claim that pending models, PRs or hardware pass.
 #### CLAIMED 2026-10-13 — Prepare Dia CUDA package while CPU control is queued
 
 Owner: this maintainer session. New storage worktree
-`/mnt/storage/crispasr/dia-cuda-prep-20261013`, branch
+`${CRISPASR_STORAGE}/crispasr/dia-cuda-prep-20261013`, branch
 `prepare/dia-cuda-20261013`, based on runtime candidate `2205d920d`.
 CPU OFF/ON/OFF job `38357576078` remains unchanged and awaits a GH runner.
 The fully read Kaggle guide reserves Kaggle for actual GPU work; the CPU
@@ -26271,7 +26299,7 @@ rejection update; draft PR #521 records the completed, rejected original control
 #### CLAIMED 2026-10-09 — Nemotron Q4 RNNT precision repair
 
 Owner: this maintainer session. Worktree
-`/mnt/storage/crispasr/salvage-20261008/nemotron-quant`, branch
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/nemotron-quant`, branch
 `fix/nemotron-rnnt-quant`. Original NVIDIA/F16 fixed-audio proof is complete:
 all 22 VoxCPM2 controls read correctly; published native Q4 reads only 8/22.
 No fresh/reused state differences. Isolate joint/predictor/prompt critical
@@ -26431,9 +26459,9 @@ stage acceptance, and no claim that a near-F16-sized hybrid is a small Q4 model.
 #### CLAIMED 2026-10-09 — PR #492 salvage, OmniVoice cleanup and remaining performance work
 
 Owner: this maintainer session, resumed 2026-10-09. Separate worktrees under
-`/mnt/storage/crispasr/salvage-20261008/`: `mel`, `mimo-integration`,
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/`: `mel`, `mimo-integration`,
 `omnivoice`, `echo`, `profile`, `lm`; PR #492 diagnostics remain under
-`/mnt/storage/crispasr/pr492-acceptance-20261008/worktree`. Do not modify the
+`${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/worktree`. Do not modify the
 original checkout or live service. Large scratch/models/proof stay on storage;
 GH CPU and the one-account Kaggle real-GPU protocol apply. Every terminal GPU
 run is archived before reuse, including rejected speech results; successful
@@ -26468,7 +26496,7 @@ actual-worker builds refresh their compiler cache. Thresholds stay unchanged.
   full cloned-speech acceptance still fails. Original NVIDIA/F16 ASR retains
   the same substitutions. This session claims the missing original OmniVoice
   generation control in separate worktree
-  `/mnt/storage/crispasr/salvage-20261008/omnivoice`: pinned upstream `08be0b4`
+  `${CRISPASR_STORAGE}/crispasr/salvage-20261008/omnivoice`: pinned upstream `08be0b4`
   and original model `c5fdb5cc`, immutable existing reference/text, seed 42 and
   32 steps. Compare baseline versus full preprocessing/postprocessing, archive
   complete PCM/codes and recognize with the pinned original NVIDIA F32 model.
@@ -26618,7 +26646,7 @@ features/encoder/sequence evidence remain required. No recognizer promotion.
 
 #### VALIDATED 2026-10-08 — MiMo full CUDA speech acceptance and precision profile
 
-Worktree: `/mnt/storage/crispasr/pr492-acceptance-20261008/worktree`, branch
+Worktree: `${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/worktree`, branch
 `review/pr492-acceptance`. Kaggle `mimo-pr492-asr-cuda` v3 COMPLETE on one
 Tesla T4/sm_75 at numeric `6b90353678f525e634c1a359355ae15c2c815ace`, packaging
 `e77acb058`. All terminal artifacts are archived and the numerical arrays,
@@ -26654,7 +26682,7 @@ Receipt: `docs/release-v0.8.42-validation.json`. #492 remains excluded.
 
 #### OPEN 2026-10-08 — MiMo CPU BLAS follow-up validation
 
-Worktree: `/mnt/storage/crispasr/pr492-acceptance-20261008/worktree`, branch
+Worktree: `${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/worktree`, branch
 `review/pr492-acceptance`. The complete promotion oracle isolates CPU Q8
 activation quantization. Test a diagnostic-only scheduler variant that adds
 BLAS ahead of CPU for CPU tokenizer sessions, retaining the original Q4 file
@@ -26714,7 +26742,7 @@ focused cppcheck passes. Full hosted rerun `37729063238` failed on a Hikari cons
 Fixed in `f55c7bc8c`: constructor and reset share a nonvirtual helper. Focused
 cppcheck 2.17.1 and C++ syntax pass; full pinned cppcheck 2.7 rerun
 `37737578258` passes the full pinned cppcheck 2.7 run.
-No new GPU performance claim. Cold proof: `/mnt/storage/crispasr/triage-20261007/`.
+No new GPU performance claim. Cold proof: `${CRISPASR_STORAGE}/crispasr/triage-20261007/`.
 #490 character alignment is integrated with full real Arabic/Java proof. #483 has matched packages;
 reporter GPU output/timing comparisons remain pending.
 #492 MiMo/CANN remains unmerged pending numerical diagnosis; #516 is integrated.
@@ -27959,7 +27987,7 @@ Follow-ups (LOW, not blocking):
 - [ ] Fix handover to `cmake --build build` (all targets) before `ctest -L unit` —
   VPS run only built `crispasr`/`crispasr-diff`, ran 2 unit tests. Or have VPS build all.
 - [x] Install Go toolchain on VPS — DONE 2026-09-02: go1.23.4 at
-  `/mnt/volume1/go-toolchain/go`, symlinked as `~/.local/bin/go` (on PATH).
+  `${CRISPASR_WORKTREES}/go-toolchain/go`, symlinked as `~/.local/bin/go` (on PATH).
 - [ ] Optional: promote to a standing post-push Linux smoke (Routine/cron).
 - [x] Orphaned ctest-label audit (2026-09-02, follow-up to the dead-`cli` find):
   cross-checked every `LABELS` in tests/CMakeLists.txt against every `-L` filter
@@ -29102,7 +29130,7 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 **Status:** Dia CPU full speech is verified (2026-10-02); SpeechT5 still has a decoder content mismatch; Parler + FastPitch not started.
 
 ##### SpeechT5 TTS (microsoft/speecht5_tts)
-- Encoder verified (cos > 0.999 all 12 layers). Runtime `src/speecht5_tts.cpp` = encoder + decoder w/ KV cache + postnet + HiFi-GAN. GGUF `/mnt/storage/speecht5/speecht5-tts-f16.gguf` (300 MB). Converter `models/convert-speecht5-to-gguf.py`.
+- Encoder verified (cos > 0.999 all 12 layers). Runtime `src/speecht5_tts.cpp` = encoder + decoder w/ KV cache + postnet + HiFi-GAN. GGUF `${CRISPASR_STORAGE}/speecht5/speecht5-tts-f16.gguf` (300 MB). Converter `models/convert-speecht5-to-gguf.py`.
 - **TO DO:** decoder content mismatch — validate decoder per-layer against the Python reference.
 
 ##### Dia 1.6B TTS (nari-labs/Dia-1.6B)
@@ -29931,7 +29959,7 @@ Receipt: `docs/windows-cuda-package-pair-2026-10-09.json`.
 
 #### CLAIMED 2026-10-09 — Decode original controls for stage-passing Nemotron hybrid
 
-Worktree: `/mnt/storage/crispasr/salvage-20261008/nemotron-quant`, experimental
+Worktree: `${CRISPASR_STORAGE}/crispasr/salvage-20261008/nemotron-quant`, experimental
 branch `fix/nemotron-rnnt-quant`; native diagnostic branch is not an integration PR.
 GH CPU 37981088899 is SUCCESS at `3bb2b58b0`: all ten prior baseline arrays and
 original PCM are byte-exact, F16 passes all three unchanged stage and 24 layer
@@ -29983,7 +30011,7 @@ all 227 internal anchors. Candidate CI 37988394079 and CUDA package
 
 #### CLAIMED 2026-10-10 — Corrected package and stage-passing hybrid CUDA controls
 
-Continue in `/mnt/storage/crispasr/salvage-20261008/release-cuda-hardware`.
+Continue in `${CRISPASR_STORAGE}/crispasr/salvage-20261008/release-cuda-hardware`.
 Corrected source `37a90a37c9871ff4d4cf915993acec2b734293cd` passes the
 actual staged C ABI regression through CPU-only and GPU-requested routes from
 a non-ASCII package path, with no loader overrides. GH CUDA build 37988408052
@@ -30100,7 +30128,7 @@ release matrix and candidate GPU run remain pending, with no publication.
 #### CLAIMED 2026-10-10 — Contributor TTS ownership and compatibility corrections
 
 Owner: this maintainer session. Worktree
-`/mnt/storage/crispasr/salvage-20261008/contributor-tts-fixes`, branch
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/contributor-tts-fixes`, branch
 `fix/contributor-tts-contracts`. Start from reviewed PR #530 head
 `5fce2351533617e35bba13711ac3319dbe870e08`, preserve contributor commits,
 and correct atomic reference state, Moss/OpenVoice ownership, SNAC error
@@ -30150,8 +30178,8 @@ at this checkpoint; immutable source stays f51dc7770. No bump/tag yet.
 #### CLAIMED 2026-10-11 — Session UTF-8 and Canary alignment crash
 
 Owner: this maintainer session. Separate worktrees under
-`/mnt/storage/crispasr/salvage-20261008/issue533-utf8` and
-`/mnt/storage/crispasr/salvage-20261008/issue532-canary`, branches
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/issue533-utf8` and
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/issue532-canary`, branches
 `fix/session-byte-bpe-utf8` and `fix/canary-ctc-allocation`. Whole new issues
 #533/#532 and all comments read before starting. Reproduce split-byte BPE
 through native session result getters/bindings; retain complete valid text and
@@ -30195,7 +30223,7 @@ head before integration. Read all live open issue/PR discussions, including
 
 #### CLAIMED 2026-10-11 — Breeze guided acceptance must reject missing evidence
 
-Worktree `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+Worktree `${CRISPASR_STORAGE}/crispasr/salvage-20261008/pr529-guided-validation`,
 branch `fix/breeze-guided-validation`, preserving contributor head `3ebd2a561`.
 The updated #529 comparator discovers only available reference directories and
 inherits a missing-stage path that reports but does not fail. A negative control
@@ -30225,7 +30253,7 @@ No pending/rejected model experiment has been promoted and no release tag cut.
 
 #### CLAIMED 2026-10-11 — Generated C ABI capability drift
 
-Worktree `/mnt/storage/crispasr/salvage-20261008/caps-drift`, branch
+Worktree `${CRISPASR_STORAGE}/crispasr/salvage-20261008/caps-drift`, branch
 `fix/backend-caps-drift`. Actual immutable release CLI lists 136 backends but its
 C ABI table omits `hikari` and `moonshine-tiny-de-dattazigzag`. The generated
 header repair must be independent of #531's pending synthesis/model scope.
@@ -30262,7 +30290,7 @@ checks remain pending and the two synthesis PRs still need model acceptance.
 
 #### CLAIMED 2026-10-11 — Pinned original Breeze guidance reference on GH CPU
 
-Worktree `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+Worktree `${CRISPASR_STORAGE}/crispasr/salvage-20261008/pr529-guided-validation`,
 branch `fix/breeze-guided-validation`. Port delivery of the contributor's
 reference dumper to heavy-cpu without changing inference or matrix tolerances.
 Pin original source `58ec70ce5fa4cc361bdebf77ec40d1365da00ab2` and model
@@ -30285,7 +30313,7 @@ validation branch; the contributor PR still retains head `3de24603e`.
 
 #### CLAIMED 2026-10-11 — Native Breeze guided parity and frame-budget audit
 
-Continue in `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`.
+Continue in `${CRISPASR_STORAGE}/crispasr/salvage-20261008/pr529-guided-validation`.
 Original GH reference run 38121758868 is SUCCESS; independently verified 145
 complete finite arrays and all eight cases from artifact 11695878891. The scale-0
 original cases emit 31 frames despite the declared 24-frame configuration;
@@ -30298,7 +30326,7 @@ have all applicable checks green and are merged; synthesis PRs remain pending.
 
 #### Completed investigation 2026-10-11 — #533 reporter clips and missing continuation byte
 
-Worktree `/mnt/storage/crispasr/salvage-20261008/issue533-byte-preservation`,
+Worktree `${CRISPASR_STORAGE}/crispasr/salvage-20261008/issue533-byte-preservation`,
 branch `fix/qwen3-byte-preservation`. Read both new reporter comments in full:
 byte 0xA0 vanishes deterministically from 造/加, with two linked 30-second WAVs.
 Trace byte-level decoding versus Unicode whitespace cleanup, prove a controlled
@@ -30309,7 +30337,7 @@ fix the byte-loss cause and keep model/platform acceptance claims separate.
 #### CLAIMED 2026-10-11 — PR #536 reference transcript cache invalidation
 
 Owner: this maintainer session. Worktree
-`/mnt/storage/crispasr/salvage-20261008/pr536-voice-cache`, branch
+`${CRISPASR_STORAGE}/crispasr/salvage-20261008/pr536-voice-cache`, branch
 `fix/bt2-voice-cache`. Whole PR #536 and its unique changes against #529 read.
 Preserve contributor commits; reproduce a sidecar-only transcript edit retaining
 the WAV mtime, then include the sidecar identity in the shared reference key.
@@ -30533,7 +30561,7 @@ pass and unchanged eight-case generation failure are retained.
 
 #### CLAIMED 2026-10-11 — Compose pending Breeze synthesis surfaces
 
-Worktree `/mnt/storage/crispasr/salvage-20261008/breeze-synthesis-composition`,
+Worktree `${CRISPASR_STORAGE}/crispasr/salvage-20261008/breeze-synthesis-composition`,
 branch `test/breeze-synthesis-composition`. Compose current main, the maintainer
 #529 diagnostic branch, #531 ownership/rate fixes and #536 per-request voices
 without merging pending model features to main. Read-only merge audit finds a
@@ -30574,7 +30602,7 @@ skips (53.812 seconds), and 227 internal anchors across 82 Markdown files.
 
 #### CLAIMED 2026-10-11 — Breeze backbone precision boundary probe
 
-Continue in `/mnt/storage/crispasr/salvage-20261008/pr529-guided-validation`,
+Continue in `${CRISPASR_STORAGE}/crispasr/salvage-20261008/pr529-guided-validation`,
 branch `fix/breeze-guided-validation`. Depth probe 38154207238 completed
 successfully and all 106 arrays independently match hashes, shapes, dtypes and
 finite receipts. Original BF16 cached/full-prefix and depth-only promoted FP32
@@ -30630,7 +30658,7 @@ four tests with zero skips (55.208 seconds); all 227 anchors resolve.
 
 #### CLAIMED 2026-10-11 — Breeze session sampler wiring and decoded surfaces
 
-Continue in `/mnt/storage/crispasr/salvage-20261008/breeze-synthesis-composition`,
+Continue in `${CRISPASR_STORAGE}/crispasr/salvage-20261008/breeze-synthesis-composition`,
 branch `test/breeze-synthesis-composition`. Audit found Breeze open nested
 inside CA_HAVE_CONFUCIUS4_TTS and runtime seed/temperature/max-token session
 setters missing despite native hooks. Repair the independent compile guard,
@@ -31427,7 +31455,7 @@ PCM captures, independent ASR and cosine/magnitude checks where aligned.
 Keep existing full-speech gates and sampling defaults unchanged. Patch runtime
 only after the earliest divergence or a source-compiled failing control identifies
 a defect. Heavy models/builds run on GH CI or actual Kaggle GPU; large local
-artifacts stay on /mnt/storage.
+artifacts stay on ${CRISPASR_STORAGE}.
 
 
 #### UPDATE 2026-10-12 — Dia delayed-code boundary fix under speech validation
@@ -32832,7 +32860,7 @@ support or a claim to reproduce the author's unpublished reader. Feasibility:
    ~5% WER, 288x speed or eight-H100 training time on a Kaggle GPU.
 6. Use Kaggle for heavy encoder extraction/training and GH CI for conversion,
    reproducibility and integration checks. Keep datasets/features/checkpoints
-   under `/mnt/storage`; checkpoint produced artifacts before later risky work.
+   under `${CRISPASR_STORAGE}`; checkpoint produced artifacts before later risky work.
 7. After a useful Python prototype, port via convert → reference dump → stage
    diff with cosine AND magnitudes → decoded transcripts. Establish F32/BF16
    and Q8 baselines before lower quants; validate CPU/Metal/actual CUDA and all
@@ -33060,8 +33088,8 @@ Adapt the proven GH heavy capture worker and submit one pinned CPU job.
 Original source/weights/canonical feedback/precision/seed/negatives stay fixed;
 no speech or release acceptance. CIFS became intermittently unavailable and
 interrupted the local secret scan with a working-directory error. Source-only
-worktrees temporarily use /mnt/volume1/crispasr-dia-decoder-boundary-20261013
-and /mnt/volume1/crispasr-decoder-boundary-tracking-20261013; weights, builds
+worktrees temporarily use ${CRISPASR_WORKTREES}/crispasr-dia-decoder-boundary-20261013
+and ${CRISPASR_WORKTREES}/crispasr-decoder-boundary-tracking-20261013; weights, builds
 and captures stay on storage/GH CI. Shared main checkout remains untouched.
 
 #### UPDATE 2026-10-13 — Decoder boundary observation coded; hosted replay queued
@@ -33093,7 +33121,7 @@ GH 38472367538 completed SUCCESS at pinned source
 8d0ad8862d2cad5d305a48a57f2a99b5024bc39a. Full logs and artifact
 11858752399 (890,528,559 bytes; GH SHA256
 de7187841db0a43da0d3462e4d72f50b7283d3876e366d50745ee0be99058e26)
-are being preserved under /mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014.
+are being preserved under ${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014.
 Storage paths are available again. Independently verify source/runtime/model
 provenance, all original hook tests, complete OFF/ON/OFF trajectories, ordinary
 stages, sixteen boundary snapshots and unchanged negatives before interpreting
@@ -33158,7 +33186,7 @@ or numerical change and no redundant whole-model run followed this probe.
 #### CLAIMED 2026-10-14 — Same-input self-output and cross-attention primitives
 
 Continue in the isolated Dia diagnostic worktree at source 8d0ad886, with all
-weights, builds and owned captures under /mnt/storage. Fetch only block-zero
+weights, builds and owned captures under ${CRISPASR_STORAGE}. Fetch only block-zero
 self/cross output coefficients, verify original immutable ranges and native
 mapped hashes against the physical export audit. Run actual original
 DenseGeneral and attention expressions on both original/native owned inputs,
@@ -33224,7 +33252,7 @@ Run 38527734866 started 07:27:15 UTC; checkout, disk preparation and pinned
 CPU dependency installation passed. The actual worker began 07:30:21 UTC
 and is still running. Main 16a2858 secret scan passed; remaining general
 CI is pending. Independent whole-artifact/source/PCM/full-history/dump/WER
-audit helpers are prepared under /mnt/storage/crispasr/
+audit helpers are prepared under ${CRISPASR_STORAGE}/crispasr/
 dia-free-capture-delivery-20261014 and syntax-checked only; no result is
 predeclared and no redundant model/GPU job was launched.
 
@@ -33238,7 +33266,7 @@ This hardware follow-up is unverified; earlier 310P receipts are separate.
 #### UPDATE 2026-10-14 — Dia terminal collector active; Ascend evidence retained
 
 Dia run38527734866 remains executing. Single automatic collector is active
-in /mnt/storage/crispasr/dia-free-capture-delivery-20261014, exec session23984
+in ${CRISPASR_STORAGE}/crispasr/dia-free-capture-delivery-20261014, exec session23984
 (collector-state.json records PID). It polls the existing run, never submits
 another model job, then buffers whole official ZIP/log retrieval, checks
 digest/CRC/safe extraction and runs independent source/PCM/full-history/
@@ -33266,7 +33294,7 @@ NPU execution is simulated. Exercise the reported constant-512-position
 width sequence plus growing-width/shrinking-position and ordinary position
 growth controls. Observe the old-source failure before any repair. Keep
 this test in the owned Dia diagnostic worktree and all compiled fixtures/
-logs under /mnt/storage. Production pin/runtime stay unchanged; shared-ggml
+logs under ${CRISPASR_STORAGE}. Production pin/runtime stay unchanged; shared-ggml
 repair/SDK/device rerun follow the Dia transparency gate as requested.
 
 #### CANN rotary requested-capacity defect reproduced — 2026-10-14
@@ -33304,13 +33332,13 @@ before marking transparency verified. No speech/release acceptance.
 
 After the active Dia independent transparency audit passes, repair the
 confirmed requested-capacity defect in an owned shared-ggml worktree at
-/mnt/volume1/crispasr-cann-rope-ggml-20261014, exact tested base21acf3162.
+${CRISPASR_WORKTREES}/crispasr-cann-rope-ggml-20261014, exact tested base21acf3162.
 Track actual sin/cos allocated bytes independently of last-call dimensions;
 leave rotary arithmetic/tolerances/routing unchanged. Re-run the unchanged
 pre-fix regression against candidate source and preserve both old failures.
 Prepare SDK validation in separate source-only CrispASR worktree
-/mnt/volume1/crispasr-cann-rope-sdk-20261014; all compiled fixtures/artifacts
-remain /mnt/storage or GH. Compile both existing SDK architectures, preserve
+${CRISPASR_WORKTREES}/crispasr-cann-rope-sdk-20261014; all compiled fixtures/artifacts
+remain ${CRISPASR_STORAGE} or GH. Compile both existing SDK architectures, preserve
 310P BF16 routing, and provide immutable fresh-directory physical rerun
 commands to PR544. Production ggml pin advances only after required physical
 proof and composed CI; no NPU model/quality/performance claim from CPU tests.
@@ -33350,7 +33378,7 @@ https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6164617603
 SDK run38536737288 remains queued on both architectures. Single collector
 exec session33397 watches this existing run and retains complete terminal
 run/job metadata and buffered ZIP/logs under
-/mnt/storage/crispasr/cann-rope-sdk-20261014. State file records PID; no
+${CRISPASR_STORAGE}/crispasr/cann-rope-sdk-20261014. State file records PID; no
 second collector/model/build was launched. SDK results and the contributor
 physical candidate rerun remain pending. Keep production pin21acf3162
 until required physical and composed-integration gates pass.
@@ -33364,7 +33392,7 @@ literal native expressions on each producer's own captured pre-norm outputs.
 Verify immutable tensor ranges against the physical F32 export, native replay
 against hosted snapshots, scale-sensitive metrics, repeat/thread controls and
 negative controls. All coefficients, compiled fixtures and raw evidence stay
-under /mnt/storage/crispasr/dia-query-owned-replay-20261014. This is bounded
+under ${CRISPASR_STORAGE}/crispasr/dia-query-owned-replay-20261014. This is bounded
 CPU numerical diagnosis; speech remains rejected and no defaults change.
 
 CANN SDK run38536737288 is now building on both runners; capacity and
@@ -33394,7 +33422,7 @@ candidate sourceca4c12c4 with current main in the owned SDK worktree, then
 run composed general CI. SDK run38536737288 remains active on both runners;
 its single collector retains complete terminal logs. Production pin stays
 21acf3162 until both SDK and composed CI pass. Full model/Q4/speed follow-ups
-remain distinct. All build artifacts stay on GH or /mnt/storage.
+remain distinct. All build artifacts stay on GH or ${CRISPASR_STORAGE}.
 
 #### UPDATE 2026-10-14 — Physical repair replied; composed CI submitted
 
@@ -33406,15 +33434,15 @@ on this composition and docs227anchors/102files pass. Production remains
 21acf3162. Existing SDK38536737288 still builds both architectures.
 
 Shared-fork merge ea526e120deff8333fc42decc315137d7e297fca is prepared
-locally in /mnt/volume1/crispasr-cann-rope-integration-ggml-20261014.
+locally in ${CRISPASR_WORKTREES}/crispasr-cann-rope-integration-ggml-20261014.
 Its complete tree46e7c06208ed32f6bcf825afe9e0ed09dc712883 is identical
 to physically tested0a8620765, preserving shared-fork985ba50 history.
 It is not yet pushed to the production fork branch. A shallow boundary
 was deepened before merging; no unrelated-history override was used.
 
 One terminal collector per run retains complete logs/metadata:
-/mnt/storage/crispasr/cann-rope-sdk-20261014 and
-/mnt/storage/crispasr/cann-rope-integration-20261014. No new heavy local
+${CRISPASR_STORAGE}/crispasr/cann-rope-sdk-20261014 and
+${CRISPASR_STORAGE}/crispasr/cann-rope-integration-20261014. No new heavy local
 build or model run is active. Audit terminal evidence, then integrate after
 all required gates pass; full NPU model/Q4/performance remain follow-ups.
 
@@ -33461,7 +33489,7 @@ scan found no cold files over256MiB outside active agent/runtime trees;
 the bounded volume1 scan produced no eligible over512MiB candidates before
 termination. Package runtimes/toolchains and other active project state were
 left untouched. This was a partial volume audit, not a claim that the disks
-are cleared. All new SDK/model proof artifacts remain on /mnt/storage.
+are cleared. All new SDK/model proof artifacts remain on ${CRISPASR_STORAGE}.
 
 #### COMPLETE 2026-10-14 — CANN rotary capacity repair integration gates passed
 
@@ -33470,7 +33498,7 @@ All thirteen composed CI38541851377 jobs pass, including2020unit tests,
 verifies142complete log members, each checkout/build/required step and final
 source composition. Complete1918837-byte logZIP SHA
 bc685989ebcba300c1bdc6c3e383d7b69f65f18de7d3bba3bebf9688f24e1fd8
-is retained with native metadata/audit methods under /mnt/storage.
+is retained with native metadata/audit methods under ${CRISPASR_STORAGE}.
 
 Both SDK architecture builds and physical1691/1691 broad plus452/452 repeat
 already pass. Shared-forkea526e120 is pushed, preserving newer history with
@@ -33508,7 +33536,7 @@ original Python weights/config/driving implementation, run original generation
 and dump_reference, then actual crispasr-diff plus CLI/Python Session checks
 through auto and explicit C ABI dispatch. Retain complete hashes/logs and
 negative controls. GH heavy CPU performs builds/reference/model work; all local
-artifacts remain /mnt/storage/crispasr/cann-model-fixture-20261014.
+artifacts remain ${CRISPASR_STORAGE}/crispasr/cann-model-fixture-20261014.
 
 The current Moonshine diff driver is CPU-only; its scope must be explicit.
 Do not call CPU diff NPU proof. After CPU bundle works, prepare explicit
@@ -33526,9 +33554,9 @@ encoder cosine+norm+L2 checks, actual diff and CLI/auto-explicit Session.
 
 Single collector exec84578 preserves terminal success or failure, official
 archive SHA/CRC, complete metadata/logs and per-payload hashes under
-/mnt/storage/crispasr/cann-model-fixture-20261014. No second build/model run
+${CRISPASR_STORAGE}/crispasr/cann-model-fixture-20261014. No second build/model run
 or GPU task was launched. Source worktree is
-/mnt/volume1/crispasr-cann-model-fixture-20261014; heavy files stay on GH/storage.
+${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014; heavy files stay on GH/storage.
 Hosted model result remains pending. No NPU procedure or device request yet.
 Evidence and scope: docs/cann-model-fixture-preparation-2026-10-14.md.
 
@@ -33545,7 +33573,7 @@ measurement is discarded or called a failure/pass.
 Corrected sourcea149749ee492c4ea9fa80b682d0248090f9bb6af uses fresh F32
 coefficient identity and is submitted as GH38555394740. Four local guards
 and all four secret checks pass again. A separate single collector watches
-that run under /mnt/storage/crispasr/cann-model-fixture-20261014-v2; old
+that run under ${CRISPASR_STORAGE}/crispasr/cann-model-fixture-20261014-v2; old
 cancellation evidence stays in the original directory. Hosted numerical/
 transcript result remains pending; no NPU/quant/speed acceptance.
 
@@ -33574,7 +33602,7 @@ libraries. Verify CPU/core source identity: current ggml differs from the
 library’s c36 source only in three CANN files. Capture actual public encoder
 and native backend transcript on pinned original PCM/model; compare complete
 arrays/norms and decoded text, retaining source/build/closure/raw evidence.
-All artifacts stay on /mnt/storage. This is bounded CPU backend proof;
+All artifacts stay on ${CRISPASR_STORAGE}. This is bounded CPU backend proof;
 full CLI/Session wiring stays with GH, no GPU or performance claim.
 
 #### Moonshine actual native CPU backend proved — 2026-10-14
@@ -33591,7 +33619,7 @@ Actual guard rejects double-scale/nonfinite/wrong-shape arrays.
 
 Complete33-payload native proof revision5afafd2e40d3941b49979c41a3960b175bfe71a4
 anonymously verifies3649899bytes/SHA5b99d8ca092ac86db19b0c652d7ba5323e90052974dacfd49052c1f2a1f6613c.
-All artifacts remain /mnt/storage/crispasr/cann-model-fixture-native-backend-20261014.
+All artifacts remain ${CRISPASR_STORAGE}/crispasr/cann-model-fixture-native-backend-20261014.
 Full receipt: docs/moonshine-native-backend-fixture-2026-10-14.md and .json.
 
 GH38555394740 has started; its single collector still watches sourcea149749.
@@ -33617,9 +33645,9 @@ publishing physical hardware commands. Dia full speech remains rejected.
 #### COMPLETE 2026-10-14 — Strict Moonshine device validation
 
 Owner: current maintainer session, separate worktree
-/mnt/volume1/crispasr-cann-model-fixture-20261014, branch
+${CRISPASR_WORKTREES}/crispasr-cann-model-fixture-20261014, branch
 diag/cann-model-strict-20261014. Heavy build/run/evidence files remain
-/mnt/storage/crispasr/cann-model-strict-20261014 or GH hosted scratch.
+${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014 or GH hosted scratch.
 Add opt-in exact backend/device selection shared by Moonshine CLI/C ABI/stage
 entry points, rejecting unavailable devices and contradictory CPU requests.
 Validate allocated encoder graph assignments and successful computation without
@@ -33646,7 +33674,7 @@ scale/NaN/wrong-shape6, changed PCM/missing encoder4. Scope-placement defect
 observed and fixed before any queued hosted model work; before/failure logs
 retained. Complete67-payload public bundle anonymously hash verified; see strict
 validation .md/.json. One hosted collector owns run38575701613 under
-/mnt/storage/crispasr/cann-model-strict-20261014/hosted (execsession25445).
+${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/hosted (execsession25445).
 Terminal artifact independently audited and integrated below; general CI/lint pass on the runtime candidate.
 
 #### Strict Moonshine validation integrated — 2026-10-14
@@ -33673,7 +33701,7 @@ SDK9.2beta2: x86_64/910B ACL graphs on and ARM64/310P ACL graphs off. Targets
 include CLI, shared library, diff, quantizer and test-backend-ops. Current main
 CI38598459749 and lint38598459828 are queued on this composition; candidate
 runtime CI remains independently accepted as documented above. One SDK raw
-collector owns /mnt/storage/crispasr/cann-model-strict-20261014/sdk.
+collector owns ${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014/sdk.
 Retain and audit both SDK target/flag receipts when terminal. This is compilation
 coverage, not physical NPU inference. Strict diagnostics are integrated on main;
 the merged feature branch is deleted and its separate worktree remains detached
@@ -33706,7 +33734,7 @@ are preserved. Complete30-payload proof is public and anonymously SHA verified.
 Full exact runner interface/model controls38602252235 and CI38602256898 are
 queued; audit returned binaries/arrays/output before integration or publishing
 hardware commands. One raw collector owns the model run under
-/mnt/storage/crispasr/cann-model-validator-20261014/hosted (execsession13785).
+${CRISPASR_STORAGE}/crispasr/cann-model-validator-20261014/hosted (execsession13785).
 SDK38598516003 has started both architecture jobs; its separate collector remains
 the sole owner. Physical NPU success is still unvalidated, and no release is cut.
 Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.
@@ -33734,7 +33762,7 @@ SDK38598516003 passes both official chip builds; full logs establish all6 target
 links per chip. No actual compiler definitions inferred from missing metadata.
 Follow-up38605386237 on230d7e4 adds exported compiler commands and retained
 cache/command artifacts; it is in progress, with unique collector under
-/mnt/storage/crispasr/cann-model-validator-20261014/sdk-metadata (session51495).
+${CRISPASR_STORAGE}/crispasr/cann-model-validator-20261014/sdk-metadata (session51495).
 Physical NPU model/ACL/quant/performance remain pending. No release tag.
 Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.
 
@@ -33743,7 +33771,7 @@ Evidence: docs/cann-model-validator-preparation-2026-10-14.md and .json.
 Owner: maintainer; full issue read (no comments at triage). Metadata-only
 inspection pinned fishaudio/drama-3 at
 `e0a9218aa48888270f06ef1ed9ea67622c0e17d2`. Config, complete license and model
-card are retained with hashes under /mnt/storage/crispasr/drama3-triage-20261014.
+card are retained with hashes under ${CRISPASR_STORAGE}/crispasr/drama3-triage-20261014.
 No weights downloaded, backend implemented or inference accepted.
 
 The config declares FishOmniModel/fish_omni: 40 text layers (three linear
@@ -33798,7 +33826,7 @@ docs/cann-model-validator-preparation-2026-10-14.md and .json.
 
 Resume correctness after CANN compiler metadata acceptance. In the isolated
 Dia diagnostic worktree, retain bounded replay under
-/mnt/storage/crispasr/dia-self-kv-owned-replay-20261014. Verify original block-zero
+${CRISPASR_STORAGE}/crispasr/dia-self-kv-owned-replay-20261014. Verify original block-zero
 self K/V coefficients and their native mappings against the physical F32 audit.
 Execute actual original DenseGeneral/RotaryEmbedding/KVCache and the literal
 native K/V projection, rotary, concatenation and host cache reorder expressions
@@ -33826,7 +33854,7 @@ the shared-history prefix, including per-row magnitudes and relative L2.
 Keep this distinct from the earlier F16 step76/nucleus analysis; no model load,
 new generation, seed/filter/default change or performance run. The first F32
 sampling boundary will select the next numerical diagnostic. Heavy arrays and
-method remain /mnt/storage/crispasr/dia-f32-first-divergence-20261014.
+method remain ${CRISPASR_STORAGE}/crispasr/dia-f32-first-divergence-20261014.
 
 Both new diagnostics are independently audited and complete public archives
 are anonymously SHA-verified. Late K/V:10 metric rows/14 rejecting controls;
@@ -33848,7 +33876,7 @@ reported phrase and original recipe; do not select a new seed or waive gates.
 #### COMPLETE 2026-10-14 — Dia complete layer17 owned-input replay
 
 Owner: maintainer session; use the existing isolated Dia diagnostic worktree
-and /mnt/storage/crispasr/dia-layer17-owned-replay-20261014. Fetch only original
+and ${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014. Fetch only original
 layer17 F32 parameters through verified immutable ranges, match all mapped
 tensors to the physical export audit, then execute the actual original complete
 DecoderLayer and literal native graph on retained layer16 outputs and actual
@@ -33893,7 +33921,7 @@ Maintainer session: extend the accepted bounded layer17 method to layer16,
 using actual captured layer15 outputs and layer16 self-cache prefixes at the
 first F32 divergence step978. Keep identical pinned blueprint, literal native
 expressions, original recipe and magnitude gates. Fetch only this layer's
-coefficients under /mnt/storage/crispasr/dia-layer16-owned-replay-20261015,
+coefficients under ${CRISPASR_STORAGE}/crispasr/dia-layer16-owned-replay-20261015,
 verify all mappings against physical F32 export hashes, then compare matching
 inputs/caches and native output against the independent hosted observation.
 No redundant full-model generation, performance test, default change or speech
@@ -33938,9 +33966,9 @@ Completed claim and acceptance scope:
 ## CLAIMED 2026-10-15 — Dia early decoder owned-input isolation
 
 Owner: maintainer session. Controller worktree:
-/mnt/volume1/crispasr-decoder-boundary-tracking-20261013. Bounded diagnostic
+${CRISPASR_WORKTREES}/crispasr-decoder-boundary-tracking-20261013. Bounded diagnostic
 method remains in the owned Dia diagnostic worktree; artifacts and actual
-execution use /mnt/storage/crispasr/dia-layer0-owned-replay-20261015.
+execution use ${CRISPASR_STORAGE}/crispasr/dia-layer0-owned-replay-20261015.
 
 Hypothesis: distinguish same-input layer0 arithmetic from incoming embedding,
 actual self-prefix and cross-cache differences at the shared-history step978,
@@ -34007,9 +34035,9 @@ by the newer entries above. Do not schedule these snapshots as new work.
 ### Archived claim 2026-10-16 — Broaden Dia CPU speech controls after factorial audit
 
 Owner: primary maintainer session, not delegated. Prepare worktree
-/mnt/volume1/crispasr-dia-broader-speech-20261016, branch
+${CRISPASR_WORKTREES}/crispasr-dia-broader-speech-20261016, branch
 diag/dia-broader-speech-20261016, based on immutable5e04955e runtime.
-Builds/arrays/logs under /mnt/storage/crispasr/dia-broader-speech-20261016.
+Builds/arrays/logs under ${CRISPASR_STORAGE}/crispasr/dia-broader-speech-20261016.
 Heavy38892690744 reports success: only F32 cross-cache plus portable sampling
 passes both-decoder/CLI WER-zero among the four fixed-serial-head combinations.
 Official artifact12049198423 passes independent535-payload v3 audit, including
@@ -34058,9 +34086,9 @@ This closes the wiring task, not current-main unforced speech or GPU/Q4.
 ### Archived claim 2026-10-16 — Paired Echo FFN boundary capture
 
 Owner: coordinator; runtime observation stays outside the Hermes worker.
-Worktree /mnt/volume1/crispasr-echo-ffn-native-20261016, branch
+Worktree ${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016, branch
  diag/echo-ffn-native-20261016. Data/builds under
-/mnt/storage/crispasr/echo-ffn-native-20261016. Extend the existing diagnostic
+${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016. Extend the existing diagnostic
 scheduler observer (no graph mathematics or defaults) to retain last-prefill-
 token MLP input, gate/up outputs, activated product/down input and MLP/down
 output with layer names. Wire optional original capture and public diff stages
@@ -34101,7 +34129,7 @@ controls and the fresh exact-source hosted check. Preserve both source pins.
 
 ### Archived claim 2026-10-16 — Echo full-model observer transparency
 
-Owner: coordinator, worktree /mnt/volume1/crispasr-echo-ffn-fullmodel-20261016,
+Owner: coordinator, worktree ${CRISPASR_WORKTREES}/crispasr-echo-ffn-fullmodel-20261016,
 branch diag/echo-ffn-fullmodel-20261016, based on frozen capture sourced8183cf9.
 Prepare an actual public-dumper Python and direct native stage/decoded-output
 OFF/ON/OFF worker for 2B EN/ZH F16 controls. Original HF source is5d98a34d,
@@ -34110,7 +34138,7 @@ verified full-file/class hashes. All existing arrays and actual text/cues must
 remain byte-exact within each implementation; all six new boundaries must be
 present at every decoder layer. Keep original/native numerical parity distinct
 from observer identity, and retain all failed controls. Run heavy builds/models
-on GH; local data and scratch under /mnt/storage/crispasr/echo-ffn-fullmodel-20261016.
+on GH; local data and scratch under ${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016.
 No runtime math/default change, same-input Q4 attribution or GPU/model promotion.
 The first Hermes full-model design is rejected for invented commands/pins; the
 worker is now checking primary metadata only. OmniVoice follow-up also needs a

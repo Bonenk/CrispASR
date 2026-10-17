@@ -58,7 +58,7 @@ margin/ranks. Keep all arms and failures. This key-only intervention cannot
 settle correlated joint Q/K phase effects. Null PCM is deliberate without DAC;
 runner exit alone is insufficient. No speech, GPU, Q4, performance or default
 promotion follows from this diagnostic. The full model runs on GH, with all
-local evidence under /mnt/storage/crispasr/dia-cache-intervention-20261015.
+local evidence under ${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015.
 
 ## Failed control retained; diagnostic graph repair submitted
 

@@ -34,7 +34,7 @@ or establish native speech/GPU/Q4/performance acceptance.
 
 [Complete seven-row receipt with input hashes, cosine, RMS and source pins](dia-query-capture-reconciliation-2026-10-16.json).
 Local reproduction script/receipt live under
-/mnt/storage/crispasr/dia-native-fork-20261016/query-provenance-v1.
+${CRISPASR_STORAGE}/crispasr/dia-native-fork-20261016/query-provenance-v1.
 
 The [earlier complete module proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/dce9d23fc048c78e57729e403af04ed97dd78adb/dia-20261015-query-key/complete-original-query-replay-v1.zip)
 and [factorial result/proof](dia-query-key-results-2026-10-15.md) retain the old

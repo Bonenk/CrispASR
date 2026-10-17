@@ -24,7 +24,7 @@ makes the negative control fail. Both captured hidden states reproduce all
 18,504 original-compatible serial values exactly at both thread counts; native
 and identity outputs match. Whole-runtime syntax and format18 pass. The failed
 CIFS shared-library symlink build remains intact; accepted static proof is at
-/mnt/storage/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
+${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/preflight-v2.
 
 This accepts a disabled-by-default diagnostic graph, not current-main speech.
 Current main retains F16 cross K/V, std::discrete_distribution, repaired top-k

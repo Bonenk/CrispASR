@@ -33,7 +33,7 @@ python tools/ci-heavy/dia_attention_arithmetic.py \
   --query-proof /path/to/query-replay-v2 \
   --native /path/to/previous-hosted-key-intervention/out \
   --native-query-proof /path/to/native-query-producer-v1 \
-  --output /mnt/storage/crispasr/fresh-attention-arithmetic
+  --output ${CRISPASR_STORAGE}/crispasr/fresh-attention-arithmetic
 ```
 
 Use the pinned Python3.12/Torch2.6.0+cpu/NumPy1.26.4 reference environment.
@@ -48,11 +48,11 @@ checks every thread/repeat/control, and freshly invokes every actual ELF mode:
 
 ```sh
 python tools/ci-heavy/dia-attention-arithmetic/audit.py \
-  --proof /mnt/storage/crispasr/fresh-attention-arithmetic \
-  --output /mnt/storage/crispasr/fresh-independent-attention-audit.json
+  --proof ${CRISPASR_STORAGE}/crispasr/fresh-attention-arithmetic \
+  --output ${CRISPASR_STORAGE}/crispasr/fresh-independent-attention-audit.json
 python tools/ci-heavy/dia-attention-arithmetic/reduce_worst.py \
-  --proof /mnt/storage/crispasr/fresh-attention-arithmetic \
-  --output /mnt/storage/crispasr/fresh-single-dot-reduction
+  --proof ${CRISPASR_STORAGE}/crispasr/fresh-attention-arithmetic \
+  --output ${CRISPASR_STORAGE}/crispasr/fresh-single-dot-reduction
 ```
 
 The reduction helper selects the largest disagreement with fixed original
@@ -71,7 +71,7 @@ float64 CFG without sampling or inference:
 ```sh
 python tools/ci-heavy/dia_cfg_margin.py \
   --native /path/to/previous-hosted-key-intervention/out \
-  --output /mnt/storage/crispasr/fresh-cfg-margin
+  --output ${CRISPASR_STORAGE}/crispasr/fresh-cfg-margin
 ```
 
 These probes establish component arithmetic. They do not assign additive causal

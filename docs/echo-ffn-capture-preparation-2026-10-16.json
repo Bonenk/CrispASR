@@ -8,7 +8,7 @@
     "torch": "2.6.0+cpu",
     "transformers_import": "5.5.4",
     "transformers_distribution": "5.5.4",
-    "modeling_path": "/home/claudeuser/.local/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py",
+    "modeling_path": "${MAINTAINER_HOME}/.local/lib/python3.12/site-packages/transformers/models/qwen3_5/modeling_qwen3_5.py",
     "modeling_sha256": "aee59d55ee4e8ce0e50bf0e279796b85c2c66a28dfae55c3fcbb62fa9bcba048",
     "class_sha256": "c4e763e69d5676e71d222060e36258f6b2cc939a3597118c4207d370d120a265",
     "scope": "Tiny actual class only; no original checkpoint loaded"
@@ -27,33 +27,33 @@
       "c++",
       "-std=c++17",
       "-O2",
-      "-I/mnt/volume1/crispasr-echo-ffn-native-20261016/src",
-      "-I/mnt/volume1/crispasr-dia-cache-sampler-20261016/ggml/include",
-      "/mnt/volume1/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
-      "-L/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/libs",
-      "-Wl,-rpath,/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-I${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/src",
+      "-I${CRISPASR_WORKTREES}/crispasr-dia-cache-sampler-20261016/ggml/include",
+      "${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
+      "-L${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
       "-l:libggml.so.0",
       "-l:libggml-cpu.so.0",
       "-l:libggml-base.so.0",
       "-o",
-      "/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/test-ffn-final"
+      "${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/test-ffn-final"
     ],
     "returncode": 0,
     "mutant_compile": [
       "c++",
       "-std=c++17",
       "-O2",
-      "-I/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/first-row-mutant",
-      "-I/mnt/volume1/crispasr-echo-ffn-native-20261016/src",
-      "-I/mnt/volume1/crispasr-dia-cache-sampler-20261016/ggml/include",
-      "/mnt/volume1/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
-      "-L/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/libs",
-      "-Wl,-rpath,/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-I${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/first-row-mutant",
+      "-I${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/src",
+      "-I${CRISPASR_WORKTREES}/crispasr-dia-cache-sampler-20261016/ggml/include",
+      "${CRISPASR_WORKTREES}/crispasr-echo-ffn-native-20261016/tests/test-index-echo-ffn-capture.cpp",
+      "-L${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
+      "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/libs",
       "-l:libggml.so.0",
       "-l:libggml-cpu.so.0",
       "-l:libggml-base.so.0",
       "-o",
-      "/mnt/storage/crispasr/echo-ffn-native-20261016/local-v1/test-first-row-mutant"
+      "${CRISPASR_STORAGE}/crispasr/echo-ffn-native-20261016/local-v1/test-first-row-mutant"
     ],
     "mutant_returncode": 1,
     "source": [
@@ -252,7 +252,7 @@
     "cue_contract_source": "a1d84150a98ef233483f0448768531e7171f7384",
     "run": 38938983824,
     "branch": "diag/echo-ffn-fullmodel-v4-20261016",
-    "worktree": "/mnt/volume1/crispasr-echo-ffn-fullmodel-v4-20261016",
+    "worktree": "${CRISPASR_WORKTREES}/crispasr-echo-ffn-fullmodel-v4-20261016",
     "runtime_reference_bytes_unchanged_from": "0dfccc7d01b94a8975c0cc9c6afac83471660833",
     "local_controls": 11,
     "actual_compiled_cue_formatting": [
@@ -264,22 +264,22 @@
     "auditor_preparation": {
       "files": [
         {
-          "path": "/mnt/storage/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/audit.py",
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/audit.py",
           "bytes": 13435,
           "sha256": "b4b720db714fbf7682870bcc0700b721ba436f6eceb89624129d7ddb3d84cc55"
         },
         {
-          "path": "/mnt/storage/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.py",
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.py",
           "bytes": 2325,
           "sha256": "7f6ed6e66700f0f6dd3bab9fde5b44e732eef2069c9670e5137892d59b2fb295"
         },
         {
-          "path": "/mnt/storage/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.log",
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/selftest.log",
           "bytes": 65,
           "sha256": "24e0bd5a4aebf87526eb07a95aef97daacf2dbb30976e6d719732309d77a5a63"
         },
         {
-          "path": "/mnt/storage/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/watch.py",
+          "path": "${CRISPASR_STORAGE}/crispasr/echo-ffn-fullmodel-20261016/audit-preparation-v4/watch.py",
           "bytes": 1101,
           "sha256": "33e140632284d75bb40cb85fe12ef8026fcbae194b33717f21ced9fb6ab803b0"
         }

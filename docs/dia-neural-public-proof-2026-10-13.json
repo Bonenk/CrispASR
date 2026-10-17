@@ -286,7 +286,7 @@
       ]
     }
   ],
-  "retained_package_folder": "/mnt/storage/crispasr/dia-short-20261012/public-neural-proof-20261013",
+  "retained_package_folder": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/public-neural-proof-20261013",
   "package_script_sha256": "9da4674774b174b696269a18292ae7c20da88cf76121575f5ce9259d7e2c0207",
   "source_files_total": 46,
   "source_bytes_total": 278408243,

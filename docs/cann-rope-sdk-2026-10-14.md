@@ -4,7 +4,7 @@
 passes both official SDK9.2 beta2 builds. Complete log ZIP SHA-256:
 `6c9add26bf34c4e51ddd6d34a690eb4b6b41f25e3ab942192c68442669464af6`,
 385,361 bytes; logs and native run/job metadata remain under
-`/mnt/storage/crispasr/cann-rope-sdk-20261014`.
+`${CRISPASR_STORAGE}/crispasr/cann-rope-sdk-20261014`.
 
 | Architecture / target | ACL graph compilation | Actual build targets | Controls |
 |---|---|---|---|

@@ -27,7 +27,7 @@ Existing local guards pass against byte-identical frozen scripts:
 The JSON receipt retains full guard output, nine exact source-file hashes and
 four terminal-cancelled superseded secret scans. Current scans and required
 science/lint jobs remain intact. All evidence is under
-`/mnt/storage/crispasr/release-preflight-20261015`; tiny symlink-dependent test
+`${CRISPASR_STORAGE}/crispasr/release-preflight-20261015`; tiny symlink-dependent test
 fixtures used local temporary storage and were removed by their own traps.
 
 The CLI artifact11980941526 passes its complete official SHA256, CRC and ten
@@ -56,7 +56,7 @@ without loader or Python path overrides, library discovery resolves inside the
 installed package, both native/helper libraries load, and all116 backend names
 remain stable across repeated C-ABI calls and missing-model error paths. All18
 wheel ELF files pass dependency closure with `$ORIGIN` RUNPATHs. Large packages,
-source, installed site-packages and logs remain under /mnt/storage.
+source, installed site-packages and logs remain under ${CRISPASR_STORAGE}.
 
 The two initial smoke-harness assumptions (a quantizer version switch and a
 `dia-tts` C-ABI name) were corrected against frozen source; original failed

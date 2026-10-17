@@ -35,7 +35,7 @@ contains build receipts and logs, rather than the executable itself.
 [Complete independent receipt](cann-910b3-rope-physical-2026-10-14.json) retains
 all member/log hashes, commands, assessments and exact repaired case lines.
 Local raw archive and audit methods are under
-`/mnt/storage/crispasr/cann-910b3-rope-candidate-20261014`.
+`${CRISPASR_STORAGE}/crispasr/cann-910b3-rope-candidate-20261014`.
 
 The [SDK9.2 two-architecture builds](https://github.com/CrispStrobe/CrispASR/actions/runs/38536737288)
 remain in progress at this checkpoint. Compose the tested source with current

@@ -228,7 +228,7 @@
     "terminal_library_run": 38742753167,
     "terminal_library_conclusion": "success",
     "hosted_original_symlink_bundle_relocated_dlopen_pass": true,
-    "local_materialized_bundle_verification": "verifying bundle rpath closure + load after relocation: /mnt/storage/crispasr/release-preflight-20261015/library-38742753167/verify-tmp/tmp.XApIWo42Lh/relocated\n  rpath closure OK: every bundled dependency of 17 libs resolves internally\n  OK: libcrispasr.so.0.8.43 dlopens after relocation; session ABI resolves\n",
+    "local_materialized_bundle_verification": "verifying bundle rpath closure + load after relocation: ${CRISPASR_STORAGE}/crispasr/release-preflight-20261015/library-38742753167/verify-tmp/tmp.XApIWo42Lh/relocated\n  rpath closure OK: every bundled dependency of 17 libs resolves internally\n  OK: libcrispasr.so.0.8.43 dlopens after relocation; session ABI resolves\n",
     "wheel": {
       "name": "crispasr-0.8.43-py3-none-linux_x86_64.whl",
       "bytes": 53352316,

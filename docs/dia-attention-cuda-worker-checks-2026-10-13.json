@@ -5,35 +5,35 @@
       "test": "test_dia_attention_cuda_inputs.py",
       "count": 11,
       "exit": 0,
-      "log": "/mnt/storage/crispasr/dia-attention-gpu-proof-v5-20261013/shape-repair-tests.log",
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-gpu-proof-v5-20261013/shape-repair-tests.log",
       "log_sha256": "06d3ef928621fcce3a5cccec72a94c7af869f08da07b3943ae33616c9a285188"
     },
     {
       "test": "test_dia_cuda_bundle.py",
       "count": 4,
       "exit": 0,
-      "log": "/mnt/storage/crispasr/dia-attention-delivery-20261013/final-test_dia_cuda_bundle.py.log",
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_cuda_bundle.py.log",
       "log_sha256": "42932bc9e3b8ab42fe8f88f2bd2856340a6c54ba2f4654592dc9281797d8eab6"
     },
     {
       "test": "test_dia_diff_device.py",
       "count": 1,
       "exit": 0,
-      "log": "/mnt/storage/crispasr/dia-attention-delivery-20261013/final-test_dia_diff_device.py.log",
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_diff_device.py.log",
       "log_sha256": "8ab07fd445b3711742b09b94ec2a598ca692075fb87ea5646e9b51880aed2637"
     },
     {
       "test": "test_dia_dump_step.py",
       "count": 2,
       "exit": 0,
-      "log": "/mnt/storage/crispasr/dia-attention-delivery-20261013/final-test_dia_dump_step.py.log",
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_dump_step.py.log",
       "log_sha256": "1193ddbfe1f1697d4cfca27d29a53d2c186057e9ceb3a3e41379e97e40130401"
     },
     {
       "test": "test_dia_rotary_dispatch.py",
       "count": 1,
       "exit": 0,
-      "log": "/mnt/storage/crispasr/dia-attention-delivery-20261013/final-test_dia_rotary_dispatch.py.log",
+      "log": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013/final-test_dia_rotary_dispatch.py.log",
       "log_sha256": "2a1d5de710a3c566389fc4caad8aca3cd80b92a63af51a7e72b9dcb42ee519fc"
     }
   ],

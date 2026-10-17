@@ -63,7 +63,7 @@
   },
   "verified_inputs": [
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
       "bytes": 99803232,
       "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
     },
@@ -88,87 +88,87 @@
       "sha256": "f01416957e113cd563462fc29763286578fef7af7acad1bde7941e7ef7e87d76"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
       "bytes": 1446416,
       "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
       "bytes": 317376,
       "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_attention.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_attention.f32",
       "bytes": 16384,
       "sha256": "451fbe31df7b3d114db882fb4bcab17aef2e090238bf5b61b8e0d4f1e7268e7a"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
       "bytes": 16384,
       "sha256": "316fc837b6093dacac2ace287c3ef5737b502be05cddf31ba996ed88675af040"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
       "bytes": 16384,
       "sha256": "82d2e41e80ac34a9df59a0a721fc7ae2953b618ffe5c4a28f8eaf1ece57fc006"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_k0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_k0.f32",
       "bytes": 638976,
       "sha256": "2d2ca3c7f5f021e7f7992472ac93ab51dcbdc84a93066063a22727e4c2511490"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_v0.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_cross_v0.f32",
       "bytes": 638976,
       "sha256": "621f5e36065bba71a46b041cfa53d4fcf8945e1d6bb2cf0fd93cc294aa943c5b"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_output.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_sa_output.f32",
       "bytes": 16384,
       "sha256": "dc64aa8e2982553d6c8c2cc3b3b41b69b672ad97b92c0c8b1216bfaaf3e8b4c1"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_attention.f32",
       "bytes": 16384,
       "sha256": "82d2e41e80ac34a9df59a0a721fc7ae2953b618ffe5c4a28f8eaf1ece57fc006"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
       "bytes": 16384,
       "sha256": "98fde59a9122b6b57b763516a160230c581c8445323180746d2e8f751169611a"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_output.f32",
       "bytes": 16384,
       "sha256": "98fde59a9122b6b57b763516a160230c581c8445323180746d2e8f751169611a"
     }

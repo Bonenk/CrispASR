@@ -17,115 +17,115 @@
   "production_cache_capacity": 3072,
   "verified_inputs_and_libraries": [
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-base.so.0.26.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml-cpu.so",
       "bytes": 1446416,
       "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libggml.so.0.26.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs",
       "path": "libs/libgomp.so.1",
       "bytes": 317376,
       "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-q.f32",
       "bytes": 65536,
       "sha256": "4988a84e938d487730154cb617dcd1ddf3a62be45499f4c91075b33957c28440"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-output.f32",
       "bytes": 65536,
       "sha256": "8b15190029fbbdf61684882cacfd8805e52c7fc427266c759dba6ab90b89f398"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-attention-mode0.f32",
       "bytes": 147456,
       "sha256": "b0642d378e65dfc906574653d2ef8ec432fa9a99825e846612fe9b542692ddcd"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-k-0.npy",
       "bytes": 4224,
       "sha256": "1429cb625c3be80b2d4088df5e4515b35290310c680ae3cf0af43b838914e0b8"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-k-1.npy",
       "bytes": 8320,
       "sha256": "7d7ca5cd66a058acc900e8c1d0d60ac61f0006dc14f3e6852ef5031213173c5a"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-k-2.npy",
       "bytes": 12416,
       "sha256": "17f3f579d0d9fc8f62c1da0675660adb7551459a50e90c77acd5664645569fc8"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-k-3.npy",
       "bytes": 16512,
       "sha256": "f11712903b6edbefcbad37133f1818322e282db494f2ae47159201e24f99365d"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-v-0.npy",
       "bytes": 4224,
       "sha256": "1bca124117c626f5e1f6451b77000720c670fd1ab6df2fb78581e5fa61d86225"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-v-1.npy",
       "bytes": 8320,
       "sha256": "82ba0fcc1b429c7d8484f21d5d5f0225df3412a28cc9beebe7e64ac69044228b"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-v-2.npy",
       "bytes": 12416,
       "sha256": "f5ed2abbe86063d6f8a259ac526cb053531739d647b56a37d4f449f08f660297"
     },
     {
-      "directory": "/mnt/storage/crispasr/dia-block0-attention-probe-20261013",
+      "directory": "${CRISPASR_STORAGE}/crispasr/dia-block0-attention-probe-20261013",
       "path": "original-cache-v-3.npy",
       "bytes": 16512,
       "sha256": "858f20b26e1edf099ff5945c6566b61dd9bedc33a80840e6fdc3ff1739da4a48"

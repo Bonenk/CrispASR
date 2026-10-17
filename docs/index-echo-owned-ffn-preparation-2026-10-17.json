@@ -6,32 +6,32 @@
   "lint_run": 39001788270,
   "local_checks": [
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v1.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v1.log",
       "bytes": 6363,
       "sha256": "8316182dcb876c61cf8a8d523fd903560fd6d083efd4adc46e60dd19f7900a3f"
     },
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v2.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v2.log",
       "bytes": 611,
       "sha256": "d68a844f9e6efc9001659be6cf98963b2fd214c6a141b4af1fd4ea5fd450ff86"
     },
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v3-final.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v3-final.log",
       "bytes": 610,
       "sha256": "4237eff2a2d7072e87e173c4e871b5b53b9c907b83de0d76e6f106ff2f64bfae"
     },
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/secrets-final.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/secrets-final.log",
       "bytes": 509,
       "sha256": "f58cbc7162718294b4ae3a21a0ac92a78935a69215db0d96bc74cbf1addfeb2e"
     },
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-torch26-v1.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-torch26-v1.log",
       "bytes": 610,
       "sha256": "83cea24f26e31dbd3daad822a639b89a1143e1750c9a56c7f1db2e39ed256849"
     },
     {
-      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/repair-local-v2/actual-controls-v2.log",
+      "path": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/repair-local-v2/actual-controls-v2.log",
       "bytes": 725,
       "sha256": "d25e69984f6a348c7f9bcf071a198f6d296a6ac79d29dff13e8f668f5504bd11"
     }
@@ -63,7 +63,7 @@
           "tools/check-workflow-run-blocks.py"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-workflow-run-blocks.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-workflow-run-blocks.log"
       },
       {
         "command": [
@@ -71,7 +71,7 @@
           "tools/check-release-portable-cpu.py"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-release-portable-cpu.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-release-portable-cpu.log"
       },
       {
         "command": [
@@ -79,7 +79,7 @@
           "tools/check-doc-anchors.py"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-doc-anchors.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-doc-anchors.log"
       },
       {
         "command": [
@@ -87,7 +87,7 @@
           "tools/check-chat-binding-coverage.py"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-chat-binding-coverage.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-chat-binding-coverage.log"
       },
       {
         "command": [
@@ -95,7 +95,7 @@
           "tools/check-kaggle-harness-sync.py"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-kaggle-harness-sync.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-kaggle-harness-sync.log"
       },
       {
         "command": [
@@ -104,7 +104,7 @@
           "--check"
         ],
         "exit": 0,
-        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/sync-version.log"
+        "log": "${CRISPASR_STORAGE}/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/sync-version.log"
       }
     ]
   },
@@ -130,5 +130,6 @@
       "local_torch26_controls": "6/6 PASS",
       "secret_guard": "4/4 PASS, none skipped"
     }
-  ]
+  ],
+  "source_integration": "Worker967a62e0 and observer repairc2deea37 integrated on main with source bytes and authorship preserved; full model result remains pending"
 }

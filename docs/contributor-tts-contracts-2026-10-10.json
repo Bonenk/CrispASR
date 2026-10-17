@@ -4,7 +4,7 @@
   "original_head": "5fce2351533617e35bba13711ac3319dbe870e08",
   "integration_pr": 531,
   "branch": "fix/contributor-tts-contracts",
-  "worktree": "/mnt/storage/crispasr/salvage-20261008/contributor-tts-fixes",
+  "worktree": "${CRISPASR_STORAGE}/crispasr/salvage-20261008/contributor-tts-fixes",
   "local_contracts": {
     "tests": 4,
     "passed": 4,

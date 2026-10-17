@@ -4,7 +4,7 @@
   "artifact_id": 11790236875,
   "artifact_zip_bytes": 244549895,
   "artifact_zip_sha256": "b2219179f07bb593477edda9113a19aa87ecf728f0fdbcf6b6873f1dbf7f7fd4",
-  "retained_proof_folder": "/mnt/storage/crispasr/dia-short-20261012/neural-precision-hosted-proof/heavy-38343667254",
+  "retained_proof_folder": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/neural-precision-hosted-proof/heavy-38343667254",
   "receipt": {
     "source": "5a8fe578e6a7d16b68cbb3de3398f3c704191cd4",
     "source_worktree_dirty": false,

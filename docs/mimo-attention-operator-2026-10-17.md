@@ -30,8 +30,9 @@ stage and decoded-speech gates remain unchanged. No production source, defaults,
 GPU, speed or release acceptance follows.
 
 Diagnostic source02bd2aeed3a1461280daaa89756136530ace9676 remains on its frozen
-branch; applicable hosted checks and integration are pending. Lint39003053402
-and general CI39003202215 are queued. The small probe links previously hosted/audited CPU libraries from
+branch. All10 lint39003053402 and13 general CI39003202215 jobs pass; the
+unchanged diagnostic is integrated on main. The small probe links previously
+hosted/audited CPU libraries from
 ggml0a862076, with all three physical hashes checked anew. No model weights or
 full ggml build ran locally. Native compile uses unchanged-Wall/-Wextra/-Werror
 and clang-format18 passes. Initial deprecated-setter compile and CIFS alias

@@ -1,7 +1,7 @@
 # Issue #412 — Breeze-TTS-2 scoping
 
 Sources: HF `BreezeBlue/Breeze-TTS-2` (**not gated**, `license: other`) + GH `breezeblue-ai/breeze-tts`
-(Apache-2.0 code), cloned to `/mnt/volume1/tmp-overflow/breeze-src/{,gh}`. Line refs are `gh/` paths.
+(Apache-2.0 code), cloned to `${CRISPASR_WORKTREES}/tmp-overflow/breeze-src/{,gh}`. Line refs are `gh/` paths.
 
 ## 1. Architecture
 **It is a CSM (Sesame) fork.** `models/breeze.py` is HF's `modeling_csm.py` with `Csm`→`Breeze`:

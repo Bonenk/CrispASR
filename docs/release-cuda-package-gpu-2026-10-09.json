@@ -123,7 +123,7 @@
       "gh_artifact": 11648407040,
       "source": "37a90a37c9871ff4d4cf915993acec2b734293cd",
       "artifact_zip_sha256": "9fb257ffcf9e2f06abf2c82a58d9aca34188a4301e49444ae61b01c25bc124fe",
-      "tar": "/mnt/storage/crispasr/salvage-20261008/proof/release-cuda-37988408052/archive/crispasr-linux-x86_64-cuda.tar.gz",
+      "tar": "${CRISPASR_STORAGE}/crispasr/salvage-20261008/proof/release-cuda-37988408052/archive/crispasr-linux-x86_64-cuda.tar.gz",
       "tar_sha256": "a38c111037c8a6ae7b46c0a9bd1553271890daf72a42d893b74df76ccf7de79d",
       "tar_bytes": 225372192,
       "cli_version": "=== build info ===\n  version       : 0.8.42\n  git sha       : 37a90a37\n  git date      : 2026-10-09T20:38:52Z\n  git subject   : fix-_preserve_UTF-8_plugin_paths_under_C..17_and_C..20\n  build date    : 2026-10-09T21:06:19Z\n  build type    : Release\n  compiler      : gcc 11.4.0\n  os            : linux\n  arch          : x86_64\n  ggml backends : cpu,cuda\n  cuda toolkit  : 12.8.93 (build/link target)\n  cuda runtime ABI: 12 (matching major-version runtime libraries required)\n  cuda archs    : 60-real,61-real,70-real,75-real,80-real,86-real,89-real,90-real,90-virtual,120-real,120-virtual\n\n",

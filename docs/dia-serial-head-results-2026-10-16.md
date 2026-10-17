@@ -66,7 +66,7 @@ pass at immutable worker3c2fbb5a9c8c73225677ce6c9eabb6b31b21a92b. Auditor
 eadfb145 passes655 payloads, complete source/physical/library/array/ASR checks
 and26 rejecting calibration controls. Rebased303a7bb3 preserves all8 method
 files byte-exact. Local evidence remains under
-/mnt/storage/crispasr/dia-serial-head-20261016/hosted-38870499727-v1.
+${CRISPASR_STORAGE}/crispasr/dia-serial-head-20261016/hosted-38870499727-v1.
 
 Official artifact12035991525 is904974837 bytes, SHA256
 `1f7fd84771ce7ce08dcf7f5a3ae8c9fa379f1f4315d4bb4b836f739839916b15`.

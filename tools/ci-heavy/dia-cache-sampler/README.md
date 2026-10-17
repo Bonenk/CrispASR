@@ -38,7 +38,7 @@ A completed failed matrix remains rejected evidence, never a successful port.
 No forced inputs/output tokens or changed seed/quality threshold are allowed.
 Full-array independent artifact audit and broader prompts/seeds must follow.
 
-Local evidence under /mnt/storage/crispasr/dia-cache-sampler-20261016 is distinct
+Local evidence under ${CRISPASR_STORAGE}/crispasr/dia-cache-sampler-20261016 is distinct
 from heavy hosted validation. The default sampler body and default ggml calls
 remain frozen against the pristine contract; the test explicitly admits only
 the two F32 upload calls and selectable cross-input type for the optional path.

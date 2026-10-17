@@ -19,7 +19,7 @@
 
 Branch `feat/raon-opentts`. Model: KRAFTON/Raon-OpenTTS-{0.3B,1B}, CC-BY-NC-4.0,
 English, F5-TTS DiT + flow matching + HiFi-GAN vocoder, 16 kHz / 80-mel.
-Reference code cloned to /mnt/volume1/tmp-overflow/raon-ref/Raon-OpenTTS
+Reference code cloned to ${CRISPASR_WORKTREES}/tmp-overflow/raon-ref/Raon-OpenTTS
 (fork of the F5-TTS repo, Apache-2.0 for the vocoder).
 
 ## DONE 2026-09-02 — Raon-OpenTTS 0.3B SHIPPED (roundtrip passed). Merging to main.

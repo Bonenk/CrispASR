@@ -145,5 +145,5 @@
   "scale_control": "2x encoder reference: exactly one numerical failure, relative L2 0.5; text passes",
   "audio_sha256": "7d161e34953595856acc195aee52e9e2a48724b669176f2f0b38549d60927ba3",
   "acceptance_json_sha256": "70de6ad2da3a52dc3f465fceb00efe03820629bc841e09c0994640f988562597",
-  "cold_proof": "/mnt/storage/crispasr/triage-20261007/pr515-a9-x86-37744837589"
+  "cold_proof": "${CRISPASR_STORAGE}/crispasr/triage-20261007/pr515-a9-x86-37744837589"
 }

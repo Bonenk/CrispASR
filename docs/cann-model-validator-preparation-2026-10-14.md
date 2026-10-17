@@ -63,7 +63,7 @@ retention is added and SDK follow-up38605386237 passes both chips with
 actual compiler definitions independently audited. Physical
 NPU, quantized speech quality, ACL capture/replay and performance remain
 unvalidated. All heavy local files stay under
-`/mnt/storage/crispasr/cann-model-validator-20261014`.
+`${CRISPASR_STORAGE}/crispasr/cann-model-validator-20261014`.
 
 ## Accepted full interface result
 

@@ -301,7 +301,7 @@
     "ggml": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
     "model_sha256": "3f3a903b10294ead4ef6a4afec035639fd2113b1d307d42f649a97cc85670e3f",
     "official_source_url": "https://raw.githubusercontent.com/XiaomiMiMo/MiMo-Audio/691ce54144a6844cc641fd96046a6ba20776c8b0/src/mimo_audio_tokenizer/quantization.py",
-    "reproducer_path": "/mnt/storage/crispasr/pr492-acceptance-20261008/proof/check_rvq_frame263.py",
+    "reproducer_path": "${CRISPASR_STORAGE}/crispasr/pr492-acceptance-20261008/proof/check_rvq_frame263.py",
     "reproducer_sha256": "bde6e3ebc3dda0c665a40e7ebc5e7e616a3db8911d084d183a9fb11390e950c0"
   },
   "native_arrays_sha256": {

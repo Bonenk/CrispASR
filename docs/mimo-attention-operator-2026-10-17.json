@@ -391,19 +391,19 @@
         "path": "actual-binaries/ggml/src/libggml-base.so.0.26.0",
         "bytes": 964048,
         "sha256": "7d6d347baf0c7d82924d1ec50d0142f2f35ae7a66b7541c6b48659b24e90530b",
-        "canonical_copy": "/mnt/storage/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-base.so.0.26.0"
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-base.so.0.26.0"
       },
       {
         "path": "actual-binaries/ggml/src/libggml-cpu.so.0.26.0",
         "bytes": 1431992,
         "sha256": "d1d276add014805b04e2d6587196d865ad604cc2c3aac3ff61ba2ce9c1c859d5",
-        "canonical_copy": "/mnt/storage/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-cpu.so.0.26.0"
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml-cpu.so.0.26.0"
       },
       {
         "path": "actual-binaries/ggml/src/libggml.so.0.26.0",
         "bytes": 60720,
         "sha256": "5cce8cd436039e068f9e56979e1940d9f7fe0cc3fc61196371b2d3b6710bbd68",
-        "canonical_copy": "/mnt/storage/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml.so.0.26.0"
+        "canonical_copy": "${CRISPASR_STORAGE}/crispasr/mimo-owned-attention-20261017/accepted-libs-v2/libggml.so.0.26.0"
       }
     ],
     "aliases": "Physical copies; CIFS does not support requested symlink operation; v1 failure retained"
@@ -485,12 +485,12 @@
   "runtime_or_default_changes": false,
   "lint_run": {
     "id": 39003053402,
-    "status": "queued"
+    "status": "success"
   },
-  "source_integration": "Diagnostic source remains on frozen branch pending applicable hosted checks; not merged to main",
+  "source_integration": "Integrated on main from immutable02bd2aee, preserving original authorship and diagnostic source bytes",
   "next": "Capture actual same-input Q/K/V, mask, scores/probabilities and pre-output-projection values with OFF/ON/OFF identity before choosing a model-specific numerical repair",
   "general_ci_run": {
     "id": 39003202215,
-    "status": "queued"
+    "status": "success"
   }
 }

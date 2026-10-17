@@ -29,9 +29,9 @@ Original attempt: candidateeae36591 on diag/dia-native-fork-20261016. Heavy CPU
 [38851402907](https://github.com/CrispStrobe/CrispASR/actions/runs/38851402907)
 and lint [38851403072](https://github.com/CrispStrobe/CrispASR/actions/runs/38851403072)
 are dispatched; this checkpoint is not a hosted result. The owned worktree is
-/mnt/volume1/crispasr-dia-native-fork-20261016, with local proof/scratch under
-/mnt/storage/crispasr/dia-native-fork-20261016/local-v1. The detached pinned
-syntax-check worktree /mnt/volume1/crispasr-dia-native-fork-runtime-20261016
+${CRISPASR_WORKTREES}/crispasr-dia-native-fork-20261016, with local proof/scratch under
+${CRISPASR_STORAGE}/crispasr/dia-native-fork-20261016/local-v1. The detached pinned
+syntax-check worktree ${CRISPASR_WORKTREES}/crispasr-dia-native-fork-runtime-20261016
 contains only this experiment's scratch source/header patch.
 
 The [accepted original-only fork](dia-original-trace-results-2026-10-16.md)
@@ -96,7 +96,7 @@ Calibration passes23 rejecting controls, including changed prefixes, extra token
 changes, bad serialized MT states, false ASR scores, audio scale, nonfinite PCM
 and unsafe paths. Its fresh actual pinned sampler/patch guard also passes.
 Local receipt/logs remain under
-/mnt/storage/crispasr/dia-native-fork-20261016/local-v1/auditor-v2.
+${CRISPASR_STORAGE}/crispasr/dia-native-fork-20261016/local-v1/auditor-v2.
 All4 unskipped no-secrets checks pass before the auditor push. Scratch audit runs
 use unique directories so a failed audit's evidence survives later retries.
 

@@ -2,7 +2,7 @@
 
 Companion to `docs/breeze-tts-2-feasibility.md`. That memo is the GO/NO-GO
 scoping; this is the build sheet. Everything below is line-cited against
-`/mnt/volume1/tmp-overflow/breeze-src/` — `gh/` = the Apache-2.0 inference repo
+`${CRISPASR_WORKTREES}/tmp-overflow/breeze-src/` — `gh/` = the Apache-2.0 inference repo
 (`breezeblue-ai/breeze-tts`), bare paths = the HF checkpoint
 (`BreezeBlue/Breeze-TTS-2`).
 

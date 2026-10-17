@@ -136,5 +136,5 @@
     "CUDA 12.8 supports Pascal/Volta; PyTorch binary-wheel policy is distinct from toolkit support.",
     "Driver/API compatibility still requires the matching toolkit runtime bundle."
   ],
-  "cold_evidence": "/mnt/volume1/tmp-overflow/cuda-483-proof (logs, DLL hash receipts, original tested source bundle)"
+  "cold_evidence": "${CRISPASR_WORKTREES}/tmp-overflow/cuda-483-proof (logs, DLL hash receipts, original tested source bundle)"
 }

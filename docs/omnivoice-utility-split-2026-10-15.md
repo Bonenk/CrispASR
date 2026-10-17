@@ -26,7 +26,7 @@ The unchanged original oracle already passes738/18 on Python3.12, NumPy1.26.4
 and pydub0.25.1. Full-array proof and an independent replay of all hosted arrays pass, as do the
 heavy run and all 10 lint checks. See the
 [integration receipt](omnivoice-utility-split-proof-2026-10-15.md). All large outputs and isolated reference dependencies
-are under /mnt/storage/crispasr/omnivoice-utility-split-20261015.
+are under ${CRISPASR_STORAGE}/crispasr/omnivoice-utility-split-20261015.
 
 GH reproduction recipe (the validated source is recorded in the receipt):
 
@@ -37,7 +37,7 @@ gh workflow run heavy-cpu.yml --ref main \
 ```
 
 Local execution uses the same script with `HEAVY_OUT`, `HEAVY_SCRATCH` and
-`TMPDIR` set under /mnt/storage, plus isolated pinned reference dependencies.
+`TMPDIR` set under ${CRISPASR_STORAGE}, plus isolated pinned reference dependencies.
 The main clone diagnosis is in
 [the original control](omnivoice-original-clone-2026-10-09.json) and
 [native failure receipt](omnivoice-clone-failure-2026-10-09.json).

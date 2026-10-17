@@ -36,9 +36,9 @@
       "/usr/bin/c++",
       "-std=c++17",
       "-O2",
-      "/mnt/storage/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol.cpp",
+      "${CRISPASR_STORAGE}/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol.cpp",
       "-o",
-      "/mnt/storage/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol"
+      "${CRISPASR_STORAGE}/crispasr/dia-output-protocol-20261015/dia-output-protocol-3_83yrl2/protocol"
     ],
     "build_stdout": "",
     "build_stderr": "",

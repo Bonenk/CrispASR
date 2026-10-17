@@ -70,13 +70,13 @@
     "exit_code": 0,
     "scope": "Seven CI-covered changed runtime files; server excluded by existing full-tree CI policy. No Index-Echo files or new suppressions."
   },
-  "cold_receipt": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration/cppcheck-passed/heavy-36992014618/cppcheck.json",
+  "cold_receipt": "${CRISPASR_WORKTREES}/tmp-overflow/dia-nemotron-main-integration/cppcheck-passed/heavy-36992014618/cppcheck.json",
   "language": "explicit C++ for standalone headers; no warning rules weakened",
   "rejected_harness": {
     "run": 36990965775,
     "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36990965775",
     "failure": "Standalone dia_sampling.h inferred as C; syntaxError on std::vector. Corrected language configuration only.",
-    "cold_receipts": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration/cppcheck-header-classification-rejected"
+    "cold_receipts": "${CRISPASR_WORKTREES}/tmp-overflow/dia-nemotron-main-integration/cppcheck-header-classification-rejected"
   },
   "separate_index_echo_finding": {
     "failed_baseline_run": 36969566590,

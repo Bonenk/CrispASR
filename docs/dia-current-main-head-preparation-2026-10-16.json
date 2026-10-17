@@ -123,12 +123,12 @@
   ],
   "libraries": [
     {
-      "path": "/mnt/storage/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-cpu.a",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-cpu.a",
       "bytes": 1839420,
       "sha256": "18b454308c901c080b84a17b9c85919469ebff066484a034750b50fcaf320330"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-base.a",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-main-head-20261016/local-v2/build/src/libggml-base.a",
       "bytes": 1392024,
       "sha256": "a8392287d96d99b9a376f4952609e7f99d1c3764d52a1a877f6031a6abbb082e"
     }

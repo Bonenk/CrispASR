@@ -17,5 +17,5 @@
     "x86": 37744837589,
     "arm64": 37744841616
   },
-  "cold_proof": "/mnt/storage/crispasr/triage-20261007/onnx-routing-proof"
+  "cold_proof": "${CRISPASR_STORAGE}/crispasr/triage-20261007/onnx-routing-proof"
 }

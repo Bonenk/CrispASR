@@ -49,7 +49,7 @@ selector tests. The hosted model worker passes all13 strict surface/reference/
 device controls. No physical NPU, ACL capture/replay, quantized
 quality or performance result is claimed. No unexecuted hardware procedure is
 published. All build/run/evidence files remain under
-`/mnt/storage/crispasr/cann-model-strict-20261014` or hosted scratch.
+`${CRISPASR_STORAGE}/crispasr/cann-model-strict-20261014` or hosted scratch.
 
 The bounded probe also compiles the verbatim actual Moonshine dispatch and
 Ref implementation. Good reference passes; doubled scale, NaN and wrong shape

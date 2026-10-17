@@ -14,7 +14,7 @@ audio sanitizers pass 121 assertions in 17 cases; Windows speaker tests pass
 iOS and Android jobs also pass. The only skipped step uploads a fuzz crash
 input when no crash occurred. All 142 log members are hashed and the full
 ZIP is CRC-verified. Native terminal metadata and full logs are retained under
-`/mnt/storage/crispasr/cann-rope-integration-20261014`.
+`${CRISPASR_STORAGE}/crispasr/cann-rope-integration-20261014`.
 
 - [Both official SDK9.2 beta2 builds pass](cann-rope-sdk-2026-10-14.md),
   building CANN, CLI, shared ABI, diff, quantizer and the real operator test;

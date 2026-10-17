@@ -33,7 +33,7 @@ card/tokenizer, transcript/token IDs, reference GGUF, owned arrays and raw logs.
 Model weights remain at the two recorded immutable public Hub objects.
 Full anonymous download verifies `cc84efd19a97c276118bcf3f3750bca46d045e13f3c55c430e67a9535df7cba5`,
 2,395,093 bytes. [Full result ledger](moonshine-original-fixture-audit-2026-10-14.json).
-All local files and isolated packages remain on /mnt/storage.
+All local files and isolated packages remain on ${CRISPASR_STORAGE}.
 
 This establishes original coefficients, generation and reference capture.
 Native stage/CLI/Session acceptance remains pending in hosted run38555394740;

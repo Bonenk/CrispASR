@@ -735,21 +735,21 @@ usage example in its own docstring (`:39-42`) is stale. **This is the actual
 sequence:**
 
 ```bash
-PY=/mnt/volume1/miniconda/bin/python     # torch 2.11, onnxruntime 1.23.2, librosa 0.11
+PY=${CRISPASR_WORKTREES}/miniconda/bin/python     # torch 2.11, onnxruntime 1.23.2, librosa 0.11
                                          # needs: $PY -m pip install gguf
 
 # 1. convert the upstream ONNX to GGUF
-$PY models/convert-basic-pitch-to-gguf.py     --input  /mnt/storage/gguf-models/basic-pitch-src/nmp.onnx     --output /mnt/storage/gguf-models/basic-pitch-f16.gguf
+$PY models/convert-basic-pitch-to-gguf.py     --input  ${CRISPASR_STORAGE}/gguf-models/basic-pitch-src/nmp.onnx     --output ${CRISPASR_STORAGE}/gguf-models/basic-pitch-f16.gguf
 
 # 2. build the diff driver
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target crispasr-diff -j$(nproc)
 
 # 3. dump the reference (standalone script, NOT dump_reference.py)
-$PY tools/reference_backends/basic_pitch.py     --model      /mnt/storage/gguf-models/basic-pitch-src/nmp.onnx     --audio      samples/jfk.wav     --output-dir /mnt/storage/parity/basic-pitch-ref
+$PY tools/reference_backends/basic_pitch.py     --model      ${CRISPASR_STORAGE}/gguf-models/basic-pitch-src/nmp.onnx     --audio      samples/jfk.wav     --output-dir ${CRISPASR_STORAGE}/parity/basic-pitch-ref
 
 # 4. per-stage cosine diff
-build/bin/crispasr-diff basic-pitch     /mnt/storage/gguf-models/basic-pitch-f16.gguf     /mnt/storage/parity/basic-pitch-ref/ref.gguf     samples/jfk.wav
+build/bin/crispasr-diff basic-pitch     ${CRISPASR_STORAGE}/gguf-models/basic-pitch-f16.gguf     ${CRISPASR_STORAGE}/parity/basic-pitch-ref/ref.gguf     samples/jfk.wav
 ```
 
 Stages compared, in order (`src/basic_pitch.cpp:857-916`): `audio_window0`,
@@ -761,7 +761,7 @@ counts, then `basic-pitch diff: PASS (0 failing stages)`, exit code 0. Any
 stage below `cos = 0.999`, or a size mismatch, flips that line to `FAIL` and
 the process exits 1.
 
-*(Keep parity artefacts on `/mnt/storage`, not `/mnt/volume1`.)*
+*(Keep parity artefacts on `${CRISPASR_STORAGE}`, not `${CRISPASR_WORKTREES}`.)*
 
 ### 5.4 The Onsets & Frames path — what exists, and its two limits
 
@@ -774,10 +774,10 @@ cmake --build build --target oaf-parity-dump -j$(nproc)
 build/bin/oaf-parity-dump <model.gguf> <audio.wav> <out-prefix> [n_threads]
 
 # Python driver: runs the above, then ORT, and reports
-python tools/oaf_parity.py     --model build/.../onsets-and-frames-f32.gguf     --audio some.wav     --dump  build/bin/oaf-parity-dump     --onnx  /mnt/storage/tuner-bench/onnx/onsets_and_frames.onnx     [--threads 4] [--seconds 0] [--workdir DIR]
+python tools/oaf_parity.py     --model build/.../onsets-and-frames-f32.gguf     --audio some.wav     --dump  build/bin/oaf-parity-dump     --onnx  ${CRISPASR_STORAGE}/tuner-bench/onnx/onsets_and_frames.onnx     [--threads 4] [--seconds 0] [--workdir DIR]
 
 # Note-level F1 on MusicNet, N arms through one decoder
-python tools/oaf_musicnet_f1.py     --musicnet /mnt/storage/tuner-bench/datasets/musicnet/musicnet     --arm onnx=/mnt/storage/tuner-bench/onnx/onsets_and_frames.onnx     --arm f32=/path/onsets-and-frames-f32.gguf     --arm q4_0=/path/onsets-and-frames-q4_0.gguf     --dump build/bin/oaf-parity-dump --workdir /mnt/storage/oaf-f1
+python tools/oaf_musicnet_f1.py     --musicnet ${CRISPASR_STORAGE}/tuner-bench/datasets/musicnet/musicnet     --arm onnx=${CRISPASR_STORAGE}/tuner-bench/onnx/onsets_and_frames.onnx     --arm f32=/path/onsets-and-frames-f32.gguf     --arm q4_0=/path/onsets-and-frames-q4_0.gguf     --dump build/bin/oaf-parity-dump --workdir ${CRISPASR_STORAGE}/oaf-f1
 ```
 
 `oaf-parity-dump` (`tests/oaf_parity_dump.cpp`) is a plain `main()`, built as a

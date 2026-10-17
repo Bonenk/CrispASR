@@ -31,7 +31,7 @@ reject zero rows and reversed vectors. No threshold is chosen from results.
 The worker retains complete configure/build/command logs, compile commands,
 model/tokenizer, original reference, owned arrays, transcripts and file receipts.
 Model/build work runs on GH. One collector under
-`/mnt/storage/crispasr/cann-model-fixture-20261014-v2` watches the existing run,
+`${CRISPASR_STORAGE}/crispasr/cann-model-fixture-20261014-v2` watches the existing run,
 retains failed results, verifies the official full artifact digest, safely
 extracts all payloads and records their hashes. Collector completion only
 means raw evidence is retained; independent numerical/decoded-output audit

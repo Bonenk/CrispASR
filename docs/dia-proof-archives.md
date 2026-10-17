@@ -13,8 +13,8 @@ the manifest, then returns the original `heavy-<run>` proof folder. It preserves
 existing paths and removes its temporary download after validation.
 
 ```bash
-python3 tools/dia_proof_archives.py portable-rng /mnt/storage/dia-proof/rng
-python3 tools/dia_proof_archives.py canonical-original /mnt/storage/dia-proof/original
+python3 tools/dia_proof_archives.py portable-rng ${CRISPASR_STORAGE}/dia-proof/rng
+python3 tools/dia_proof_archives.py canonical-original ${CRISPASR_STORAGE}/dia-proof/original
 ```
 
 Both actual layouts have been validated: the public RNG proof through the real

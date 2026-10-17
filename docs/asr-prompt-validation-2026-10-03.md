@@ -53,5 +53,5 @@ See [PLAN.md](../PLAN.md) for source commits, preparation failures and next step
 
 Original prompt proof commits remain reachable through
 `archive/asr-prompt-glint-proof-20261003`. Full artifacts/logs and the independent
-worktree are under `/mnt/storage/crispasr/issue488-pr489-glint-20261003/`;
-`/mnt/volume1/wt-488-489-glint` remains a symlink to the cold worktree.
+worktree are under `${CRISPASR_STORAGE}/crispasr/issue488-pr489-glint-20261003/`;
+`${CRISPASR_WORKTREES}/wt-488-489-glint` remains a symlink to the cold worktree.

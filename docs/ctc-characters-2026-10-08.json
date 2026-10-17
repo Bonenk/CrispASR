@@ -6,7 +6,7 @@
   "known_path_assertions": 41,
   "csharp": "build passed, 0 warnings, 0 errors",
   "hosted": "37756933124 PASS: exact independent post-logit Viterbi, CLI word/segment JSON, Python/C ABI offsets and invalid-accessor checks, real Java/JNA Arabic alignment.",
-  "cold_proof": "/mnt/storage/crispasr/issue490-characters-20261008/proof",
+  "cold_proof": "${CRISPASR_STORAGE}/crispasr/issue490-characters-20261008/proof",
   "source_sha256": {
     "src/align.cpp": "3a09740cb1c4fdaa278c34e63dbd0a613479d13fd02172e436b40f76ab0e9ec8",
     "src/crispasr_aligner.cpp": "81df390db9bf2cd033c04722fd0a940a9d459eb307c1e829221580d46f287a3e",

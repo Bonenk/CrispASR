@@ -26,14 +26,14 @@ From the repository root, use a storage-backed fresh build/proof path:
 
 ```sh
 cmake -S tools/ci-heavy/cann-composed \
-  -B /mnt/storage/crispasr/cann-composed-20261015/build-cpu \
+  -B ${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
   -DGGML_NATIVE=OFF -DGGML_CANN=OFF -DGGML_CUDA=OFF \
   -DGGML_VULKAN=OFF -DGGML_BLAS=OFF -DBUILD_SHARED_LIBS=OFF
-cmake --build /mnt/storage/crispasr/cann-composed-20261015/build-cpu \
+cmake --build ${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu \
   --target cann-composed -j 2
-PROBE_BINARY=/mnt/storage/crispasr/cann-composed-20261015/build-cpu/bin/cann-composed \
-PROBE_EVIDENCE_DIR=/mnt/storage/crispasr/cann-composed-20261015/cpu-proof-v1 \
+PROBE_BINARY=${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/build-cpu/bin/cann-composed \
+PROBE_EVIDENCE_DIR=${CRISPASR_STORAGE}/crispasr/cann-composed-20261015/cpu-proof-v1 \
 python3 tools/ci-heavy/cann-composed/test_probe.py -v
 ```
 

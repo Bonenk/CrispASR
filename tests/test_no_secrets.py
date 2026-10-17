@@ -53,6 +53,20 @@ def scan(root: Path):
 
 
 class NoSecretsTest(unittest.TestCase):
+    def test_private_maintainer_locations_not_in_docs(self):
+        # Public evidence uses portable aliases; physical locations belong in
+        # ignored maintainer notes. Hosted CI's /mnt/heavy is a public runner path.
+        pattern = re.compile(r"/mnt/(?:volume1|storage)\b|/home/(?:claude|codex)[^/\s]*/")
+        self.assertIsNotNone(pattern.search("/mnt/" + "volume1/private-checkout"))
+        self.assertIsNone(pattern.search("${CRISPASR_STORAGE}/fixtures"))
+        files = subprocess.check_output(["git", "ls-files", "-z", "--", "*.md", "*.json"], cwd=ROOT)
+        hits = []
+        for name in filter(None, files.decode().split("\0")):
+            path = ROOT / name
+            if path.is_file() and pattern.search(path.read_text(errors="replace")):
+                hits.append(name)
+        self.assertEqual(hits, [], "private maintainer locations in tracked documentation:\n" + "\n".join(hits))
+
     def test_no_credentials_in_tracked_files(self):
         hits = scan(ROOT)
         self.assertEqual(hits, [], "credentials in tracked files:\n" + "\n".join(hits))

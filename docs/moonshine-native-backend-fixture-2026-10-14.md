@@ -32,7 +32,7 @@ full encoder arrays, transcripts and method/result receipts. Anonymous full
 download verifies `5b99d8ca092ac86db19b0c652d7ba5323e90052974dacfd49052c1f2a1f6613c`, 3,649,899 bytes.
 [Complete result ledger](moonshine-native-backend-fixture-2026-10-14.json).
 All compiled fixtures and heavy artifacts stay under
-`/mnt/storage/crispasr/cann-model-fixture-native-backend-20261014`.
+`${CRISPASR_STORAGE}/crispasr/cann-model-fixture-native-backend-20261014`.
 
 This is actual CPU backend stage and decoded-output proof. It does not replace
 full CLI/C ABI dispatch checks. [Hosted run38555394740](https://github.com/CrispStrobe/CrispASR/actions/runs/38555394740)

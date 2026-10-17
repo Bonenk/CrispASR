@@ -33,6 +33,15 @@ from pathlib import Path
 
 import numpy as np
 
+
+def vibevoice_modular_dir():
+    """Locate installed source without executing the package's broken init."""
+    import importlib.util
+    spec = importlib.util.find_spec("vibevoice")
+    if spec is None or not spec.submodule_search_locations:
+        raise ImportError("Install the upstream vibevoice package before dumping references")
+    return Path(next(iter(spec.submodule_search_locations))) / "modular"
+
 # Patch transformers AutoModel.register to allow re-registration (vibevoice package conflict)
 def _patch_automodel_register():
     from transformers.models.auto import auto_factory
@@ -148,7 +157,7 @@ def main():
 
     # Import model classes directly (bypass vibevoice.__init__ which triggers broken imports)
     import importlib.util
-    _vv_pkg = "/home/claudeuser/.local/lib/python3.13/site-packages/vibevoice/modular"
+    _vv_pkg = str(vibevoice_modular_dir())
 
     spec_tok = importlib.util.spec_from_file_location(
         "vibevoice.modular.modular_vibevoice_tokenizer", f"{_vv_pkg}/modular_vibevoice_tokenizer.py")

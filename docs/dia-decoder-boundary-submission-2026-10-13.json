@@ -107,8 +107,8 @@
   ],
   "storage": {
     "source_only_worktrees": [
-      "/mnt/volume1/crispasr-dia-decoder-boundary-20261013",
-      "/mnt/volume1/crispasr-decoder-boundary-tracking-20261013"
+      "${CRISPASR_WORKTREES}/crispasr-dia-decoder-boundary-20261013",
+      "${CRISPASR_WORKTREES}/crispasr-decoder-boundary-tracking-20261013"
     ],
     "large_weights_builds_captures": "storage or GH CI only",
     "reason": "CIFS intermittent unavailability; original controller secret scan failed with missing working-directory error and was retried without weakening tests",

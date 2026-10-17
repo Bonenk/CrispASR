@@ -24,7 +24,7 @@ fusion witness returns−2^-46 in native FMA mode and0 in serial mode. Three
 invalid mode controls and repeated patch rejection pass. The entire patched
 runtime passes C++ syntax against pinned8d0ad886/C36 headers. C++ format18,
 Python compilation and all4 unskipped secret checks pass. Local retained proof:
-/mnt/storage/crispasr/dia-serial-head-20261016/local-v1/graph-v2.
+${CRISPASR_STORAGE}/crispasr/dia-serial-head-20261016/local-v1/graph-v2.
 
 The worker compiles pristine8d0ad886/C36, runs actual graph replay against the
 public original/native hidden fixture, then uses physically verified F32 neural

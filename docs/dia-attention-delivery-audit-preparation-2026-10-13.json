@@ -271,7 +271,7 @@
       "sha256": "0af27d68b2049c028db963fbe9a03a229ae061a97b51a664ad988a6ef88ae982"
     }
   ],
-  "storage": "/mnt/storage/crispasr/dia-attention-delivery-20261013",
+  "storage": "${CRISPASR_STORAGE}/crispasr/dia-attention-delivery-20261013",
   "production_defaults_changed": false,
   "speech_acceptance": false,
   "gpu_acceptance": false,

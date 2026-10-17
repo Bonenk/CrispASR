@@ -4,6 +4,10 @@
 
 ## Read first, if you have it
 
+Local operational notes, when present, are in gitignored `CLAUDE.md`. Read them
+for storage/worktree/job recovery; keep actual machine paths and private account
+details there. Public plans and receipts use portable aliases and public run IDs.
+
 Maintainer checkouts keep a development guide **beside** this repository, at
 `../crispasr-crispembed-dev.md` — a sibling of the repo root, not a file inside
 it, and deliberately not tracked here (it spans CrispASR *and* CrispEmbed).

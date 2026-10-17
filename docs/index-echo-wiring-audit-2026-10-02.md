@@ -35,7 +35,7 @@ The 17.914 GiB F16 pair also exceeds ordinary WASM32 address space.
 ## Release decision
 
 Index-Echo integration is ready for v0.8.41. At this audit, `VERSION` remains
-0.8.40 and the release is claimed in `PLAN.md` by `/mnt/volume1/wt-483`.
+0.8.40 and the release is claimed in `PLAN.md` by `${CRISPASR_WORKTREES}/wt-483`.
 The latest [deterministic Windows Piper live check](https://github.com/CrispStrobe/CrispASR/actions/runs/37022213369)
 and [tip lint](https://github.com/CrispStrobe/CrispASR/actions/runs/37022213402)
 both finished successfully after the initial audit. The unchanged native source

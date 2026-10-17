@@ -104,13 +104,13 @@
     ],
     "verified_inputs": [
       {
-        "root": "/mnt/storage/crispasr/dia-short-20261012/probability-probe",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/probability-probe",
         "path": "original-control-actual-original-cfg-inputs.f32",
         "bytes": 1369296,
         "sha256": "ed8c93e769b92e6e09255b25fb18004ea04d14a6210a82c3442b30b3b8c9c842"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-short-20261012/probability-probe",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-short-20261012/probability-probe",
         "path": "native-actual-original-cfg-inputs.f32",
         "bytes": 1369296,
         "sha256": "f669ddf1683c6e1a6fee2e1ab4d2789a32ec287adc5ba2eac4cd3a699590f6ad"
@@ -130,13 +130,13 @@
     },
     "verified_inputs": [
       {
-        "root": "/mnt/storage/crispasr/dia-f32-first-divergence-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-f32-first-divergence-20261014",
         "path": "original-shared-prefix-logits.npy",
         "bytes": 72461792,
         "sha256": "b797e5f76f2d3c5043f80bb1b8cb39fcd9ffd3ea1ab35e47bb0b9f193d2504e0"
       },
       {
-        "root": "/mnt/storage/crispasr/dia-f32-first-divergence-20261014",
+        "root": "${CRISPASR_STORAGE}/crispasr/dia-f32-first-divergence-20261014",
         "path": "native-shared-prefix-logits.npy",
         "bytes": 72461792,
         "sha256": "ac40ecfb570ee7d1cdb12dde7e34034b7981293f1bb3e1b8e4dc16807b16178b"

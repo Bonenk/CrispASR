@@ -67,7 +67,7 @@ ordering or support. Exact source, terminal CI and public proof are recorded in
 [the result receipt](../../../docs/dia-query-key-results-2026-10-15.md). Do not
 repeat the unchanged historical experiment.
 No new model runs belong on the VPS; local evidence and all large files stay
-under /mnt/storage/crispasr/dia-query-key-20261015.
+under ${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015.
 
 ## One-step native query producer
 
@@ -75,14 +75,14 @@ under /mnt/storage/crispasr/dia-query-key-20261015.
 with the actual c36dab89 libraries and headers. It needs the complete original
 query proof and previous hosted native artifact extracted locally. Only the
 16 MiB native query matrix and small owned arrays are loaded; no full model or
-new full-speech run is involved. Large outputs belong on /mnt/storage.
+new full-speech run is involved. Large outputs belong on ${CRISPASR_STORAGE}.
 
 ```sh
 python tools/ci-heavy/dia_query_producer.py \
   --query-proof /path/to/query-replay-v2 \
   --native /path/to/hosted-native-out \
   --headers /path/to/c36-include \
-  --output /mnt/storage/crispasr/fresh-native-query-probe
+  --output ${CRISPASR_STORAGE}/crispasr/fresh-native-query-probe
 ```
 
 The producer requires an exact captured-native query control before interpreting

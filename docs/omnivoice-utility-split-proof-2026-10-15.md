@@ -68,4 +68,4 @@ production defaults remain excluded.
 
 The [candidate method](https://github.com/CrispStrobe/CrispASR/blob/69d9eac4b10e1cc857e4e2e90b1101fd40983b6b/docs/omnivoice-utility-split-2026-10-15.md)
 records reproduction details. All large arrays, isolated dependencies and proof
-are under `/mnt/storage/crispasr/omnivoice-utility-split-20261015`.
+are under `${CRISPASR_STORAGE}/crispasr/omnivoice-utility-split-20261015`.

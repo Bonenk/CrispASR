@@ -7,8 +7,8 @@ Candidate9ed6cff6 runs on the owned branch diag/dia-original-trace-20261015.
 Heavy CPU [38818571466](https://github.com/CrispStrobe/CrispASR/actions/runs/38818571466)
 and lint [38818570959](https://github.com/CrispStrobe/CrispASR/actions/runs/38818570959)
 are dispatched; this document records preparation, not accepted hosted results.
-The owned worktree is /mnt/volume1/crispasr-dia-original-trace-20261015.
-Local scratch/proof is under /mnt/storage/crispasr/dia-original-trace-20261015/local-v1.
+The owned worktree is ${CRISPASR_WORKTREES}/crispasr-dia-original-trace-20261015.
+Local scratch/proof is under ${CRISPASR_STORAGE}/crispasr/dia-original-trace-20261015/local-v1.
 
 The completed terminal intervention separates inherited hidden-state error,
 final normalization and output-head effects, with CFG F64 giving identical

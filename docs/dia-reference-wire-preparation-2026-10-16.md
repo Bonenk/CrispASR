@@ -34,7 +34,7 @@ It retains failures and complete raw evidence for independent audit. No full
 checklist, current-main speech, GPU, Q4 or speed claim follows yet.
 
 Local logs and compiled controls are retained under
-/mnt/storage/crispasr/dia-reference-wire-20261016/local-v1. Early failures are
+${CRISPASR_STORAGE}/crispasr/dia-reference-wire-20261016/local-v1. Early failures are
 retained: a scratch-test extraction boundary included the new parser, the
 public-list test assumed a fixed number of spaces, and the reader test assumed
 GGUFWriter stored empty string metadata. The corrected tests isolate the
@@ -91,7 +91,7 @@ audit. Its27,366,062-byte ZIP has SHA256
 `a5057a28d8e867a853913b4c6e0c382914e90f27578420febda4b10eaaad8e45` and
 is [publicly downloadable at an immutable revision](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/60deae78ec95424d76d15f028afa948c468778a9/dia-20261016-reference-wire/tiny-runtime-v1/tiny-runtime-captures-v1.zip).
 A fresh anonymous full download verifies size and SHA. Local method and raw
-proof remain at /mnt/storage/crispasr/dia-reference-wire-20261016/tiny-runtime-v1.
+proof remain at ${CRISPASR_STORAGE}/crispasr/dia-reference-wire-20261016/tiny-runtime-v1.
 The publication helper's duplicate metadata key failed after successful upload;
 the failed log is retained and a separate read-only verifier recovered the
 immutable revision and verified a second full anonymous download.

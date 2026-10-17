@@ -83,7 +83,7 @@ The [candidate method](https://github.com/CrispStrobe/CrispASR/blob/ff7e07c0f5ec
 records the exact pipeline and dispatch. Full hosted artifacts still require
 independent source/hash/CRC/array audit before interpretation or integration.
 This conditional diagnostic cannot promote speech, GPU, Q4, speed or defaults.
-All large files remain under /mnt/storage/crispasr/dia-query-key-20261015.
+All large files remain under ${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015.
 
 ## Hosted audit preparation checkpoint — 17:15 UTC
 

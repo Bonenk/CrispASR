@@ -305,217 +305,217 @@
     },
     "verified_inputs": [
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_attention.k_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.k_proj.weight.original.f32",
         "bytes": 8388608,
         "sha256": "b2c738d46258892343e37be70f1082078cc690f07344295d1ed3ae5a0c770f02"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_attention.o_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.o_proj.weight.original.f32",
         "bytes": 16777216,
         "sha256": "ccbe7f3786eb302963faca3b08bd021142599cbbc8552d0253bf1a38517d40c5"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_attention.q_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.q_proj.weight.original.f32",
         "bytes": 16777216,
         "sha256": "869765db6bfa9d4424d8a7cde9d6fe08697dd579bcd387026ab176d4de733d2e"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_attention.v_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_attention.v_proj.weight.original.f32",
         "bytes": 8388608,
         "sha256": "b0351ca81d8de50438ff14c85e751d73437889ab6fb9c8085c3754cc7ef63b24"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/mlp.wi_fused.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/mlp.wi_fused.weight.original.f32",
         "bytes": 134217728,
         "sha256": "af5e570e9402a02be450dc5109908496e492876c8e0fa9657cfd650bc7302612"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/mlp.wo.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/mlp.wo.weight.original.f32",
         "bytes": 67108864,
         "sha256": "7f8a30289ac87d66efa2dd212025b49b404dd196849444cc21708f6aaf618df7"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.weight.original.f32",
         "bytes": 8192,
         "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.weight.original.f32",
         "bytes": 8192,
         "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.weight.original.f32",
         "bytes": 8192,
         "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_attention.k_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.k_proj.weight.original.f32",
         "bytes": 4194304,
         "sha256": "8b97f583a8f1c1266262d1d26ace801ba64ef1ed31c8f1650af3ba98ae347a7a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_attention.o_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.o_proj.weight.original.f32",
         "bytes": 16777216,
         "sha256": "d25a2f43a14c319738aef34aca3ec45de569cfe16e85fb53aee1f0de2a04915c"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_attention.q_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.q_proj.weight.original.f32",
         "bytes": 16777216,
         "sha256": "2ac383c68c0eafe86eeac79217b5ede78c7e65414e11011df8f79a463c45ccfc"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_attention.v_proj.weight.original.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_attention.v_proj.weight.original.f32",
         "bytes": 4194304,
         "sha256": "f76fcdd36786e92f52de4a003f01e33966e01adada36e43c6739625851c369f7"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_k_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_k_proj.native.f32",
         "bytes": 8388608,
         "sha256": "5190986007b3c6d1d1f34ef42e4465e37b622e8de7c281fb41e1b818b0b14d7f"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_o_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_o_proj.native.f32",
         "bytes": 16777216,
         "sha256": "f10444b188c74fa1dc2a9ace7cdf1c5648778996b0d8f14bdc2fb766a2c472b1"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_q_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_q_proj.native.f32",
         "bytes": 16777216,
         "sha256": "39ff8cba7271ca14eb3c82ae1e4158c67ef7d05327fe4d57a714722c02c93f6b"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/cross_v_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/cross_v_proj.native.f32",
         "bytes": 8388608,
         "sha256": "ee1ed970e468ea727b4362a6b98721673586b8c9df4acf26721e2dfdb79e4d00"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/gate.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/gate.native.f32",
         "bytes": 67108864,
         "sha256": "66650ba25abdb9022d7597844cf512b01f02cecfc46574708a5c1dfdaf77429d"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/up.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/up.native.f32",
         "bytes": 67108864,
         "sha256": "72b6e97c1557efddb0960e7d3bbda9e18ede23c7be75357c8de19102c7a09e64"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/wo.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/wo.native.f32",
         "bytes": 67108864,
         "sha256": "eff47268b57130fd0fc8b6cff709c8ae223e5ada235326ca87b4743248a3fa75"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_ca_norm.native.f32",
         "bytes": 8192,
         "sha256": "96f1e0d13598886dd7b1f077dfd5e53b4f8f9c94fbd2b29d480992dc8c3fc65a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_mlp_norm.native.f32",
         "bytes": 8192,
         "sha256": "36b4affea9ef11a0df81ee7e4ef454d2a725986ac95ee065b13d0d3a9f12a729"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/pre_sa_norm.native.f32",
         "bytes": 8192,
         "sha256": "5f49012ff9be44bdcf40303e0cca5efc78244700bdcb1e077ea530b6749df55a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_k_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_k_proj.native.f32",
         "bytes": 4194304,
         "sha256": "e34b4a032a8fb300a36784ed262c33f33599158253d0a9ab51b453f2c70cfe36"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_o_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_o_proj.native.f32",
         "bytes": 16777216,
         "sha256": "bddbe63b15e369d9dc030fd905a354ea4e67c636ef37d6480ca40c60a5e60000"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_q_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_q_proj.native.f32",
         "bytes": 16777216,
         "sha256": "1471dc91d05d223e09d2a2fe7ff8e3fe856082ea841d988ff564803aedef5ac0"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-layer17-owned-replay-20261014/self_v_proj.native.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-layer17-owned-replay-20261014/self_v_proj.native.f32",
         "bytes": 4194304,
         "sha256": "81aadab5dd422357a6782d7131f5fa65f5de5489c4e602c9a689084b82a51a0a"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
         "bytes": 983808,
         "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
         "bytes": 1446416,
         "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
         "bytes": 55184,
         "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
         "bytes": 317376,
         "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
         "bytes": 99803232,
         "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_16.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_16.f32",
         "bytes": 16384,
         "sha256": "3772ea025b01b02507db44ee74575b166d68b90a86297ad0649c534cd97018e2"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_encoder_output.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_encoder_output.f32",
         "bytes": 319488,
         "sha256": "cf02ed15c36081a4e056cb0e553ba56c3e3a54ac35844e27b5fa550709dd6734"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-k.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-k.f32",
         "bytes": 4009984,
         "sha256": "8b8203eed2ca774cd62d2afced3a5335ffbbcf1703ac3f322dd1ba12514266d4"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-v.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-original-input-v.f32",
         "bytes": 4009984,
         "sha256": "642bbd14b815c810dbf124f20615aad333d4a86018dfc6baa8d3fc6ee8174ecc"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-k.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-k.f32",
         "bytes": 4009984,
         "sha256": "623a32473e448bce8baf40a0a869e4c7a00c65256ebd93652b5a01d96bd75bb2"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-v.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-attention-late-replay-20261013/layer-17-native-input-v.f32",
         "bytes": 4009984,
         "sha256": "f20946d9b0df0af6827bdc91dcb638f4ae35f6b18af1dbb94dcd5e84cbcf1ccf"
       },
       {
-        "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_17.f32",
+        "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_layer_17.f32",
         "bytes": 16384,
         "sha256": "faa8ccd16f769972316810085e1bdd2726ce305eea67fb4a0604496bc64e7323"
       }

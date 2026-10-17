@@ -40,7 +40,7 @@ execution, scheduler fallback, ACL capture/replay, F16/Q8/Q4 model quality and
 performance remain pending. The existing Moonshine diff dispatch initializes
 CPU; physical validation must first add strict device routing and trace actual
 scheduled NPU work. Heavy evidence remains under
-`/mnt/storage/crispasr/cann-model-fixture-20261014-v2`.
+`${CRISPASR_STORAGE}/crispasr/cann-model-fixture-20261014-v2`.
 
 Complete public evidence, verified by anonymous full downloads:
 

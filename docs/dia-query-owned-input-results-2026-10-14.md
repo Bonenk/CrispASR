@@ -32,7 +32,7 @@ SHA-256 `2895afedee72ccae36f1b81ea06408ddf5de70cdd7a1900d852fa8e6a30bdf90`, 65,2
 and verified in full. It includes original coefficients, native mappings,
 source expressions, owned inputs/outputs, replay executable and CPU libraries,
 receipts and audit methods. [Full result ledger](dia-query-owned-input-results-2026-10-14.json).
-Local artifacts remain under `/mnt/storage/crispasr/dia-query-owned-replay-20261014`.
+Local artifacts remain under `${CRISPASR_STORAGE}/crispasr/dia-query-owned-replay-20261014`.
 
 This separates query projection error from the larger source-RoPE-off rotary
 error. Earlier source-RoPE-on full runs improved primitive parity but failed

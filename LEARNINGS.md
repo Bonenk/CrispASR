@@ -12715,13 +12715,13 @@ output — without it the model free-hallucinates.
 
 ### CIFS + git worktree = data loss
 
-During this work, a git worktree on the CIFS mount (`/mnt/storage/`)
+During this work, a git worktree on the CIFS mount (`${CRISPASR_STORAGE}/`)
 suffered file corruption: `Edit` tool writes succeeded (the data hit the
 CIFS cache) but the underlying inode was deleted (Links: 0), making the
 file unreadable by `cat`, `cp`, or git. The edits were lost.
 
-**Fix.** Moved the worktree to the local SSD (`/mnt/volume1/worktree-bark-fix`).
-Build dirs also on local SSD (`/mnt/volume1/build-bark-fix`). Models and
+**Fix.** Moved the worktree to the local SSD (`${CRISPASR_WORKTREES}/worktree-bark-fix`).
+Build dirs also on local SSD (`${CRISPASR_WORKTREES}/build-bark-fix`). Models and
 large data on CIFS; code and builds on local disk.
 
 **Lesson.** Never put git worktrees on CIFS mounts. The `actimeo=60` cache
@@ -13860,11 +13860,11 @@ that needs multiple large models — never hold two in memory simultaneously.
 
 **CIFS-backed HF cache is 10–50× slower than local disk.** Model loading from
 `/mnt/akademie_storage/huggingface/hub` (CIFS) took 5–10 minutes vs ~6 seconds
-from `/mnt/volume1/tmp-overflow/` (local NVMe). For iterative debugging, copy
+from `${CRISPASR_WORKTREES}/tmp-overflow/` (local NVMe). For iterative debugging, copy
 safetensors to local storage first:
 ```bash
 cp $HF_CACHE/models--HumeAI--tada-codec/snapshots/*/encoder/model.safetensors \
-   /mnt/volume1/tmp-overflow/tada-codec-local/encoder/
+   ${CRISPASR_WORKTREES}/tmp-overflow/tada-codec-local/encoder/
 ```
 
 **transformers 5.x broke `from_pretrained` for custom PreTrainedModel
@@ -15529,7 +15529,7 @@ and take median/min, never sequential blocks. An encoder flash-attn rewrite
 q8_0, q4_k, q4_k-imatrix, the reusable `.imatrix.gguf`, `-ref.gguf` (crispasr-diff),
 README. imatrix corpus = 48 CC0 Common Voice Arabic clips (`fsicoli/common_voice_17_0`
 `ar/dev` tar); imatrix q4_k transcript-identical to plain q4_k (payoff only at
-q3_k/iq4). Source re-downloaded to `/mnt/volume1/cohere-fresh` (CIFS
+q3_k/iq4). Source re-downloaded to `${CRISPASR_WORKTREES}/cohere-fresh` (CIFS
 `/mnt/akademie_storage` was the corruption vector — download to local disk).
 
 **-ref.gguf env gotcha:** `cohere_asr` needs **transformers-from-source (5.14+)**
@@ -16930,7 +16930,7 @@ DISK: F16 conversion peak = 8GB model + 6GB out = 14GB; keep ≥6GB free.
 Q8_0 (~3.4 GB) to stay under ceiling, or do it on the VPS.
 Original: both local volumes ~full (7.5/9.9 GB free); 8 GB model + 6 GB GGUF
 won't fit. Graph code done on M1; **download+convert+diff-validate on the VPS**
-(/mnt/storage) or after freeing space. I do all compute-graph code myself vs the
+(${CRISPASR_STORAGE}) or after freeing space. I do all compute-graph code myself vs the
 diff harness (the dev guide (`crispasr-crispembed-dev.md`)); agents only scaffold
 converter/reference/CMake.
 
@@ -17352,7 +17352,7 @@ the dev guide (`crispasr-crispembed-dev.md`).
 - Corrected GGUFs (f16/q8_0/q4_k) → `cstr/csm-1b-GGUF` (re-uploaded) +
   local `/Volumes/backups/ai/crispasr/csm-1b-{f16,q4_k}.gguf`.
 - Reference dumps + `csm-ref.gguf` → `/Volumes/backups/ai/crispasr/ref-dumps/csm-greedy/` (greedy, T=11, "Hello, how are you?" seed 42).
-- VPS ground-truth: `/mnt/storage/csm-tts/csm_reference_manual.py` (manual safetensors forward; HF transformers dynamo is broken for CSM). moshi installed in `/opt/miniconda` for Mimi decode reference.
+- VPS ground-truth: `${CRISPASR_STORAGE}/csm-tts/csm_reference_manual.py` (manual safetensors forward; HF transformers dynamo is broken for CSM). moshi installed in `/opt/miniconda` for Mimi decode reference.
 - The GGUF is built from the HF-transformers checkpoint → NEOX rope is correct (not torchtune interleaved). Local CLI binary target is `crispasr-cli` (not `crispasr`, which is just the lib).
 
 ## Dia 1.6B TTS port (agent memory `project_dia_tts_port`, migrated 2026-08-06)

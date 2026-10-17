@@ -9,7 +9,9 @@ its stale status labels as current facts.
 ## Working protocol
 
 Read the sibling development guide and AGENTS.md. Work in a separate worktree;
-large models, builds and artifacts belong under /mnt/storage. Before coding,
+large models, builds and artifacts belong on the maintainer storage volume.
+Read ignored CLAUDE.md for actual local paths; never commit machine-specific
+operational details. Tracked receipts use portable location aliases. Before coding,
 add a dated CLAIMED block naming the owner, worktree, scope and acceptance
 criteria, and push that claim to main. Remove the claim when the work lands.
 Read complete issue/PR threads before acting. Audit old notes against code.
@@ -20,7 +22,7 @@ Only then profile or promote defaults. Preserve failures and source/input
 hashes; use distinct run directories so failed evidence cannot be overwritten.
 Follow docs/contributing.md for all affected surfaces, including the C ABI.
 
-Main checkpointad2998ab passes all13 general CI jobs (38855803220), Ruby,
+Historical checkpointad2998ab passes all13 general CI jobs (38855803220), Ruby,
 secret scan and Pages. Native-fork worker5417ed6d passes all10 lint jobs
 (38855559850) and heavy38855559740; independent auditc0fac6c1 passes642
 payloads. These are exact-source checks. The diagnostic integration and future
@@ -31,7 +33,26 @@ require applicable fresh CI. Echo observer integration preserves the complete no
 tree of3a13e0c6 (all13 combined CI and10 lint jobs passed). Routing controls do
 not establish native speech acceptance.
 
+
+## Handoff and immediate priorities
+
+See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
+entry points, bounded next action, acceptance gates and external dependencies.
+No task remains assigned to a departed agent. Inspect existing Echo runs first;
+then reproduce new Nemotron streaming issue547 on reporter/current source with
+exact offered fixtures and fresh/reused session controls. Actual MiMo71-row
+Q/K/V capture follows. Research and hardware waits are explicitly separate.
+
+Issue547 was read in full on2026-10-17 (no comments then). Exact WAV/PCM fixtures
+are not attached. The adapter already resets and the encoder clears backend
+cache on its first call; the reported stale-cache explanation is unproven.
+Acceptance requires nonempty correct finals for consecutive standalone-recognized
+turns, partials and reset/counter/cache evidence, then C-ABI/session and Windows
+CPU checks. Do not patch teardown or suppress empty events speculatively.
+
 ## Ordered roadmap
+
+The immediate handoff priorities above supersede this longer-term research order.
 
 1. **Dia correctness:** validate current-main speech, reconcile reference/diff
    wiring, then broaden prompts/seeds before GPU/Q4 and profiling.
@@ -117,8 +138,8 @@ commands: [CANN TODO](docs/cann-todo.md) and
   The completed64-cell tiny attention audit proves a scalar F16 value-accumulator
   error (0.460% on constant V, exact repeated-half prediction). The old71-row
   prefill takes the F32 tiled path, so this is not its repair. Diagnostic
-  source02bd2aee remains frozen on its branch; lint39003053402 and general
-  CI39003202215 are queued; hosted checks/integration remain pending. Actual matching Q/K/V,
+  source02bd2aee remains frozen on its branch. All10 lint39003053402 and13 general CI39003202215 jobs pass;
+  the unchanged diagnostic source is integrated on main. Actual matching Q/K/V,
   mask, scores/probabilities and pre-output-projection capture with OFF/ON/OFF
   identity is next under a fresh claim; the old full capture has no Q/K/V.
   See docs/mimo-attention-operator-2026-10-17.md. Do not repeat old BLAS/cache-read sweeps.
@@ -246,7 +267,7 @@ support or a claim to reproduce the author's unpublished reader. Feasibility:
    ~5% WER, 288x speed or eight-H100 training time on a Kaggle GPU.
 6. Use Kaggle for heavy encoder extraction/training and GH CI for conversion,
    reproducibility and integration checks. Keep datasets/features/checkpoints
-   under `/mnt/storage`; checkpoint produced artifacts before later risky work.
+   under `${CRISPASR_STORAGE}`; checkpoint produced artifacts before later risky work.
 7. After a useful Python prototype, port via convert → reference dump → stage
    diff with cosine AND magnitudes → decoded transcripts. Establish F32/BF16
    and Q8 baselines before lower quants; validate CPU/Metal/actual CUDA and all
@@ -372,24 +393,13 @@ are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
 
-## CLAIMED 2026-10-17 — Echo9B native block-observer harness repair
+## In flight — Echo9B owned-input FFN worker
 
-Owner: coordinator; fresh worktree
-/mnt/volume1/crispasr-echo-9b-owned-ffn-repair-20261017, branch
-diag/echo-9b-owned-ffn-repair-20261017, based on frozen967a62e0. Heavy
-39001786227 failed on first OFF arm at llm_block_0: the worker disabled all
-observers but required block stages. Runtime index_echo_prefill intentionally
-requires DUMP_STAGES or DUMP_FFN to retain blocks. Keep the existing block
-observer enabled identically in all arms and toggle only FFN capture. Add a
-negative control that rejects the previous no-block setup; preserve OFF/ON/OFF
-identity and every numerical gate. No runtime math/default/recipe change.
-Frozen failed source, terminal logs, full downloaded artifact and public partial
-revision702d609ab72e54f313f7665d2fa4c2c8a605deba remain retained. Build, exported
-ABI, all pinned physical downloads and actual5.6/Torch2.6 tiny controls pass;
-all10 lint39001788270 jobs pass. No9B captured-tensor attribution is accepted.
-Retest tiny actual-source controls before a fresh GH CPU run and public prefix.
-Large assets/results remain under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017.
-MiMo actual Q/K/V capture stays next after this actionable harness repair.
+The corrected worker is integrated on main. Frozen dispatched sourcec2deea37
+remains unchanged on diag/echo-9b-owned-ffn-repair-20261017. A new maintainer
+should inspect the existing run, retrieve and independently audit results; avoid
+duplicate dispatches. Exact commands, local collectors and recovery locations
+are in ignored CLAUDE.md; public source/run IDs and acceptance are below.
 
 Frozen repairc2deea373f9bd27f526f873bc01cb97068e1bff7 is pushed. Local actual
 released5.6.0/Torch2.6CPU controls pass6/6, including missing-block/stale-FFN
@@ -404,18 +414,3 @@ remain retained. See docs/index-echo-owned-ffn-failed-2026-10-17.json and the
 updated preparation receipt. Await actual native OFF/ON/OFF and source-layer
 results before diagnosing projections, changing precision or promoting Q4.
 MiMo actual Q/K/V capture remains the next independent implementation task.
-
-
-## CLAIMED 2026-10-17 — integration, privacy and maintainer handoff
-
-Owner: coordinator. Land the independently tested attention diagnostic02bd2aee
-and the locally controlled Echo worker967a62e0 plus observer repairc2deea37.
-Retain immutable experimental branches and public failure receipts. No runtime
-math, model acceptance, release tag or pending hardware result is implied.
-Move machine-specific documentation/receipt locations into ignored maintainer
-notes, replace public locations with portable aliases, and add a documentation
-privacy guard. Preserve numeric results, source/input hashes and public pins.
-Update PLAN/HISTORY and a public handoff with ordered tasks, entry points,
-acceptance gates and external dependencies, including the complete new547
-report. Verify local guards and dispatch applicable combined-source CI/lint.
-This is the requested wrap-up; do not start unbounded new model experiments.

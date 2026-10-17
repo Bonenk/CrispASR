@@ -64,7 +64,7 @@
   },
   "verified_inputs": [
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/original-step978-ref.gguf",
       "bytes": 99803232,
       "sha256": "2097f70d956812a019bd7c83430fd198eb4ccd2d6275fa30a91a8c39d8091e78"
     },
@@ -89,57 +89,57 @@
       "sha256": "ed63444a6d84473bab36890db69494d11b7d14813ec6c8161188686fa0b8c06e"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-base.so.0.26.0",
       "bytes": 983808,
       "sha256": "b02f334b2650dec5c2400384a542733f21570d061a05d831e8ca06c79db5ee01"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml-cpu.so",
       "bytes": 1446416,
       "sha256": "74315b105a7793e8f12a22b3fb8efd1be2eed1b906ccc9f46b42fceb7a2ab452"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libggml.so.0.26.0",
       "bytes": 55184,
       "sha256": "b35ee7decce7423157007df410d3e03fe4d16ef325c41f6ba1d61a4ad58aaf07"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-rmsnorm-probe-20261013/libs/libgomp.so.1",
       "bytes": 317376,
       "sha256": "4427bcbbc6faac6eaa4e8906ea4668e1615c9cfdff442549a8f5b49c3639217f"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_sa_norm.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_sa_norm.f32",
       "bytes": 16384,
       "sha256": "6ecd0e7a64f25d93ef0e7e36b93b44152f1cad66d556f28f578e6870e2eeb8cd"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_ca_norm.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_pre_ca_norm.f32",
       "bytes": 16384,
       "sha256": "31bc132bf9e0d3673c2564e2e9fdbb161e5268a1ee921fd72455a48896d3cb41"
     },
     {
-      "path": "/mnt/storage/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
+      "path": "${CRISPASR_STORAGE}/crispasr/dia-decoder-boundary-delivery-20261014/output/boundary-on/cpp_decoder_block0_cross_q.f32",
       "bytes": 16384,
       "sha256": "316fc837b6093dacac2ace287c3ef5737b502be05cddf31ba996ed88675af040"
     }

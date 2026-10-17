@@ -15,8 +15,8 @@ independent full-array audit, configuration/source/parameter pins and notices.
 
 ```sh
 python tools/ci-heavy/dia_key_history.py \
-  --inputs /mnt/storage/dia-key-proof/inputs-v1 \
-  --output /mnt/storage/dia-key-proof/new-original-replay
+  --inputs ${CRISPASR_STORAGE}/dia-key-proof/inputs-v1 \
+  --output ${CRISPASR_STORAGE}/dia-key-proof/new-original-replay
 ```
 
 `producer.cpp` compiles the literal captured-runtime embedding/RMS/RoPE helpers

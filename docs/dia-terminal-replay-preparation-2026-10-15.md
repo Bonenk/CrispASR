@@ -31,7 +31,7 @@ passes syntax against exact pinned headers. Accepted finite file/prefix tests,
 single-use patch tests and all4 unskipped secret guards pass locally. The
 actual ggml ownership guard is reused and will be rebuilt/executed on GH.
 Local preflight receipt remains under
-`/mnt/storage/crispasr/dia-terminal-20261015/local-v1/preflight.json`.
+`${CRISPASR_STORAGE}/crispasr/dia-terminal-20261015/local-v1/preflight.json`.
 
 The worker records actual logits, all18 layer metrics with norms/errors, hidden
 metrics, all18 cross-cache identity checks and original Torch2.6 filter support,
@@ -65,6 +65,6 @@ original layer17 captures validate the ownership checks, the composed runtime
 patch reproduces exact preflight bytes, and three real prior CFG cases agree
 with exact rational arithmetic. [Calibration receipt](dia-terminal-auditor-calibration-2026-10-15.json).
 Raw receipts remain under
-`/mnt/storage/crispasr/dia-terminal-20261015/auditor-calibration-v1/` and
+`${CRISPASR_STORAGE}/crispasr/dia-terminal-20261015/auditor-calibration-v1/` and
 `auditor-calibration-v2/`. No new terminal hidden-state or speech result follows;
 both GH numerical and lint jobs remain queued at this checkpoint.

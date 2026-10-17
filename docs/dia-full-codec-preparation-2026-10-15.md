@@ -67,7 +67,7 @@ The local metric controls reject scale/order/shape/nonfinite/zero-norm errors.
 
 The unchanged worker at7b42071f completed on the local VPS with isolated
 Torch2.6.0+cpu, DAC1.0.0, audiotools0.7.2 and Whisper20250625. All models,
-installed reference dependencies and outputs are under /mnt/storage. This is a
+installed reference dependencies and outputs are under ${CRISPASR_STORAGE}. This is a
 local CPU result; hosted numerical/reference success is not claimed.
 
 | Codes decoded by actual original DAC | Samples | RMS | ASR WER |

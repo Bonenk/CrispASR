@@ -528,25 +528,25 @@
         "-std=c++17",
         "-fsyntax-only",
         "-I",
-        "/mnt/storage/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
         "-I",
-        "/mnt/volume1/crispasr-dia-decoder-boundary-20261013/src",
+        "${CRISPASR_WORKTREES}/crispasr-dia-decoder-boundary-20261013/src",
         "-I",
-        "/mnt/storage/crispasr/dia-query-key-20261015/local-guards-v1",
-        "/mnt/storage/crispasr/dia-query-key-20261015/local-guards-v1/dia_tts.cpp"
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v1",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v1/dia_tts.cpp"
       ],
       [
         "c++",
         "-std=c++17",
         "-O2",
         "-I",
-        "/mnt/storage/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
-        "/mnt/volume1/crispasr-dia-query-key-20261015/tools/ci-heavy/dia-query-key-intervention/graph_guard.cpp",
-        "-Wl,-rpath,/mnt/storage/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs",
-        "/mnt/storage/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-cpu.so.0",
-        "/mnt/storage/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-base.so.0",
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/headers/include",
+        "${CRISPASR_WORKTREES}/crispasr-dia-query-key-20261015/tools/ci-heavy/dia-query-key-intervention/graph_guard.cpp",
+        "-Wl,-rpath,${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs",
+        "${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-cpu.so.0",
+        "${CRISPASR_STORAGE}/crispasr/dia-cache-intervention-20261015/hosted-38738218813-v2/out/libs/libggml-base.so.0",
         "-o",
-        "/mnt/storage/crispasr/dia-query-key-20261015/local-guards-v2/graph-guard"
+        "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015/local-guards-v2/graph-guard"
       ]
     ],
     "header_revision": "c36dab89b662838f0f5d4826c399198c0b90bbfc",
@@ -568,7 +568,7 @@
     "calibration_key_only_pass": true,
     "new_query_key_checks_executed": true,
     "full_query_key_audit_pass": true,
-    "storage_directory": "/mnt/storage/crispasr/dia-query-key-20261015",
+    "storage_directory": "${CRISPASR_STORAGE}/crispasr/dia-query-key-20261015",
     "scope": "Prepared independent archive/source/raw-array/sampler audit passes previous real key-only proof; pending Q/K artifact is not yet audited."
   },
   "integration": "637800051f7a2498d9830828f2dc435a372465f5",
