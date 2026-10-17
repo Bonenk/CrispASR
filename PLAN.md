@@ -26,8 +26,8 @@ secret scan and Pages. Native-fork worker5417ed6d passes all10 lint jobs
 payloads. These are exact-source checks. The diagnostic integration and future
 release tips require fresh CI; older documentation-tip queues are superseded.
 Last published release is v0.8.43; v0.8.44 remains untagged. Dia sampling controls are integrated from candidate7d0f68f3 (all13 CI and10
-lint jobs passed); all non-document source bytes are preserved. Fresh main
-CI remains pending. Echo observer integration preserves the complete non-document
+lint jobs passed); all non-document source bytes are preserved. Main f9eef29e passes all13 CI38974250081 jobs. Later documentation tips
+require applicable fresh CI. Echo observer integration preserves the complete non-document
 tree of3a13e0c6 (all13 combined CI and10 lint jobs passed). Routing controls do
 not establish native speech acceptance.
 
@@ -65,7 +65,11 @@ the direct-original and full-model observer dependencies.
    The matched CUDA precision/recipe experiment is independently audited:261
    payloads and262 anonymous file checks. Precision/recipe alone did not recover
    the three quiet cases; see docs/dia-cuda-factorial-results-2026-10-16.json.
-   Next isolate categorical draw placement with unchanged CUDA neural compute.
+   Categorical draw placement is isolated and independently audited: CUDA/CPU/
+   CUDA on the same model changes fox quality0/1/0 WER, with neural compute
+   fixed. First applied feedback differences follow byte-identical probability
+   inputs. All other cases still fail speech. Next test the concrete final-BOS
+   preservation boundary under the active claim; see HISTORY.md and result receipt.
    Existing full-F32 broader quality fails
    on both recognizer architectures; numerical/code equality alone is insufficient.
    Once bounded fixed cases pass unchanged speech gates, test the existing
@@ -352,51 +356,6 @@ are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
 
-## CLAIMED 2026-10-16 — Isolate Dia categorical draw placement
-
-Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampler-device-20261016,
-branch diag/dia-sampler-device-20261016, frozen source4d622e7e9574c360c0f38154797a3453f26e2096.
-Kernelcrispasr-dia-sampler-device-v1/version1 is COMPLETE; uploaded source is
-byte-exact, SHA4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435.
-Tiny actual original sampler/ID/RNG and generation/delay/frame-count controls
-pass under Torch2.6 and2.11. Exception restoration, broken-restoration and invalid
-input controls pass; read-only review finds no blocking source defect. Three
-recent sessions were terminal before one submission; terminal collector is active.
-Actual T4 tiny controls completed and all73 public files are anonymously
-hash-verified at revision65b7524ef49366fc4c570870be2b1620b8446501. CPU/CUDA
-differ on all288 corresponding nondegenerate IDs; both one-hot controls match.
-CPU placement matches direct CPU IDs/RNG, returns IDs to CUDA, and leaves its
-RNG unchanged. Independent local Torch2.11 replay matches432 CPU IDs and all
-six after-RNG states. First five CUDA-draw syntheses checkpointed publicly at
-revision15ce3f04cac9d7274a1ff59fa76613a666e2d87f before the CPU-draw arm.
-Final raw7bc65637442e50bd17f8a6abb5139781f7ba9883 is independently audited:
-288 payloads/289 full anonymous downloads. CUDA arms pass both fox cases; CPU
-draw fails both. All three remaining cases fail speech in every arm. Actual CPU
-replay matches2880 first64 IDs; all15 feedback reconstructions match original
-generate with stubbed neural steps. Public independent audit pack is publishing.
-See [preparation receipt](docs/dia-sampler-device-preparation-2026-10-16.json).
-Scope: original F32 neural computation
-and filtering on one supported CUDA host; same model instance and fixed native
-recipe1.2/45/.95/CFG3/cap3072, original five texts/seeds. Predeclare CUDA draw,
-CPU draw, CUDA draw anchor (15 outputs). Middle arm copies final probabilities
-to CPU for the original torch.multinomial and returns IDs to CUDA; no other
-inference arithmetic, token forcing, prompts, weights, seeds or codec changes.
-This is an explicit sampler placement intervention, not observer transparency.
-Before model downloads, capture tiny identical CPU/CUDA uniform/linear/one-hot
-9x1028 probability draws, RNG states and deterministic one-hot controls. Retain
-runtime framework source revision. Source-preserving local tiny operator and
-original sampler tests must pass, with changed-placement/restoration negatives.
-For full generation preserve CPU/CUDA states before/after, draw counts and
-byte-exact probability transfer assertions; unchanged CPU state in CUDA arms,
-unchanged CUDA state in CPU-draw arm. Require anchor speech outcomes to match,
-both sealed recognizer positives to pass, all15 PCM/raw recognition cells retained.
-No precision/default/Q4/speech promotion from diagnostic completion. Submit once
-after current session inventory per ../kaggle_usage.md; no CPU neural fallback,
-framework replacement, quota workaround or draw fishing. Public HF checkpoints
-before weights and between arms; independently audit terminal pinned evidence.
-All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
-
-
 ## CLAIMED 2026-10-17 — Dia final delayed BOS boundary
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-bos-boundary-20261017,
@@ -404,8 +363,9 @@ branch diag/dia-bos-boundary-20261017. The pinned original prefill explicitly
 places BOS in row15/book8 (delay15), but original generate decrements its BOS
 countdown before checking >0, so write step14 disables preservation and overwrites
 that prepared BOS at target row15. Native dia_tts.cpp mirrors the same boundary.
-This is a concrete inconsistency to test, not a proven quality cause or production
-fix. Tiny actual original generate/DecoderOutput must expose the invariant failure
+This timing is already documented in LEARNINGS.md and intentionally matches
+original source; this counterfactual tests quality, not a new native-parity fix.
+It is not a proven quality cause or production fix. Tiny actual original generate/DecoderOutput must expose the invariant failure
 before intervention; use no neural weights. Predeclare original / preserve final
 prepared BOS / original anchor, with only update_one's apply_mask flag at target
 row15 changed. Assert original update method restoration and a single changed

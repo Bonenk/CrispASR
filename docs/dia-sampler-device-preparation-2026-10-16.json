@@ -4,7 +4,7 @@
   "kernel_version": 1,
   "uploaded_source_exact": true,
   "script_sha256": "4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435",
-  "status": "KernelWorkerStatus.RUNNING",
+  "status": "KernelWorkerStatus.COMPLETE",
   "arms": [
     "cuda-draw",
     "cpu-draw",
@@ -40,8 +40,8 @@
   "unsupported_gpu_policy": "Exit inconclusive; no CPU neural fallback/framework replacement/automatic retry",
   "public_raw_prefix": "dia-20261016-original-cuda/sampler-device-v1",
   "public_tiny_prefix": "dia-20261016-original-cuda/sampler-device-v1-preflight",
-  "full_model_results": "pending",
-  "independent_terminal_audit": "pending",
+  "full_model_results": "Complete; diagnostic quality only",
+  "independent_terminal_audit": "PASS288payloads/289anonymous files",
   "speech_acceptance": false,
   "native_acceptance": false,
   "q4_acceptance": false,
@@ -174,5 +174,6 @@
     "recognition_cells": 0,
     "receipt_sha256": "1e1f895413e2a0799f64b13b1eb3c04d05db2b7e475e8a1c1acb01eab23ca5f8",
     "scope": "Anonymous pinned receipt only; full payload and speech audit pending"
-  }
+  },
+  "result_receipt": "docs/dia-sampler-device-results-2026-10-17.json"
 }

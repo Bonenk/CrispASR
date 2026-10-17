@@ -1,3 +1,36 @@
+## Dia draw device causally isolates fox speech gap — 2026-10-17
+
+Original F32 CUDA model and original filtering stayed fixed on one Tesla T4,
+Torch2.11.0+cu128/CUDA12.8. Both fox seeds transcribe exactly in CUDA draw and
+CUDA anchor, but fail with CPU draws (fox42 You, fox123 empty; both WER1).
+All three legacy/hello cases fail speech in every arm. CPU hello42 is loud
+(RMS.1083786) despite empty ASR, so not every failure is quiet. Both sealed
+recognizer positives pass. This isolates a sampling-device cause for this
+controlled fox gap, not a general native-runtime fix or explanation of all failures.
+
+Independent audit verifies288 payloads,289 full anonymous files, source/dtype/
+PCM/WAV/raw recognition and RNG activity. Actual Torch2.11 CPU replay matches
+2880 captured first64 IDs from real full-model probability inputs. All15 NumPy
+feedback reconstructions match actual original generate with neural-step/codec
+output stubs. Seed42 first applied feedback differs at step1/book0, after identical
+step0 probabilities; fox42 picks568 vs330 (p.41407415/.04925467). Seed123 first
+applied difference is step15/book8 from draw14. All first64 filtered probabilities
+are identical for those seed123 cases; this does not imply unfiltered-logit equality.
+Cosines, both norms, relative errors and every case are in the result receipt.
+
+CUDA anchors have identical complete sampled IDs and first64 probability arrays.
+Both hello and fox PCM anchors are exact. Legacy PCM retains cosine.9999999977021555,
+norms.10384299877480836/.10384321240133167 and relativeL2 6.782278770870514e-5.
+Its variation follows identical sampled histories; the particular codec operation
+is unproven. Global waveform identity is not claimed. No thresholds/defaults change.
+
+[Permanent independent audit](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/747f8d0bcc9effdc21be513a11321b1ecd53dce9/dia-20261016-original-cuda/sampler-device-v1-audit-v1/README.md)
+is fully anonymously hash-verified (proof7310291bytes). Raw revision7bc65637 is
+immutable. See [complete result](docs/dia-sampler-device-results-2026-10-17.json).
+The completed sampler claim is archived; an exact delayed-BOS boundary
+inconsistency is separately claimed in PLAN.md. Speech/native/Q4 acceptance remains
+false. Main f9eef29e also passes all13 CI38974250081 jobs, preserving Echo integration.
+
 ## Actual CPU/CUDA categorical draw confound independently verified — 2026-10-16
 
 Before neural-weight downloads, Tesla T4 sm75/Torch2.11.0+cu128 runs identical

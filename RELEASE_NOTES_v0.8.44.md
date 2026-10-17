@@ -656,3 +656,13 @@ Echo FFN diagnostic capture is integrated. The final composition preserves all
 jobs. The1946-payload2B F16 observer proof includes original/native intermediate
 identity, cached generation, CLI subtitles and C-ABI segments. These controls
 support the diagnostic tooling;9B Q4 acceptance and performance remain pending.
+
+
+Dia diagnosis now isolates draw placement on the same original F32 CUDA model:
+both fox cases pass with CUDA draws, fail with CPU draws, then pass after restoring
+CUDA draws. Independent audit verifies288 payloads/289 public files, and actual
+CPU replay matches2880 captured IDs. Legacy and both hello cases still fail
+speech across all arms. These results correct the earlier cross-device causal
+interpretation; they do not change defaults or establish broader native/Q4
+acceptance. Complete evidence and limitations are archived in HISTORY.md and
+docs/dia-sampler-device-results-2026-10-17.json.
