@@ -367,14 +367,17 @@ can be scheduled after checking actual exported and wrapped surfaces.
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-bos-boundary-20261017,
 branch diag/dia-bos-boundary-20261017, frozen sourcea54bbb5e34c24c8fcb2f50539ca1bd4517e52982.
-Kernelcrispasr-dia-bos-boundary-v1/version1 is RUNNING; pulled uploaded source
+Kernelcrispasr-dia-bos-boundary-v1/version1 is COMPLETE; pulled uploaded source
 is byte-exact, SHAe46c44131064ac48fe7a1b1aa0e202d4d1914f9601f2d4dcb69e2bd2b9397f66.
 Tiny original tests pass under Torch2.11 and2.6, including unchanged disabled-wrapper
 feedback and prepared BOS, sampled/capacity EOS, exact one-slot intervention and
 wrong-step/removed-preservation negatives. Literal native protocol passes unchanged.
 Read-only review finds no blocking source defect. Four recent sessions were terminal
 before one submission; terminal collector is active. Full-model quality and independent
-terminal audit remain pending. See docs/dia-bos-boundary-preparation-2026-10-17.json.
+terminal evidence audit passes260 payloads/261 anonymous downloads. All15 outputs
+and17 recognitions completed: all three previous failures remain, both fox controls
+pass in every arm. This counterfactual does not recover speech; public audit pack
+is being prepared before archive. See docs/dia-bos-boundary-preparation-2026-10-17.json.
 The pinned original prefill explicitly
 places BOS in row15/book8 (delay15), but original generate decrements its BOS
 countdown before checking >0, so write step14 disables preservation and overwrites
@@ -396,3 +399,31 @@ recognition. Independently audit full output before any native graph/default/Q4
 change. No full neural weights locally; all assets under
 /mnt/storage/crispasr/dia-bos-boundary-20261017. Actual GPU submission follows
 ../kaggle_usage.md session checks, with no unsupported-host retry loop.
+
+
+## CLAIMED 2026-10-17 — Echo9B paired FFN attribution on owned native inputs
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-echo-9b-owned-ffn-20261017,
+branch diag/echo-9b-owned-ffn-20261017. Original
+IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba:
+32 layers,4096 hidden,12288 intermediate;96 actual BF16 MLP weights confirmed
+by bounded safetensors-header reads. Converted public source
+cstr/index-echo-9b-GGUF@70cbee15fa7fadb85829d9d8d3439a5cb8fbe52b has unchanged
+primary e4b1dd17... and existing failed imatrix plain decoder85b43a41... (5.05GB).
+Capture all six existing FFN boundaries through native C API on JFK/ZH, with
+same-instance OFF/ON/OFF prefill/logit/prompt/stage identity and unchanged source.
+Reuse that failed recipe to obtain new boundary evidence, not repeat acceptance
+or promote it. Then free native context and load only one original MLP layer at
+a time via safe_open/get_tensor and the verified actual Qwen3_5MLP class. Replay
+on byte-identical owned native mlp_in; compare gate/up/product/down with cosine,
+both norms, relative errors. Separately apply original down_proj to actual native
+down_in to distinguish projection error from upstream activation drift. Source
+MLP OFF/ON/OFF must preserve output bytes. Retain all tensors/hashes/provenance
+and physical quant types; missing alignment, reshaped/aliased inputs or changed
+source must fail. Tiny actual-class positives and scale/input/source negatives
+precede any full model job. No graph arithmetic or quant recipe change yet.
+Use GH heavy-cpu for builds and this bounded CPU module replay; full9B Python
+model is never resident. No models locally; large assets remain under
+/mnt/storage/crispasr/echo-9b-owned-ffn-20261017 and remote HEAVY_SCRATCH.
+Public diagnostic fixture checkpoints must precede later crash-prone phases.
+No Q4/speech/GPU/performance/default acceptance follows from component attribution.
