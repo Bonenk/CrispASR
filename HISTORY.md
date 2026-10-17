@@ -1,3 +1,26 @@
+## Dia delayed-BOS counterfactual prepared and submitted — 2026-10-17
+
+Frozena54bbb5e changes only update_one's mask at target row15, preserving the
+last prefilled BOS on book8. Original generate/sampler/constructor/filtering/DAC
+remain unchanged. This behavior is already documented in LEARNINGS.md and native
+faithfully mirrors it; the intervention tests a source-quality hypothesis, not
+a new native-reference mismatch. No production graph/default patch is made.
+Tiny actual original generation confirms the unchanged path overwrites that
+prepared BOS; the intervention changes exactly one slot and preserves every
+prepared BOS/next valid prediction. Sampled/capacity stopping, disabled-wrapper
+identity, normal/exception restoration and wrong-step/removed-preservation negatives
+pass. Literal native protocol also passes unchanged. Neural steps/codec output
+are stubs in these tiny controls; they imply no speech acceptance.
+
+One Kaggle version1 was submitted after four recent sessions were verified
+terminal. Pulled source matches SHAe46c44131064ac48fe7a1b1aa0e202d4d1914f9601f2d4dcb69e2bd2b9397f66.
+Three same-instance original/preserve-final-BOS/original-anchor arms keep F32 CUDA,
+CUDA draws, original five texts/seeds and native1.2/45/.95/CFG3/cap3072 fixed.
+Each arm checkpoints actual BOS before/after, first64 probability inputs, all
+sampled IDs, RNG states and PCM before the next arm. Both fox and sealed
+recognizer positives remain controls. Full-model speech and independent evidence
+audit remain in PLAN.md. No broad speech/native/Q4/default acceptance is inferred.
+
 ## Dia draw device causally isolates fox speech gap — 2026-10-17
 
 Original F32 CUDA model and original filtering stayed fixed on one Tesla T4,

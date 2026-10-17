@@ -51,8 +51,8 @@ actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
 ## Dia correctness — current dependencies
 
 The completed reduction/cache/RNG, broader matrix and recognition investigations
-are in HISTORY.md and their pinned machine receipts. Current claims above carry
-the direct-original and full-model observer dependencies.
+are in HISTORY.md and their pinned machine receipts. Current active claims carry
+the remaining source-quality counterfactuals.
 
 1. Direct-original CPU construction/recognition is audited and fails speech.
    Original README F16 CUDA is independently audited: both fox seeds pass,
@@ -359,7 +359,16 @@ can be scheduled after checking actual exported and wrapped surfaces.
 ## CLAIMED 2026-10-17 — Dia final delayed BOS boundary
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-bos-boundary-20261017,
-branch diag/dia-bos-boundary-20261017. The pinned original prefill explicitly
+branch diag/dia-bos-boundary-20261017, frozen sourcea54bbb5e34c24c8fcb2f50539ca1bd4517e52982.
+Kernelcrispasr-dia-bos-boundary-v1/version1 is RUNNING; pulled uploaded source
+is byte-exact, SHAe46c44131064ac48fe7a1b1aa0e202d4d1914f9601f2d4dcb69e2bd2b9397f66.
+Tiny original tests pass under Torch2.11 and2.6, including unchanged disabled-wrapper
+feedback and prepared BOS, sampled/capacity EOS, exact one-slot intervention and
+wrong-step/removed-preservation negatives. Literal native protocol passes unchanged.
+Read-only review finds no blocking source defect. Four recent sessions were terminal
+before one submission; terminal collector is active. Full-model quality and independent
+terminal audit remain pending. See docs/dia-bos-boundary-preparation-2026-10-17.json.
+The pinned original prefill explicitly
 places BOS in row15/book8 (delay15), but original generate decrements its BOS
 countdown before checking >0, so write step14 disables preservation and overwrites
 that prepared BOS at target row15. Native dia_tts.cpp mirrors the same boundary.
