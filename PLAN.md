@@ -419,3 +419,23 @@ doc-anchor/chat-binding/harness-sync/version checks. These do not replace all
 hosted lint/build checks. Heavy39001786227 and lint39001788270 remain queued;
 no native9B tensor result has been produced yet. Terminal collector remains
 active under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017/collector-v1.
+
+
+## CLAIMED 2026-10-17 — Echo9B native block-observer harness repair
+
+Owner: coordinator; fresh worktree
+/mnt/volume1/crispasr-echo-9b-owned-ffn-repair-20261017, branch
+diag/echo-9b-owned-ffn-repair-20261017, based on frozen967a62e0. Heavy
+39001786227 failed on first OFF arm at llm_block_0: the worker disabled all
+observers but required block stages. Runtime index_echo_prefill intentionally
+requires DUMP_STAGES or DUMP_FFN to retain blocks. Keep the existing block
+observer enabled identically in all arms and toggle only FFN capture. Add a
+negative control that rejects the previous no-block setup; preserve OFF/ON/OFF
+identity and every numerical gate. No runtime math/default/recipe change.
+Frozen failed source, terminal logs, full downloaded artifact and public partial
+revision702d609ab72e54f313f7665d2fa4c2c8a605deba remain retained. Build, exported
+ABI, all pinned physical downloads and actual5.6/Torch2.6 tiny controls pass;
+all10 lint39001788270 jobs pass. No9B captured-tensor attribution is accepted.
+Retest tiny actual-source controls before a fresh GH CPU run and public prefix.
+Large assets/results remain under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017.
+MiMo actual Q/K/V capture stays next after this actionable harness repair.
