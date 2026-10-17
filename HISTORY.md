@@ -1,3 +1,31 @@
+## Tiny CPU attention accumulator mathematically isolated — 2026-10-17
+
+Sixty-four actual CPU operator cells and an independent F64 audit establish
+scalar F16 value-accumulator error: constant V yields0.004595963669287369
+relative L2 despite cosine0.9999895055406776. Rounding after every sum predicts
+all12 constant-V scalar/reference F16 outputs byte for byte. Default64/71-row
+tiled F32 accumulation and eager paths satisfy the same invariant on identical
+stored operands. Scores/probabilities/eager nonuniform controls stay below
+1.819e-7 relative L2; scale/layout/shape/input negatives reject. No neural model
+weights or full ggml build ran locally. Source02bd2aee and binary/library hashes
+are retained separately. Frozen diagnostic branch remains unmerged; hosted
+checks and integration remain pending.
+
+The old71-row MiMo prefill uses F32 tiled accumulation, so this is not its
+explanation or a runtime/default repair. Its old capture lacks Q/K/V. Actual
+owned-input attention capture remains in PLAN.md. Existing Q4/original-stage/
+speech failures remain explicit. The first new archive transfer failed hash/
+CRC and was rejected; a second matches the API SHA and all463 member checks.
+Known FFN inputs match the independent older proof; neither ZIP supplies Q/K/V.
+
+[Permanent operator proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2ffac96dd901bb34e55755eef93094cfa8f8c14d/mimo-20261017-owned-attention/operator-proof-v1/README.md) retains
+512 raw arrays, actual binary/libraries, source/licenses, independent audit and
+failed acquisition/compiler/alias controls. All541 ZIP payloads are
+manifest/hash-checked; ZIP1183435bytes and README are fully
+anonymously hash-verified. See [result](docs/mimo-attention-operator-2026-10-17.md)
+and [machine receipt](docs/mimo-attention-operator-2026-10-17.json). No model,
+GPU, speed, release or production-default acceptance follows.
+
 ## Echo9B owned-input FFN diagnostic prepared and submitted — 2026-10-17
 
 Frozen source967a62e0 adds a diagnostic worker, not a quant recipe or runtime

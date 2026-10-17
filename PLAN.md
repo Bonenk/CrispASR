@@ -114,8 +114,14 @@ commands: [CANN TODO](docs/cann-todo.md) and
   hypothesis is independently rejected and archived in HISTORY.md.
   [Four-arm result](docs/mimo-kvread-ab-2026-10-15.md): hidden/logit error remains
   5.73%/5.13%, with a0.5% gate. The default Q4 original-stage gap also remains.
-  Next select a specific attention/activation arithmetic hypothesis on owned
-  inputs under a fresh claim; do not repeat the old BLAS/cache-read sweeps.
+  The completed64-cell tiny attention audit proves a scalar F16 value-accumulator
+  error (0.460% on constant V, exact repeated-half prediction). The old71-row
+  prefill takes the F32 tiled path, so this is not its repair. Diagnostic
+  source02bd2aee remains frozen on its branch; lint39003053402 and general
+  CI39003202215 are queued; hosted checks/integration remain pending. Actual matching Q/K/V,
+  mask, scores/probabilities and pre-output-projection capture with OFF/ON/OFF
+  identity is next under a fresh claim; the old full capture has no Q/K/V.
+  See docs/mimo-attention-operator-2026-10-17.md. Do not repeat old BLAS/cache-read sweeps.
   CANN RVQ/F16 embedding and ggml NZ need physical Ascend and PR-only/NZ-only/composed attribution. The measured
   full tokenizer path was7–10% slower; do not enable it by default. Review the
   complete latest thread before proposing any further split or merge.
@@ -408,21 +414,8 @@ public payloads before drawing a projection diagnosis or changing precision.
 See docs/index-echo-owned-ffn-preparation-2026-10-17.json.
 
 
-## CLAIMED 2026-10-17 — MiMo same-input attention arithmetic attribution
-
-Owner: coordinator; separate worktree
-/mnt/volume1/crispasr-mimo-owned-attention-20261017, branch
-diag/mimo-owned-attention-20261017. While Echo's frozen hosted worker queues,
-inspect retained run37855479658 tensors and the actual pinned ggml CPU score,
-softmax and value reductions. First verify the original artifact's API digest
-and actual captured boundaries. Use model-free tiny tensor controls and, only
-if actual matching Q/K/V inputs survive, replay those owned inputs. Distinguish
-F16 operand conversion, score accumulation, softmax and value accumulation;
-compare cosine, both norms, relative error and decision effects. Preserve layout,
-mask, actual kernel/source/binary provenance and failed controls. No full-model
-rerun, graph/default change or numerical gate relaxation follows from an
-unconfirmed hypothesis. Do not repeat the rejected F32 cache-read sweep.
-Heavy builds/models stay on GH; small artifact/probe data stays under
-/mnt/storage/crispasr/mimo-owned-attention-20261017. Native math remains with
-the coordinator. Acceptance here is a bounded operator attribution and
-reproducible positive/scale/layout negatives, not speech or PR492 acceptance.
+Echo worker967a62e0 additionally passes six local static workflow/portable-CPU/
+doc-anchor/chat-binding/harness-sync/version checks. These do not replace all
+hosted lint/build checks. Heavy39001786227 and lint39001788270 remain queued;
+no native9B tensor result has been produced yet. Terminal collector remains
+active under /mnt/storage/crispasr/echo-9b-owned-ffn-20261017/collector-v1.

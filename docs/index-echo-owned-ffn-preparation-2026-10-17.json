@@ -48,5 +48,59 @@
   "q4_acceptance": false,
   "gpu_acceptance": false,
   "performance_acceptance": false,
-  "production_defaults_changed": false
+  "production_defaults_changed": false,
+  "local_static_checks": {
+    "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "tools/check-workflow-run-blocks.py"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-workflow-run-blocks.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-release-portable-cpu.py"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-release-portable-cpu.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-doc-anchors.py"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-doc-anchors.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-chat-binding-coverage.py"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-chat-binding-coverage.log"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check-kaggle-harness-sync.py"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/check-kaggle-harness-sync.log"
+      },
+      {
+        "command": [
+          "python3",
+          "scripts/sync-version.py",
+          "--check"
+        ],
+        "exit": 0,
+        "log": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-lint-v1/sync-version.log"
+      }
+    ]
+  }
 }
