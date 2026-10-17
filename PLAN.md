@@ -406,3 +406,23 @@ Collector retains terminal logs/artifacts under the claim's storage root. Audit
 physical weights, native OFF/ON/OFF identity, original layer outputs and all
 public payloads before drawing a projection diagnosis or changing precision.
 See docs/index-echo-owned-ffn-preparation-2026-10-17.json.
+
+
+## CLAIMED 2026-10-17 — MiMo same-input attention arithmetic attribution
+
+Owner: coordinator; separate worktree
+/mnt/volume1/crispasr-mimo-owned-attention-20261017, branch
+diag/mimo-owned-attention-20261017. While Echo's frozen hosted worker queues,
+inspect retained run37855479658 tensors and the actual pinned ggml CPU score,
+softmax and value reductions. First verify the original artifact's API digest
+and actual captured boundaries. Use model-free tiny tensor controls and, only
+if actual matching Q/K/V inputs survive, replay those owned inputs. Distinguish
+F16 operand conversion, score accumulation, softmax and value accumulation;
+compare cosine, both norms, relative error and decision effects. Preserve layout,
+mask, actual kernel/source/binary provenance and failed controls. No full-model
+rerun, graph/default change or numerical gate relaxation follows from an
+unconfirmed hypothesis. Do not repeat the rejected F32 cache-read sweep.
+Heavy builds/models stay on GH; small artifact/probe data stays under
+/mnt/storage/crispasr/mimo-owned-attention-20261017. Native math remains with
+the coordinator. Acceptance here is a bounded operator attribution and
+reproducible positive/scale/layout negatives, not speech or PR492 acceptance.
