@@ -1,6 +1,6 @@
 # CrispASR — Pending work
 
-Updated 2026-10-16. This file contains current actions, dependencies and a
+Updated 2026-10-17. This file contains current actions, dependencies and a
 legacy audit inventory. Completed work and experiment receipts live in
 [HISTORY.md](HISTORY.md#plan-reconciliation-archive--2026-10-15).
 The archived snapshot preserves detailed older requirements without treating
@@ -356,7 +356,7 @@ can be scheduled after checking actual exported and wrapped surfaces.
 
 Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-sampler-device-20261016,
 branch diag/dia-sampler-device-20261016, frozen source4d622e7e9574c360c0f38154797a3453f26e2096.
-Kernelcrispasr-dia-sampler-device-v1/version1 is RUNNING; uploaded source is
+Kernelcrispasr-dia-sampler-device-v1/version1 is COMPLETE; uploaded source is
 byte-exact, SHA4db1fd69a641f6960cff2c9f5969ed6570ee0c47890dcff75f80f5468781d435.
 Tiny actual original sampler/ID/RNG and generation/delay/frame-count controls
 pass under Torch2.6 and2.11. Exception restoration, broken-restoration and invalid
@@ -369,7 +369,11 @@ CPU placement matches direct CPU IDs/RNG, returns IDs to CUDA, and leaves its
 RNG unchanged. Independent local Torch2.11 replay matches432 CPU IDs and all
 six after-RNG states. First five CUDA-draw syntheses checkpointed publicly at
 revision15ce3f04cac9d7274a1ff59fa76613a666e2d87f before the CPU-draw arm.
-This is a pinned receipt check; full payload/speech/terminal audit remains pending.
+Final raw7bc65637442e50bd17f8a6abb5139781f7ba9883 is independently audited:
+288 payloads/289 full anonymous downloads. CUDA arms pass both fox cases; CPU
+draw fails both. All three remaining cases fail speech in every arm. Actual CPU
+replay matches2880 first64 IDs; all15 feedback reconstructions match original
+generate with stubbed neural steps. Public independent audit pack is publishing.
 See [preparation receipt](docs/dia-sampler-device-preparation-2026-10-16.json).
 Scope: original F32 neural computation
 and filtering on one supported CUDA host; same model instance and fixed native
@@ -391,3 +395,28 @@ after current session inventory per ../kaggle_usage.md; no CPU neural fallback,
 framework replacement, quota workaround or draw fishing. Public HF checkpoints
 before weights and between arms; independently audit terminal pinned evidence.
 All large assets under /mnt/storage/crispasr/dia-sampler-device-20261016.
+
+
+## CLAIMED 2026-10-17 — Dia final delayed BOS boundary
+
+Owner: coordinator; fresh worktree /mnt/volume1/crispasr-dia-bos-boundary-20261017,
+branch diag/dia-bos-boundary-20261017. The pinned original prefill explicitly
+places BOS in row15/book8 (delay15), but original generate decrements its BOS
+countdown before checking >0, so write step14 disables preservation and overwrites
+that prepared BOS at target row15. Native dia_tts.cpp mirrors the same boundary.
+This is a concrete inconsistency to test, not a proven quality cause or production
+fix. Tiny actual original generate/DecoderOutput must expose the invariant failure
+before intervention; use no neural weights. Predeclare original / preserve final
+prepared BOS / original anchor, with only update_one's apply_mask flag at target
+row15 changed. Assert original update method restoration and a single changed
+book8 slot; wrong-step/removed-preservation negatives must fail. Cover sampled and
+capacity EOS, existing delay replays and sampler controls. Preserve original
+sources and all old failures. If tiny gates pass, one supported CUDA experiment
+uses unchanged original normal F32 CUDA model/filter/RNG, fixed native1.2/45/.95/
+CFG3/cap3072 and original five texts/seeds; same instance and both fox plus sealed
+recognizer positives. No seed/prompt/forced-code changes. Each arm checkpoints
+publicly; keep actual probabilities/IDs, BOS before/after, RNG states, PCM and raw
+recognition. Independently audit full output before any native graph/default/Q4
+change. No full neural weights locally; all assets under
+/mnt/storage/crispasr/dia-bos-boundary-20261017. Actual GPU submission follows
+../kaggle_usage.md session checks, with no unsupported-host retry loop.
