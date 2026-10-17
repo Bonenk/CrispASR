@@ -1,0 +1,46 @@
+{
+  "status": "DISPATCHED_AWAITING_HOSTED_EXECUTION",
+  "source": "967a62e094aaa361dad6d27ec39e1292e8dc91a0",
+  "branch": "diag/echo-9b-owned-ffn-20261017",
+  "heavy_run": 39001786227,
+  "lint_run": 39001788270,
+  "local_checks": [
+    {
+      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v1.log",
+      "bytes": 6363,
+      "sha256": "8316182dcb876c61cf8a8d523fd903560fd6d083efd4adc46e60dd19f7900a3f"
+    },
+    {
+      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v2.log",
+      "bytes": 611,
+      "sha256": "d68a844f9e6efc9001659be6cf98963b2fd214c6a141b4af1fd4ea5fd450ff86"
+    },
+    {
+      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/actual-mlp-controls-v3-final.log",
+      "bytes": 610,
+      "sha256": "4237eff2a2d7072e87e173c4e871b5b53b9c907b83de0d76e6f106ff2f64bfae"
+    },
+    {
+      "path": "/mnt/storage/crispasr/echo-9b-owned-ffn-20261017/local-v1/secrets-final.log",
+      "bytes": 509,
+      "sha256": "f58cbc7162718294b4ae3a21a0ac92a78935a69215db0d96bc74cbf1addfeb2e"
+    }
+  ],
+  "local_environment": {
+    "torch": "2.11.0+cu130",
+    "transformers": "5.6.0 extracted released wheel; shared environment unchanged"
+  },
+  "local_results": {
+    "final_actual_mlp_controls": "5/5 PASS",
+    "secret_guard": "4/4 PASS, none skipped",
+    "earliest_attempt": "Rejected shared Transformers 5.13.0.dev0, as intended by pinned-source guard"
+  },
+  "hosted_packages": "torch==2.6.0 numpy==1.26.4 transformers==5.6.0 safetensors==0.6.2 gguf==0.18.0 soundfile==0.13.1 huggingface_hub==1.10.1",
+  "scope": "Existing failed plain calibrated Q4 decoder; same-native-input prefill FFN attribution on JFK and ZH, actual original MLP one layer at a time; no full original decoder instantiated",
+  "public_checkpoint_prefix": "index-echo-9b/owned-ffn-20261017/v1",
+  "speech_acceptance": false,
+  "q4_acceptance": false,
+  "gpu_acceptance": false,
+  "performance_acceptance": false,
+  "production_defaults_changed": false
+}

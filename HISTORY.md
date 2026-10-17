@@ -1,3 +1,25 @@
+## Echo9B owned-input FFN diagnostic prepared and submitted — 2026-10-17
+
+Frozen source967a62e0 adds a diagnostic worker, not a quant recipe or runtime
+change. Local actual released Qwen3_5MLP controls pass5/5: owned input and output
+copy identity, unchanged OFF/ON/OFF, changed-input/source rejection, malformed
+shape rejection and a2x scale error that cosine alone cannot detect. All four
+secret checks pass. Initial shared Transformers5.13dev was correctly rejected;
+final controls use the verified released5.6.0 source in an isolated wheel,
+with shared packages unchanged. Local Torch is2.11; hosted repeats on2.6CPU.
+
+[Heavy CPU39001786227](https://github.com/CrispStrobe/CrispASR/actions/runs/39001786227)
+and [lint39001788270](https://github.com/CrispStrobe/CrispASR/actions/runs/39001788270)
+are queued. The worker captures the existing failed calibrated plain9B Q4 FFNs
+through the actual C ABI on JFK/ZH, frees each native child, then loads one
+original BF16 MLP layer at a time as F32. Same-input original gate/up/product/down
+metrics and conditional down/activation replays distinguish local component
+error from accumulated model drift. Public checkpoints precede expensive phases;
+source, input, physical weights, binaries and failed controls remain retained.
+Full hosted execution and independent audit stay in PLAN.md. No model, speech,
+Q4, GPU, speed or production-default acceptance follows from tiny controls.
+See [preparation receipt](docs/index-echo-owned-ffn-preparation-2026-10-17.json).
+
 ## Dia final-BOS counterfactual does not recover speech — 2026-10-17
 
 Original/intervention/original-anchor completed all15 syntheses and17 recognitions

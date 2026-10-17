@@ -392,3 +392,16 @@ model is never resident. No models locally; large assets remain under
 /mnt/storage/crispasr/echo-9b-owned-ffn-20261017 and remote HEAVY_SCRATCH.
 Public diagnostic fixture checkpoints must precede later crash-prone phases.
 No Q4/speech/GPU/performance/default acceptance follows from component attribution.
+
+
+Frozen diagnostic source967a62e094aaa361dad6d27ec39e1292e8dc91a0 is pushed.
+GH heavy CPU39001786227 and lint39001788270 are dispatched and queued; no
+hosted success is claimed. Final local actual released5.6.0 MLP controls pass5/5
+(including changed-input/source, malformed-shape and scale-blind negatives);
+all four secret checks pass unskipped. The shared5.13dev source was correctly
+rejected before switching to an isolated released wheel, without changing shared
+packages. Heavy runner repeats controls on pinned Torch2.6 before build/download.
+Collector retains terminal logs/artifacts under the claim's storage root. Audit
+physical weights, native OFF/ON/OFF identity, original layer outputs and all
+public payloads before drawing a projection diagnosis or changing precision.
+See docs/index-echo-owned-ffn-preparation-2026-10-17.json.
