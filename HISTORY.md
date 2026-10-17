@@ -1,3 +1,21 @@
+## Echo9B archived Q4 failure locations independently inventoried — 2026-10-17
+
+Root parsed all nine archived calibrated Q4 diff logs. First LLM blocks below
+the global0.999 summary floor are plain0/0/0, FFN-guarded11/12/15 and middle12/12/15
+for JFK/JFK-tail/ZH. These are distinct from the backend's per-stage quantized
+thresholds: literal JFK FAIL is teacherforced_logits at.967303/.983031/.979347,
+with worst-row norms1009/897,962.3/897,961.1/897 respectively. Middle block4
+cosine.999908 passes0.999. No thresholds were changed. Block-norm values omitted
+by old logs remain null in the receipt; cumulative block crossings do not identify
+the responsible FFN projection or prove a mathematical runtime defect.
+
+The630151-byte imatrix proof contains zero GGUF files or paired FFN tensors.
+A complete same-input tensor attribution remains pending; integrated captures
+supply the missing boundary mechanism. Safetensors supports lazy per-tensor
+reads, allowing bounded actual original MLP replay without a full resident9B
+neural model. See [root log inventory](docs/index-echo-q4-first-failures-2026-10-17.json).
+No new model, recipe, GPU/performance/default acceptance is inferred.
+
 ## Dia delayed-BOS counterfactual prepared and submitted — 2026-10-17
 
 Frozena54bbb5e changes only update_one's mask at target row15, preserving the

@@ -136,11 +136,18 @@ commands: [CANN TODO](docs/cann-todo.md) and
 - **Index-Echo / issue485:** higher-precision accepted paths remain available.
   All four plain recipes and three calibrated recipes fail complete acceptance.
   Collection covers all96 FFN statistics and sensitive source F32 tensors are
-  preserved. Locate the first actually failing metric and attribute FFN
-  gate/up/product/down on the same input; first quantized block0/4 alone does
-  not establish first failure. In the middle recipe, block4 cosine0.999908
-  already passes the0.999 gate.
-  then test targeted precision changes against complete EN/ZH stages, magnitudes,
+  preserved. Archived actual logs are now inventoried: plain first crosses the
+  global0.999 summary floor at block0; guarded at11/12/15 and middle at12/12/15
+  for JFK/JFK-tail/ZH. These differ from native per-stage quantized gates: JFK's
+  literal FAIL remains teacherforced_logits (.967303/.983031/.979347).
+  Block4 middle cosine0.999908 passes0.999. No FFN projection is identified by
+  those cumulative block outputs; old block logs omit norms. Next capture actual
+  paired FFN gate/up/product/down on owned identical inputs with both norms and
+  relative error. Single-file safetensors permits lazy per-tensor loading; use a
+  bounded actual original MLP module rather than requiring a full9B resident
+  model merely to attribute one FFN. The retained630KB proof contains logs and
+  metadata, zero GGUF files or FFN tensors. See
+  docs/index-echo-q4-first-failures-2026-10-17.json. Then test targeted precision changes against complete EN/ZH stages, magnitudes,
   cache behavior, decoded/subtitle output and TTS-ASR. Do not repeat rejected
   recipes unchanged. Evidence: docs/index-echo-q4-imatrix-validation-2026-10-09.json.
 - **Echo performance:** scheduler opt-in has narrow T4 evidence; new CPU/Metal/
