@@ -66,9 +66,11 @@ Five tests pass under GCC and Clang (240 seeded random, 60 unique-optimum
 exhaustive tiny paths plus edge/memory cases); four contracts exercise both
 gates and six character tests remain green. CTest/CI run all suites. The local
 receipt and scope are in the [comparison](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
-Prepare immutable hosted source and run `tools/ci-heavy/alignment_subword_bench.py
---large` (NumPy; 30-minute timeout), full-library CI and lint. Audit source and
-baseline hashes, exact return/text/bounds, successful complete alignments,
+Frozen source `a1434c9b2d2484e7af572b577cb1f53127662775` is on
+`diag/217-subword-workspace-20261018`. Heavy CPU `39115492999` runs
+`tools/ci-heavy/alignment_subword_bench.py --large` (NumPy; timeout30), CI is
+`39115494689`, lint is `39115496152`; all three are queued at dispatch audit.
+Audit source and baseline hashes, exact return/text/bounds, successful complete alignments,
 allocation/heap reductions and timing distributions. Never promote from these
 synthetic results alone. Keep input/encoder memory and model quality separate.
 

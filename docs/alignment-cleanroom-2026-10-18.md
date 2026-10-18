@@ -204,3 +204,9 @@ numbers. Keep the gate default-off until full-library CI/lint and real model
 alignment acceptance pass. A matched Japanese clip still needs encoder versus
 postprocessor stage timings and boundary/coverage evidence; the synthetic
 workspace result does not establish a Subtimer or whole-pipeline ranking.
+
+Hosted source is frozen at `a1434c9b2d2484e7af572b577cb1f53127662775` on
+`diag/217-subword-workspace-20261018`: [heavy CPU](https://github.com/CrispStrobe/CrispASR/actions/runs/39115492999),
+[full CI](https://github.com/CrispStrobe/CrispASR/actions/runs/39115494689) and
+[lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39115496152).
+All three are queued at the dispatch audit; no terminal acceptance is implied.
