@@ -748,6 +748,16 @@ package compilation. Go's hosted wrapper contract enables the race detector;
 callback registry locks must be released before invoking user callbacks. Registry
 locking alone does not serialize same-context inference and close.
 
+Legacy token adapters must copy both chosen-token and candidate text before
+native buffers can be reused or the model closed. Preserve raw UTF-8 fragments
+and native timing/probability sentinels. Validate segment/token indices and
+counts before indexed native access, bound alternative text retries, and verify
+the declared length plus terminator before copying. Poison the output buffer in
+probes so unwritten terminators cannot pass accidentally. Go's owned snapshots
+also have a high-level optional capability: keep existing public interfaces and
+result struct literals compatible when adding detailed results. Rust's per-call
+alternative capture reuses `TranscribeOptions` instead of adding required fields.
+
 
 Java native defaults must be copied into Java-owned parameter storage, then
 freed with the matching native destructor; never `Native.free()` a C++-allocated

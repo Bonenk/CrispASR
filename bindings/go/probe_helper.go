@@ -17,6 +17,10 @@ int probe_legacy_calls(void);
 int probe_parallel_by_ref_calls(void);
 int probe_dtw_enabled(void);
 int probe_legacy_context_flash(void);
+void probe_legacy_tokens_reset(void);
+void probe_legacy_tokens_mutate(void);
+int probe_legacy_alt_text_calls(void);
+
 int probe_dtw_preset(void);
 int probe_dtw_top(void);
 int probe_rust_legacy_contexts(void);
@@ -94,3 +98,7 @@ func newProbeLegacyContextForWorker(worker int) *Context {
 }
 
 func probeLegacyContextFlash() bool { return C.probe_legacy_context_flash() != 0 }
+
+func probeLegacyTokensReset()      { C.probe_legacy_tokens_reset() }
+func probeLegacyTokensMutate()     { C.probe_legacy_tokens_mutate() }
+func probeLegacyAltTextCalls() int { return int(C.probe_legacy_alt_text_calls()) }

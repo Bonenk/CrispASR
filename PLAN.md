@@ -2,9 +2,9 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: remaining legacy token/parameter
-inventory and ownership/coercion audits after the Rust/Go DTW and callback
-checkpoints. Completed repairs and measured probe counts are archived in
+Owner: maintainer coordinator. Active next: remaining legacy parameter/lifecycle
+and cross-language token audits after owned Rust/Go snapshots and alternative
+capture. Completed repairs and validation are archived in HISTORY.md. Completed repairs and measured probe counts are archived in
 HISTORY.md. Continue the cross-language wrapper task; the bounded external
 agent tasks have ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
@@ -46,12 +46,16 @@ Recommended implementation order and concrete acceptance:
    Review higher-level APIs as well as the low-level bindings.
    Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
    high-level model constructor now have operation probes. The shared helper
-   disables incompatible flash attention. Go's high-level `Token` still lacks
-   DTW output; add a compatible public result surface with an operation probe.
+   disables incompatible flash attention. Owned Rust/Go token snapshots now expose
+   IDs/raw bytes, timing/probability, DTW and alternatives; Go has a compatible
+   high-level optional accessor without changing the older `Token` struct.
+   Validate actual model output and candidate quality, including greedy/beam
+   behavior, partial UTF-8 and alignment with the Python wrapper/reference.
    Custom-head configuration remains pending: own the head storage for model
-   lifetime and validate model dimensions if exposing it. Return copied token
-   IDs/raw bytes, timing/probability and alternatives through safe public
-   operations; preserve unavailable sentinels and split UTF-8 bytes. Extend
+   lifetime and validate model dimensions if exposing it. Audit the remaining
+   Java/Ruby/WASM token operations against actual public methods; do not infer
+   coverage from declarations. Preserve unavailable sentinels and split UTF-8.
+   Extend
    `tests/fixtures/go-rust-wrapper-abi.c` and the actual Rust/Go public-method
    probes, including invalid indices/counts, null/empty native output and cleanup.
    Native declarations alone do not satisfy these rows. Go callback registries
@@ -60,8 +64,21 @@ Recommended implementation order and concrete acceptance:
    re-entry still requires caller serialization; audit/enforce that lifecycle
    in low-level and high-level APIs, including foreign callback threads.
    Rust scalar decode
-   controls still need a compatible public options surface; avoid silently
-   breaking downstream `TranscribeOptions` struct literals when extending it.
+   controls still need a compatible public options surface, including parallel
+   alternative capture and language/prompt/thread/temperature controls; avoid
+   breaking downstream `TranscribeOptions` struct literals. Sequential Rust
+   alternative capture now has an additive per-call method and compiled probes.
+   Reuse existing validation/owned string lifetime and matching parameter cleanup
+   when extending controls to either decode route.
+   Start in `crispasr/src/lib.rs::transcribe_pcm_impl` and the owned reader in
+   `crispasr/src/whisper_tokens.rs`. Inventory `crispasr_params_set_*` exports
+   against the actual public methods, including language/initial-prompt strings,
+   translate/detection, token timestamps, threads, best-of, temperature and
+   length/token limits. Cover invalid strings/scalars and allocation/native
+   failure with matching frees on sequential and parallel routes. Go's owned
+   reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
+   is in `bindings/go/pkg/whisper/token_snapshots.go`.
+
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now
    have compiled regressions; see HISTORY.md. Audit microphone ring/close and

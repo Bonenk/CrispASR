@@ -91,6 +91,17 @@ Whisper's mel/encoder language pass and returns an owned `(code, probability)`.
 It requires positive threads and validates native errors and bounded UTF-8 output.
 This mutates native encoder state; serialize operations on the model.
 
+`token(segment, index)` and `tokens(segment)` return owned `WhisperToken`
+values with IDs, raw bytes, native-centisecond timing/DTW, probabilities and
+owned alternative candidates. Negative unavailable values are preserved. `text`
+uses replacement decoding; concatenate `raw` to reconstruct split UTF-8 exactly.
+Snapshots survive later decoding and model drop. `transcribe_pcm_with_alternatives`
+accepts the existing `TranscribeOptions` plus an alternative count (native 0–32
+clamp); greedy decoding captures candidates, while beam decoding does not.
+Existing `TranscribeOptions` and `Segment` struct literals remain unchanged.
+Snapshot readers limit segments to one million tokens, alternatives to 32 per
+token and text to 1 MiB per token/candidate, rejecting invalid counts or buffers.
+
 Prefer `Session` for backend dispatch and native exception handling. Repairing
 the legacy pointer ABI does not make the deprecated direct Whisper API safe
 against C++ exceptions. Model/platform acceptance remains separate from the

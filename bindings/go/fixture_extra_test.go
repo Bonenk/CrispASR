@@ -1407,3 +1407,105 @@ func TestProbeLegacyCallbacksAcrossContexts(t *testing.T) {
 		t.Fatalf("concurrent callbacks %d/%d/%d want %d", encoded.Load(), segments.Load(), progress.Load(), want)
 	}
 }
+
+func TestProbeLegacyOwnedTokenSnapshots(t *testing.T) {
+	probeReset()
+	probeLegacyTokensReset()
+	ctx := Whisper_init("model")
+	if ctx == nil {
+		t.Fatal("init")
+	}
+	tokens, err := ctx.Whisper_token_snapshots(0)
+	if err != nil || len(tokens) != 2 {
+		t.Fatalf("tokens %v/%v", tokens, err)
+	}
+	first, second := tokens[0], tokens[1]
+	if ctx.Whisper_full_get_token_id(0, 0) != first.ID {
+		t.Fatal("token ID field differs from native getter")
+	}
+
+	if first.ID != 11 || first.T0 != 100 || first.T1 != 120 || first.DTW != 100 || first.P != 0.75 {
+		t.Fatalf("metadata %+v", first)
+	}
+	if second.T0 != -1 || second.T1 != -1 || second.P != -1 || second.DTW != 101 {
+		t.Fatalf("sentinels %+v", second)
+	}
+	if !bytes.Equal(first.Raw, []byte{0xe6, 0x97}) || first.Text != string(first.Raw) {
+		t.Fatal("split bytes lost")
+	}
+	if len(first.Alternatives) != 2 || first.Alternatives[0].ID != 42 || first.Alternatives[0].P != 0.25 {
+		t.Fatal("alternatives lost")
+	}
+	if !bytes.Equal(first.Alternatives[0].Raw, []byte{0xe6, 0x97}) || first.Alternatives[0].Text != string(first.Alternatives[0].Raw) {
+		t.Fatal("alternative bytes lost")
+	}
+	if !bytes.Equal(first.Alternatives[1].Raw, bytes.Repeat([]byte{'L'}, 2048)) || first.Alternatives[1].P != -1 {
+		t.Fatal("long alt/sentinel lost")
+	}
+	if probeLegacyAltTextCalls() <= 2 {
+		t.Fatal("alternative resize unexercised")
+	}
+	if len(second.Alternatives) != 0 {
+		t.Fatal("fabricated alts")
+	}
+	one, err := ctx.Whisper_token_snapshot(0, 1)
+	if err != nil || !bytes.Equal(one.Raw, []byte{0xa5}) {
+		t.Fatalf("one token %v/%v", one, err)
+	}
+	for _, index := range [][2]int{{-1, 0}, {0, -1}, {1, 0}, {0, 2}} {
+		if _, err := ctx.Whisper_token_snapshot(index[0], index[1]); err == nil {
+			t.Fatal("invalid token accepted")
+		}
+	}
+	for _, segment := range []int{-1, 1} {
+		if _, err := ctx.Whisper_token_snapshots(segment); err == nil {
+			t.Fatal("invalid segment accepted")
+		}
+	}
+	for _, mode := range []int{1, 12, 20, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33} {
+		probeModeSet(mode)
+		if _, err := ctx.Whisper_token_snapshot(0, 0); err == nil {
+			t.Fatalf("token mode%d accepted", mode)
+		}
+		if _, err := ctx.Whisper_token_snapshots(0); err == nil {
+			t.Fatalf("bulk mode%d accepted", mode)
+		}
+	}
+	probeModeSet(21)
+	empty, err := ctx.Whisper_token_snapshots(0)
+	if err != nil || len(empty) != 0 {
+		t.Fatal("empty token list rejected")
+	}
+	probeModeSet(28)
+	nullText, err := ctx.Whisper_token_snapshot(0, 0)
+	if err != nil || len(nullText.Raw) != 0 || len(nullText.Alternatives[0].Raw) != 0 {
+		t.Fatal("null/empty text mishandled")
+	}
+	probeModeSet(34)
+	noAlts, err := ctx.Whisper_token_snapshot(0, 0)
+	if err != nil || len(noAlts.Alternatives) != 0 {
+		t.Fatal("empty alternatives rejected")
+	}
+	probeModeSet(22)
+	untimed, err := ctx.Whisper_token_snapshot(0, 0)
+	if err != nil || untimed.DTW != -1 {
+		t.Fatal("unavailable DTW lost")
+	}
+	probeModeSet(0)
+	var missing *Context
+	if _, err := missing.Whisper_token_snapshot(0, 0); err == nil {
+		t.Fatal("nil context accepted")
+	}
+	if _, err := missing.Whisper_token_snapshots(0); err == nil {
+		t.Fatal("nil bulk context accepted")
+	}
+	probeLegacyTokensMutate()
+	ctx.Whisper_free()
+	if !bytes.Equal(first.Raw, []byte{0xe6, 0x97}) || !bytes.Equal(first.Alternatives[0].Raw, []byte{0xe6, 0x97}) || !bytes.Equal(first.Alternatives[1].Raw, bytes.Repeat([]byte{'L'}, 2048)) {
+		t.Fatal("snapshot borrowed native storage")
+	}
+	if string(append(append([]byte{}, first.Raw...), second.Raw...)) != "日" {
+		t.Fatal("split tokens did not reconstruct text")
+	}
+	probeLegacyTokensReset()
+}

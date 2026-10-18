@@ -1096,3 +1096,104 @@ fn probe_legacy_rust_dtw_context_construction() {
     }
     unsafe { probe_mode_set(0) };
 }
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_owned_token_snapshots_and_alternative_capture() {
+    extern "C" {
+        fn probe_legacy_tokens_reset();
+        fn probe_legacy_tokens_mutate();
+        fn probe_legacy_alt_text_calls() -> c_int;
+        fn probe_legacy_rust_alt_n() -> c_int;
+    }
+    unsafe {
+        probe_reset();
+        probe_legacy_tokens_reset();
+    }
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let options = crispasr::TranscribeOptions::default();
+    for (requested, expected) in [(-1, 0), (0, 0), (2, 2), (100, 32)] {
+        model
+            .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, requested)
+            .unwrap();
+        assert_eq!(unsafe { probe_legacy_rust_alt_n() }, expected);
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    let calls = unsafe { probe_calls_get() };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[], &options, 2)
+        .is_err());
+    let bad = crispasr::TranscribeOptions {
+        strategy: Some(2),
+        ..Default::default()
+    };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &bad, 2)
+        .is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    unsafe { probe_mode_set(11) };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, 2)
+        .is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe { probe_mode_set(0) };
+    let tokens = model.tokens(0).unwrap();
+    assert_eq!(tokens.len(), 2);
+    assert_eq!(tokens[0].id, 11);
+    assert_eq!(tokens[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].text, "�");
+    assert_eq!((tokens[0].t0, tokens[0].t1, tokens[0].dtw), (100, 120, 100));
+    assert_eq!(tokens[0].probability, 0.75);
+    assert_eq!(
+        (tokens[1].t0, tokens[1].t1, tokens[1].probability),
+        (-1, -1, -1.)
+    );
+    assert_eq!(tokens[1].dtw, 101);
+    assert_eq!(tokens[0].alternatives.len(), 2);
+    assert_eq!(tokens[0].alternatives[0].id, 42);
+    assert_eq!(tokens[0].alternatives[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[0].probability, 0.25);
+    assert_eq!(tokens[0].alternatives[1].raw, vec![b'L'; 2048]);
+    assert_eq!(tokens[0].alternatives[1].probability, -1.);
+    assert!(tokens[1].alternatives.is_empty());
+    assert!(unsafe { probe_legacy_alt_text_calls() } > 2); // Real resize/retry.
+    assert_eq!(model.token(0, 1).unwrap().raw, vec![0xa5]);
+    for (segment, token) in [(-1, 0), (0, -1), (1, 0), (0, 2)] {
+        assert!(model.token(segment, token).is_err());
+    }
+    assert!(model.tokens(-1).is_err());
+    assert!(model.tokens(1).is_err());
+    for mode in [1, 12, 20, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.token(0, 0).is_err(), "token mode {mode}");
+        assert!(model.tokens(0).is_err(), "bulk mode {mode}");
+    }
+    unsafe { probe_mode_set(21) };
+    assert!(model.tokens(0).unwrap().is_empty());
+    unsafe { probe_mode_set(28) };
+    let empty = model.token(0, 0).unwrap();
+    assert!(empty.raw.is_empty());
+    assert!(empty.alternatives[0].raw.is_empty());
+    unsafe { probe_mode_set(34) };
+    assert!(model.token(0, 0).unwrap().alternatives.is_empty());
+    unsafe { probe_mode_set(22) };
+    assert_eq!(model.token(0, 0).unwrap().dtw, -1);
+    unsafe { probe_mode_set(2) };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, 3)
+        .is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe {
+        probe_mode_set(0);
+        probe_legacy_tokens_mutate();
+    }
+    drop(model);
+    assert_eq!(tokens[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[1].raw, vec![b'L'; 2048]);
+    assert_eq!(
+        [tokens[0].raw.clone(), tokens[1].raw.clone()].concat(),
+        "日".as_bytes()
+    );
+    unsafe { probe_legacy_tokens_reset() };
+}

@@ -88,6 +88,17 @@ extern "C" {
     // --- Results ---
     pub fn whisper_full_n_segments(ctx: *mut WhisperContext) -> c_int;
     pub fn whisper_full_n_tokens(ctx: *mut WhisperContext, i_segment: c_int) -> c_int;
+    pub fn whisper_full_get_token_text(
+        ctx: *mut WhisperContext,
+        i_segment: c_int,
+        i_token: c_int,
+    ) -> *const c_char;
+    pub fn whisper_full_get_token_id(
+        ctx: *mut WhisperContext,
+        i_segment: c_int,
+        i_token: c_int,
+    ) -> i32;
+
     pub fn crispasr_token_dtw_t(ctx: *mut WhisperContext, i_segment: c_int, i_token: c_int) -> i64;
 
     pub fn whisper_full_get_segment_text(

@@ -1,3 +1,41 @@
+## Owned legacy Whisper tokens and alternatives — 2026-10-18
+
+Rust `CrispASR::token/tokens` now returns owned `WhisperToken` values with IDs,
+raw text bytes, native-centisecond timing/DTW, probabilities and owned candidate
+alternatives. The additive `transcribe_pcm_with_alternatives` method enables
+per-call capture through the native 0–32 clamp and reuses existing options,
+parameter cleanup and VAD-path lifetime. Existing `TranscribeOptions` and
+`Segment` literal shapes remain unchanged. Alternative capture is greedy-only
+in the native decoder; the parallel scalar-control extension remains pending.
+
+Go's `Whisper_token_snapshot(s)` returns owned `WhisperTokenSnapshot` values.
+Its higher-level `TokenSnapshots(ctx, segment)` helper uses the optional
+`TokenSnapshotProvider` capability, exposing DTW and candidates without changing
+the existing `Context` interface or `Token` struct. Unsupported providers,
+nil contexts and closed models return errors. Existing `SetAltN` paths enable
+Go capture. Go strings retain native bytes; Rust also provides replacement-
+decoded display text. Both preserve split UTF-8 in raw byte arrays and negative
+unavailable metadata. Neither result retains a borrowed native pointer.
+
+Readers validate indices/counts before native indexed access, copy chosen and
+candidate text, bound native-string scans and candidate buffer retries, and
+verify returned lengths plus actual NUL terminators. Poisoned caller buffers
+catch unwritten terminators. Limits are one million tokens per segment, 32
+alternatives per token and 1 MiB of text per token/candidate. Empty/null text
+and empty token/candidate lists are supported. Invalid counts, negative or
+oversized text lengths, missing terminators and inconsistent embedded NULs
+return errors. Bulk operations discard partially copied results on error.
+
+Validation: **37 low-level Go tests plus two higher-level operation tests under
+the race detector**, **32 Rust tests and five doctests pass** against the compiled
+public-header fixture. New probes verify native IDs/data equivalence, 2 KiB
+candidate retry/copy behavior, split UTF-8 reconstruction, metadata sentinels,
+invalid/native-failure paths, parameter cleanup, legacy source compatibility and
+snapshots after native-buffer mutation/model close. Missing public snapshot
+methods were reproduced before implementation. Actual model/candidate quality,
+parallel Rust capture and remaining lifecycle/platform acceptance remain scoped
+in PLAN.md; component probes do not establish full wrapper parity.
+
 ## DTW constructors/getters and Go callback registry races — 2026-10-18
 
 Rust's deprecated `CrispASR` now supports `new_with_dtw` and typed `DtwPreset`

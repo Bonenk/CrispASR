@@ -1043,6 +1043,33 @@ int crispasr_session_set_speaker_identity(crispasr_session* s, const char* id) {
     } while (0)
 
 
+static char legacy_token_prefix[] = "\xe6\x97";
+static char legacy_token_suffix[] = "\xa5";
+static char legacy_alt_prefix[] = "\xe6\x97";
+static char legacy_alt_long[2049];
+static char legacy_oversized_text[1048578];
+static int legacy_alt_text_calls, legacy_rust_alt_n;
+void probe_legacy_tokens_reset(void) {
+    memcpy(legacy_token_prefix, "\xe6\x97", 3);
+    memcpy(legacy_token_suffix, "\xa5", 2);
+    memcpy(legacy_alt_prefix, "\xe6\x97", 3);
+    memset(legacy_alt_long, 'L', sizeof(legacy_alt_long) - 1);
+    legacy_alt_long[sizeof(legacy_alt_long) - 1] = 0;
+    legacy_alt_text_calls = 0;
+}
+void probe_legacy_tokens_mutate(void) {
+    memset(legacy_token_prefix, 'x', 2);
+    legacy_token_suffix[0] = 'x';
+    memset(legacy_alt_prefix, 'x', 2);
+    memset(legacy_alt_long, 'x', sizeof(legacy_alt_long) - 1);
+}
+int probe_legacy_alt_text_calls(void) {
+    return legacy_alt_text_calls;
+}
+int probe_legacy_rust_alt_n(void) {
+    return legacy_rust_alt_n;
+}
+
 // Literal public-header legacy Rust transport; by-value entry remains a trap.
 static int rust_legacy_contexts;
 static struct whisper_context_params last_legacy_context_params;
@@ -1108,6 +1135,7 @@ struct whisper_full_params* whisper_full_default_params_by_ref(enum whisper_samp
 }
 int whisper_full_by_ref(whisper_context* ctx, struct whisper_full_params* p, const float* samples, int n) {
     ++probe_calls;
+    legacy_rust_alt_n = p ? p->alt_n : -1;
     if (ctx != rust_legacy_context() || !p || n != 3 || samples[0] != 1 || samples[1] != 3 || samples[2] != 5)
         return -9;
     if (p->strategy != CRISPASR_SAMPLING_GREEDY && p->strategy != CRISPASR_SAMPLING_BEAM_SEARCH)
@@ -1375,23 +1403,56 @@ int64_t crispasr_token_dtw_t(struct whisper_context* ctx, int s, int t) {
     return whisper_full_get_token_data(ctx, s, t).t_dtw;
 }
 void crispasr_params_set_alt_n(struct whisper_full_params* p, int n) {
-    STUB_ABORT();
+    if (p)
+        p->alt_n = n < 0 ? 0 : n > 32 ? 32 : n;
 }
 int crispasr_token_n_alts(struct whisper_context* ctx, int s, int t) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || s != 0 || t < 0 || t >= 2)
+        STUB_ABORT();
+    if (probe_mode == 23)
+        return -1;
+    if (probe_mode == 24)
+        return 33;
+    return t == 0 && probe_mode != 34 ? 2 : 0;
 }
 int32_t crispasr_token_alt_id(struct whisper_context* ctx, int s, int t, int a) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || s != 0 || t != 0 || a < 0 || a >= 2)
+        STUB_ABORT();
+    return 42 + a;
 }
 float crispasr_token_alt_p(struct whisper_context* ctx, int s, int t, int a) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || s != 0 || t != 0 || a < 0 || a >= 2)
+        STUB_ABORT();
+    return a == 0 ? .25f : -1.f;
 }
 int crispasr_token_alt_text(struct whisper_context* ctx, int s, int t, int a, char* out, int cap) {
-    STUB_ABORT();
-    return 0;
+    ++legacy_alt_text_calls;
+    if (ctx != rust_legacy_context() || s != 0 || t != 0 || a < 0 || a >= 2 || !out || cap <= 0)
+        STUB_ABORT();
+    if (probe_mode == 25)
+        return -2;
+    if (probe_mode == 26)
+        return cap;
+    if (probe_mode == 27) {
+        out[0] = 'z';
+        return 1;
+    }
+    if (probe_mode == 29)
+        return 0;
+    if (probe_mode == 30)
+        return -1;
+    if (probe_mode == 33) {
+        out[0] = 0;
+        out[1] = 'z';
+        out[2] = 0;
+        return 2;
+    }
+    const char* text = probe_mode == 28 ? "" : a == 0 ? legacy_alt_prefix : legacy_alt_long;
+    int len = (int)strlen(text);
+    if (len + 1 > cap)
+        return -1;
+    memcpy(out, text, len + 1);
+    return len;
 }
 float crispasr_detect_language(struct whisper_context* ctx, const float* pcm, int n, int nt, char* out, int cap) {
     ++probe_calls;
@@ -1502,16 +1563,13 @@ int whisper_score_texts(struct whisper_context* ctx, const float* s, int n, cons
 
 // Auto-generated stubs for missing symbols
 int64_t crispasr_token_t0(whisper_context* ctx, int i_seg, int i_tok) {
-    STUB_ABORT();
-    return 0;
+    return whisper_full_get_token_data(ctx, i_seg, i_tok).t0;
 }
 int64_t crispasr_token_t1(whisper_context* ctx, int i_seg, int i_tok) {
-    STUB_ABORT();
-    return 0;
+    return whisper_full_get_token_data(ctx, i_seg, i_tok).t1;
 }
 float crispasr_token_p(whisper_context* ctx, int i_seg, int i_tok) {
-    STUB_ABORT();
-    return 0;
+    return whisper_full_get_token_data(ctx, i_seg, i_tok).p;
 }
 int crispasr_session_stream_kind(crispasr_session* s) {
     STUB_ABORT();
@@ -1785,15 +1843,23 @@ const char* whisper_full_get_segment_text_from_state(struct whisper_state* state
 int whisper_full_n_tokens(struct whisper_context* ctx, int i_segment) {
     if (ctx != rust_legacy_context() || i_segment != 0)
         STUB_ABORT();
-    return probe_mode == 20 ? -1 : probe_mode == 21 ? 0 : 2;
+    return probe_mode == 20 ? -1 : probe_mode == 21 ? 0 : probe_mode == 31 ? 1000001 : 2;
 }
 int whisper_full_n_tokens_from_state(struct whisper_state* state, int i_segment) {
     STUB_ABORT();
     return 0;
 }
 const char* whisper_full_get_token_text(struct whisper_context* ctx, int i_segment, int i_token) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || i_segment != 0 || i_token < 0 || i_token >= 2)
+        STUB_ABORT();
+    if (probe_mode == 28)
+        return NULL;
+    if (probe_mode == 32) {
+        memset(legacy_oversized_text, 'V', sizeof(legacy_oversized_text) - 1);
+        legacy_oversized_text[sizeof(legacy_oversized_text) - 1] = 0;
+        return legacy_oversized_text;
+    }
+    return i_token == 0 ? legacy_token_prefix : legacy_token_suffix;
 }
 const char* whisper_full_get_token_text_from_state(struct whisper_context* ctx, struct whisper_state* state,
                                                    int i_segment, int i_token) {
@@ -1801,9 +1867,9 @@ const char* whisper_full_get_token_text_from_state(struct whisper_context* ctx, 
     return 0;
 }
 whisper_token whisper_full_get_token_id(struct whisper_context* ctx, int i_segment, int i_token) {
-    whisper_token _s = {0};
-    STUB_ABORT();
-    return _s;
+    if (ctx != rust_legacy_context() || i_segment != 0 || i_token < 0 || i_token >= 2)
+        STUB_ABORT();
+    return 11 + i_token;
 }
 whisper_token whisper_full_get_token_id_from_state(struct whisper_state* state, int i_segment, int i_token) {
     whisper_token _s = {0};
@@ -1814,6 +1880,10 @@ whisper_token_data whisper_full_get_token_data(struct whisper_context* ctx, int 
     if (ctx != rust_legacy_context() || i_segment != 0 || i_token < 0 || i_token >= 2)
         STUB_ABORT();
     whisper_token_data result = {0};
+    result.id = 11 + i_token;
+    result.t0 = i_token == 0 ? 100 : -1;
+    result.t1 = i_token == 0 ? 120 : -1;
+    result.p = i_token == 0 ? .75f : -1.f;
     result.t_dtw = probe_mode == 22 ? -1 : 100 + i_token;
     return result;
 }

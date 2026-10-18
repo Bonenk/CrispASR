@@ -217,8 +217,8 @@ and DTW sentinels; `TestProbeModelDTWConstructor` exercises the higher-level mod
 constructor and close. Those are operation probes, not model-dependent tests.
 `TestProbeLegacyCallbacksAcrossContexts` exercises eight contexts through native
 callbacks, including registration changes within delivery. The strict hosted
-Go/Rust contract enables Go's race detector. Custom heads, higher-level DTW
-output and remaining legacy token/context/resource paths are still pending.
+Go/Rust contract enables Go's race detector. Custom heads and remaining legacy context/resource controls are still pending.
+The owned-token and compatible higher-level DTW paths are described below.
 
 
 WASM token polling copies all NUL-separated strings into owned C++ storage
@@ -311,3 +311,35 @@ threads. `JavaLegacyWrapperContract` compiles the actual legacy classes against
 `build_legacy_wrapper_probe.py`, rather than counting raw JNA declarations.
 The legacy full-params layout requires a 64-bit JVM; broader token/parallel
 features and actual-model/platform acceptance remain in PLAN.md.
+
+
+## Owned legacy Whisper tokens and alternatives
+
+The family includes `whisper_full_n_tokens`, token text/ID/data, the scalar
+`crispasr_token_t0/t1/p/dtw_t` helpers, alternative count/ID/probability/text and
+`crispasr_params_set_alt_n`. Go's token-data field reads are bulk equivalents of
+the scalar metadata helpers; Rust calls the scalar helpers without mirroring a
+struct returned by value.
+
+| Wrapper | Callable operation | Probe |
+|---|---|---|
+| Rust | `CrispASR::token/tokens`, owned `WhisperToken` and candidates; `transcribe_pcm_with_alternatives` enables capture using existing options | `probe_legacy_rust_owned_token_snapshots_and_alternative_capture` |
+| Go | `Whisper_token_snapshot(s)` returns owned `WhisperTokenSnapshot` values; existing `Params.SetAltN` enables capture | `TestProbeLegacyOwnedTokenSnapshots` |
+| Go higher-level | `TokenSnapshots(ctx, segment)`, optional `TokenSnapshotProvider`; `Context.SetAltN` enables capture | `TestProbeModelTokenSnapshotsWithoutChangingContextInterface` |
+
+Raw token and alternative bytes are copied, including incomplete UTF-8, and
+metadata preserves native centiseconds and unavailable negative values. Rust
+also provides replacement-decoded display text; Go strings keep the same bytes
+as `Raw`. No borrowed native string or result pointer escapes. Snapshots remain
+valid after native buffers are mutated and the model is closed. Existing Go
+`Context` implementations/`Token` literals and Rust `TranscribeOptions`/`Segment`
+literals keep their shapes. Rust alternative capture is sequential; parallel
+capture and the remaining scalar control surface are still scoped in PLAN.md.
+
+Probes exercise long alternative buffer retries, token/alternative count limits,
+negative/oversized lengths, missing terminators, inconsistent embedded NULs,
+null/empty native text, invalid indices, unavailable sentinels and partial UTF-8
+reconstruction. The limits are one million tokens per segment, 32 alternatives
+and 1 MiB text per token/candidate. These compiled public-header fixtures do not
+establish real model accuracy/candidate quality or concurrent close safety;
+serialize access/inference/close on the same legacy context.

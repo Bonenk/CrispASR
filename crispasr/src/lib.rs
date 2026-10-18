@@ -18,6 +18,9 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod whisper_tokens;
+pub use whisper_tokens::{WhisperToken, WhisperTokenAlternative};
+
 pub mod extra;
 pub use extra::*;
 
@@ -167,7 +170,7 @@ impl CrispASR {
         pcm: &[f32],
         opts: &TranscribeOptions,
     ) -> Result<Vec<Segment>, String> {
-        self.transcribe_pcm_impl(pcm, opts, None)
+        self.transcribe_pcm_impl(pcm, opts, None, None)
     }
 
     /// Split PCM into `processors` chunks using native progress-tracked parallel
@@ -182,7 +185,19 @@ impl CrispASR {
         if processors <= 0 {
             return Err("parallel decoding requires positive processors".into());
         }
-        self.transcribe_pcm_impl(pcm, opts, Some(processors))
+        self.transcribe_pcm_impl(pcm, opts, Some(processors), None)
+    }
+
+    /// Decode while capturing greedy token alternatives. Counts use the native
+    /// 0..32 clamp; beam decoding does not emit alternatives. Retrieve owned
+    /// candidates afterward with `token` or `tokens`. Existing options stay valid.
+    pub fn transcribe_pcm_with_alternatives(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        alt_n: i32,
+    ) -> Result<Vec<Segment>, String> {
+        self.transcribe_pcm_impl(pcm, opts, None, Some(alt_n))
     }
 
     fn transcribe_pcm_impl(
@@ -190,6 +205,7 @@ impl CrispASR {
         pcm: &[f32],
         opts: &TranscribeOptions,
         processors: Option<i32>,
+        alt_n: Option<i32>,
     ) -> Result<Vec<Segment>, String> {
         if pcm.is_empty() || pcm.len() > i32::MAX as usize {
             return Err("nonempty PCM with an int32 sample count required".into());
@@ -224,6 +240,9 @@ impl CrispASR {
             return Err("could not allocate transcription parameters".into());
         }
         unsafe {
+            if let Some(n) = alt_n {
+                crispasr_sys::crispasr_params_set_alt_n(params, n);
+            }
             if opts.vad {
                 crispasr_sys::crispasr_params_set_vad(params, 1);
                 if let Some(t) = opts.vad_threshold {

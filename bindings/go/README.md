@@ -188,7 +188,18 @@ native defaults; both constructors use pointer parameters and matching frees.
 Use a native library whose DTW helper disables incompatible flash attention.
 `Whisper_full_get_token_dtw_t` checks indices and returns native centiseconds,
 preserving `-1` when unavailable; copied `TokenData` also exposes `TDtw()`.
-The older high-level `Token` struct does not yet carry DTW output.
+`Whisper_token_snapshot(segment, token)` and `Whisper_token_snapshots(segment)`
+return owned IDs, raw bytes, native-centisecond timing/DTW, probability and
+alternatives. `Text` is a Go string containing the raw bytes, including incomplete
+UTF-8; concatenate `Raw` values for exact reconstruction. Negative unavailable
+metadata is preserved, and snapshots survive model close. Readers reject invalid
+indices/counts and malformed native alternative buffers; limits are one million
+tokens per segment, 32 alternatives per token and 1 MiB per token/candidate text.
+
+The higher-level package exposes `TokenSnapshots(ctx, segment)` through optional
+`TokenSnapshotProvider` support. It returns the same owned snapshots, including
+DTW and alternatives. Existing `Context` implementations and `Token` struct
+literals are unchanged; unsupported providers and closed models return errors.
 
 Callback registry access is synchronized across contexts. The registry lock is
 released before invoking a callback, allowing registration changes during
