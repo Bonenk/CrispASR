@@ -427,13 +427,21 @@ setters **and** the data-returning session methods such as
 `crispasr_session_synthesize`, `crispasr_session_synthesize_raw`, and
 `crispasr_session_speech_to_speech`. None of these are auto-discovered (only a new
 *backend* is — see the section above); every wrapper exposes them explicitly and
-they are kept at **full parity**. When you add one, add it to **all seven** wrappers
+the target is **full parity**, verified explicitly rather than assumed. When you add one, add it to **all seven** wrappers
 (plus the WASM/JS binding and the server, listed below — mirror the nearest existing
 setter/method in each: argtypes/restype, error-on-rc≠0,
 and for PCM-returning methods copy `synthesize`: return the malloc'd `float*` as an
 owned buffer then free via `crispasr_pcm_free`; free any `out_text` via
 `crispasr_session_translate_text_free`):
-- `python/crispasr/_binding.py` — ctypes method on `Session`.
+- `python/crispasr/_binding.py` / `_session_extra.py` / `_utilities.py` — typed
+  ctypes method or utility, plus a package-root export in `__init__.py` when
+  public. Run `python tools/check-python-api-coverage.py` and
+  `python tests/test_python_wrapper_operations.py -v`. The former inventories
+  all public session-header functions (with explicit equivalent/retired
+  exceptions); it is a drift guard, not inference or behavioral proof. The
+  compiled-probe suite checks ownership, shape, empty-result and callback
+  contracts. CI also uses the complete native library. See
+  [Python API coverage](python-api-coverage.md) for operations and limitations.
 - `bindings/go/crispasr_session.go` — the cgo-preamble `int crispasr_session_set_X(...)`
   declaration **and** the `Set X` method.
 - **Rust (repo root, not `bindings/`)**: `crispasr-sys/src/lib.rs` extern decl

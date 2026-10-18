@@ -32,6 +32,7 @@ extern "C" {
 struct whisper_context;
 struct whisper_context_params;
 struct whisper_full_params;
+typedef struct whisper_full_params whisper_full_params;
 
 struct crispasr_align_result;
 typedef struct crispasr_align_result crispasr_align_result;
@@ -598,6 +599,10 @@ CRISPASR_SESSION_API int crispasr_session_convert_content_dim(crispasr_session* 
 CRISPASR_SESSION_API int crispasr_session_convert_n_speakers(crispasr_session* s);
 // The checkpoint's native rate (32k/40k/48k) — not a constant.
 CRISPASR_SESSION_API int crispasr_session_convert_sample_rate(crispasr_session* s);
+// Explicit replay noise uses [inter_channels, n_frames] and
+// [n_frames, upsample_product] row-major arrays respectively.
+CRISPASR_SESSION_API int crispasr_session_convert_inter_channels(crispasr_session* s);
+CRISPASR_SESSION_API int crispasr_session_convert_upsample_product(crispasr_session* s);
 
 // Chord recognition: mono PCM at any rate (resampled internally to the
 // model's 22050 Hz) -> a chord timeline. Returns the span count (>0) on

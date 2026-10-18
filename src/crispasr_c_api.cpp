@@ -11940,6 +11940,26 @@ CA_EXPORT int crispasr_session_convert_sample_rate(crispasr_session* s) {
     return 0;
 }
 
+CA_EXPORT int crispasr_session_convert_inter_channels(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_inter_channels(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
+CA_EXPORT int crispasr_session_convert_upsample_product(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_upsample_product(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Chord recognition session API
 //

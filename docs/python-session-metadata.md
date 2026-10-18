@@ -125,3 +125,11 @@ frozen on `diag/549-token-boundaries-20261018`: [CI](https://github.com/CrispStr
 and [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39117923785) are
 queued at dispatch audit. Earlier source's green checks do not validate this
 follow-up; preserve exact-source receipts before release.
+
+## Word alternatives
+
+`SessionWord.alternatives` copies native `(text, probability)` candidates before
+freeing the result, where the backend and decode options supply them. The list
+is empty when absent, including older native libraries. Existing positional
+word constructors remain valid. See [the broader API inventory](python-api-coverage.md)
+for auxiliary operations and legacy Whisper token/DTW readout.

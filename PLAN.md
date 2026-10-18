@@ -1,18 +1,46 @@
 # CrispASR — Pending work
 
-## NOW — complete Python shared-API wrapper audit
+## NOW — Python wrapper implementation complete; hosted/model acceptance pending
 
-Owner: maintainer coordinator. Audit all deduplicated public declarations in
-`include/crispasr_session.h` against callable Python entry points, including
-music analysis, voice conversion, streaming callbacks/polling, TTS controls,
-text processors, capability queries and legacy Whisper helpers. Export existing
-public utilities at package root. Fix ownership, contiguous-input and empty
-result contracts encountered along these paths. Add a header-driven coverage
-check and model-free ABI behavior tests; update `docs/contributing.md` and Python
-documentation with actual scope and validation limits. Native model/hardware
-acceptance remains separate from wrapper fixture coverage. Work is in progress;
-no blanket parity claim until the census and tests pass.
+Owner: maintainer coordinator. Source inventory and operation contracts are in
+[Python API coverage](docs/python-api-coverage.md); completed implementation is
+archived in HISTORY.md. The header census now accounts for 282 unique functions
+(277 bound, three equivalent/compiled adapters, two retired native stubs).
+This is Python coverage, not a claim about every language wrapper or model.
 
+New operation/metadata probes pass with GCC and Clang. They exercise compiled C
+ABI transport, actual native metadata functions, allocated-buffer ownership,
+strided inputs, successful empty music results, replay-noise dimensions,
+callback exceptions/re-entry, options layout, and compiled legacy adapters.
+The combined local selection reports 63 passed, 92 subtests and 166 skips:
+164 export-resolution cases await an explicitly supplied current library, and
+two optional native-library checks await that build. GCC/Clang focused operation
+and metadata suites each report 39 passed, 64 subtests and one native-library
+skip. These skips are not hosted acceptance. The real-header helper also compiles locally. No full local library/model build
+was attempted. Hosted CI checks the newly built library's exports/getters and
+loads a helper compiled against that build; record its exact source/run below
+once dispatched. A fixture library is never the native model acceptance gate.
+
+Next acceptance work, in order:
+
+1. Audit the immutable source's full CI/lint (source/run pins to follow),
+   especially the complete shared library, legacy helper link/load, the
+   164-symbol smoke subset and native exported metadata. Do not accept a stale
+   build discovered from another checkout. Local symbol-resolution checks skip
+   when no current native library was explicitly supplied.
+2. Exercise representative real models through Python: piano (including empty
+   notes and MT3 programs), chords, beats at native/mismatched rates, tab
+   emissions/mapping, conversion with pinned ContentVec/F0 and supplied replay
+   noise, text processors, and TTS reference/streaming/disclosure. Compare
+   structured outputs against the same native C ABI/CLI where that surface
+   exists; TTS still requires ASR roundtrips and conversion its pinned reference
+   recipe. Retain model/revision/source/input pins. Use hosted CPU/GPU capacity
+   for heavy work; no performance/accuracy claim from transport fixtures.
+3. Keep #549 real Japanese ASR multiwindow/gap-fill ownership acceptance open;
+   the separate #217 forced-alignment worker does not validate that route.
+4. Audit other language bindings independently, including the two new replay
+   dimension getters. Python's complete census does not establish Go/Rust/Dart/
+   Java/Ruby/C#/WASM parity. Do not ship a release from queued CI alone.
 
 ## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
 

@@ -4,6 +4,13 @@ Python bindings for [CrispASR](https://github.com/CrispStrobe/CrispASR) — ligh
 
 Supports the ASR backends compiled into the linked CrispASR library, including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, VibeVoice-ASR, and Index-Echo.
 
+The package also exposes TTS, speech-to-speech, music analysis, ContentVec voice
+conversion, alignment, diarization, VAD, text processors and model utilities.
+See [the Python API inventory](../docs/python-api-coverage.md) for entry points,
+result units, ownership, callback rules and verification limits. These additions
+require a matching native build; current source coverage does not imply an
+older published wheel contains the same APIs.
+
 ## Install
 
 ```bash

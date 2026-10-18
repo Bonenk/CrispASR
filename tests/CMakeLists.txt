@@ -5622,6 +5622,14 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME test-python-wrapper-operations
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_wrapper_operations.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-wrapper-operations PROPERTIES LABELS "unit;session;bindings" TIMEOUT 60)
+    add_test(NAME test-python-api-coverage
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-python-api-coverage.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-api-coverage PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
     add_test(NAME test-session-utf8
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

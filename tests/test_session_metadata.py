@@ -196,11 +196,12 @@ extern "C" crispasr_session_result* inject_remapped() {
         code += definition(source[vad_start:], 'for (auto& seg : r->segments)')
         code += '\nreturn r; }\n'
         for name in ('n_segments', 'segment_text', 'segment_t0', 'segment_t1', 'segment_speaker',
-                     'segment_no_speech_prob', 'n_words', 'word_text', 'word_t0', 'word_t1', 'word_p',
+                     'segment_no_speech_prob', 'n_words', 'word_text', 'word_t0', 'word_t1', 'word_p', 'word_n_alts', 'word_alt_text', 'word_alt_p',
                      'n_tokens', 'token_text', 'token_t0', 'token_t1', 'token_p', 'free'):
             name = 'crispasr_session_result_' + name
             marker = re.search(r'^CA_EXPORT [^\n]*\b' + name + r'\(', source, re.MULTILINE).group()
             code += definition(source, marker) + '\n'
+        code += 'extern "C" void inject_word_alt(crispasr_session_result* r) { if (!r->segments.empty() && !r->segments[0].words.empty()) r->segments[0].words[0].alts.push_back({"alternative 日本語", 0.25f}); }\n'
         code += definition(source, 'CA_EXPORT void crispasr_free_aligner_cache(') + '\n'
         (path / 'test.cpp').write_text(code)
         subprocess.run([os.environ.get('CXX', 'c++'), '-std=c++17', '-shared', '-fPIC',
@@ -234,6 +235,13 @@ extern "C" crispasr_session_result* inject_remapped() {
                     fn = getattr(cls.lib, 'crispasr_session_result_' + kind + '_' + field)
                     fn.argtypes = [ctypes.c_void_p] + [ctypes.c_int] * count
                     fn.restype = restype
+        cls.fixture.inject_word_alt.argtypes = [ctypes.c_void_p]
+        for name, args, restype in [('word_n_alts', 2, ctypes.c_int),
+                                    ('word_alt_text', 3, ctypes.c_char_p),
+                                    ('word_alt_p', 3, ctypes.c_float)]:
+            fn = getattr(cls.lib, 'crispasr_session_result_' + name)
+            fn.argtypes = [ctypes.c_void_p] + [ctypes.c_int] * args
+            fn.restype = restype
         cls.fixture.crispasr_session_result_free.argtypes = [ctypes.c_void_p]
 
     @classmethod
@@ -245,6 +253,12 @@ extern "C" crispasr_session_result* inject_remapped() {
             return self.session._read_result(handle)
         finally:
             self.fixture.crispasr_session_result_free(handle)
+
+    def test_word_alternatives_copied_before_native_free(self):
+        handle = self.fixture.inject_cohere(b'Hello world')
+        self.fixture.inject_word_alt(handle)
+        segments = self.read(handle)
+        self.assertEqual(segments[0].words[0].alternatives, [('alternative 日本語', 0.25)])
 
     def test_cohere_native_token_metadata_survives(self):
         seg, = self.read(self.fixture.inject_cohere(b'Hello, world!'))
@@ -336,7 +350,7 @@ extern "C" crispasr_session_result* inject_remapped() {
 
         frontend = Frontend()
         pcm = np.zeros(16, dtype=np.float32)
-        with patch.object(self.session, '_lib', frontend):
+        with patch.object(self.session, '_lib', frontend), patch.object(self.session, '_handle', 1):
             results = [self.session.transcribe(pcm, language='ja'),
                        self.session.transcribe_chunked(pcm),
                        self.session.transcribe_vad(pcm, 'fixture-vad.gguf'),

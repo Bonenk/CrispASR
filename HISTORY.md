@@ -1,3 +1,35 @@
+## Python shared-API wrapper completion — 2026-10-18
+
+Added music results (piano/programs, chords/names, beats/tempo, tablature
+emissions), ContentVec voice conversion with validated replay noise, TTS
+streaming/reference PCM/TADA/disclosure/CFG helpers, persistent callbacks and
+stream polling, truecase/PCS processors, capability/version/GPU utilities and
+missing package exports. Session loading now exposes GPU/flash-attention/layer
+options. Word alternatives and legacy Whisper tokens/alternatives/DTW/parallel
+controls reach Python. Added two native model-dimension getters to validate
+replay noise instead of guessing buffer sizes, plus the missing C typedef that
+prevented the session header from compiling standalone as C.
+
+Fixed allocated-string pointer loss in punctuation/translation, audio/text
+cleanup on error, stereo/strided input handling, closed stream/session use,
+stream parent lifetime, callback exception transport and callback re-entry.
+Legacy by-value Whisper inference uses a compiled pointer adapter and fails
+clearly when the helper is absent. Frozen pre-change punctuation replay against
+the ownership probe produced one invalid free and one outstanding allocation;
+the corrected wrapper passes the same ownership contract. The helper compiles
+against real headers with all three pointer adapters exported.
+
+A complete header drift guard accounts for 282 unique functions: 277 bound,
+three equivalent/bulk/compiled routes and two retired native stubs. It is
+separate from behavioral evidence. GCC and Clang wrapper/metadata probes pass;
+CI/CTest run the new suites and hosted CI additionally checks the complete
+library and compiles/loads its helper. Removed a stale machine-specific native
+library fallback and the already-stale curated symbol count from the smoke
+suite. The complete native-build/model acceptance status belongs in PLAN.md.
+`docs/python-api-coverage.md` records operations, units, ownership and limits;
+`docs/contributing.md` now requires the guard and behavioral checks without
+assuming every wrapper already has full parity.
+
 ## #549 explicit-output tied-frame token ownership — 2026-10-18
 
 A native-grouped continuation token sharing the next word's start frame was

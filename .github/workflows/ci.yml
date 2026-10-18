@@ -174,7 +174,7 @@ jobs:
       # downloading. --timeout: a hung unit test must not eat the runner.
       - name: Breeze guided acceptance deletion controls
         run: |
-          python3 -m pip install numpy
+          python3 -m pip install numpy pytest
           python3 tests/test_breeze_guided_validation.py -v
 
       - name: Run the unit tier
@@ -229,7 +229,13 @@ jobs:
           test -n "$library"
           CRISPASR_LIB="$PWD/$library" python3 tests/test_session_metadata.py -v
           CRISPASR_LIB="$PWD/$library" python3 tests/test_parakeet_window_metadata.py -v
-
+          CRISPASR_LIB="$PWD/$library" python3 tests/test_python_wrapper_operations.py -v
+          python3 tools/check-python-api-coverage.py --library "$PWD/$library"
+          CRISPASR_LIB_PATH="$PWD/$library" python3 -m pytest -q tests/test_binding_parity.py tests/test_python_binding_utils.py tests/test_python_helpers.py tests/test_python_audio_resample.py
+          cc -shared -fPIC python/crispasr/_helpers.c -Iinclude -Iggml/include \
+            "$PWD/$library" -Wl,-rpath,"$(dirname "$PWD/$library")" \
+            -o "$RUNNER_TEMP/libcrispasr_helpers.so"
+          python3 -c 'import ctypes, os; lib = ctypes.CDLL(os.path.join(os.environ["RUNNER_TEMP"], "libcrispasr_helpers.so")); assert lib.crispasr_transcribe_parallel_ptr'
 
       - name: Breeze session reference and instruction composition
         run: python3 tests/test_breeze_session_modes.py -v

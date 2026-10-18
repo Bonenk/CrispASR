@@ -91,10 +91,12 @@ class AudioResampleTests(unittest.TestCase):
                 def full(handle, params, pointer, count):
                     capture(handle, pointer, count)
                     return 0
-                lib.whisper_full = full
+                helpers = Mock(spec=[])
+                helpers.whisper_full_ptr = full
                 whisper = object.__new__(binding.CrispASR)
-                whisper._lib, whisper._ctx, whisper._helpers = lib, None, None
+                whisper._lib, whisper._ctx, whisper._helpers = lib, 1, helpers
                 self.assertEqual(whisper.transcribe_pcm(source, sample_rate=24000), [])
+                whisper._ctx = None
             np.testing.assert_array_equal(received[0], expected)
 
 
