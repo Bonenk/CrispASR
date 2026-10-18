@@ -1,3 +1,26 @@
+## Go legacy parameter strings and decode controls — 2026-10-18
+
+Legacy `Params` retains prompt/VAD paths as Go strings and creates temporary C
+strings only for a sequential or parallel inference call, with deferred release
+on all returns. Value copies preserve independent settings without shared native
+string lifetimes or a new close requirement. Borrowed native defaults remain
+untouched. Nil contexts, empty/oversized PCM, invalid processor counts and NUL
+strings return errors before native dispatch; the old empty-input panic was
+reproduced in a regression.
+
+Both Go APIs gain the five missing scalar controls: best-of, language detection,
+blank suppression, tinydiarize and alternative count (native 0–32 clamp). The
+higher-level Context interface includes those methods; custom implementers/mocks
+must supply them. The options wrapper keeps the native struct private.
+
+Validation: **34 Go tests, 28 Rust tests and five Rust doctests** pass using the
+isolated native fixture library. Parameter tests exercise native public-header
+struct transport, repeated replacements, copied UTF-8 strings, GC inside
+callbacks, sequential/parallel success and native errors. The higher-level Go
+package compiles against the same isolated fixture; its model tests were not
+run. Remaining DTW/context/token paths and real-model/platform acceptance stay
+in PLAN.md.
+
 ## Ruby microphone tickets and pump cleanup — 2026-10-18
 
 Microphone handles now use the shared opaque-ticket namespace, with private

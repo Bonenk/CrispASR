@@ -40,6 +40,12 @@ class GoRustWrapperContract(unittest.TestCase):
                 cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS',result.stdout);print(result.stdout)
+            # Compile the higher-level public interface against the same isolated
+            # library; do not run its model-dependent tests in this contract.
+            result=subprocess.run(['go','test','./pkg/whisper','-run','^$'],
+                cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            print('PASS Go high-level package compilation (no model tests run)')
             env['CRISPASR_SYS_LIB_DIR']=str(tmp)
             env.pop('CRISPASR_LIB_DIR',None)
             env.pop('CRISPASR_LIB_NAME',None)

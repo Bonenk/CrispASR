@@ -1043,6 +1043,7 @@ int crispasr_session_set_speaker_identity(crispasr_session* s, const char* id) {
 
 
 // whisper legacy stubs
+#include "wrapper-whisper-go-params.c"
 struct whisper_context* whisper_init_from_file_with_params(const char* p, struct whisper_context_params pr) {
     STUB_ABORT();
     return NULL;
@@ -1061,8 +1062,7 @@ void whisper_free_context_params(struct whisper_context_params* p) {
     STUB_ABORT();
 }
 int whisper_full(struct whisper_context* ctx, struct whisper_full_params p, const float* s, int n) {
-    STUB_ABORT();
-    return 0;
+    return probe_legacy_full(ctx, p, s, n);
 }
 struct whisper_full_params* whisper_full_default_params_by_ref(enum whisper_sampling_strategy s) {
     STUB_ABORT();
@@ -1217,8 +1217,7 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
     return 0;
 }
 int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params p, const float* s, int n, int nproc) {
-    STUB_ABORT();
-    return 0;
+    return nproc == 2 ? probe_legacy_full(ctx, p, s, n) : -8;
 }
 int whisper_bench_memcpy(int n) {
     STUB_ABORT();
@@ -1655,7 +1654,8 @@ struct whisper_context_params whisper_context_default_params(void) {
 }
 struct whisper_full_params whisper_full_default_params(enum whisper_sampling_strategy strategy) {
     struct whisper_full_params _s = {0};
-    STUB_ABORT();
+    _s.strategy = strategy;
+    _s.greedy.best_of = 1;
     return _s;
 }
 struct whisper_context* whisper_init_from_file_with_params_no_state_by_ref(const char* path_model,

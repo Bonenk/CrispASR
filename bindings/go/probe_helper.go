@@ -11,6 +11,9 @@ package whisper
 typedef struct crispasr_session CrispasrSession;
 void probe_mode_set(int m);
 void probe_streamed_ready(int ready);
+void probe_legacy_expect(const char*, const char*);
+void probe_legacy_mode(int);
+int probe_legacy_calls(void);
 void probe_text_mode(int mode);
 int probe_text_live(void);
 int probe_text_contexts(void);
@@ -63,3 +66,13 @@ func probeTextLive() int     { return int(C.probe_text_live()) }
 func probeTextContexts() int { return int(C.probe_text_contexts()) }
 
 func probeStreamedReady(ready int) { C.probe_streamed_ready(C.int(ready)) }
+
+func probeLegacyExpect(prompt, model string) {
+	p, m := C.CString(prompt), C.CString(model)
+	defer C.free(unsafe.Pointer(p))
+	defer C.free(unsafe.Pointer(m))
+	C.probe_legacy_expect(p, m)
+}
+func probeLegacyMode(mode int)        { C.probe_legacy_mode(C.int(mode)) }
+func probeLegacyCalls() int           { return int(C.probe_legacy_calls()) }
+func newProbeLegacyContext() *Context { return (*Context)(unsafe.Pointer(uintptr(0x100000001))) }

@@ -38,6 +38,12 @@ func newContext(model *model, params whisper.Params) (Context, error) {
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
+func (context *context) SetBestOf(n int)          { context.params.SetBestOf(n) }
+func (context *context) SetDetectLanguage(v bool) { context.params.SetDetectLanguage(v) }
+func (context *context) SetSuppressBlank(v bool)  { context.params.SetSuppressBlank(v) }
+func (context *context) SetTdrz(v bool)           { context.params.SetTdrz(v) }
+func (context *context) SetAltN(n int)            { context.params.SetAltN(n) }
+
 // Set the language to use for speech recognition.
 func (context *context) SetLanguage(lang string) error {
 	if context.model.ctx == nil {

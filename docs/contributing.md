@@ -636,6 +636,11 @@ bundles, preserve companion artifacts and license metadata, retry only each
 function's documented buffer-small code, and bound retries. Native download
 transport in a fixture does not prove browser networking or persistence.
 
+Go legacy parameter copies must retain independent prompt/VAD strings. Allocate
+C strings for the duration of inference and defer their release, including
+native-error returns; never free borrowed native defaults. Compile higher-level
+packages when changing a low-level options representation or public interface.
+
 Polling counts are element counts, not byte lengths. For native NUL-separated
 tokens read exactly that many terminated strings; never estimate a byte length.
 The Go regression places the buffer immediately before a protected memory page.

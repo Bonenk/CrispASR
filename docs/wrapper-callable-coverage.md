@@ -183,3 +183,22 @@ start/stop/open failures, queue overflow, GC, callback exceptions, pump kill and
 an injected copy exception after dequeue. A test-only atomic allocation counter
 checks queued/pending chunks return to zero. This does not prove audio-device
 access on a target platform.
+
+
+## Go legacy Whisper parameters
+
+Low-level `Params` and higher-level `Context` expose `SetBestOf`,
+`SetDetectLanguage`, `SetSuppressBlank`, `SetTdrz`, and `SetAltN`; the last
+matches the native 0–32 clamp. These are public scalar-field equivalents of
+the corresponding five `crispasr_params_set_*` exports. `SetInitialPrompt` and
+`SetVADModelPath` retain Go values; sequential/parallel inference allocate and
+free temporary native strings instead of leaking allocations in setters.
+
+`TestProbeLegacyParamsCopiesStringsControlsAndFailures` exercises actual
+public-header struct transport, independent copies, repeated replacement,
+GC inside callbacks, parallel/sequential calls and failures. Invalid PCM,
+processor counts and NUL strings never reach the native oracle.
+`TestProbeLegacyEmptyPCMReturnsError` reproduced the old index-out-of-range
+panic and now passes. The contract also compiles the higher-level package;
+that compilation does not run its model-dependent tests. DTW and remaining
+legacy context/token/resource paths are still pending.

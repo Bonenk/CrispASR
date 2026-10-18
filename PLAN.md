@@ -27,11 +27,10 @@ Recommended implementation order and concrete acceptance:
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
    implementation. Direct Parakeet uses an integer centisecond offset.
-   Go's legacy `Params` is a copyable native struct: prompt/VAD-path setters
-   allocate C strings without a disposal owner. Introduce an explicit owned
-   parameter route without freeing borrowed/default pointers or copied structs;
-   test repeated assignment, copies, close and failed inference. Add missing
-   scalar controls and DTW through compiled native adapters.
+   Go's legacy parameter-string ownership and five scalar decode controls now
+   have compiled operation probes; verify actual model behavior. Continue DTW,
+   remaining token introspection and legacy context/callback lifecycle auditing.
+   Review higher-level APIs as well as the low-level bindings.
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now
    have compiled regressions; see HISTORY.md. Audit microphone ring/close and

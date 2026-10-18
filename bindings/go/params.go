@@ -2,6 +2,8 @@ package whisper
 
 import (
 	"fmt"
+	"strings"
+	"unsafe"
 )
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -9,6 +11,7 @@ import (
 
 /*
 #include <crispasr.h>
+#include <stdlib.h>
 */
 import "C"
 
@@ -16,171 +19,173 @@ import "C"
 // PUBLIC METHODS
 
 func (p *Params) SetTranslate(v bool) {
-	p.translate = toBool(v)
+	p.native.translate = toBool(v)
 }
 
 func (p *Params) SetSplitOnWord(v bool) {
-	p.split_on_word = toBool(v)
+	p.native.split_on_word = toBool(v)
 }
 
 func (p *Params) SetNoContext(v bool) {
-	p.no_context = toBool(v)
+	p.native.no_context = toBool(v)
 }
 
 func (p *Params) SetSingleSegment(v bool) {
-	p.single_segment = toBool(v)
+	p.native.single_segment = toBool(v)
 }
 
 func (p *Params) SetPrintSpecial(v bool) {
-	p.print_special = toBool(v)
+	p.native.print_special = toBool(v)
 }
 
 func (p *Params) SetPrintProgress(v bool) {
-	p.print_progress = toBool(v)
+	p.native.print_progress = toBool(v)
 }
 
 func (p *Params) SetPrintRealtime(v bool) {
-	p.print_realtime = toBool(v)
+	p.native.print_realtime = toBool(v)
 }
 
 func (p *Params) SetPrintTimestamps(v bool) {
-	p.print_timestamps = toBool(v)
+	p.native.print_timestamps = toBool(v)
 }
 
 // Voice Activity Detection (VAD)
 func (p *Params) SetVAD(v bool) {
-	p.vad = toBool(v)
+	p.native.vad = toBool(v)
 }
 
 func (p *Params) SetVADModelPath(path string) {
-	p.vad_model_path = C.CString(path)
+	p.vadModelPath = path
+	p.vadModelPathSet = true
 }
 
 func (p *Params) SetVADThreshold(t float32) {
-	p.vad_params.threshold = C.float(t)
+	p.native.vad_params.threshold = C.float(t)
 }
 
 func (p *Params) SetVADMinSpeechMs(ms int) {
-	p.vad_params.min_speech_duration_ms = C.int(ms)
+	p.native.vad_params.min_speech_duration_ms = C.int(ms)
 }
 
 func (p *Params) SetVADMinSilenceMs(ms int) {
-	p.vad_params.min_silence_duration_ms = C.int(ms)
+	p.native.vad_params.min_silence_duration_ms = C.int(ms)
 }
 
 func (p *Params) SetVADMaxSpeechSec(s float32) {
-	p.vad_params.max_speech_duration_s = C.float(s)
+	p.native.vad_params.max_speech_duration_s = C.float(s)
 }
 
 func (p *Params) SetVADSpeechPadMs(ms int) {
-	p.vad_params.speech_pad_ms = C.int(ms)
+	p.native.vad_params.speech_pad_ms = C.int(ms)
 }
 
 func (p *Params) SetVADSamplesOverlap(sec float32) {
-	p.vad_params.samples_overlap = C.float(sec)
+	p.native.vad_params.samples_overlap = C.float(sec)
 }
 
 // Set language id
 func (p *Params) SetLanguage(lang int) error {
 	if lang == -1 {
-		p.language = nil
+		p.native.language = nil
 		return nil
 	}
 	str := C.whisper_lang_str(C.int(lang))
 	if str == nil {
 		return ErrInvalidLanguage
 	} else {
-		p.language = str
+		p.native.language = str
 	}
 	return nil
 }
 
 // Get language id
 func (p *Params) Language() int {
-	if p.language == nil {
+	if p.native.language == nil {
 		return -1
 	}
-	return int(C.whisper_lang_id(p.language))
+	return int(C.whisper_lang_id(p.native.language))
 }
 
 // Threads available
 func (p *Params) Threads() int {
-	return int(p.n_threads)
+	return int(p.native.n_threads)
 }
 
 // Set number of threads to use
 func (p *Params) SetThreads(threads int) {
-	p.n_threads = C.int(threads)
+	p.native.n_threads = C.int(threads)
 }
 
 // Set start offset in ms
 func (p *Params) SetOffset(offset_ms int) {
-	p.offset_ms = C.int(offset_ms)
+	p.native.offset_ms = C.int(offset_ms)
 }
 
 // Set audio duration to process in ms
 func (p *Params) SetDuration(duration_ms int) {
-	p.duration_ms = C.int(duration_ms)
+	p.native.duration_ms = C.int(duration_ms)
 }
 
 // Set timestamp token probability threshold (~0.01)
 func (p *Params) SetTokenThreshold(t float32) {
-	p.thold_pt = C.float(t)
+	p.native.thold_pt = C.float(t)
 }
 
 // Set timestamp token sum probability threshold (~0.01)
 func (p *Params) SetTokenSumThreshold(t float32) {
-	p.thold_ptsum = C.float(t)
+	p.native.thold_ptsum = C.float(t)
 }
 
 // Set max segment length in characters
 func (p *Params) SetMaxSegmentLength(n int) {
-	p.max_len = C.int(n)
+	p.native.max_len = C.int(n)
 }
 
 func (p *Params) SetTokenTimestamps(b bool) {
-	p.token_timestamps = toBool(b)
+	p.native.token_timestamps = toBool(b)
 }
 
 // Set max tokens per segment (0 = no limit)
 func (p *Params) SetMaxTokensPerSegment(n int) {
-	p.max_tokens = C.int(n)
+	p.native.max_tokens = C.int(n)
 }
 
 // Set audio encoder context
 func (p *Params) SetAudioCtx(n int) {
-	p.audio_ctx = C.int(n)
+	p.native.audio_ctx = C.int(n)
 }
 
 func (p *Params) SetMaxContext(n int) {
-	p.n_max_text_ctx = C.int(n)
+	p.native.n_max_text_ctx = C.int(n)
 }
 
 func (p *Params) SetBeamSize(n int) {
-	p.beam_search.beam_size = C.int(n)
+	p.native.beam_search.beam_size = C.int(n)
 }
 
 func (p *Params) SetEntropyThold(t float32) {
-	p.entropy_thold = C.float(t)
+	p.native.entropy_thold = C.float(t)
 }
 
 func (p *Params) SetTemperature(t float32) {
-	p.temperature = C.float(t)
+	p.native.temperature = C.float(t)
 }
 
 // Sets the fallback temperature incrementation
 // Pass -1.0 to disable this feature
 func (p *Params) SetTemperatureFallback(t float32) {
-	p.temperature_inc = C.float(t)
+	p.native.temperature_inc = C.float(t)
 }
 
 // Set initial prompt
 func (p *Params) SetInitialPrompt(prompt string) {
-	p.initial_prompt = C.CString(prompt)
+	p.initialPrompt = prompt
+	p.initialPromptSet = true
 }
 
 func (p *Params) SetCarryInitialPrompt(v bool) {
-	p.carry_initial_prompt = toBool(v)
+	p.native.carry_initial_prompt = toBool(v)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -198,47 +203,97 @@ func toBool(v bool) C.bool {
 
 func (p *Params) String() string {
 	str := "<whisper.params"
-	str += fmt.Sprintf(" strategy=%v", p.strategy)
-	str += fmt.Sprintf(" n_threads=%d", p.n_threads)
-	if p.language != nil {
-		str += fmt.Sprintf(" language=%s", C.GoString(p.language))
+	str += fmt.Sprintf(" strategy=%v", p.native.strategy)
+	str += fmt.Sprintf(" n_threads=%d", p.native.n_threads)
+	if p.native.language != nil {
+		str += fmt.Sprintf(" language=%s", C.GoString(p.native.language))
 	}
-	str += fmt.Sprintf(" n_max_text_ctx=%d", p.n_max_text_ctx)
-	str += fmt.Sprintf(" offset_ms=%d", p.offset_ms)
-	str += fmt.Sprintf(" duration_ms=%d", p.duration_ms)
-	str += fmt.Sprintf(" audio_ctx=%d", p.audio_ctx)
-	str += fmt.Sprintf(" initial_prompt=%s", C.GoString(p.initial_prompt))
-	str += fmt.Sprintf(" entropy_thold=%f", p.entropy_thold)
-	str += fmt.Sprintf(" temperature=%f", p.temperature)
-	str += fmt.Sprintf(" temperature_inc=%f", p.temperature_inc)
-	str += fmt.Sprintf(" beam_size=%d", p.beam_search.beam_size)
-	if p.translate {
+	str += fmt.Sprintf(" n_max_text_ctx=%d", p.native.n_max_text_ctx)
+	str += fmt.Sprintf(" offset_ms=%d", p.native.offset_ms)
+	str += fmt.Sprintf(" duration_ms=%d", p.native.duration_ms)
+	str += fmt.Sprintf(" audio_ctx=%d", p.native.audio_ctx)
+	prompt := p.initialPrompt
+	if !p.initialPromptSet {
+		prompt = C.GoString(p.native.initial_prompt)
+	}
+	str += fmt.Sprintf(" initial_prompt=%s", prompt)
+	str += fmt.Sprintf(" entropy_thold=%f", p.native.entropy_thold)
+	str += fmt.Sprintf(" temperature=%f", p.native.temperature)
+	str += fmt.Sprintf(" temperature_inc=%f", p.native.temperature_inc)
+	str += fmt.Sprintf(" beam_size=%d", p.native.beam_search.beam_size)
+	if p.native.translate {
 		str += " translate"
 	}
-	if p.no_context {
+	if p.native.no_context {
 		str += " no_context"
 	}
-	if p.single_segment {
+	if p.native.single_segment {
 		str += " single_segment"
 	}
-	if p.print_special {
+	if p.native.print_special {
 		str += " print_special"
 	}
-	if p.print_progress {
+	if p.native.print_progress {
 		str += " print_progress"
 	}
-	if p.print_realtime {
+	if p.native.print_realtime {
 		str += " print_realtime"
 	}
-	if p.print_timestamps {
+	if p.native.print_timestamps {
 		str += " print_timestamps"
 	}
-	if p.token_timestamps {
+	if p.native.token_timestamps {
 		str += " token_timestamps"
 	}
-	if p.carry_initial_prompt {
+	if p.native.carry_initial_prompt {
 		str += " carry_initial_prompt"
 	}
 
 	return str + ">"
+}
+
+// SetBestOf updates the native positive best-of control; nonpositive values
+// leave it unchanged, matching crispasr_params_set_best_of.
+func (p *Params) SetBestOf(n int) {
+	if n > 0 && uint64(n) <= 2147483647 {
+		p.native.greedy.best_of = C.int(n)
+	}
+}
+func (p *Params) SetDetectLanguage(v bool) { p.native.detect_language = toBool(v) }
+func (p *Params) SetSuppressBlank(v bool)  { p.native.suppress_blank = toBool(v) }
+func (p *Params) SetTdrz(v bool)           { p.native.tdrz_enable = toBool(v) }
+
+// SetAltN clamps the candidate count to [0,32], matching the native adapter.
+func (p *Params) SetAltN(n int) {
+	if n < 0 {
+		n = 0
+	}
+	if n > 32 {
+		n = 32
+	}
+	p.native.alt_n = C.int(n)
+}
+
+func (p Params) nativeForCall() (C.struct_whisper_full_params, func(), error) {
+	native := p.native
+	if (p.initialPromptSet && strings.ContainsRune(p.initialPrompt, 0)) || (p.vadModelPathSet && strings.ContainsRune(p.vadModelPath, 0)) {
+		return native, nil, fmt.Errorf("legacy Whisper prompt/model path contains NUL")
+	}
+	var prompt, model *C.char
+	if p.initialPromptSet {
+		prompt = C.CString(p.initialPrompt)
+		native.initial_prompt = prompt
+	}
+	if p.vadModelPathSet {
+		model = C.CString(p.vadModelPath)
+		native.vad_model_path = model
+	}
+	return native, func() {
+		if prompt != nil {
+			C.free(unsafe.Pointer(prompt))
+		}
+		if model != nil {
+			C.free(unsafe.Pointer(model))
+		}
+	}, nil
 }

@@ -4,6 +4,8 @@ package whisper
 
 import (
 	"bytes"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -1112,5 +1114,92 @@ func TestProbePolledSegmentsCopyMetadataAndRejectInvalidCounts(t *testing.T) {
 		if probeResultFreesGet() != before+1 {
 			t.Fatal("invalid logits leaked")
 		}
+	}
+}
+
+func TestProbeLegacyEmptyPCMReturnsError(t *testing.T) {
+	var ctx *Context
+	if err := ctx.Whisper_full(Params{}, nil, nil, nil, nil); err == nil {
+		t.Fatal("nil context/empty PCM accepted")
+	}
+}
+
+func TestProbeLegacyParamsCopiesStringsControlsAndFailures(t *testing.T) {
+	ctx := newProbeLegacyContext()
+	p := ctx.Whisper_full_default_params(SAMPLING_GREEDY)
+	p.SetThreads(3)
+	p.SetBestOf(7)
+	p.SetBestOf(0)
+	p.SetDetectLanguage(true)
+	p.SetSuppressBlank(false)
+	p.SetTdrz(true)
+	p.SetAltN(100)
+	p.SetInitialPrompt("old 日本語")
+	p.SetVADModelPath("old-vad")
+	previous := p
+	p.SetInitialPrompt("new 日本語")
+	p.SetVADModelPath("new-vad")
+	pcm := []float32{1, 3, 5}
+	encoded, segments, progress := 0, 0, 0
+	probeLegacyMode(0)
+	run := func(options Params, prompt, model string) {
+		t.Helper()
+		probeLegacyExpect(prompt, model)
+		if err := ctx.Whisper_full(options, pcm, func() bool { encoded++; runtime.GC(); return true }, func(int) { segments++ }, func(int) { progress++ }); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run(previous, "old 日本語", "old-vad")
+	run(p, "new 日本語", "new-vad")
+	if encoded != 2 || segments != 2 || progress != 2 {
+		t.Fatalf("callbacks %d/%d/%d", encoded, segments, progress)
+	}
+	if !strings.Contains(previous.String(), "initial_prompt=old 日本語") || !strings.Contains(p.String(), "initial_prompt=new 日本語") {
+		t.Fatal("parameter copies share prompts")
+	}
+	for i := 0; i < 64; i++ {
+		p.SetInitialPrompt("replacement")
+		p.SetVADModelPath("replacement-vad")
+		run(p, "replacement", "replacement-vad")
+	}
+	probeLegacyExpect("old 日本語", "old-vad")
+	if err := ctx.Whisper_full_parallel(previous, pcm, 2, func() bool { return true }, func(int) {}); err != nil {
+		t.Fatal(err)
+	}
+	probeLegacyMode(1)
+	if err := ctx.Whisper_full(previous, pcm, nil, nil, nil); err == nil {
+		t.Fatal("native failure ignored")
+	}
+	if err := ctx.Whisper_full_parallel(previous, pcm, 2, nil, nil); err == nil {
+		t.Fatal("parallel failure ignored")
+	}
+	probeLegacyMode(0)
+	calls := probeLegacyCalls()
+	if err := ctx.Whisper_full(previous, nil, nil, nil, nil); err == nil {
+		t.Fatal("empty PCM accepted")
+	}
+	if err := ctx.Whisper_full_parallel(previous, pcm, 0, nil, nil); err == nil {
+		t.Fatal("zero processors accepted")
+	}
+	invalid := previous
+	invalid.SetInitialPrompt("bad\x00prompt")
+	if err := ctx.Whisper_full(invalid, pcm, nil, nil, nil); err == nil {
+		t.Fatal("NUL prompt accepted")
+	}
+	invalid = previous
+	invalid.SetVADModelPath("bad\x00model")
+	if err := ctx.Whisper_full_parallel(invalid, pcm, 2, nil, nil); err == nil {
+		t.Fatal("NUL model accepted")
+	}
+	if probeLegacyCalls() != calls {
+		t.Fatal("invalid inputs reached native code")
+	}
+	previous.SetAltN(-2)
+	if previous.native.alt_n != 0 {
+		t.Fatal("negative candidate count not clamped")
+	}
+	previous.SetAltN(5)
+	if previous.native.alt_n != 5 {
+		t.Fatal("candidate count lost")
 	}
 }
