@@ -33,6 +33,19 @@ Run ordinary full-library CI and lint on the same frozen source. Keep that branc
 immutable while documentation checkpoints advance. No default promotion until
 those gates and representative model alignment acceptance are satisfied.
 
+## CLAIMED — #217 subword CTC failure contract (2026-10-18)
+
+Owner: coordinator in the existing isolated #217 worktree. Independent audit of
+our `canary_ctc_align_words` finds no complete-path check before traceback.
+Scope: prove the failure on tiny native-tokenizer fixtures, then reject
+unreachable/nonfinite terminal states and invalid ABI inputs. This is a separate
+correctness change, not a subword speedup. Preserve valid word text and native
+centisecond bounds; no encoder, tokenizer or DP arithmetic change.
+Acceptance: demonstrate the pre-fix failure, verify repeated-label minimum-frame
+constraints and known valid paths, reject null/out-of-range arguments, and run
+the existing character-kernel acceptance suite unchanged. The frozen character
+benchmark source/branch must remain immutable.
+
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 
 After the exact-output CPU kernel experiment, profile the separate
