@@ -711,14 +711,6 @@ public final class CrispasrAuxiliary {
         prev, prev.length, curr, curr.length, minLcs);
   }
 
-  // -----------------------------------------------------------------
-  // Helpers for unit tests: layout sizes
-  // -----------------------------------------------------------------
-
-  static int nativeSegmentSize() {
-    return (int) new Memory(24).size(); // placeholder; actual via Structure size
-  }
-
   /** Legacy Parakeet decoder. Times/offsets are centiseconds; all output is copied. */
   public static final class Parakeet implements AutoCloseable {
     private Pointer handle;

@@ -44,12 +44,34 @@ static void rb_extra_check(int rc, const char* name) {
         rb_raise(rb_eRuntimeError, "%s failed (rc=%d)", name, rc);
 }
 static _Thread_local int rb_extra_in_stream;
-static _Thread_local VALUE rb_aux_pending_exc = Qnil;
+// Keep deferred exceptions in Ruby's per-thread/fiber storage, so GC traces
+// them. A raw C TLS VALUE is neither marked nor updated by compaction.
+static ID rb_aux_error_id;
+static VALUE rb_aux_pending_get(void) {
+    if (!rb_aux_error_id)
+        rb_aux_error_id = rb_intern("__crispasr_callback_error");
+    return rb_thread_local_aref(rb_thread_current(), rb_aux_error_id);
+}
+#define rb_aux_pending_exc rb_aux_pending_get()
+static VALUE rb_aux_remember_error(VALUE error) {
+    if (NIL_P(rb_aux_pending_get()))
+        rb_thread_local_aset(rb_thread_current(), rb_aux_error_id, error);
+    return Qnil;
+}
+static void rb_aux_capture_error(void) {
+    VALUE error = rb_errinfo();
+    int state = 0;
+    // Store the original while errinfo still roots it; no allocation failure
+    // from recording an exception may unwind through native callback frames.
+    rb_protect(rb_aux_remember_error, error, &state);
+    if (!state)
+        rb_set_errinfo(Qnil);
+}
 static inline void rb_aux_check_pending(void) {
-    if (rb_aux_pending_exc != Qnil) {
-        VALUE e = rb_aux_pending_exc;
-        rb_aux_pending_exc = Qnil;
-        rb_exc_raise(e);
+    VALUE error = rb_aux_pending_get();
+    if (!NIL_P(error)) {
+        rb_thread_local_aset(rb_thread_current(), rb_aux_error_id, Qnil);
+        rb_exc_raise(error);
     }
 }
 static struct CrispasrSession* rb_extra_handle(VALUE handle) {

@@ -1,3 +1,16 @@
+## Ruby chat GC compaction lifetime — 2026-10-18
+
+A new abort-callback test calls `GC.compact` during native generation and was
+observed failing with cleared message bytes. Rooting Ruby Strings, increasing
+their capacity/length and explicit address registration did not preserve their
+native data pointers. Chat now holds messages, strings and stop arrays in
+Ruby-owned opaque data payloads with stable native addresses. Abort userdata is
+a native session key resolved through the rooted callback map, avoiding a
+movable Proc VALUE in C userdata. The two-session/compaction regression passes;
+Ruby now has 166 model-free assertions; deferred exceptions are rooted in
+Ruby thread/fiber storage so later callbacks may collect safely. Removed a dead Java layout placeholder
+and an orphan Dart streaming comment. Full platform/model gates remain pending.
+
 ## Wrapper auxiliary and legacy pointer repairs — 2026-10-18
 
 Added usable C#/Java registry, cache, session options, speaker embedder and

@@ -44,7 +44,7 @@ Validated implementation checkpoint (model-free ABI transport):
 - Ruby auxiliary changes were reviewed beyond their initial passing probe.
   Removed a dummy diarization implementation, made options real, fixed ignored
   chat options/string keys, callback re-entry, audio error leaks/stereo aliases,
-  and restricted direct callback-test entry points to probe builds. **159
+  and restricted direct callback-test entry points to probe builds. **166
   assertions** now include native struct/argument checks, actual speaker turns,
   changed chat context/sampler options, GC during callbacks and audio errors.
   This does not certify every legacy Ruby wrapper or every allocation path.
@@ -78,6 +78,17 @@ languages with explicit equivalents/retired/platform exclusions. A rejected
 symbol-mention manifest is not evidence. Remaining rows must be checked against
 code, including legacy Whisper/Parakeet helpers, typed ASR callbacks, speaker
 DB/auxiliary families and WASM registry/diarization/browser scheduling.
+
+Current implementation is on main at
+`e7a369e905a9ae5a4eebbbea299983c4d16f8037`, frozen as
+`diag/wrapper-aux-20261018`. The six-language ABI workflow run
+[39131299304](https://github.com/CrispStrobe/CrispASR/actions/runs/39131299304)
+was queued at dispatch. Review the exact source SHA and actual job logs before
+claiming hosted acceptance. A Ruby follow-up additionally reproduces callback
+GC-compaction invalidating chat input strings: native message/stop/string buffers
+now use Ruby-owned stable data payloads and abort userdata selects a rooted
+session-keyed callback rather than storing a movable Proc VALUE. The strengthened
+166-assertion probe passes; full native/model acceptance remains pending.
 
 Repair order and acceptance:
 

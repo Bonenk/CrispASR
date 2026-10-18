@@ -124,6 +124,13 @@ s.set_segment_callback(h, ->(txt,t0,t1,idx){ raise ArgumentError,'cb err' })
 reject(ArgumentError){ s.transcribe(h,[1,3,5]) }
 s.set_segment_callback(h, ->(txt,t0,t1,idx){ s.transcribe(h,[1,3,5]) })
 reject(RuntimeError){ s.transcribe(h,[1,3,5]) }
+s.set_progress_callback(h, ->(_,_){raise ArgumentError,'root sentinel'})
+s.set_segment_callback(h, ->(*_){GC.compact if GC.respond_to?(:compact)})
+begin
+  s.transcribe(h,[1,3,5]);raise 'missing deferred callback error'
+rescue ArgumentError => e
+  eq(e.message,'root sentinel')
+end
 s.set_progress_callback(h, nil)
 s.set_segment_callback(h, nil)
 s.set_token_callback(h, nil)
@@ -245,6 +252,14 @@ begin
 rescue ArgumentError => e
   eq(e.message, 'abort boom')
 end
+first_abort=0;second_abort=0
+other_chat=chat.open('probe',{})
+chat.set_abort_callback(ch, ->{first_abort+=1;GC.compact if GC.respond_to?(:compact);true})
+chat.set_abort_callback(other_chat, ->{second_abort+=1;true})
+GC.compact if GC.respond_to?(:compact)
+eq(chat.generate(ch,msg,{}),"Grüße");eq(first_abort,1);eq(second_abort,0)
+eq(chat.generate(other_chat,msg,{}),"Grüße");eq(first_abort,1);eq(second_abort,1)
+chat.close(other_chat)
 chat.set_abort_callback(ch, nil)
 begin
   chat.generate_stream(ch, msg, {}){|chunk| raise ArgumentError,'tok2' }

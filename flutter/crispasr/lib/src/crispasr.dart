@@ -6142,11 +6142,6 @@ class CrispasrSession {
     }
   }
 
-  /// Polling alternative for sentence streaming: when native callbacks cannot be
-  /// used from an isolate, poll via chunked synthesis on a worker isolate.
-  /// This is a convenience placeholder - actual chunking is backend-specific and
-  /// callers should prefer [synthesizeStreaming] on the same isolate.
-
   // -- Progress / segment / token callbacks (isolate-safe) --
 
   /// Register a per-window progress callback for chunked transcription.

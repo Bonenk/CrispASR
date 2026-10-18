@@ -152,11 +152,7 @@ static void rb_aux_invoke_proc(VALUE proc, int nargs, VALUE* args) {
     rb_protect(rb_aux_call_proc_body, (VALUE)&a, &state);
     rb_extra_in_stream = 0;
     if (state) {
-        if (rb_aux_pending_exc == Qnil) {
-            VALUE err = rb_errinfo();
-            rb_set_errinfo(Qnil);
-            rb_aux_pending_exc = err;
-        }
+        rb_aux_capture_error();
     }
 }
 
@@ -208,11 +204,7 @@ static void rb_aux_progress_tramp(int processed, int total, void* ud) {
     rb_protect(rb_aux_progress_body, (VALUE)&d, &state);
     rb_extra_in_stream = 0;
     if (state) {
-        if (rb_aux_pending_exc == Qnil) {
-            VALUE err = rb_errinfo();
-            rb_set_errinfo(Qnil);
-            rb_aux_pending_exc = err;
-        }
+        rb_aux_capture_error();
     }
 }
 static VALUE rb_aux_segment_body(VALUE v) {
@@ -248,11 +240,7 @@ static void rb_aux_segment_tramp(const char* text, int64_t t0, int64_t t1, int i
     rb_protect(rb_aux_segment_body, (VALUE)&d, &state);
     rb_extra_in_stream = 0;
     if (state) {
-        if (rb_aux_pending_exc == Qnil) {
-            VALUE err = rb_errinfo();
-            rb_set_errinfo(Qnil);
-            rb_aux_pending_exc = err;
-        }
+        rb_aux_capture_error();
     }
 }
 static VALUE rb_aux_token_body(VALUE v) {
@@ -284,30 +272,27 @@ static void rb_aux_token_tramp(const char* text, int idx, void* ud) {
     rb_protect(rb_aux_token_body, (VALUE)&d, &state);
     rb_extra_in_stream = 0;
     if (state) {
-        if (rb_aux_pending_exc == Qnil) {
-            VALUE err = rb_errinfo();
-            rb_set_errinfo(Qnil);
-            rb_aux_pending_exc = err;
-        }
+        rb_aux_capture_error();
     }
 }
-static bool rb_aux_chat_abort_tramp(void* ud) {
-    VALUE proc = (VALUE)(uintptr_t)ud;
+static VALUE rb_aux_chat_abort_dispatch(VALUE raw) {
+    if (!raw || rb_aux_chat_callbacks == Qnil)
+        return Qtrue;
+    VALUE proc = rb_hash_aref(rb_aux_chat_callbacks, ULL2NUM((uintptr_t)raw));
     if (NIL_P(proc))
-        return true;
-    struct rb_aux_call_args a;
-    a.proc = proc;
-    a.nargs = 0;
+        return Qtrue;
+    struct rb_aux_call_args args;
+    args.proc = proc;
+    args.nargs = 0;
+    return rb_aux_call_proc_body((VALUE)&args);
+}
+static bool rb_aux_chat_abort_tramp(void* ud) {
     int state = 0;
     rb_extra_in_stream = 1;
-    VALUE res = rb_protect(rb_aux_call_proc_body, (VALUE)&a, &state);
+    VALUE res = rb_protect(rb_aux_chat_abort_dispatch, (VALUE)(uintptr_t)ud, &state);
     rb_extra_in_stream = 0;
     if (state) {
-        if (rb_aux_pending_exc == Qnil) {
-            VALUE err = rb_errinfo();
-            rb_set_errinfo(Qnil);
-            rb_aux_pending_exc = err;
-        }
+        rb_aux_capture_error();
         return false; // abort on exception; original survives via pending
     }
     return RTEST(res);
@@ -1052,9 +1037,12 @@ static VALUE rb_aux_diarize(int argc, VALUE* argv, VALUE self) {
         opts.field = NUM2INT(v);
     RB_DIA_INT("method", method)
     RB_DIA_INT("n_threads", threads)
-    RB_DIA_INT("min_speakers", min) RB_DIA_INT("max_speakers", max) RB_DIA_INT("num_speakers", count)
+    RB_DIA_INT("min_speakers", min)
+    RB_DIA_INT("max_speakers", max)
+    RB_DIA_INT("num_speakers", count)
 #undef RB_DIA_INT
-        if (opts.method < 0 || opts.method > 5) rb_raise(rb_eArgError, "Invalid diarization method");
+    if (opts.method < 0 || opts.method > 5)
+        rb_raise(rb_eArgError, "Invalid diarization method");
     v = rb_aux_hash_field(options, "slice_t0_cs");
     if (!NIL_P(v))
         opts.offset = NUM2LL(v);
@@ -1106,23 +1094,29 @@ static VALUE rb_chat_get_field(VALUE hash, const char* key) {
     return v;
 }
 
-// Heap-backed Ruby strings keep C pointers stable even when a callback compacts
-// the Ruby heap. The array roots every copied role/content/stop until return.
+// Opaque Ruby-owned data payloads have stable native addresses across GC
+// compaction. Ruby String storage may move/re-embed even while it is rooted.
+static VALUE rb_chat_buffer(long size) {
+    return rb_data_object_zalloc(rb_cObject, size, NULL, RUBY_DEFAULT_FREE);
+}
 static const char* rb_chat_owned_cstring(VALUE input, VALUE roots) {
     StringValue(input);
     StringValueCStr(input);
-    VALUE copy = rb_str_buf_new(RSTRING_LEN(input) + 64);
-    rb_str_cat(copy, RSTRING_PTR(input), RSTRING_LEN(input));
+    long n = RSTRING_LEN(input);
+    VALUE copy = rb_chat_buffer(n + 1);
+    char* bytes = (char*)DATA_PTR(copy);
+    memcpy(bytes, RSTRING_PTR(input), n);
+    bytes[n] = 0;
     rb_ary_push(roots, copy);
-    return RSTRING_PTR(copy);
+    return bytes;
 }
 static VALUE rb_chat_messages(VALUE messages, VALUE roots) {
     Check_Type(messages, T_ARRAY);
     long n = RARRAY_LEN(messages);
     if (n > LONG_MAX / (long)sizeof(crispasr_chat_message))
         rb_raise(rb_eArgError, "Too many chat messages");
-    VALUE storage = rb_str_new(NULL, n * sizeof(crispasr_chat_message) + 64);
-    crispasr_chat_message* native = (crispasr_chat_message*)RSTRING_PTR(storage);
+    VALUE storage = rb_chat_buffer(n * sizeof(crispasr_chat_message));
+    crispasr_chat_message* native = (crispasr_chat_message*)DATA_PTR(storage);
     for (long i = 0; i < n; ++i) {
         VALUE item = rb_ary_entry(messages, i);
         Check_Type(item, T_HASH);
@@ -1171,15 +1165,19 @@ static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p) {
         p->field = NUM2INT(v);
     RB_CHAT_OPEN_INT(n_threads)
     RB_CHAT_OPEN_INT(n_threads_batch)
-    RB_CHAT_OPEN_INT(n_ctx) RB_CHAT_OPEN_INT(n_batch) RB_CHAT_OPEN_INT(n_ubatch) RB_CHAT_OPEN_INT(n_gpu_layers)
+    RB_CHAT_OPEN_INT(n_ctx)
+    RB_CHAT_OPEN_INT(n_batch)
+    RB_CHAT_OPEN_INT(n_ubatch)
+    RB_CHAT_OPEN_INT(n_gpu_layers)
 #undef RB_CHAT_OPEN_INT
 #define RB_CHAT_OPEN_BOOL(field)                                                                                       \
     v = rb_chat_get_field(params, #field);                                                                             \
     if (!NIL_P(v))                                                                                                     \
         p->field = RTEST(v);
-        RB_CHAT_OPEN_BOOL(use_mmap) RB_CHAT_OPEN_BOOL(use_mlock) RB_CHAT_OPEN_BOOL(embeddings)
+    RB_CHAT_OPEN_BOOL(use_mmap)
+    RB_CHAT_OPEN_BOOL(use_mlock) RB_CHAT_OPEN_BOOL(embeddings)
 #undef RB_CHAT_OPEN_BOOL
-            v = rb_chat_get_field(params, "chat_template");
+        v = rb_chat_get_field(params, "chat_template");
     if (!NIL_P(v))
         p->chat_template = StringValueCStr(v);
 }
@@ -1201,9 +1199,12 @@ static void rb_chat_generate_options(VALUE params, crispasr_chat_generate_params
     v = rb_chat_get_field(params, #field);                                                                             \
     if (!NIL_P(v))                                                                                                     \
         p->field = NUM2DBL(v);
-        RB_CHAT_FLOAT(temperature) RB_CHAT_FLOAT(top_p) RB_CHAT_FLOAT(min_p) RB_CHAT_FLOAT(repeat_penalty)
+    RB_CHAT_FLOAT(temperature)
+    RB_CHAT_FLOAT(top_p)
+    RB_CHAT_FLOAT(min_p)
+    RB_CHAT_FLOAT(repeat_penalty)
 #undef RB_CHAT_FLOAT
-            v = rb_chat_get_field(params, "seed");
+    v = rb_chat_get_field(params, "seed");
     if (!NIL_P(v))
         p->seed = NUM2UINT(v);
     v = rb_chat_get_field(params, "prefill_only");
@@ -1213,12 +1214,12 @@ static void rb_chat_generate_options(VALUE params, crispasr_chat_generate_params
     if (!NIL_P(v)) {
         Check_Type(v, T_ARRAY);
         long n = RARRAY_LEN(v);
-        *storage = rb_str_new(NULL, n * sizeof(char*) + 64);
+        *storage = rb_chat_buffer(n * sizeof(char*));
         for (long i = 0; i < n; ++i) {
             VALUE stop = rb_ary_entry(v, i);
-            ((const char**)RSTRING_PTR(*storage))[i] = rb_chat_owned_cstring(stop, roots);
+            ((const char**)DATA_PTR(*storage))[i] = rb_chat_owned_cstring(stop, roots);
         }
-        p->stop = (const char**)RSTRING_PTR(*storage);
+        p->stop = (const char**)DATA_PTR(*storage);
         p->n_stop = n;
     }
 }
@@ -1267,12 +1268,18 @@ static VALUE rb_chat_generate(VALUE self, VALUE handle, VALUE messages, VALUE pa
     VALUE roots = rb_ary_new();
     VALUE message_storage = rb_chat_messages(messages, roots);
     long n = RARRAY_LEN(messages);
-    crispasr_chat_message* cms = (crispasr_chat_message*)RSTRING_PTR(message_storage);
+    crispasr_chat_message* cms = (crispasr_chat_message*)DATA_PTR(message_storage);
     crispasr_chat_generate_params gp;
     VALUE stop_storage = Qnil;
     rb_chat_generate_options(params, &gp, &stop_storage, roots);
     crispasr_chat_error err = {0};
+    rb_gc_register_address(&roots);
+    rb_gc_register_address(&message_storage);
+    rb_gc_register_address(&stop_storage);
     char* out = crispasr_chat_generate(s, cms, n, &gp, &err);
+    rb_gc_unregister_address(&stop_storage);
+    rb_gc_unregister_address(&message_storage);
+    rb_gc_unregister_address(&roots);
     RB_GC_GUARD(stop_storage);
     RB_GC_GUARD(roots);
     RB_GC_GUARD(message_storage);
@@ -1334,13 +1341,19 @@ static VALUE rb_chat_generate_stream(VALUE self, VALUE handle, VALUE messages, V
     VALUE roots = rb_ary_new();
     VALUE message_storage = rb_chat_messages(messages, roots);
     long n = RARRAY_LEN(messages);
-    crispasr_chat_message* cms = (crispasr_chat_message*)RSTRING_PTR(message_storage);
+    crispasr_chat_message* cms = (crispasr_chat_message*)DATA_PTR(message_storage);
     crispasr_chat_generate_params gp;
     VALUE stop_storage = Qnil;
     rb_chat_generate_options(params, &gp, &stop_storage, roots);
     struct chat_stream_data d = {proc, Qnil, 0};
     crispasr_chat_error err = {0};
+    rb_gc_register_address(&roots);
+    rb_gc_register_address(&message_storage);
+    rb_gc_register_address(&stop_storage);
     int32_t rc = crispasr_chat_generate_stream(s, cms, n, &gp, chat_on_token, &d, &err);
+    rb_gc_unregister_address(&stop_storage);
+    rb_gc_unregister_address(&message_storage);
+    rb_gc_unregister_address(&roots);
     RB_GC_GUARD(stop_storage);
     RB_GC_GUARD(roots);
     RB_GC_GUARD(message_storage);
@@ -1363,7 +1376,7 @@ static VALUE rb_chat_set_abort(VALUE self, VALUE handle, VALUE proc) {
         crispasr_chat_set_abort_callback(s, NULL, NULL);
     } else {
         rb_hash_aset(rb_aux_chat_callbacks, key, proc);
-        crispasr_chat_set_abort_callback(s, rb_aux_chat_abort_tramp, (void*)(uintptr_t)proc);
+        crispasr_chat_set_abort_callback(s, rb_aux_chat_abort_tramp, (void*)s);
     }
     return Qnil;
 }
@@ -1384,7 +1397,7 @@ static VALUE rb_chat_count_tokens(VALUE self, VALUE handle, VALUE messages) {
     VALUE roots = rb_ary_new();
     VALUE message_storage = rb_chat_messages(messages, roots);
     long n = RARRAY_LEN(messages);
-    crispasr_chat_message* cms = (crispasr_chat_message*)RSTRING_PTR(message_storage);
+    crispasr_chat_message* cms = (crispasr_chat_message*)DATA_PTR(message_storage);
     crispasr_chat_error err = {0};
     int32_t rc = crispasr_chat_count_tokens(s, cms, n, &err);
     RB_GC_GUARD(roots);
