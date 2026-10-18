@@ -1,3 +1,37 @@
+## Go/Rust public options, text processors and polling — 2026-10-18
+
+Go `SessionOpenWithOptions` and Rust `Session::open_with_options` expose all
+v2 load fields. Their fixture compiles the literal 48-byte native struct and
+checks custom/default values plus zero reserved fields. Go adds backend verb
+queries, including buffer growth and unknown-backend errors. Rust adds owned
+candidate text scoring; Go scoring validates counts and NUL-containing input.
+
+Go and Rust now expose standalone truecase/PCS models. Prefix-specific native
+fixtures verify allocated text is freed by the matching function, empty success
+is distinct from null failure, and context/output ownership survives close.
+Go's new text owners serialize processing and close; Rust uses mutable processing
+and Drop. Existing Go punctuation now rejects closed contexts and embedded NUL.
+
+Both languages now drain owned streamed segment metadata. Rust's VAD route
+shares its ordinary result reader, with RAII cleanup on invalid counts. Missing
+word confidence remains the native **-1** instead of fabricated **1.0**; a probe
+was observed failing before repair. Readers reject negative counts and invalid/
+overflowing logits before copying and free the result on failure.
+
+Rust adds progress/count/reset polling helpers. Its raw-token drain explicitly
+requires unsafe caller synchronization because the C ABI returns a borrowed
+buffer selected globally; it does not invent a safe ownership guarantee.
+
+A separate probe reproduced Go leaking an allocated native container whose
+reported length was zero. Container owners now free before all failure returns;
+Go/Rust also reject impossible lengths before copying. Rust signing options
+return errors for NUL paths/unpaired keys rather than panicking.
+
+Validation: **32 Go tests, 28 Rust tests and five doctests** pass against isolated
+header-checked probes. The protected-page token test, native default/custom
+load fields, UTF-8 metadata, positive errors and allocation counters are included.
+Full-library/platform/model acceptance remains pending.
+
 ## Ruby/WASM generic speaker primitives — 2026-10-18
 
 Added usable generic `SpeakerEmbedder`, `PyannoteCache` and clustering APIs in

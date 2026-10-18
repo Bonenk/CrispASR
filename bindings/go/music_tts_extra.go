@@ -18,7 +18,9 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"math"
 	"runtime/cgo"
+	"strings"
 	"unsafe"
 )
 
@@ -765,6 +767,17 @@ func AudioResample(pcm []float32, sourceRate, targetRate int) ([]float32, error)
 	return out, nil
 }
 
+// Native allocations must be freed even when their returned size is invalid.
+func copyNativeContainer(ptr *C.uchar, size C.size_t) ([]byte, error) {
+	if ptr != nil {
+		defer C.crispasr_c2pa_free(ptr)
+	}
+	if ptr == nil || size == 0 || uint64(size) > math.MaxInt32 {
+		return nil, errors.New("invalid native container pointer or copy length")
+	}
+	return C.GoBytes(unsafe.Pointer(ptr), C.int(size)), nil
+}
+
 func PcmToWav(pcm []float32, sampleRate int) ([]byte, error) {
 	if len(pcm) == 0 {
 		return nil, errors.New("PcmToWav: empty PCM")
@@ -774,14 +787,8 @@ func PcmToWav(pcm []float32, sampleRate int) ([]byte, error) {
 	}
 	var outLen C.size_t
 	ptr := C.crispasr_pcm_to_wav((*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)), C.int(sampleRate), &outLen)
-	if ptr == nil || int(outLen) == 0 {
-		return nil, errors.New("PcmToWav failed")
-	}
-	defer C.crispasr_c2pa_free((*C.uchar)(unsafe.Pointer(ptr)))
-	wav := C.GoBytes(unsafe.Pointer(ptr), C.int(outLen))
-	cp := make([]byte, len(wav))
-	copy(cp, wav)
-	return cp, nil
+	return copyNativeContainer(ptr, outLen)
+
 }
 
 func C2paSign(data []byte, format, certPath, keyPath string) ([]byte, error) {
@@ -790,6 +797,12 @@ func C2paSign(data []byte, format, certPath, keyPath string) ([]byte, error) {
 	}
 	if format == "" {
 		return nil, errors.New("C2paSign: format required")
+	}
+	if (certPath == "") != (keyPath == "") {
+		return nil, errors.New("certificate and key must be paired")
+	}
+	if strings.IndexByte(format, 0) >= 0 || strings.IndexByte(certPath, 0) >= 0 || strings.IndexByte(keyPath, 0) >= 0 {
+		return nil, errors.New("signing options must not contain NUL")
 	}
 	cFormat := C.CString(format)
 	defer C.free(unsafe.Pointer(cFormat))
@@ -804,14 +817,8 @@ func C2paSign(data []byte, format, certPath, keyPath string) ([]byte, error) {
 	}
 	var outLen C.size_t
 	ptr := C.crispasr_c2pa_sign((*C.uchar)(unsafe.Pointer(&data[0])), C.size_t(len(data)), cFormat, cCert, cKey, &outLen)
-	if ptr == nil || int(outLen) == 0 {
-		return nil, errors.New("C2paSign failed (unavailable or bad container)")
-	}
-	defer C.crispasr_c2pa_free(ptr)
-	signed := C.GoBytes(unsafe.Pointer(ptr), C.int(outLen))
-	cp := make([]byte, len(signed))
-	copy(cp, signed)
-	return cp, nil
+	return copyNativeContainer(ptr, outLen)
+
 }
 
 // WatermarkLoadModel already declared in crispasr_session.go — not redeclared here
@@ -864,6 +871,17 @@ func (s *CrispasrSession) ScoreTexts(pcm []float32, language, initialPrompt stri
 	s.nativeHandle()
 	if s.handle == nil {
 		return nil, nil, errors.New("session is closed")
+	}
+	if len(pcm) == 0 || len(pcm) > math.MaxInt32 || len(texts) > math.MaxInt32 {
+		return nil, nil, errors.New("invalid PCM or candidate count")
+	}
+	if strings.IndexByte(language, 0) >= 0 || strings.IndexByte(initialPrompt, 0) >= 0 {
+		return nil, nil, errors.New("scoring options must not contain NUL")
+	}
+	for _, text := range texts {
+		if strings.IndexByte(text, 0) >= 0 {
+			return nil, nil, errors.New("candidate must not contain NUL")
+		}
 	}
 	if len(texts) == 0 {
 		return nil, nil, errors.New("ScoreTexts: empty texts")

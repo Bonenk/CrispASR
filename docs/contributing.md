@@ -623,6 +623,12 @@ allocated punctuation/translation result must stay a pointer until copied and
 freed. Per-call VAD options need all six fields and language forwarding tested
 against the literal runtime layout.
 
+V2 session-load options occupy 48 bytes (six scalar ints plus six reserved
+ints); compile the literal runtime layout in the probe instead of guessing its
+size. Preserve native unknown word confidence (-1), and reject negative result
+counts or overflowing logit dimensions before allocating/copying. Rust's VAD
+and polled results share its owned ordinary result reader.
+
 Polling counts are element counts, not byte lengths. For native NUL-separated
 tokens read exactly that many terminated strings; never estimate a byte length.
 The Go regression places the buffer immediately before a protected memory page.

@@ -72,6 +72,23 @@ Cache apply returns owned `{t0,t1,speaker}` records and leaves input records
 unchanged. Explicit close is idempotent; subsequent operations raise. Other
 languages' existing generic primitives still need their ledger rows reviewed.
 
+## Go/Rust options, text and polling follow-up
+
+| Native family | Go public operation | Rust public operation | Operation proof |
+| --- | --- | --- | --- |
+| Session open with params | `SessionOpenWithOptions`, `DefaultSessionOptions` | `Session::open_with_options`, `SessionOptions::default` | Literal runtime 48-byte struct, custom/default values and zero reserved fields |
+| Backend capabilities | `BackendCapabilities`, `ListBackendCapabilities` | Existing `Session::backend_caps` / `list_backends_with_caps` | New Go growth/unknown-backend probe; existing Rust methods still need their ledger proof row |
+| Truecase / PCS init/process/free text/free | `TruecaseInit`, `PCSInit`, promoted `.Process`/`.Close` | `TruecaseModel::open`, `PCSModel::open`, `.process`, Drop | Prefix-specific allocation/free oracle, empty text and failures |
+| Candidate scores | Existing `Session.ScoreTexts` | `Session::score_texts` | Actual candidate/option transport, owned scores/counts and positive native error |
+| Owned streamed segment result | `DrainStreamedSegments` | `drain_streamed_segments` | Shared metadata reader, copied raw bytes/alternatives/speaker and result free |
+| Progress/count/reset polling | Existing `GetProgress`, `ResetProgress`, `GetStreamed*Count`, `ResetStreamed*` | `get_progress`, `reset_progress`, `get_streamed_*_count`, `reset_streamed_*` | Serialized global polling fixture |
+| Borrowed token polling | `DrainStreamedTokens` with documented caller serialization | **unsafe** `drain_streamed_token_bytes` / `drain_streamed_tokens` | Protected-page raw fragments/empty tokens and malformed counts |
+
+Global polling selects the most recently streaming session. An owned segment
+result can be copied after the call; the borrowed token buffer cannot be used
+concurrently with another drain/inference/close. Rust makes that requirement
+an explicit unsafe contract. These checks do not prove concurrent model behavior.
+
 ## Additional reviewed paths
 
 - C# `Session.TranscribeVad(pcm, rate, model, language, options)` and Java

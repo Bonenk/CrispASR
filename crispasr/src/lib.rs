@@ -380,6 +380,10 @@ impl Session {
                 "Failed to open {model_path:?}. Library was built with: [{avail}]"
             ));
         }
+        Ok(Self::from_native(handle, n_threads))
+    }
+
+    fn from_native(handle: *mut crispasr_sys::CrispasrSession, n_threads: i32) -> Self {
         let callbacks = Box::new(UnsafeCell::new(SessionCallbacks {
             progress: None,
             segment: None,
@@ -389,12 +393,12 @@ impl Session {
             token_err: None,
             active: AtomicBool::new(false),
         }));
-        Ok(Self {
+        Self {
             handle,
             n_threads,
             callbacks,
             callback_active: AtomicBool::new(false),
-        })
+        }
     }
 
     /// List of backend names the loaded CrispASR library was compiled with.
@@ -887,6 +891,20 @@ impl Session {
             return Err(format!("{ctx} failed for backend {:?}", self.backend()));
         }
 
+        Self::copy_owned_session_result(res)
+    }
+
+    fn copy_owned_session_result(
+        res: *mut crispasr_sys::CrispasrSessionResult,
+    ) -> Result<(Vec<SessionSegment>, Option<CtcLogits>), String> {
+        struct OwnedResult(*mut crispasr_sys::CrispasrSessionResult);
+        impl Drop for OwnedResult {
+            fn drop(&mut self) {
+                unsafe { crispasr_sys::crispasr_session_result_free(self.0) };
+            }
+        }
+        let owned = OwnedResult(res);
+        let res = owned.0;
         // Helper: centiseconds -> seconds, preserving -1 sentinel (not -0.01)
         fn cs_to_sec(cs: i64) -> f64 {
             if cs < 0 {
@@ -899,6 +917,9 @@ impl Session {
         let mut out = Vec::new();
         unsafe {
             let n = crispasr_sys::crispasr_session_result_n_segments(res);
+            if n < 0 {
+                return Err("Invalid native segment count".into());
+            }
             for i in 0..n {
                 let tp = crispasr_sys::crispasr_session_result_segment_text(res, i);
                 let text = if tp.is_null() {
@@ -916,6 +937,9 @@ impl Session {
                 };
 
                 let wn = crispasr_sys::crispasr_session_result_n_words(res, i);
+                if wn < 0 {
+                    return Err("Invalid native word count".into());
+                }
                 let mut words = Vec::with_capacity(wn as usize);
                 for j in 0..wn {
                     let wtp = crispasr_sys::crispasr_session_result_word_text(res, i, j);
@@ -934,6 +958,9 @@ impl Session {
                     let raw_p = crispasr_sys::crispasr_session_result_word_p(res, i, j);
                     // Word alternatives — copied before free, no fabrication
                     let n_alts = crispasr_sys::crispasr_session_result_word_n_alts(res, i, j);
+                    if n_alts < 0 {
+                        return Err("Invalid native alternative count".into());
+                    }
                     let mut alts = Vec::with_capacity(n_alts as usize);
                     for k in 0..n_alts {
                         let alt_ptr =
@@ -953,7 +980,7 @@ impl Session {
                         text: wt,
                         start: w_start,
                         end: w_end,
-                        confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
+                        confidence: raw_p,
                         alternatives: alts,
                     });
                 }
@@ -966,6 +993,9 @@ impl Session {
                 };
                 // Native tokens — raw bytes preserved, sentinel preserved, empty when absent, copied before free
                 let n_toks = crispasr_sys::crispasr_session_result_n_tokens(res, i);
+                if n_toks < 0 {
+                    return Err("Invalid native token count".into());
+                }
                 let mut tokens = Vec::with_capacity(n_toks as usize);
                 for j in 0..n_toks {
                     let tok_ptr = crispasr_sys::crispasr_session_result_token_text(res, i, j);
@@ -1008,23 +1038,25 @@ impl Session {
             let n_frames = crispasr_sys::crispasr_session_result_n_logit_frames(res);
             let n_vocab = crispasr_sys::crispasr_session_result_n_logit_vocab(res);
             let lp = crispasr_sys::crispasr_session_result_logits(res);
-            let logits = if n_frames > 0 && n_vocab > 0 && !lp.is_null() {
-                let n = (n_vocab as usize)
+            if n_frames < 0 || n_vocab < 0 {
+                return Err("Invalid native logit dimensions".into());
+            }
+            let logits = if n_frames > 0 && n_vocab > 0 {
+                let count = (n_vocab as usize)
                     .checked_mul(n_frames as usize)
-                    .unwrap_or(0);
-                if n == 0 {
-                    None
-                } else {
-                    Some(CtcLogits {
-                        n_vocab: n_vocab as usize,
-                        n_frames: n_frames as usize,
-                        data: std::slice::from_raw_parts(lp, n).to_vec(),
-                    })
+                    .filter(|n| *n <= isize::MAX as usize / std::mem::size_of::<f32>())
+                    .ok_or("Native logit dimensions overflow")?;
+                if lp.is_null() {
+                    return Err("Null native logit buffer".into());
                 }
+                Some(CtcLogits {
+                    n_vocab: n_vocab as usize,
+                    n_frames: n_frames as usize,
+                    data: std::slice::from_raw_parts(lp, count).to_vec(),
+                })
             } else {
                 None
             };
-            crispasr_sys::crispasr_session_result_free(res);
             Ok((out, logits))
         }
     }
@@ -1105,129 +1137,7 @@ impl Session {
             }
             return Err(err);
         }
-        if res.is_null() {
-            return Err(format!(
-                "crispasr_session_transcribe_vad failed for backend {:?}",
-                self.backend()
-            ));
-        }
-
-        let mut out = Vec::new();
-        fn cs_to_sec_vad(cs: i64) -> f64 {
-            if cs < 0 {
-                -1.0
-            } else {
-                cs as f64 / 100.0
-            }
-        }
-        unsafe {
-            let n = crispasr_sys::crispasr_session_result_n_segments(res);
-            for i in 0..n {
-                let tp = crispasr_sys::crispasr_session_result_segment_text(res, i);
-                let text = if tp.is_null() {
-                    String::new()
-                } else {
-                    CStr::from_ptr(tp).to_string_lossy().into_owned()
-                };
-                let raw_t0 = crispasr_sys::crispasr_session_result_segment_t0(res, i);
-                let raw_t1 = crispasr_sys::crispasr_session_result_segment_t1(res, i);
-                let (t0, t1) = if raw_t0 < 0 || raw_t1 < 0 || raw_t1 < raw_t0 {
-                    (-1.0, -1.0)
-                } else {
-                    (cs_to_sec_vad(raw_t0), cs_to_sec_vad(raw_t1))
-                };
-
-                let wn = crispasr_sys::crispasr_session_result_n_words(res, i);
-                let mut words = Vec::with_capacity(wn as usize);
-                for j in 0..wn {
-                    let wtp = crispasr_sys::crispasr_session_result_word_text(res, i, j);
-                    let wt = if wtp.is_null() {
-                        String::new()
-                    } else {
-                        CStr::from_ptr(wtp).to_string_lossy().into_owned()
-                    };
-                    let raw_wt0 = crispasr_sys::crispasr_session_result_word_t0(res, i, j);
-                    let raw_wt1 = crispasr_sys::crispasr_session_result_word_t1(res, i, j);
-                    let (w_start, w_end) = if raw_wt0 < 0 || raw_wt1 < 0 || raw_wt1 < raw_wt0 {
-                        (-1.0, -1.0)
-                    } else {
-                        (cs_to_sec_vad(raw_wt0), cs_to_sec_vad(raw_wt1))
-                    };
-                    let raw_p = crispasr_sys::crispasr_session_result_word_p(res, i, j);
-                    let n_alts = crispasr_sys::crispasr_session_result_word_n_alts(res, i, j);
-                    let mut alts = Vec::with_capacity(n_alts as usize);
-                    for k in 0..n_alts {
-                        let alt_ptr =
-                            crispasr_sys::crispasr_session_result_word_alt_text(res, i, j, k);
-                        let alt_text = if alt_ptr.is_null() {
-                            String::new()
-                        } else {
-                            CStr::from_ptr(alt_ptr).to_string_lossy().into_owned()
-                        };
-                        let alt_p = crispasr_sys::crispasr_session_result_word_alt_p(res, i, j, k);
-                        alts.push(WordAlternative {
-                            text: alt_text,
-                            confidence: alt_p,
-                        });
-                    }
-                    words.push(SessionWord {
-                        text: wt,
-                        start: w_start,
-                        end: w_end,
-                        confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
-                        alternatives: alts,
-                    });
-                }
-                // Segment speaker — native per-segment label in "(Speaker N) " form or "" when none
-                let spk_ptr = crispasr_sys::crispasr_session_result_segment_speaker(res, i);
-                let speaker = if spk_ptr.is_null() {
-                    String::new()
-                } else {
-                    CStr::from_ptr(spk_ptr).to_string_lossy().into_owned()
-                };
-                // Native tokens — raw bytes preserved, sentinel preserved, empty when absent, copied before free
-                let n_toks = crispasr_sys::crispasr_session_result_n_tokens(res, i);
-                let mut tokens = Vec::with_capacity(n_toks as usize);
-                for j in 0..n_toks {
-                    let tok_ptr = crispasr_sys::crispasr_session_result_token_text(res, i, j);
-                    let (tok_text, tok_raw) = if tok_ptr.is_null() {
-                        (String::new(), Vec::new())
-                    } else {
-                        // Preserve raw bytes (may be UTF-8 fragment split across tokens)
-                        let raw = CStr::from_ptr(tok_ptr).to_bytes().to_vec();
-                        let txt = String::from_utf8_lossy(&raw).into_owned();
-                        (txt, raw)
-                    };
-                    let raw_tt0 = crispasr_sys::crispasr_session_result_token_t0(res, i, j);
-                    let raw_tt1 = crispasr_sys::crispasr_session_result_token_t1(res, i, j);
-                    let (tok_start, tok_end) = if raw_tt0 < 0 || raw_tt1 < 0 || raw_tt1 < raw_tt0 {
-                        (-1.0, -1.0)
-                    } else {
-                        (cs_to_sec_vad(raw_tt0), cs_to_sec_vad(raw_tt1))
-                    };
-                    let tok_p = crispasr_sys::crispasr_session_result_token_p(res, i, j);
-                    tokens.push(SessionToken {
-                        text: tok_text,
-                        raw: tok_raw,
-                        start: tok_start,
-                        end: tok_end,
-                        confidence: tok_p,
-                    });
-                }
-                let nsp = crispasr_sys::crispasr_session_result_segment_no_speech_prob(res, i);
-                out.push(SessionSegment {
-                    text: text.trim().to_string(),
-                    start: t0,
-                    end: t1,
-                    words,
-                    no_speech_prob: nsp,
-                    speaker,
-                    tokens,
-                });
-            }
-            crispasr_sys::crispasr_session_result_free(res);
-        }
-        Ok(out)
+        self.parse_session_result(res, "crispasr_session_transcribe_vad")
     }
 
     // ---------------------------------------------------------------------

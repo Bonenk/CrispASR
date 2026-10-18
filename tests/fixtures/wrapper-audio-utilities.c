@@ -54,7 +54,7 @@ void crispasr_audio_free(float* pcm) {
 unsigned char* crispasr_pcm_to_wav(const float* pcm, int n, int rate, size_t* size) {
     unsigned char* p = malloc(4);
     memcpy(p, "W\0AV", 4);
-    *size = 4;
+    *size = utility_mode == 5 ? 0 : utility_mode == 6 ? SIZE_MAX : 4;
     ++utility_live;
     return p;
 }
@@ -66,7 +66,7 @@ unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t len, const c
     }
     unsigned char* p = malloc(len);
     memcpy(p, data, len);
-    *size = len;
+    *size = utility_mode == 5 ? 0 : utility_mode == 6 ? SIZE_MAX : len;
     ++utility_live;
     return p;
 }

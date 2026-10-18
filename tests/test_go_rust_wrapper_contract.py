@@ -19,8 +19,11 @@ class GoRustWrapperContract(unittest.TestCase):
     def test_native_metadata_tasks_ownership_and_callbacks(self):
         with tempfile.TemporaryDirectory(prefix='go-rust-abi-') as directory:
             tmp=Path(directory);lib=tmp/'src';lib.mkdir()
+            runtime=(ROOT/'src/crispasr_c_api.cpp').read_text()
+            start=runtime.index('struct crispasr_open_params_v1 {')
+            (tmp/'runtime-open-layout.h').write_text(runtime[start:runtime.index('};',start)+2])
             obj=tmp/'probe.o'
-            subprocess.run(['cc','-std=c11','-Werror','-fPIC','-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
+            subprocess.run(['cc','-std=c11','-Werror','-fPIC','-I'+str(tmp),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
                 '-c',str(ROOT/'tests/fixtures/go-rust-wrapper-abi.c'),'-o',str(obj)],check=True)
             subprocess.run(['cc','-shared',str(obj),'-o',str(lib/'libcrispasr.so')],check=True)
             subprocess.run(['ar','rcs',str(lib/'libcrispasr.a'),str(obj)],check=True)

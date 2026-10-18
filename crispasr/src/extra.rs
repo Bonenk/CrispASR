@@ -839,6 +839,22 @@ pub fn audio_resample(pcm: &[f32], source_rate: i32, target_rate: i32) -> Result
     copy_native_audio(p, n)
 }
 
+struct OwnedNativeContainer(*mut u8);
+impl Drop for OwnedNativeContainer {
+    fn drop(&mut self) {
+        if !self.0.is_null() {
+            unsafe { crispasr_sys::crispasr_c2pa_free(self.0) };
+        }
+    }
+}
+fn copy_native_container(ptr: *mut u8, count: usize) -> Result<Vec<u8>, String> {
+    let owned = OwnedNativeContainer(ptr);
+    if owned.0.is_null() || count == 0 || count > isize::MAX as usize {
+        return Err("Invalid native container pointer or length".into());
+    }
+    Ok(unsafe { std::slice::from_raw_parts(owned.0, count) }.to_vec())
+}
+
 pub fn pcm_to_wav(pcm: &[f32], sample_rate: i32) -> Result<Vec<u8>, String> {
     if pcm.is_empty() {
         return Err("pcm_to_wav: empty PCM".to_string());
@@ -855,18 +871,7 @@ pub fn pcm_to_wav(pcm: &[f32], sample_rate: i32) -> Result<Vec<u8>, String> {
             &mut out_len,
         )
     };
-    if out_len == 0 {
-        if !ptr.is_null() {
-            unsafe { crispasr_sys::crispasr_c2pa_free(ptr) };
-        }
-        return Err("pcm_to_wav failed".to_string());
-    }
-    if ptr.is_null() {
-        return Err("pcm_to_wav: null pointer with positive length".to_string());
-    }
-    let wav = unsafe { std::slice::from_raw_parts(ptr, out_len).to_vec() };
-    unsafe { crispasr_sys::crispasr_c2pa_free(ptr) };
-    Ok(wav)
+    copy_native_container(ptr, out_len)
 }
 
 pub fn c2pa_sign(
@@ -879,8 +884,17 @@ pub fn c2pa_sign(
         return Err("c2pa_sign: empty data".to_string());
     }
     let cformat = CString::new(format).map_err(|e| e.to_string())?;
-    let ccert = cert_path.map(|s| CString::new(s).unwrap());
-    let ckey = key_path.map(|s| CString::new(s).unwrap());
+    if cert_path.is_some() != key_path.is_some() || format.is_empty() {
+        return Err("Certificate/key must be paired and format nonempty".into());
+    }
+    let ccert = cert_path
+        .map(CString::new)
+        .transpose()
+        .map_err(|e| e.to_string())?;
+    let ckey = key_path
+        .map(CString::new)
+        .transpose()
+        .map_err(|e| e.to_string())?;
     let cert_ptr = ccert.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
     let key_ptr = ckey.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
     let mut out_len: usize = 0;
@@ -894,18 +908,7 @@ pub fn c2pa_sign(
             &mut out_len,
         )
     };
-    if out_len == 0 {
-        if !ptr.is_null() {
-            unsafe { crispasr_sys::crispasr_c2pa_free(ptr) };
-        }
-        return Err("c2pa_sign failed (unavailable or bad container)".to_string());
-    }
-    if ptr.is_null() {
-        return Err("c2pa_sign: null pointer with positive length".to_string());
-    }
-    let signed = unsafe { std::slice::from_raw_parts(ptr, out_len).to_vec() };
-    unsafe { crispasr_sys::crispasr_c2pa_free(ptr) };
-    Ok(signed)
+    copy_native_container(ptr, out_len)
 }
 
 pub fn watermark_load_model(gguf_path: &str) -> Result<(), String> {
@@ -1010,4 +1013,237 @@ impl Drop for TitaNet {
     fn drop(&mut self) {
         unsafe { crispasr_sys::crispasr_titanet_free(self.handle) };
     }
+}
+
+/// Explicit native v2 load options. Defaults match the library's GPU/flash defaults.
+#[derive(Debug, Clone)]
+pub struct SessionOptions {
+    pub n_threads: i32,
+    pub use_gpu: bool,
+    pub verbosity: i32,
+    pub flash_attention: bool,
+    /// -1 uses the maximum; zero keeps LLM layers on CPU.
+    pub gpu_layers: i32,
+}
+impl Default for SessionOptions {
+    fn default() -> Self {
+        Self {
+            n_threads: 4,
+            use_gpu: true,
+            verbosity: 0,
+            flash_attention: true,
+            gpu_layers: -1,
+        }
+    }
+}
+#[repr(C)]
+struct NativeSessionOptions {
+    abi_version: c_int,
+    n_threads: c_int,
+    use_gpu: c_int,
+    verbosity: c_int,
+    flash_attn: c_int,
+    n_gpu_layers: c_int,
+    reserved: [c_int; 6],
+}
+impl Session {
+    pub fn open_with_options(
+        model: &str,
+        backend: Option<&str>,
+        options: &SessionOptions,
+    ) -> Result<Self, String> {
+        if options.n_threads < 0 || options.verbosity < 0 || options.gpu_layers < -1 {
+            return Err("Invalid session load options".into());
+        }
+        let threads = if options.n_threads == 0 {
+            4
+        } else {
+            options.n_threads
+        };
+        let params = NativeSessionOptions {
+            abi_version: 2,
+            n_threads: threads,
+            use_gpu: options.use_gpu.into(),
+            verbosity: options.verbosity,
+            flash_attn: options.flash_attention.into(),
+            n_gpu_layers: options.gpu_layers,
+            reserved: [0; 6],
+        };
+        let path = CString::new(model).map_err(|e| e.to_string())?;
+        let backend = backend
+            .map(CString::new)
+            .transpose()
+            .map_err(|e| e.to_string())?;
+        let handle = unsafe {
+            crispasr_sys::crispasr_session_open_with_params(
+                path.as_ptr(),
+                backend.as_ref().map_or(std::ptr::null(), |s| s.as_ptr()),
+                &params as *const _ as *const c_void,
+            )
+        };
+        if handle.is_null() {
+            return Err("session_open_with_params failed".into());
+        }
+        Ok(Self::from_native(handle, threads))
+    }
+    /// Teacher-forced candidate scores; requires a supporting backend.
+    pub fn score_texts(
+        &self,
+        pcm: &[f32],
+        language: Option<&str>,
+        prompt: Option<&str>,
+        texts: &[&str],
+    ) -> Result<(Vec<f32>, Vec<i32>), String> {
+        if pcm.is_empty() || texts.is_empty() {
+            return Err("Nonempty PCM and candidates required".into());
+        }
+        let samples = c_int::try_from(pcm.len()).map_err(|_| "PCM exceeds native range")?;
+        let count =
+            c_int::try_from(texts.len()).map_err(|_| "Candidate count exceeds native range")?;
+        let language = language
+            .map(CString::new)
+            .transpose()
+            .map_err(|e| e.to_string())?;
+        let prompt = prompt
+            .map(CString::new)
+            .transpose()
+            .map_err(|e| e.to_string())?;
+        let strings: Vec<CString> = texts
+            .iter()
+            .map(|s| CString::new(*s))
+            .collect::<Result<_, _>>()
+            .map_err(|e| e.to_string())?;
+        let pointers: Vec<_> = strings.iter().map(|s| s.as_ptr()).collect();
+        let mut scores = vec![0.0; texts.len()];
+        let mut counts = vec![0; texts.len()];
+        let rc = unsafe {
+            crispasr_sys::crispasr_session_score_texts(
+                self.handle,
+                pcm.as_ptr(),
+                samples,
+                language.as_ref().map_or(std::ptr::null(), |s| s.as_ptr()),
+                prompt.as_ref().map_or(std::ptr::null(), |s| s.as_ptr()),
+                pointers.as_ptr(),
+                count,
+                scores.as_mut_ptr(),
+                counts.as_mut_ptr(),
+            )
+        };
+        if rc != 0 {
+            return Err(format!("score_texts failed (rc={rc})"));
+        }
+        Ok((scores, counts))
+    }
+}
+
+// Each model owns a context; only &mut processing is allowed, and Drop frees it.
+macro_rules! standalone_text_model {
+    ($name:ident, $init:path, $process:path, $free_text:path, $free:path) => {
+        pub struct $name {
+            handle: *mut c_void,
+        }
+        unsafe impl Send for $name {}
+        impl $name {
+            pub fn open(model: &str) -> Result<Self, String> {
+                let model = CString::new(model).map_err(|e| e.to_string())?;
+                let handle = unsafe { $init(model.as_ptr()) };
+                if handle.is_null() {
+                    return Err("Text processor could not open".into());
+                }
+                Ok(Self { handle })
+            }
+            /// Copy allocated UTF-8 before releasing it; null is a failure, empty is valid.
+            pub fn process(&mut self, text: &str) -> Result<String, String> {
+                let text = CString::new(text).map_err(|e| e.to_string())?;
+                let output = unsafe { $process(self.handle, text.as_ptr()) };
+                if output.is_null() {
+                    return Err("Text processing failed".into());
+                }
+                let owned = unsafe { CStr::from_ptr(output) }
+                    .to_string_lossy()
+                    .into_owned();
+                unsafe { $free_text(output) };
+                Ok(owned)
+            }
+        }
+        impl Drop for $name {
+            fn drop(&mut self) {
+                unsafe { $free(self.handle) };
+            }
+        }
+    };
+}
+standalone_text_model!(
+    TruecaseModel,
+    crispasr_sys::crispasr_truecase_init,
+    crispasr_sys::crispasr_truecase_process,
+    crispasr_sys::crispasr_truecase_free_text,
+    crispasr_sys::crispasr_truecase_free
+);
+standalone_text_model!(
+    PCSModel,
+    crispasr_sys::crispasr_pcs_init,
+    crispasr_sys::crispasr_pcs_process,
+    crispasr_sys::crispasr_pcs_free_text,
+    crispasr_sys::crispasr_pcs_free
+);
+
+/// Global polling selects the session which most recently used default streaming callbacks.
+pub fn get_progress() -> i32 {
+    unsafe { crispasr_sys::crispasr_get_progress() }
+}
+pub fn reset_progress() {
+    unsafe { crispasr_sys::crispasr_reset_progress() };
+}
+pub fn get_streamed_segment_count() -> i32 {
+    unsafe { crispasr_sys::crispasr_get_streamed_segment_count() }
+}
+pub fn reset_streamed_segments() {
+    unsafe { crispasr_sys::crispasr_reset_streamed_segments() };
+}
+pub fn get_streamed_token_count() -> i32 {
+    unsafe { crispasr_sys::crispasr_get_streamed_token_count() }
+}
+pub fn reset_streamed_tokens() {
+    unsafe { crispasr_sys::crispasr_reset_streamed_tokens() };
+}
+/// Drain an owned result, preserving the same metadata as ordinary transcription.
+pub fn drain_streamed_segments() -> Result<Vec<crate::SessionSegment>, String> {
+    let result = unsafe { crispasr_sys::crispasr_drain_streamed_segments() };
+    if result.is_null() {
+        return Ok(Vec::new());
+    }
+    Session::copy_owned_session_result(result).map(|(segments, _)| segments)
+}
+/// Copy NUL-separated raw token fragments from the native borrowed polling buffer.
+///
+/// # Safety
+/// Serialize this call with every native drain, inference and close for the
+/// globally selected session. Another thread must not invalidate its borrowed
+/// buffer between the native return and completion of this copy.
+pub unsafe fn drain_streamed_token_bytes() -> Result<Vec<Vec<u8>>, String> {
+    let mut count = 0;
+    let mut ptr = unsafe { crispasr_sys::crispasr_drain_streamed_tokens(&mut count) };
+    if count < 0 || (count > 0 && ptr.is_null()) {
+        return Err("Invalid native token buffer".into());
+    }
+    let mut out = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let token = unsafe { CStr::from_ptr(ptr) }.to_bytes();
+        out.push(token.to_vec());
+        ptr = unsafe { ptr.add(token.len() + 1) };
+    }
+    Ok(out)
+}
+/// Display text from polled tokens; use raw bytes to concatenate split UTF-8 first.
+///
+/// # Safety
+/// The synchronization requirements of [`drain_streamed_token_bytes`] apply.
+pub unsafe fn drain_streamed_tokens() -> Result<Vec<String>, String> {
+    unsafe { drain_streamed_token_bytes() }.map(|tokens| {
+        tokens
+            .into_iter()
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+            .collect()
+    })
 }

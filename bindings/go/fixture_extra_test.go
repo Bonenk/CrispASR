@@ -930,3 +930,187 @@ func TestProbeSpeakerDatabaseRosterScoresEnrollmentAndLifetime(t *testing.T) {
 		t.Fatal("closed call reached native")
 	}
 }
+
+func TestProbeSessionOpenOptionsAndCapabilityQueries(t *testing.T) {
+	probeModeSet(0)
+	defer probeModeSet(0)
+	opts := SessionOptions{NThreads: 7, UseGPU: false, Verbosity: 2, FlashAttention: false, GPULayers: 3}
+	sess, err := SessionOpenWithOptions("model", "probe", opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.Close()
+	probeModeSet(1)
+	sess, err = SessionOpenWithOptions("model", "", DefaultSessionOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess.Close()
+	probeModeSet(2)
+	if _, err = SessionOpenWithOptions("model", "probe", opts); err == nil {
+		t.Fatal("native null accepted")
+	}
+	probeModeSet(0)
+	opts.GPULayers = -2
+	if _, err = SessionOpenWithOptions("model", "probe", opts); err == nil {
+		t.Fatal("invalid GPU layers")
+	}
+	if _, err = SessionOpenWithOptions("model\x00hidden", "", DefaultSessionOptions()); err == nil {
+		t.Fatal("NUL path")
+	}
+	verbs, err := BackendCapabilities("probe")
+	if err != nil || len(verbs) != 2 || verbs[0] != "asr" || verbs[1] != "tts" {
+		t.Fatalf("capabilities: %q %v", verbs, err)
+	}
+	verbs, err = BackendCapabilities("long")
+	if err != nil || len(verbs) != 1 || len(verbs[0]) != 600 {
+		t.Fatalf("capability growth: %q %v", verbs, err)
+	}
+	if _, err = BackendCapabilities("unknown"); err == nil {
+		t.Fatal("unknown backend accepted")
+	}
+	all, err := ListBackendCapabilities()
+	if err != nil || len(all["probe"]) != 2 {
+		t.Fatalf("all capabilities: %#v %v", all, err)
+	}
+}
+func TestProbeScoreTextsTransportAndPositiveErrors(t *testing.T) {
+	probeModeSet(0)
+	defer probeModeSet(0)
+	sess := newProbeSession(t)
+	scores, counts, err := sess.ScoreTexts([]float32{1, 3, 5}, "ja", "prompt", []string{"one", "two words"})
+	if err != nil || len(scores) != 2 || scores[1] != -.75 || counts[1] != 3 {
+		t.Fatalf("scores: %v %v %v", scores, counts, err)
+	}
+	probeModeSet(2)
+	if _, _, err = sess.ScoreTexts([]float32{1, 3, 5}, "ja", "prompt", []string{"one", "two words"}); err == nil {
+		t.Fatal("positive native error accepted")
+	}
+}
+
+func TestProbeStandaloneTextProcessorsOwnedOutputsAndClose(t *testing.T) {
+	probeTextMode(0)
+	defer probeTextMode(0)
+	type processor interface {
+		Process(string) (string, error)
+		Close()
+	}
+	factories := []struct {
+		open     func(string) (processor, error)
+		expected string
+	}{
+		{func(path string) (processor, error) { return TruecaseInit(path) }, "Grüße"},
+		{func(path string) (processor, error) { return PCSInit(path) }, "Hello."},
+		{func(path string) (processor, error) { return PuncInit(path) }, "Hello!"},
+	}
+	for _, factory := range factories {
+		model, err := factory.open("model")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out, err := model.Process("hello")
+		if err != nil || out != factory.expected || probeTextLive() != 0 {
+			t.Fatalf("text: %q %v live=%d", out, err, probeTextLive())
+		}
+		probeTextMode(2)
+		empty, err := model.Process("")
+		if err != nil || empty != "" || probeTextLive() != 0 {
+			t.Fatalf("empty: %q %v", empty, err)
+		}
+		probeTextMode(1)
+		if _, err = model.Process("hello"); err == nil {
+			t.Fatal("native null accepted")
+		}
+		probeTextMode(0)
+		if _, err = model.Process("bad\x00text"); err == nil {
+			t.Fatal("NUL accepted")
+		}
+		model.Close()
+		model.Close()
+		if probeTextContexts() != 0 || out != factory.expected {
+			t.Fatal("context/output lifetime")
+		}
+		if _, err = model.Process("hello"); err == nil {
+			t.Fatal("closed processor accepted")
+		}
+		probeTextMode(3)
+		if _, err = factory.open("model"); err == nil {
+			t.Fatal("native init failure accepted")
+		}
+		probeTextMode(0)
+	}
+}
+
+func TestProbeNativeContainerZeroAndOverflowCountsAlwaysFree(t *testing.T) {
+	defer probeUtilityMode(0)
+	for _, mode := range []int{5, 6} {
+		probeUtilityMode(mode)
+		if _, err := PcmToWav([]float32{1, 3, 5}, 16000); err == nil {
+			t.Fatal("invalid WAV size accepted")
+		}
+		if probeUtilityLive() != 0 {
+			t.Fatalf("WAV leaked on invalid size mode %d", mode)
+		}
+		if _, err := C2paSign([]byte{1, 0, 2}, "audio/wav", "", ""); err == nil {
+			t.Fatal("invalid signed size accepted")
+		}
+		if probeUtilityLive() != 0 {
+			t.Fatalf("signed container leaked on invalid size mode %d", mode)
+		}
+	}
+}
+
+func TestProbeMissingWordConfidenceRemainsUnavailable(t *testing.T) {
+	probeModeSet(10)
+	defer probeModeSet(0)
+	sess := newProbeSession(t)
+	result, err := sess.Transcribe([]float32{1, 3, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Segments[0].Words[0].P != -1 {
+		t.Fatalf("unavailable confidence fabricated as %v", result.Segments[0].Words[0].P)
+	}
+}
+
+func TestProbePolledSegmentsCopyMetadataAndRejectInvalidCounts(t *testing.T) {
+	probeModeSet(0)
+	defer probeModeSet(0)
+	probeStreamedReady(1)
+	before := probeResultFreesGet()
+	if GetStreamedSegmentCount() != 1 {
+		t.Fatal("queued count")
+	}
+	result, err := DrainStreamedSegments()
+	if err != nil || len(result.Segments) != 1 || result.Segments[0].Speaker != "(Speaker 1) " || len(result.Segments[0].Words[0].Alternatives) != 1 || !bytes.Equal(result.Segments[0].Tokens[0].Raw, []byte{0xe6, 0x97}) {
+		t.Fatalf("polled metadata: %#v %v", result, err)
+	}
+	if probeResultFreesGet() != before+1 || GetStreamedSegmentCount() != 0 {
+		t.Fatal("polled result not freed/drained")
+	}
+	if empty, err := DrainStreamedSegments(); err != nil || empty != nil {
+		t.Fatal("empty drain")
+	}
+	for _, mode := range []int{11, 12, 13, 14} {
+		probeModeSet(mode)
+		probeStreamedReady(1)
+		before = probeResultFreesGet()
+		if _, err := DrainStreamedSegments(); err == nil {
+			t.Fatalf("invalid count mode %d accepted", mode)
+		}
+		if probeResultFreesGet() != before+1 {
+			t.Fatal("invalid result leaked")
+		}
+	}
+	sess := newProbeSession(t)
+	for _, mode := range []int{15, 16} {
+		probeModeSet(mode)
+		before = probeResultFreesGet()
+		if _, _, err := sess.TranscribeWithLogits([]float32{1, 3, 5}); err == nil {
+			t.Fatal("invalid logits accepted")
+		}
+		if probeResultFreesGet() != before+1 {
+			t.Fatal("invalid logits leaked")
+		}
+	}
+}

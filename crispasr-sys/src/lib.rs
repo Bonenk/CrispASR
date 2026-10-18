@@ -900,6 +900,16 @@ extern "C" {
     ) -> i32;
     pub fn crispasr_titanet_cosine_sim(a: *const c_float, b: *const c_float, dim: i32) -> c_float;
 
+    // Standalone truecase and punctuation/capitalization/segmentation.
+    pub fn crispasr_truecase_init(model: *const c_char) -> *mut c_void;
+    pub fn crispasr_truecase_process(ctx: *mut c_void, text: *const c_char) -> *const c_char;
+    pub fn crispasr_truecase_free_text(text: *const c_char);
+    pub fn crispasr_truecase_free(ctx: *mut c_void);
+    pub fn crispasr_pcs_init(model: *const c_char) -> *mut c_void;
+    pub fn crispasr_pcs_process(ctx: *mut c_void, text: *const c_char) -> *const c_char;
+    pub fn crispasr_pcs_free_text(text: *const c_char);
+    pub fn crispasr_pcs_free(ctx: *mut c_void);
+
     // Speaker profile database
     pub fn crispasr_speaker_db_open(
         dir_path: *const c_char,

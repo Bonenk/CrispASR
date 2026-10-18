@@ -40,11 +40,13 @@ Recommended implementation order and concrete acceptance:
    include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
    work and callback delivery are safely proxied. Measure complete default
    and opt-in module sizes and instantiate actual models in a browser.
-5. **Go/Rust and residual public options.** Check session-open options, text
-   processors/scoring, global polling/reset/drained-segment metadata and all
-   capability queries against actual callable methods. In Rust, a safe polling
-   adapter must account for the borrowed native buffer and globally selected
-   session; do not permit another thread to close/free it while copying.
+5. **Residual public options and polling ownership.** Go/Rust now have load
+   options, standalone truecase/PCS and owned segment polling; Rust text scoring
+   and Go capability queries have compiled probes. Review remaining ledger
+   rows rather than treating the old missing-family list as current. Rust's raw
+   token polling is explicitly unsafe: a future safe adapter needs ownership
+   beyond the borrowed buffer selected globally by the C ABI. Do not permit
+   another thread to close/free it while copying.
    Finish per-call VAD settings in languages beyond the C#/Java/Dart/Python
    paths already implemented; probe actual option fields and language.
 6. **Platform and model acceptance.** Run full-library/compiler checks and

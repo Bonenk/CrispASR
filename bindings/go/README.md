@@ -155,3 +155,13 @@ Getting help:
 ## License
 
 The license for the Go bindings is the same as the license for the rest of the crispasr project, which is the MIT License. See the `LICENSE` file for more details.
+
+`SessionOpenWithOptions(path, backend, options)` accepts `SessionOptions`;
+start from `DefaultSessionOptions()` for native GPU/flash defaults. Use
+`BackendCapabilities` / `ListBackendCapabilities` for verbs. `TruecaseInit`
+and `PCSInit` return owned processors with `Process` and idempotent `Close`.
+`DrainStreamedSegments` returns owned metadata or nil when empty. Serialize
+all global polling with inference/close of the most recently streaming session.
+
+Word probability `P` preserves native -1 when unavailable; it is not replaced
+with a fabricated 1.0. Invalid native counts/dimensions return errors.

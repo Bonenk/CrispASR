@@ -1429,7 +1429,7 @@ type TranscribeWord struct {
 	Text string
 	T0   int64 // centiseconds; -1 = unavailable
 	T1   int64
-	P    float32 // confidence; 1.0 if unavailable (native -1 folded)
+	P    float32 // confidence; -1 if unavailable
 	// Alternatives are word-level alternatives (when alt_n >0). Empty when unavailable.
 	Alternatives []WordAlternative
 }
@@ -1503,7 +1503,7 @@ func (s *CrispasrSession) TranscribeLang(pcm []float32, lang string) (*Transcrib
 		return nil, errors.New("transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
 // TranscribeWithLogits transcribes 16 kHz mono float32 PCM and also returns the
@@ -1537,7 +1537,15 @@ func (s *CrispasrSession) TranscribeWithLogits(pcm []float32) (*TranscribeResult
 		return nil, nil, errors.New("transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), extractLogits(r), nil
+	result, err := extractResult(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	logits, err := extractLogits(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	return result, logits, nil
 }
 
 // TranscribeChunked runs chunked-encode ASR (issue #208): it forces the
@@ -1574,7 +1582,7 @@ func (s *CrispasrSession) TranscribeChunked(pcm []float32, chunkSeconds, overlap
 		return nil, errors.New("chunked transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
 // GetProgress polls long-form (chunked) transcription progress: 0..100, or -1
@@ -1610,11 +1618,14 @@ func (s *CrispasrSession) TranscribeVAD(pcm []float32, sampleRate int, vadModelP
 		return nil, errors.New("transcription with VAD failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
-func extractResult(r *C.crispasr_session_result) *TranscribeResult {
+func extractResult(r *C.crispasr_session_result) (*TranscribeResult, error) {
 	nSegs := int(C.crispasr_session_result_n_segments(r))
+	if nSegs < 0 {
+		return nil, errors.New("invalid native segment count")
+	}
 	result := &TranscribeResult{Segments: make([]TranscribeSegment, nSegs)}
 	for i := 0; i < nSegs; i++ {
 		seg := &result.Segments[i]
@@ -1629,6 +1640,9 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 			seg.Speaker = C.GoString(spk)
 		}
 		nWords := int(C.crispasr_session_result_n_words(r, C.int(i)))
+		if nWords < 0 {
+			return nil, errors.New("invalid native word count")
+		}
 		seg.Words = make([]TranscribeWord, nWords)
 		for j := 0; j < nWords; j++ {
 			w := &seg.Words[j]
@@ -1638,12 +1652,12 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 			w.T0 = int64(C.crispasr_session_result_word_t0(r, C.int(i), C.int(j)))
 			w.T1 = int64(C.crispasr_session_result_word_t1(r, C.int(i), C.int(j)))
 			p := float32(C.crispasr_session_result_word_p(r, C.int(i), C.int(j)))
-			if p < 0 {
-				p = 1.0
-			}
 			w.P = p
 			// Word alternatives (when alt_n>0) — copied before free, no fabrication
 			nAlts := int(C.crispasr_session_result_word_n_alts(r, C.int(i), C.int(j)))
+			if nAlts < 0 {
+				return nil, errors.New("invalid native alternative count")
+			}
 			if nAlts > 0 {
 				w.Alternatives = make([]WordAlternative, nAlts)
 				for k := 0; k < nAlts; k++ {
@@ -1658,6 +1672,9 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 		}
 		// Native tokens — raw bytes preserved, sentinel preserved, empty list when absent, copied before free
 		nTokens := int(C.crispasr_session_result_n_tokens(r, C.int(i)))
+		if nTokens < 0 {
+			return nil, errors.New("invalid native token count")
+		}
 		if nTokens > 0 {
 			seg.Tokens = make([]SessionToken, nTokens)
 			for j := 0; j < nTokens; j++ {
@@ -1675,25 +1692,31 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 			}
 		}
 	}
-	return result
+	return result, nil
 }
 
 // extractLogits lifts out the CTC logits attached to a result (see
 // CtcLogits) into a Go-owned slice before the result is freed. The C buffer is
 // owned by the result, so the data is copied out here. Returns nil unless the
 // session opted in via SetReturnLogits and the backend produced a grid.
-func extractLogits(r *C.crispasr_session_result) *CtcLogits {
+func extractLogits(r *C.crispasr_session_result) (*CtcLogits, error) {
 	nFrames := int(C.crispasr_session_result_n_logit_frames(r))
 	nVocab := int(C.crispasr_session_result_n_logit_vocab(r))
 	ptr := C.crispasr_session_result_logits(r)
-	if nFrames <= 0 || nVocab <= 0 || ptr == nil {
-		return nil
+	if nFrames < 0 || nVocab < 0 {
+		return nil, errors.New("invalid native logit dimensions")
+	}
+	if nFrames == 0 || nVocab == 0 {
+		return nil, nil
+	}
+	if ptr == nil || nFrames > math.MaxInt/4/nVocab {
+		return nil, errors.New("invalid native logit buffer or size")
 	}
 	n := nFrames * nVocab
 	data := make([]float32, n)
 	src := unsafe.Slice((*float32)(unsafe.Pointer(ptr)), n)
 	copy(data, src)
-	return &CtcLogits{NVocab: nVocab, NFrames: nFrames, Data: data}
+	return &CtcLogits{NVocab: nVocab, NFrames: nFrames, Data: data}, nil
 }
 
 // CtcVocab returns the Omni CTC vocabulary as raw pieces indexed by token id
@@ -2201,6 +2224,12 @@ func PuncInit(modelPath string) (*PuncModel, error) {
 
 // Process restores punctuation + capitalization to the input text.
 func (p *PuncModel) Process(text string) (string, error) {
+	if p == nil || p.handle == nil {
+		return "", errors.New("punctuation model is closed")
+	}
+	if strings.IndexByte(text, 0) >= 0 {
+		return "", errors.New("text must not contain NUL")
+	}
 	ctext := C.CString(text)
 	defer C.free(unsafe.Pointer(ctext))
 	result := C.crispasr_punc_process(p.handle, ctext)
@@ -2501,7 +2530,7 @@ func (s *CrispasrSession) TranscribeVadLang(pcm []float32, sampleRate int,
 		return nil, fmt.Errorf("crispasr_session_transcribe_vad_lang failed")
 	}
 	defer C.crispasr_session_result_free(res)
-	return extractResult(res), nil
+	return extractResult(res)
 }
 
 // DetectBackendFromGGUF returns the backend name from GGUF metadata.
@@ -2927,4 +2956,18 @@ func WatermarkDetect(pcm []float32) float32 {
 		return 0
 	}
 	return float32(C.crispasr_watermark_detect((*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm))))
+}
+
+// DrainStreamedSegments copies and releases the globally selected session's
+// owned polling result. A nil result means no queued segments.
+func DrainStreamedSegments() (*TranscribeResult, error) {
+	result := C.crispasr_drain_streamed_segments()
+	if result == nil {
+		return nil, nil
+	}
+	defer C.crispasr_session_result_free(result)
+	if C.crispasr_session_result_n_segments(result) < 0 {
+		return nil, errors.New("invalid native segment count")
+	}
+	return extractResult(result)
 }

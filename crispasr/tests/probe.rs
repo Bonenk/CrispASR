@@ -693,3 +693,199 @@ fn probe_legacy_titanet_similarity_rejects_dimension_truncation() {
         std::panic::catch_unwind(|| crispasr::titanet_cosine_sim(&[1.0], &[1.0, 0.0])).is_err()
     );
 }
+
+#[test]
+fn probe_session_open_options_and_score_texts_transport() {
+    unsafe {
+        probe_mode_set(0);
+    }
+    let options = crispasr::SessionOptions {
+        n_threads: 7,
+        use_gpu: false,
+        verbosity: 2,
+        flash_attention: false,
+        gpu_layers: 3,
+    };
+    let sess = Session::open_with_options("model", Some("probe"), &options).unwrap();
+    let (scores, counts) = sess
+        .score_texts(
+            &[1.0, 3.0, 5.0],
+            Some("ja"),
+            Some("prompt"),
+            &["one", "two words"],
+        )
+        .unwrap();
+    assert_eq!(scores, vec![-0.25, -0.75]);
+    assert_eq!(counts, vec![2, 3]);
+    assert!(sess.score_texts(&[], None, None, &["one"]).is_err());
+    assert!(sess.score_texts(&[1.0], None, None, &[]).is_err());
+    assert!(sess
+        .score_texts(&[1.0], None, None, &["bad\0text"])
+        .is_err());
+    unsafe {
+        probe_mode_set(2);
+    }
+    assert!(sess
+        .score_texts(&[1.0, 3.0, 5.0], None, None, &["one", "two words"])
+        .is_err());
+    assert!(Session::open_with_options("model", Some("probe"), &options).is_err());
+    drop(sess);
+    unsafe {
+        probe_mode_set(1);
+    }
+    let default = Session::open_with_options("model", None, &Default::default()).unwrap();
+    drop(default);
+    unsafe {
+        probe_mode_set(0);
+    }
+    assert!(Session::open_with_options("bad\0path", None, &Default::default()).is_err());
+    let invalid = crispasr::SessionOptions {
+        gpu_layers: -2,
+        ..Default::default()
+    };
+    assert!(Session::open_with_options("model", None, &invalid).is_err());
+}
+
+#[test]
+fn probe_standalone_text_processors_own_native_contexts_and_strings() {
+    extern "C" {
+        fn probe_text_mode(mode: c_int);
+        fn probe_text_live() -> c_int;
+        fn probe_text_contexts() -> c_int;
+    }
+    unsafe {
+        probe_text_mode(0);
+    }
+    let mut truecase = crispasr::TruecaseModel::open("model").unwrap();
+    let mut pcs = crispasr::PCSModel::open("model").unwrap();
+    assert_eq!(unsafe { probe_text_contexts() }, 2);
+    let text = truecase.process("hello").unwrap();
+    assert_eq!(text, "Grüße");
+    assert_eq!(pcs.process("hello").unwrap(), "Hello.");
+    assert_eq!(unsafe { probe_text_live() }, 0);
+    unsafe {
+        probe_text_mode(2);
+    }
+    assert_eq!(truecase.process("").unwrap(), "");
+    assert_eq!(pcs.process("").unwrap(), "");
+    assert_eq!(unsafe { probe_text_live() }, 0);
+    unsafe {
+        probe_text_mode(1);
+    }
+    assert!(truecase.process("hello").is_err());
+    assert!(pcs.process("hello").is_err());
+    assert!(truecase.process("bad\0text").is_err());
+    assert!(pcs.process("bad\0text").is_err());
+    drop(truecase);
+    drop(pcs);
+    assert_eq!(unsafe { probe_text_contexts() }, 0);
+    assert_eq!(text, "Grüße");
+    unsafe {
+        probe_text_mode(3);
+    }
+    assert!(crispasr::TruecaseModel::open("model").is_err());
+    assert!(crispasr::PCSModel::open("model").is_err());
+    unsafe {
+        probe_text_mode(0);
+    }
+    assert!(crispasr::TruecaseModel::open("bad\0path").is_err());
+}
+
+#[test]
+fn probe_native_container_invalid_counts_free_before_error() {
+    for mode in [5, 6] {
+        unsafe {
+            probe_utility_mode(mode);
+        }
+        assert!(crispasr::pcm_to_wav(&[1.0, 3.0, 5.0], 16000).is_err());
+        assert_eq!(unsafe { probe_utility_live() }, 0);
+        assert!(crispasr::c2pa_sign(&[1, 0, 2], "audio/wav", None, None).is_err());
+        assert_eq!(unsafe { probe_utility_live() }, 0);
+    }
+    unsafe {
+        probe_utility_mode(0);
+    }
+    assert!(crispasr::c2pa_sign(&[1], "audio/wav", Some("bad\0path"), Some("key")).is_err());
+    assert!(crispasr::c2pa_sign(&[1], "audio/wav", Some("cert"), None).is_err());
+}
+
+#[test]
+fn probe_missing_word_confidence_remains_unavailable_across_vad_and_asr() {
+    unsafe {
+        probe_mode_set(10);
+    }
+    let sess = new_probe_session();
+    let pcm = [1.0, 3.0, 5.0];
+    assert_eq!(sess.transcribe(&pcm).unwrap()[0].words[0].confidence, -1.0);
+    assert_eq!(
+        sess.transcribe_vad(&pcm, "vad", None).unwrap()[0].words[0].confidence,
+        -1.0
+    );
+    unsafe {
+        probe_mode_set(0);
+    }
+}
+
+#[test]
+fn probe_polled_results_share_metadata_validation_and_cleanup() {
+    extern "C" {
+        fn probe_streamed_ready(ready: c_int);
+    }
+    unsafe {
+        probe_mode_set(0);
+        probe_streamed_ready(1);
+    }
+    let before = unsafe { probe_result_frees_get() };
+    assert_eq!(crispasr::get_streamed_segment_count(), 1);
+    let segments = crispasr::drain_streamed_segments().unwrap();
+    assert_eq!(segments[0].tokens[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(segments[0].words[0].alternatives.len(), 1);
+    assert_eq!(segments[0].speaker, "(Speaker 1) ");
+    assert_eq!(unsafe { probe_result_frees_get() }, before + 1);
+    assert!(crispasr::drain_streamed_segments().unwrap().is_empty());
+    for mode in [11, 12, 13, 14] {
+        unsafe {
+            probe_mode_set(mode);
+            probe_streamed_ready(1);
+        }
+        let before = unsafe { probe_result_frees_get() };
+        assert!(crispasr::drain_streamed_segments().is_err());
+        assert_eq!(unsafe { probe_result_frees_get() }, before + 1);
+    }
+    let sess = new_probe_session();
+    for mode in [15, 16] {
+        unsafe {
+            probe_mode_set(mode);
+        }
+        let before = unsafe { probe_result_frees_get() };
+        assert!(sess.transcribe_with_logits(&[1.0, 3.0, 5.0]).is_err());
+        assert_eq!(unsafe { probe_result_frees_get() }, before + 1);
+    }
+    unsafe {
+        probe_mode_set(0);
+        probe_streamed_ready(1);
+    }
+    crispasr::reset_streamed_segments();
+    assert_eq!(crispasr::get_streamed_segment_count(), 0);
+    crispasr::reset_progress();
+    assert_eq!(crispasr::get_progress(), -1);
+    crispasr::reset_streamed_tokens();
+    assert_eq!(crispasr::get_streamed_token_count(), 0);
+    unsafe {
+        probe_mode_set(5);
+    }
+    // Probe tests serialize access; no native operation can invalidate this borrowed buffer.
+    assert_eq!(
+        unsafe { crispasr::drain_streamed_token_bytes() }.unwrap(),
+        vec![vec![0xe6, 0x97], vec![0xa5], vec![]]
+    );
+    for mode in [2, 3] {
+        unsafe {
+            probe_mode_set(mode);
+        }
+        assert!(unsafe { crispasr::drain_streamed_token_bytes() }.is_err());
+    }
+    unsafe {
+        probe_mode_set(0);
+    }
+}

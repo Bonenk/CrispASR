@@ -22,6 +22,10 @@ static int probe_calls = 0;
 static int probe_invalid_frees = 0;
 static int probe_result_frees = 0;
 static int probe_streams, probe_stream_closes;
+static int streamed_ready;
+void probe_streamed_ready(int ready) {
+    streamed_ready = ready;
+}
 int probe_stream_closes_get(void) {
     return probe_stream_closes;
 }
@@ -124,21 +128,24 @@ static int check_pcm(const float* pcm, int n) {
 }
 
 // --- Session open ---
-struct crispasr_open_params_v1 {
-    int abi_version, n_threads, use_gpu, verbosity, flash_attn, n_gpu_layers, reserved[6];
-};
+#include "runtime-open-layout.h"
 crispasr_session* crispasr_session_open(const char* p, int n) {
     return (crispasr_session*)0x100000001ULL;
 }
 crispasr_session* crispasr_session_open_explicit(const char* p, const char* b, int n) {
     return (crispasr_session*)0x100000001ULL;
 }
-crispasr_session* crispasr_session_open_with_params(const char* m, const char* b,
-                                                    const struct crispasr_open_params_v1* pr) {
-    if (pr->abi_version != 2 || pr->n_threads != 7 || pr->use_gpu != 0 || pr->verbosity != 2 || pr->flash_attn != 0 ||
-        pr->n_gpu_layers != 3)
+crispasr_session* crispasr_session_open_with_params(const char* m, const char* b, const crispasr_open_params_v1* pr) {
+    if (probe_mode == 2 || !pr || sizeof(*pr) != 48 || pr->abi_version != 2 || !m || strcmp(m, "model"))
         return NULL;
-    for (int i = 0; i < 6; i++)
+    if (probe_mode == 1) {
+        if (b || pr->n_threads != 4 || pr->use_gpu != 1 || pr->verbosity != 0 || pr->flash_attn != 1 ||
+            pr->n_gpu_layers != -1)
+            return NULL;
+    } else if (!b || strcmp(b, "probe") || pr->n_threads != 7 || pr->use_gpu != 0 || pr->verbosity != 2 ||
+               pr->flash_attn != 0 || pr->n_gpu_layers != 3)
+        return NULL;
+    for (int i = 0; i < 6; ++i)
         if (pr->reserved[i])
             return NULL;
     return (crispasr_session*)0x100000001ULL;
@@ -176,6 +183,8 @@ static int* make_result(int has_data) {
     return p;
 }
 int crispasr_session_result_n_segments(crispasr_session_result* r) {
+    if (probe_mode == 11)
+        return -1;
     if (!r)
         return 0;
     int* p = (int*)r;
@@ -217,6 +226,8 @@ float crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r,
     return -1.0f;
 }
 int crispasr_session_result_n_words(crispasr_session_result* r, int i) {
+    if (probe_mode == 12)
+        return -1;
     if (!r)
         return 0;
     int* p = (int*)r;
@@ -254,9 +265,11 @@ float crispasr_session_result_word_p(crispasr_session_result* r, int i, int w) {
     int* p = (int*)r;
     if (!*p)
         return -1;
-    return word_p;
+    return probe_mode == 10 ? -1.f : word_p;
 }
 int crispasr_session_result_word_n_alts(crispasr_session_result* r, int i, int w) {
+    if (probe_mode == 13)
+        return -1;
     if (!r)
         return 0;
     int* p = (int*)r;
@@ -271,6 +284,8 @@ float crispasr_session_result_word_alt_p(crispasr_session_result* r, int i, int 
     return 0.25f;
 }
 int crispasr_session_result_n_tokens(crispasr_session_result* r, int i) {
+    if (probe_mode == 14)
+        return -1;
     if (!r)
         return 0;
     int* p = (int*)r;
@@ -319,12 +334,22 @@ float crispasr_session_result_token_p(crispasr_session_result* r, int i, int t) 
     return token_ps[t];
 }
 int crispasr_session_result_n_logit_frames(crispasr_session_result* r) {
+    if (probe_mode == 15)
+        return INT32_MAX;
+    if (probe_mode == 16)
+        return 1;
     return 0;
 }
 int crispasr_session_result_n_logit_vocab(crispasr_session_result* r) {
+    if (probe_mode == 15)
+        return INT32_MAX;
+    if (probe_mode == 16)
+        return 1;
     return 0;
 }
 const float* crispasr_session_result_logits(crispasr_session_result* r) {
+    if (probe_mode == 15)
+        return probe_buffer;
     return NULL;
 }
 void crispasr_session_result_free(crispasr_session_result* r) {
@@ -763,20 +788,35 @@ int crispasr_session_kokoro_clear_phoneme_cache(crispasr_session* s) {
 }
 int crispasr_session_score_texts(crispasr_session* s, const float* pcm, int n, const char* lang, const char* prompt,
                                  const char** texts, int nt, float* out_lp, int* out_nt) {
-    for (int i = 0; i < nt; i++) {
-        out_lp[i] = -1.0f;
-        out_nt[i] = 1;
-    }
+    if (probe_mode == 2)
+        return 1;
+    if (!pcm || n != 3 || pcm[0] != 1 || pcm[2] != 5 || nt != 2 || strcmp(texts[0], "one") ||
+        strcmp(texts[1], "two words") || (lang && strcmp(lang, "ja")) || (prompt && strcmp(prompt, "prompt")))
+        return -1;
+    out_lp[0] = -.25f;
+    out_lp[1] = -.75f;
+    out_nt[0] = 2;
+    out_nt[1] = 3;
     return 0;
 }
 
 int crispasr_get_streamed_segment_count(void) {
-    return 0;
+    return streamed_ready;
 }
 crispasr_session_result* crispasr_drain_streamed_segments(void) {
-    return NULL;
+    if (!streamed_ready)
+        return NULL;
+    streamed_ready = 0;
+    probe_token_head[0] = (char)0xe6;
+    probe_token_head[1] = (char)0x97;
+    probe_token_head[2] = 0;
+    probe_token_tail[0] = (char)0xa5;
+    probe_token_tail[1] = 0;
+    return (crispasr_session_result*)make_result(1);
 }
-void crispasr_reset_streamed_segments(void) {}
+void crispasr_reset_streamed_segments(void) {
+    streamed_ready = 0;
+}
 int crispasr_get_streamed_token_count(void) {
     return 0;
 }
@@ -830,6 +870,13 @@ int crispasr_detect_backends_from_gguf(const char* p, char* out, int cap) {
     return 6;
 }
 int crispasr_backend_caps_abi(const char* b, char* out, int cap) {
+    if (!strcmp(b, "long")) {
+        if (cap < 601)
+            return -2;
+        memset(out, 'x', 600);
+        out[600] = 0;
+        return 600;
+    }
     if (strcmp(b, "probe"))
         return -3;
     if (cap < 8)
@@ -1386,48 +1433,7 @@ crispasr_stream* crispasr_session_stream_open(crispasr_session* s, int n_threads
     return (crispasr_stream*)2;
 }
 
-void* crispasr_punc_init(const char* model) {
-    STUB_ABORT();
-    return 0;
-}
-const char* crispasr_punc_process(void* ctx, const char* text) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_punc_free_text(const char* text) {
-    STUB_ABORT();
-}
-void crispasr_punc_free(void* ctx) {
-    STUB_ABORT();
-}
-void* crispasr_truecase_init(const char* model_path) {
-    STUB_ABORT();
-    return 0;
-}
-const char* crispasr_truecase_process(void* ctx, const char* text) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_truecase_free_text(const char* text) {
-    STUB_ABORT();
-}
-void crispasr_truecase_free(void* ctx) {
-    STUB_ABORT();
-}
-void* crispasr_pcs_init(const char* model_path) {
-    STUB_ABORT();
-    return 0;
-}
-const char* crispasr_pcs_process(void* ctx, const char* text) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_pcs_free_text(const char* text) {
-    STUB_ABORT();
-}
-void crispasr_pcs_free(void* ctx) {
-    STUB_ABORT();
-}
+#include "wrapper-text-processors.c"
 int crispasr_transcribe_parallel(struct whisper_context* ctx, struct whisper_full_params params, const float* samples,
                                  int n_samples, int n_processors) {
     STUB_ABORT();
