@@ -475,3 +475,21 @@ is distinct from the 192-float TitaNet API.
 `{labels:, n_clusters:}`. `Whisper::CrispASR::PyannoteCache.new(pcm, model,
 threads = 4)` provides `apply(segments, offset_cs = 0)` and `close`. Segment
 hashes use native centiseconds and return copied `{t0:, t1:, speaker:}` records.
+
+## Session ownership and load options
+
+Handles returned by the Session/Stream/Chat, direct Parakeet/TitaNet, speaker
+DB and text processor APIs are opaque integer tickets. Pass them back through
+the Ruby APIs; they are not native memory addresses. Closed tickets stay closed
+when a native allocator reuses an address. Close is idempotent and a session
+closes its child `Whisper::CrispASR::Session::Stream` handles first.
+
+Same-context re-entry from argument conversion, a callback or another Ruby
+thread raises while an operation borrows the context. Other operations remain
+available after a deferred callback error. Existing method arities and aliases
+are preserved.
+
+`Whisper::CrispASR::Session.open_with_options(model, backend = nil, options = nil)`
+accepts `n_threads`, `use_gpu`, `verbosity`, `flash_attn`, and `n_gpu_layers` as
+symbol or string hash keys. Boolean controls require true/false; defaults match
+the native v2 loader. Release the returned handle with `Session.close`.

@@ -255,3 +255,12 @@ int crispasr_detect_backend_from_gguf(const char* path, char* out, int cap) {
     strcpy(out, "foo");
     return 3;
 }
+
+static int temperature_calls;
+int probe_temperature_calls(void) {
+    return temperature_calls;
+}
+int crispasr_session_set_temperature(crispasr_session* session, float temperature, uint64_t seed) {
+    ++temperature_calls;
+    return session && temperature == .5f && seed == 0 ? 0 : -1;
+}

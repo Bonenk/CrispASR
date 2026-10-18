@@ -2,7 +2,11 @@
 #include "crispasr_session.h"
 #include <stdlib.h>
 #include <string.h>
-static int titan_mode, titan_live, titan_calls;
+static int titan_mode, titan_live, titan_calls, titan_reuse;
+static int titan_reused_context;
+void probe_titanet_force_reuse(int enabled) {
+    titan_reuse = enabled;
+}
 void probe_titanet_mode(int mode) {
     titan_mode = mode;
 }
@@ -16,12 +20,13 @@ void* crispasr_titanet_init(const char* model, int32_t threads) {
     if (!strcmp(model, "fail"))
         return NULL;
     ++titan_live;
-    return malloc(1);
+    return titan_reuse ? (void*)&titan_reused_context : malloc(1);
 }
 void crispasr_titanet_free(void* ctx) {
     if (ctx) {
         --titan_live;
-        free(ctx);
+        if (ctx != &titan_reused_context)
+            free(ctx);
     }
 }
 int32_t crispasr_titanet_embed(void* ctx, const float* pcm, int32_t count, float* out) {

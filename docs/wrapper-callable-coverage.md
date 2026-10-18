@@ -89,6 +89,25 @@ result can be copied after the call; the borrowed token buffer cannot be used
 concurrently with another drain/inference/close. Rust makes that requirement
 an explicit unsafe contract. These checks do not prove concurrent model behavior.
 
+## Ruby session lifecycle and v2 loader
+
+`Session.open`, `.open_explicit` and `.open_with_options` return opaque integer
+tickets; `Session.close` closes child `Session::Stream` handles first. Stream
+open/feed/text/flush/live-decode/close paths validate ownership and reject use
+after parent close. The new loader accepts all five v2 configuration controls,
+with runtime ABI version/reserved fields generated internally.
+
+The 155 guarded Session/Stream/Chat operations preserve arities and aliases and
+hold per-context borrows across coercion/callback/thread switches. This count
+is a guard synchronization fact, not a native export coverage percentage.
+Direct context, DB and text handles also use opaque tickets. Tests force native
+address reuse and still reject old closed tickets; native callbacks continue to
+use actual native pointers internally.
+
+`RubyWrapperContract` validates this through concrete stream and loader probes,
+including native close ordering and callback userdata. Remaining mic and legacy
+Whisper ownership paths remain separate tasks in PLAN.md.
+
 ## Additional reviewed paths
 
 - C# `Session.TranscribeVad(pcm, rate, model, language, options)` and Java

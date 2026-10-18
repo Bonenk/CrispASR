@@ -19,11 +19,19 @@ static crispasr_session_result* new_result(void) {
     probe_callbacks();
     return (crispasr_session_result*)1;
 }
-crispasr_session* crispasr_session_open(const char* model, int threads) {
+static crispasr_session* probe_session_handle(void) {
+#ifdef CRISPASR_PROBE_UNIQUE_SESSIONS
+    static uintptr_t next = 0x1000;
+    return (crispasr_session*)++next;
+#else
     return (crispasr_session*)1;
+#endif
+}
+crispasr_session* crispasr_session_open(const char* model, int threads) {
+    return probe_session_handle();
 }
 crispasr_session* crispasr_session_open_explicit(const char* model, const char* backend, int threads) {
-    return (crispasr_session*)1;
+    return probe_session_handle();
 }
 crispasr_session_result* crispasr_session_transcribe(crispasr_session* s, const float* p, int n) {
     return new_result();

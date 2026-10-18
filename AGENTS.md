@@ -49,3 +49,6 @@ Two habits that repeatedly cost time here:
   with `--check`; adding a `##` section to `LEARNINGS.md` shifts every line
   number it cites).
 - `bindings/go/whisper.go` cgo `LDFLAGS` → `python tools/sync_go_cgo_ldflags.py`.
+
+- Ruby Session/Stream/Chat context guard declarations and registrations →
+  `python tools/sync_ruby_context_guards.py` (`--check` runs in the Ruby ABI probe).

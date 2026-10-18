@@ -27,12 +27,12 @@ Recommended implementation order and concrete acceptance:
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
    implementation. Direct Parakeet uses an integer centisecond offset.
-3. **Ruby remaining lifetime work.** Generic speaker embedder, clustering and
-   pyannote cache now have typed owners and compiled probes (see HISTORY.md).
-   Audit raw Whisper/stream handles and every allocation-returning
-   audio/container/processor/scoring path for exceptions and callback re-entry.
-   Native buffers crossing Ruby coercion or callbacks must remain stable
-   through GC compaction; a rooted String alone is insufficient.
+3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
+   opaque tickets, child-close ordering and raw text processor ownership now
+   have compiled regressions; see HISTORY.md. Audit microphone ring/close and
+   the old Whisper object/parameter/result path, including all allocation-returning
+   audio/container/scoring helpers on Ruby allocation exceptions. Extend the
+   callable ledger rather than treating 155 guarded operations as API coverage.
 4. **WASM remaining adapters and dispatch.** Implement registry/cache, generic
    diarization, shared session options, typed ASR
    callback setters, VAD-transcription/language options and legacy controls.
@@ -47,6 +47,7 @@ Recommended implementation order and concrete acceptance:
    token polling is explicitly unsafe: a future safe adapter needs ownership
    beyond the borrowed buffer selected globally by the C ABI. Do not permit
    another thread to close/free it while copying.
+   Ruby now exposes v2 session-open options; WASM still needs that public path.
    Finish per-call VAD settings in languages beyond the C#/Java/Dart/Python
    paths already implemented; probe actual option fields and language.
 6. **Platform and model acceptance.** Run full-library/compiler checks and

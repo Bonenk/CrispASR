@@ -167,6 +167,7 @@ static void free_text(const void* p) {
     ++invalid_frees;
 }
 
+#ifndef CRISPASR_PROBE_REAL_TEXT_PROCESSORS
 void* crispasr_truecase_init(const char* model) {
     return (void*)1;
 }
@@ -197,6 +198,7 @@ void crispasr_punc_free_text(const char* p) {
     free_text(p);
 }
 void crispasr_punc_free(void* ctx) {}
+#endif
 char* crispasr_session_translate_text(crispasr_session* s, const char* text, const char* src, const char* tgt,
                                       int max) {
     return mode == 2 ? NULL : alloc_text(mode == 1 ? "" : "こんにちは");
@@ -286,13 +288,29 @@ const char* crispasr_dart_helpers_version(void) {
 void crispasr_set_gpu_backend(const char* name) {
     ++calls;
 }
+#ifdef CRISPASR_PROBE_RUBY_STREAM_OWNERS
+extern int probe_streams_for_owner(crispasr_session*);
+static int parent_close_violations;
+int probe_parent_close_violations(void) {
+    return parent_close_violations;
+}
+#endif
 void crispasr_session_close(crispasr_session* s) {
+#ifdef CRISPASR_PROBE_RUBY_STREAM_OWNERS
+    if (probe_streams_for_owner(s) > 0)
+        ++parent_close_violations;
+#endif
     ++calls;
 }
 
+#ifdef CRISPASR_PROBE_LITERAL_OPEN_LAYOUT
+#include "runtime-open-layout.h"
+#else
 struct crispasr_open_params_v1 {
     int abi_version, n_threads, use_gpu, verbosity, flash_attn, n_gpu_layers, reserved[6];
 };
+#endif
+
 crispasr_session* crispasr_session_open_with_params(const char* model, const char* backend,
                                                     const crispasr_open_params_v1* p) {
     if (p->abi_version != 2 || p->n_threads != 7 || p->use_gpu != 0 || p->verbosity != 2 || p->flash_attn != 0 ||
@@ -306,6 +324,7 @@ crispasr_session* crispasr_session_open_with_params(const char* model, const cha
 const char* crispasr_session_backend(crispasr_session* s) {
     return "probe";
 }
+#ifndef CRISPASR_PROBE_RUBY_STREAM_OWNERS
 int crispasr_stream_feed(crispasr_stream* s, const float* pcm, int n) {
     return run(pcm, n) < 0 ? -1 : 1;
 }
@@ -315,6 +334,8 @@ int crispasr_stream_flush(crispasr_stream* s) {
 void crispasr_stream_close(crispasr_stream* s) {
     ++calls;
 }
+#endif
+
 
 float* crispasr_session_speech_to_speech(crispasr_session* s, const float* pcm, int n, char** text, int* out_n) {
     if (run(pcm, n) < 0 && mode != 2)

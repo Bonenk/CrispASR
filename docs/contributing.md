@@ -650,6 +650,15 @@ compiled operation probes for these families, including malformed counts and
 positive error codes. Ruby typed owners must reject recursive initialization
 from argument coercion before overwriting native ownership.
 
+Ruby Session/Stream/Chat guard declarations and registration wrappers are
+synchronized with `python3 tools/sync_ruby_context_guards.py`; the strict Ruby
+probe checks `--check`. Preserve each method's arity and aliases. A context
+borrow must cover argument coercion and other Ruby threads, not only native
+callbacks on the calling thread. Always close child streams before the parent.
+Public Ruby integer handles are opaque tickets; look up native pointers before
+FFI and never resurrect a closed ticket when an allocator reuses an address.
+The forced-address-reuse and parent-close fixtures check these properties.
+
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.
 Keep both public header inventories and the separate chat API in the audit.

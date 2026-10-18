@@ -74,13 +74,116 @@ static inline void rb_aux_check_pending(void) {
         rb_exc_raise(error);
     }
 }
+static VALUE rb_extra_sessions = Qnil, rb_extra_stream_owners = Qnil, rb_extra_active_contexts = Qnil;
+static VALUE rb_parakeet_handles = Qnil, rb_titanet_handles = Qnil, rb_speaker_db_handles = Qnil;
+static VALUE rb_chat_live = Qnil, rb_text_handles = Qnil, rb_extra_stream_pointers = Qnil;
+static uint64_t rb_extra_ticket_counter;
+static VALUE rb_extra_new_ticket(void) {
+    if (rb_extra_ticket_counter == UINT64_MAX)
+        rb_raise(rb_eRuntimeError, "Native handle namespace exhausted");
+    return ULL2NUM(++rb_extra_ticket_counter);
+}
+static void* rb_extra_native_pointer(VALUE map, VALUE key, const char* kind) {
+    if (!RB_INTEGER_TYPE_P(key))
+        rb_raise(rb_eTypeError, "Integer native handle required");
+    VALUE native = map == Qnil ? Qnil : rb_hash_aref(map, key);
+    if (NIL_P(native))
+        rb_raise(rb_eRuntimeError, "%s is closed or foreign", kind);
+    return (void*)(uintptr_t)NUM2ULL(native);
+}
+struct rb_extra_owner_registration {
+    VALUE* map;
+    void* native;
+};
+static VALUE rb_extra_owner_registration_body(VALUE raw) {
+    struct rb_extra_owner_registration* owner = (void*)(uintptr_t)raw;
+    if (*owner->map == Qnil) {
+        *owner->map = rb_hash_new();
+        rb_global_variable(owner->map);
+    }
+    VALUE key = rb_extra_new_ticket();
+    rb_hash_aset(*owner->map, key, ULL2NUM((uintptr_t)owner->native));
+    return key;
+}
+static VALUE rb_extra_track_owner(VALUE* map, void* native, void (*release)(void*)) {
+    struct rb_extra_owner_registration owner = {map, native};
+    int state = 0;
+    VALUE key = rb_protect(rb_extra_owner_registration_body, (VALUE)(uintptr_t)&owner, &state);
+    if (state) {
+        release(native);
+        rb_jump_tag(state);
+    }
+    return key;
+}
+
+static void rb_extra_session_maps(void) {
+    if (rb_extra_stream_pointers == Qnil) {
+        rb_extra_stream_pointers = rb_hash_new();
+        rb_global_variable(&rb_extra_stream_pointers);
+    }
+    if (rb_extra_active_contexts == Qnil) {
+        rb_extra_active_contexts = rb_hash_new();
+        rb_global_variable(&rb_extra_active_contexts);
+    }
+    if (rb_text_handles == Qnil) {
+        rb_text_handles = rb_hash_new();
+        rb_global_variable(&rb_text_handles);
+    }
+    if (rb_extra_sessions == Qnil) {
+        rb_extra_sessions = rb_hash_new();
+        rb_global_variable(&rb_extra_sessions);
+    }
+    if (rb_extra_stream_owners == Qnil) {
+        rb_extra_stream_owners = rb_hash_new();
+        rb_global_variable(&rb_extra_stream_owners);
+    }
+}
+static void rb_extra_release_session(void* native) {
+    crispasr_session_close((struct CrispasrSession*)native);
+}
+static VALUE rb_extra_track_session(struct CrispasrSession* native) {
+    return rb_extra_track_owner(&rb_extra_sessions, native, rb_extra_release_session);
+}
+struct rb_extra_stream_registration {
+    struct CrispasrStream* native;
+    VALUE owner, key;
+};
+static VALUE rb_extra_stream_registration_body(VALUE raw) {
+    struct rb_extra_stream_registration* registration = (void*)(uintptr_t)raw;
+    VALUE key = rb_extra_new_ticket();
+    registration->key = key;
+    rb_hash_aset(rb_extra_stream_pointers, key, ULL2NUM((uintptr_t)registration->native));
+    rb_hash_aset(rb_extra_stream_owners, key, registration->owner);
+    return key;
+}
+static VALUE rb_extra_track_stream(struct CrispasrStream* native, VALUE owner) {
+    struct rb_extra_stream_registration registration = {native, owner, Qnil};
+    int state = 0;
+    VALUE key = rb_protect(rb_extra_stream_registration_body, (VALUE)(uintptr_t)&registration, &state);
+    if (state) {
+        if (!NIL_P(registration.key))
+            rb_hash_delete(rb_extra_stream_pointers, registration.key);
+        crispasr_stream_close(native);
+        rb_jump_tag(state);
+    }
+    return key;
+}
+static struct CrispasrStream* rb_extra_stream_handle(VALUE handle) {
+    if (!RB_INTEGER_TYPE_P(handle))
+        rb_raise(rb_eTypeError, "Integer stream handle required");
+    if (rb_extra_in_stream)
+        rb_raise(rb_eRuntimeError, "stream re-entry during callback");
+    VALUE owner = rb_extra_stream_owners == Qnil ? Qnil : rb_hash_aref(rb_extra_stream_owners, handle);
+    if (NIL_P(owner) || rb_extra_sessions == Qnil || NIL_P(rb_hash_aref(rb_extra_sessions, owner)))
+        rb_raise(rb_eRuntimeError, "Stream is closed");
+    return rb_extra_native_pointer(rb_extra_stream_pointers, handle, "Stream");
+}
 static struct CrispasrSession* rb_extra_handle(VALUE handle) {
+    if (!RB_INTEGER_TYPE_P(handle))
+        rb_raise(rb_eTypeError, "Integer session handle required");
     if (rb_extra_in_stream)
         rb_raise(rb_eRuntimeError, "session re-entry during streaming callback");
-    uintptr_t p = (uintptr_t)NUM2ULL(handle);
-    if (!p)
-        rb_raise(rb_eArgError, "null session handle");
-    return (struct CrispasrSession*)p;
+    return rb_extra_native_pointer(rb_extra_sessions, handle, "Session");
 }
 /* Ruby-managed scratch bytes survive exceptions without a malloc leak. */
 static VALUE rb_extra_pcm(VALUE input) {
@@ -89,8 +192,10 @@ static VALUE rb_extra_pcm(VALUE input) {
     if (n <= 0 || n > INT_MAX || n > LONG_MAX / (long)sizeof(float))
         rb_raise(rb_eArgError, "PCM length out of range");
     VALUE storage = rb_str_new(NULL, n * sizeof(float));
-    for (long i = 0; i < n; ++i)
-        ((float*)RSTRING_PTR(storage))[i] = (float)NUM2DBL(rb_ary_entry(input, i));
+    for (long i = 0; i < n; ++i) {
+        float value = NUM2DBL(rb_ary_entry(input, i));
+        ((float*)RSTRING_PTR(storage))[i] = value;
+    }
     return storage;
 }
 static VALUE rb_extra_floats(const float* p, long n) {
@@ -298,3 +403,5 @@ static VALUE rb_extra_streaming(VALUE self, VALUE handle, VALUE text) {
     rb_extra_check(rc, "synthesize_streaming");
     return Qnil;
 }
+
+#include "ruby_crispasr_context_guard.h"

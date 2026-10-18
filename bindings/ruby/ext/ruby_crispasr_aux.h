@@ -607,53 +607,96 @@ typedef void* (*init_fn)(const char*);
 typedef const char* (*proc_fn)(void*, const char*);
 typedef void (*free_text_fn)(const char*);
 typedef void (*free_fn)(void*);
-static VALUE rb_aux_text_processor_init(VALUE self, VALUE path, init_fn fn) {
-    void* h = fn(StringValueCStr(path));
-    if (!h)
+struct rb_aux_text_registration {
+    void* native;
+    int kind;
+};
+static VALUE rb_aux_text_registration_body(VALUE raw) {
+    struct rb_aux_text_registration* registration = (void*)(uintptr_t)raw;
+    VALUE key = rb_extra_new_ticket();
+    VALUE record = rb_ary_new_from_args(2, ULL2NUM((uintptr_t)registration->native), INT2NUM(registration->kind));
+    rb_hash_aset(rb_text_handles, key, record);
+    return key;
+}
+static VALUE rb_aux_text_processor_init(VALUE self, VALUE path, init_fn fn, free_fn release, int kind) {
+    rb_extra_session_maps();
+    void* native = fn(StringValueCStr(path));
+    if (!native)
         rb_raise(rb_eRuntimeError, "processor init failed");
-    return ULL2NUM((uintptr_t)h);
+    struct rb_aux_text_registration registration = {native, kind};
+    int state = 0;
+    VALUE key = rb_protect(rb_aux_text_registration_body, (VALUE)(uintptr_t)&registration, &state);
+    if (state) {
+        release(native);
+        rb_jump_tag(state);
+    }
+    return key;
 }
-static VALUE rb_aux_text_processor_process(VALUE self, VALUE handle, VALUE text, proc_fn fn, free_text_fn ft) {
-    void* h = (void*)NUM2ULL(handle);
-    const char* out = fn(h, StringValueCStr(text));
-    if (!out)
+static int rb_aux_text_kind(VALUE handle) {
+    if (!RB_INTEGER_TYPE_P(handle))
+        rb_raise(rb_eTypeError, "Integer processor handle required");
+    VALUE kind = rb_text_handles == Qnil ? Qnil : rb_hash_aref(rb_text_handles, handle);
+    return NIL_P(kind) ? 0 : NUM2INT(rb_ary_entry(kind, 1));
+}
+struct rb_aux_text_copy {
+    const char* text;
+};
+static VALUE rb_aux_text_copy_body(VALUE raw) {
+    return rb_utf8_str_new_cstr(((struct rb_aux_text_copy*)(uintptr_t)raw)->text);
+}
+static VALUE rb_aux_text_processor_process(VALUE self, VALUE handle, VALUE text, proc_fn fn, free_text_fn release,
+                                           int kind) {
+    if (rb_aux_text_kind(handle) != kind)
+        rb_raise(rb_eRuntimeError, "Processor is closed or has a different type");
+    const char* input = StringValueCStr(text);
+    VALUE record = rb_hash_aref(rb_text_handles, handle);
+    const char* output = fn((void*)(uintptr_t)NUM2ULL(rb_ary_entry(record, 0)), input);
+    if (!output)
         rb_raise(rb_eRuntimeError, "processor process failed");
-    VALUE s = rb_utf8_str_new_cstr(out);
-    ft(out);
-    return s;
+    struct rb_aux_text_copy copy = {output};
+    int state = 0;
+    VALUE result = rb_protect(rb_aux_text_copy_body, (VALUE)(uintptr_t)&copy, &state);
+    release(output);
+    if (state)
+        rb_jump_tag(state);
+    return result;
 }
-static VALUE rb_aux_text_processor_free(VALUE self, VALUE handle, free_fn fn) {
-    void* h = (void*)NUM2ULL(handle);
-    if (h)
-        fn(h);
+static VALUE rb_aux_text_processor_free(VALUE self, VALUE handle, free_fn release, int kind) {
+    int actual = rb_aux_text_kind(handle);
+    if (!actual)
+        return Qnil;
+    if (actual != kind)
+        rb_raise(rb_eRuntimeError, "Processor has a different type");
+    VALUE record = rb_hash_delete(rb_text_handles, handle);
+    release((void*)(uintptr_t)NUM2ULL(rb_ary_entry(record, 0)));
     return Qnil;
 }
 static VALUE rb_aux_punc_init(VALUE self, VALUE path) {
-    return rb_aux_text_processor_init(self, path, crispasr_punc_init);
+    return rb_aux_text_processor_init(self, path, crispasr_punc_init, crispasr_punc_free, 1);
 }
-static VALUE rb_aux_punc_process(VALUE self, VALUE h, VALUE t) {
-    return rb_aux_text_processor_process(self, h, t, crispasr_punc_process, crispasr_punc_free_text);
+static VALUE rb_aux_punc_process(VALUE self, VALUE handle, VALUE text) {
+    return rb_aux_text_processor_process(self, handle, text, crispasr_punc_process, crispasr_punc_free_text, 1);
 }
-static VALUE rb_aux_punc_free(VALUE self, VALUE h) {
-    return rb_aux_text_processor_free(self, h, crispasr_punc_free);
+static VALUE rb_aux_punc_free(VALUE self, VALUE handle) {
+    return rb_aux_text_processor_free(self, handle, crispasr_punc_free, 1);
 }
 static VALUE rb_aux_truecase_init(VALUE self, VALUE path) {
-    return rb_aux_text_processor_init(self, path, crispasr_truecase_init);
+    return rb_aux_text_processor_init(self, path, crispasr_truecase_init, crispasr_truecase_free, 2);
 }
-static VALUE rb_aux_truecase_process(VALUE self, VALUE h, VALUE t) {
-    return rb_aux_text_processor_process(self, h, t, crispasr_truecase_process, crispasr_truecase_free_text);
+static VALUE rb_aux_truecase_process(VALUE self, VALUE handle, VALUE text) {
+    return rb_aux_text_processor_process(self, handle, text, crispasr_truecase_process, crispasr_truecase_free_text, 2);
 }
-static VALUE rb_aux_truecase_free(VALUE self, VALUE h) {
-    return rb_aux_text_processor_free(self, h, crispasr_truecase_free);
+static VALUE rb_aux_truecase_free(VALUE self, VALUE handle) {
+    return rb_aux_text_processor_free(self, handle, crispasr_truecase_free, 2);
 }
 static VALUE rb_aux_pcs_init(VALUE self, VALUE path) {
-    return rb_aux_text_processor_init(self, path, crispasr_pcs_init);
+    return rb_aux_text_processor_init(self, path, crispasr_pcs_init, crispasr_pcs_free, 3);
 }
-static VALUE rb_aux_pcs_process(VALUE self, VALUE h, VALUE t) {
-    return rb_aux_text_processor_process(self, h, t, crispasr_pcs_process, crispasr_pcs_free_text);
+static VALUE rb_aux_pcs_process(VALUE self, VALUE handle, VALUE text) {
+    return rb_aux_text_processor_process(self, handle, text, crispasr_pcs_process, crispasr_pcs_free_text, 3);
 }
-static VALUE rb_aux_pcs_free(VALUE self, VALUE h) {
-    return rb_aux_text_processor_free(self, h, crispasr_pcs_free);
+static VALUE rb_aux_pcs_free(VALUE self, VALUE handle) {
+    return rb_aux_text_processor_free(self, handle, crispasr_pcs_free, 3);
 }
 static VALUE rb_aux_free_aligner(VALUE self) {
     crispasr_free_aligner_cache();
@@ -1133,16 +1176,20 @@ struct rb_chat_string_copy {
 static VALUE rb_chat_copy_text(VALUE raw) {
     return rb_utf8_str_new_cstr(((struct rb_chat_string_copy*)raw)->text);
 }
-static VALUE rb_chat_live = Qnil;
 static void rb_chat_ensure_live(void) {
     if (rb_chat_live == Qnil) {
         rb_chat_live = rb_hash_new();
         rb_global_variable(&rb_chat_live);
     }
 }
-static void rb_chat_track(VALUE h) {
-    rb_chat_ensure_live();
-    rb_hash_aset(rb_chat_live, h, Qtrue);
+static void rb_chat_release_owner(void* native) {
+    crispasr_chat_close((crispasr_chat_session_t)native);
+}
+static VALUE rb_chat_track(crispasr_chat_session_t native) {
+    return rb_extra_track_owner(&rb_chat_live, (void*)native, rb_chat_release_owner);
+}
+static crispasr_chat_session_t rb_chat_native(VALUE handle) {
+    return (crispasr_chat_session_t)rb_extra_native_pointer(rb_chat_live, handle, "Chat session");
 }
 static void rb_chat_untrack(VALUE h) {
     if (rb_chat_live != Qnil)
@@ -1155,7 +1202,7 @@ static void rb_chat_check_live(VALUE h) {
         rb_raise(rb_eRuntimeError, "chat session is closed");
 }
 
-static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p) {
+static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p, VALUE roots) {
     crispasr_chat_open_params_default(p);
     if (NIL_P(params))
         return;
@@ -1182,7 +1229,7 @@ static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p) {
 #undef RB_CHAT_OPEN_BOOL
     v = rb_chat_get_field(params, "chat_template");
     if (!NIL_P(v))
-        p->chat_template = StringValueCStr(v);
+        p->chat_template = rb_chat_owned_cstring(v, roots);
 }
 static void rb_chat_generate_options(VALUE params, crispasr_chat_generate_params* p, VALUE* storage, VALUE roots) {
     crispasr_chat_generate_params_default(p);
@@ -1227,15 +1274,15 @@ static void rb_chat_generate_options(VALUE params, crispasr_chat_generate_params
     }
 }
 static VALUE rb_chat_open(VALUE self, VALUE model_path, VALUE params) {
+    VALUE roots = rb_ary_new();
     crispasr_chat_open_params p;
-    rb_chat_open_options(params, &p);
+    rb_chat_open_options(params, &p, roots);
     crispasr_chat_error err = {0};
-    crispasr_chat_session_t s = crispasr_chat_open(StringValueCStr(model_path), &p, &err);
+    crispasr_chat_session_t s = crispasr_chat_open(rb_chat_owned_cstring(model_path, roots), &p, &err);
+    RB_GC_GUARD(roots);
     if (!s)
         rb_raise(rb_eRuntimeError, "chat_open failed: %s", err.message);
-    VALUE h = ULL2NUM((uintptr_t)s);
-    rb_chat_track(h);
-    return h;
+    return rb_chat_track(s);
 }
 static VALUE rb_chat_close(VALUE self, VALUE handle) {
     if (rb_extra_in_stream)
@@ -1243,7 +1290,7 @@ static VALUE rb_chat_close(VALUE self, VALUE handle) {
     rb_chat_ensure_live();
     if (NIL_P(rb_hash_aref(rb_chat_live, handle)))
         return Qnil;
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     if (s) {
         // clear abort callback
         rb_aux_ensure_chat_callbacks();
@@ -1257,7 +1304,7 @@ static VALUE rb_chat_close(VALUE self, VALUE handle) {
 }
 static VALUE rb_chat_reset(VALUE self, VALUE handle) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     crispasr_chat_error err = {0};
     int32_t rc = crispasr_chat_reset(s, &err);
     if (rc != 0)
@@ -1267,7 +1314,7 @@ static VALUE rb_chat_reset(VALUE self, VALUE handle) {
 }
 static VALUE rb_chat_generate(VALUE self, VALUE handle, VALUE messages, VALUE params) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     VALUE roots = rb_ary_new();
     VALUE message_storage = rb_chat_messages(messages, roots);
     long n = RARRAY_LEN(messages);
@@ -1337,7 +1384,7 @@ static void chat_on_token(const char* chunk, void* ud) {
 }
 static VALUE rb_chat_generate_stream(VALUE self, VALUE handle, VALUE messages, VALUE params) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     if (!rb_block_given_p())
         rb_raise(rb_eArgError, "block required");
     VALUE proc = rb_block_proc();
@@ -1371,7 +1418,7 @@ static VALUE rb_chat_generate_stream(VALUE self, VALUE handle, VALUE messages, V
 }
 static VALUE rb_chat_set_abort(VALUE self, VALUE handle, VALUE proc) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     rb_aux_ensure_chat_callbacks();
     VALUE key = ULL2NUM((uintptr_t)s);
     if (NIL_P(proc)) {
@@ -1385,18 +1432,18 @@ static VALUE rb_chat_set_abort(VALUE self, VALUE handle, VALUE proc) {
 }
 static VALUE rb_chat_template(VALUE self, VALUE handle) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     const char* t = crispasr_chat_template_name(s);
     return rb_utf8_str_new_cstr(t ? t : "");
 }
 static VALUE rb_chat_n_ctx(VALUE self, VALUE handle) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     return INT2NUM(crispasr_chat_n_ctx(s));
 }
 static VALUE rb_chat_count_tokens(VALUE self, VALUE handle, VALUE messages) {
     rb_chat_check_live(handle);
-    crispasr_chat_session_t s = (crispasr_chat_session_t)(uintptr_t)NUM2ULL(handle);
+    crispasr_chat_session_t s = rb_chat_native(handle);
     VALUE roots = rb_ary_new();
     VALUE message_storage = rb_chat_messages(messages, roots);
     long n = RARRAY_LEN(messages);
@@ -1410,10 +1457,12 @@ static VALUE rb_chat_count_tokens(VALUE self, VALUE handle, VALUE messages) {
     return INT2NUM(rc);
 }
 static VALUE rb_chat_memory_estimate(VALUE self, VALUE path, VALUE params) {
+    VALUE roots = rb_ary_new();
     crispasr_chat_open_params p;
-    rb_chat_open_options(params, &p);
+    rb_chat_open_options(params, &p, roots);
     crispasr_chat_error err = {0};
-    size_t sz = crispasr_chat_memory_estimate(StringValueCStr(path), &p, &err);
+    size_t sz = crispasr_chat_memory_estimate(rb_chat_owned_cstring(path, roots), &p, &err);
+    RB_GC_GUARD(roots);
     if (sz == 0 && err.code != 0)
         rb_raise(rb_eRuntimeError, "memory_estimate failed: %s", err.message);
     return ULL2NUM(sz);
@@ -1425,6 +1474,31 @@ static VALUE rb_chat_ai_disclosure(VALUE self) {
 
 /* Test-only direct callback routing probes. */
 #ifdef CRISPASR_WRAPPER_PROBE
+extern void probe_text_mode(int);
+extern int probe_text_live(void);
+extern int probe_text_contexts(void);
+static VALUE rb_test_text_mode(VALUE self, VALUE mode) {
+    probe_text_mode(NUM2INT(mode));
+    return Qnil;
+}
+static VALUE rb_test_text_live(VALUE self) {
+    return INT2NUM(probe_text_live());
+}
+static VALUE rb_test_text_contexts(VALUE self) {
+    return INT2NUM(probe_text_contexts());
+}
+extern int probe_temperature_calls(void);
+static VALUE rb_test_temperature_calls(VALUE self) {
+    return INT2NUM(probe_temperature_calls());
+}
+extern int probe_parent_close_violations(void);
+extern int probe_stream_closes(void);
+static VALUE rb_test_parent_close_violations(VALUE self) {
+    return INT2NUM(probe_parent_close_violations());
+}
+static VALUE rb_test_stream_closes(VALUE self) {
+    return INT2NUM(probe_stream_closes());
+}
 extern void probe_speaker_mode(int);
 extern int probe_speaker_live(void);
 static VALUE rb_test_speaker_mode(VALUE self, VALUE mode) {
@@ -1442,6 +1516,11 @@ static VALUE rb_test_db_mode(VALUE self, VALUE mode) {
 }
 static VALUE rb_test_db_live(VALUE self) {
     return INT2NUM(probe_db_live());
+}
+extern void probe_titanet_force_reuse(int);
+static VALUE rb_test_titanet_reuse(VALUE self, VALUE enabled) {
+    probe_titanet_force_reuse(RTEST(enabled));
+    return Qnil;
 }
 extern void probe_titanet_mode(int);
 extern int probe_titanet_live(void);
@@ -1462,19 +1541,22 @@ static VALUE rb_test_audio_live(VALUE self) {
     return INT2NUM(probe_utility_live());
 }
 static VALUE rb_test_invoke_progress(VALUE self, VALUE handle) {
-    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(handle);
+    VALUE native = rb_extra_sessions == Qnil || NIL_P(handle) ? Qnil : rb_hash_aref(rb_extra_sessions, handle);
+    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(NIL_P(native) ? handle : native);
     rb_aux_progress_tramp(3, 6, ud);
     rb_aux_check_pending();
     return Qnil;
 }
 static VALUE rb_test_invoke_segment(VALUE self, VALUE handle) {
-    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(handle);
+    VALUE native = rb_extra_sessions == Qnil || NIL_P(handle) ? Qnil : rb_hash_aref(rb_extra_sessions, handle);
+    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(NIL_P(native) ? handle : native);
     rb_aux_segment_tramp("日本語", 123, 456, 7, ud);
     rb_aux_check_pending();
     return Qnil;
 }
 static VALUE rb_test_invoke_token(VALUE self, VALUE handle) {
-    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(handle);
+    VALUE native = rb_extra_sessions == Qnil || NIL_P(handle) ? Qnil : rb_hash_aref(rb_extra_sessions, handle);
+    void* ud = NIL_P(handle) ? NULL : (void*)(uintptr_t)NUM2ULL(NIL_P(native) ? handle : native);
     rb_aux_token_tramp("\xe6\x97", 9, ud);
     rb_aux_check_pending();
     return Qnil;
@@ -1484,6 +1566,49 @@ static VALUE rb_test_invoke_token(VALUE self, VALUE handle) {
 
 #include "ruby_crispasr_speaker.h"
 
+// BEGIN GENERATED CONTEXT GUARDS
+RB_CONTEXT_WRAPPER_1(rb_aux_backend_getter);
+RB_CONTEXT_WRAPPER_5(rb_aux_score_texts);
+RB_CONTEXT_WRAPPER_2(rb_aux_set_pcm_rate);
+RB_CONTEXT_WRAPPER_3(rb_aux_set_att);
+RB_CONTEXT_WRAPPER_2(rb_aux_set_grammar_strict);
+RB_CONTEXT_WRAPPER_1(rb_aux_punc_init);
+RB_CONTEXT_WRAPPER_2(rb_aux_punc_process);
+RB_CONTEXT_WRAPPER_1(rb_aux_punc_free);
+RB_CONTEXT_WRAPPER_1(rb_aux_truecase_init);
+RB_CONTEXT_WRAPPER_2(rb_aux_truecase_process);
+RB_CONTEXT_WRAPPER_1(rb_aux_truecase_free);
+RB_CONTEXT_WRAPPER_1(rb_aux_pcs_init);
+RB_CONTEXT_WRAPPER_2(rb_aux_pcs_process);
+RB_CONTEXT_WRAPPER_1(rb_aux_pcs_free);
+RB_CONTEXT_WRAPPER_2(rb_aux_set_progress_cb);
+RB_CONTEXT_WRAPPER_2(rb_aux_set_segment_cb);
+RB_CONTEXT_WRAPPER_2(rb_aux_set_token_cb);
+RB_CONTEXT_WRAPPER_3(rb_aux_pitch);
+RB_CONTEXT_WRAPPER_1(rb_aux_pitch_n_frames);
+RB_CONTEXT_WRAPPER_1(rb_aux_pitch_sample_rate);
+RB_CONTEXT_WRAPPER_2(rb_aux_pitch_frame);
+RB_CONTEXT_WRAPPER_2(rb_aux_separate);
+RB_CONTEXT_WRAPPER_1(rb_aux_separate_n_stems);
+RB_CONTEXT_WRAPPER_1(rb_aux_separate_sample_rate);
+RB_CONTEXT_WRAPPER_1(rb_aux_convert_sample_rate);
+RB_CONTEXT_WRAPPER_1(rb_aux_piano_n_notes);
+RB_CONTEXT_WRAPPER_1(rb_aux_chords_n_spans);
+RB_CONTEXT_WRAPPER_1(rb_aux_beats_n_events);
+RB_CONTEXT_WRAPPER_1(rb_aux_tab_n_frames);
+RB_CONTEXT_WRAPPER_3(rb_aux_transcribe_vad);
+RB_CONTEXT_WRAPPER_2(rb_chat_open);
+RB_CONTEXT_WRAPPER_1(rb_chat_close);
+RB_CONTEXT_WRAPPER_1(rb_chat_reset);
+RB_CONTEXT_WRAPPER_3(rb_chat_generate);
+RB_CONTEXT_WRAPPER_3(rb_chat_generate_stream);
+RB_CONTEXT_WRAPPER_2(rb_chat_set_abort);
+RB_CONTEXT_WRAPPER_1(rb_chat_template);
+RB_CONTEXT_WRAPPER_1(rb_chat_n_ctx);
+RB_CONTEXT_WRAPPER_2(rb_chat_count_tokens);
+RB_CONTEXT_WRAPPER_2(rb_chat_memory_estimate);
+RB_CONTEXT_WRAPPER_0(rb_chat_ai_disclosure);
+// END GENERATED CONTEXT GUARDS
 /* Registration helper called from Init */
 static void rb_aux_init(void) {
     rb_speaker_aux_init();
@@ -1522,43 +1647,50 @@ static void rb_aux_init(void) {
     rb_define_singleton_method(mCrispASR, "diarize_turns", rb_aux_diarize, -1);
 
     // Session additions
-    rb_define_singleton_method(mSession, "backend", rb_aux_backend_getter, 1);
-    rb_define_singleton_method(mSession, "score_texts", rb_aux_score_texts, 5);
-    rb_define_singleton_method(mSession, "set_pcm_sample_rate", rb_aux_set_pcm_rate, 2);
-    rb_define_singleton_method(mSession, "set_parakeet_att_context", rb_aux_set_att, 3);
-    rb_define_singleton_method(mSession, "set_grammar_strict", rb_aux_set_grammar_strict, 2);
-    rb_define_singleton_method(mSession, "punc_init", rb_aux_punc_init, 1);
-    rb_define_singleton_method(mSession, "punc_process", rb_aux_punc_process, 2);
-    rb_define_singleton_method(mSession, "punc_free", rb_aux_punc_free, 1);
-    rb_define_singleton_method(mSession, "truecase_init", rb_aux_truecase_init, 1);
-    rb_define_singleton_method(mSession, "truecase_process", rb_aux_truecase_process, 2);
-    rb_define_singleton_method(mSession, "truecase_free", rb_aux_truecase_free, 1);
-    rb_define_singleton_method(mSession, "pcs_init", rb_aux_pcs_init, 1);
-    rb_define_singleton_method(mSession, "pcs_process", rb_aux_pcs_process, 2);
-    rb_define_singleton_method(mSession, "pcs_free", rb_aux_pcs_free, 1);
-    rb_define_singleton_method(mSession, "set_progress_callback", rb_aux_set_progress_cb, 2);
-    rb_define_singleton_method(mSession, "set_segment_callback", rb_aux_set_segment_cb, 2);
-    rb_define_singleton_method(mSession, "set_token_callback", rb_aux_set_token_cb, 2);
-    rb_define_singleton_method(mSession, "pitch", rb_aux_pitch, 3);
-    rb_define_singleton_method(mSession, "pitch_n_frames", rb_aux_pitch_n_frames, 1);
-    rb_define_singleton_method(mSession, "pitch_sample_rate", rb_aux_pitch_sample_rate, 1);
-    rb_define_singleton_method(mSession, "pitch_frame", rb_aux_pitch_frame, 2);
-    rb_define_singleton_method(mSession, "separate", rb_aux_separate, 2);
-    rb_define_singleton_method(mSession, "separate_n_stems", rb_aux_separate_n_stems, 1);
-    rb_define_singleton_method(mSession, "separate_sample_rate", rb_aux_separate_sample_rate, 1);
-    rb_define_singleton_method(mSession, "convert_sample_rate", rb_aux_convert_sample_rate, 1);
-    rb_define_singleton_method(mSession, "piano_n_notes", rb_aux_piano_n_notes, 1);
-    rb_define_singleton_method(mSession, "chords_n_spans", rb_aux_chords_n_spans, 1);
-    rb_define_singleton_method(mSession, "beats_n_events", rb_aux_beats_n_events, 1);
-    rb_define_singleton_method(mSession, "tab_n_frames", rb_aux_tab_n_frames, 1);
-    rb_define_singleton_method(mSession, "transcribe_vad", rb_aux_transcribe_vad, 3);
+    rb_define_singleton_method(mSession, "backend", rb_context_guard_rb_aux_backend_getter, 1);
+    rb_define_singleton_method(mSession, "score_texts", rb_context_guard_rb_aux_score_texts, 5);
+    rb_define_singleton_method(mSession, "set_pcm_sample_rate", rb_context_guard_rb_aux_set_pcm_rate, 2);
+    rb_define_singleton_method(mSession, "set_parakeet_att_context", rb_context_guard_rb_aux_set_att, 3);
+    rb_define_singleton_method(mSession, "set_grammar_strict", rb_context_guard_rb_aux_set_grammar_strict, 2);
+    rb_define_singleton_method(mSession, "punc_init", rb_context_guard_rb_aux_punc_init, 1);
+    rb_define_singleton_method(mSession, "punc_process", rb_context_guard_rb_aux_punc_process, 2);
+    rb_define_singleton_method(mSession, "punc_free", rb_context_guard_rb_aux_punc_free, 1);
+    rb_define_singleton_method(mSession, "truecase_init", rb_context_guard_rb_aux_truecase_init, 1);
+    rb_define_singleton_method(mSession, "truecase_process", rb_context_guard_rb_aux_truecase_process, 2);
+    rb_define_singleton_method(mSession, "truecase_free", rb_context_guard_rb_aux_truecase_free, 1);
+    rb_define_singleton_method(mSession, "pcs_init", rb_context_guard_rb_aux_pcs_init, 1);
+    rb_define_singleton_method(mSession, "pcs_process", rb_context_guard_rb_aux_pcs_process, 2);
+    rb_define_singleton_method(mSession, "pcs_free", rb_context_guard_rb_aux_pcs_free, 1);
+    rb_define_singleton_method(mSession, "set_progress_callback", rb_context_guard_rb_aux_set_progress_cb, 2);
+    rb_define_singleton_method(mSession, "set_segment_callback", rb_context_guard_rb_aux_set_segment_cb, 2);
+    rb_define_singleton_method(mSession, "set_token_callback", rb_context_guard_rb_aux_set_token_cb, 2);
+    rb_define_singleton_method(mSession, "pitch", rb_context_guard_rb_aux_pitch, 3);
+    rb_define_singleton_method(mSession, "pitch_n_frames", rb_context_guard_rb_aux_pitch_n_frames, 1);
+    rb_define_singleton_method(mSession, "pitch_sample_rate", rb_context_guard_rb_aux_pitch_sample_rate, 1);
+    rb_define_singleton_method(mSession, "pitch_frame", rb_context_guard_rb_aux_pitch_frame, 2);
+    rb_define_singleton_method(mSession, "separate", rb_context_guard_rb_aux_separate, 2);
+    rb_define_singleton_method(mSession, "separate_n_stems", rb_context_guard_rb_aux_separate_n_stems, 1);
+    rb_define_singleton_method(mSession, "separate_sample_rate", rb_context_guard_rb_aux_separate_sample_rate, 1);
+    rb_define_singleton_method(mSession, "convert_sample_rate", rb_context_guard_rb_aux_convert_sample_rate, 1);
+    rb_define_singleton_method(mSession, "piano_n_notes", rb_context_guard_rb_aux_piano_n_notes, 1);
+    rb_define_singleton_method(mSession, "chords_n_spans", rb_context_guard_rb_aux_chords_n_spans, 1);
+    rb_define_singleton_method(mSession, "beats_n_events", rb_context_guard_rb_aux_beats_n_events, 1);
+    rb_define_singleton_method(mSession, "tab_n_frames", rb_context_guard_rb_aux_tab_n_frames, 1);
+    rb_define_singleton_method(mSession, "transcribe_vad", rb_context_guard_rb_aux_transcribe_vad, 3);
 #ifdef CRISPASR_WRAPPER_PROBE
     rb_define_singleton_method(mCrispASR, "test_audio_mode", rb_test_audio_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_audio_live", rb_test_audio_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_text_mode", rb_test_text_mode, 1);
+    rb_define_singleton_method(mCrispASR, "test_text_live", rb_test_text_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_text_contexts", rb_test_text_contexts, 0);
+    rb_define_singleton_method(mCrispASR, "test_temperature_calls", rb_test_temperature_calls, 0);
+    rb_define_singleton_method(mCrispASR, "test_parent_close_violations", rb_test_parent_close_violations, 0);
+    rb_define_singleton_method(mCrispASR, "test_stream_closes", rb_test_stream_closes, 0);
     rb_define_singleton_method(mCrispASR, "test_speaker_mode", rb_test_speaker_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_speaker_live", rb_test_speaker_live, 0);
     rb_define_singleton_method(mCrispASR, "test_db_mode", rb_test_db_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_db_live", rb_test_db_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_titanet_reuse", rb_test_titanet_reuse, 1);
     rb_define_singleton_method(mCrispASR, "test_titanet_mode", rb_test_titanet_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_titanet_live", rb_test_titanet_live, 0);
     // Test helpers (routing verification)
@@ -1572,15 +1704,15 @@ static void rb_aux_init(void) {
 
     // Chat
     mChat = rb_define_module_under(mCrispASR, "Chat");
-    rb_define_singleton_method(mChat, "open", rb_chat_open, 2);
-    rb_define_singleton_method(mChat, "close", rb_chat_close, 1);
-    rb_define_singleton_method(mChat, "reset", rb_chat_reset, 1);
-    rb_define_singleton_method(mChat, "generate", rb_chat_generate, 3);
-    rb_define_singleton_method(mChat, "generate_stream", rb_chat_generate_stream, 3);
-    rb_define_singleton_method(mChat, "set_abort_callback", rb_chat_set_abort, 2);
-    rb_define_singleton_method(mChat, "template_name", rb_chat_template, 1);
-    rb_define_singleton_method(mChat, "n_ctx", rb_chat_n_ctx, 1);
-    rb_define_singleton_method(mChat, "count_tokens", rb_chat_count_tokens, 2);
-    rb_define_singleton_method(mChat, "memory_estimate", rb_chat_memory_estimate, 2);
-    rb_define_singleton_method(mChat, "ai_disclosure_text", rb_chat_ai_disclosure, 0);
+    rb_define_singleton_method(mChat, "open", rb_context_guard_rb_chat_open, 2);
+    rb_define_singleton_method(mChat, "close", rb_context_guard_rb_chat_close, 1);
+    rb_define_singleton_method(mChat, "reset", rb_context_guard_rb_chat_reset, 1);
+    rb_define_singleton_method(mChat, "generate", rb_context_guard_rb_chat_generate, 3);
+    rb_define_singleton_method(mChat, "generate_stream", rb_context_guard_rb_chat_generate_stream, 3);
+    rb_define_singleton_method(mChat, "set_abort_callback", rb_context_guard_rb_chat_set_abort, 2);
+    rb_define_singleton_method(mChat, "template_name", rb_context_guard_rb_chat_template, 1);
+    rb_define_singleton_method(mChat, "n_ctx", rb_context_guard_rb_chat_n_ctx, 1);
+    rb_define_singleton_method(mChat, "count_tokens", rb_context_guard_rb_chat_count_tokens, 2);
+    rb_define_singleton_method(mChat, "memory_estimate", rb_context_guard_rb_chat_memory_estimate, 2);
+    rb_define_singleton_method(mChat, "ai_disclosure_text", rb_context_guard_rb_chat_ai_disclosure, 0);
 }

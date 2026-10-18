@@ -137,8 +137,8 @@ s.set_token_callback(h, nil)
 s.transcribe(h,[1,3,5])
 # cross-session / unknown-userdata routing — verifies exact userdata dispatch, no fallback scan
 
-# Use distinct fake handles to avoid fixture returning same pointer (1) for every open
-h1=0x1001; h2=0x1002
+# Real wrapper opens receive distinct native fixture handles.
+h1=s.open('probe',1); h2=s.open('probe',1)
 prog1=[]; prog2=[]
 s.set_progress_callback(h1, ->(a,b){ prog1 << [a,b] })
 s.set_progress_callback(h2, ->(a,b){ prog2 << [a,b] })
@@ -348,5 +348,74 @@ c.test_speaker_mode(1);reject(RuntimeError){c::PyannoteCache.new([1,3,5],'seg',2
 reject(ArgumentError){c::PyannoteCache.new([],'seg',2)}
 def orphan_speaker(c); c::SpeakerEmbedder.new('embed');nil;end
 orphan_speaker(c);GC.start;eq(c.test_speaker_live,0)
+# A reused native address must never resurrect an already closed public handle.
+c.test_titanet_reuse(true)
+stale=s.titanet_init('probe',4);s.titanet_free(stale)
+replacement=s.titanet_init('probe',4)
+reject(RuntimeError){s.titanet_embed(stale,[1,3,5])}
+s.titanet_free(stale);eq(c.test_titanet_live,1);eq(s.titanet_embed(replacement,[1,3,5]).length,192)
+s.titanet_free(replacement);eq(c.test_titanet_live,0);c.test_titanet_reuse(false)
+borrowed_titan=s.titanet_init('probe',4)
+value=Object.new;value.define_singleton_method(:to_f){s.titanet_free(borrowed_titan);1.0}
+reject(RuntimeError){s.titanet_embed(borrowed_titan,[value,3,5])};eq(c.test_titanet_live,1)
+s.titanet_free(borrowed_titan);eq(c.test_titanet_live,0)
+eq(s.method(:transcribe).arity,2);eq(s::Stream.method(:open).arity,6);eq(chat.method(:generate).arity,3)
+s.singleton_class.alias_method(:contract_transcribe,:transcribe)
+eq(s.contract_transcribe(h,[1,3,5]).first[:tokens].length,2)
+s.singleton_class.remove_method(:contract_transcribe)
+loadopts={n_threads:7,use_gpu:false,verbosity:2,flash_attn:false,n_gpu_layers:3}
+loaded=s.open_with_options('probe','probe',loadopts)
+opts_tokens=[];s.set_token_callback(loaded,->(text,index){opts_tokens << text})
+eq(s.transcribe(loaded,[1,3,5]).first[:tokens].length,2);eq(opts_tokens.first.bytes,[0xe6,0x97])
+s.close(loaded);s.close(loaded);reject(RuntimeError){s.transcribe(loaded,[1,3,5])}
+reloaded=s.open_with_options('probe','probe',loadopts)
+reject(RuntimeError){s.transcribe(loaded,[1,3,5])};s.close(loaded)
+eq(s.transcribe(reloaded,[1,3,5]).first[:tokens].length,2);s.close(reloaded)
+reject(ArgumentError){s.open_with_options('probe','probe',loadopts.merge(n_gpu_layers:-2))}
+reject(ArgumentError){s.open_with_options('probe','probe',loadopts.merge(use_gpu:0))}
+reject(RuntimeError){s.open_with_options('probe','probe',loadopts.merge(n_threads:6))}
+path=Object.new;def path.to_str;GC.compact if GC.respond_to?(:compact);'probe';end
+compacted_chat=chat.open(path,{chat_template:'gemma',n_ctx:2048,n_gpu_layers:0,use_mmap:false})
+eq(chat.n_ctx(compacted_chat),2048);chat.close(compacted_chat)
+c.test_text_mode(0)
+[[:punc,'Hello!'],[:truecase,'Grüße'],[:pcs,'Hello.']].each do |prefix,expected|
+  handle=s.send("#{prefix}_init",'model');eq(s.send("#{prefix}_process",handle,'hello'),expected);eq(c.test_text_live,0)
+  c.test_text_mode(2);eq(s.send("#{prefix}_process",handle,''),'');eq(c.test_text_live,0)
+  c.test_text_mode(1);reject(RuntimeError){s.send("#{prefix}_process",handle,'hello')};c.test_text_mode(0)
+  reject(RuntimeError){s.send(prefix==:punc ? 'truecase_free':'punc_free',handle)}
+  value=Object.new;value.define_singleton_method(:to_str){s.send("#{prefix}_free",handle);'hello'}
+  reject(RuntimeError){s.send("#{prefix}_process",handle,value)}
+  s.send("#{prefix}_free",handle);s.send("#{prefix}_free",handle);eq(c.test_text_contexts,0)
+  reject(RuntimeError){s.send("#{prefix}_process",handle,'hello')}
+end
+coercion_owner=s.open('probe',1)
+number=Object.new
+number.define_singleton_method(:to_f){s.close(coercion_owner);0.5}
+before_temperature=c.test_temperature_calls
+reject(RuntimeError){s.set_temperature(coercion_owner,number,0)}
+eq(c.test_temperature_calls,before_temperature)
+s.set_temperature(coercion_owner,0.5,0);eq(c.test_temperature_calls,before_temperature+1)
+eq(s.backend(coercion_owner),'probe')
+reject(RuntimeError) do
+  s.synthesize_streaming(coercion_owner,'test') do |pcm,last|
+    Thread.new{Thread.current.report_on_exception=false;s.close(coercion_owner)}.value
+  end
+end
+eq(s.backend(coercion_owner),'probe');s.close(coercion_owner)
+streams=Whisper::CrispASR::Session::Stream
+owner=s.open('probe',1)
+stream=streams.open(owner,100,300,10,nil,false)
+eq(streams.feed(stream,[1,3,5]),1);eq(streams.get_text(stream)[:text],'ok');streams.set_live_decode(stream,true)
+eq(s.stream_kind(owner),1)
+coercion=Object.new;coercion.define_singleton_method(:to_f){s.close(owner);1.0}
+reject(RuntimeError){streams.feed(stream,[coercion,3,5])}
+closed_before=c.test_stream_closes
+s.close(owner)
+eq(c.test_parent_close_violations,0);eq(c.test_stream_closes,closed_before+1)
+s.close(owner);streams.close(stream);eq(c.test_stream_closes,closed_before+1)
+reject(RuntimeError){streams.feed(stream,[1,3,5])};reject(RuntimeError){streams.get_text(stream)}
+reject(RuntimeError){streams.flush(stream)};reject(RuntimeError){streams.set_live_decode(stream,true)}
+reject(RuntimeError){s.stream_kind(owner)}
+reject(RuntimeError){s.transcribe(owner,[1,3,5])};reject(RuntimeError){streams.open(owner,100,300,10,nil,false)}
 s.close(h)
 puts "PASS Ruby ABI: #{$count} assertions"

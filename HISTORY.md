@@ -1,3 +1,35 @@
+## Ruby session ownership, re-entry and opaque handles — 2026-10-18
+
+Ruby closes child streams before their parent session, rejects closed/foreign
+handles and makes explicit close idempotent. A native ordering oracle rejected
+the old parent-close path. Stream feeding now uses Ruby-managed scratch storage
+and defers callback errors until native code returns.
+
+Session/Stream/Chat operations now hold a per-context borrow through argument
+coercion, callbacks and Ruby thread/fiber switches. A regression demonstrated
+that coercion could close a borrowed context; same-context re-entry now raises
+before native mutation. The guard preserves method arities and Ruby aliases.
+Its 155 operation wrappers are synchronized by
+`tools/sync_ruby_context_guards.py`; the Ruby contract and workflow enforce it.
+
+Tracked integer handles are now opaque monotonic tickets, with native pointers
+kept in private owner maps. Reusing a native allocation address cannot revive
+an old closed handle. A forced-address-reuse fixture reproduced the prior
+failure and now passes. Native callbacks still receive actual native userdata,
+including 64-bit pointers; caller-facing tickets are never native pointers.
+
+Punctuation/truecase/PCS handles enforce their native type, close exactly once,
+and free allocated text even if Ruby copying raises. Chat open/template strings
+use stable owned payloads through model-path coercion and GC compaction.
+Ruby also gains `Session.open_with_options`, covering the v2 native load fields
+against the literal runtime POD layout.
+
+Validation: **307 Ruby assertions** pass, including coercion, cross-thread
+callback close, address reuse, native parent/child close ordering, real wrapper
+opens for callback routing, arities/aliases, native pointer transport and errors.
+Mic and remaining legacy Whisper/resource paths still need their scoped audit;
+full-library/model/platform validation remains pending in PLAN.md.
+
 ## Go/Rust public options, text processors and polling — 2026-10-18
 
 Go `SessionOpenWithOptions` and Rust `Session::open_with_options` expose all

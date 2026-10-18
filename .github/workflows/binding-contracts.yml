@@ -11,6 +11,7 @@ on:
       - 'tests/fixtures/**'
       - 'tests/build_legacy_wrapper_probe.py'
       - 'tools/run-wrapper-contract.py'
+      - 'tools/sync_ruby_context_guards.py'
       - 'include/crispasr*.h'
       - '.github/workflows/binding-contracts.yml'
   pull_request:
@@ -23,6 +24,7 @@ on:
       - 'tests/fixtures/**'
       - 'tests/build_legacy_wrapper_probe.py'
       - 'tools/run-wrapper-contract.py'
+      - 'tools/sync_ruby_context_guards.py'
       - 'include/crispasr*.h'
       - '.github/workflows/binding-contracts.yml'
   workflow_dispatch:

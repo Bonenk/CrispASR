@@ -450,21 +450,41 @@ static VALUE mMic;
 
 #include "ruby_crispasr_aux.h"
 
-static VALUE rb_session_open(VALUE self, VALUE model_path, VALUE n_threads) {
-    struct CrispasrSession* s = crispasr_session_open(StringValueCStr(model_path), NUM2INT(n_threads));
-    if (!s)
-        rb_raise(rb_eRuntimeError, "crispasr_session_open: failed to open %s", StringValueCStr(model_path));
-    return ULL2NUM((uintptr_t)s);
+static int rb_extra_collect_stream_key(VALUE key, VALUE owner, VALUE keys) {
+    rb_ary_push(keys, key);
+    return ST_CONTINUE;
 }
-
+static VALUE rb_stream_close(VALUE self, VALUE handle);
+static VALUE rb_session_open(VALUE self, VALUE model_path, VALUE n_threads) {
+    rb_extra_session_maps();
+    int threads = NUM2INT(n_threads);
+    VALUE roots = rb_ary_new();
+    const char* path = rb_chat_owned_cstring(model_path, roots);
+    struct CrispasrSession* native = crispasr_session_open(path, threads);
+    RB_GC_GUARD(roots);
+    if (!native)
+        rb_raise(rb_eRuntimeError, "crispasr_session_open failed");
+    return rb_extra_track_session(native);
+}
 static VALUE rb_session_close(VALUE self, VALUE handle) {
-    struct CrispasrSession* s = rb_extra_handle(handle);
-    if (s) {
-        // Clear any rooted callbacks before freeing native state.
-        if (rb_aux_callbacks != Qnil)
-            rb_hash_delete(rb_aux_callbacks, handle);
-        crispasr_session_close(s);
+    if (!RB_INTEGER_TYPE_P(handle))
+        rb_raise(rb_eTypeError, "Integer session handle required");
+    if (rb_extra_in_stream)
+        rb_raise(rb_eRuntimeError, "session close during callback");
+    if (rb_extra_sessions == Qnil || NIL_P(rb_hash_aref(rb_extra_sessions, handle)))
+        return Qnil;
+    struct CrispasrSession* native = rb_extra_handle(handle);
+    VALUE keys = rb_ary_new();
+    rb_hash_foreach(rb_extra_stream_owners, rb_extra_collect_stream_key, keys);
+    for (long i = 0; i < RARRAY_LEN(keys); ++i) {
+        VALUE child = rb_ary_entry(keys, i);
+        if (rb_equal(rb_hash_aref(rb_extra_stream_owners, child), handle))
+            rb_stream_close(self, child);
     }
+    if (rb_aux_callbacks != Qnil)
+        rb_hash_delete(rb_aux_callbacks, ULL2NUM((uintptr_t)native));
+    rb_hash_delete(rb_extra_sessions, handle);
+    crispasr_session_close(native);
     return Qnil;
 }
 
@@ -1296,41 +1316,38 @@ static VALUE rb_kokoro_resolve_for_lang(VALUE self, VALUE model_path, VALUE lang
 // =====================================================================
 
 static VALUE rb_session_stream_kind(VALUE self, VALUE session_h) {
-    return INT2NUM(crispasr_session_stream_kind((struct CrispasrSession*)NUM2ULL(session_h)));
+    return INT2NUM(crispasr_session_stream_kind(rb_extra_handle(session_h)));
 }
 
 static VALUE rb_stream_open(VALUE self, VALUE session_h, VALUE step_ms, VALUE length_ms, VALUE keep_ms, VALUE language,
                             VALUE translate) {
-    struct CrispasrSession* sess = (struct CrispasrSession*)NUM2ULL(session_h);
-    const char* lang = NIL_P(language) ? "" : StringValueCStr(language);
-    struct CrispasrStream* st = crispasr_session_stream_open(sess, 4, NUM2INT(step_ms), NUM2INT(length_ms),
-                                                             NUM2INT(keep_ms), lang, RTEST(translate) ? 1 : 0);
-    if (!st) {
+    int step = NUM2INT(step_ms), length = NUM2INT(length_ms), keep = NUM2INT(keep_ms);
+    VALUE roots = rb_ary_new();
+    const char* lang = NIL_P(language) ? "" : rb_chat_owned_cstring(language, roots);
+    struct CrispasrSession* owner = rb_extra_handle(session_h);
+    struct CrispasrStream* native =
+        crispasr_session_stream_open(owner, 4, step, length, keep, lang, RTEST(translate) ? 1 : 0);
+    RB_GC_GUARD(roots);
+    if (!native)
         rb_raise(rb_eRuntimeError, "crispasr_session_stream_open failed");
-    }
-    return ULL2NUM((uintptr_t)st);
+    return rb_extra_track_stream(native, session_h);
 }
-
 static VALUE rb_stream_feed(VALUE self, VALUE handle, VALUE pcm_arr) {
-    struct CrispasrStream* st = (struct CrispasrStream*)NUM2ULL(handle);
-    Check_Type(pcm_arr, T_ARRAY);
-    long n = RARRAY_LEN(pcm_arr);
-    if (n == 0)
+    VALUE storage = rb_aux_pcm_storage(pcm_arr);
+    struct CrispasrStream* stream = rb_extra_stream_handle(handle);
+    long count = RARRAY_LEN(pcm_arr);
+    if (!count)
         return INT2NUM(0);
-    float* pcm = (float*)malloc(sizeof(float) * (size_t)n);
-    if (!pcm)
-        rb_raise(rb_eNoMemError, "alloc failed");
-    for (long i = 0; i < n; i++)
-        pcm[i] = (float)NUM2DBL(rb_ary_entry(pcm_arr, i));
-    int rc = crispasr_stream_feed(st, pcm, (int)n);
-    free(pcm);
+    int rc = crispasr_stream_feed(stream, (float*)RSTRING_PTR(storage), count);
+    RB_GC_GUARD(storage);
+    rb_aux_check_pending();
     if (rc < 0)
         rb_raise(rb_eRuntimeError, "crispasr_stream_feed failed (rc=%d)", rc);
     return INT2NUM(rc);
 }
 
 static VALUE rb_stream_get_text(VALUE self, VALUE handle) {
-    struct CrispasrStream* st = (struct CrispasrStream*)NUM2ULL(handle);
+    struct CrispasrStream* st = rb_extra_stream_handle(handle);
     char buf[8192];
     buf[0] = '\0';
     double t0 = 0.0, t1 = 0.0;
@@ -1347,17 +1364,24 @@ static VALUE rb_stream_get_text(VALUE self, VALUE handle) {
 }
 
 static VALUE rb_stream_flush(VALUE self, VALUE handle) {
-    struct CrispasrStream* st = (struct CrispasrStream*)NUM2ULL(handle);
+    struct CrispasrStream* st = rb_extra_stream_handle(handle);
     int rc = crispasr_stream_flush(st);
+    rb_aux_check_pending();
     if (rc < 0)
         rb_raise(rb_eRuntimeError, "crispasr_stream_flush failed (rc=%d)", rc);
     return INT2NUM(rc);
 }
 
 static VALUE rb_stream_close(VALUE self, VALUE handle) {
-    struct CrispasrStream* st = (struct CrispasrStream*)NUM2ULL(handle);
-    if (st)
-        crispasr_stream_close(st);
+    if (!RB_INTEGER_TYPE_P(handle))
+        rb_raise(rb_eTypeError, "Integer stream handle required");
+    if (rb_extra_in_stream)
+        rb_raise(rb_eRuntimeError, "stream close during callback");
+    if (rb_extra_stream_owners == Qnil || NIL_P(rb_hash_delete(rb_extra_stream_owners, handle)))
+        return Qnil;
+    VALUE pointer = rb_hash_delete(rb_extra_stream_pointers, handle);
+    if (!NIL_P(pointer))
+        crispasr_stream_close((struct CrispasrStream*)(uintptr_t)NUM2ULL(pointer));
     return Qnil;
 }
 
@@ -1638,12 +1662,60 @@ static VALUE rb_session_detected_language(VALUE self, VALUE handle) {
     return rb_utf8_str_new_cstr(buf);
 }
 
+// Exact v2 load POD; the operation fixture compiles the literal runtime layout.
+struct rb_session_open_options {
+    int abi_version, n_threads, use_gpu, verbosity, flash_attn, n_gpu_layers, reserved[6];
+};
+static VALUE rb_session_open_with_options(int argc, VALUE* argv, VALUE self) {
+    VALUE model, backend, options;
+    rb_scan_args(argc, argv, "12", &model, &backend, &options);
+    rb_extra_session_maps();
+    struct rb_session_open_options params = {2, 4, 1, 0, 1, -1, {0}};
+    if (!NIL_P(options)) {
+        Check_Type(options, T_HASH);
+        VALUE value;
+#define RB_OPEN_INT(name)                                                                                              \
+    value = rb_aux_hash_field(options, #name);                                                                         \
+    if (!NIL_P(value))                                                                                                 \
+        params.name = NUM2INT(value);
+        RB_OPEN_INT(n_threads)
+        RB_OPEN_INT(verbosity)
+        RB_OPEN_INT(n_gpu_layers)
+#undef RB_OPEN_INT
+#define RB_OPEN_BOOL(name)                                                                                             \
+    value = rb_aux_hash_field(options, #name);                                                                         \
+    if (!NIL_P(value)) {                                                                                               \
+        if (value != Qtrue && value != Qfalse)                                                                         \
+            rb_raise(rb_eArgError, "Boolean load option required");                                                    \
+        params.name = RTEST(value);                                                                                    \
+    }
+        RB_OPEN_BOOL(use_gpu)
+        RB_OPEN_BOOL(flash_attn)
+#undef RB_OPEN_BOOL
+    }
+    if (params.n_threads < 0 || params.verbosity < 0 || params.n_gpu_layers < -1)
+        rb_raise(rb_eArgError, "Invalid session load options");
+    VALUE roots = rb_ary_new();
+    const char* path = rb_chat_owned_cstring(model, roots);
+    const char* name = NIL_P(backend) ? NULL : rb_chat_owned_cstring(backend, roots);
+    struct CrispasrSession* native = crispasr_session_open_with_params(path, name, &params);
+    RB_GC_GUARD(roots);
+    if (!native)
+        rb_raise(rb_eRuntimeError, "session_open_with_params failed");
+    return rb_extra_track_session(native);
+}
+
 static VALUE rb_session_open_explicit(VALUE self, VALUE model_path, VALUE backend, VALUE n_threads) {
-    struct CrispasrSession* s =
-        crispasr_session_open_explicit(StringValueCStr(model_path), StringValueCStr(backend), NUM2INT(n_threads));
-    if (!s)
+    rb_extra_session_maps();
+    int threads = NUM2INT(n_threads);
+    VALUE roots = rb_ary_new();
+    const char* path = rb_chat_owned_cstring(model_path, roots);
+    const char* name = rb_chat_owned_cstring(backend, roots);
+    struct CrispasrSession* native = crispasr_session_open_explicit(path, name, threads);
+    RB_GC_GUARD(roots);
+    if (!native)
         rb_raise(rb_eRuntimeError, "crispasr_session_open_explicit failed");
-    return ULL2NUM((uintptr_t)s);
+    return rb_extra_track_session(native);
 }
 
 static VALUE rb_vad_slices(int argc, VALUE* argv, VALUE self) {
@@ -1706,7 +1778,6 @@ static VALUE rb_registry_list_backends(VALUE self) {
 }
 
 // Explicitly owned direct-context handles reject closed/foreign pointers.
-static VALUE rb_parakeet_handles = Qnil, rb_titanet_handles = Qnil, rb_speaker_db_handles = Qnil;
 static VALUE rb_direct_context_map(VALUE* map) {
     if (*map == Qnil) {
         *map = rb_hash_new();
@@ -1714,26 +1785,21 @@ static VALUE rb_direct_context_map(VALUE* map) {
     }
     return *map;
 }
-static void rb_direct_context_check(VALUE map, VALUE handle) {
-    if (map == Qnil || NIL_P(rb_hash_aref(map, handle)))
-        rb_raise(rb_eRuntimeError, "Native context is closed");
+static void* rb_direct_context_check(VALUE map, VALUE handle) {
+    return rb_extra_native_pointer(map, handle, "Native context");
 }
 // --- Parakeet direct API ---
 static VALUE rb_parakeet_init(VALUE self, VALUE model_path, VALUE n_threads, VALUE use_flash) {
-    VALUE live = rb_direct_context_map(&rb_parakeet_handles);
+    rb_direct_context_map(&rb_parakeet_handles);
     void* h = crispasr_parakeet_init(StringValueCStr(model_path), NUM2INT(n_threads), RTEST(use_flash) ? 1 : 0);
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_parakeet_init failed");
-    VALUE key = ULL2NUM((uintptr_t)h);
-    rb_hash_aset(live, key, Qtrue);
-    return key;
+    return rb_extra_track_owner(&rb_parakeet_handles, h, crispasr_parakeet_free);
 }
 static VALUE rb_parakeet_free(VALUE self, VALUE handle) {
-    if (rb_parakeet_handles == Qnil || NIL_P(rb_hash_delete(rb_parakeet_handles, handle)))
-        return Qnil;
-    void* h = (void*)NUM2ULL(handle);
-    if (h)
-        crispasr_parakeet_free(h);
+    VALUE native = rb_parakeet_handles == Qnil ? Qnil : rb_hash_delete(rb_parakeet_handles, handle);
+    if (!NIL_P(native))
+        crispasr_parakeet_free((void*)(uintptr_t)NUM2ULL(native));
     return Qnil;
 }
 static VALUE rb_parakeet_copy_result(VALUE raw) {
@@ -1764,8 +1830,7 @@ static VALUE rb_parakeet_copy_result(VALUE raw) {
     return hash;
 }
 static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VALUE language) {
-    rb_direct_context_check(rb_parakeet_handles, handle);
-    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    void* h = rb_direct_context_check(rb_parakeet_handles, handle);
     if (!h)
         rb_raise(rb_eRuntimeError, "Parakeet context is closed");
     int64_t offset = 0;
@@ -1791,25 +1856,20 @@ static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VAL
 
 // --- TitaNet ---
 static VALUE rb_titanet_init(VALUE self, VALUE model_path, VALUE n_threads) {
-    VALUE live = rb_direct_context_map(&rb_titanet_handles);
+    rb_direct_context_map(&rb_titanet_handles);
     void* h = crispasr_titanet_init(StringValueCStr(model_path), NUM2INT(n_threads));
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_titanet_init failed");
-    VALUE key = ULL2NUM((uintptr_t)h);
-    rb_hash_aset(live, key, Qtrue);
-    return key;
+    return rb_extra_track_owner(&rb_titanet_handles, h, crispasr_titanet_free);
 }
 static VALUE rb_titanet_free(VALUE self, VALUE handle) {
-    if (rb_titanet_handles == Qnil || NIL_P(rb_hash_delete(rb_titanet_handles, handle)))
-        return Qnil;
-    void* h = (void*)NUM2ULL(handle);
-    if (h)
-        crispasr_titanet_free(h);
+    VALUE native = rb_titanet_handles == Qnil ? Qnil : rb_hash_delete(rb_titanet_handles, handle);
+    if (!NIL_P(native))
+        crispasr_titanet_free((void*)(uintptr_t)NUM2ULL(native));
     return Qnil;
 }
 static VALUE rb_titanet_embed(VALUE self, VALUE handle, VALUE pcm_arr) {
-    rb_direct_context_check(rb_titanet_handles, handle);
-    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    void* h = rb_direct_context_check(rb_titanet_handles, handle);
     VALUE storage = rb_aux_pcm_storage(pcm_arr);
     long n = RARRAY_LEN(pcm_arr);
     if (!n)
@@ -1832,7 +1892,7 @@ static VALUE rb_titanet_embed(VALUE self, VALUE handle, VALUE pcm_arr) {
 static VALUE rb_speaker_db_open(VALUE self, VALUE dir_path, VALUE expected_names, VALUE consent) {
     if (!RTEST(consent))
         rb_raise(rb_eRuntimeError, "speaker_db_open requires an explicit consent attestation (GDPR Art. 9)");
-    VALUE live = rb_direct_context_map(&rb_speaker_db_handles);
+    rb_direct_context_map(&rb_speaker_db_handles);
     if (RSTRING_LEN(StringValue(expected_names)) == 0)
         rb_raise(rb_eArgError, "Participant roster required");
     VALUE roots = rb_ary_new();
@@ -1842,24 +1902,20 @@ static VALUE rb_speaker_db_open(VALUE self, VALUE dir_path, VALUE expected_names
     RB_GC_GUARD(roots);
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_speaker_db_open failed");
-    VALUE key = ULL2NUM((uintptr_t)h);
-    rb_hash_aset(live, key, Qtrue);
-    return key;
+    return rb_extra_track_owner(&rb_speaker_db_handles, h, crispasr_speaker_db_free);
 }
 static VALUE rb_speaker_db_free(VALUE self, VALUE handle) {
-    if (rb_speaker_db_handles == Qnil || NIL_P(rb_hash_delete(rb_speaker_db_handles, handle)))
-        return Qnil;
-    crispasr_speaker_db_free((void*)(uintptr_t)NUM2ULL(handle));
+    VALUE native = rb_speaker_db_handles == Qnil ? Qnil : rb_hash_delete(rb_speaker_db_handles, handle);
+    if (!NIL_P(native))
+        crispasr_speaker_db_free((void*)(uintptr_t)NUM2ULL(native));
     return Qnil;
 }
 static VALUE rb_speaker_db_count(VALUE self, VALUE handle) {
-    rb_direct_context_check(rb_speaker_db_handles, handle);
-    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    void* h = rb_direct_context_check(rb_speaker_db_handles, handle);
     return INT2NUM(crispasr_speaker_db_count(h));
 }
 static VALUE rb_speaker_db_match(VALUE self, VALUE handle, VALUE emb_arr, VALUE threshold) {
-    rb_direct_context_check(rb_speaker_db_handles, handle);
-    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    void* h = rb_direct_context_check(rb_speaker_db_handles, handle);
     VALUE storage = rb_aux_pcm_storage(emb_arr);
     long dim = RARRAY_LEN(emb_arr);
     if (!dim)
@@ -1933,7 +1989,7 @@ static VALUE rb_session_result_word_alt_p(VALUE self, VALUE res_handle, VALUE i_
 
 // --- Stream set_live_decode ---
 static VALUE rb_stream_set_live_decode(VALUE self, VALUE handle, VALUE enabled) {
-    struct CrispasrStream* s = (struct CrispasrStream*)NUM2ULL(handle);
+    struct CrispasrStream* s = rb_extra_stream_handle(handle);
     crispasr_stream_set_live_decode(s, RTEST(enabled) ? 1 : 0);
     return Qnil;
 }
@@ -1953,6 +2009,122 @@ static VALUE rb_titanet_cosine_sim(VALUE self, VALUE a_arr, VALUE b_arr) {
     return DBL2NUM(sim);
 }
 
+// BEGIN GENERATED CONTEXT GUARDS
+RB_CONTEXT_WRAPPER_2(rb_session_open);
+RB_CONTEXT_WRAPPER_1(rb_session_close);
+RB_CONTEXT_WRAPPER_2(rb_session_set_codec_path);
+RB_CONTEXT_WRAPPER_VAR(rb_session_set_voice);
+RB_CONTEXT_WRAPPER_2(rb_session_set_speaker_name);
+RB_CONTEXT_WRAPPER_2(rb_session_set_speaker_id);
+RB_CONTEXT_WRAPPER_2(rb_session_set_punc_model);
+RB_CONTEXT_WRAPPER_3(rb_session_set_hotwords);
+RB_CONTEXT_WRAPPER_2(rb_session_set_sensitivity);
+RB_CONTEXT_WRAPPER_2(rb_session_set_g2p_dict);
+RB_CONTEXT_WRAPPER_1(rb_session_speakers);
+RB_CONTEXT_WRAPPER_2(rb_session_set_instruct);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_phonemes);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_pad_silence_ms);
+RB_CONTEXT_WRAPPER_1(rb_session_is_custom_voice);
+RB_CONTEXT_WRAPPER_1(rb_session_is_voice_design);
+RB_CONTEXT_WRAPPER_2(rb_session_synthesize);
+RB_CONTEXT_WRAPPER_2(rb_session_synthesize_raw);
+RB_CONTEXT_WRAPPER_2(rb_session_accept_marking_responsibility);
+RB_CONTEXT_WRAPPER_2(rb_session_speech_to_speech);
+RB_CONTEXT_WRAPPER_1(rb_session_input_sample_rate);
+RB_CONTEXT_WRAPPER_1(rb_session_output_sample_rate);
+RB_CONTEXT_WRAPPER_1(rb_session_input_channels);
+RB_CONTEXT_WRAPPER_1(rb_session_output_channels);
+RB_CONTEXT_WRAPPER_2(rb_session_transcribe);
+RB_CONTEXT_WRAPPER_2(rb_session_transcribe_with_logits);
+RB_CONTEXT_WRAPPER_1(rb_session_ctc_vocab);
+RB_CONTEXT_WRAPPER_5(rb_session_transcribe_chunked);
+RB_CONTEXT_WRAPPER_0(rb_session_get_progress);
+RB_CONTEXT_WRAPPER_VAR(rb_session_vad_segments);
+RB_CONTEXT_WRAPPER_4(rb_session_align_words);
+RB_CONTEXT_WRAPPER_1(rb_session_clear_phoneme_cache);
+RB_CONTEXT_WRAPPER_2(rb_session_set_source_language);
+RB_CONTEXT_WRAPPER_2(rb_session_set_target_language);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_reference_language);
+RB_CONTEXT_WRAPPER_2(rb_session_set_punctuation);
+RB_CONTEXT_WRAPPER_2(rb_session_set_translate);
+RB_CONTEXT_WRAPPER_3(rb_session_set_temperature);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_seed);
+RB_CONTEXT_WRAPPER_2(rb_session_set_max_new_tokens);
+RB_CONTEXT_WRAPPER_2(rb_session_set_frequency_penalty);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_steps);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_num_candidates);
+RB_CONTEXT_WRAPPER_2(rb_session_set_top_p);
+RB_CONTEXT_WRAPPER_2(rb_session_set_top_k);
+RB_CONTEXT_WRAPPER_2(rb_session_set_do_sample);
+RB_CONTEXT_WRAPPER_2(rb_session_set_min_p);
+RB_CONTEXT_WRAPPER_2(rb_session_set_repetition_penalty);
+RB_CONTEXT_WRAPPER_2(rb_session_set_cfg_weight);
+RB_CONTEXT_WRAPPER_2(rb_session_set_tts_noise_temp);
+RB_CONTEXT_WRAPPER_2(rb_session_set_exaggeration);
+RB_CONTEXT_WRAPPER_2(rb_session_set_max_speech_tokens);
+RB_CONTEXT_WRAPPER_2(rb_session_set_min_speech_tokens);
+RB_CONTEXT_WRAPPER_2(rb_session_set_length_scale);
+RB_CONTEXT_WRAPPER_2(rb_session_set_best_of);
+RB_CONTEXT_WRAPPER_2(rb_session_set_beam_size);
+RB_CONTEXT_WRAPPER_2(rb_session_set_return_logits);
+RB_CONTEXT_WRAPPER_4(rb_session_set_grammar_text);
+RB_CONTEXT_WRAPPER_5(rb_session_set_fallback_thresholds);
+RB_CONTEXT_WRAPPER_2(rb_session_set_alt_n);
+RB_CONTEXT_WRAPPER_4(rb_session_set_whisper_decode_extras);
+RB_CONTEXT_WRAPPER_2(rb_session_set_ask);
+RB_CONTEXT_WRAPPER_4(rb_session_detect_language);
+RB_CONTEXT_WRAPPER_2(rb_kokoro_resolve_for_lang);
+RB_CONTEXT_WRAPPER_1(rb_session_stream_kind);
+RB_CONTEXT_WRAPPER_6(rb_stream_open);
+RB_CONTEXT_WRAPPER_2(rb_stream_feed);
+RB_CONTEXT_WRAPPER_1(rb_stream_get_text);
+RB_CONTEXT_WRAPPER_1(rb_stream_flush);
+RB_CONTEXT_WRAPPER_1(rb_stream_close);
+RB_CONTEXT_WRAPPER_2(rb_stream_set_live_decode);
+RB_CONTEXT_WRAPPER_1(rb_detect_backend_from_gguf);
+RB_CONTEXT_WRAPPER_3(rb_lcs_dedup_prefix_count);
+RB_CONTEXT_WRAPPER_1(rb_kokoro_lang_is_german);
+RB_CONTEXT_WRAPPER_1(rb_kokoro_lang_has_native_voice);
+RB_CONTEXT_WRAPPER_5(rb_session_translate_text);
+RB_CONTEXT_WRAPPER_0(rb_session_available_backends);
+RB_CONTEXT_WRAPPER_1(rb_session_detected_language);
+RB_CONTEXT_WRAPPER_VAR(rb_session_open_with_options);
+RB_CONTEXT_WRAPPER_3(rb_session_open_explicit);
+RB_CONTEXT_WRAPPER_VAR(rb_vad_slices);
+RB_CONTEXT_WRAPPER_1(rb_enhance_audio_rnnoise);
+RB_CONTEXT_WRAPPER_3(rb_text_detect_language);
+RB_CONTEXT_WRAPPER_0(rb_registry_list_backends);
+RB_CONTEXT_WRAPPER_2(rb_titanet_cosine_sim);
+RB_CONTEXT_WRAPPER_VAR(rb_session_transcribe_vad_lang);
+RB_CONTEXT_WRAPPER_3(rb_session_result_word_n_alts);
+RB_CONTEXT_WRAPPER_4(rb_session_result_word_alt_p);
+RB_CONTEXT_WRAPPER_2(rb_extra_piano);
+RB_CONTEXT_WRAPPER_3(rb_extra_chords);
+RB_CONTEXT_WRAPPER_2(rb_extra_beats);
+RB_CONTEXT_WRAPPER_3(rb_extra_tab);
+RB_CONTEXT_WRAPPER_VAR(rb_extra_convert);
+RB_CONTEXT_WRAPPER_4(rb_extra_voice_samples);
+RB_CONTEXT_WRAPPER_2(rb_extra_cfg);
+RB_CONTEXT_WRAPPER_3(rb_extra_tada);
+RB_CONTEXT_WRAPPER_1(rb_extra_last_error);
+RB_CONTEXT_WRAPPER_0(rb_extra_disclaimer_text);
+RB_CONTEXT_WRAPPER_1(rb_extra_disclaimer_pcm);
+RB_CONTEXT_WRAPPER_2(rb_extra_streaming);
+RB_CONTEXT_WRAPPER_3(rb_parakeet_init);
+RB_CONTEXT_WRAPPER_1(rb_parakeet_free);
+RB_CONTEXT_WRAPPER_3(rb_parakeet_transcribe);
+RB_CONTEXT_WRAPPER_2(rb_titanet_init);
+RB_CONTEXT_WRAPPER_1(rb_titanet_free);
+RB_CONTEXT_WRAPPER_2(rb_titanet_embed);
+RB_CONTEXT_WRAPPER_3(rb_speaker_db_open);
+RB_CONTEXT_WRAPPER_1(rb_speaker_db_free);
+RB_CONTEXT_WRAPPER_1(rb_speaker_db_count);
+RB_CONTEXT_WRAPPER_3(rb_speaker_db_match);
+RB_CONTEXT_WRAPPER_4(rb_speaker_db_enroll);
+RB_CONTEXT_WRAPPER_2(rb_session_set_speaker_identity);
+RB_CONTEXT_WRAPPER_1(rb_watermark_embed);
+RB_CONTEXT_WRAPPER_1(rb_watermark_detect);
+// END GENERATED CONTEXT GUARDS
 void init_ruby_crispasr_session(VALUE* mWhisper) {
     // Define module path under the existing Whisper module so existing
     // code keeps working: CrispASR::Session, but we also alias it under
@@ -1960,131 +2132,141 @@ void init_ruby_crispasr_session(VALUE* mWhisper) {
     mCrispASR = rb_define_module_under(*mWhisper, "CrispASR");
     mSession = rb_define_module_under(mCrispASR, "Session");
 
-    rb_define_singleton_method(mSession, "open", rb_session_open, 2);
-    rb_define_singleton_method(mSession, "close", rb_session_close, 1);
-    rb_define_singleton_method(mSession, "set_codec_path", rb_session_set_codec_path, 2);
-    rb_define_singleton_method(mSession, "set_voice", rb_session_set_voice, -1);
-    rb_define_singleton_method(mSession, "set_speaker_name", rb_session_set_speaker_name, 2);
-    rb_define_singleton_method(mSession, "set_speaker_id", rb_session_set_speaker_id, 2);
-    rb_define_singleton_method(mSession, "set_punc_model", rb_session_set_punc_model, 2);
-    rb_define_singleton_method(mSession, "set_hotwords", rb_session_set_hotwords, 3);
-    rb_define_singleton_method(mSession, "set_sensitivity", rb_session_set_sensitivity, 2);
-    rb_define_singleton_method(mSession, "set_g2p_dict", rb_session_set_g2p_dict, 2);
-    rb_define_singleton_method(mSession, "speakers", rb_session_speakers, 1);
-    rb_define_singleton_method(mSession, "set_instruct", rb_session_set_instruct, 2);
-    rb_define_singleton_method(mSession, "set_tts_phonemes", rb_session_set_tts_phonemes, 2);
-    rb_define_singleton_method(mSession, "set_tts_pad_silence_ms", rb_session_set_tts_pad_silence_ms, 2);
-    rb_define_singleton_method(mSession, "is_custom_voice", rb_session_is_custom_voice, 1);
-    rb_define_singleton_method(mSession, "is_voice_design", rb_session_is_voice_design, 1);
-    rb_define_singleton_method(mSession, "synthesize", rb_session_synthesize, 2);
-    rb_define_singleton_method(mSession, "synthesize_raw", rb_session_synthesize_raw, 2);
-    rb_define_singleton_method(mSession, "accept_marking_responsibility", rb_session_accept_marking_responsibility, 2);
-    rb_define_singleton_method(mSession, "speech_to_speech", rb_session_speech_to_speech, 2);
-    rb_define_singleton_method(mSession, "input_sample_rate", rb_session_input_sample_rate, 1);
-    rb_define_singleton_method(mSession, "output_sample_rate", rb_session_output_sample_rate, 1);
-    rb_define_singleton_method(mSession, "input_channels", rb_session_input_channels, 1);
-    rb_define_singleton_method(mSession, "output_channels", rb_session_output_channels, 1);
-    rb_define_singleton_method(mSession, "transcribe", rb_session_transcribe, 2);
-    rb_define_singleton_method(mSession, "transcribe_with_logits", rb_session_transcribe_with_logits, 2);
-    rb_define_singleton_method(mSession, "ctc_vocab", rb_session_ctc_vocab, 1);
-    rb_define_singleton_method(mSession, "transcribe_chunked", rb_session_transcribe_chunked, 5);
-    rb_define_singleton_method(mSession, "get_progress", rb_session_get_progress, 0);
-    rb_define_singleton_method(mSession, "vad_segments", rb_session_vad_segments, -1);
-    rb_define_singleton_method(mSession, "align_words", rb_session_align_words, 4);
-    rb_define_singleton_method(mSession, "clear_phoneme_cache", rb_session_clear_phoneme_cache, 1);
-    rb_define_singleton_method(mSession, "set_source_language", rb_session_set_source_language, 2);
-    rb_define_singleton_method(mSession, "set_target_language", rb_session_set_target_language, 2);
-    rb_define_singleton_method(mSession, "set_tts_reference_language", rb_session_set_tts_reference_language, 2);
-    rb_define_singleton_method(mSession, "set_punctuation", rb_session_set_punctuation, 2);
-    rb_define_singleton_method(mSession, "set_translate", rb_session_set_translate, 2);
-    rb_define_singleton_method(mSession, "set_temperature", rb_session_set_temperature, 3);
-    rb_define_singleton_method(mSession, "set_tts_seed", rb_session_set_tts_seed, 2);
-    rb_define_singleton_method(mSession, "set_max_new_tokens", rb_session_set_max_new_tokens, 2);
-    rb_define_singleton_method(mSession, "set_frequency_penalty", rb_session_set_frequency_penalty, 2);
-    rb_define_singleton_method(mSession, "set_tts_steps", rb_session_set_tts_steps, 2);
-    rb_define_singleton_method(mSession, "set_tts_num_candidates", rb_session_set_tts_num_candidates, 2);
-    rb_define_singleton_method(mSession, "set_top_p", rb_session_set_top_p, 2);
-    rb_define_singleton_method(mSession, "set_top_k", rb_session_set_top_k, 2);
-    rb_define_singleton_method(mSession, "set_do_sample", rb_session_set_do_sample, 2);
-    rb_define_singleton_method(mSession, "set_min_p", rb_session_set_min_p, 2);
-    rb_define_singleton_method(mSession, "set_repetition_penalty", rb_session_set_repetition_penalty, 2);
-    rb_define_singleton_method(mSession, "set_cfg_weight", rb_session_set_cfg_weight, 2);
-    rb_define_singleton_method(mSession, "set_tts_noise_temp", rb_session_set_tts_noise_temp, 2);
-    rb_define_singleton_method(mSession, "set_exaggeration", rb_session_set_exaggeration, 2);
-    rb_define_singleton_method(mSession, "set_max_speech_tokens", rb_session_set_max_speech_tokens, 2);
-    rb_define_singleton_method(mSession, "set_min_speech_tokens", rb_session_set_min_speech_tokens, 2);
-    rb_define_singleton_method(mSession, "set_length_scale", rb_session_set_length_scale, 2);
-    rb_define_singleton_method(mSession, "set_best_of", rb_session_set_best_of, 2);
-    rb_define_singleton_method(mSession, "set_beam_size", rb_session_set_beam_size, 2);
-    rb_define_singleton_method(mSession, "set_return_logits", rb_session_set_return_logits, 2);
-    rb_define_singleton_method(mSession, "set_grammar_text", rb_session_set_grammar_text, 4);
-    rb_define_singleton_method(mSession, "set_fallback_thresholds", rb_session_set_fallback_thresholds, 5);
-    rb_define_singleton_method(mSession, "set_alt_n", rb_session_set_alt_n, 2);
-    rb_define_singleton_method(mSession, "set_whisper_decode_extras", rb_session_set_whisper_decode_extras, 4);
-    rb_define_singleton_method(mSession, "set_ask", rb_session_set_ask, 2);
-    rb_define_singleton_method(mSession, "detect_language", rb_session_detect_language, 4);
-    rb_define_singleton_method(mSession, "kokoro_resolve_for_lang", rb_kokoro_resolve_for_lang, 2);
+    rb_define_singleton_method(mSession, "open", rb_context_guard_rb_session_open, 2);
+    rb_define_singleton_method(mSession, "close", rb_context_guard_rb_session_close, 1);
+    rb_define_singleton_method(mSession, "set_codec_path", rb_context_guard_rb_session_set_codec_path, 2);
+    rb_define_singleton_method(mSession, "set_voice", rb_context_guard_rb_session_set_voice, -1);
+    rb_define_singleton_method(mSession, "set_speaker_name", rb_context_guard_rb_session_set_speaker_name, 2);
+    rb_define_singleton_method(mSession, "set_speaker_id", rb_context_guard_rb_session_set_speaker_id, 2);
+    rb_define_singleton_method(mSession, "set_punc_model", rb_context_guard_rb_session_set_punc_model, 2);
+    rb_define_singleton_method(mSession, "set_hotwords", rb_context_guard_rb_session_set_hotwords, 3);
+    rb_define_singleton_method(mSession, "set_sensitivity", rb_context_guard_rb_session_set_sensitivity, 2);
+    rb_define_singleton_method(mSession, "set_g2p_dict", rb_context_guard_rb_session_set_g2p_dict, 2);
+    rb_define_singleton_method(mSession, "speakers", rb_context_guard_rb_session_speakers, 1);
+    rb_define_singleton_method(mSession, "set_instruct", rb_context_guard_rb_session_set_instruct, 2);
+    rb_define_singleton_method(mSession, "set_tts_phonemes", rb_context_guard_rb_session_set_tts_phonemes, 2);
+    rb_define_singleton_method(mSession, "set_tts_pad_silence_ms", rb_context_guard_rb_session_set_tts_pad_silence_ms,
+                               2);
+    rb_define_singleton_method(mSession, "is_custom_voice", rb_context_guard_rb_session_is_custom_voice, 1);
+    rb_define_singleton_method(mSession, "is_voice_design", rb_context_guard_rb_session_is_voice_design, 1);
+    rb_define_singleton_method(mSession, "synthesize", rb_context_guard_rb_session_synthesize, 2);
+    rb_define_singleton_method(mSession, "synthesize_raw", rb_context_guard_rb_session_synthesize_raw, 2);
+    rb_define_singleton_method(mSession, "accept_marking_responsibility",
+                               rb_context_guard_rb_session_accept_marking_responsibility, 2);
+    rb_define_singleton_method(mSession, "speech_to_speech", rb_context_guard_rb_session_speech_to_speech, 2);
+    rb_define_singleton_method(mSession, "input_sample_rate", rb_context_guard_rb_session_input_sample_rate, 1);
+    rb_define_singleton_method(mSession, "output_sample_rate", rb_context_guard_rb_session_output_sample_rate, 1);
+    rb_define_singleton_method(mSession, "input_channels", rb_context_guard_rb_session_input_channels, 1);
+    rb_define_singleton_method(mSession, "output_channels", rb_context_guard_rb_session_output_channels, 1);
+    rb_define_singleton_method(mSession, "transcribe", rb_context_guard_rb_session_transcribe, 2);
+    rb_define_singleton_method(mSession, "transcribe_with_logits", rb_context_guard_rb_session_transcribe_with_logits,
+                               2);
+    rb_define_singleton_method(mSession, "ctc_vocab", rb_context_guard_rb_session_ctc_vocab, 1);
+    rb_define_singleton_method(mSession, "transcribe_chunked", rb_context_guard_rb_session_transcribe_chunked, 5);
+    rb_define_singleton_method(mSession, "get_progress", rb_context_guard_rb_session_get_progress, 0);
+    rb_define_singleton_method(mSession, "vad_segments", rb_context_guard_rb_session_vad_segments, -1);
+    rb_define_singleton_method(mSession, "align_words", rb_context_guard_rb_session_align_words, 4);
+    rb_define_singleton_method(mSession, "clear_phoneme_cache", rb_context_guard_rb_session_clear_phoneme_cache, 1);
+    rb_define_singleton_method(mSession, "set_source_language", rb_context_guard_rb_session_set_source_language, 2);
+    rb_define_singleton_method(mSession, "set_target_language", rb_context_guard_rb_session_set_target_language, 2);
+    rb_define_singleton_method(mSession, "set_tts_reference_language",
+                               rb_context_guard_rb_session_set_tts_reference_language, 2);
+    rb_define_singleton_method(mSession, "set_punctuation", rb_context_guard_rb_session_set_punctuation, 2);
+    rb_define_singleton_method(mSession, "set_translate", rb_context_guard_rb_session_set_translate, 2);
+    rb_define_singleton_method(mSession, "set_temperature", rb_context_guard_rb_session_set_temperature, 3);
+    rb_define_singleton_method(mSession, "set_tts_seed", rb_context_guard_rb_session_set_tts_seed, 2);
+    rb_define_singleton_method(mSession, "set_max_new_tokens", rb_context_guard_rb_session_set_max_new_tokens, 2);
+    rb_define_singleton_method(mSession, "set_frequency_penalty", rb_context_guard_rb_session_set_frequency_penalty, 2);
+    rb_define_singleton_method(mSession, "set_tts_steps", rb_context_guard_rb_session_set_tts_steps, 2);
+    rb_define_singleton_method(mSession, "set_tts_num_candidates", rb_context_guard_rb_session_set_tts_num_candidates,
+                               2);
+    rb_define_singleton_method(mSession, "set_top_p", rb_context_guard_rb_session_set_top_p, 2);
+    rb_define_singleton_method(mSession, "set_top_k", rb_context_guard_rb_session_set_top_k, 2);
+    rb_define_singleton_method(mSession, "set_do_sample", rb_context_guard_rb_session_set_do_sample, 2);
+    rb_define_singleton_method(mSession, "set_min_p", rb_context_guard_rb_session_set_min_p, 2);
+    rb_define_singleton_method(mSession, "set_repetition_penalty", rb_context_guard_rb_session_set_repetition_penalty,
+                               2);
+    rb_define_singleton_method(mSession, "set_cfg_weight", rb_context_guard_rb_session_set_cfg_weight, 2);
+    rb_define_singleton_method(mSession, "set_tts_noise_temp", rb_context_guard_rb_session_set_tts_noise_temp, 2);
+    rb_define_singleton_method(mSession, "set_exaggeration", rb_context_guard_rb_session_set_exaggeration, 2);
+    rb_define_singleton_method(mSession, "set_max_speech_tokens", rb_context_guard_rb_session_set_max_speech_tokens, 2);
+    rb_define_singleton_method(mSession, "set_min_speech_tokens", rb_context_guard_rb_session_set_min_speech_tokens, 2);
+    rb_define_singleton_method(mSession, "set_length_scale", rb_context_guard_rb_session_set_length_scale, 2);
+    rb_define_singleton_method(mSession, "set_best_of", rb_context_guard_rb_session_set_best_of, 2);
+    rb_define_singleton_method(mSession, "set_beam_size", rb_context_guard_rb_session_set_beam_size, 2);
+    rb_define_singleton_method(mSession, "set_return_logits", rb_context_guard_rb_session_set_return_logits, 2);
+    rb_define_singleton_method(mSession, "set_grammar_text", rb_context_guard_rb_session_set_grammar_text, 4);
+    rb_define_singleton_method(mSession, "set_fallback_thresholds", rb_context_guard_rb_session_set_fallback_thresholds,
+                               5);
+    rb_define_singleton_method(mSession, "set_alt_n", rb_context_guard_rb_session_set_alt_n, 2);
+    rb_define_singleton_method(mSession, "set_whisper_decode_extras",
+                               rb_context_guard_rb_session_set_whisper_decode_extras, 4);
+    rb_define_singleton_method(mSession, "set_ask", rb_context_guard_rb_session_set_ask, 2);
+    rb_define_singleton_method(mSession, "detect_language", rb_context_guard_rb_session_detect_language, 4);
+    rb_define_singleton_method(mSession, "kokoro_resolve_for_lang", rb_context_guard_rb_kokoro_resolve_for_lang, 2);
 
     // Streaming (PLAN #62b) — CrispASR::Session::Stream.{open, feed, get_text, flush, close}.
     mStream = rb_define_module_under(mSession, "Stream");
-    rb_define_singleton_method(mSession, "stream_kind", rb_session_stream_kind, 1);
-    rb_define_singleton_method(mStream, "open", rb_stream_open, 6);
-    rb_define_singleton_method(mStream, "feed", rb_stream_feed, 2);
-    rb_define_singleton_method(mStream, "get_text", rb_stream_get_text, 1);
-    rb_define_singleton_method(mStream, "flush", rb_stream_flush, 1);
-    rb_define_singleton_method(mStream, "close", rb_stream_close, 1);
-    rb_define_singleton_method(mStream, "set_live_decode", rb_stream_set_live_decode, 2);
+    rb_define_singleton_method(mSession, "stream_kind", rb_context_guard_rb_session_stream_kind, 1);
+    rb_define_singleton_method(mStream, "open", rb_context_guard_rb_stream_open, 6);
+    rb_define_singleton_method(mStream, "feed", rb_context_guard_rb_stream_feed, 2);
+    rb_define_singleton_method(mStream, "get_text", rb_context_guard_rb_stream_get_text, 1);
+    rb_define_singleton_method(mStream, "flush", rb_context_guard_rb_stream_flush, 1);
+    rb_define_singleton_method(mStream, "close", rb_context_guard_rb_stream_close, 1);
+    rb_define_singleton_method(mStream, "set_live_decode", rb_context_guard_rb_stream_set_live_decode, 2);
 
     // Full C-ABI parity (PLAN #59).
-    rb_define_singleton_method(mSession, "detect_backend_from_gguf", rb_detect_backend_from_gguf, 1);
-    rb_define_singleton_method(mSession, "lcs_dedup_prefix_count", rb_lcs_dedup_prefix_count, 3);
-    rb_define_singleton_method(mSession, "kokoro_lang_is_german", rb_kokoro_lang_is_german, 1);
-    rb_define_singleton_method(mSession, "kokoro_lang_has_native_voice", rb_kokoro_lang_has_native_voice, 1);
-    rb_define_singleton_method(mSession, "translate_text", rb_session_translate_text, 5);
-    rb_define_singleton_method(mSession, "available_backends", rb_session_available_backends, 0);
-    rb_define_singleton_method(mSession, "detected_language", rb_session_detected_language, 1);
-    rb_define_singleton_method(mSession, "open_explicit", rb_session_open_explicit, 3);
-    rb_define_singleton_method(mSession, "vad_slices", rb_vad_slices, -1);
-    rb_define_singleton_method(mSession, "enhance_audio_rnnoise", rb_enhance_audio_rnnoise, 1);
-    rb_define_singleton_method(mSession, "text_detect_language", rb_text_detect_language, 3);
-    rb_define_singleton_method(mSession, "registry_list_backends", rb_registry_list_backends, 0);
-    rb_define_singleton_method(mSession, "titanet_cosine_sim", rb_titanet_cosine_sim, 2);
-    rb_define_singleton_method(mSession, "transcribe_vad_lang", rb_session_transcribe_vad_lang, -1);
-    rb_define_singleton_method(mSession, "result_word_n_alts", rb_session_result_word_n_alts, 3);
-    rb_define_singleton_method(mSession, "result_word_alt_p", rb_session_result_word_alt_p, 4);
+    rb_define_singleton_method(mSession, "detect_backend_from_gguf", rb_context_guard_rb_detect_backend_from_gguf, 1);
+    rb_define_singleton_method(mSession, "lcs_dedup_prefix_count", rb_context_guard_rb_lcs_dedup_prefix_count, 3);
+    rb_define_singleton_method(mSession, "kokoro_lang_is_german", rb_context_guard_rb_kokoro_lang_is_german, 1);
+    rb_define_singleton_method(mSession, "kokoro_lang_has_native_voice",
+                               rb_context_guard_rb_kokoro_lang_has_native_voice, 1);
+    rb_define_singleton_method(mSession, "translate_text", rb_context_guard_rb_session_translate_text, 5);
+    rb_define_singleton_method(mSession, "available_backends", rb_context_guard_rb_session_available_backends, 0);
+    rb_define_singleton_method(mSession, "detected_language", rb_context_guard_rb_session_detected_language, 1);
+    rb_define_singleton_method(mSession, "open_with_options", rb_context_guard_rb_session_open_with_options, -1);
+    rb_define_singleton_method(mSession, "open_explicit", rb_context_guard_rb_session_open_explicit, 3);
+    rb_define_singleton_method(mSession, "vad_slices", rb_context_guard_rb_vad_slices, -1);
+    rb_define_singleton_method(mSession, "enhance_audio_rnnoise", rb_context_guard_rb_enhance_audio_rnnoise, 1);
+    rb_define_singleton_method(mSession, "text_detect_language", rb_context_guard_rb_text_detect_language, 3);
+    rb_define_singleton_method(mSession, "registry_list_backends", rb_context_guard_rb_registry_list_backends, 0);
+    rb_define_singleton_method(mSession, "titanet_cosine_sim", rb_context_guard_rb_titanet_cosine_sim, 2);
+    rb_define_singleton_method(mSession, "transcribe_vad_lang", rb_context_guard_rb_session_transcribe_vad_lang, -1);
+    rb_define_singleton_method(mSession, "result_word_n_alts", rb_context_guard_rb_session_result_word_n_alts, 3);
+    rb_define_singleton_method(mSession, "result_word_alt_p", rb_context_guard_rb_session_result_word_alt_p, 4);
 
-    rb_define_singleton_method(mSession, "piano", rb_extra_piano, 2);
-    rb_define_singleton_method(mSession, "chords", rb_extra_chords, 3);
-    rb_define_singleton_method(mSession, "beats", rb_extra_beats, 2);
-    rb_define_singleton_method(mSession, "tab", rb_extra_tab, 3);
-    rb_define_singleton_method(mSession, "convert", rb_extra_convert, -1);
-    rb_define_singleton_method(mSession, "set_voice_samples", rb_extra_voice_samples, 4);
-    rb_define_singleton_method(mSession, "set_tts_cfg_scale", rb_extra_cfg, 2);
-    rb_define_singleton_method(mSession, "tada_set_makeref_models", rb_extra_tada, 3);
-    rb_define_singleton_method(mSession, "last_synth_error", rb_extra_last_error, 1);
-    rb_define_singleton_method(mSession, "disclaimer_text", rb_extra_disclaimer_text, 0);
-    rb_define_singleton_method(mSession, "get_disclaimer_pcm", rb_extra_disclaimer_pcm, 1);
-    rb_define_singleton_method(mSession, "synthesize_streaming", rb_extra_streaming, 2);
+    rb_define_singleton_method(mSession, "piano", rb_context_guard_rb_extra_piano, 2);
+    rb_define_singleton_method(mSession, "chords", rb_context_guard_rb_extra_chords, 3);
+    rb_define_singleton_method(mSession, "beats", rb_context_guard_rb_extra_beats, 2);
+    rb_define_singleton_method(mSession, "tab", rb_context_guard_rb_extra_tab, 3);
+    rb_define_singleton_method(mSession, "convert", rb_context_guard_rb_extra_convert, -1);
+    rb_define_singleton_method(mSession, "set_voice_samples", rb_context_guard_rb_extra_voice_samples, 4);
+    rb_define_singleton_method(mSession, "set_tts_cfg_scale", rb_context_guard_rb_extra_cfg, 2);
+    rb_define_singleton_method(mSession, "tada_set_makeref_models", rb_context_guard_rb_extra_tada, 3);
+    rb_define_singleton_method(mSession, "last_synth_error", rb_context_guard_rb_extra_last_error, 1);
+    rb_define_singleton_method(mSession, "disclaimer_text", rb_context_guard_rb_extra_disclaimer_text, 0);
+    rb_define_singleton_method(mSession, "get_disclaimer_pcm", rb_context_guard_rb_extra_disclaimer_pcm, 1);
+    rb_define_singleton_method(mSession, "synthesize_streaming", rb_context_guard_rb_extra_streaming, 2);
 
     // Parakeet direct API
-    rb_define_singleton_method(mSession, "parakeet_init", rb_parakeet_init, 3);
-    rb_define_singleton_method(mSession, "parakeet_free", rb_parakeet_free, 1);
-    rb_define_singleton_method(mSession, "parakeet_transcribe", rb_parakeet_transcribe, 3);
+    rb_define_singleton_method(mSession, "parakeet_init", rb_context_guard_rb_parakeet_init, 3);
+    rb_define_singleton_method(mSession, "parakeet_free", rb_context_guard_rb_parakeet_free, 1);
+    rb_define_singleton_method(mSession, "parakeet_transcribe", rb_context_guard_rb_parakeet_transcribe, 3);
 
     // TitaNet
-    rb_define_singleton_method(mSession, "titanet_init", rb_titanet_init, 2);
-    rb_define_singleton_method(mSession, "titanet_free", rb_titanet_free, 1);
-    rb_define_singleton_method(mSession, "titanet_embed", rb_titanet_embed, 2);
+    rb_define_singleton_method(mSession, "titanet_init", rb_context_guard_rb_titanet_init, 2);
+    rb_define_singleton_method(mSession, "titanet_free", rb_context_guard_rb_titanet_free, 1);
+    rb_define_singleton_method(mSession, "titanet_embed", rb_context_guard_rb_titanet_embed, 2);
 
     // Speaker database
-    rb_define_singleton_method(mSession, "speaker_db_open", rb_speaker_db_open, 3);
-    rb_define_singleton_method(mSession, "speaker_db_free", rb_speaker_db_free, 1);
-    rb_define_singleton_method(mSession, "speaker_db_count", rb_speaker_db_count, 1);
-    rb_define_singleton_method(mSession, "speaker_db_match", rb_speaker_db_match, 3);
-    rb_define_singleton_method(mSession, "speaker_db_enroll", rb_speaker_db_enroll, 4);
-    rb_define_singleton_method(mSession, "set_speaker_identity", rb_session_set_speaker_identity, 2);
-    rb_define_singleton_method(mSession, "watermark_embed", rb_watermark_embed, 1);
-    rb_define_singleton_method(mSession, "watermark_detect", rb_watermark_detect, 1);
+    rb_define_singleton_method(mSession, "speaker_db_open", rb_context_guard_rb_speaker_db_open, 3);
+    rb_define_singleton_method(mSession, "speaker_db_free", rb_context_guard_rb_speaker_db_free, 1);
+    rb_define_singleton_method(mSession, "speaker_db_count", rb_context_guard_rb_speaker_db_count, 1);
+    rb_define_singleton_method(mSession, "speaker_db_match", rb_context_guard_rb_speaker_db_match, 3);
+    rb_define_singleton_method(mSession, "speaker_db_enroll", rb_context_guard_rb_speaker_db_enroll, 4);
+    rb_define_singleton_method(mSession, "set_speaker_identity", rb_context_guard_rb_session_set_speaker_identity, 2);
+    rb_define_singleton_method(mSession, "watermark_embed", rb_context_guard_rb_watermark_embed, 1);
+    rb_define_singleton_method(mSession, "watermark_detect", rb_context_guard_rb_watermark_detect, 1);
 
     // Mic (PLAN #62d) — CrispASR::Mic.{open(rate, channels) { |pcm| ... }, start, stop, close, default_device_name}.
     mMic = rb_define_module_under(mCrispASR, "Mic");
