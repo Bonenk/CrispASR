@@ -14,11 +14,15 @@ unchanged. No decoder/inference or strategy changes are included in this fix.
 
 CI `39104177158` was cancelled by the required claim/checkpoint main push;
 it never completed full-library validation. Do not reuse it as a green result.
-Frozen validation branch: `diag/549-legacy-split-validation-20261018`.
-Audit its CI/lint runs and integrating main. Discover the immutable dispatched
-source/run IDs with `gh run list --repo CrispStrobe/CrispASR --branch
- diag/549-legacy-split-validation-20261018` (put the command on one line).
-Later documentation checkpoints must not cancel that branch's build.
+Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` is on
+`diag/549-legacy-split-validation-20261018`. CI `39104662258` and lint
+`39104663518` are dispatched and queued; audit both terminal results. Their
+source includes the original four #549 fixes and the legacy splitter follow-up.
+Later documentation checkpoints must not cancel or mutate that branch's build.
+After green CI, verify all non-document source bytes match integrating main,
+then answer/close #549 with the compatibility notes below. Preserve the separate
+Japanese/legacy overlap token-ownership task until its own acceptance passes.
+
 
 ## Issue #549 — implementation complete; full-library CI pending (2026-10-18)
 
