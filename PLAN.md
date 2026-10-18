@@ -127,6 +127,17 @@ parameters, exact feature recipes or source may be reused. The comparison and
 licensing/provenance constraints are in
 [the audit](docs/alignment-cleanroom-2026-10-18.md).
 
+## CLAIMED 2026-10-18 — #549 final explicit-output boundary ownership
+
+Owner: maintainer coordinator, `perf/217-alignment-cleanroom`. Extend native
+index ownership to both shared and legacy explicit-output segment splitters:
+a previous word's continuation token can share the next word's first frame.
+Preserve word segments/times; change only token assignment to its native owner.
+Keep timestamp fallback for token-less/inconsistent external fixtures. Add a
+real native-grouping tied-frame fixture and compare both packaging surfaces.
+Frozen window-fix source `aaa5f21a9` has CI39117671481/lint39117673618 pending;
+this follow-up needs its own final integrated checks.
+
 ## #549 — token ownership implemented; follow-up CI/audio validation pending
 
 Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
