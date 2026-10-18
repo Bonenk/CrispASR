@@ -25,7 +25,7 @@ EQUIVALENT = {
 
 def header_symbols(text):
     text = re.sub(r'/\*.*?\*/|//[^\n]*', '', text, flags=re.S)
-    return set(re.findall(r'CRISPASR_SESSION_API[^;]+?\b(crispasr_\w+)\s*\(', text))
+    return set(re.findall(r'CRISPASR_(?:SESSION_)?API[^;]+?\b(crispasr_\w+)\s*\(', text))
 
 
 def python_symbols(paths):
@@ -63,7 +63,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--library', type=Path, help='also resolve all declared exports in a complete native build')
     args = parser.parse_args(argv)
-    declared = header_symbols((ROOT / 'include/crispasr_session.h').read_text())
+    declared = set().union(*(header_symbols((ROOT / 'include' / name).read_text())
+                             for name in ('crispasr_session.h', 'crispasr.h')))
     bound = python_symbols((ROOT / 'python/crispasr').glob('*.py'))
     exclusions = RETIRED | EQUIVALENT
     stale = set(exclusions) - declared

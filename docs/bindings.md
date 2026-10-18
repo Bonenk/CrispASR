@@ -145,13 +145,13 @@ session tokens or other metadata; see the source audit linked above.
 | Language | Current scope / verification |
 |---|---|
 | C / C++ | Public C ABI is the wrapper reference; CLI/native task surfaces still differ. |
-| Python | Session-header source census with documented equivalents/retired cases; eight additional audio/container/channel functions in `crispasr.h` remain open. Local behavior probes pass; native/model acceptance pending. |
+| Python | Session-header source census with documented equivalents/retired cases; the eight additional audio/container/channel functions in `crispasr.h` are now implemented and covered by the expanded guard. Local behavior probes pass; native/model acceptance pending. |
 | Dart / Flutter | Broad ASR/auxiliary APIs, piano/programs and beats; shared tokens, additional task/TTS operations and missing-time fixes pending. |
 | Go | ASR/auxiliary APIs and session controls; metadata and task/TTS gaps pending. |
 | Rust | ASR/auxiliary APIs, safe PCM voice references; safe result fields and task/TTS gaps pending. |
 | Java | ASR/auxiliary APIs and session controls; result and task/TTS gaps pending. |
 | Ruby | ASR/auxiliary APIs and session controls; result and task/TTS gaps pending. |
-| C# / .NET | Broad music/conversion API; shared tokens, replay-noise validation and TTS gaps pending. Dedicated workflow: `bindings-csharp.yml`. |
+| C# / .NET | Broad music/conversion API; shared tokens, replay-noise validation and initial TTS additions now have model-free .NET/ABI proof; auxiliary API/hosted acceptance remains pending. Dedicated workflow: `bindings-csharp.yml`. |
 | JavaScript / WASM | Session ASR/setters, piano/programs and chords; result and additional task/TTS gaps pending, subject to WASM backend availability. |
 
 > **Setter coverage.** The wrappers share many session controls, but the claim

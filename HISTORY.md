@@ -1,3 +1,20 @@
+## Python second-header utilities and C# safety/metadata — 2026-10-18
+
+Added Python mono/native-rate/stereo native loading, WAV/C2PA byte helpers and
+channel getters, with copies and allocator-matched cleanup including errors.
+The Python guard now reads both public headers (296 unique functions). Three
+model-free tests exercise literal native container wrappers and mocked decode/
+signing backends; real signing/model acceptance is separate.
+
+Observed C# passing undersized replay noise into native conversion, then added
+model-derived exact lengths, checked products, speaker bounds and clear older-
+library failure while preserving random draws without new dimension probes.
+Added owned shared tokens/raw bytes and missing-time availability to all four
+result readers, plus TTS reference/CFG/TADA/disclosure/streaming and callback
+transport/polling. Actual compiled .NET/C probe tests pass 58 current + 3 older
+library assertions, including copies after free and deferred callback errors.
+Remaining cross-language implementation/hosted gates are tracked in PLAN.md.
+
 ## Cross-language wrapper source audit — 2026-10-18
 
 Audited Dart, Go, Rust, Java, Ruby, C# and WASM entry points/result readers;

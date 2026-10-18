@@ -5622,6 +5622,10 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME test-python-audio-utilities
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_audio_utilities.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-audio-utilities PROPERTIES LABELS "unit;bindings;audio" TIMEOUT 60)
     add_test(NAME test-python-wrapper-operations
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_wrapper_operations.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

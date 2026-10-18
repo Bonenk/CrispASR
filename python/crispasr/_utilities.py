@@ -106,3 +106,112 @@ class TruecaseModel(_TextModel):
 class PCSModel(_TextModel):
     """Standalone punctuation/capitalization/segmentation model."""
     _prefix = 'crispasr_pcs'
+
+
+from dataclasses import dataclass
+import operator
+import os
+import numpy as np
+from ._session_extra import F, I, mono, pointer, copy_view
+
+
+@dataclass
+class AudioData:
+    """Owned mono [frame] or interleaved stereo [frame,2] PCM and its rate.
+
+    source_channels preserves the stereo decoder's 1/2 source-channel flag;
+    stereo output always has two columns, including duplicated mono sources.
+    """
+    samples: np.ndarray
+    sample_rate: int
+    source_channels: int = 1
+
+
+def load_audio(path, *, sample_rate=None, lib_path=None):
+    """Decode with the native multi-format loader; default output is 16 kHz mono."""
+    lib = _library(lib_path)
+    free = function(lib, 'crispasr_audio_free', [F], None)
+    pcm, n, rate = F(), C.c_int(), C.c_int()
+    if sample_rate is None:
+        fn = function(lib, 'crispasr_audio_load', [C.c_char_p, C.POINTER(F), I, I], C.c_int)
+        args = [os.fsencode(path)]
+    else:
+        sample_rate = operator.index(sample_rate)
+        if sample_rate <= 0 or sample_rate > 2147483647:
+            raise ValueError('sample_rate must be a positive C integer')
+        fn = function(lib, 'crispasr_audio_load_at_rate', [C.c_char_p, C.c_int, C.POINTER(F), I, I], C.c_int)
+        args = [os.fsencode(path), sample_rate]
+    try:
+        rc = fn(*args, C.byref(pcm), C.byref(n), C.byref(rate))
+        if rc != 0:
+            raise RuntimeError(f'audio decode failed (rc={rc})')
+        return AudioData(copy_view(pcm, (n.value,)), rate.value)
+    finally:
+        if pcm:
+            free(pcm)
+
+
+def load_audio_stereo(path, *, lib_path=None):
+    """Decode two owned PCM columns at 16 kHz, preserving the source channel flag."""
+    lib = _library(lib_path)
+    free = function(lib, 'crispasr_audio_free', [F], None)
+    fn = function(lib, 'crispasr_audio_load_stereo',
+                  [C.c_char_p, C.POINTER(F), C.POINTER(F), I, I, I], C.c_int)
+    left, right, n, rate, channels = F(), F(), C.c_int(), C.c_int(), C.c_int()
+    try:
+        rc = fn(os.fsencode(path), C.byref(left), C.byref(right), C.byref(n), C.byref(rate), C.byref(channels))
+        if rc != 0:
+            raise RuntimeError(f'stereo audio decode failed (rc={rc})')
+        samples = np.column_stack((copy_view(left, (n.value,)), copy_view(right, (n.value,))))
+        return AudioData(samples, rate.value, channels.value)
+    finally:
+        if left:
+            free(left)
+        if right and C.cast(right, C.c_void_p).value != C.cast(left, C.c_void_p).value:
+            free(right)
+
+
+def _container_result(lib, call):
+    free = function(lib, 'crispasr_c2pa_free', [C.c_void_p], None)
+    n = C.c_size_t()
+    ptr = call(C.byref(n))
+    try:
+        if not ptr:
+            raise RuntimeError('container operation failed, unavailable, or unsupported format')
+        return C.string_at(ptr, n.value)
+    finally:
+        if ptr:
+            free(ptr)
+
+
+def pcm_to_wav(pcm, sample_rate=16000, *, lib_path=None):
+    """Wrap mono PCM as 16-bit WAV carrying native provenance metadata."""
+    pcm = mono(pcm)
+    sample_rate = operator.index(sample_rate)
+    if not len(pcm) or not 0 < sample_rate <= 2147483647:
+        raise ValueError('nonempty mono PCM and a positive C integer sample rate are required')
+    lib = _library(lib_path)
+    fn = function(lib, 'crispasr_pcm_to_wav', [F, C.c_int, C.c_int, C.POINTER(C.c_size_t)], C.c_void_p)
+    return _container_result(lib, lambda n: fn(pointer(pcm), len(pcm), sample_rate, n))
+
+
+def c2pa_sign(data, format='audio/wav', *, cert_path=None, key_path=None, lib_path=None):
+    """Sign container bytes with native C2PA; unavailable/failed signing raises.
+
+    Optional PEM paths must be supplied together; otherwise the native bundled
+    self-signed certificate is used. This does not represent a trusted identity.
+    """
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise TypeError('data must be container bytes')
+    data = bytes(data)
+    if not data or not format:
+        raise ValueError('nonempty container bytes and MIME format are required')
+    if (cert_path is None) != (key_path is None):
+        raise ValueError('cert_path and key_path must be supplied together')
+    lib = _library(lib_path)
+    fn = function(lib, 'crispasr_c2pa_sign',
+                  [C.c_void_p, C.c_size_t, C.c_char_p, C.c_char_p, C.c_char_p, C.POINTER(C.c_size_t)], C.c_void_p)
+    buffer = C.create_string_buffer(data)
+    return _container_result(lib, lambda n: fn(buffer, len(data), format.encode('utf-8'),
+                                              None if cert_path is None else os.fsencode(cert_path),
+                                              None if key_path is None else os.fsencode(key_path), n))

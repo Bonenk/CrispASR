@@ -355,6 +355,8 @@ class SessionExtras:
 
 # Explicit symbol table keeps the header census aware of generated query methods.
 _QUERIES = {
+    "input_channels": ("crispasr_session_input_channels", C.c_int),
+    "output_channels": ("crispasr_session_output_channels", C.c_int),
     "pitch_n_frames": ("crispasr_session_pitch_n_frames", C.c_int),
     "pitch_sample_rate": ("crispasr_session_pitch_sample_rate", C.c_int),
     "convert_inter_channels": ("crispasr_session_convert_inter_channels", C.c_int),

@@ -4,9 +4,10 @@ The Python package exposes the public operations in
 `include/crispasr_session.h`, with equivalent bulk/superset entry points where
 appropriate. `tools/check-python-api-coverage.py` inventories every unique
 function declaration, rather than the older curated 155-symbol smoke list.
-This inventory is limited to the session header: eight additional audio,
-container/signing and channel functions in `include/crispasr.h` remain unwrapped;
-see [the expanded audit](binding-gaps-2026-10-18.md#python-census-boundary).
+The inventory now reads both `include/crispasr_session.h` and
+`include/crispasr.h`: 296 unique functions. The eight additional audio/container/
+channel omissions from the [initial expanded audit](binding-gaps-2026-10-18.md#python-census-boundary)
+are implemented and tested through model-free native probes.
 The inventory is a source drift guard; it does not establish model accuracy,
 platform support, or successful inference from a particular checkpoint.
 
@@ -37,6 +38,8 @@ platform support, or successful inference from a particular checkpoint.
 | GPU preference / capabilities / versions | `set_gpu_backend`, `backend_capabilities`, `c_api_version`, `dart_helpers_version` | Process-wide load preference; declared verbs are separate from compiled `available_backends` |
 | Legacy Whisper DTW / parallel decode | `CrispASR(..., dtw=True, ...)`, `transcribe_pcm(..., n_processors=...)`, `token_dtw_time` | Compiled pointer adapter required for struct-by-value calls; missing helpers raise instead of an unsafe ctypes call |
 | Legacy tokens / decode controls | `CrispASR.tokens`, `Segment.tokens`, `transcribe_pcm(decode_options=...)` | Original bytes, timestamps/probabilities, vocabulary-ID alternatives, DTW times; native stored string pointers retained through inference |
+| Audio decode / channel metadata | `load_audio`, `load_audio_stereo`, `Session.input_channels`, `output_channels` | `AudioData.samples` owns mono `[frame]` or stereo `[frame,2]` PCM, rate and original channel flag; optional target rate avoids a 16 kHz intermediate |
+| Container / signing | `pcm_to_wav`, `c2pa_sign` | Owned binary bytes; native WAV provenance; signing failure/unavailability raises and does not return unsigned success |
 | Existing auxiliary APIs | Package-root exports | Alignment, diarization, speaker embedding/roster DB, VAD/slices, language detection, RNNoise, registry/cache, mic, watermark, Kokoro helpers, GGUF detection, LCS dedup, legacy Parakeet |
 
 Music results and conversion buffers are copied before another native call can

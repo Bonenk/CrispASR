@@ -60,9 +60,10 @@ from ._binding import (
 )
 
 from ._session_extra import PianoResult, ChordResult, BeatResult, TabResult
-from ._utilities import TruecaseModel, PCSModel, set_gpu_backend, backend_capabilities, c_api_version, dart_helpers_version
+from ._utilities import TruecaseModel, PCSModel, set_gpu_backend, backend_capabilities, c_api_version, dart_helpers_version, AudioData, load_audio, load_audio_stereo, pcm_to_wav, c2pa_sign
 
 __all__ = [
+    "AudioData", "load_audio", "load_audio_stereo", "pcm_to_wav", "c2pa_sign",
     'PuncModel',
     'TitaNet',
     'VadSpan',

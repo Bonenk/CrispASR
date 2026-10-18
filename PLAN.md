@@ -20,6 +20,19 @@ and pushes. No model/graph math changes or heavy local builds. Each public API
 must have a callable implementation, correct result/ownership handling and
 behavioral validation; a declaration alone does not close a gap.
 
+
+Coordinator checkpoint: Python's eight additional audio/container/channel APIs
+are implemented, and its guard now inventories both headers (296 unique
+functions, including explicit equivalent/retired cases). Three compiled-probe
+tests pass, including literal native WAV/sign wrapper functions with a mocked
+signing backend; this is not cryptographic trust/real-signing acceptance.
+C# replay-noise tests first failed on an undersized buffer reaching native code;
+length/overflow checks now pass. Shared C# tokens/raw bytes, all four result
+routes and TTS/callback additions pass 61 actual .NET/C-ABI assertions across
+current and older probe libraries. Other C# utilities remain in progress.
+Two Hermes sessions are actively implementing Dart and Go/Rust; their partial
+edits have not been accepted or committed. Hosted proof remains pending.
+
 Repair order and acceptance:
 
 0. **Close the census boundary:** extend Python's guard across both public
