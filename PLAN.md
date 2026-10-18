@@ -1,12 +1,63 @@
 # CrispASR — Pending work
 
-## NOW — Python wrapper implementation complete; hosted/model acceptance pending
+## NOW — non-Python wrapper parity audit and scoped repairs
+
+Owner: maintainer coordinator. Source audit at
+`c12707299c5dcbca7bafe60a073688250238cdd9` confirms gaps across Dart, Go,
+Rust, Java, Ruby, C# and WASM. See
+[the per-wrapper findings and source entry points](docs/binding-gaps-2026-10-18.md).
+No non-Python runtime fix is claimed by this audit. `docs/bindings.md` no longer
+claims universal full parity. Declaration/symbol-mention counts are not callable
+API coverage; legacy Parakeet token readers do not cover shared session tokens.
+
+Repair order and acceptance:
+
+0. **Close the census boundary:** extend Python's guard across both public
+   headers (and retain the separate chat-header guard). Add the eight confirmed
+   missing functions in `crispasr.h`: mono/native-rate/stereo audio loading,
+   PCM-to-WAV, C2PA sign/free, and input/output channel getters. Read each native
+   ownership/error contract, expose usable public functions and test allocated
+   buffers, stereo shape, output rates, zero/error results and unavailable
+   optional signing support. Do not describe the 282-function session-header
+   census as the complete public C ABI.
+
+1. **C# replay-noise bounds:** bind the new model dimension getters; validate
+   optional conversion noise lengths with checked products before P/Invoke.
+   Add short-buffer rejection tests proving native conversion is not entered,
+   valid-buffer forwarding/copying tests and older-library behavior. Run the
+   .NET tests and `bindings-csharp.yml` on Linux/Windows.
+2. **Shared result contract, Dart first:** add owned token bytes/text,
+   timestamps/probabilities and default-empty token lists to all seven wrappers;
+   preserve speaker labels, word alternatives and missing-time availability.
+   Fix Dart/Rust's `-1` → `-0.01` conversion. Update every transcribe/chunked/
+   VAD/logits/stream result reader. Preserve existing constructors and documented
+   units; test split UTF-8, null/absent timing, offsets and post-free ownership
+   against the same compiled native fixtures/library. Rust additionally needs
+   safe segment speaker fields; Go/Java/Rust need usable word alternatives.
+3. **Dart operations:** chords, tablature, ContentVec conversion with safe
+   replay noise; PCM voice references, TTS CFG-scale, TADA companions,
+   disclosure/synthesis errors and sentence streaming. Use polling/isolate-safe
+   delivery where native callbacks cannot run safely on the Dart isolate.
+   Keep existing piano/program and beat functionality. Add analyzer/tests,
+   disposal and actual FFI failure/empty-result/ownership checks.
+4. **Go/Rust operations**, then **Java/Ruby/C#/WASM**: close each audit matrix
+   row, including public entry points, registration, native declarations,
+   result types, ownership and feature availability. Register a complete
+   per-language coverage manifest/guard; classify equivalent/retired/platform
+   cases explicitly. Run language compiler/tests and applicable hosted jobs.
+5. **Model acceptance:** representative real audio/task outputs and TTS→ASR
+   roundtrips through each completed wrapper, using pinned models, source and
+   inputs. A source inventory or Python test does not satisfy this gate.
+
+## Python session-header expansion — additional ABI gaps and hosted/model acceptance pending
 
 Owner: maintainer coordinator. Source inventory and operation contracts are in
 [Python API coverage](docs/python-api-coverage.md); completed implementation is
 archived in HISTORY.md. The header census now accounts for 282 unique functions
 (277 bound, three equivalent/compiled adapters, two retired native stubs).
-This is Python coverage, not a claim about every language wrapper or model.
+This census is limited to that header. Eight additional Python omissions in
+`include/crispasr.h` are now scoped above; this is not complete public C-ABI,
+other-language or model acceptance.
 
 New operation/metadata probes pass with GCC and Clang. They exercise compiled C
 ABI transport, actual native metadata functions, allocated-buffer ownership,

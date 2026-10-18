@@ -1,4 +1,13 @@
-## Python shared-API wrapper completion — 2026-10-18
+## Cross-language wrapper source audit — 2026-10-18
+
+Audited Dart, Go, Rust, Java, Ruby, C# and WASM entry points/result readers;
+removed unsupported universal full-parity claims from `docs/bindings.md`.
+Recorded existing functionality, confirmed omissions and the Python guard's
+session-header boundary in `docs/binding-gaps-2026-10-18.md`. No non-Python
+runtime fix is claimed by this audit; repairs and acceptance are scoped in
+PLAN.md, including C# replay-buffer validation and shared metadata preservation.
+
+## Python session-header wrapper expansion — 2026-10-18
 
 Added music results (piano/programs, chords/names, beats/tempo, tablature
 emissions), ContentVec voice conversion with validated replay noise, TTS

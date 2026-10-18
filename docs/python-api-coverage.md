@@ -4,6 +4,9 @@ The Python package exposes the public operations in
 `include/crispasr_session.h`, with equivalent bulk/superset entry points where
 appropriate. `tools/check-python-api-coverage.py` inventories every unique
 function declaration, rather than the older curated 155-symbol smoke list.
+This inventory is limited to the session header: eight additional audio,
+container/signing and channel functions in `include/crispasr.h` remain unwrapped;
+see [the expanded audit](binding-gaps-2026-10-18.md#python-census-boundary).
 The inventory is a source drift guard; it does not establish model accuracy,
 platform support, or successful inference from a particular checkpoint.
 
