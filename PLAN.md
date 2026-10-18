@@ -1,5 +1,20 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-10-18 — #217 actual Japanese alignment profiling worker
+
+Owner: maintainer coordinator; branch `perf/217-alignment-cleanroom`.
+Prepare hosted-only CPU validation of the pinned F16 Japanese 1.1B CTC model
+and a pinned FLEURS `ja_jp` test recording (CC BY 4.0 attribution retained).
+Retain actual native logits/vocabulary/PCM and compare baseline/opt-in/OFF
+outputs, including the immutable own DP reference on those exact logits.
+Measure model load, encoder and postprocessor independently; compare exported
+C ABI/Python and CLI word output and absolute offsets. No model/runtime math
+change, no default promotion and no historical/third-party speed ranking.
+Worker may be queued while earlier CI runs wait, but acceptance still depends
+on their exact-source results. Tiny local worker-contract checks only; all
+model downloads/builds/inference run on GH. FLEURS lacks word boundaries, so
+this is parity/profiling evidence, not a boundary-accuracy benchmark.
+
 ## #217 — comparison complete; opt-in character CTC candidate validated locally
 
 Owner: maintainer coordinator. Work is isolated on
