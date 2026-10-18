@@ -1,3 +1,17 @@
+## #217 independent subword workspace experiment — 2026-10-18
+
+Implemented default-off `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` from our own source:
+one-frame normalized emissions and flat traceback, preserving vocabulary-wide
+F32 score order and output semantics against immutable own source `deaf9c010`.
+Five new acceptance tests pass under GCC and Clang, including 240 random cases
+and 60 independently enumerated unique-optimum tiny paths. The four failure
+contracts pass with both gates, and the six character tests still pass. CTest
+and ordinary CI include the new suite. Local synthetic medians show noisy
+1.07–1.75× runtime ratios and 1.97–106.84× lower tracked heap; full ranges,
+source hashes and scope are retained in the [audit](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
+No foreign code/asset, encoder change or production/default promotion; hosted
+and real-model acceptance remain in PLAN.md.
+
 ## #217 subword CTC failure semantics — 2026-10-18
 
 A literal production tokenizer/Viterbi fixture proved that an impossible

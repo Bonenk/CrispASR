@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -33,6 +34,7 @@ class SubwordAlignContract(unittest.TestCase):
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cstdlib>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -46,6 +48,8 @@ struct canary_ctc_context {
 };
 '''
         code += definition(source, 'static bool tokenise_word(') + '\n'
+        for name in ('baseline', 'compact'):
+            code += definition(source, f'static int canary_ctc_align_words_{name}(') + '\n'
         code += definition(source, 'extern "C" int canary_ctc_align_words(') + '\n'
         code += '''
 extern "C" int run(const float* logits, int T, int V, const char** words, int n,
@@ -77,9 +81,15 @@ extern "C" int run(const float* logits, int T, int V, const char** words, int n,
         scores = np.ascontiguousarray(scores, dtype=np.float32)
         encoded = (ctypes.c_char_p * len(words))(*(w.encode() for w in words))
         output = (Word * len(words))()
-        rc = self.lib.run(scores.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                          scores.shape[0], scores.shape[1], encoded, len(words), output, mode)
-        return rc, [(w.text.decode(), w.t0, w.t1) for w in output]
+        results = []
+        for gate in ('0', '1'):
+            output = (Word * len(words))()
+            with patch.dict(os.environ, {'CRISPASR_SUBWORD_CTC_ALIGN_OPT': gate}):
+                rc = self.lib.run(scores.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
+                                  scores.shape[0], scores.shape[1], encoded, len(words), output, mode)
+            results.append((rc, [(w.text.decode(), w.t0, w.t1) for w in output]))
+        self.assertEqual(results[0], results[1], 'workspace gate changed failure/valid output')
+        return results[0]
 
     def test_impossible_transcript_must_not_report_success(self):
         # Two distinct labels cannot fit in one frame.

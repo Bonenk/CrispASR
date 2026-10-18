@@ -154,3 +154,53 @@ coverage and original audio offsets when testing chunking.
 No external fitted asset may enter that benchmark or the independent training
 pipeline under this task's constraint. External pipeline timing remains
 unmeasured; the current work measures our own kernel against our own baseline.
+
+## Independent subword workspace experiment
+
+The follow-up is authored from our own `canary_ctc_align_words` source, with no
+external implementation or fitted assets. `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1`
+enables one-frame log-softmax storage and flat traceback. The default retains
+the original implementation, including the separately repaired error contract.
+Vocabulary-wide max/sum order, intermediate F32 stores, strict transition ties,
+tokenization and word-boundary scans are unchanged. Emission workspace becomes
+`V` floats instead of `T * V`; traceback remains `T * (2N+1)` bytes. This is
+not GPU Viterbi, encoder chunking or an elimination of the input-logit matrix.
+
+The immutable own reference contains the tokenizer and alignment function from
+`deaf9c010acce1410f470d6df421d0f77ff16be2`. Five new tests pass under GCC and
+Clang with `-O3 -DNDEBUG -fno-fast-math`: 240 seeded randomized cases, tied and
+nonfinite inputs, unknown/byte fallback, repeated labels, Unicode, nonzero blank
+and frame duration, output truncation, 60 unique-optimum exhaustive tiny paths,
+and allocation/heap acceptance. The four existing subword failure-contract tests
+now exercise both gates; all six character tests still pass after extracting
+the unchanged allocation tracker into a shared test-only header. The harness
+compiles literal production tokenizer/DP functions with only their context
+fields; this is not yet full-library/encoder or model acceptance. CTest and the
+ordinary Linux unit workflow run the new suite.
+
+Preliminary local synthetic measurements (T=256, 20 words/40 labels, nine
+measurements after one warm-up per arm; same noisy shared CPU):
+
+| Vocabulary | Gate off → on median (ms) | Median ratio | Tracked peak heap off → on (bytes) |
+| --- | ---: | ---: | ---: |
+| 16 | 0.528 → 0.492 | 1.07× | 45,676 → 23,212 |
+| 64 | 0.603 → 0.526 | 1.15× | 94,828 → 23,404 |
+| 1,024 | 3.487 → 2.047 | 1.70× | 1,077,868 → 27,244 |
+| 4,096 | 19.244 → 11.024 | 1.75× | 4,223,596 → 39,532 |
+
+Each candidate call preserves the frozen reference's exact return code, word
+bytes and centisecond bounds. All shapes reduce counted allocations from 311
+to 54. Timing ranges overlap and show substantial noise; do not interpret these
+medians as a guaranteed speedup. The [raw receipt](alignment-subword-local-2026-10-18.json)
+records all ranges, CPU/compiler/flags and source hashes. Its measured source
+was a dirty draft on the claim commit, identified by exact source SHA256; no
+claim that the commit alone contains that draft is made. Heap counters cover
+live C++ allocations inside alignment only, excluding input/model/vocabulary
+setup, output allocation, IPC and serialization; they are not RSS or VRAM.
+
+`tools/ci-heavy/alignment_subword_bench.py --large` adds hosted long shapes.
+Audit its immutable source and terminal artifacts before accepting hosted
+numbers. Keep the gate default-off until full-library CI/lint and real model
+alignment acceptance pass. A matched Japanese clip still needs encoder versus
+postprocessor stage timings and boundary/coverage evidence; the synthetic
+workspace result does not establish a Subtimer or whole-pipeline ranking.

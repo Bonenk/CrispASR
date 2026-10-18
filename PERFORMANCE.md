@@ -1,3 +1,15 @@
+## Subword CTC workspace experiment — 2026-10-18
+
+`CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` enables a separate default-off Parakeet/Canary
+postprocessor experiment. Four tiny local synthetic shapes show 1.07–1.75×
+median kernel speed and 1.97–106.84× lower tracked C++ heap with exact frozen
+return/text/timestamp output; timing noise is substantial. One-frame
+normalization replaces `T * V` stored emissions, and flat traceback removes
+per-frame allocations. Encoder, input logits and GPU memory are unaffected.
+Five new tests pass under GCC and Clang; full-library/hosted/model acceptance
+is pending. See [method and limitations](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment)
+and [raw local receipt](docs/alignment-subword-local-2026-10-18.json).
+
 # CrispASR — Performance benchmarks
 
 Character CTC workspace experiment (2026-10-18): opt-in

@@ -5634,6 +5634,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_align_compact.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
+    add_test(NAME test-subword-align-compact
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_subword_align_compact.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-subword-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
     add_test(NAME test-canary-align-contract
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_canary_align_contract.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

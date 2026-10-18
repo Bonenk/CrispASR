@@ -1,19 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-10-18 — #217 independent subword workspace experiment
-
-Owner: maintainer coordinator; isolated branch `perf/217-alignment-cleanroom`.
-Profile and reduce the native `canary_ctc_align_words` workspace independently
-of the character kernel and external implementations. Freeze our current
-`deaf9c010` tokenizer/DP as the reference; preserve its new invalid-path contract.
-Candidate scope: opt-in one-frame log-softmax workspace and flat traceback;
-no model, tokenizer, score-order, path-tie or timestamp changes. Default stays off.
-Acceptance: exact return/text/centisecond output against frozen own code on
-random/tied/repeated/Unicode/invalid fixtures, independent tiny path checks,
-measured live heap/allocation reductions, and bounded local timing. Hosted
-large-shape profiling and full-library CI/lint remain separate gates; no model
-or Japanese quality/performance claim follows from synthetic postprocessing.
-
 ## #217 — comparison complete; opt-in character CTC candidate validated locally
 
 Owner: maintainer coordinator. Work is isolated on
@@ -71,14 +57,30 @@ proof of long-form model accuracy. Character-path nonfinite-input policy still
 follows its frozen baseline; any future policy unification needs separate
 valid-output and error-contract acceptance, not a concealed speed change.
 
+## #217 subword workspace — implemented; hosted/model acceptance pending
+
+Independent own-code candidate uses `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1`, default
+off. It normalizes one vocabulary row at a time and flattens traceback while
+retaining the frozen `deaf9c010` tokenizer/DP return/text/timestamp behavior.
+Five tests pass under GCC and Clang (240 seeded random, 60 unique-optimum
+exhaustive tiny paths plus edge/memory cases); four contracts exercise both
+gates and six character tests remain green. CTest/CI run all suites. The local
+receipt and scope are in the [comparison](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
+Prepare immutable hosted source and run `tools/ci-heavy/alignment_subword_bench.py
+--large` (NumPy; 30-minute timeout), full-library CI and lint. Audit source and
+baseline hashes, exact return/text/bounds, successful complete alignments,
+allocation/heap reductions and timing distributions. Never promote from these
+synthetic results alone. Keep input/encoder memory and model quality separate.
+
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 
-After the exact-output CPU kernel experiment, profile the separate
-`canary_ctc_align_words` path on frozen logits and the encoder on a matched
-Japanese clip. Character CTC timings alone do not characterize Parakeet.
-Independently implement any shared workspace improvements with exact native
-centisecond-output and tokenizer parity; keep original behavior available for
-A/B, and separate any existing invalid-path semantic repair from a speed change.
+After hosted acceptance of both exact-output CPU workspace experiments, profile
+`canary_ctc_align_words` on actual frozen model logits and split encoder versus
+postprocessor time on a matched Japanese clip. Synthetic timings alone do not
+characterize Parakeet. Preserve native centisecond-output/tokenizer parity and
+keep original behavior available for A/B. The unchanged per-word path scans
+remain a separate candidate only if profiling justifies them; do not conflate
+invalid-path semantic repair with a speed change.
 
 Long-form accuracy requires audio/text anchors before changing the current
 proportional Qwen chunk assignment or unbounded CTC encoder use. Build a small
