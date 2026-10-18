@@ -150,3 +150,24 @@ into one owned result. The compiled Node contract checks string transport,
 unknown versus empty bundles, all three artifact kinds, license metadata,
 cache arguments, native errors, buffer growth, retry ceilings and unterminated
 native output. This is a model-free transport test, not browser download proof.
+
+
+## WASM generic diarization and language-aware VAD
+
+`diarizeSegments` and `diarizeSegmentsWithTurns` cover the two generic diarization
+ABI exports. The compiled fixture uses literal runtime segment/turn/options
+structs on wasm32. It checks field transport, stereo channels, absolute times,
+owned output, empty turns, negative/oversized counts, native failures and bounded
+buffer growth. Model methods retain their distinct path fields.
+
+`asrTranscribeVad` covers `crispasr_session_transcribe_vad_lang`, a superset of
+the no-language export. The compiled fixture verifies all six literal VAD
+option fields, language, native-default null options, invalid-input rejection,
+result ownership and metadata. These contracts do not establish model accuracy
+or threaded browser scheduling.
+
+
+WASM's `sessionTranscribeWithLogits` uses a shared native-to-owned transcription
+helper. The operation probe checks negative segment/word/alternative/token
+counts, negative/overflowing logit dimensions, missing buffers, copied grids,
+native-result freeing and logit-flag reset on C++ and JS encoding errors.

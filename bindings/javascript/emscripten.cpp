@@ -41,6 +41,7 @@ typedef struct crispasr_session CrispasrSession;
 
 
 #include "session_results.h"
+#include "session_transcription.h"
 
 static CrispasrSession* g_tts_session = nullptr;
 // Backend-agnostic ASR session (parakeet/canary/whisper/…) for the asr* surface
@@ -55,6 +56,8 @@ struct whisper_context* g_context;
 #include "session_speaker.h"
 #include "session_options.h"
 #include "session_registry.h"
+#include "session_diarization.h"
+#include "session_vad.h"
 
 #ifdef __EMSCRIPTEN_PTHREADS__
 // Present only in threaded builds. Under -sPROXY_TO_PTHREAD this runs on pthread-0
@@ -110,6 +113,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_speaker();
     binding_register_open_options();
     binding_register_registry();
+    binding_register_diarization();
+    binding_register_vad();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
                              binding_check_reentry();
@@ -161,8 +166,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                                                                          lang.empty() ? nullptr : lang.c_str())
                                       : nullptr;
                     if (result) {
-                        segments = binding_copy_segments(result);
-                        crispasr_session_result_free(result);
+                        segments = binding_take_segments(result);
                     }
                     return segments;
                 },
@@ -350,8 +354,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                                                                           lang.empty() ? nullptr : lang.c_str());
             if (!r)
                 return out;
-            out = binding_encode_segments(binding_copy_segments(r), 1.0);
-            crispasr_session_result_free(r);
+            out = binding_encode_segments(binding_take_segments(r), 1.0);
             return out;
         }));
 
@@ -378,8 +381,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                 g_asr_session, pcmf32.data(), n, chunkSeconds, overlapSeconds, lang.empty() ? nullptr : lang.c_str());
             if (!r)
                 return out;
-            out = binding_encode_segments(binding_copy_segments(r), 1.0);
-            crispasr_session_result_free(r);
+            out = binding_encode_segments(binding_take_segments(r), 1.0);
             return out;
         }));
 
@@ -892,8 +894,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
             if (!res)
                 return emscripten::val::array();
 
-            auto out = binding_encode_segments(binding_copy_segments(res), 100.0);
-            crispasr_session_result_free(res);
+            auto out = binding_encode_segments(binding_take_segments(res), 100.0);
             return out;
         }));
 
@@ -910,52 +911,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
             binding_check_reentry();
             if (!g_tts_session)
                 return emscripten::val::null();
-            const int n = audio["length"].as<int>();
-            std::vector<float> pcm(n);
-            emscripten::val heap = emscripten::val::module_property("HEAPU8");
-            emscripten::val memory = heap["buffer"];
-            emscripten::val mv = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcm.data()), n);
-            mv.call<void>("set", audio);
-
-            crispasr_session_set_return_logits(g_tts_session, 1);
-            crispasr_session_result* res;
-            if (!lang.empty()) {
-                res = crispasr_session_transcribe_lang(g_tts_session, pcm.data(), n, lang.c_str());
-            } else {
-                res = crispasr_session_transcribe(g_tts_session, pcm.data(), n);
-            }
-            if (!res) {
-                crispasr_session_set_return_logits(g_tts_session, 0);
-                return emscripten::val::null();
-            }
-
-            emscripten::val out = emscripten::val::object();
-            auto segs = binding_encode_segments(binding_copy_segments(res), 100.0);
-            out.set("segments", segs);
-
-            // Copy the result-owned logit grid into a JS Float32Array before the
-            // result (and its buffer) is freed — same owned-then-freed idiom as
-            // ttsSynthesize.
-            int nf = crispasr_session_result_n_logit_frames(res);
-            int nv = crispasr_session_result_n_logit_vocab(res);
-            const float* lg = crispasr_session_result_logits(res);
-            if (nf > 0 && nv > 0 && lg) {
-                const int total = nf * nv;
-                emscripten::val data = emscripten::val::global("Float32Array").new_(total);
-                emscripten::val memoryView = emscripten::val(emscripten::typed_memory_view(total, lg));
-                data.call<void>("set", memoryView);
-                emscripten::val logits = emscripten::val::object();
-                logits.set("nFrames", nf);
-                logits.set("nVocab", nv);
-                logits.set("data", data);
-                out.set("logits", logits);
-            } else {
-                out.set("logits", emscripten::val::null());
-            }
-
-            crispasr_session_set_return_logits(g_tts_session, 0);
-            crispasr_session_result_free(res);
-            return out;
+            auto pcm = binding_pcm(audio);
+            return binding_encode_transcription(binding_transcribe_logits(g_tts_session, pcm, lang));
         }));
 
     // CTC vocabulary access (Omni CTC backend). Returns the vocab as a JS array

@@ -627,7 +627,9 @@ V2 session-load options occupy 48 bytes (six scalar ints plus six reserved
 ints); compile the literal runtime layout in the probe instead of guessing its
 size. Preserve native unknown word confidence (-1), and reject negative result
 counts or overflowing logit dimensions before allocating/copying. Rust's VAD
-and polled results share its owned ordinary result reader.
+and polled results share its owned ordinary result reader. WASM copies result
+metadata and logit grids into owned C++ data before JS encoding, with RAII native
+cleanup and logit-flag reset; probe malformed counts and JS encoding exceptions.
 
 WASM registry/cache probes must distinguish unknown bundles from known empty
 bundles, preserve companion artifacts and license metadata, retry only each

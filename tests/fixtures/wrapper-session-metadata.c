@@ -6,6 +6,10 @@
 #endif
 static char token_head[3], token_tail[2];
 static int result_frees;
+static int result_count_mode;
+void probe_result_count_mode(int mode) {
+    result_count_mode = mode;
+}
 extern void probe_callbacks(void);
 int probe_result_frees(void) {
     return result_frees;
@@ -61,19 +65,27 @@ crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr_session* 
 #endif
     return new_result();
 }
+static int result_logits_enabled;
+int probe_result_logits_enabled(void) {
+    return result_logits_enabled;
+}
 int crispasr_session_set_return_logits(crispasr_session* s, int value) {
+    result_logits_enabled = value;
     return 0;
 }
 int crispasr_session_result_n_logit_frames(crispasr_session_result* r) {
-    return 0;
+    return result_count_mode == 5 ? -1 : result_count_mode == 6 ? INT32_MAX : result_count_mode >= 7 ? 1 : 0;
 }
 int crispasr_session_result_n_logit_vocab(crispasr_session_result* r) {
-    return 0;
+    return result_count_mode >= 6 ? 2 : 0;
 }
 const float* crispasr_session_result_logits(crispasr_session_result* r) {
-    return 0;
+    static float logits[] = {-1, 2};
+    return result_count_mode == 8 ? logits : NULL;
 }
 int crispasr_session_result_n_segments(crispasr_session_result* r) {
+    if (result_count_mode == 1)
+        return -1;
     return 1;
 }
 const char* crispasr_session_result_segment_text(crispasr_session_result* r, int i) {
@@ -92,6 +104,8 @@ const char* crispasr_session_result_segment_speaker(crispasr_session_result* r, 
     return "speaker";
 }
 int crispasr_session_result_n_words(crispasr_session_result* r, int i) {
+    if (result_count_mode == 2)
+        return -1;
     return 1;
 }
 const char* crispasr_session_result_word_text(crispasr_session_result* r, int i, int j) {
@@ -107,6 +121,8 @@ float crispasr_session_result_word_p(crispasr_session_result* r, int i, int j) {
     return .75f;
 }
 int crispasr_session_result_word_n_alts(crispasr_session_result* r, int i, int j) {
+    if (result_count_mode == 3)
+        return -1;
     return 1;
 }
 const char* crispasr_session_result_word_alt_text(crispasr_session_result* r, int i, int j, int k) {
@@ -121,6 +137,8 @@ void crispasr_session_result_free(crispasr_session_result* r) {
 }
 #ifndef CRISPASR_PROBE_OLD_TOKENS
 int crispasr_session_result_n_tokens(crispasr_session_result* r, int i) {
+    if (result_count_mode == 4)
+        return -1;
     return 2;
 }
 const char* crispasr_session_result_token_text(crispasr_session_result* r, int i, int j) {

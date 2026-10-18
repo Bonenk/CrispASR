@@ -3,6 +3,9 @@
 #include "crispasr_session.h"
 #include <emscripten/bind.h>
 #include <cstdint>
+#include <climits>
+#include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -23,22 +26,37 @@ struct binding_segment : binding_piece {
 static std::string binding_string(const char* p) {
     return p ? p : "";
 }
+struct binding_result_deleter {
+    void operator()(crispasr_session_result* r) const {
+        if (r)
+            crispasr_session_result_free(r);
+    }
+};
+using binding_result_owner = std::unique_ptr<crispasr_session_result, binding_result_deleter>;
+static int binding_result_count(int n) {
+    if (n < 0)
+        throw std::runtime_error("Negative native result count");
+    return n;
+}
 static std::vector<binding_segment> binding_copy_segments(crispasr_session_result* r) {
     std::vector<binding_segment> out;
-    for (int i = 0; i < crispasr_session_result_n_segments(r); ++i) {
+    const int count = binding_result_count(crispasr_session_result_n_segments(r));
+    for (int i = 0; i < count; ++i) {
         binding_segment seg;
         seg.text = binding_string(crispasr_session_result_segment_text(r, i));
         seg.t0 = crispasr_session_result_segment_t0(r, i);
         seg.t1 = crispasr_session_result_segment_t1(r, i);
         seg.p = crispasr_session_result_segment_no_speech_prob(r, i);
         seg.speaker = binding_string(crispasr_session_result_segment_speaker(r, i));
-        for (int j = 0; j < crispasr_session_result_n_words(r, i); ++j) {
+        const int words = binding_result_count(crispasr_session_result_n_words(r, i));
+        for (int j = 0; j < words; ++j) {
             binding_word w;
             w.text = binding_string(crispasr_session_result_word_text(r, i, j));
             w.t0 = crispasr_session_result_word_t0(r, i, j);
             w.t1 = crispasr_session_result_word_t1(r, i, j);
             w.p = crispasr_session_result_word_p(r, i, j);
-            for (int k = 0; k < crispasr_session_result_word_n_alts(r, i, j); ++k) {
+            const int alts = binding_result_count(crispasr_session_result_word_n_alts(r, i, j));
+            for (int k = 0; k < alts; ++k) {
                 binding_piece alt;
                 alt.text = binding_string(crispasr_session_result_word_alt_text(r, i, j, k));
                 alt.p = crispasr_session_result_word_alt_p(r, i, j, k);
@@ -46,7 +64,8 @@ static std::vector<binding_segment> binding_copy_segments(crispasr_session_resul
             }
             seg.words.push_back(std::move(w));
         }
-        for (int j = 0; j < crispasr_session_result_n_tokens(r, i); ++j) {
+        const int tokens = binding_result_count(crispasr_session_result_n_tokens(r, i));
+        for (int j = 0; j < tokens; ++j) {
             binding_piece t;
             t.text = binding_string(crispasr_session_result_token_text(r, i, j));
             t.t0 = crispasr_session_result_token_t0(r, i, j);
@@ -57,6 +76,10 @@ static std::vector<binding_segment> binding_copy_segments(crispasr_session_resul
         out.push_back(std::move(seg));
     }
     return out;
+}
+static std::vector<binding_segment> binding_take_segments(crispasr_session_result* r) {
+    binding_result_owner owned(r);
+    return binding_copy_segments(r);
 }
 static emscripten::val binding_bytes(const std::string& text) {
     auto out = emscripten::val::global("Uint8Array").new_(text.size());

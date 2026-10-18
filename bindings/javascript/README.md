@@ -136,3 +136,28 @@ Paths refer to the module filesystem. Browser network/download support and
 persistence require separate environment validation; a registry hit does not
 prove a model is downloadable or supported by this module. The compiled Node
 contract checks argument/status/buffer transport without making downloads.
+
+
+## Diarization and VAD transcription
+
+`diarizeSegments(audio, rightOrNull, segments, options)` returns owned labeled
+segments. `diarizeSegmentsWithTurns(...)` returns `{segments, turns}`. Input
+segments use `{t0, t1}` in absolute integer centiseconds and are not modified.
+Audio is mono 16 kHz PCM; supply a same-length right channel for stereo methods.
+Options are `method` (0–5), `n_threads`, `slice_t0_cs`, `model_path`,
+`embedder_path`, `min_speakers`, `max_speakers`, and `num_speakers`. Methods 3/5
+use `model_path` (pyannote/Sortformer); method 4 uses `embedder_path` (FoxNose).
+Speaker turns share the absolute centisecond timeline. Methods without derived
+turns return an empty turns array. Buffer retries are bounded; native failures
+and invalid returned counts throw.
+
+`asrTranscribeVad(audio, sampleRate, vadModelPath, language, optionsOrNull)`
+uses the ASR singleton and returns the same owned centisecond segments and
+word/token metadata as `asrTranscribe`. Empty language selects the native
+backend default. `null` options preserve native VAD defaults; an options object
+accepts `threshold`, `min_speech_duration_ms`, `min_silence_duration_ms`,
+`speech_pad_ms`, `chunk_seconds`, and `n_threads`. Object defaults are
+0.5/250/100/30/30 and the module thread default. A zero chunk limit disables
+maximum-length splitting. Invalid settings or native transcription failure throw.
+Both operations are synchronous and need the same browser scheduling care as
+other synchronous inference calls.

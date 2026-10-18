@@ -1,3 +1,25 @@
+## WASM diarization, VAD and owned transcription results — 2026-10-18
+
+Generic diarization now exposes segment labeling and derived speaker turns,
+with distinct model/embedder fields and absolute centisecond times. Compiled
+wasm32 probes use the literal runtime structs and cover mono/stereo transport,
+empty turns, invalid counts and bounded turn-buffer retries. Language-aware
+VAD transcription exposes all six per-call controls and native-default null
+options while preserving word/token metadata.
+
+A regression reproduced silent acceptance of negative native segment, word,
+alternative and token counts; the shared reader now rejects them. Ordinary ASR
+result copies use RAII cleanup. The logits path now validates dimensions and
+multiplication, rejects missing positive-sized buffers, and copies segments and
+logits into owned C++ data before JS encoding. Native results are freed and the
+session logit flag reset even when copying fails or JS encoding throws.
+
+Validation: **279 WASM operation assertions plus 39 chat assertions** pass.
+Both complete main-source syntax configurations (pthread and single-thread/chat)
+pass. The Python model-free operation suite also passes (16 tests, one expected
+real-library skip). Full module size, models and browser scheduling remain
+pending; these are transport and ownership checks.
+
 ## WASM load options and registry/cache adapters — 2026-10-18
 
 WASM exposes v2 ASR/TTS load options with all five controls and zeroed reserved

@@ -21,6 +21,10 @@ static int dia_arguments(const float* left, int n, crispasr_diarize_seg_abi* seg
 int32_t crispasr_diarize_segments_abi(const float* left, const float* right, int32_t n, int32_t stereo,
                                       crispasr_diarize_seg_abi* segs, int32_t count,
                                       const crispasr_diarize_opts_abi* opts) {
+#ifdef CRISPASR_PROBE_WASM_DIA
+    if ((stereo && (!right || right[0] != 5 || right[2] != 1)) || (!stereo && right) || !opts || opts->_pad2)
+        return 1;
+#endif
     if (!dia_arguments(left, n, segs, count, opts))
         return 1;
     if (dia_mode == 4)
@@ -33,6 +37,10 @@ int32_t crispasr_diarize_segments_turns_abi(const float* left, const float* righ
                                             crispasr_diarize_seg_abi* segs, int32_t count,
                                             const crispasr_diarize_opts_abi* opts, crispasr_diarize_turn_abi* turns,
                                             int32_t cap, int32_t* out_count) {
+#ifdef CRISPASR_PROBE_WASM_DIA
+    if ((stereo && (!right || right[0] != 5 || right[2] != 1)) || (!stereo && right) || !opts || opts->_pad2)
+        return 1;
+#endif
     if (!dia_arguments(left, n, segs, count, opts))
         return 1;
     if (dia_mode == 4)
@@ -40,6 +48,24 @@ int32_t crispasr_diarize_segments_turns_abi(const float* left, const float* righ
     if (dia_mode == 1 && !dia_retried) {
         dia_retried = 1;
         *out_count = cap + 1;
+        return 2;
+    }
+    if (dia_mode == 7) {
+        segs[0].speaker = 1;
+        segs[1].speaker = 0;
+        *out_count = 0;
+        return 0;
+    }
+    if (dia_mode == 8) {
+        *out_count = cap + 1;
+        return 2;
+    }
+    if (dia_mode == 5) {
+        *out_count = cap;
+        return 2;
+    }
+    if (dia_mode == 6) {
+        *out_count = 1024 * 1024 + 1;
         return 2;
     }
     if (dia_mode == 2) {

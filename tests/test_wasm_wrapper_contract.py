@@ -17,16 +17,26 @@ SHIM=r'''
 static crispasr_session* g_tts_session=(crispasr_session*)1;
 static crispasr_session* g_asr_session=nullptr;
 #include "session_results.h"
+#include "session_transcription.h"
 #include "session_tasks.h"
 #include "session_utilities.h"
 #include "session_analysis.h"
 #include "session_speaker.h"
 #include "session_options.h"
 #include "session_registry.h"
+#include "session_diarization.h"
+#include "session_vad.h"
 extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
 extern "C" int probe_calls(void);
 extern "C" void probe_registry_mode(int);
+extern "C" void probe_diarize_mode(int);
+extern "C" int probe_diarize_calls(void);
+extern "C" void probe_vad_expect(int);
+extern "C" int probe_vad_calls(void);
+extern "C" int probe_result_frees(void);
+extern "C" void probe_result_count_mode(int);
+extern "C" int probe_result_logits_enabled(void);
 extern "C" int probe_analysis_live(void);
 extern "C" void probe_analysis_mode(int);
 extern "C" void probe_speaker_mode(int);
@@ -40,16 +50,24 @@ extern "C" void probe_utility_mode(int);
 extern "C" int probe_utility_live(void);
 static emscripten::val read_result(bool seconds) {
     binding_check_reentry();float p[]={1,3,5};auto r=crispasr_session_transcribe(g_tts_session,p,3);
-    auto owned=binding_copy_segments(r);crispasr_session_result_free(r);
+    auto owned=binding_take_segments(r);
     return binding_encode_segments(owned,seconds?100.0:1.0);
 }
+static emscripten::val read_logits() {
+    binding_check_reentry();
+    return binding_encode_transcription(binding_transcribe_logits(g_tts_session, {1,3,5}, "ja"));
+}
 EMSCRIPTEN_BINDINGS(wrapper_probe) {
+    emscripten::function("readLogits",&read_logits);
+    emscripten::function("logitsEnabled",&probe_result_logits_enabled);
     binding_register_session_tasks();
     binding_register_utilities();
     binding_register_analysis();
     binding_register_speaker();
     binding_register_open_options();
     binding_register_registry();
+    binding_register_diarization();
+    binding_register_vad();
     emscripten::function("speakerMode",&probe_speaker_mode);
     emscripten::function("speakerLive",&probe_speaker_live);
     emscripten::function("dbMode",&probe_db_mode);
@@ -65,6 +83,12 @@ EMSCRIPTEN_BINDINGS(wrapper_probe) {
     emscripten::function("probeLive",&probe_live);
     emscripten::function("probeCalls",&probe_calls);
     emscripten::function("registryMode",&probe_registry_mode);
+    emscripten::function("diarizeMode",&probe_diarize_mode);
+    emscripten::function("diarizeCalls",&probe_diarize_calls);
+    emscripten::function("vadExpect",&probe_vad_expect);
+    emscripten::function("vadCalls",&probe_vad_calls);
+    emscripten::function("resultFrees",&probe_result_frees);
+    emscripten::function("resultCountMode",&probe_result_count_mode);
     emscripten::function("probeInvalidFrees",&probe_invalid_frees);
 }
 '''
@@ -150,6 +174,38 @@ require(process.argv[2])().then(m=>{
  for(const mode of [2,4,5]){m.registryMode(mode);rejects(()=>m.registryLookup('foo'));rejects(()=>m.registryBackends());rejects(()=>m.registryDefaultBundle('foo'));rejects(()=>m.cacheDirectory(''));}
  for(const mode of [6,7]){m.registryMode(mode);rejects(()=>m.registryDefaultBundle('foo'));}m.registryMode(0);
  eq(bundle.artifacts[1].filename,'codec.gguf');
+ const diaOpts={method:4,n_threads:2,slice_t0_cs:125,embedder_path:'embed',min_speakers:2,max_speakers:4,num_speakers:3};
+ const gridDia=[{t0:125,t1:175},{t0:200,t1:250}];
+ eq(m.diarizeSegments(pcm,null,gridDia,diaOpts).map(x=>x.speaker),[1,0]);eq(gridDia[0].speaker,undefined);
+ let turns=m.diarizeSegmentsWithTurns(pcm,null,gridDia,diaOpts);eq(turns.turns,[{t0:125,t1:150,speaker:1},{t0:150,t1:250,speaker:0}]);
+ eq(turns.segments[0].t0,125);m.diarizeMode(1);eq(m.diarizeSegmentsWithTurns(pcm,null,gridDia,diaOpts).turns.length,2);
+ for(const mode of [2,3,4,5,6,8]){m.diarizeMode(mode);rejects(()=>m.diarizeSegmentsWithTurns(pcm,null,gridDia,diaOpts));}m.diarizeMode(0);
+ eq(m.diarizeSegments(pcm,new Float32Array([5,3,1]),gridDia,diaOpts)[1].speaker,0);
+ m.diarizeMode(7);eq(m.diarizeSegmentsWithTurns(pcm,null,gridDia,diaOpts).turns,[]);m.diarizeMode(0);
+ const diaCalls=m.diarizeCalls();
+ rejects(()=>m.diarizeSegments(pcm,new Float32Array(2),gridDia,diaOpts));rejects(()=>m.diarizeSegments(pcm,null,[],diaOpts));
+ rejects(()=>m.diarizeSegments(pcm,null,[{t0:1.5,t1:3}],diaOpts));rejects(()=>m.diarizeSegments(pcm,null,[{t0:4,t1:3}],diaOpts));
+ for(const patch of [{method:6},{n_threads:0},{max_speakers:1},{num_speakers:5},{embedder_path:''},{embedder_path:'x\0y'},{slice_t0_cs:NaN},{min_speakers:1.5},{method:3,model_path:''}])
+   rejects(()=>m.diarizeSegments(pcm,null,gridDia,{...diaOpts,...patch}));
+ eq(m.diarizeCalls(),diaCalls);m.diarizeMode(4);rejects(()=>m.diarizeSegments(pcm,null,gridDia,diaOpts));m.diarizeMode(0);
+ eq(m.asrOpenWithOptions('model','foo',load),true);
+ const vadOpts={threshold:.375,min_speech_duration_ms:123,min_silence_duration_ms:456,speech_pad_ms:78,chunk_seconds:9,n_threads:2};
+ let frees=m.resultFrees();m.vadExpect(1);let vad=m.asrTranscribeVad(pcm,16000,'vad','ja',vadOpts);
+ eq(vad[0].t0,123);eq(Array.from(vad[0].tokens[0].rawText),[0xe6,0x97]);eq(m.resultFrees(),frees+1);
+ m.vadExpect(1);for(const mode of [1,2,3,4]){m.resultCountMode(mode);frees=m.resultFrees();rejects(()=>m.asrTranscribeVad(pcm,16000,'vad','ja',vadOpts));eq(m.resultFrees(),frees+1);}m.resultCountMode(0);
+ m.vadExpect(2);eq(m.asrTranscribeVad(pcm,16000,'vad','ja',null).length,1);
+ m.vadExpect(0);eq(m.asrTranscribeVad(pcm,16000,'vad','',null).length,1);
+ const vadCalls=m.vadCalls();
+ for(const patch of [{threshold:NaN},{threshold:2},{threshold:'0.5'},{min_speech_duration_ms:-1},{min_silence_duration_ms:-1},{speech_pad_ms:-1},{chunk_seconds:-1},{n_threads:0}])
+   rejects(()=>m.asrTranscribeVad(pcm,16000,'vad','ja',{...vadOpts,...patch}));
+ rejects(()=>m.asrTranscribeVad(pcm,16000,'vad','ja',[]));rejects(()=>m.asrTranscribeVad(pcm,0,'vad','ja',vadOpts));
+ rejects(()=>m.asrTranscribeVad(pcm,16000,'vad\0x','ja',vadOpts));eq(m.vadCalls(),vadCalls);
+ m.vadExpect(3);rejects(()=>m.asrTranscribeVad(pcm,16000,'vad','ja',vadOpts));
+ eq(m.asrOpenWithOptions('missing','foo',load),false);rejects(()=>m.asrTranscribeVad(pcm,16000,'vad','ja',vadOpts));
+ for(const mode of [1,2,3,4,5,6,7]){m.resultCountMode(mode);frees=m.resultFrees();rejects(()=>m.readLogits());eq(m.resultFrees(),frees+1);eq(m.logitsEnabled(),0);}
+ m.resultCountMode(8);const transcription=m.readLogits();eq(transcription.logits.nFrames,1);eq(transcription.logits.nVocab,2);eq(Array.from(transcription.logits.data),[-1,2]);eq(transcription.segments[0].t0,1.23);eq(m.logitsEnabled(),0);
+ const U8=global.Uint8Array;try{global.Uint8Array=function(){throw new Error('encoding failure')};frees=m.resultFrees();rejects(()=>m.readLogits());eq(m.resultFrees(),frees+1);eq(m.logitsEnabled(),0);}finally{global.Uint8Array=U8;}
+ m.resultCountMode(0);eq(m.readLogits().logits,null);eq(transcription.logits.data[1],2);
  console.log('PASS WASM ABI: '+n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
 '''
@@ -161,17 +217,18 @@ class WasmWrapperContract(unittest.TestCase):
             tmp=Path(tmp);objects=[]
             src=(ROOT/'src/crispasr_c_api.cpp').read_text();layouts=[]
             start=src.index('struct crispasr_open_params_v1 {');(tmp/'runtime-open-layout.h').write_text(src[start:src.index('};',start)+2])
+            start=src.index('struct crispasr_vad_abi_opts {');(tmp/'runtime-vad-layout.h').write_text(src[start:src.index('};',start)+2])
             for name in ['crispasr_diarize_seg_abi','crispasr_diarize_turn_abi','crispasr_diarize_opts_abi']:
                 start=src.index('struct '+name+' {');layouts.append(src[start:src.index('};',start)+2])
             (tmp/'runtime-abi-layout.h').write_text('\n'.join(layouts))
-            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry']:
+            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry','wrapper-diarize-arguments']:
                 obj=tmp/(name+'.o');objects.append(str(obj))
-                subprocess.run([EMCC,'-DCRISPASR_PROBE_LITERAL_OPEN_LAYOUT','-DCRISPASR_PROBE_WASM_OPEN','-I'+str(tmp),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
+                subprocess.run([EMCC,'-DCRISPASR_PROBE_WASM_DIA','-DCRISPASR_PROBE_VAD_ARGUMENTS','-DCRISPASR_PROBE_LITERAL_OPEN_LAYOUT','-DCRISPASR_PROBE_WASM_OPEN','-I'+str(tmp),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
             # Unexercised registration dependencies abort if accidentally called.
             # Concrete public-header probes supply every operation asserted below.
-            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry']
+            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry','wrapper-diarize-arguments']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
-            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_registry.h'])
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_transcription.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_registry.h','session_diarization.h','session_vad.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
             headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
             unused=[]
