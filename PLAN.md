@@ -27,8 +27,10 @@ or Japanese Parakeet/Canary subword performance.
 Frozen character-performance source `567fc431e333d3cf1e2cb895f3d2895364e54328`
 is on `diag/217-ctc-workspace-20261018`. Heavy CPU `39112822169` runs
 `tools/ci-heavy/alignment_ctc_bench.py --large` with NumPy. CI `39112823566`
-and lint `39112825190` were also dispatched for that source; audit terminal
-results and verify source pins before accepting any hosted result. It compiles only our model-free kernel
+was also dispatched for that source and is retained while progressing.
+Queued lint `39112825190` was superseded/cancelled in favor of combined-source
+lint below. Audit terminal results and verify source pins before accepting any
+hosted result. It compiles only our model-free kernel
 and frozen own baseline; no external models/code are needed. Audit all receipt
 output parity, kernel-time distributions, actual allocation counts and tracked
 peak heap, source hashes, compiler/CPU/flags, and the independent test suite.
@@ -47,8 +49,10 @@ centisecond bounds. No encoder, tokenizer or valid-path DP arithmetic changes;
 this is a correctness fix, not a Japanese Parakeet speedup. CTest/ordinary CI
 run this suite. The independent character-kernel source remains unchanged.
 
-Audit the combined source's full-library CI/lint separately from the immutable
-character-only performance source. Do not treat a synthetic token fixture as
+Frozen combined source `deaf9c010acce1410f470d6df421d0f77ff16be2` is on
+`diag/217-alignment-contract-20261018`: CI `39113844983` and lint
+`39113846749` are dispatched and queued. Audit this combined source separately
+from the immutable character-only performance source. Do not treat a synthetic token fixture as
 proof of long-form model accuracy. Character-path nonfinite-input policy still
 follows its frozen baseline; any future policy unification needs separate
 valid-output and error-contract acceptance, not a concealed speed change.
