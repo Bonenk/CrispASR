@@ -262,3 +262,24 @@ public-header callbacks and emit borrowed buffers which are immediately mutated.
 They also exercise foreign-thread emission, stale userdata, replacement/close,
 callback and encoder errors, backlog limits and popped-event cleanup. This does
 not prove each backend emits every hook; real-model event acceptance is in PLAN.
+
+
+## Legacy Rust and Java Whisper operations
+
+Rust `CrispASR::new` and `transcribe_pcm[_with_strategy/_with_options]` retain
+source-compatible sys function names that link to native pointer-parameter
+exports. The deprecated path remains deprecated; the symbol repair does not
+change its native exception-safety limitations. The literal-header Go/Rust
+fixture exercises initialization, copied segments, VAD plus tinydiarize, native
+failure/null parameters, input rejection and parameter/context cleanup.
+
+Java `WhisperCpp.getContextDefaultParams/getFullDefaultParams` return independent
+Java-owned copies. `initContext` forwards GPU/flash/device and DTW flags,
+preset/top count, custom heads and memory size through native pointer parameters.
+Custom heads are snapshotted for model lifetime. `fullTranscribe` and
+`fullTranscribeWithTime` use the pointer inference export; close/reinitialization
+retire old ownership and reject overlap/re-entry, including foreign callback
+threads. `JavaLegacyWrapperContract` compiles the actual legacy classes against
+`build_legacy_wrapper_probe.py`, rather than counting raw JNA declarations.
+The legacy full-params layout requires a 64-bit JVM; broader token/parallel
+features and actual-model/platform acceptance remain in PLAN.md.

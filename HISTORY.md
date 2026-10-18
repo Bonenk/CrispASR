@@ -1,3 +1,42 @@
+## Rust legacy Whisper ABI and Java context/parameter repairs — 2026-10-18
+
+Rust's deprecated `CrispASR` path declared pointer arguments but linked the native
+struct-by-value initializer and inference symbols. A public-header fixture
+reproduced an abort at the wrong initializer. The existing Rust sys names now
+link to native `*_by_ref` exports. Null native parameters, invalid sample counts,
+strategy/VAD settings and NUL-containing VAD paths return errors. VAD and
+tinydiarize can be enabled together; the previous VAD branch skipped tinydiarize.
+Parameters and the VAD path remain owned through inference and are released on
+success/failure. Negative native segment counts are rejected. Deprecation and
+the direct legacy API's native exception-safety limitations remain unchanged.
+
+Java's `WhisperCpp` leaked native defaults, copied only two context flags, and
+left freed context pointers live. Defaults are now independent Java-owned
+copies, with temporary C++ allocations freed through matching native destructors.
+Context initialization forwards GPU/device/flash and every exposed DTW option;
+custom heads are copied for the model lifetime. Native initialization failure
+retires the old context, while option/allocation failure preserves it. Close is
+idempotent and reinitialization is supported. Both decode methods use the
+pointer inference export, reject invalid native counts and retain parameters and
+callbacks through GC. Short operation leases reject overlap and re-entry from
+both ordinary and foreign callback threads without holding a Java monitor
+through native execution. Legacy full-parameter decoding explicitly requires a
+64-bit JVM until its size_t fields have a target-tested layout.
+
+A forced non-UTF-8 JNA default reproduced broken legacy transcription. Library
+strings and full-parameter strings now use explicit UTF-8. Fixtures verify
+non-ASCII prompts and copied text under both default and ISO-8859-1 settings.
+Separate regressions reproduced the native-default leak and dropped DTW options.
+
+Validation: **34 Go tests, 29 Rust tests plus five doctests**, and the existing
+**224 Java assertions plus 44 legacy assertions in each of two encoding modes**
+pass. Shared native-fixture checks also pass **four Python tests, 35 C# legacy
+assertions and 37 Dart tests with a clean analyzer**. These compiled public-header
+probes establish ABI/options/ownership transport; actual models and target
+platforms remain pending in PLAN.md. The preceding WASM event checkpoint
+`6eda4a9da2c867fcbda2262f2cd867dd0c6e5915` passed all six hosted binding contract
+jobs before this checkpoint.
+
 ## WASM retained ASR event callbacks — 2026-10-18
 
 New `asrSetSegmentCallback`, `asrSetTokenCallback` and

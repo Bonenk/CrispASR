@@ -723,8 +723,21 @@ struct by value. Use `crispasr_transcribe_parallel_by_ref` for parallel inferenc
 with progress tracking. Retain the language/prompt/VAD-model string storage
 until inference returns, and free opaque parameter objects on every path.
 `tests/build_legacy_wrapper_probe.py` compiles the literal runtime setters and
-parallel/token adapters against the real Whisper structs; Python, C# and Dart
-exercise these adapters with a model-free decoder.
+parallel/token adapters against the real Whisper structs; Python, C#, Dart and
+Java exercise these adapters with a model-free decoder. Rust's legacy opaque
+pointer declarations preserve their Rust names but link to the actual native
+`*_by_ref` symbols; the Go/Rust fixture keeps the wrong by-value initializer as
+an aborting trap and exercises the deprecated Rust path too.
+
+Java native defaults must be copied into Java-owned parameter storage, then
+freed with the matching native destructor; never `Native.free()` a C++-allocated
+parameter object. Forward every context option, deep-copy custom heads for the
+loaded model, and retain callback functions through inference and GC. A short
+operation lease must reject close/re-entry across callback threads without
+holding the Java monitor throughout native execution. Test foreign-thread
+callbacks, repeated close, failed initialization and literal native struct sizes.
+Legacy Java full-params layout remains a deliberate 64-bit-only exclusion until
+its size_t fields have a target-tested native layout.
 
 `crispasr_parakeet_transcribe` takes an **int64 centisecond offset** as its fourth
 argument. It has no language-string argument. Use unified session language hints

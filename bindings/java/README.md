@@ -1,6 +1,6 @@
-# Java JNI bindings for CrispASR
+# Java JNA bindings for CrispASR
 
-This package provides Java JNI bindings for crispasr. They have been tested on:
+This package provides Java JNA bindings for crispasr. They have been tested on:
 
   * <strike>Darwin (OS X) 12.6 on x64_64</strike>
   * Ubuntu on x86_64
@@ -8,7 +8,7 @@ This package provides Java JNI bindings for crispasr. They have been tested on:
 
 The "low level" bindings are in `WhisperCppJnaLibrary`. The most simple usage is as follows:
 
-JNA will attempt to load the `whispercpp` shared library from:
+JNA will attempt to load the `crispasr` shared library from:
 
 - jna.library.path
 - jna.platform.library
@@ -162,3 +162,27 @@ copy /y ..\..\build\bin\Release\crispasr.dll build\generated\resources\main\win3
 ## License
 
 The license for the Java bindings is the same as the license for the rest of the crispasr project, which is the MIT License. See the `LICENSE` file for more details.
+
+
+## Legacy parameter and context ownership
+
+`WhisperCpp` passes context and decoding parameters through native pointer
+exports. Context initialization forwards GPU/flash/device and every exposed DTW
+setting, including custom heads and memory size. Custom head arrays are copied
+and kept alive by the loaded model; later configuration changes affect a future
+initialization. Native failure during replacement leaves the model closed;
+invalid options or parameter-allocation failure preserve the existing context.
+
+`getContextDefaultParams` and `getFullDefaultParams` return independent Java-owned
+objects. Do not free their storage with `Native.free` or native parameter-free
+functions. Temporary native defaults are freed internally with matching native
+destructors. Repeated model close is harmless, and explicit reinitialization is
+supported. Decoding after close fails. Native strings use UTF-8.
+
+Overlapping context operations and close/reinitialization from a native callback
+raise `IllegalStateException`. Callback functions and parameter storage stay
+reachable through native inference, including foreign callback threads. Do not
+mutate the parameter object or its borrowed pointer fields while inference runs.
+The legacy full-parameter struct requires a 64-bit JVM; 32-bit legacy decode is
+explicitly refused. Actual target/model validation remains in the repository
+PLAN.md, alongside the generic `CrispasrSession` API and remaining callable audit.

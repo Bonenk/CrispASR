@@ -1042,6 +1042,14 @@ int crispasr_session_set_speaker_identity(crispasr_session* s, const char* id) {
     } while (0)
 
 
+// Literal public-header legacy Rust transport; by-value entry remains a trap.
+static int rust_legacy_contexts;
+int probe_rust_legacy_contexts(void) {
+    return rust_legacy_contexts;
+}
+static whisper_context* rust_legacy_context(void) {
+    return (whisper_context*)0x100000003ULL;
+}
 // whisper legacy stubs
 #include "wrapper-whisper-go-params.c"
 struct whisper_context* whisper_init_from_file_with_params(const char* p, struct whisper_context_params pr) {
@@ -1049,44 +1057,76 @@ struct whisper_context* whisper_init_from_file_with_params(const char* p, struct
     return NULL;
 }
 struct whisper_context_params* whisper_context_default_params_by_ref(void) {
-    STUB_ABORT();
-    return NULL;
+    if (probe_mode == 10)
+        return NULL;
+    struct whisper_context_params* p = tracked_alloc(sizeof(*p));
+    if (p) {
+        memset(p, 0, sizeof(*p));
+        p->use_gpu = true;
+    }
+    return p;
 }
 void whisper_free(struct whisper_context* ctx) {
-    STUB_ABORT();
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    --rust_legacy_contexts;
 }
 void whisper_free_params(struct whisper_full_params* p) {
-    STUB_ABORT();
+    tracked_free(p);
 }
 void whisper_free_context_params(struct whisper_context_params* p) {
-    STUB_ABORT();
+    tracked_free(p);
 }
 int whisper_full(struct whisper_context* ctx, struct whisper_full_params p, const float* s, int n) {
     return probe_legacy_full(ctx, p, s, n);
 }
 struct whisper_full_params* whisper_full_default_params_by_ref(enum whisper_sampling_strategy s) {
-    STUB_ABORT();
-    return NULL;
+    if (probe_mode == 11)
+        return NULL;
+    struct whisper_full_params* p = tracked_alloc(sizeof(*p));
+    if (p) {
+        memset(p, 0, sizeof(*p));
+        p->strategy = s;
+        p->language = "de";
+    }
+    return p;
+}
+int whisper_full_by_ref(whisper_context* ctx, struct whisper_full_params* p, const float* samples, int n) {
+    ++probe_calls;
+    if (ctx != rust_legacy_context() || !p || n != 3 || samples[0] != 1 || samples[1] != 3 || samples[2] != 5)
+        return -9;
+    if (p->strategy != CRISPASR_SAMPLING_GREEDY && p->strategy != CRISPASR_SAMPLING_BEAM_SEARCH)
+        return -8;
+    if (p->vad &&
+        (!p->tdrz_enable || !p->vad_model_path || strcmp(p->vad_model_path, "vad") || p->vad_params.threshold != .7f ||
+         p->vad_params.min_speech_duration_ms != 300 || p->vad_params.min_silence_duration_ms != 200))
+        return -7;
+    return probe_mode == 2 ? -1 : 0;
 }
 int whisper_full_n_segments(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    return probe_mode == 12 ? -1 : probe_mode == 1 ? 0 : 1;
 }
 const char* whisper_full_get_segment_text(struct whisper_context* ctx, int i) {
-    STUB_ABORT();
-    return "";
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    return "日";
 }
 int64_t whisper_full_get_segment_t0(struct whisper_context* ctx, int i) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    return 100;
 }
 int64_t whisper_full_get_segment_t1(struct whisper_context* ctx, int i) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    return 200;
 }
 float whisper_full_get_segment_no_speech_prob(struct whisper_context* ctx, int i) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context())
+        STUB_ABORT();
+    return .125f;
 }
 int whisper_full_lang_id(struct whisper_context* ctx) {
     STUB_ABORT();
@@ -1381,26 +1421,29 @@ void crispasr_params_set_initial_prompt(struct whisper_full_params* p, const cha
     STUB_ABORT();
 }
 void crispasr_params_set_vad(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
+    p->vad = v != 0;
 }
 void crispasr_params_set_vad_model_path(struct whisper_full_params* p, const char* pr) {
-    STUB_ABORT();
+    p->vad_model_path = pr;
 }
 void crispasr_params_set_vad_threshold(struct whisper_full_params* p, float t) {
-    STUB_ABORT();
+    p->vad_params.threshold = t;
 }
 void crispasr_params_set_vad_min_speech_ms(struct whisper_full_params* p, int ms) {
-    STUB_ABORT();
+    p->vad_params.min_speech_duration_ms = ms;
 }
 void crispasr_params_set_vad_min_silence_ms(struct whisper_full_params* p, int ms) {
-    STUB_ABORT();
+    p->vad_params.min_silence_duration_ms = ms;
 }
 void crispasr_params_set_tdrz(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
+    p->tdrz_enable = v != 0;
 }
 struct whisper_context* whisper_init_from_file_with_params_by_ref(const char* p, struct whisper_context_params* pr) {
-    STUB_ABORT();
-    return NULL;
+    ++probe_calls;
+    if (!p || !pr || !pr->use_gpu || strcmp(p, "fail") == 0)
+        return NULL;
+    ++rust_legacy_contexts;
+    return rust_legacy_context();
 }
 int whisper_score_texts(struct whisper_context* ctx, const float* s, int n, const char* l, const char* pr,
                         const char** t, int nt, float* lp, int* ntok, int ntr) {

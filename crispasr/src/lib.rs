@@ -67,6 +67,9 @@ impl CrispASR {
     pub fn new(model_path: &str) -> Result<Self, String> {
         let path = CString::new(model_path).map_err(|e| format!("invalid path: {e}"))?;
         let cparams = unsafe { crispasr_sys::whisper_context_default_params_by_ref() };
+        if cparams.is_null() {
+            return Err("could not allocate context parameters".into());
+        }
         let ctx =
             unsafe { crispasr_sys::whisper_init_from_file_with_params(path.as_ptr(), cparams) };
         unsafe { crispasr_sys::whisper_free_context_params(cparams) };
@@ -98,52 +101,66 @@ impl CrispASR {
         )
     }
 
-    /// Transcribe with full option control — VAD, tinydiarize, and future
-    /// knobs as they land upstream. Safe against older dylibs: setters
-    /// that the loaded library doesn't expose are no-ops.
+    /// Transcribe with VAD and tinydiarize options. Requires the native
+    /// pointer-parameter and option-helper exports from the matching library.
     pub fn transcribe_pcm_with_options(
         &self,
         pcm: &[f32],
         opts: &TranscribeOptions,
     ) -> Result<Vec<Segment>, String> {
+        if pcm.is_empty() || pcm.len() > i32::MAX as usize {
+            return Err("nonempty PCM with an int32 sample count required".into());
+        }
         let strategy = opts
             .strategy
             .unwrap_or(crispasr_sys::CRISPASR_SAMPLING_GREEDY);
+        if strategy != crispasr_sys::CRISPASR_SAMPLING_GREEDY
+            && strategy != crispasr_sys::CRISPASR_SAMPLING_BEAM_SEARCH
+        {
+            return Err("unsupported sampling strategy".into());
+        }
+        let vad_path = if opts.vad {
+            if opts
+                .vad_threshold
+                .is_some_and(|t| !t.is_finite() || !(0.0..=1.0).contains(&t))
+                || opts.vad_min_speech_ms.is_some_and(|n| n < 0)
+                || opts.vad_min_silence_ms.is_some_and(|n| n < 0)
+            {
+                return Err("invalid VAD options".into());
+            }
+            opts.vad_model_path
+                .as_ref()
+                .map(|s| CString::new(s.as_str()))
+                .transpose()
+                .map_err(|e| format!("invalid VAD path: {e}"))?
+        } else {
+            None
+        };
         let params = unsafe { crispasr_sys::whisper_full_default_params_by_ref(strategy) };
-
-        // VAD
-        if opts.vad {
-            unsafe {
+        if params.is_null() {
+            return Err("could not allocate transcription parameters".into());
+        }
+        unsafe {
+            if opts.vad {
                 crispasr_sys::crispasr_params_set_vad(params, 1);
                 if let Some(t) = opts.vad_threshold {
                     crispasr_sys::crispasr_params_set_vad_threshold(params, t);
                 }
-                if let Some(ms) = opts.vad_min_speech_ms {
-                    crispasr_sys::crispasr_params_set_vad_min_speech_ms(params, ms);
+                if let Some(n) = opts.vad_min_speech_ms {
+                    crispasr_sys::crispasr_params_set_vad_min_speech_ms(params, n);
                 }
-                if let Some(ms) = opts.vad_min_silence_ms {
-                    crispasr_sys::crispasr_params_set_vad_min_silence_ms(params, ms);
+                if let Some(n) = opts.vad_min_silence_ms {
+                    crispasr_sys::crispasr_params_set_vad_min_silence_ms(params, n);
                 }
-            }
-            // Keep the CString alive until after whisper_full returns.
-            let vad_path_cstr = opts
-                .vad_model_path
-                .as_ref()
-                .map(|s| CString::new(s.as_str()).ok())
-                .flatten();
-            if let Some(cs) = &vad_path_cstr {
-                unsafe {
-                    crispasr_sys::crispasr_params_set_vad_model_path(params, cs.as_ptr());
+                if let Some(path) = &vad_path {
+                    crispasr_sys::crispasr_params_set_vad_model_path(params, path.as_ptr());
                 }
             }
-            // vad_path_cstr stays in scope for the whisper_full call below.
-            return self.run_full(pcm, params, vad_path_cstr);
+            if opts.tdrz {
+                crispasr_sys::crispasr_params_set_tdrz(params, 1);
+            }
         }
-        if opts.tdrz {
-            unsafe { crispasr_sys::crispasr_params_set_tdrz(params, 1) };
-        }
-
-        self.run_full(pcm, params, None)
+        self.run_full(pcm, params, vad_path)
     }
 
     fn run_full(
@@ -161,6 +178,9 @@ impl CrispASR {
         }
 
         let n = unsafe { crispasr_sys::whisper_full_n_segments(self.ctx) };
+        if n < 0 {
+            return Err("invalid native segment count".into());
+        }
         let mut segments = Vec::with_capacity(n as usize);
 
         for i in 0..n {

@@ -30,18 +30,19 @@ public class WhisperAheads extends Structure {
      * Create alignment heads from an array of WhisperAhead objects
      */
     public void setHeads(WhisperAhead[] aheadsArray) {
-        this.n_heads = aheadsArray.length;
-
-        int structSize = aheadsArray[0].size();
-        Memory mem = new Memory(structSize * aheadsArray.length);
-
+        if (aheadsArray == null) throw new IllegalArgumentException("Alignment heads required");
+        if (aheadsArray.length > Integer.MAX_VALUE / 8) throw new IllegalArgumentException("Too many alignment heads");
+        if (aheadsArray.length == 0) { n_heads = 0; heads = null; return; }
+        for (WhisperAhead head : aheadsArray)
+            if (head == null) throw new IllegalArgumentException("Null alignment head");
+        Memory owned = new Memory(8L * aheadsArray.length);
         for (int i = 0; i < aheadsArray.length; i++) {
-            aheadsArray[i].write();
-            byte[] buffer = aheadsArray[i].getPointer().getByteArray(0, structSize);
-            mem.write(i * structSize, buffer, 0, buffer.length);
+            owned.setInt(i * 8L, aheadsArray[i].n_text_layer);
+            owned.setInt(i * 8L + 4, aheadsArray[i].n_head);
         }
-
-        this.heads = mem;
+        // Publish only after validation and copying succeed.
+        n_heads = aheadsArray.length;
+        heads = owned;
     }
 
     @Override

@@ -22,20 +22,16 @@ Recommended implementation order and concrete acceptance:
    Record bulk/superset equivalents, retired refusing stubs and deliberate
    platform exclusions separately. TitaNet and roster DB now have reviewed
    public paths in all eight; extend the ledger beyond those families.
-2. **Legacy Whisper controls.** First fix two verified high-level paths:
-   - Rust `crispasr-sys/src/lib.rs` declares pointer parameters for
-     `whisper_init_from_file_with_params` and `whisper_full`, while those native
-     symbols take structs by value. Route the legacy wrapper through the real
-     `*_by_ref` exports and add a literal-header ABI/operation regression; its
-     deprecation does not make the current signature mismatch acceptable.
-   - Java `WhisperCpp.initContextImpl` copies only `use_gpu` and `flash_attn`
-     into newly allocated native defaults, ignoring GPU-device/DTW settings.
-     Forward the remaining public options through pointer-safe native adapters,
-     free each default-params allocation, and make `freeContext` retire `ctx`
-     before native free (it currently leaves the pointer set). Probe repeated
-     close/reinitialization, initialization failure and actual DTW forwarding.
-   Then extend the cross-language inventory. C#/Python/Dart have pointer-safe parameter,
-   DTW and parallel probes; inspect Go's compiled parameter routes and finish
+2. **Legacy Whisper controls.** Rust legacy pointer-symbol routing and Java
+   context/parameter ownership and option forwarding now have operation probes;
+   completed repairs are in HISTORY.md. Validate actual Whisper models and
+   supported native platforms, including callback threads and failed reinitialization.
+   Java's legacy full-params struct is still 64-bit only: 32-bit decode refuses
+   explicitly until size_t/pointer layouts are repaired and exercised on a target
+   runtime. Preserve the existing Java long-valued public options when adding a
+   pointer-width-aware native layout. Continue auditing mutable parameter objects
+   and caller-owned pointer arrays/strings during callbacks and concurrent calls.
+   C#/Python/Dart have pointer-safe parameter, DTW and parallel probes; inspect Go's compiled parameter routes and finish
    Java/Rust/Ruby/WASM callable gaps. Cover scalar setters, language detection,
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
@@ -105,13 +101,12 @@ Recommended implementation order and concrete acceptance:
    Review real CI logs before acceptance. No release from fixture success or
    queued jobs.
 
-The stream checkpoint `f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all
-six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625865),
-including Ruby's finalizer regression. Its
-[full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625808)
-was still pending at inspection. Retained ASR event changes require their own
-hosted results for the actual tip. Older source checkpoints establish only their
-recorded component contracts, not full current-wrapper/model acceptance.
+The ASR event checkpoint `6eda4a9da2c867fcbda2262f2cd867dd0c6e5915` passed all
+six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39151650142).
+The [full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39151650113)
+and actual-model/platform gates still require review. Subsequent legacy
+Rust/Java changes require their own hosted results for the actual tip.
+Older source checkpoints establish only their recorded component contracts.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.

@@ -17,6 +17,8 @@ SYSTEM_LIBS={'stdc++','c++','m','c','dl','pthread','rt','atomic','gcc','gcc_s'}
 @unittest.skipUnless(TOOLS and sys.platform.startswith('linux'),'Linux C/Go/Rust toolchains required')
 class GoRustWrapperContract(unittest.TestCase):
     def test_native_metadata_tasks_ownership_and_callbacks(self):
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         with tempfile.TemporaryDirectory(prefix='go-rust-abi-') as directory:
             tmp=Path(directory);lib=tmp/'src';lib.mkdir()
             runtime=(ROOT/'src/crispasr_c_api.cpp').read_text()

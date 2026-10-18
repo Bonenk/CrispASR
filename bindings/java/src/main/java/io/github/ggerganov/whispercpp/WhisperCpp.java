@@ -19,9 +19,13 @@ import java.util.List;
 public class WhisperCpp implements AutoCloseable {
     private WhisperCppJnaLibrary lib = WhisperCppJnaLibrary.instance;
     private Pointer ctx = null;
-    private Pointer paramsPointer = null;
-    private Pointer greedyParamsPointer = null;
-    private Pointer beamParamsPointer = null;
+    private WhisperContextParams.ByValue contextParamsOwner;
+    private boolean operation;
+    private synchronized void beginOperation() {
+        if (operation) throw new IllegalStateException("Whisper context is in use");
+        operation = true;
+    }
+    private synchronized void endOperation() { operation = false; }
 
     public File modelDir() {
         String modelDirPath = System.getenv("XDG_CACHE_HOME");
@@ -48,125 +52,108 @@ public class WhisperCpp implements AutoCloseable {
     }
 
     private void initContextImpl(String modelPath, WhisperContextParams.ByValue params) throws FileNotFoundException {
-        if (ctx != null) {
-            lib.whisper_free(ctx);
-        }
-
-        if (!modelPath.contains("/") && !modelPath.contains("\\")) {
-            if (!modelPath.endsWith(".bin")) {
-                modelPath = "ggml-" + modelPath.replace("-", ".") + ".bin";
+        if (modelPath == null || modelPath.isEmpty() || modelPath.indexOf('\0') >= 0)
+            throw new IllegalArgumentException("Nonempty model path without NUL required");
+        if (params == null) throw new IllegalArgumentException("Context parameters required");
+        beginOperation();
+        try {
+            WhisperContextParams.ByValue snapshot = params.snapshot();
+            if (!modelPath.contains("/") && !modelPath.contains("\\")) {
+                if (!modelPath.endsWith(".bin")) modelPath = "ggml-" + modelPath.replace("-", ".") + ".bin";
+                modelPath = new File(modelDir(), modelPath).getAbsolutePath();
             }
-
-            modelPath = new File(modelDir(), modelPath).getAbsolutePath();
-        }
-
-        // Use the _by_ref variant to avoid JNA struct-by-value alignment
-        // issues on Windows x64 (MSVC padding differs from JNA's layout
-        // for structs containing size_t + pointer members like whisper_aheads).
-        // Write user settings into the native-allocated struct via the pointer.
-        Pointer paramsPtr = lib.whisper_context_default_params_by_ref();
-        paramsPtr.setByte(0, params.use_gpu != null ? params.use_gpu.byteValue() : 1);
-        paramsPtr.setByte(1, params.flash_attn != null ? params.flash_attn.byteValue() : 1);
-        ctx = lib.whisper_init_from_file_with_params_by_ref(modelPath, paramsPtr);
-
-        if (ctx == null) {
-            throw new FileNotFoundException(modelPath);
-        }
+            Pointer nativeParams = lib.whisper_context_default_params_by_ref();
+            if (nativeParams == null) throw new IllegalStateException("Context parameter allocation failed");
+            try {
+                snapshot.writeNative(nativeParams);
+                freeContext();
+                ctx = lib.whisper_init_from_file_with_params_by_ref(modelPath, nativeParams);
+                if (ctx == null) throw new FileNotFoundException(modelPath);
+                contextParamsOwner = snapshot;
+            } finally {
+                lib.whisper_free_context_params(nativeParams);
+            }
+        } finally { endOperation(); }
     }
 
-    /**
-     * Provides default params which can be used with `whisper_init_from_file_with_params()` etc.
-     * Returns a ByValue instance to ensure proper parameter passing to native code.
-     */
+    /** Return an independent Java-owned copy of native context defaults. */
     public WhisperContextParams.ByValue getContextDefaultParams() {
-        WhisperContextParams.ByValue valueParams = new WhisperContextParams.ByValue(
-            lib.whisper_context_default_params_by_ref());
-        valueParams.read();
-        return valueParams;
+        Pointer pointer = lib.whisper_context_default_params_by_ref();
+        if (pointer == null) throw new IllegalStateException("Context parameter allocation failed");
+        try { return WhisperContextParams.readNative(pointer); }
+        finally { lib.whisper_free_context_params(pointer); }
     }
-    
-    /**
-     * Provides default params which can be used with `whisper_full()` etc.
-     * Because this function allocates memory for the params, the caller must call either:
-     * - call `whisper_free_params()`
-     * - `Native.free(Pointer.nativeValue(pointer));`
-     *
-     * @param strategy - GREEDY
-     */
+
+    /** Return Java-owned decoding defaults; never free these with Native.free(). */
     public WhisperFullParams.ByValue getFullDefaultParams(WhisperSamplingStrategy strategy) {
-        Pointer pointer;
-
-        // whisper_full_default_params_by_ref allocates memory which we need to delete, so only create max 1 pointer for each strategy.
-        if (strategy == WhisperSamplingStrategy.CRISPASR_SAMPLING_GREEDY) {
-            if (greedyParamsPointer == null) {
-                greedyParamsPointer = lib.whisper_full_default_params_by_ref(strategy.ordinal());
-            }
-            pointer = greedyParamsPointer;
-        } else {
-            if (beamParamsPointer == null) {
-                beamParamsPointer = lib.whisper_full_default_params_by_ref(strategy.ordinal());
-            }
-            pointer = beamParamsPointer;
-        }
-
-        WhisperFullParams.ByValue params = new WhisperFullParams.ByValue(pointer);
-        params.read();
-        return params;
+        // The public legacy full-params structure contains 64-bit size_t fields.
+        // Generic CrispasrSession is the supported route on 32-bit Java runtimes.
+        if (Native.SIZE_T_SIZE != 8) throw new UnsupportedOperationException("Legacy full parameters require a 64-bit runtime");
+        if (strategy == null) throw new IllegalArgumentException("Sampling strategy required");
+        Pointer pointer = lib.whisper_full_default_params_by_ref(strategy.ordinal());
+        if (pointer == null) throw new IllegalStateException("Decoding parameter allocation failed");
+        try {
+            WhisperFullParams.ByValue out = new WhisperFullParams.ByValue();
+            out.getPointer().write(0, pointer.getByteArray(0, out.size()), 0, out.size());
+            out.read();
+            return out;
+        } finally { lib.whisper_free_params(pointer); }
     }
 
     @Override
     public void close() {
-        freeContext();
-        freeParams();
-        System.out.println("Whisper closed");
+        beginOperation();
+        try { freeContext(); }
+        finally { endOperation(); }
     }
 
     private void freeContext() {
-        if (ctx != null) {
-            lib.whisper_free(ctx);
-        }
-    }
-
-    private void freeParams() {
-        if (paramsPointer != null) {
-            Native.free(Pointer.nativeValue(paramsPointer));
-            paramsPointer = null;
-        }
-        if (greedyParamsPointer != null) {
-            Native.free(Pointer.nativeValue(greedyParamsPointer));
-            greedyParamsPointer = null;
-        }
-        if (beamParamsPointer != null) {
-            Native.free(Pointer.nativeValue(beamParamsPointer));
-            beamParamsPointer = null;
+        Pointer old = ctx;
+        ctx = null;
+        try { if (old != null) lib.whisper_free(old); }
+        finally {
+            java.lang.ref.Reference.reachabilityFence(contextParamsOwner);
+            contextParamsOwner = null;
         }
     }
 
     /**
      * Run the entire model: PCM -&gt; log mel spectrogram -&gt; encoder -&gt; decoder -&gt; text.
-     * Not thread safe for same context
+     * Overlap and callback re-entry on the same context are rejected.
+     * Do not mutate the parameter object or its borrowed pointer fields during inference.
      * Uses the specified decoding strategy to obtain the text.
      */
     public String fullTranscribe(WhisperFullParams.ByValue whisperParams, float[] audioData) throws IOException {
-        if (ctx == null) {
-            throw new IllegalStateException("Model not initialised");
+        beginOperation();
+        try {
+            if (ctx == null) {
+                throw new IllegalStateException("Model not initialised");
+            }
+
+            if (whisperParams == null || audioData == null || audioData.length == 0)
+                throw new IllegalArgumentException("Parameters and nonempty PCM required");
+            if (Native.SIZE_T_SIZE != 8) throw new UnsupportedOperationException("Legacy full parameters require a 64-bit runtime");
+            whisperParams.write();
+            if (lib.whisper_full_by_ref(ctx, whisperParams.getPointer(), audioData, audioData.length) != 0) {
+                throw new IOException("Failed to process audio");
+            }
+
+            int nSegments = lib.whisper_full_n_segments(ctx);
+            if (nSegments < 0) throw new IOException("Invalid native segment count");
+
+            StringBuilder str = new StringBuilder();
+
+            for (int i = 0; i < nSegments; i++) {
+                String text = lib.whisper_full_get_segment_text(ctx, i);
+                str.append(text);
+            }
+
+            return str.toString().trim();
+        } finally {
+            java.lang.ref.Reference.reachabilityFence(whisperParams);
+            java.lang.ref.Reference.reachabilityFence(contextParamsOwner);
+            endOperation();
         }
-
-        if (lib.whisper_full(ctx, whisperParams, audioData, audioData.length) != 0) {
-            throw new IOException("Failed to process audio");
-        }
-
-        int nSegments = lib.whisper_full_n_segments(ctx);
-
-        StringBuilder str = new StringBuilder();
-
-        for (int i = 0; i < nSegments; i++) {
-            String text = lib.whisper_full_get_segment_text(ctx, i);
-            System.out.println("Segment:" + text);
-            str.append(text);
-        }
-
-        return str.toString().trim();
     }
 
     /**
@@ -178,25 +165,37 @@ public class WhisperCpp implements AutoCloseable {
      * @throws IOException the io exception
      */
     public List<WhisperSegment> fullTranscribeWithTime(WhisperFullParams.ByValue whisperParams, float[] audioData) throws IOException {
-        if (ctx == null) {
-            throw new IllegalStateException("Model not initialised");
+        beginOperation();
+        try {
+            if (ctx == null) {
+                throw new IllegalStateException("Model not initialised");
+            }
+
+            if (whisperParams == null || audioData == null || audioData.length == 0)
+                throw new IllegalArgumentException("Parameters and nonempty PCM required");
+            if (Native.SIZE_T_SIZE != 8) throw new UnsupportedOperationException("Legacy full parameters require a 64-bit runtime");
+            whisperParams.write();
+            if (lib.whisper_full_by_ref(ctx, whisperParams.getPointer(), audioData, audioData.length) != 0) {
+                throw new IOException("Failed to process audio");
+            }
+
+            int nSegments = lib.whisper_full_n_segments(ctx);
+            if (nSegments < 0) throw new IOException("Invalid native segment count");
+            List<WhisperSegment> segments= new ArrayList<>(nSegments);
+
+            for (int i = 0; i < nSegments; i++) {
+                long t0 = lib.whisper_full_get_segment_t0(ctx, i);
+                String text = lib.whisper_full_get_segment_text(ctx, i);
+                long t1 = lib.whisper_full_get_segment_t1(ctx, i);
+                segments.add(new WhisperSegment(t0,t1,text));
+            }
+
+            return segments;
+        } finally {
+            java.lang.ref.Reference.reachabilityFence(whisperParams);
+            java.lang.ref.Reference.reachabilityFence(contextParamsOwner);
+            endOperation();
         }
-
-        if (lib.whisper_full(ctx, whisperParams, audioData, audioData.length) != 0) {
-            throw new IOException("Failed to process audio");
-        }
-
-        int nSegments = lib.whisper_full_n_segments(ctx);
-        List<WhisperSegment> segments= new ArrayList<>(nSegments);
-
-        for (int i = 0; i < nSegments; i++) {
-            long t0 = lib.whisper_full_get_segment_t0(ctx, i);
-            String text = lib.whisper_full_get_segment_text(ctx, i);
-            long t1 = lib.whisper_full_get_segment_t1(ctx, i);
-            segments.add(new WhisperSegment(t0,t1,text));
-        }
-
-        return segments;
     }
 
 //    public int getTextSegmentCount(Pointer ctx) {

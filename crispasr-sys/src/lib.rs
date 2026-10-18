@@ -1,5 +1,5 @@
 //! Raw FFI bindings to CrispASR.
-//! Mirrors the public C API in include/whisper.h.
+//! Mirrors the public C API in include/crispasr.h and include/crispasr_session.h.
 
 use std::ffi::{c_char, c_float, c_int, c_void};
 
@@ -30,6 +30,8 @@ pub type CrispasrProgressCallback =
 
 extern "C" {
     // --- Lifecycle ---
+    // Preserve the Rust spelling; pointer arguments require the native by-ref ABI.
+    #[link_name = "whisper_init_from_file_with_params_by_ref"]
     pub fn whisper_init_from_file_with_params(
         path: *const c_char,
         params: *const WhisperContextParams,
@@ -41,6 +43,7 @@ extern "C" {
     pub fn whisper_free_context_params(params: *mut WhisperContextParams);
 
     // --- Inference ---
+    #[link_name = "whisper_full_by_ref"]
     pub fn whisper_full(
         ctx: *mut WhisperContext,
         params: *const WhisperFullParams,

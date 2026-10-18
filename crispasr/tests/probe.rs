@@ -889,3 +889,61 @@ fn probe_polled_results_share_metadata_validation_and_cleanup() {
         probe_mode_set(0);
     }
 }
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_pointer_entrypoints_and_owned_parameters() {
+    extern "C" {
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe {
+        probe_reset();
+    }
+    assert!(crispasr::CrispASR::new("bad\0path").is_err());
+    assert!(crispasr::CrispASR::new("fail").is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe { probe_mode_set(10) };
+    assert!(crispasr::CrispASR::new("model").is_err());
+    unsafe { probe_mode_set(0) };
+    let model = crispasr::CrispASR::new("model").expect("legacy pointer init");
+    let pcm = [1., 3., 5.];
+    let segments = model
+        .transcribe_pcm(&pcm)
+        .expect("legacy pointer inference");
+    assert_eq!(segments[0].text, "日");
+    assert_eq!(segments[0].start, 1.);
+    assert_eq!(segments[0].end, 2.);
+    assert_eq!(segments[0].no_speech_prob, 0.125);
+    let options = crispasr::TranscribeOptions {
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    assert!(model.transcribe_pcm_with_options(&pcm, &options).is_ok());
+    assert!(model.transcribe_pcm_with_strategy(&pcm, 1).is_ok());
+    let calls = unsafe { probe_calls_get() };
+    assert!(model.transcribe_pcm(&[]).is_err());
+    assert!(model.transcribe_pcm_with_strategy(&pcm, 2).is_err());
+    let mut bad = options.clone();
+    bad.vad_model_path = Some("bad\0path".into());
+    assert!(model.transcribe_pcm_with_options(&pcm, &bad).is_err());
+    bad = options.clone();
+    bad.vad_threshold = Some(f32::NAN);
+    assert!(model.transcribe_pcm_with_options(&pcm, &bad).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    for mode in [2, 11, 12] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.transcribe_pcm(&pcm).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    unsafe { probe_mode_set(1) };
+    assert!(model.transcribe_pcm(&pcm).unwrap().is_empty());
+    unsafe { probe_mode_set(0) };
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    drop(model);
+    assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+}

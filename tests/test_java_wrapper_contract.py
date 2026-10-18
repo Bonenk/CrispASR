@@ -360,4 +360,22 @@ class JavaAuxWrapperContract(unittest.TestCase):
             print(run.stdout.strip())
 
 
+@unittest.skipUnless(JAVA and JAR and Path(JAR).is_file(), 'Java runtime/compiler and CRISPASR_JNA_JAR required')
+class JavaLegacyWrapperContract(unittest.TestCase):
+    def test_legacy_context_options_owned_parameters_and_repeated_close(self):
+        from build_legacy_wrapper_probe import build
+        with tempfile.TemporaryDirectory(prefix='java-legacy-') as tmp:
+            path=Path(tmp);build(path/'libcrispasr.so')
+            sources=list((ROOT/'bindings/java/src/main/java').rglob('*.java'))
+            javac=shutil.which('javac')
+            compiler=[javac] if javac else [JAVA,'-m','jdk.compiler/com.sun.tools.javac.Main']
+            subprocess.run(compiler+['-encoding','UTF-8','-cp',JAR,'-d',str(path),*map(str,sources),str(ROOT/'tests/fixtures/JavaLegacyProbe.java')],check=True)
+            for encoding in (None,'ISO-8859-1'):
+                run=subprocess.run([JAVA,'-Djna.tmpdir='+str(path),'-Djna.library.path='+str(path),
+                    *(['-Djna.encoding='+encoding] if encoding else []),'-cp',str(path)+os.pathsep+JAR,'JavaLegacyProbe'],
+                    capture_output=True,text=True,timeout=30)
+                self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+                self.assertIn('PASS Java legacy:',run.stdout);print(run.stdout.strip())
+
+
 if __name__=='__main__':unittest.main()

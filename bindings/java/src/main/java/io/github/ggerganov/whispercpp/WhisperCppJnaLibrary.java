@@ -10,7 +10,8 @@ import io.github.ggerganov.whispercpp.params.WhisperFullParams;
 
 public interface WhisperCppJnaLibrary extends Library {
 
-    WhisperCppJnaLibrary instance = Native.load("crispasr", WhisperCppJnaLibrary.class);
+    WhisperCppJnaLibrary instance = Native.load("crispasr", WhisperCppJnaLibrary.class,
+            java.util.Collections.singletonMap(Library.OPTION_STRING_ENCODING, "UTF-8"));
 
     String whisper_print_system_info();
 
@@ -24,9 +25,8 @@ public interface WhisperCppJnaLibrary extends Library {
 
     /**
      * Provides default params which can be used with `whisper_init_from_file_with_params()` etc.
-     * Because this function allocates memory for the params, the caller must call either:
+     * This returns C++-allocated storage; call its matching native destructor:
      * - call `whisper_free_context_params()`
-     * - `Native.free(Pointer.nativeValue(pointer));`
      */
     Pointer whisper_context_default_params_by_ref();
 
@@ -265,9 +265,8 @@ public interface WhisperCppJnaLibrary extends Library {
 
     /**
      * Provides default params which can be used with `whisper_full()` etc.
-     * Because this function allocates memory for the params, the caller must call either:
+     * This returns C++-allocated storage; call its matching native destructor:
      * - call `whisper_free_params()`
-     * - `Native.free(Pointer.nativeValue(pointer));`
      *
      * @param strategy - WhisperSamplingStrategy.value
      */

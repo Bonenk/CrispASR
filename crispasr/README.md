@@ -61,3 +61,19 @@ globally: callers must serialize drain/inference/close until copying finishes.
 
 Word `confidence` preserves native -1 when unavailable. VAD and owned polling
 share the ordinary result reader, including count checks and RAII cleanup.
+
+
+## Legacy Whisper compatibility
+
+The deprecated `CrispASR` type remains available. Its opaque-parameter sys calls
+now link to the native `*_by_ref` exports, preserving the Rust function names.
+Use a matching native library with those exports and the option helpers; missing
+exports cannot be treated as silent no-ops. Empty/oversized PCM, invalid strategy
+or VAD settings, NUL-containing VAD paths and null native parameters return errors.
+VAD and tinydiarize can be enabled together. Native parameter allocations are
+freed on success and native failure; the VAD path remains alive through inference.
+
+Prefer `Session` for backend dispatch and native exception handling. Repairing
+the legacy pointer ABI does not make the deprecated direct Whisper API safe
+against C++ exceptions. Model/platform acceptance remains separate from the
+compiled ABI operation probes recorded in the repository's PLAN.md.
