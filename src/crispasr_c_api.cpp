@@ -6678,7 +6678,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         for (int i = 0; i < pr->n_tokens; ++i) {
             const auto& t = pr->tokens[i];
-            seg.tokens.push_back({t.text ? t.text : "", t.t0, t.t1, t.p, {}});
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
         }
         r->segments.push_back(std::move(seg));
         parakeet_result_free(pr);
