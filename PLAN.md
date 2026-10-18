@@ -1,5 +1,19 @@
 # CrispASR — Pending work
 
+## NOW — complete Python shared-API wrapper audit
+
+Owner: maintainer coordinator. Audit all deduplicated public declarations in
+`include/crispasr_session.h` against callable Python entry points, including
+music analysis, voice conversion, streaming callbacks/polling, TTS controls,
+text processors, capability queries and legacy Whisper helpers. Export existing
+public utilities at package root. Fix ownership, contiguous-input and empty
+result contracts encountered along these paths. Add a header-driven coverage
+check and model-free ABI behavior tests; update `docs/contributing.md` and Python
+documentation with actual scope and validation limits. Native model/hardware
+acceptance remains separate from wrapper fixture coverage. Work is in progress;
+no blanket parity claim until the census and tests pass.
+
+
 ## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
 
 Owner: maintainer coordinator. Work is isolated on
