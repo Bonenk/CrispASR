@@ -5622,6 +5622,15 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    # Model-free language ABI probes skip on developer machines without SDKs.
+    # binding-contracts.yml uses the strict runner and rejects every skip.
+    foreach(wrapper_language csharp java ruby wasm)
+        add_test(NAME test-${wrapper_language}-wrapper-contract
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_${wrapper_language}_wrapper_contract.py
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        set_tests_properties(test-${wrapper_language}-wrapper-contract PROPERTIES
+            LABELS "unit;bindings" TIMEOUT 180)
+    endforeach()
     add_test(NAME test-python-audio-utilities
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_audio_utilities.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

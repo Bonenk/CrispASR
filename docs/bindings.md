@@ -653,3 +653,28 @@ result, _ := s.SpeechToSpeech(inputPCM)
 fmt.Println("Transcript:", result.Transcript)
 // result.PCM is []float32 at 24 kHz
 ```
+
+### Current wrapper repair validation
+
+The model-free ABI suites run through actual .NET, JNA, Ruby-extension and
+Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|wasm`
+(select one language). SDK requirements and the difference between optional
+CTest skips and strict CI are documented in [contributing](contributing.md).
+These suites exercise transport, ownership and lifecycle; they do not establish
+real model accuracy or complete API parity. Current remaining work is in
+[PLAN.md](../PLAN.md), with completed checkpoints in [HISTORY.md](../HISTORY.md).
+
+Shared token results retain raw UTF-8 bytes because individual tokens may split
+a Unicode character. Decode concatenated raw pieces to reconstruct text; each
+token's display text may contain replacement characters. Existing language
+time units remain stable, and unavailable timing is exposed as `-1` plus an
+availability predicate. Java `asr` results and Ruby's ordinary transcription
+results use centiseconds; WASM `session*`, C# and Dart expose seconds. Ruby's
+existing `transcribe_vad_lang` route uses seconds.
+
+WASM `sessionSynthesizeStreaming(text, callback)` delivers synchronous sentence
+chunks as copied `Float32Array`s. It returns `{status, failed, error}` after
+native synthesis returns. Check both the native status and callback error.
+Callback exceptions stay on the JS side until native unwinds; re-entry is
+rejected. Browser worker scheduling and backend availability still require the
+full WASM build/model gates.

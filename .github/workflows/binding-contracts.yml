@@ -1,0 +1,67 @@
+name: Binding ABI contracts
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bindings/**'
+      - 'tests/test_*_wrapper_contract.py'
+      - 'tests/fixtures/**'
+      - 'tools/run-wrapper-contract.py'
+      - 'include/crispasr*.h'
+      - '.github/workflows/binding-contracts.yml'
+  pull_request:
+    paths:
+      - 'bindings/**'
+      - 'tests/test_*_wrapper_contract.py'
+      - 'tests/fixtures/**'
+      - 'tools/run-wrapper-contract.py'
+      - 'include/crispasr*.h'
+      - '.github/workflows/binding-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [csharp, java, ruby, wasm]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        if: matrix.language == 'csharp'
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-java@v4
+        if: matrix.language == 'java'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Fetch pinned JNA dependency
+        if: matrix.language == 'java'
+        run: |
+          curl --fail --retry 3 --location https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar --output "$RUNNER_TEMP/jna.jar"
+          echo "CRISPASR_JNA_JAR=$RUNNER_TEMP/jna.jar" >> "$GITHUB_ENV"
+      - uses: ruby/setup-ruby@v1
+        if: matrix.language == 'ruby'
+        with:
+          ruby-version: '3.3'
+      - uses: mymindstorm/setup-emsdk@v14
+        if: matrix.language == 'wasm'
+        with:
+          version: '6.0.2'
+          actions-cache-folder: emsdk-6.0.2
+      - name: Compile and exercise actual wrapper adapters
+        run: python3 tools/run-wrapper-contract.py ${{ matrix.language }}

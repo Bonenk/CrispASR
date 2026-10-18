@@ -105,6 +105,7 @@ class Program {
         try { action(); } catch(T) { Equal(probe_calls(),before);return; }
         throw new Exception("missing "+typeof(T).Name+" before native conversion");
     }
+    [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)]static extern int probe_stream_closes();
     static void Main(string[] args) {
         using var s=Session.Open("probe");
         var content=new float[6];var f0=new float[3];
@@ -143,6 +144,9 @@ class Program {
             Reject<ArgumentException>(()=>s.Transcribe(f0));
             Equal(probe_frees(),before+1);s.SetTokenCallback(null);
         }
+        var owner=Session.Open("probe");var stream=owner.StreamOpen();
+        Equal(stream.Feed(new float[]{1,2,3}),1);stream.SetLiveDecode(true);Equal(stream.GetText().Text,"ok");
+        owner.Dispose();Equal(probe_stream_closes(),1);Reject<ObjectDisposedException>(()=>stream.Feed(new float[]{1}));stream.Dispose();
         Console.WriteLine($"PASS C# conversion ABI: {assertions} assertions");
     }
 }
@@ -168,7 +172,7 @@ class CSharpWrapperContract(unittest.TestCase):
                 library=path/('old.so' if old else 'probe.so')
                 subprocess.run(['cc','-shared','-fPIC','-std=c11','-Werror',
                                 '-I'+str(ROOT/'include'), *(['-DOLD_PROBE'] if old else []),
-                                str(path/'probe.c'),'-o',str(library)],check=True)
+                                str(path/'probe.c'),str(ROOT/'tests/fixtures/wrapper-stream-lifetime.c'),'-o',str(library)],check=True)
                 result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll'),
                                        *(['old'] if old else [])],
                                       env=dict(env,CRISPASR_LIBRARY_PATH=str(library)),
@@ -177,6 +181,53 @@ class CSharpWrapperContract(unittest.TestCase):
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                 self.assertIn('PASS C# conversion ABI:',result.stdout)
                 print(result.stdout.strip())
+
+
+AUX_PROGRAM = r'''
+using System;
+using System.Runtime.InteropServices;
+using CrispASR;
+class AuxiliaryProbe {
+    [DllImport("crispasr")]static extern int probe_utility_live();
+    [DllImport("crispasr")]static extern void probe_utility_mode(int mode);
+    [DllImport("crispasr")]static extern int probe_live();
+    static int checks;
+    static void Eq<T>(T a,T b){if(!object.Equals(a,b))throw new Exception($"{a} != {b}");checks++;}
+    static void Reject<T>(Action f)where T:Exception{try{f();}catch(T){checks++;return;}throw new Exception("Expected "+typeof(T));}
+    static void Main(string[] args){
+        string path=args[0];var pcm=new float[]{1,3,5};
+        Eq(Audio.Load(path)[0],.25f);Eq(Audio.Load(path,24000,out int rate)[2],.75f);Eq(rate,24000);
+        Eq(Audio.LoadStereo(path).Samples.Length,6);probe_utility_mode(3);Eq(Audio.LoadStereo(path).SourceChannels,1);
+        Eq(Audio.Resample(Array.Empty<float>(),16000,24000).Length,0);Eq(Audio.Resample(pcm,16000,24000)[0],.25f);
+        Eq(Audio.PcmToWav(pcm)[1],(byte)0);Eq(Audio.SignC2pa(new byte[]{1,0,2})[1],(byte)0);
+        probe_utility_mode(2);Reject<InvalidOperationException>(()=>Audio.Load(path));Reject<InvalidOperationException>(()=>Audio.LoadStereo(path));Reject<InvalidOperationException>(()=>Audio.Resample(pcm,16000,24000));Reject<InvalidOperationException>(()=>Audio.SignC2pa(new byte[]{1}));
+        Eq(probe_utility_live(),0);probe_utility_mode(0);
+        Eq(RuntimeInfo.Version,"probe");Eq(RuntimeInfo.BackendCapabilities("foo")[1],"tts");Eq(RuntimeInfo.AllBackendCapabilities().Contains("foo"),true);
+        using(var p=new TextProcessor("probe")){Eq(p.Process("x"),"Grüße");}
+        using(var p=new TextProcessor("probe",TextProcessorKind.PunctuationCapitalizationSegmentation)){Eq(p.Process("x"),"Hello.");}
+        using(var session=Session.Open("probe")){Eq(session.Backend,"probe");Eq(session.ScoreTexts(pcm,new[]{"one","two"}).TokenCounts[1],3);}
+        Eq(probe_live(),0);Eq(probe_utility_live(),0);
+        Console.WriteLine($"PASS C# utilities: {checks} assertions");
+    }
+}
+'''
+
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('cc'), '.NET SDK and C compiler required')
+class CSharpUtilityContract(unittest.TestCase):
+    def test_audio_container_processors_and_scoring(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-utility-contract-') as tmp:
+            path=Path(tmp)
+            sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text(AUX_PROGRAM)
+            subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],check=True,capture_output=True,text=True)
+            library=path/'libcrispasr.so'
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
+                *[str(ROOT/'tests/fixtures'/name) for name in ['python-wrapper-abi.c','wrapper-session-metadata.c','wrapper-audio-utilities.c']],'-o',str(library)],check=True)
+            audio=path/'audio.wav';audio.write_bytes(b'probe')
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll'),str(audio)],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertIn('PASS C# utilities:',result.stdout);print(result.stdout.strip())
 
 
 if __name__=='__main__': unittest.main()

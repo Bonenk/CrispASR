@@ -588,6 +588,29 @@ python tools/check-backend-wiring.py --crispasr ./build/bin/crispasr --require-l
 > the shared `.git/index` — this clobbered the entire §135 CSM landing
 > (commit `100b9ee5`). `git config pull.rebase true` is set in this repo.
 
+### Model-free wrapper ABI acceptance
+
+When changing result readers, callbacks, or new session operations, run the
+actual language adapter against a tiny native probe, in addition to the native
+model tests. `python3 tools/run-wrapper-contract.py LANGUAGE` currently supports
+`csharp`, `java`, `ruby`, and `wasm`. This strict runner fails on missing SDKs or
+skipped checks. CTest's optional versions may skip on ordinary developer clones.
+The `Binding ABI contracts` workflow installs the SDKs and runs these checks
+without building the full model library.
+
+Java requires a JDK and `CRISPASR_JNA_JAR` pointing to JNA 5.13.0; Ruby requires
+its C headers; C# requires .NET 8; WASM requires Emscripten and Node. The tiny
+probes include the public C header. Ruby's unexercised legacy registration
+symbols are aborting stubs; calling one fails the test. Such stubs provide no
+acceptance evidence for those APIs. Shared token bytes, alternative text,
+timestamp availability, allocated-buffer cleanup, replay-noise bounds and
+callback errors need behavioral assertions. Counting native declarations or
+constructing an output struct does not establish wrapper coverage.
+
+These checks establish ABI transport and ownership. Real model transcripts,
+structured music results and TTS→ASR roundtrips remain separate acceptance gates.
+Keep both public header inventories and the separate chat API in the audit.
+
 ## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
 
 Everything above assumes the backend produces TEXT and therefore fits

@@ -1,3 +1,52 @@
+## Java/C# audio and utility expansion; stream lifetime — 2026-10-18
+
+Added mono/native-rate/stereo loading, in-memory resampling, binary WAV/C2PA
+transport, runtime/capability queries, truecase/PCS processors and candidate
+scoring to Java and completed the corresponding C# gaps. Buffers are copied
+and freed on errors, including partial audio allocations and aliased stereo
+pointers. C# mono loading now frees a buffer returned alongside an error, and
+WAV lengths use a checked size conversion. Native signing failure is an error;
+there is no unsigned fallback. Signing probes validate binary transport only.
+
+Java and C# stream handles retain the parent and close before it; calls after
+parent disposal are rejected. Added live-decode setters. Current probes pass
+59 Java assertions plus six older-ABI checks; C# passes 69 current/older core
+assertions plus 23 utility assertions. These checks do not establish full API,
+cryptographic or real-model acceptance. Remaining scope is in PLAN.md.
+
+## WASM shared metadata and task adapters — 2026-10-18
+
+Added one owned result collector/encoder for synchronous ASR, session/logits and
+browser async transport, retaining tokens/raw bytes, word alternatives, speakers
+and missing-time availability. Existing `asr*` centiseconds and `session*`
+seconds remain intact. Added beats, tablature, bounded replay conversion, PCM
+references, CFG scale, TADA companion controls and disclosure/error access.
+Sentence synthesis catches callback exceptions in JS before native frames and
+returns `{status, failed, error}` after native returns. Existing adapter entry
+points reject callback re-entry. Adapter exception handling is enabled for
+scratch-buffer cleanup, retaining the separate C2PA native-EH mode.
+
+A tiny actual Embind module passes 33 Node assertions with Emscripten 6.0.0;
+this is model-free adapter evidence. Hosted 6.0.2 full builds, browser scheduling
+and real models remain pending. Added the strict `Binding ABI contracts`
+workflow and optional CTest registrations for .NET, Java, Ruby and WASM.
+
+## Java and Ruby session operations and metadata — 2026-10-18
+
+Added owned shared token bytes/text and word alternatives to Java and Ruby
+normal, chunked, VAD and logits results. Existing time units remain intact;
+Ruby's VAD-language seconds retain the `-1` unavailable sentinel. Added piano/
+programs, chords, beats, tablature, conversion with replay-buffer bounds, PCM
+voice references, distinct CFG scale, TADA companions, disclosure/error access
+and synchronous sentence synthesis. Callback errors are deferred until native
+returns; re-entry is rejected. Java stream handles retain the owner and close
+before session teardown.
+
+Model-free compiled probes pass 40 Java current-ABI assertions, six older-ABI
+checks and 29 Ruby assertions. This establishes adapter transport/ownership,
+not real model accuracy or full auxiliary/chat API parity. Pending work is in
+PLAN.md.
+
 ## Python second-header utilities and C# safety/metadata — 2026-10-18
 
 Added Python mono/native-rate/stereo native loading, WAV/C2PA byte helpers and

@@ -22,6 +22,7 @@ namespace CrispASR
     public sealed partial class Session : IDisposable
     {
         private IntPtr _handle;
+        private readonly System.Collections.Generic.HashSet<StreamDecoder> _streams = new();
 
         // The session C ABI reports every time in centiseconds; this binding
         // exposes seconds throughout (issue #291). ONE constant, used by every
@@ -117,6 +118,7 @@ namespace CrispASR
             if (_inCallback) throw new InvalidOperationException("Do not dispose a session from its callback");
             if (_handle != IntPtr.Zero)
             {
+                foreach (var stream in new System.Collections.Generic.List<StreamDecoder>(_streams)) stream.Dispose();
                 NativeMethods.crispasr_session_close(_handle);
                 _handle = IntPtr.Zero;
             }
@@ -790,8 +792,13 @@ namespace CrispASR
                 Handle, nThreads, stepMs, lengthMs, keepMs, language ?? "", translate ? 1 : 0);
             if (p == IntPtr.Zero)
                 throw new InvalidOperationException("stream_open failed");
-            return new StreamDecoder(p);
+            var stream = new StreamDecoder(this,p);
+            _streams.Add(stream);
+            return stream;
         }
+
+        internal void CheckStreamOwner() { _ = Handle; }
+        internal void StreamClosed(StreamDecoder stream) => _streams.Remove(stream);
 
         // ----------------------------------------------------------------
         // Forced alignment (static)
@@ -1112,12 +1119,15 @@ namespace CrispASR
     {
         private IntPtr _handle;
 
-        internal StreamDecoder(IntPtr handle) => _handle = handle;
+        private readonly Session _owner;
+        internal StreamDecoder(Session owner, IntPtr handle) { _owner=owner;_handle = handle; }
+        public void SetLiveDecode(bool enabled) => NativeMethods.crispasr_stream_set_live_decode(Handle,enabled?1:0);
 
         private IntPtr Handle
         {
             get
             {
+                _owner.CheckStreamOwner();
                 if (_handle == IntPtr.Zero) throw new ObjectDisposedException(nameof(StreamDecoder));
                 return _handle;
             }
@@ -1157,7 +1167,9 @@ namespace CrispASR
         {
             if (_handle != IntPtr.Zero)
             {
+                _owner.CheckStreamOwner();
                 NativeMethods.crispasr_stream_close(_handle);
+                _owner.StreamClosed(this);
                 _handle = IntPtr.Zero;
             }
         }

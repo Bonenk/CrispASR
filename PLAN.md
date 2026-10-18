@@ -30,8 +30,24 @@ C# replay-noise tests first failed on an undersized buffer reaching native code;
 length/overflow checks now pass. Shared C# tokens/raw bytes, all four result
 routes and TTS/callback additions pass 61 actual .NET/C-ABI assertions across
 current and older probe libraries. Other C# utilities remain in progress.
-Two Hermes sessions are actively implementing Dart and Go/Rust; their partial
-edits have not been accepted or committed. Hosted proof remains pending.
+Java operations/utilities pass 59 actual JNA/native assertions plus six older-token-API checks;
+Ruby's compiled extension passes 29 assertions. Both now copy shared tokens and
+alternatives in their normal/chunked/VAD/logits result readers, and expose music,
+conversion and the new TTS operations. Java streaming handles now retain their
+session and close before it. WASM shared metadata, beats/tab/conversion and TTS adapters pass 33 actual
+Embind/Node assertions (local Emscripten 6.0.0). The async compute-to-servicer
+path uses the same owned metadata; full native/browser builds remain pending.
+Java/C# native audio/container/capability/text-processor/scoring APIs now pass
+compiled probes. C# additionally closes child streams before session teardown:
+69 core current/old-ABI assertions plus 23 utility assertions. The complete
+WASM adapter passes local single-thread syntax compilation against public
+headers; manually duplicated extern declarations were removed. Threaded/full
+hosted builds and the remaining auxiliary/chat APIs are not yet accepted.
+Dart and Go/Rust agents are revising their probes: fixed private paths, simulated
+rather than actual fallback tests and struct-only tests were rejected. Their
+edits remain unaccepted. Broader auxiliary API inventory and separate chat gaps,
+plus hosted/model acceptance, remain open; this checkpoint is not all-wrapper
+completion.
 
 Repair order and acceptance:
 

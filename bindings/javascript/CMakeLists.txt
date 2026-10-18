@@ -78,6 +78,13 @@ if (CRISPASR_C2PA_ENABLED)
     set(WASM_C2PA_LINK_FLAGS "-fwasm-exceptions -s SUPPORT_LONGJMP=wasm")
 endif()
 
+# Adapter validation throws must unwind owned scratch buffers. Keep the opt-in
+# C2PA native-EH mode; otherwise enable JS exception handling for this adapter.
+if (NOT CRISPASR_C2PA_ENABLED)
+    target_compile_options(${TARGET} PRIVATE -fexceptions)
+    target_link_options(${TARGET} PRIVATE -fexceptions -sDISABLE_EXCEPTION_CATCHING=0)
+endif()
+
 set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
     --bind \
     ${WASM_C2PA_LINK_FLAGS} \

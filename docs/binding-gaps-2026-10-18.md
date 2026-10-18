@@ -1,3 +1,9 @@
+> This is the initial source audit, not current completion status. Python/C#
+> checkpoints are in HISTORY.md; Java/Ruby now have compiled-probe repairs for
+> the core rows below. Dart/Go/Rust/WASM integration, auxiliary inventories and
+> hosted/model acceptance are tracked in PLAN.md. Do not count this table's
+> historical omissions as still absent without inspecting the current code.
+
 # Non-Python wrapper audit — 2026-10-18
 
 Source snapshot: `c12707299c5dcbca7bafe60a073688250238cdd9` (the following

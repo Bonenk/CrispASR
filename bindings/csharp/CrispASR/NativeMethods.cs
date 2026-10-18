@@ -575,6 +575,8 @@ namespace CrispASR
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_stream_flush(IntPtr stream);
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void crispasr_stream_set_live_decode(IntPtr stream, int enabled);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void crispasr_stream_close(IntPtr stream);
