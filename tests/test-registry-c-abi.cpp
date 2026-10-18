@@ -8,7 +8,7 @@
 #include <string>
 
 TEST_CASE("registry C ABI: default bundle metadata is exact", "[unit][registry][c-abi]") {
-    REQUIRE(std::string(crispasr_c_api_version()) == "0.7.0");
+    REQUIRE(std::string(crispasr_c_api_version()) == "0.7.1");
 
     char backend[64] = {};
     char license[256] = {};

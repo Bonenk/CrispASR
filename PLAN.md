@@ -2,9 +2,9 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: remaining legacy parameter/lifecycle
-and cross-language token audits after owned Rust/Go snapshots and alternative
-capture. Completed repairs and validation are archived in HISTORY.md. Completed repairs and measured probe counts are archived in
+Owner: maintainer coordinator. Active now: compatible Rust Whisper scalar
+controls and parallel alternative capture; track the full CI rerun after the
+stale API-version/Ruby-registration assertions were repaired. Completed repairs and measured probe counts are archived in
 HISTORY.md. Continue the cross-language wrapper task; the bounded external
 agent tasks have ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.

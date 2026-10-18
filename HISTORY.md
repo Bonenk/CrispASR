@@ -1,3 +1,20 @@
+## Repair stale CPU CI assertions — 2026-10-18
+
+The six hosted binding contract jobs passed on `9bbbd8228`, as did the separate
+Go, Rust and Ruby binding workflows. The broader CPU unit suite exposed three
+stale source assertions: registry metadata still pinned C API `0.7.0` after the
+pointer-parallel API advanced it to `0.7.1`, and two Ruby checks expected direct
+registrations after generated context guards were introduced. The version pin
+now matches the shipped API. Ruby checks require the guarded registration and
+its generated forwarding declaration, retaining checks that both public methods
+reach their implementations.
+
+Focused verification passes **243 assertions in 33 test cases** using the actual
+Catch2 tests, literal runtime registry/version adapters and real registry
+catalog code, without building model/GGML backends. The generated Ruby guard
+check also passes. Full hosted CI rerun remains required; the earlier failure
+was not a missing speaker-identity or watermark operation.
+
 ## Owned legacy Whisper tokens and alternatives — 2026-10-18
 
 Rust `CrispASR::token/tokens` now returns owned `WhisperToken` values with IDs,

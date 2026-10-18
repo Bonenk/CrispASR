@@ -193,7 +193,8 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
         {"bindings/go/crispasr_session.go", "func (s *CrispasrSession) SetSpeakerIdentity(identity string) error"},
         {"crispasr/src/lib.rs", "pub fn set_speaker_identity(&self, identity: &str)"},
         {"crispasr-sys/src/lib.rs", "pub fn crispasr_session_set_speaker_identity("},
-        {"bindings/ruby/ext/ruby_crispasr_session.c", "\"set_speaker_identity\", rb_session_set_speaker_identity"},
+        {"bindings/ruby/ext/ruby_crispasr_session.c",
+         "\"set_speaker_identity\", rb_context_guard_rb_session_set_speaker_identity"},
         {"bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java",
          "public void setSpeakerIdentity(String identity)"},
         {"bindings/csharp/CrispASR/Session.cs", "public void SetSpeakerIdentity(string identity)"},
@@ -203,6 +204,9 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
     for (const auto& b : kBindings) {
         INFO("binding=" << b.file);
         REQUIRE(contains(read_file(b.file), b.needle));
+        if (std::string(b.file) == "bindings/ruby/ext/ruby_crispasr_session.c") {
+            REQUIRE(contains(read_file(b.file), "RB_CONTEXT_WRAPPER_2(rb_session_set_speaker_identity);"));
+        }
     }
 }
 
@@ -541,7 +545,9 @@ TEST_CASE("every binding that can opt out of marking can also mark", "[unit][com
     }
     SECTION("ruby") {
         REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
-                         "\"watermark_embed\", rb_watermark_embed"));
+                         "\"watermark_embed\", rb_context_guard_rb_watermark_embed"));
+        REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
+                         "RB_CONTEXT_WRAPPER_1(rb_watermark_embed);"));
     }
     SECTION("java") {
         REQUIRE(contains(read_file("bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java"),
