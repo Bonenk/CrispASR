@@ -119,3 +119,9 @@ The metadata suite also creates an actual native-grouped word whose final
 continuation token shares the next segment's first frame. Both shared and
 legacy splitters retain that token with the preceding word; all token bytes
 still appear exactly once. This case failed on both paths before the follow-up.
+
+Final ownership follow-up source is `ebf69c43721e56a43b7c8f637873902098f523ba`,
+frozen on `diag/549-token-boundaries-20261018`: [CI](https://github.com/CrispStrobe/CrispASR/actions/runs/39117921894)
+and [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39117923785) are
+queued at dispatch audit. Earlier source's green checks do not validate this
+follow-up; preserve exact-source receipts before release.

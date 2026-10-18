@@ -162,8 +162,9 @@ parity and corrects the claim that Dart symbol checks auto-discover new APIs.
 
 Keep the issue open for full-library/platform follow-up and reporter validation.
 The first window-only source `aaa5f21a9` has CI39117671481/lint39117673618
-pending; final source also includes the explicit-output boundary fix. Freeze
-that complete source, run CI/lint, and audit the actual exported-getter
+pending. Final integrated source `ebf69c43721e56a43b7c8f637873902098f523ba`
+is frozen on `diag/549-token-boundaries-20261018`, CI `39117921894` and lint
+`39117923785` (both queued at dispatch audit). Audit the actual exported-getter
 step for both metadata suites. Earlier green source `741141118` does not validate
 this follow-up. Then use a licensed Japanese ASR multi-window fixture: keep
 original native decodes/window choices fixed, require identical word/text/time
