@@ -210,3 +210,21 @@ constructor with one that poisons the borrowed native buffer: later fragments
 were corrupted before the fix and now survive. Negative counts and positive/null
 pairs throw; zero-count drains return empty arrays. This covers servicer-side
 JS re-entry; concurrent compute/session-close ownership remains pending.
+
+
+## WASM threaded dispatch and async v2 loading
+
+The shared dispatcher now serves async ASR, model loading and TTS, keeping emval
+ownership on the caller's servicer. A compiled PROXY_TO_PTHREAD fixture verifies
+work/encoder errors, callback exceptions, rejected/throwing queue submission,
+readiness, overlap rejection, callback chaining and atomic progress polling.
+Payload and emval counts return to their baselines. A JS finally retires delivery
+even when JS skips C++ destructors; no return proxy is needed.
+
+`asrOpenWithOptionsAsync` and `ttsOpenWithOptionsAsync` pass all v2 fields and
+reserved padding against the literal runtime POD, and load on compute. The
+fixture exercises the public async TTS function with allocated/empty/malformed
+PCM, native errors and a throwing JS typed-array constructor. Native PCM is
+freed before encoding. The same assertion program runs in Node and headless
+Chromium with actual pthreads and COOP/COEP. These are component contracts,
+not real-model transcript/roundtrip or full-module acceptance.

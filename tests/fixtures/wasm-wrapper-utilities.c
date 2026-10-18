@@ -30,3 +30,10 @@ void crispasr_watermark_embed(float* pcm, int n, float alpha) {
 float crispasr_watermark_detect(const float* pcm, int n) {
     return .75f;
 }
+
+int crispasr_get_streamed_segment_count(void) {
+    return 2;
+}
+int crispasr_get_streamed_token_count(void) {
+    return 4;
+}

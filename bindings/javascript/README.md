@@ -119,7 +119,9 @@ Zero threads selects the module default. A single-thread module rejects thread
 counts above one. Invalid options throw before replacing the current session;
 a valid open closes the old singleton first and returns `false` if loading fails.
 These synchronous functions have the same browser scheduling constraints as
-`asrOpen`/`ttsOpenExplicit`; they do not proxy model loading to a worker.
+`asrOpen`/`ttsOpenExplicit`. In a proxied pthread module, use
+`asrOpenWithOptionsAsync(path, backend, options, callback)` or
+`ttsOpenWithOptionsAsync(...)` for nonblocking loading.
 
 `registryLookup(backend)` and `registryLookupByFilename(filename)` return
 `{filename, url, approxSize}`, or `null` on a miss. `registryBackends()` returns
@@ -167,5 +169,31 @@ other synchronous inference calls.
 partial UTF-8 sequences and empty tokens. Assemble the fragments before decoding
 text. The wrapper copies every native string before creating JS arrays, so JS
 constructor re-entry cannot change later tokens. Negative counts or positive
-counts with a null buffer throw. Concurrent native compute/drain/close still
-requires the browser dispatch/ownership work tracked in PLAN.md.
+counts with a null buffer throw. Token/segment drain and count queries require idle compute; the shared guard
+rejects them while an async native operation runs. Retained ASR callback
+delivery remains pending in PLAN.md.
+
+
+## Proxied browser dispatch
+
+Threaded `PROXY_TO_PTHREAD` modules expose the async ASR/open/TTS routes.
+`browserComputeReady()` reports readiness. Async calls run native compute on
+its dedicated pthread, then deliver owned results to the caller's servicer
+thread. Only one native operation may be active: synchronous inference,
+close/replacement and another async submission raise while compute is busy.
+`asrGetProgress()` remains available. Completion callbacks may submit the next
+operation. Error completions are asynchronous too.
+
+Native/encoding failures deliver `{error: message}` through the callback.
+A callback exception is contained and stored as `module.crispasrLastCallbackError`;
+inspect and clear that property when reporting application errors. The native
+delivery is released even when encoding or the callback throws. TTS delivers an
+owned `Float32Array`, including empty output, and frees native PCM before JS
+encoding. A failed replacement load leaves its singleton closed.
+
+The model-free contract compiles a real proxied pthread module and runs it in
+Node. Set `CRISPASR_CHROME` to a Chromium/Chrome executable to run the same checks
+in a headless browser served with COOP/COEP headers; the binding CI requires this
+browser pass. These checks cover dispatch, load-option transport and TTS-buffer
+ownership. Full model accuracy, module size and other hardware paths remain
+separate validation gates.

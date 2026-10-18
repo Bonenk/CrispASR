@@ -679,6 +679,16 @@ Public Ruby integer handles are opaque tickets; look up native pointers before
 FFI and never resurrect a closed ticket when an allocator reuses an address.
 The forced-address-reuse and parent-close fixtures check these properties.
 
+WASM's default Emscripten exception mode does not unwind C++ destructors when
+JavaScript throws. A C++ `catch (...)` is insufficient for constructor/callback
+failures. Dispatch delivery is explicitly retired in a JS `finally` on the
+creating servicer; only plain native work/result data crosses threads. Async
+TTS catches constructor errors inside JS before returning an emval. Probe real
+pthread work errors, encoder/callback errors, rejected queues, overlapping calls,
+callback chaining, progress responsiveness and native/emval allocation baselines.
+Set `CRISPASR_CHROME` to exercise the same assertions under browser COOP/COEP;
+the binding CI locates its required Chrome executable before running the suite.
+
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.
 Keep both public header inventories and the separate chat API in the audit.

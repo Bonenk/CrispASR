@@ -73,37 +73,9 @@ int main() {
 }
 #endif
 
-#ifdef __EMSCRIPTEN_PTHREADS__
-// JS values stay on their creating servicer thread. Only native inputs/results
-// cross the compute queue, leaving the servicer available for pthread startup.
-template <typename T>
-static void browser_dispatch(std::function<T()> work, std::function<emscripten::val(T&)> encode,
-                             emscripten::val callback) {
-    if (!g_compute_thread_set.load() || g_compute_thread == pthread_self()) {
-        emscripten::val error = emscripten::val::object();
-        error.set("error", std::string("Proxied compute thread is not ready"));
-        callback(error);
-        return;
-    }
-    auto* cb = new emscripten::val(callback);
-    const pthread_t servicer = pthread_self();
-    if (!g_proxy_queue.proxyAsync(g_compute_thread, [work, encode, cb, servicer]() {
-            auto* result = new T(work());
-            g_proxy_queue.proxyAsync(servicer, [result, encode, cb]() {
-                emscripten::val output = encode(*result);
-                delete result;
-                (*cb)(output);
-                delete cb;
-            });
-        })) {
-        emscripten::val error = emscripten::val::object();
-        error.set("error", std::string("Could not dispatch browser compute"));
-        (*cb)(error);
-        delete cb;
-    }
-}
-
-#endif
+#include "session_dispatch.h"
+#include "session_async_options.h"
+#include "session_async_audio.h"
 
 EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_session_tasks();
@@ -112,12 +84,14 @@ EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_analysis();
     binding_register_speaker();
     binding_register_open_options();
+    binding_register_async_options();
+    binding_register_async_audio();
     binding_register_registry();
     binding_register_diarization();
     binding_register_vad();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
-                             binding_check_reentry();
+                             binding_check_callback();
                              return g_compute_thread_set.load() && g_compute_thread != pthread_self();
                          }));
     emscripten::function(
@@ -126,8 +100,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
             binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    if (g_asr_session)
-                        crispasr_session_close(g_asr_session);
+                    auto* old = g_asr_session;
+                    g_asr_session = nullptr;
+                    if (old)
+                        crispasr_session_close(old);
                     g_asr_session = backend.empty()
                                         ? crispasr_session_open(path.c_str(), threads)
                                         : crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
@@ -141,8 +117,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
             binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    if (g_tts_session)
-                        crispasr_session_close(g_tts_session);
+                    auto* old = g_tts_session;
+                    g_tts_session = nullptr;
+                    if (old)
+                        crispasr_session_close(old);
                     g_tts_session = crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
                     return g_tts_session != nullptr;
                 },
@@ -152,12 +130,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
         "asrTranscribeAsync",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang, emscripten::val cb) {
             binding_check_reentry();
-            const int n = audio["length"].as<int>();
-            auto pcm = std::make_shared<std::vector<float>>(n);
-            emscripten::val heap = emscripten::val::module_property("HEAPU8");
-            emscripten::val view = emscripten::val::global("Float32Array")
-                                       .new_(heap["buffer"], reinterpret_cast<uintptr_t>(pcm->data()), n);
-            view.call<void>("set", audio);
+            auto pcm = std::make_shared<std::vector<float>>(binding_pcm(audio));
             browser_dispatch<std::vector<binding_segment>>(
                 [pcm, lang]() {
                     std::vector<binding_segment> segments;
@@ -388,7 +361,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // asrGetProgress() -> 0..100 (or -1 idle). Long-form progress poll, updated
     // in lockstep with asrTranscribeChunked windows (issue #208).
     emscripten::function("asrGetProgress", emscripten::optional_override([]() {
-                             binding_check_reentry();
+                             binding_check_callback();
                              return crispasr_get_progress();
                          }));
 
@@ -531,46 +504,6 @@ EMSCRIPTEN_BINDINGS(whisper) {
                              return out;
                          }));
 
-#ifdef __EMSCRIPTEN_PTHREADS__
-    // Multithreaded, deadlock-free synth for the browser. Delivers a Float32Array
-    // (24 kHz mono PCM, empty on failure) to `cb`. The servicer only enqueues work
-    // and returns immediately; the blocking compute happens on the proxied pthread.
-    emscripten::function(
-        "ttsSynthesizeAsync", emscripten::optional_override([](const std::string& text, emscripten::val cb) {
-            binding_check_reentry();
-            auto* text_copy = new std::string(text);
-            auto* cbp = new emscripten::val(cb);
-            if (!g_compute_thread_set.load() || g_compute_thread == pthread_self()) {
-                emscripten::val error = emscripten::val::object();
-                error.set("error", "Threaded browser compute is not ready; use PROXY_TO_PTHREAD");
-                (*cbp)(error);
-                delete text_copy;
-                delete cbp;
-                return;
-            }
-            pthread_t servicer = pthread_self();
-            // Enqueue the blocking synth onto the compute thread (pthread-0).
-            g_proxy_queue.proxyAsync(g_compute_thread, [text_copy, cbp, servicer]() {
-                int n = 0;
-                float* pcm =
-                    g_tts_session ? crispasr_session_synthesize(g_tts_session, text_copy->c_str(), &n) : nullptr;
-                delete text_copy;
-                // Hand the result (shared WASM heap) back to the servicer; only
-                // touch the JS callback `val` on the thread that created it.
-                g_proxy_queue.proxyAsync(servicer, [pcm, n, cbp]() {
-                    emscripten::val out = emscripten::val::array();
-                    if (pcm && n > 0) {
-                        out = emscripten::val::global("Float32Array").new_(n);
-                        out.call<void>("set", emscripten::val(emscripten::typed_memory_view(n, pcm)));
-                    }
-                    if (pcm)
-                        crispasr_pcm_free(pcm);
-                    (*cbp)(out);
-                    delete cbp;
-                });
-            });
-        }));
-#endif
 
     // Declare whose voice a PRESET voice is: "real_person" | "synthetic" |
     // "unknown". Cloning is not the only way to produce a deep fake — a preset

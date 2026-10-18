@@ -6,10 +6,7 @@
 #include <vector>
 #include <stdexcept>
 
-EM_JS(void, binding_check_reentry, (), {
-    if (Module['crispasrInCallback'])
-        throw new Error('Session re-entry from a native callback is not allowed');
-});
+#include "session_guard.h"
 // Catch JS exceptions on the JS side, before they can cross native synthesis.
 EM_JS(void, binding_pcm_deliver, (uintptr_t handle, const float* pcm, int n, int final), {
     var state = Emval.toValue(handle);

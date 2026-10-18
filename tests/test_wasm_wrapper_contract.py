@@ -1,5 +1,9 @@
 """Actual Embind result/task adapters, compiled into a tiny WASM module."""
 import os
+import functools
+import http.server
+import queue
+import threading
 import re
 from pathlib import Path
 import shutil
@@ -61,6 +65,7 @@ static emscripten::val read_logits() {
 EMSCRIPTEN_BINDINGS(wrapper_probe) {
     emscripten::function("readLogits",&read_logits);
     emscripten::function("logitsEnabled",&probe_result_logits_enabled);
+    emscripten::function("probeBusy",emscripten::optional_override([](bool value){binding_browser_busy=value;}));
     binding_register_session_tasks();
     binding_register_utilities();
     binding_register_analysis();
@@ -216,6 +221,8 @@ require(process.argv[2])().then(m=>{
  } finally {global.Uint8Array=OriginalU8;}
  for(const mode of [8,9]){m.probeMode(mode);rejects(()=>m.drainStreamedTokenBytes());}
  for(const mode of [10,11]){m.probeMode(mode);eq(m.drainStreamedTokenBytes(),[]);}m.probeMode(0);
+ eq(m.getStreamedSegmentCount(),2);eq(m.getStreamedTokenCount(),4);
+ m.probeBusy(true);try{rejects(()=>m.getStreamedSegmentCount());rejects(()=>m.getStreamedTokenCount());rejects(()=>m.readResult(false));}finally{m.probeBusy(false);}
  console.log('PASS WASM ABI: ' +n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
 '''
@@ -286,5 +293,115 @@ EMSCRIPTEN_BINDINGS(chat_probe){binding_register_chat();emscripten::function("ch
             result=subprocess.run([NODE,str(ROOT/'tests/fixtures/wasm-chat-program.cjs'),str(module)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS WASM chat:',result.stdout);print(result.stdout.strip())
+
+
+@unittest.skipUnless(EMXX and NODE,'Emscripten C++ compiler and Node required')
+class WasmDispatchContract(unittest.TestCase):
+    def test_actual_threaded_dispatch_errors_and_ownership(self):
+        with tempfile.TemporaryDirectory(prefix='wasm-dispatch-') as directory:
+            tmp=Path(directory);module=tmp/'dispatch.js'
+            runtime=(ROOT/'src/crispasr_c_api.cpp').read_text();start=runtime.index('struct crispasr_open_params_v1 {')
+            (tmp/'runtime-open-layout.h').write_text(runtime[start:runtime.index('};',start)+2])
+            subprocess.run([EMXX,'-std=c++17','-pthread','-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
+                '--bind','-sPROXY_TO_PTHREAD=1','-sPTHREAD_POOL_SIZE=1','-sEXIT_RUNTIME=0',
+                '-sSINGLE_FILE=1','-sMODULARIZE=1','-sENVIRONMENT=web,node,worker','-sINITIAL_MEMORY=32MB',
+                '-sEXPORT_NAME=dispatchFactory','-sEXPORTED_RUNTIME_METHODS=count_emval_handles',
+                '-I'+str(ROOT/'bindings/javascript'),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-I'+str(tmp),
+                str(ROOT/'tests/fixtures/wasm-dispatch-probe.cpp'),str(ROOT/'tests/fixtures/wasm-async-open.cpp'),
+                '-o',str(module)],check=True)
+            program=tmp/'test.cjs';program.write_text(r'''
+const assert=require('node:assert/strict');
+require(process.argv[2])().then(async m=>{
+  let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++};const rejects=f=>{assert.throws(f);n++};
+  for(let i=0;!m.computeReady()&&i<200;i++)await new Promise(r=>setTimeout(r,5));
+  eq(m.computeReady(),true);
+  const handles=m.count_emval_handles();
+  const dispatch=mode=>new Promise(resolve=>m.dispatchProbe(mode,resolve));
+  for(const [mode,message] of [[1,'work sentinel'],[2,'encoding sentinel'],[3,'JS encoding sentinel'],[4,'Could not dispatch browser compute'],[5,'Proxied compute thread is not ready'],[6,'queue sentinel'],[7,'Unknown native compute exception']]){
+    eq((await dispatch(mode)).error,message);eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
+  }
+  let beats=0,queries=0;const timer=setInterval(()=>{beats++;m.probeProgress();queries++;},2);
+  const success=dispatch(0);rejects(()=>m.checkIdle());rejects(()=>m.dispatchProbe(0,()=>{}));
+  eq(await success,42);clearInterval(timer);eq(beats>2,true);eq(queries>2,true);eq(m.livePayloads(),0);
+  rejects(()=>m.dispatchProbe(0,null));eq(m.livePayloads(),0);
+  const sentinel=new Error('callback sentinel');
+  await new Promise(resolve=>m.dispatchProbe(0,()=>{setTimeout(resolve,0);throw sentinel}));
+  eq(m.crispasrLastCallbackError===sentinel,true);delete m.crispasrLastCallbackError;
+  eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
+  eq(await new Promise(resolve=>m.dispatchProbe(0,first=>{eq(first,42);m.dispatchProbe(0,resolve);rejects(()=>m.checkIdle());})),42);
+  eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
+  // A not-ready error owns no busy lease and cannot unlock another queued job.
+  const unavailable=dispatch(5),active=dispatch(0);eq((await unavailable).error,'Proxied compute thread is not ready');
+  rejects(()=>m.checkIdle());eq(await active,42);eq(m.livePayloads(),0);eq(m.checkIdle(),true);
+  const opts={n_threads:7,use_gpu:false,verbosity:2,flash_attn:false,n_gpu_layers:3};
+  eq(await new Promise(r=>m.asrOpenWithOptionsAsync('model','foo',opts,r)),true);eq(m.openLive(),1);
+  const opens=m.openCalls();rejects(()=>m.asrOpenWithOptionsAsync('model','foo',{n_threads:-1},()=>{}));eq(m.openCalls(),opens);eq(m.openLive(),1);
+  const tts=new Promise(r=>m.ttsOpenWithOptionsAsync('model','foo',opts,r));rejects(()=>m.closeAsr());eq(await tts,true);eq(m.openLive(),2);
+  eq((await new Promise(r=>m.asrOpenWithOptionsAsync('throw','foo',opts,r))).error,'open sentinel');eq(m.openLive(),1);m.closeAsr();eq(m.openLive(),1);
+  m.openDefaults(1);eq(await new Promise(r=>m.asrOpenWithOptionsAsync('model','',null,r)),true);eq(m.openLive(),2);
+  const synth=text=>new Promise(r=>m.ttsSynthesizeAsync(text,r));
+  const audio=await synth('normal');eq(Array.from(audio),[.25,.5,.75]);eq(m.audioLive(),0);
+  for(const text of ['empty','zero-allocated']){eq((await synth(text)).length,0);eq(m.audioLive(),0);}
+  for(const text of ['throw','missing','bad']){eq(typeof (await synth(text)).error,'string');eq(m.audioLive(),0);}
+  const F32=globalThis.Float32Array;
+  try {globalThis.Float32Array=function(){throw new Error('audio encode sentinel')};eq((await synth('normal')).error,'audio encode sentinel');}
+  finally {globalThis.Float32Array=F32;}
+  eq(m.audioLive(),0);eq(m.count_emval_handles(),handles);
+  rejects(()=>m.ttsSynthesizeAsync('bad\0text',()=>{}));eq(m.audioLive(),0);
+  m.closeAsr();m.closeTts();eq(m.openLive(),0);eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
+  console.log('PASS WASM threaded dispatch: '+n+' assertions');process.exit(0);
+}).catch(e=>{console.error(e);process.exit(1)});
+''')
+            result=subprocess.run([NODE,str(program),str(module)],capture_output=True,text=True,timeout=25)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS WASM threaded dispatch:',result.stdout);print(result.stdout.strip())
+            browser=os.environ.get('CRISPASR_CHROME')
+            if browser:
+                self._exercise_browser(tmp,program.read_text(),browser)
+
+    def _exercise_browser(self,tmp,node_program,browser):
+        # Run the same assertions on the browser servicer with real pthreads.
+        body=node_program[node_program.index('  let n=0;'):node_program.index("  console.log('PASS WASM threaded dispatch:")]
+        (tmp/'index.html').write_text("""<!doctype html><meta charset="utf-8">
+<script src="dispatch.js"></script><script>
+const assert={deepEqual(a,b){if(JSON.stringify(a)!==JSON.stringify(b))throw new Error('value mismatch: '+JSON.stringify(a)+' vs '+JSON.stringify(b));},throws(fn){let caught=false;try{fn()}catch(e){caught=true}if(!caught)throw new Error('missing exception')}};
+dispatchFactory().then(async m=>{
+"""+body+"""
+ await fetch('/result',{method:'POST',body:JSON.stringify({ok:true,assertions:n,isolated:crossOriginIsolated})});
+}).catch(async e=>{await fetch('/result',{method:'POST',body:JSON.stringify({ok:false,error:String(e),stack:e.stack})})});
+</script>""")
+        results=queue.Queue()
+        class Handler(http.server.SimpleHTTPRequestHandler):
+            def end_headers(self):
+                self.send_header('Cross-Origin-Opener-Policy','same-origin')
+                self.send_header('Cross-Origin-Embedder-Policy','require-corp')
+                super().end_headers()
+            def log_message(self,*args):pass
+            def do_POST(self):
+                import json
+                try:results.put(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
+                except Exception as error:results.put({'ok':False,'error':str(error)})
+                self.send_response(200);self.end_headers()
+        server=http.server.ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Handler,directory=str(tmp)))
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        log=tmp/'browser.log'
+        try:
+            with log.open('w') as output:
+                process=subprocess.Popen([browser,'--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
+                    '--no-first-run','--no-default-browser-check','--user-data-dir='+str(tmp/'chrome-profile'),
+                    'http://127.0.0.1:'+str(server.server_port)+'/index.html'],stdout=output,stderr=output)
+                try:
+                    try:result=results.get(timeout=35)
+                    except queue.Empty:self.fail('Browser result timeout: '+log.read_text()[-6000:])
+                    self.assertTrue(result.get('ok'),result)
+                    self.assertTrue(result.get('isolated'),result)
+                    print('PASS WASM Chromium pthread dispatch: '+str(result['assertions'])+' assertions')
+                finally:
+                    process.terminate()
+                    try:process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:process.kill();process.wait()
+        finally:
+            server.shutdown();server.server_close();thread.join(timeout=5)
+
 
 if __name__=='__main__':unittest.main()

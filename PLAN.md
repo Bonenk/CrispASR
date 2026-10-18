@@ -2,7 +2,8 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Continue the cross-language wrapper task; the
+Owner: maintainer coordinator. Active next: retained WASM stream lifetime and
+ASR callbacks after the dispatch checkpoint. Continue the cross-language wrapper task; the
 bounded external agent tasks have ended. Completed source repairs and measured
 probe counts are archived in HISTORY.md. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
@@ -55,14 +56,18 @@ Recommended implementation order and concrete acceptance:
      contain callback errors/re-entry. Never move emval objects to compute threads.
    - Own child stream handles and close them before parent replacement/free;
      probe feed/flush/text/options, native failure and retired handles.
-   - Repair dispatch work/encoding/callback exceptions and failed proxy delivery,
-     then enforce one active operation against close/replacement/inference. Keep
-     supported atomic progress queries usable while work runs. Test an actual
-     threaded proxy module and browser event-loop responsiveness.
-   - Add async v2 load-options routes once dispatch ownership is safe; current
-     synchronous options routes do not make browser loading nonblocking.
-   - Token polling now copies before JS constructors run; still serialize the
-     globally selected native borrowed drain against concurrent compute/close.
+   - Dispatch now has real pthread Node/browser operation probes, including
+     native/encoder/callback errors, overlap guards and progress responsiveness.
+     Extend acceptance to full models and module variants. Audit remaining ASR/
+     synchronous result encoders for intermediate emval/scratch leaks when JS
+     constructors/getters throw; JS throws do not unwind default C++ EH frames.
+     Extend borrow guards through argument coercion: a JS getter can submit
+     async work or close an owner after an operation's initial guard.
+   - Async v2 ASR/TTS load options now have literal-POD and worker-thread probes;
+     validate real backend/model replacement and memory limits.
+   - Token polling copies before JS constructors run; count/drain calls now
+     reject during active async compute. Finish retained ASR event delivery for
+     incremental results and audit coercion/lifetime guards across all adapters.
 5. **Residual public options and polling ownership.** Go/Rust now have load
    options, standalone truecase/PCS and owned segment polling; Rust text scoring
    and Go capability queries have compiled probes. Review remaining ledger

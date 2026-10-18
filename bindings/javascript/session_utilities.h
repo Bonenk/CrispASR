@@ -204,8 +204,10 @@ static void binding_register_utilities() {
             out.set("tokenCounts", counts);
             return out;
         }));
-    emscripten::function("getStreamedSegmentCount",
-                         emscripten::optional_override([]() { return crispasr_get_streamed_segment_count(); }));
+    emscripten::function("getStreamedSegmentCount", emscripten::optional_override([]() {
+                             binding_check_reentry();
+                             return crispasr_get_streamed_segment_count();
+                         }));
     emscripten::function("drainStreamedSegments", emscripten::optional_override([]() {
                              binding_check_reentry();
                              auto r = crispasr_drain_streamed_segments();
@@ -238,8 +240,10 @@ static void binding_register_utilities() {
                              binding_check_reentry();
                              crispasr_reset_streamed_segments();
                          }));
-    emscripten::function("getStreamedTokenCount",
-                         emscripten::optional_override([]() { return crispasr_get_streamed_token_count(); }));
+    emscripten::function("getStreamedTokenCount", emscripten::optional_override([]() {
+                             binding_check_reentry();
+                             return crispasr_get_streamed_token_count();
+                         }));
     emscripten::function("resetStreamedTokens", emscripten::optional_override([]() {
                              binding_check_reentry();
                              crispasr_reset_streamed_tokens();

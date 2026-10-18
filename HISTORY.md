@@ -1,3 +1,34 @@
+## WASM proxied dispatch ownership and browser validation — 2026-10-18
+
+Async ASR, loading and TTS now share a dispatcher. Only native inputs/results
+cross to compute; the creating servicer retains callbacks and encoders. A
+regression reproduced an uncaught work exception aborting the old pthread.
+Work and encoder failures now reach the callback as error objects; callback
+exceptions are contained in `crispasrLastCallbackError`. A JS finally retires
+delivery even when JS throws skip default Emscripten C++ destructors. Servicer
+completion polling eliminates the failing return-proxy ownership path.
+
+A shared busy guard rejects overlap, close/replacement and borrowed token/segment
+polling during compute. Atomic ASR progress remains available. Completion can
+chain another job, and an unrelated readiness error cannot release its busy
+lease. Model replacement clears the old singleton before opening, including on
+C++ failure. New async v2 ASR/TTS load routes validate on the servicer and pass
+plain POD options to compute.
+
+The actual async TTS adapter copies PCM on compute and frees native allocations
+before JS encoding. Empty/allocated-empty output, invalid counts/null buffers,
+native throws and JS typed-array constructor errors have operation probes.
+
+Validation: **289 ABI assertions, 39 chat assertions and 86 threaded dispatch
+assertions in each of Node and headless Chromium** pass. The browser module uses
+real pthreads and COOP/COEP and checks event-loop/progress responsiveness. Tests
+check native payload/PCM counts and emval baselines, queue-failure injection,
+callback chaining and literal runtime load-option layout. Both complete main
+source syntax configurations pass. CI now requires Chrome for the browser probe.
+Full model/module variants, retained ASR events/streams and remaining encoder
+coercion/resource audits stay in PLAN.md; this is component/browser acceptance,
+not model parity or a release gate.
+
 ## WASM token drain copies before JS re-entry — 2026-10-18
 
 Token polling now copies all NUL-separated native strings into owned C++ storage

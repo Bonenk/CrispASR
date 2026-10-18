@@ -1,6 +1,7 @@
 #pragma once
 #include "crispasr_session.h"
 #include <cmath>
+#include <climits>
 #include <cstddef>
 
 // Private ABI POD; operation probes compile the literal runtime declaration.
@@ -63,19 +64,27 @@ static crispasr_open_params_v1 binding_open_options(const emscripten::val& optio
 #endif
     return p;
 }
+static void binding_validate_open_path(const std::string& model, const std::string& backend) {
+    if (model.empty() || model.find('\0') != std::string::npos || backend.find('\0') != std::string::npos)
+        throw std::invalid_argument("Invalid model path or backend");
+}
+// Plain native inputs only: usable on compute without creating any emval.
+static bool binding_native_open_options(crispasr_session*& session, const std::string& model,
+                                        const std::string& backend, const crispasr_open_params_v1& params) {
+    auto* old = session;
+    session = nullptr;
+    if (old)
+        crispasr_session_close(old);
+    session = crispasr_session_open_with_params(model.c_str(), backend.empty() ? nullptr : backend.c_str(), &params);
+    return session != nullptr;
+}
 static bool binding_open_with_options(crispasr_session*& session, const std::string& model, const std::string& backend,
                                       const emscripten::val& options) {
     binding_check_reentry();
-    if (model.empty() || model.find('\0') != std::string::npos || backend.find('\0') != std::string::npos)
-        throw std::invalid_argument("Invalid model path or backend");
-    // Validate before replacing a live session. Native opens keep the existing
-    // singleton replacement convention (close first to bound model memory).
+    binding_validate_open_path(model, backend);
+    // Validate before replacing a live singleton; close first bounds model memory.
     auto params = binding_open_options(options);
-    if (session)
-        crispasr_session_close(session);
-    session = nullptr;
-    session = crispasr_session_open_with_params(model.c_str(), backend.empty() ? nullptr : backend.c_str(), &params);
-    return session != nullptr;
+    return binding_native_open_options(session, model, backend, params);
 }
 static void binding_register_open_options() {
     using namespace emscripten;

@@ -83,5 +83,12 @@ jobs:
         with:
           version: '6.0.2'
           actions-cache-folder: emsdk-6.0.2
+      - name: Locate required browser for pthread dispatch checks
+        if: matrix.language == 'wasm'
+        run: |
+          browser_path="$(command -v google-chrome || command -v chromium)"
+          test -x "$browser_path"
+          "$browser_path" --version
+          echo "CRISPASR_CHROME=$browser_path" >> "$GITHUB_ENV"
       - name: Compile and exercise actual wrapper adapters
         run: python3 tools/run-wrapper-contract.py ${{ matrix.language }}
