@@ -92,6 +92,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_diarization();
     binding_register_vad();
     binding_register_streams();
+    binding_register_asr_callbacks();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
                              binding_check_callback();

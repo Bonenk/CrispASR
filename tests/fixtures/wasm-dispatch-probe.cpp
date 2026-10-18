@@ -91,6 +91,7 @@ EMSCRIPTEN_BINDINGS(dispatch_probe) {
     binding_register_async_options();
     binding_register_async_audio();
     binding_register_streams();
+    binding_register_asr_callbacks();
     register_stream_probe();
     emscripten::function("audioLive", &probe_async_audio_live);
     emscripten::function("openLive", &probe_async_open_live);

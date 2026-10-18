@@ -245,7 +245,7 @@ class WasmWrapperContract(unittest.TestCase):
             # Concrete public-header probes supply every operation asserted below.
             fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry','wrapper-diarize-arguments']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
-            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_transcription.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_lifetime.h','session_registry.h','session_diarization.h','session_vad.h'])
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_transcription.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_lifetime.h','session_asr_events_native.h','session_registry.h','session_diarization.h','session_vad.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
             headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
             unused=[]
@@ -348,11 +348,37 @@ require(process.argv[2])().then(async m=>{
   finally {globalThis.Float32Array=F32;}
   eq(m.audioLive(),0);eq(m.count_emval_handles(),handles);
   rejects(()=>m.ttsSynthesizeAsync('bad\0text',()=>{}));eq(m.audioLive(),0);
+  m.crispasrLastCallbackError=null;
+  const events=[],tokenEvents=[];
+  m.asrSetSegmentCallback(e=>{events.push(['segment',e]);rejects(()=>m.asrDispatchEvents());rejects(()=>m.closeAsr());});
+  m.asrSetTokenCallback(e=>tokenEvents.push(e));m.asrSetProgressCallback(e=>events.push(['progress',e]));
+  const emit=mode=>new Promise(r=>m.emitAsrEventsAsync(mode,r));
+  const held=new Promise(r=>m.holdEventQueueAsync(r));
+  for(let i=0;!m.eventQueueHeld()&&i<200;i++)await new Promise(r=>setTimeout(r,1));
+  eq(m.eventQueueHeld(),1);m.asrDispatchEvents();m.releaseEventQueue();eq(await held,0);
+  const emission=emit(0);rejects(()=>m.asrSetTokenCallback(null));rejects(()=>m.closeAsr());
+  eq(await emission,0);eq(events,[['progress',{processed:16,total:64}],['segment',{text:'日本語',t0:125,t1:250,index:7}],['progress',{processed:64,total:64}]]);
+  eq(tokenEvents.map(e=>Array.from(e.rawText)),[[230,151],[165],[]]);eq(tokenEvents.map(e=>e.index),[0,1,2]);
+  eq(new TextDecoder().decode(new Uint8Array([...tokenEvents[0].rawText,...tokenEvents[1].rawText])),'日');
+  eq(m.eventLive(),0);eq(m.eventQueued(),0);eq(m.count_emval_handles(),handles);
+  await emit(1);let replacements=[];m.asrSetTokenCallback(e=>replacements.push(e));eq(await emit(2),0);eq(replacements,[]);
+  const cbError=new Error('ASR retained sentinel');m.asrSetTokenCallback(()=>{throw cbError});eq(await emit(5),0);eq(m.crispasrLastCallbackError===cbError,true);eq(m.eventLive(),0);m.crispasrLastCallbackError=null;
+  const bytes=Uint8Array.prototype.slice;
+  try {Uint8Array.prototype.slice=function(){throw cbError};eq(await emit(5),0);eq(m.crispasrLastCallbackError===cbError,true);}
+  finally {Uint8Array.prototype.slice=bytes;}
+  eq(m.eventLive(),0);eq(m.eventQueued(),0);m.crispasrLastCallbackError=null;
+  m.asrSetTokenCallback(e=>replacements.push(e));const flood=emit(3);const deadline=Date.now()+2000;while(!m.eventFinished() && Date.now()<deadline){};eq(m.eventFinished(),1);eq(await flood,0);eq(m.crispasrLastCallbackError.message.includes('events were lost'),true);eq(m.eventQueued(),0);eq(m.eventLive(),0);m.crispasrLastCallbackError=null;
+  eq(await emit(4),0);eq(m.crispasrLastCallbackError.message.includes('invalid event'),true);m.crispasrLastCallbackError=null;
+  const callbacks=events.length;m.asrSetSegmentCallback(null);m.asrSetTokenCallback(undefined);m.asrSetProgressCallback(null);eq(await emit(0),0);eq(events.length,callbacks);eq(m.eventQueued(),0);
+  rejects(()=>m.asrSetTokenCallback({}));eq(m.count_emval_handles(),handles);
+  m.asrSetTokenCallback(e=>replacements.push(e));await emit(1);
+  eq(await new Promise(r=>m.asrOpenWithOptionsAsync('model','',null,r)),true);eq(await emit(2),0);eq(m.callbackCloseErrors(),0);eq(m.crispasrAsrCallbacks.every(x=>x===null),true);
   const streamOpts={step_ms:100,length_ms:300,keep_ms:20,language:'ja'};
   const streamOpen=opts=>new Promise(r=>m.asrStreamOpenAsync(opts,r));
   const streamCall=(name,...args)=>new Promise(r=>m[name](...args,r));
+  m.asrSetTokenCallback(e=>replacements.push(e));
   const stream=await streamOpen(streamOpts);eq(typeof stream,'number');eq(m.streamLive(),1);eq(m.asrStreamKind(),2);
-  rejects(()=>m.batchAllowed());rejects(()=>m.closeAsr());eq(m.openLive(),2);eq(m.streamLive(),1);
+  rejects(()=>m.batchAllowed());rejects(()=>m.asrSetTokenCallback(null));rejects(()=>m.closeAsr());eq(m.openLive(),2);eq(m.streamLive(),1);
   rejects(()=>m.asrStreamFeed(stream,new Float32Array([.25,.5,.75])));
   eq(typeof (await streamOpen(streamOpts)).error,'string');eq(m.streamLive(),1);
   eq(await streamCall('asrStreamFeedAsync',stream,new Float32Array([.25,.5,.75])),1);
@@ -386,6 +412,7 @@ require(process.argv[2])().then(async m=>{
   const third=await streamOpen(streamOpts);eq(await streamCall('asrStreamCloseAsync',third),0);eq(await streamCall('asrStreamCloseAsync',third),0);
   eq(m.streamLive(),0);eq(m.streamOrderErrors(),0);eq(m.batchAllowed(),true);eq(m.count_emval_handles(),handles);
   m.closeAsr();m.closeTts();eq(m.openLive(),0);eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
+  await new Promise(r=>setTimeout(r,30));eq(m.eventTimerArmed(),0);
   console.log('PASS WASM threaded dispatch: '+n+' assertions');process.exit(0);
 }).catch(e=>{console.error(e);process.exit(1)});
 ''')
@@ -457,11 +484,12 @@ static crispasr_session* g_tts_session=nullptr;
 #include "session_guard.h"
 #include "session_options.h"
 #include "session_streams.h"
+#include "session_asr_events.h"
 #include "wasm-stream-probe.h"
 extern "C" void probe_async_open_defaults(int);
 extern "C" int probe_async_open_live();
 EMSCRIPTEN_BINDINGS(stream_probe) {
-    binding_register_open_options(); binding_register_streams(); register_stream_probe();
+    binding_register_open_options(); binding_register_streams(); binding_register_asr_callbacks(); register_stream_probe();
     emscripten::function("openDefaults",&probe_async_open_defaults);
     emscripten::function("openLive",&probe_async_open_live);
     emscripten::function("closeAsr",emscripten::optional_override([](){binding_check_reentry();binding_native_close_session(g_asr_session);}));
@@ -475,11 +503,18 @@ EMSCRIPTEN_BINDINGS(stream_probe) {
                 '-o',str(module)],check=True)
             program=tmp/'test.cjs'
             program.write_text(r'''const assert=require('node:assert/strict');
-require(process.argv[2])().then(m=>{
+require(process.argv[2])().then(async m=>{
  let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++};const rejects=fn=>{assert.throws(fn);n++};
  const opts={step_ms:100,length_ms:300,keep_ms:20,language:'ja'}, pcm=new Float32Array([.25,.5,.75]);
  m.openDefaults(1);eq(m.asrStreamKind(),0);rejects(()=>m.asrStreamOpen(opts));
  eq(m.asrOpenWithOptions('model','',null),true);eq(m.openLive(),1);eq(m.asrStreamKind(),2);
+ const callbacks=[],tokens=[];
+ m.asrSetSegmentCallback(e=>{callbacks.push(e);rejects(()=>m.closeAsr());});m.asrSetTokenCallback(e=>tokens.push(e));m.asrSetProgressCallback(e=>callbacks.push(e));
+ m.emitAsrEvents(0);eq(callbacks.length,0);m.asrDispatchEvents();eq(callbacks,[{processed:16,total:64},{text:'日本語',t0:125,t1:250,index:7},{processed:64,total:64}]);
+ eq(tokens.map(e=>Array.from(e.rawText)),[[230,151],[165],[]]);eq(tokens[1].index,1);eq(m.eventLive(),0);
+ m.emitAsrEvents(1);m.asrSetTokenCallback(e=>{throw new Error('must not run stale')});m.emitAsrEvents(2);m.asrDispatchEvents();eq(m.crispasrLastCallbackError,undefined);
+ m.asrSetSegmentCallback(null);m.asrSetTokenCallback(null);m.asrSetProgressCallback(null);m.asrDispatchEvents();
+ rejects(()=>m.asrSetProgressCallback(1));eq(m.eventQueued(),0);
  const stream=m.asrStreamOpen(opts);eq(typeof stream,'number');eq(m.streamLive(),1);rejects(()=>m.asrStreamOpen(opts));rejects(()=>m.batchAllowed());
  eq(m.asrStreamFeed(stream,pcm),1);eq(m.asrStreamFlush(stream),1);
  const result=m.asrStreamGetText(stream);eq(result,{text:'日本語',t0:1.25,t1:2.5,counter:3});
@@ -504,7 +539,9 @@ require(process.argv[2])().then(m=>{
  // Option getters may retire/reopen a parent at the same native allocation address.
  const changed={...opts,get language(){m.closeAsr();m.asrOpenWithOptions('model','',null);return 'ja'}};
  rejects(()=>m.asrStreamOpen(changed));eq(m.streamLive(),0);eq(m.openLive(),1);
- const last=m.asrStreamOpen(opts);m.closeAsr();eq(m.streamLive(),0);eq(m.openLive(),0);eq(m.streamOrderErrors(),0);rejects(()=>m.asrStreamGetText(last));
+ m.asrSetTokenCallback(()=>{});m.exhaustCallbackVersions();rejects(()=>m.asrSetTokenCallback(()=>{}));m.asrSetTokenCallback(null);m.asrDispatchEvents();eq(m.crispasrAsrCallbacks[1],null);
+ const last=m.asrStreamOpen(opts);m.closeAsr();eq(m.streamLive(),0);eq(m.openLive(),0);eq(m.streamOrderErrors(),0);eq(m.callbackCloseErrors(),0);rejects(()=>m.asrStreamGetText(last));m.asrDispatchEvents();
+ await new Promise(r=>setTimeout(r,30));eq(m.eventTimerArmed(),0);
  console.log('PASS WASM single-thread streams: '+n+' assertions');
 }).catch(e=>{console.error(e);process.exit(1)});
 ''')

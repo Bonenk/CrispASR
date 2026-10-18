@@ -1,3 +1,44 @@
+## WASM retained ASR event callbacks — 2026-10-18
+
+New `asrSetSegmentCallback`, `asrSetTokenCallback` and
+`asrSetProgressCallback` adapters retain JS functions on the servicer. Native
+callbacks enqueue copied text/raw bytes and metadata using nonreused generation
+tickets as userdata, with no JS/emval objects on compute or producer threads.
+`asrDispatchEvents` drains copied events even while compute is active; an
+automatic servicer pump delivers them and stops when no callbacks remain.
+Committed events drain before async completion. Single-thread synchronous work
+queues events until native return or explicit draining.
+
+Callback replacement retires stale generations and pending events for that hook.
+Parent close clears all native hooks before stream/model teardown; servicer
+references retire at the next pump, before async completion. Null restores the
+native default segment/token pollers. Registration/clearing requires idle
+compute without a retained stream because native setters are plain field writes.
+Callback/encoder errors are contained, with each popped native event retired in
+a JS finally. A deterministic native/servicer handshake reproduced a blocking
+queue drain; generation reads are now atomic and draining defers on a busy mutex
+instead of waiting for the producer. The bounded 4096-event/8-MiB queue reports lost events on overflow,
+invalid metadata or allocation failure; it does not silently promise complete
+incremental output. Native work continues after a callback error.
+
+Fixtures compile the actual typed callback declarations and mutate borrowed
+buffers immediately after emission. They cover raw partial/empty UTF-8 tokens,
+centisecond segment metadata, progress sample counts, foreign-thread production,
+stale userdata, replacement/close, exceptions, deterministic queue backpressure,
+and native/emval/timer cleanup. Generation exhaustion refuses new callbacks
+while still permitting clear/teardown. Deliberately omitting cleanup after a callback
+exception reproduced one leaked native event; restoring the finally passes.
+New stream/event JS bridges also normalize wasm32 pointers to unsigned heap
+offsets. Actual large-heap/platform acceptance remains separate.
+
+Validation: **289 WASM ABI assertions, 39 chat assertions, 71 single-thread
+stream/event assertions, and 192 threaded assertions in each of Node and
+Chromium** pass. Both main WASM syntax variants, formatting, doc anchors and
+workflow-shell checks pass. The preceding stream checkpoint
+`f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all six hosted binding contract
+jobs, including Ruby. These component gates do not establish which actual
+models/backends emit each native event hook; that acceptance remains in PLAN.md.
+
 ## WASM retained stream ownership and Ruby GC probe repair — 2026-10-18
 
 WASM now exposes session stream kind/open/feed/flush/text/live-decode/close.

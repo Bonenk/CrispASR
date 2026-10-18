@@ -171,7 +171,9 @@ text. The wrapper copies every native string before creating JS arrays, so JS
 constructor re-entry cannot change later tokens. Negative counts or positive
 counts with a null buffer throw. Token/segment drain and count queries require idle compute; the shared guard
 rejects them while an async native operation runs. Retained ASR callback
-delivery remains pending in PLAN.md.
+delivery is available through the retained setters described below. Native
+segment/token setters replace their corresponding default pollers; clear them
+to restore polling.
 
 
 ## Proxied browser dispatch
@@ -238,4 +240,47 @@ in threaded modules. Finish one callback before submitting the next operation.
 
 The tiny Node/browser probes establish transport, scheduling and ownership.
 Actual backend/model accuracy, browser memory and decoder responsiveness remain
-separate acceptance work in PLAN.md. Native event callbacks are still pending.
+separate acceptance work in PLAN.md.
+
+
+## Retained ASR events
+
+`asrSetSegmentCallback(callback)`, `asrSetTokenCallback(callback)`, and
+`asrSetProgressCallback(callback)` retain a function on the caller's JS thread.
+Pass null or undefined to clear one. Register or clear only while compute is
+idle and before opening a retained stream. Parent close/replacement clears all
+three native hooks, discards pending events, and restores native polling hooks.
+The servicer retires JS callback references on its next pump, before async
+completion.
+Callback replacement discards pending events for that hook; stale native
+userdata generations cannot call a replacement function.
+
+Callbacks receive one owned object:
+
+| Hook | Event |
+| --- | --- |
+| Segment | `{text, t0, t1, index}`; timestamps are native centiseconds |
+| Token | `{rawText, index}`; `rawText` is a copied `Uint8Array` |
+| Progress | `{processed, total}`; counts are native input samples |
+
+Token fragments may be incomplete UTF-8 or empty. Concatenate bytes before
+text decoding. Native threads only enqueue copied data; JS callbacks never run
+on compute or native producer threads. Events are delivered by a 10 ms servicer
+pump and drained before an async operation's completion callback. In a sync
+single-thread call, delivery follows the native return; `asrDispatchEvents()`
+can drain immediately afterwards. This function also works during async
+compute because it reads copied events rather than model state.
+
+Event callbacks cannot re-enter wrapper operations, including registration,
+close or another event drain. Errors are contained in
+`module.crispasrLastCallbackError`, with native event allocations retired even
+when JS encoding or a callback throws. Applications may inspect and clear this
+property. The native queue is bounded at 4096 events and 8 MiB of text; overflow,
+unrepresentable timestamps or allocation failure report an error there and mean
+incremental events were lost. The native operation continues. The pump stops
+when no callbacks remain.
+
+These setters expose native hooks; they do not make a backend emit unsupported
+events. In particular, progress depends on native chunked transcription and a
+retained stream backend need not emit session hooks. Verify actual model/backend
+behavior separately from the compiled transport and ownership probes.

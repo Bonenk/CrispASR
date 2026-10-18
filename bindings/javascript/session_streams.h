@@ -112,7 +112,7 @@ static binding_stream_text binding_native_stream_text(int ticket) {
 // A literal JS object avoids user setters on Object.prototype during encoding.
 // clang-format off
 EM_JS(emscripten::EM_VAL, binding_stream_text_encode, (const char* text, double t0, double t1, double counter), {
-    return Emval.toHandle({text: UTF8ToString(text), t0: t0, t1: t1, counter: counter});
+    return Emval.toHandle({text: UTF8ToString(text >>> 0), t0: t0, t1: t1, counter: counter});
 });
 // clang-format on
 static emscripten::val binding_encode_stream_text(binding_stream_text& text) {

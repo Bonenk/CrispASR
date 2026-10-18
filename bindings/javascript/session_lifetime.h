@@ -1,5 +1,6 @@
 #pragma once
 #include "crispasr_session.h"
+#include "session_asr_events_native.h"
 #include <atomic>
 #include <climits>
 #include <map>
@@ -39,6 +40,7 @@ static void binding_native_close_session(crispasr_session*& session) {
     if (binding_has_stream(session) && emscripten_is_main_runtime_thread())
         throw std::runtime_error("Use asrCloseAsync or an async open to close a streamed session");
 #endif
+    binding_asr_clear_events(session);
     auto* parent = session;
     session = nullptr;
     ++binding_session_epoch;

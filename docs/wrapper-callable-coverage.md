@@ -243,5 +243,22 @@ against the public stream declarations and a native ownership/thread oracle.
 The probes cover exact options and PCM, native failure, text growth, copied
 UTF-8/time/counter results, ticket retirement and parent replacement/close.
 Only one child is supported per session, matching the native ABI contract;
-batch ASR inference refuses while that child exists. Typed retained ASR event
-callbacks and real-model acceptance remain pending in PLAN.md.
+batch ASR inference refuses while that child exists. Real-model acceptance remains pending in PLAN.md.
+
+
+## WASM retained ASR callbacks
+
+`crispasr_session_set_segment_callback`, `_set_token_callback` and
+`_set_progress_callback` map to `asrSetSegmentCallback`, `asrSetTokenCallback`
+and `asrSetProgressCallback`. `asrDispatchEvents` drains copied events, including
+during compute. Callback userdata carries a nonreused generation ticket;
+JS functions remain on the servicer. Segment times retain native centiseconds,
+token bytes preserve incomplete/empty UTF-8, and progress preserves sample counts.
+Registration/clear requires idle compute and no retained stream. Null restores
+the native default polling hooks. Parent close clears all callback generations.
+
+Actual `WasmStreamContract` and `WasmDispatchContract` fixtures store the typed
+public-header callbacks and emit borrowed buffers which are immediately mutated.
+They also exercise foreign-thread emission, stale userdata, replacement/close,
+callback and encoder errors, backlog limits and popped-event cleanup. This does
+not prove each backend emits every hook; real-model event acceptance is in PLAN.

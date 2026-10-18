@@ -1,4 +1,5 @@
 #pragma once
+#include "session_asr_events.h"
 #ifdef __EMSCRIPTEN_PTHREADS__
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -59,6 +60,9 @@ static void binding_browser_poll(void* raw) {
         emscripten_async_call(binding_browser_poll, raw, 1);
         return;
     }
+    // Deliver all committed ASR events before the operation completion. Event
+    // callbacks keep re-entry blocked even after native work has finished.
+    binding_asr_events_drain();
     // Native work has ended and its results are owned. Release before encoding
     // and callback delivery so completion callbacks can enqueue the next job.
     if (job->owns_busy)

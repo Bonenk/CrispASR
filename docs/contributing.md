@@ -695,6 +695,19 @@ second stream and batch inference until close. Backend stream cleanup can join
 decoder threads, so threaded modules use compute-dispatched stream methods and
 async parent close/replacement. Probe the real worker thread, retired tickets,
 text-buffer growth and JS input-copy re-entry, not just symbol declarations.
+Retained ASR hooks copy native event data into a bounded queue; generation-ticket
+userdata must never point at JS/emval storage. Drain on the servicer, retire each
+popped native event in a JS finally, and deliver committed events before async
+completion. Servicer reads of generations must be atomic, and queue draining
+must use a nonblocking try-lock: a native producer may need browser services
+while it owns the queue mutex. Probe this with a producer/servicer handshake.
+Clear generations and pending events before parent teardown. Native
+setters are plain field assignments, so registration/clear is restricted to idle
+compute without retained children. Queue overflow must report lost events rather
+than silently pretending delivery was complete. Probe partial/empty UTF-8 token
+bytes, replacement, callback/encoder throws and actual foreign-thread emission.
+Normalize wasm32 pointer arguments to unsigned offsets before JS heap access;
+large model heaps can place event text above the signed int32 range.
 
 Ruby GC resource tests must not assume that a discarded temporary on an active
 VM/C stack is immediately unreachable. Exercise owner finalization after the

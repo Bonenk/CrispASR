@@ -67,11 +67,15 @@ extern "C" void crispasr_stream_close(crispasr_stream* s) {
     ++closes;
     delete s;
 }
+extern "C" void probe_asr_emit(crispasr_session*, int);
 extern "C" int crispasr_stream_feed(crispasr_stream* s, const float* pcm, int n) {
     check_thread();
     ++calls;
     if (!s || !pcm || n != 3 || pcm[0] != .25f || pcm[1] != .5f || pcm[2] != .75f)
         throw std::runtime_error("stream PCM mismatch");
+#ifdef __EMSCRIPTEN_PTHREADS__
+    probe_asr_emit(s->parent, 5);
+#endif
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     return mode == 2 ? -2 : 1;
 }

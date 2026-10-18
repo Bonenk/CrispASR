@@ -2,8 +2,8 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: retained WASM ASR callbacks after
-stream ownership and dispatch checkpoints. Continue the cross-language wrapper
+Owner: maintainer coordinator. Active next: legacy callable-wrapper inventory
+and residual ownership/coercion audits after WASM event/stream checkpoints. Continue the cross-language wrapper
 task; the bounded external agent tasks have ended. Completed source repairs and measured
 probe counts are archived in HISTORY.md. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
@@ -22,7 +22,19 @@ Recommended implementation order and concrete acceptance:
    Record bulk/superset equivalents, retired refusing stubs and deliberate
    platform exclusions separately. TitaNet and roster DB now have reviewed
    public paths in all eight; extend the ledger beyond those families.
-2. **Legacy Whisper controls.** C#/Python/Dart have pointer-safe parameter,
+2. **Legacy Whisper controls.** First fix two verified high-level paths:
+   - Rust `crispasr-sys/src/lib.rs` declares pointer parameters for
+     `whisper_init_from_file_with_params` and `whisper_full`, while those native
+     symbols take structs by value. Route the legacy wrapper through the real
+     `*_by_ref` exports and add a literal-header ABI/operation regression; its
+     deprecation does not make the current signature mismatch acceptable.
+   - Java `WhisperCpp.initContextImpl` copies only `use_gpu` and `flash_attn`
+     into newly allocated native defaults, ignoring GPU-device/DTW settings.
+     Forward the remaining public options through pointer-safe native adapters,
+     free each default-params allocation, and make `freeContext` retire `ctx`
+     before native free (it currently leaves the pointer set). Probe repeated
+     close/reinitialization, initialization failure and actual DTW forwarding.
+   Then extend the cross-language inventory. C#/Python/Dart have pointer-safe parameter,
    DTW and parallel probes; inspect Go's compiled parameter routes and finish
    Java/Rust/Ruby/WASM callable gaps. Cover scalar setters, language detection,
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
@@ -45,16 +57,18 @@ Recommended implementation order and concrete acceptance:
    probes; validate their full-module size and browser filesystem/download behavior.
    Generic diarization/turns, language-aware VAD and owned logits results now
    have compiled operation probes; include them in real-model/browser acceptance.
-   Implement typed ASR callback setters and remaining legacy controls. Retained
-   session streams now have public ticket adapters; validate real backend behavior.
+   Finish remaining legacy controls. Retained ASR callback setters and session
+   stream adapters now have public paths; validate actual native backend behavior.
    Generic speaker/clustering/pyannote adapters now have operation probes;
    include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
    work and callback delivery are safely proxied. Measure complete default
    and opt-in module sizes and instantiate actual models in a browser.
    Concrete remaining WASM acceptance:
-   - Retained segment/token/progress callbacks must deliver copied native events
-     on the servicer, preserve raw token bytes, clear on replacement/close, and
-     contain callback errors/re-entry. Never move emval objects to compute threads.
+   - Validate retained ASR segment/token/progress events with actual models and
+     streams, including which backends emit each native hook. Copied-event transport,
+     raw token bytes, generations, replacement/close, bounded backlog and JS/native
+     allocation cleanup have component probes; they do not establish event support
+     on every backend. Keep registration idle and before retained stream creation.
    - Validate retained stream adapters with actual models: feed/flush/text/live
      decode, backend stream-kind semantics, finalization and browser responsiveness.
      The compiled probes cover native transport and child-before-parent ownership,
@@ -71,8 +85,9 @@ Recommended implementation order and concrete acceptance:
    - Async v2 ASR/TTS load options now have literal-POD and worker-thread probes;
      validate real backend/model replacement and memory limits.
    - Token polling copies before JS constructors run; count/drain calls now
-     reject during active async compute. Finish retained ASR event delivery for
-     incremental results and audit coercion/lifetime guards across all adapters.
+     reject during active async compute. Retained ASR delivery uses a separate copied
+     queue that can drain during compute. Audit coercion/lifetime guards across
+     remaining adapters.
 5. **Residual public options and polling ownership.** Go/Rust now have load
    options, standalone truecase/PCS and owned segment polling; Rust text scoring
    and Go capability queries have compiled probes. Review remaining ledger
@@ -90,15 +105,13 @@ Recommended implementation order and concrete acceptance:
    Review real CI logs before acceptance. No release from fixture success or
    queued jobs.
 
-The dispatch baseline is `1ebaf240cf8f06d40be4a5ce88b58d2fc89ddef1`.
-Its [binding ABI run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146277899)
-and [full WASM run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146278024)
-were queued at inspection. At the subsequent `1bd1447d3` checkpoint the binding
-run passed C#, Java, Dart, Go/Rust and WASM, but failed Ruby's conservative-GC
-finalizer assumption. That test now allocates on a finished thread; the strict
-340-assertion Ruby probe passes locally. Require a hosted rerun. The explicit
-failure-state guard has local Node/browser regressions. Require hosted results
-for the actual tip before acceptance; older frozen wrapper checkpoints are historical evidence only.
+The stream checkpoint `f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all
+six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625865),
+including Ruby's finalizer regression. Its
+[full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625808)
+was still pending at inspection. Retained ASR event changes require their own
+hosted results for the actual tip. Older source checkpoints establish only their
+recorded component contracts, not full current-wrapper/model acceptance.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.
