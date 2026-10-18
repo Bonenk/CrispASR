@@ -211,6 +211,12 @@ jobs:
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v
 
+      - name: Session metadata through exported C ABI and Python (#549)
+        run: |
+          library=$(find build \( -type f -o -type l \) -name libcrispasr.so -print -quit)
+          test -n "$library"
+          CRISPASR_LIB="$PWD/$library" python3 tests/test_session_metadata.py -v
+
 
       - name: Breeze session reference and instruction composition
         run: python3 tests/test_breeze_session_modes.py -v

@@ -407,6 +407,18 @@ CRISPASR_SESSION_API const char* crispasr_session_result_word_text(crispasr_sess
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API float crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
+// Native token metadata (#549). Empty for backends/routes without token output.
+// t0/t1 use centiseconds; negative means unavailable (never interpolate).
+// Token text may contain a UTF-8 byte fragment: concatenate bytes before decoding
+// to reconstruct the transcript. Returned pointers live until result_free.
+CRISPASR_SESSION_API int crispasr_session_result_n_tokens(crispasr_session_result* r, int i_seg);
+CRISPASR_SESSION_API const char* crispasr_session_result_token_text(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API int64_t crispasr_session_result_token_t0(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API int64_t crispasr_session_result_token_t1(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API float crispasr_session_result_token_p(crispasr_session_result* r, int i_seg, int i_token);
+// Release the process-wide forced-aligner cache. Safe to repeat; waits for an
+// active alignment to finish. The next alignment reloads its requested model.
+CRISPASR_SESSION_API void crispasr_free_aligner_cache(void);
 // Whisper's per-segment no-speech probability (the <|nospeech|> token
 // posterior) in [0, 1]. Only the whisper backend populates it; other backends
 // and out-of-range indices return the -1.0 sentinel ("no data").
