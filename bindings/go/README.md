@@ -178,6 +178,13 @@ and invalid parallel processor counts are rejected before native calls.
 Serialize operations on a native context and do not mutate one `Params` value
 concurrently; independent value copies may be configured separately.
 
+`Whisper_full_parallel` uses the native pointer-parameter parallel wrapper,
+including CrispASR's global progress lifecycle. The additive
+`Whisper_full_parallel_with_progress` also accepts a per-call progress callback;
+encoder, segment and progress closures are removed on success and native failure.
+Existing `Whisper_full_parallel` callers keep their signature. Use a matching
+native library exporting `crispasr_transcribe_parallel_by_ref`.
+
 Both low-level `Params` and the higher-level `Context` expose `SetBestOf`,
 `SetDetectLanguage`, `SetSuppressBlank`, `SetTdrz`, and `SetAltN`. Candidate
 counts clamp to 0–32; nonpositive best-of values leave the setting unchanged.

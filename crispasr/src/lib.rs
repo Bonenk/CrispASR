@@ -108,6 +108,30 @@ impl CrispASR {
         pcm: &[f32],
         opts: &TranscribeOptions,
     ) -> Result<Vec<Segment>, String> {
+        self.transcribe_pcm_impl(pcm, opts, None)
+    }
+
+    /// Split PCM into `processors` chunks using native progress-tracked parallel
+    /// Whisper decoding. Chunk boundaries may reduce transcription accuracy.
+    /// Options and owned result handling are identical to sequential decoding.
+    pub fn transcribe_pcm_parallel(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        processors: i32,
+    ) -> Result<Vec<Segment>, String> {
+        if processors <= 0 {
+            return Err("parallel decoding requires positive processors".into());
+        }
+        self.transcribe_pcm_impl(pcm, opts, Some(processors))
+    }
+
+    fn transcribe_pcm_impl(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        processors: Option<i32>,
+    ) -> Result<Vec<Segment>, String> {
         if pcm.is_empty() || pcm.len() > i32::MAX as usize {
             return Err("nonempty PCM with an int32 sample count required".into());
         }
@@ -160,7 +184,7 @@ impl CrispASR {
                 crispasr_sys::crispasr_params_set_tdrz(params, 1);
             }
         }
-        self.run_full(pcm, params, vad_path)
+        self.run_full(pcm, params, vad_path, processors)
     }
 
     fn run_full(
@@ -168,9 +192,22 @@ impl CrispASR {
         pcm: &[f32],
         params: *mut crispasr_sys::WhisperFullParams,
         _keep_alive_vad_path: Option<CString>,
+        processors: Option<i32>,
     ) -> Result<Vec<Segment>, String> {
-        let ret =
-            unsafe { crispasr_sys::whisper_full(self.ctx, params, pcm.as_ptr(), pcm.len() as i32) };
+        let ret = unsafe {
+            match processors {
+                Some(n) => crispasr_sys::crispasr_transcribe_parallel_by_ref(
+                    self.ctx,
+                    params,
+                    pcm.as_ptr(),
+                    pcm.len() as i32,
+                    n,
+                ),
+                None => {
+                    crispasr_sys::whisper_full(self.ctx, params, pcm.as_ptr(), pcm.len() as i32)
+                }
+            }
+        };
         unsafe { crispasr_sys::whisper_free_params(params) };
 
         if ret != 0 {
@@ -205,6 +242,44 @@ impl CrispASR {
         }
 
         Ok(segments)
+    }
+
+    /// Detect language directly from mono 16 kHz PCM, returning an owned language
+    /// code and probability. This runs Whisper mel/encoder inference and replaces
+    /// native encoder state. `n_threads` must be positive.
+    pub fn detect_language(&self, pcm: &[f32], n_threads: i32) -> Result<(String, f32), String> {
+        if pcm.is_empty() || pcm.len() > i32::MAX as usize || n_threads <= 0 {
+            return Err(
+                "language detection requires nonempty int32 PCM and positive threads".into(),
+            );
+        }
+        let mut code = [0 as c_char; 32];
+        let probability = unsafe {
+            crispasr_sys::crispasr_detect_language(
+                self.ctx,
+                pcm.as_ptr(),
+                pcm.len() as i32,
+                n_threads,
+                code.as_mut_ptr(),
+                code.len() as i32,
+            )
+        };
+        if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+            return Err(format!(
+                "language detection failed (probability {probability})"
+            ));
+        }
+        let end = code
+            .iter()
+            .position(|&b| b == 0)
+            .ok_or("unterminated native language code")?;
+        if end == 0 {
+            return Err("empty native language code".into());
+        }
+        let bytes: Vec<u8> = code[..end].iter().map(|&b| b as u8).collect();
+        let language =
+            String::from_utf8(bytes).map_err(|_| "invalid UTF-8 native language code")?;
+        Ok((language, probability))
     }
 
     /// Get the detected language from the last transcription.

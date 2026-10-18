@@ -8,6 +8,7 @@
 #include "crispasr.h"
 #include "crispasr_chat.h"
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -1103,6 +1104,21 @@ int whisper_full_by_ref(whisper_context* ctx, struct whisper_full_params* p, con
         return -7;
     return probe_mode == 2 ? -1 : 0;
 }
+static int parallel_by_ref_calls;
+int probe_parallel_by_ref_calls(void) {
+    return parallel_by_ref_calls;
+}
+int crispasr_transcribe_parallel_by_ref(struct whisper_context* ctx, const struct whisper_full_params* p,
+                                        const float* samples, int n, int processors) {
+    ++parallel_by_ref_calls;
+    if (processors != 2) {
+        ++probe_calls;
+        return -8;
+    }
+    if (ctx == rust_legacy_context())
+        return whisper_full_by_ref(ctx, (struct whisper_full_params*)p, samples, n);
+    return probe_legacy_full(ctx, *p, samples, n);
+}
 int whisper_full_n_segments(struct whisper_context* ctx) {
     if (ctx != rust_legacy_context())
         STUB_ABORT();
@@ -1359,8 +1375,20 @@ int crispasr_token_alt_text(struct whisper_context* ctx, int s, int t, int a, ch
     return 0;
 }
 float crispasr_detect_language(struct whisper_context* ctx, const float* pcm, int n, int nt, char* out, int cap) {
-    STUB_ABORT();
-    return 0;
+    ++probe_calls;
+    if (ctx != rust_legacy_context() || !pcm || n != 3 || pcm[0] != 1 || pcm[1] != 3 || pcm[2] != 5 || nt != 3 ||
+        cap != 32)
+        return -9;
+    if (probe_mode == 2)
+        return -3;
+    memset(out, 0, cap);
+    if (probe_mode == 15)
+        memset(out, 'x', cap);
+    else if (probe_mode == 14)
+        out[0] = (char)0xff;
+    else if (probe_mode != 16)
+        memcpy(out, "de", 2);
+    return probe_mode == 13 ? NAN : probe_mode == 17 ? 0 : probe_mode == 18 ? 1.1f : .875f;
 }
 int crispasr_stream_open_dummy(void) {
     STUB_ABORT();

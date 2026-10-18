@@ -2,8 +2,10 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: legacy callable-wrapper inventory
-and residual ownership/coercion audits after WASM event/stream checkpoints. Continue the cross-language wrapper
+Owner: maintainer coordinator. Active next: legacy DTW/token/parameter callable
+inventory, followed by the remaining ownership/coercion audits. Rust parallel
+and PCM language detection plus Go parallel progress routing are implemented;
+validation evidence is archived in HISTORY.md. Continue the cross-language wrapper
 task; the bounded external agent tasks have ended. Completed source repairs and measured
 probe counts are archived in HISTORY.md. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
@@ -37,9 +39,23 @@ Recommended implementation order and concrete acceptance:
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
    implementation. Direct Parakeet uses an integer centisecond offset.
    Go's legacy parameter-string ownership and five scalar decode controls now
-   have compiled operation probes; verify actual model behavior. Continue DTW,
+   have compiled operation probes. Rust now has parallel decoding and PCM language
+   detection, and Go parallel decoding uses the progress-tracked pointer route
+   with optional per-call progress callbacks. Verify actual model behavior and
+   progress frequency. Continue DTW,
    remaining token introspection and legacy context/callback lifecycle auditing.
    Review higher-level APIs as well as the low-level bindings.
+   Concrete next Rust/Go acceptance: expose context-time DTW configuration
+   (`crispasr_ctx_params_set_dtw`) through actual public constructors, validate
+   preset/top-layer semantics against the native enum, and own custom-head
+   storage for context lifetime if supported. Return copied token IDs/raw bytes,
+   timing/probability, DTW positions and alternatives via the native token
+   helpers; preserve unavailable sentinels and split UTF-8 bytes. Extend
+   `tests/fixtures/go-rust-wrapper-abi.c` and the actual Rust/Go public-method
+   probes, including invalid indices/counts, null/empty native output and cleanup.
+   Native declarations alone do not satisfy these rows. Rust scalar decode
+   controls still need a compatible public options surface; avoid silently
+   breaking downstream `TranscribeOptions` struct literals when extending it.
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now
    have compiled regressions; see HISTORY.md. Audit microphone ring/close and

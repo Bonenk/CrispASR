@@ -364,6 +364,13 @@ func (ctx *Context) Whisper_full(
 // It seems this approach can offer some speedup in some cases.
 // However, the transcription accuracy can be worse at the beginning and end of each chunk.
 func (ctx *Context) Whisper_full_parallel(params Params, samples []float32, processors int, encoderBeginCallback func() bool, newSegmentCallback func(int)) error {
+	return ctx.Whisper_full_parallel_with_progress(params, samples, processors, encoderBeginCallback, newSegmentCallback, nil)
+}
+
+// Whisper_full_parallel_with_progress runs parallel decode with per-call progress
+// delivery. Callbacks are retained only through this call. Serialize operations
+// on a context; callbacks must not re-enter or close the same context.
+func (ctx *Context) Whisper_full_parallel_with_progress(params Params, samples []float32, processors int, encoderBeginCallback func() bool, newSegmentCallback func(int), progressCallback func(int)) error {
 	if ctx == nil || len(samples) == 0 || uint64(len(samples)) > 2147483647 || processors < 1 || uint64(processors) > 2147483647 {
 		return errors.New("legacy parallel Whisper requires a context, PCM and positive int32 processors")
 	}
@@ -374,10 +381,12 @@ func (ctx *Context) Whisper_full_parallel(params Params, samples []float32, proc
 	defer release()
 	registerEncoderBeginCallback(ctx, encoderBeginCallback)
 	registerNewSegmentCallback(ctx, newSegmentCallback)
+	registerProgressCallback(ctx, progressCallback)
 	defer registerEncoderBeginCallback(ctx, nil)
 	defer registerNewSegmentCallback(ctx, nil)
+	defer registerProgressCallback(ctx, nil)
 
-	if C.whisper_full_parallel((*C.struct_whisper_context)(ctx), native, (*C.float)(&samples[0]), C.int(len(samples)), C.int(processors)) == 0 {
+	if C.crispasr_transcribe_parallel_by_ref((*C.struct_whisper_context)(ctx), &native, (*C.float)(&samples[0]), C.int(len(samples)), C.int(processors)) == 0 {
 		return nil
 	} else {
 		return ErrConversionFailed

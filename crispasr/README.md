@@ -37,10 +37,11 @@ cd CrispASR && cmake -B build && cmake --build build -j && sudo cmake --install 
 ## Quick start
 
 ```rust
-use crispasr::CrispAsr;
+use crispasr::Session;
 
-let model = CrispAsr::open("ggml-base.en.bin")?;
-for seg in model.transcribe_file("audio.wav")? {
+let model = Session::open("ggml-base.en.bin")?;
+let pcm: Vec<f32> = /* decoded mono 16 kHz audio */ vec![0.0; 16000];
+for seg in model.transcribe(&pcm)? {
     println!("[{:.1}s - {:.1}s] {}", seg.start, seg.end, seg.text);
 }
 ```
@@ -72,6 +73,14 @@ exports cannot be treated as silent no-ops. Empty/oversized PCM, invalid strateg
 or VAD settings, NUL-containing VAD paths and null native parameters return errors.
 VAD and tinydiarize can be enabled together. Native parameter allocations are
 freed on success and native failure; the VAD path remains alive through inference.
+
+`transcribe_pcm_parallel(&pcm, &options, processors)` uses the native
+progress-tracked pointer API, retaining the same option validation, VAD-path
+lifetime and copied segments as sequential decoding. Processors must be positive;
+chunk boundaries can reduce accuracy. `detect_language(&pcm, n_threads)` runs
+Whisper's mel/encoder language pass and returns an owned `(code, probability)`.
+It requires positive threads and validates native errors and bounded UTF-8 output.
+This mutates native encoder state; serialize operations on the model.
 
 Prefer `Session` for backend dispatch and native exception handling. Repairing
 the legacy pointer ABI does not make the deprecated direct Whisper API safe

@@ -198,6 +198,11 @@ free temporary native strings instead of leaking allocations in setters.
 public-header struct transport, independent copies, repeated replacement,
 GC inside callbacks, parallel/sequential calls and failures. Invalid PCM,
 processor counts and NUL strings never reach the native oracle.
+`Whisper_full_parallel` and the additive `Whisper_full_parallel_with_progress`
+route through `crispasr_transcribe_parallel_by_ref`; the latter delivers per-call
+progress. The oracle counts the pointer export independently and exercises
+encoder/segment/progress callbacks, GC and callback retirement after success
+and native failure. This proves routing, not actual model progress frequency.
 `TestProbeLegacyEmptyPCMReturnsError` reproduced the old index-out-of-range
 panic and now passes. The contract also compiles the higher-level package;
 that compilation does not run its model-dependent tests. DTW and remaining
@@ -272,6 +277,14 @@ exports. The deprecated path remains deprecated; the symbol repair does not
 change its native exception-safety limitations. The literal-header Go/Rust
 fixture exercises initialization, copied segments, VAD plus tinydiarize, native
 failure/null parameters, input rejection and parameter/context cleanup.
+
+Rust `transcribe_pcm_parallel` shares sequential option validation and copied
+results, using `crispasr_transcribe_parallel_by_ref`. `detect_language` calls
+`crispasr_detect_language` on PCM and returns an owned code/probability pair.
+`probe_legacy_rust_parallel_and_audio_language_detection` verifies processors,
+threads, samples, VAD plus tinydiarize, copied metadata, empty/error results,
+parameter cleanup and malformed language output. Neither method establishes
+Whisper model accuracy or makes the deprecated direct API exception-safe.
 
 Java `WhisperCpp.getContextDefaultParams/getFullDefaultParams` return independent
 Java-owned copies. `initContext` forwards GPU/flash/device and DTW flags,

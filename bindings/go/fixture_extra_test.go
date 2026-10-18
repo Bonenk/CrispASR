@@ -1163,10 +1163,36 @@ func TestProbeLegacyParamsCopiesStringsControlsAndFailures(t *testing.T) {
 		run(p, "replacement", "replacement-vad")
 	}
 	probeLegacyExpect("old 日本語", "old-vad")
+	parallelCalls := probeParallelByRefCalls()
 	if err := ctx.Whisper_full_parallel(previous, pcm, 2, func() bool { return true }, func(int) {}); err != nil {
 		t.Fatal(err)
 	}
+	if probeParallelByRefCalls() != parallelCalls+1 {
+		t.Fatal("parallel decode bypassed the pointer/progress wrapper")
+	}
+	parallelProgress, parallelSegments, parallelEncoded := 0, 0, 0
+	runParallel := func() error {
+		return ctx.Whisper_full_parallel_with_progress(previous, pcm, 2,
+			func() bool { parallelEncoded++; runtime.GC(); return true },
+			func(n int) { parallelSegments += n }, func(n int) { parallelProgress += n })
+	}
+	if err := runParallel(); err != nil {
+		t.Fatal(err)
+	}
+	if parallelProgress != 50 || parallelSegments != 1 || parallelEncoded != 1 {
+		t.Fatalf("parallel callbacks %d/%d/%d", parallelEncoded, parallelSegments, parallelProgress)
+	}
+	// Returning without a callback must not retain the previous closures.
+	if err := ctx.Whisper_full_parallel(previous, pcm, 2, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if parallelProgress != 50 || parallelSegments != 1 || parallelEncoded != 1 {
+		t.Fatal("parallel callbacks retained after return")
+	}
 	probeLegacyMode(1)
+	if err := runParallel(); err == nil {
+		t.Fatal("parallel progress route ignored native failure")
+	}
 	if err := ctx.Whisper_full(previous, pcm, nil, nil, nil); err == nil {
 		t.Fatal("native failure ignored")
 	}
@@ -1174,6 +1200,12 @@ func TestProbeLegacyParamsCopiesStringsControlsAndFailures(t *testing.T) {
 		t.Fatal("parallel failure ignored")
 	}
 	probeLegacyMode(0)
+	if err := ctx.Whisper_full_parallel(previous, pcm, 2, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if parallelProgress != 50 || parallelSegments != 1 || parallelEncoded != 1 {
+		t.Fatal("parallel callbacks retained after failure")
+	}
 	calls := probeLegacyCalls()
 	if err := ctx.Whisper_full(previous, nil, nil, nil, nil); err == nil {
 		t.Fatal("empty PCM accepted")

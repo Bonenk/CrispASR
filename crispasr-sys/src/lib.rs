@@ -53,6 +53,15 @@ extern "C" {
 
     pub fn whisper_full_default_params_by_ref(strategy: c_int) -> *mut WhisperFullParams;
 
+    /// Pointer-parameter parallel decode with native progress tracking.
+    pub fn crispasr_transcribe_parallel_by_ref(
+        ctx: *mut WhisperContext,
+        params: *const WhisperFullParams,
+        samples: *const c_float,
+        n_samples: c_int,
+        n_processors: c_int,
+    ) -> c_int;
+
     // --- Results ---
     pub fn whisper_full_n_segments(ctx: *mut WhisperContext) -> c_int;
 

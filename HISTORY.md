@@ -1,3 +1,34 @@
+## Rust legacy parallel/LID and Go parallel progress — 2026-10-18
+
+Rust's deprecated `CrispASR` now exposes `transcribe_pcm_parallel` with the same
+strategy, VAD/tinydiarize validation and owned segment reader as sequential
+inference. It calls `crispasr_transcribe_parallel_by_ref`, retaining native
+parameters and VAD path through decode and freeing parameters on all native
+return paths. Positive processor counts are required. `detect_language` runs
+the native PCM mel/encoder language pass and returns an owned code/probability
+pair. It validates samples/threads, native negative or nonfinite/out-of-range
+probabilities, and bounded NUL-terminated UTF-8 codes; zero probability is valid.
+The old `detected_language` getter remains the last-transcription query.
+The Rust README quick start now uses the existing `Session` PCM API instead of
+nonexistent type/file-transcription names.
+
+Go's existing parallel method bypassed CrispASR's global progress lifecycle by
+calling `whisper_full_parallel` directly. A compiled regression reproduced that
+bypass with a separate pointer-export counter. Both existing and additive
+`Whisper_full_parallel_with_progress` methods now use the pointer/progress
+wrapper. The new method accepts a per-call progress callback; encoder, segment
+and progress registrations retire after success and native failure. Existing
+method signatures and copyable parameter-string ownership are preserved.
+
+Validation: **34 Go tests, 30 Rust tests and five Rust doctests pass**, with the
+higher-level Go package also compiled against the isolated native fixture.
+The literal public-header fixture checks processor/thread/PCM forwarding,
+VAD plus tinydiarize, copied metadata, empty/error output, parameter/context
+cleanup, callback GC/retirement, and malformed language buffers/probabilities.
+Formatting, doc anchors and workflow shell checks pass. No model accuracy,
+progress frequency, native exception safety or platform acceptance is inferred
+from these component probes; those remain scoped in PLAN.md.
+
 ## Rust legacy Whisper ABI and Java context/parameter repairs — 2026-10-18
 
 Rust's deprecated `CrispASR` path declared pointer arguments but linked the native

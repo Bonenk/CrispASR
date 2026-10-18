@@ -14,6 +14,7 @@ void probe_streamed_ready(int ready);
 void probe_legacy_expect(const char*, const char*);
 void probe_legacy_mode(int);
 int probe_legacy_calls(void);
+int probe_parallel_by_ref_calls(void);
 void probe_text_mode(int mode);
 int probe_text_live(void);
 int probe_text_contexts(void);
@@ -74,5 +75,6 @@ func probeLegacyExpect(prompt, model string) {
 	C.probe_legacy_expect(p, m)
 }
 func probeLegacyMode(mode int)        { C.probe_legacy_mode(C.int(mode)) }
+func probeParallelByRefCalls() int    { return int(C.probe_parallel_by_ref_calls()) }
 func probeLegacyCalls() int           { return int(C.probe_legacy_calls()) }
 func newProbeLegacyContext() *Context { return (*Context)(unsafe.Pointer(uintptr(0x100000001))) }

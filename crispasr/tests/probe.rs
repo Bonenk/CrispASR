@@ -947,3 +947,81 @@ fn probe_legacy_rust_pointer_entrypoints_and_owned_parameters() {
     drop(model);
     assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
 }
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_parallel_and_audio_language_detection() {
+    extern "C" {
+        fn probe_parallel_by_ref_calls() -> c_int;
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let pcm = [1., 3., 5.];
+    let options = crispasr::TranscribeOptions {
+        strategy: Some(1),
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    let before = unsafe { probe_parallel_by_ref_calls() };
+    let segments = model.transcribe_pcm_parallel(&pcm, &options, 2).unwrap();
+    assert_eq!(unsafe { probe_parallel_by_ref_calls() }, before + 1);
+    assert_eq!(segments[0].text, "日");
+    assert_eq!(segments[0].start, 1.);
+    assert_eq!(segments[0].no_speech_prob, 0.125);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    // A processor mismatch is rejected by the fixture inside the native route.
+    assert!(model.transcribe_pcm_parallel(&pcm, &options, 3).is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    let calls = unsafe { probe_calls_get() };
+    for processors in [0, -1] {
+        assert!(model
+            .transcribe_pcm_parallel(&pcm, &options, processors)
+            .is_err());
+    }
+    assert!(model.transcribe_pcm_parallel(&[], &options, 2).is_err());
+    let mut bad = options.clone();
+    bad.vad_model_path = Some("bad\0path".into());
+    assert!(model.transcribe_pcm_parallel(&pcm, &bad, 2).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    for mode in [2, 11, 12] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.transcribe_pcm_parallel(&pcm, &options, 2).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    unsafe { probe_mode_set(1) };
+    assert!(model
+        .transcribe_pcm_parallel(&pcm, &options, 2)
+        .unwrap()
+        .is_empty());
+    unsafe { probe_mode_set(0) };
+    let language = model.detect_language(&pcm, 3).unwrap();
+    assert_eq!(language, ("de".to_owned(), 0.875));
+    let calls = unsafe { probe_calls_get() };
+    assert!(model.detect_language(&[], 3).is_err());
+    assert!(model.detect_language(&pcm, 0).is_err());
+    assert!(model.detect_language(&pcm, -1).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    // Wrong thread count reaches the native fixture and returns an error.
+    assert!(model.detect_language(&pcm, 4).is_err());
+    for mode in [2, 13, 14, 15, 16, 18] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.detect_language(&pcm, 3).is_err(), "mode {mode}");
+    }
+    unsafe { probe_mode_set(17) };
+    assert_eq!(
+        model.detect_language(&pcm, 3).unwrap(),
+        ("de".to_owned(), 0.)
+    );
+    // The returned language is an owned copy, independent of later calls.
+    assert_eq!(language.0, "de");
+    unsafe { probe_mode_set(0) };
+    drop(model);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+}

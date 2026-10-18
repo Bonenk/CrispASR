@@ -728,6 +728,14 @@ Java exercise these adapters with a model-free decoder. Rust's legacy opaque
 pointer declarations preserve their Rust names but link to the actual native
 `*_by_ref` symbols; the Go/Rust fixture keeps the wrong by-value initializer as
 an aborting trap and exercises the deprecated Rust path too.
+Count the parallel pointer export independently: a successful result from
+`whisper_full_parallel` alone does not prove CrispASR progress tracking. Go's
+parallel progress closures must retire on both success and native failure.
+Rust's PCM language detector must bound its native output scan and reject
+negative/nonfinite probabilities, empty codes and malformed UTF-8; zero
+probability is a valid result. Model progress frequency and detection accuracy
+require separate model acceptance.
+
 
 Java native defaults must be copied into Java-owned parameter storage, then
 freed with the matching native destructor; never `Native.free()` a C++-allocated
