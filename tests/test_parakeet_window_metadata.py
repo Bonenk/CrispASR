@@ -179,6 +179,17 @@ extern "C" int compare_grouping() {
                 if kind == 'segment' and field == 'p': continue
                 fn = getattr(cls.result_lib, 'crispasr_session_result_' + kind + '_' + field)
                 fn.argtypes, fn.restype = [ctypes.c_void_p] + [ctypes.c_int] * count, restype
+        # 0.5.13 per-word alts getters: register like the binding's own
+        # signature setup does. Without argtypes, ctypes converts the fixture
+        # handle (a plain int) to c_int — silently truncating the pointer — and
+        # the reads segfault. Caught by test_empty_and_bos… segfaulting on CI.
+        if hasattr(cls.result_lib, 'crispasr_session_result_word_n_alts'):
+            cls.result_lib.crispasr_session_result_word_n_alts.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+            cls.result_lib.crispasr_session_result_word_n_alts.restype = ctypes.c_int
+            cls.result_lib.crispasr_session_result_word_alt_text.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            cls.result_lib.crispasr_session_result_word_alt_text.restype = ctypes.c_char_p
+            cls.result_lib.crispasr_session_result_word_alt_p.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            cls.result_lib.crispasr_session_result_word_alt_p.restype = ctypes.c_float
 
     @classmethod
     def tearDownClass(cls):
