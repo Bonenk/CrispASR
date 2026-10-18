@@ -13,6 +13,7 @@
 #include "parakeet_orchestrate.h" // improvements Phase 1: shared transcribe orchestration
 
 #include <cstdio>
+#include <cstdlib> // [libc++ 23.1.3] std::getenv / atoi / atof / free are no longer pulled in transitively
 #include <cstring>
 
 namespace {
