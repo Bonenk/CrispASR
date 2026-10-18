@@ -185,6 +185,7 @@ close/replacement and another async submission raise while compute is busy.
 operation. Error completions are asynchronous too.
 
 Native/encoding failures deliver `{error: message}` through the callback.
+Check for the `error` property; an exception message may be empty.
 A callback exception is contained and stored as `module.crispasrLastCallbackError`;
 inspect and clear that property when reporting application errors. The native
 delivery is released even when encoding or the callback throws. TTS delivers an

@@ -85,14 +85,12 @@ Recommended implementation order and concrete acceptance:
    Review real CI logs before acceptance. No release from fixture success or
    queued jobs.
 
-The latest pushed TitaNet checkpoint is
-`2f7bd0b0946aa53cec5746ec6b89f8b96813b54b`; its ABI run
-[39133837807](https://github.com/CrispStrobe/CrispASR/actions/runs/39133837807)
-was queued at the last inspection. The subsequent speaker/options/polling
-checkpoint is `f78b2a9ecc8c80a17059a9866d85a25499094e8e`, frozen as
-`diag/wrapper-speaker-20261018`; its ABI run
-[39135417705](https://github.com/CrispStrobe/CrispASR/actions/runs/39135417705)
-was also queued. Inspect the exact SHA and hosted results before promoting any platform/model claim.
+The dispatch baseline is `1ebaf240cf8f06d40be4a5ce88b58d2fc89ddef1`.
+Its [binding ABI run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146277899)
+and [full WASM run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146278024)
+were queued at inspection. The subsequent explicit failure-state guard has local
+Node/browser regressions. Require hosted results for the actual tip before
+acceptance; older frozen wrapper checkpoints are historical evidence only.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.

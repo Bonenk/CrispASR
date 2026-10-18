@@ -1,3 +1,15 @@
+## WASM dispatch failure state independent of error text — 2026-10-18
+
+A regression reproduced an empty-message native exception being encoded as a
+successful default value. Dispatch now records failure separately from its
+message, preserving `{error: ""}` as an error completion. Callers check for the
+error property instead of message truthiness.
+
+Validation: **90 threaded dispatch assertions in each of Node and Chromium**
+pass, including allocation/handle baselines after this failure. The broader
+289-assertion ABI and 39-assertion chat suites passed at the dispatch baseline;
+full hosted/model acceptance remains pending in PLAN.md.
+
 ## WASM proxied dispatch ownership and browser validation — 2026-10-18
 
 Async ASR, loading and TTS now share a dispatcher. Only native inputs/results

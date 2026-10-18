@@ -70,6 +70,7 @@ static void binding_browser_poll(void* raw) {
 template <typename T> struct binding_browser_state {
     T value{};
     std::string error;
+    bool failed = false;
     std::atomic<bool> complete{false};
 };
 template <typename T> struct binding_browser_result : binding_browser_delivery {
@@ -79,7 +80,7 @@ template <typename T> struct binding_browser_result : binding_browser_delivery {
         : binding_browser_delivery(std::move(cb)), encoder(std::move(fn)) {}
     bool ready() const override { return state.complete.load(std::memory_order_acquire); }
     emscripten::val encode() override {
-        if (state.error.empty())
+        if (!state.failed)
             return encoder(state.value);
         auto out = emscripten::val::object();
         out.set("error", state.error);
@@ -95,6 +96,7 @@ static void browser_dispatch(std::function<T()> work, std::function<emscripten::
     auto job = std::make_unique<binding_browser_result<T>>(std::move(callback), std::move(encode));
     auto* state = &job->state;
     if (!g_compute_thread_set.load() || g_compute_thread == pthread_self()) {
+        state->failed = true;
         state->error = "Proxied compute thread is not ready";
         state->complete = true;
     } else {
@@ -107,21 +109,26 @@ static void browser_dispatch(std::function<T()> work, std::function<emscripten::
                     try {
                         state->value = work();
                     } catch (const std::exception& e) {
+                        state->failed = true;
                         state->error = e.what();
                     } catch (...) {
+                        state->failed = true;
                         state->error = "Unknown native compute exception";
                     }
                     // Last access to state on this thread. The servicer may
                     // retire it immediately after this release publication.
                     state->complete.store(true, std::memory_order_release);
                 })) {
+                state->failed = true;
                 state->error = "Could not dispatch browser compute";
                 state->complete = true;
             }
         } catch (const std::exception& e) {
+            state->failed = true;
             state->error = e.what();
             state->complete = true;
         } catch (...) {
+            state->failed = true;
             state->error = "Could not dispatch browser compute";
             state->complete = true;
         }

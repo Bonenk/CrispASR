@@ -317,7 +317,7 @@ require(process.argv[2])().then(async m=>{
   eq(m.computeReady(),true);
   const handles=m.count_emval_handles();
   const dispatch=mode=>new Promise(resolve=>m.dispatchProbe(mode,resolve));
-  for(const [mode,message] of [[1,'work sentinel'],[2,'encoding sentinel'],[3,'JS encoding sentinel'],[4,'Could not dispatch browser compute'],[5,'Proxied compute thread is not ready'],[6,'queue sentinel'],[7,'Unknown native compute exception']]){
+  for(const [mode,message] of [[1,'work sentinel'],[2,'encoding sentinel'],[3,'JS encoding sentinel'],[4,'Could not dispatch browser compute'],[5,'Proxied compute thread is not ready'],[6,'queue sentinel'],[7,'Unknown native compute exception'],[8,'']]){
     eq((await dispatch(mode)).error,message);eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
   }
   let beats=0,queries=0;const timer=setInterval(()=>{beats++;m.probeProgress();queries++;},2);

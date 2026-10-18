@@ -68,6 +68,8 @@ static void dispatch_probe(int mode, emscripten::val callback) {
                 throw std::runtime_error("work sentinel");
             if (mode == 7)
                 throw 7;
+            if (mode == 8)
+                throw std::runtime_error("");
             Payload result;
             *result.value = 42;
             return result;
