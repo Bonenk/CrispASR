@@ -313,8 +313,26 @@ struct crispasr_open_params_v1 {
 
 crispasr_session* crispasr_session_open_with_params(const char* model, const char* backend,
                                                     const crispasr_open_params_v1* p) {
-    if (p->abi_version != 2 || p->n_threads != 7 || p->use_gpu != 0 || p->verbosity != 2 || p->flash_attn != 0 ||
-        p->n_gpu_layers != 3)
+#ifdef CRISPASR_PROBE_WASM_OPEN
+    if (mode == 2 || !model || strcmp(model, "model"))
+        return NULL;
+    int expected_threads = 1;
+    if (mode == 7) {
+        if (backend || p->abi_version != 2 || p->n_threads != 1 || p->use_gpu != 1 || p->verbosity != 0 ||
+            p->flash_attn != 1 || p->n_gpu_layers != -1)
+            return NULL;
+        for (int i = 0; i < 6; ++i)
+            if (p->reserved[i])
+                return NULL;
+        return (crispasr_session*)(uintptr_t)1;
+    }
+    if (!backend || strcmp(backend, "foo"))
+        return NULL;
+#else
+    int expected_threads = 7;
+#endif
+    if (p->abi_version != 2 || p->n_threads != expected_threads || p->use_gpu != 0 || p->verbosity != 2 ||
+        p->flash_attn != 0 || p->n_gpu_layers != 3)
         return NULL;
     for (int i = 0; i < 6; i++)
         if (p->reserved[i])

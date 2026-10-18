@@ -132,3 +132,21 @@ Whisper ownership paths remain separate tasks in PLAN.md.
 
 Real-model output, browser scheduling, full WASM size and native build tests
 remain separate acceptance gates. See PLAN.md for the remaining audit rows.
+
+
+## WASM load options and registry/cache
+
+`asrOpenWithOptions`/`ttsOpenWithOptions` call
+`crispasr_session_open_with_params` using all five v2 controls and zero reserved
+padding. The probe compiles the literal runtime POD. Invalid options preserve
+the live singleton; a native load failure after valid replacement leaves it closed.
+Single-thread modules enforce one thread. Threaded/browser scheduling remains
+an independent pending gate.
+
+`registryLookup`, `registryLookupByFilename`, `registryBackends`,
+`registryDefaultBundle`, `cacheDirectory` and `cacheEnsureFile` cover the seven
+registry/cache ABI exports. Bundle info and artifact enumeration are combined
+into one owned result. The compiled Node contract checks string transport,
+unknown versus empty bundles, all three artifact kinds, license metadata,
+cache arguments, native errors, buffer growth, retry ceilings and unterminated
+native output. This is a model-free transport test, not browser download proof.

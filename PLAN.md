@@ -33,8 +33,9 @@ Recommended implementation order and concrete acceptance:
    the old Whisper object/parameter/result path, including all allocation-returning
    audio/container/scoring helpers on Ruby allocation exceptions. Extend the
    callable ledger rather than treating 155 guarded operations as API coverage.
-4. **WASM remaining adapters and dispatch.** Implement registry/cache, generic
-   diarization, shared session options, typed ASR
+4. **WASM remaining adapters and dispatch.** Registry/cache and v2 load-options adapters now have compiled Node
+   probes; validate their full-module size and browser filesystem/download behavior.
+   Implement generic diarization, typed ASR
    callback setters, VAD-transcription/language options and legacy controls.
    Generic speaker/clustering/pyannote adapters now have operation probes;
    include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
@@ -47,7 +48,7 @@ Recommended implementation order and concrete acceptance:
    token polling is explicitly unsafe: a future safe adapter needs ownership
    beyond the borrowed buffer selected globally by the C ABI. Do not permit
    another thread to close/free it while copying.
-   Ruby now exposes v2 session-open options; WASM still needs that public path.
+   Ruby and WASM now expose v2 session-open options; verify them with actual models.
    Finish per-call VAD settings in languages beyond the C#/Java/Dart/Python
    paths already implemented; probe actual option fields and language.
 6. **Platform and model acceptance.** Run full-library/compiler checks and

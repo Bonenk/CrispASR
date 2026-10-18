@@ -95,3 +95,44 @@ const notes = module.sessionPianoNotes(pcm);
 
 Times are milliseconds. MT3 reports General MIDI programs; other backends use
 `program: -1`. Empty input, no session, or a failed inference returns `[]`.
+
+
+## Session load options and registry
+
+`asrOpenWithOptions(path, backend, options)` and
+`ttsOpenWithOptions(path, backend, options)` expose the native v2 load settings:
+
+```js
+const opened = module.asrOpenWithOptions('/models/model.gguf', '', {
+  n_threads: 1,
+  use_gpu: false,
+  verbosity: 0,
+  flash_attn: true,
+  n_gpu_layers: -1,
+});
+```
+
+Use an empty backend for native auto-detection. `null` options use defaults:
+one thread in a single-thread module, four in a threaded module, GPU enabled
+when available, quiet logging, flash attention enabled and maximum GPU layers.
+Zero threads selects the module default. A single-thread module rejects thread
+counts above one. Invalid options throw before replacing the current session;
+a valid open closes the old singleton first and returns `false` if loading fails.
+These synchronous functions have the same browser scheduling constraints as
+`asrOpen`/`ttsOpenExplicit`; they do not proxy model loading to a worker.
+
+`registryLookup(backend)` and `registryLookupByFilename(filename)` return
+`{filename, url, approxSize}`, or `null` on a miss. `registryBackends()` returns
+an array of names. `registryDefaultBundle(backend)` returns
+`{backend, license, requiresAcceptance, artifacts}`, or `null` for an unknown
+backend. Each artifact contains the entry fields plus `kind`: 0 primary,
+1 companion, 2 extra. A known backend with an empty bundle returns an empty
+artifact array. License metadata does not itself record user acceptance.
+
+`cacheDirectory(overrideDir)` and
+`cacheEnsureFile(filename, url, quiet, overrideDir)` expose native cache helpers;
+an empty override selects the native default. They throw on native failure.
+Paths refer to the module filesystem. Browser network/download support and
+persistence require separate environment validation; a registry hit does not
+prove a model is downloadable or supported by this module. The compiled Node
+contract checks argument/status/buffer transport without making downloads.

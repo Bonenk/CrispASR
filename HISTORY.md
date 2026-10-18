@@ -1,3 +1,23 @@
+## WASM load options and registry/cache adapters — 2026-10-18
+
+WASM exposes v2 ASR/TTS load options with all five controls and zeroed reserved
+padding, checked against the literal native POD. Invalid options leave the
+current singleton untouched; valid native load failure follows the existing
+close-first replacement convention. Single-thread modules reject multiple
+threads instead of accepting an unsupported setting.
+
+Registry lookup, filename lookup, backend enumeration and complete default
+bundles now have public Embind adapters. Bundles retain canonical backend,
+license/acceptance metadata and primary/companion/extra artifacts; unknown
+backends remain distinct from known empty bundles. Cache directory/file helpers
+preserve native status codes, grow buffers only for documented size errors,
+and reject unterminated output or excessive retries.
+
+Validation: **191 WASM operation assertions plus 39 chat assertions** pass in
+compiled Node modules. Full main source syntax passes with single-thread/chat
+and pthread configurations. Browser networking, full module sizes and actual
+model loading remain pending; the tiny cache fixture performs no downloads.
+
 ## Ruby session ownership, re-entry and opaque handles — 2026-10-18
 
 Ruby closes child streams before their parent session, rejects closed/foreign
