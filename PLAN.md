@@ -1,5 +1,29 @@
 # CrispASR — Pending work
 
+## CLAIMED — #217 alignment comparison and clean-room optimization (2026-10-18)
+
+Owner: maintainer coordinator with isolated research/implementation assistants.
+Coordinator branch `perf/217-alignment-cleanroom`, worktree
+`${CRISPASR_WORKTREES}/crispasr-issue217-20261018`. Read the full issue including
+the October reporter follow-up. Pin the external review to Subtimer commit
+`4a894d0e166191d41ebc734b61d68f5c531fb55b`. No third-party source, native
+patches, fitted assets or learned parameters may be ported or vendored.
+The research assistant may inspect external text read-only and returns an
+ideas-only report. A fresh implementation assistant receives only our source
+and a sanitized functional brief, without external source/history context.
+
+Scope: distinguish alignment accuracy from wall-clock speed, identify actually
+published comparisons, audit current CrispASR alignment bottlenecks, then build
+an independently authored exact-output CTC optimization and benchmark it against
+our frozen baseline. Local tiny fixtures only; heavy/model runs use GH workers,
+large artifacts stay on maintainer storage. Acceptance: exact word/character
+stamps and tie/failure semantics versus baseline plus independent tiny oracle;
+record CPU/memory measurements with dimensions/flags/source pins. No claimed
+Subtimer speedup or accuracy advantage without a matched corpus/hardware test.
+Preserve existing alignment behavior; keep further long-form/VAD accuracy ideas
+separately scoped until quality evidence exists. Frozen #549 validation branch
+and runs must remain untouched during this additional work.
+
 ## #549 follow-up — legacy segmented tokens implemented (2026-10-18)
 
 Owner: next maintainer for terminal CI audit. The legacy explicit-output
