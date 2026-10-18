@@ -1,3 +1,16 @@
+## Hosted character CTC workspace — 2026-10-18
+
+Heavy CPU39112822169 passes seven synthetic shapes on EPYC7763/GCC13.3.
+Gate-off/on median ratios: 1.124–1.215×. Largest T4096/V16384/W256:
+339.608→288.506ms and tracked kernel heap275,986,668→7,556,460 bytes (36.52×).
+Frozen reference/on ratios are1.089–1.388×; both timing baselines are retained.
+Worker exact-output assertions pass; receipt is aggregate, without saved
+per-call raw outputs/timings. This is character postprocessing, with four
+unique token IDs in the synthetic transcript, not encoder/end-to-end, Japanese
+subword, RSS/VRAM or production acceptance. Default-off gate is unchanged.
+See [audit/limitations](docs/alignment-cleanroom-2026-10-18.md#hosted-character-ctc-synthetic-benchmark-accepted)
+and [raw receipt](docs/alignment-ctc-hosted-2026-10-18.json).
+
 ## Subword CTC workspace experiment — 2026-10-18
 
 `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` enables a separate default-off Parakeet/Canary

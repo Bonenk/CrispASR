@@ -210,3 +210,58 @@ Hosted source is frozen at `a1434c9b2d2484e7af572b577cb1f53127662775` on
 [full CI](https://github.com/CrispStrobe/CrispASR/actions/runs/39115494689) and
 [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39115496152).
 All three are queued at the dispatch audit; no terminal acceptance is implied.
+
+## Hosted character CTC synthetic benchmark accepted
+
+[Heavy CPU 39112822169](https://github.com/CrispStrobe/CrispASR/actions/runs/39112822169)
+completes successfully on immutable `567fc431e333d3cf1e2cb895f3d2895364e54328`.
+Independent audit verified that source SHA256 `d089c141…` and frozen-reference
+SHA256 `3a09740c…` match Git source, the checkout is clean, all seven case rows
+match the complete terminal log, and reported timing ranges, ratios, heap and
+allocation reductions are internally consistent. Compiler: GCC13.3, strict
+`-O3 -DNDEBUG -fno-fast-math`; CPU: AMD EPYC 7763. The unchanged
+[raw hosted receipt](alignment-ctc-hosted-2026-10-18.json) has SHA256
+`6a63daff66e6b6502459ee20de9cddaeeb4fff97b47349655a7324da4b7fd994`.
+
+| Frames / vocabulary / words | Gate off → on median (ms) | Off/on ratio | Tracked heap off → on (bytes) |
+| --- | ---: | ---: | ---: |
+| 256 / 16 / 20 | 0.1067 → 0.0879 | 1.215× | 62,428 → 46,940 |
+| 256 / 64 / 20 | 0.1681 → 0.1428 | 1.178× | 114,668 → 50,028 |
+| 256 / 1,024 / 20 | 1.3747 → 1.2231 | 1.124× | 1,159,180 → 111,500 |
+| 256 / 4,096 / 20 | 5.1688 → 4.5635 | 1.133× | 4,503,484 → 310,076 |
+| 2,048 / 1,024 / 128 | 15.058 → 12.598 | 1.195× | 10,132,556 → 1,746,668 |
+| 4,096 / 4,096 / 256 | 95.856 → 82.048 | 1.168× | 73,875,452 → 6,771,836 |
+| 4,096 / 16,384 / 256 | 339.608 → 288.506 | 1.177× | 275,986,668 → 7,556,460 |
+
+All arms are warmed once, then measured seven times in fixed arm order. Frozen
+reference and gate-off allocation counts/heap agree; their medians differ, so
+both baselines remain visible in the receipt. Frozen-reference/on ratios range
+1.089–1.388×; the largest shape is 323.922 → 288.506ms (1.123×). Do not assume
+the dispatcher/default arm and separately compiled frozen reference have equal
+machine-code timing merely because their source math/output agree. No compiler
+layout/cache cause for that baseline difference has been established.
+
+The worker's comparisons against the frozen own reference pass bit-for-bit on
+word and character stamps for every measured call. The aggregate artifact does
+not retain per-call raw outputs or timing samples, so this audit checks source,
+executed assertions, aggregate values and log/receipt identity rather than
+independently replaying saved large input/output arrays. Ratios are not a
+confidence interval. These synthetic transcripts use only four distinct token
+IDs including blank; natural-model cases still need their own evidence.
+Tracked heap excludes raw logits/model/setup and is not process RSS or VRAM.
+Full-library CI/lint and real model alignment are pending; defaults remain off.
+
+## Actual Japanese model profiling queued
+
+The new [method](../tools/ci-heavy/alignment-model-profile/README.md) pins a
+6.36s CC BY 4.0 FLEURS recording and the Japanese CTC1.1B F16 GGUF. It retains
+actual native OFF/ON/OFF logits and complete call outputs, queries the actual
+library's tokenizer, separates encoder/DP timings, replays the frozen own DP,
+and checks the shipped Python/exported C ABI plus CLI and absolute offsets.
+Six tiny rejection-contract tests pass. Production source is unchanged from
+`a1434c9b2`; this addition is validation tooling only.
+
+Frozen source `08aea3537ad075ffa17e66a6f601c42519213aea` is on
+`diag/217-japanese-model-profile-20261018`, [heavy CPU 39116431721](https://github.com/CrispStrobe/CrispASR/actions/runs/39116431721),
+queued at dispatch audit. It is not a boundary-labeled corpus or an original
+Python encoder comparison; no model speed/parity result is claimed yet.

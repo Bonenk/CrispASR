@@ -1,6 +1,6 @@
 # CrispASR — Pending work
 
-## #217 — comparison complete; opt-in character CTC candidate validated locally
+## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
 
 Owner: maintainer coordinator. Work is isolated on
 `perf/217-alignment-cleanroom`; no third-party source or fitted data is copied
@@ -25,8 +25,16 @@ Local synthetic measurements and their noisy timing ranges are retained in
 or Japanese Parakeet/Canary subword performance.
 
 Frozen character-performance source `567fc431e333d3cf1e2cb895f3d2895364e54328`
-is on `diag/217-ctc-workspace-20261018`. Heavy CPU `39112822169` runs
-`tools/ci-heavy/alignment_ctc_bench.py --large` with NumPy. CI `39112823566`
+is on `diag/217-ctc-workspace-20261018`. Heavy CPU `39112822169` passes
+all seven `alignment_ctc_bench.py --large` shapes on EPYC 7763/GCC13.3.
+Independent audit verifies terminal source/hash pins, artifact/log equality,
+all ratios/ranges and lower allocations/heap. Worker exact-output assertions
+pass; this aggregate receipt retains no raw per-call output/timing arrays.
+Gate-off/on median ratios are 1.124–1.215×; frozen-reference/on ratios are
+1.089–1.388×. Largest T4096/V16384/W256: gate-off339.608ms → on288.506ms,
+tracked heap275,986,668 → 7,556,460 bytes (36.52×). See
+`docs/alignment-ctc-hosted-2026-10-18.json`; this is synthetic DP, not encoder,
+model, RSS/VRAM or Japanese/subword acceptance. CI `39112823566`
 was also dispatched for that source and is retained while progressing.
 Queued lint `39112825190` was superseded/cancelled in favor of combined-source
 lint below. Audit terminal results and verify source pins before accepting any
@@ -34,8 +42,9 @@ hosted result. It compiles only our model-free kernel
 and frozen own baseline; no external models/code are needed. Audit all receipt
 output parity, kernel-time distributions, actual allocation counts and tracked
 peak heap, source hashes, compiler/CPU/flags, and the independent test suite.
-Run ordinary full-library CI and lint on the same frozen source. Keep that branch
-immutable while documentation checkpoints advance. No default promotion until
+Audit the retained character CI and later frozen integrated production
+CI/lint separately; this synthetic job is not full-library acceptance. Keep
+those branches immutable while documentation checkpoints advance. No default promotion until
 those gates and representative model alignment acceptance are satisfied.
 
 ## #217 subword CTC failure contract — implemented; full CI pending
@@ -86,8 +95,10 @@ DP reference, and checks actual Python/exported C ABI and CLI output plus a
 boundary labels, long-file, Python-blueprint encoder, GPU/VRAM or Subtimer
 comparison is implied. The default-off optimization is not promoted.
 Six tiny rejection-contract tests pass and are wired into CTest/ordinary CI;
-model work is refused locally. Dispatch on a frozen source branch with pinned
-packages and timeout120 per [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
+model work is refused locally. Frozen source `08aea3537ad075ffa17e66a6f601c42519213aea` is on
+`diag/217-japanese-model-profile-20261018`; heavy CPU `39116431721` was
+dispatched with pinned packages and timeout120 and is queued at dispatch audit.
+See [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
 Do not report model evidence before independently auditing the terminal raw
 payload/source/ELF ledger, exact logits and native/reference/public/CLI outputs.
 Earlier frozen production CI/lint remain acceptance gates. No runtime source

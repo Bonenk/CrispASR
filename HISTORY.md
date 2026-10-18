@@ -1,3 +1,15 @@
+## #217 hosted character CTC synthetic result — 2026-10-18
+
+Heavy CPU39112822169 on frozen source567fc431e passes all seven shapes, with
+worker exact-output assertions against our immutable reference. Independent
+terminal/source/hash/log/receipt audit verifies the aggregate values. EPYC7763,
+GCC13.3 strict flags: gate-off/on medians1.124–1.215×; largest T4096/V16384/W256
+339.608→288.506ms, tracked heap275,986,668→7,556,460 bytes (36.52×).
+Frozen-reference timing differs and remains visible; it yields1.089–1.388×
+ratios. The [raw receipt](docs/alignment-ctc-hosted-2026-10-18.json) retains
+ranges/counts/hashes but no per-call raw payloads. This is synthetic character
+DP only; full-library and actual-model acceptance remain in PLAN.md, default off.
+
 ## #217 actual-model alignment profiling worker — 2026-10-18
 
 Prepared a hosted-only native CPU worker for pinned Japanese CTC 1.1B F16 and
