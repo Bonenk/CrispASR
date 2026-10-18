@@ -1,3 +1,35 @@
+## Issue #549 — Python/native metadata implementation — 2026-10-18
+
+Read the complete issue (four reported discrepancies; no comments at inspection)
+and based work on current GitHub main `dd14099c3` in an isolated checkout.
+Implementation `5e7694516` plus fixed-array copy cleanup `8d844c610` adds opaque
+result token storage/accessors and `SessionToken`, preserving decoded bytes,
+timing and probability through the Python session result reader. All four
+transcription entry points use that reader; existing positional segment
+constructors and older-library fallbacks remain supported.
+
+MOSS-Transcribe-Diarize sessions use the same parser as the native segment API,
+with structured times/speakers, plain-text fallback, one decode, and no fixed
+256-segment cap in the session path. The parser's existing format and bounded
+per-segment text storage are unchanged. An unmangled C wrapper and module/session
+`free_aligner_cache()` expose the existing lock-protected cache release.
+Unavailable word/token times become Python `None`; chunk offsets and VAD
+remapping preserve native missing-time sentinels. Cohere's runtime estimates
+remain estimates; VibeVoice word times are not synthesized.
+
+Validation: 10 metadata tests compile production packaging/getter functions and
+exercise Python conversion, all four entry points, older libraries, byte-fragment
+preservation, chunk/VAD transforms and cache forwarding. The existing 4 UTF-8
+and 8 Python/native resampling tests pass. Python utility checks pass 11 with
+one optional full-library smoke skipped locally. All 5 secret/privacy guards
+pass unskipped; changed C/C++ files pass clang-format 18, workflow shell blocks
+parse, and the generated learnings index is current. CTest and ordinary GH CI
+now run the metadata contract; a linked native ABI test checks actual new exports
+and repeated cache release. Initial feature-source CI/lint were queued, so
+full-library/platform results remain pending in PLAN.md. No model accuracy,
+new native word alignment, GPU-memory measurement, version bump or release
+acceptance is claimed. See [the API contract](docs/python-session-metadata.md).
+
 ## Diagnostic integration and portable maintainer handoff — 2026-10-17
 
 Integrated the unchanged attention diagnostic from02bd2aee (all13 CI39003202215

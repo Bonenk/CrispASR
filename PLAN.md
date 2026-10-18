@@ -1,17 +1,45 @@
-## In flight — issue #549 Python metadata parity (2026-10-18)
-
-Owner: maintainer agent. Branch: `fix/549-python-metadata-parity`, based on
-current main. Scope: expose native token metadata through additive C ABI
-accessors and Python session results; preserve MOSS native diarization segments;
-expose process-wide aligner cache release; represent unavailable word timing
-explicitly. Preserve existing positional Python constructors and compatibility
-with older shared libraries. Validate native packaging and Python conversion
-with small fixtures, run the relevant checks, and record any model-dependent
-validation still outstanding. No inference graph or model changes are planned.
-
 # CrispASR — Pending work
 
-Updated 2026-10-17. This file contains current actions, dependencies and a
+## Issue #549 — implementation complete; full-library CI pending (2026-10-18)
+
+Owner: next maintainer for terminal CI audit. Implementation: `5e7694516`,
+fixed-array token-copy follow-up `8d844c610`; integrated with this checkpoint.
+See [session metadata](docs/python-session-metadata.md) and HISTORY.md.
+Local acceptance passes: 10 production-packaging/C ABI/Python metadata tests,
+4 existing UTF-8 tests, 8 Python/native resampling tests, and all 5 secret/privacy
+checks unskipped. Python utility checks pass 11 with one optional full-library
+smoke skipped locally. These do not establish full-library/platform build success.
+
+Next action: inspect CI and lint for the integrating main commit. The initial
+feature-source runs CI `39103971446` and lint `39103972664` were queued without
+starting any job and are superseded by integrating-main checks. Do not count a
+queued run as success. The `linux-unit` job must pass both the linked native
+null/cache-release test and `tests/test_session_metadata.py` with `CRISPASR_LIB`
+pointing at the newly built complete library; the latter exercises actual
+exported getters and ctypes signature setup. Resolve build/test failures, then
+answer/close #549 with the validated commit and the compatibility notes below.
+No release/tag is implied; installed v0.8.43 wheels do not contain this patch.
+
+Compatibility: unavailable Python word/token times are now `None` and have a
+`has_timestamps` property; valid numeric times are unchanged. Tokens default to
+an independent empty list on old libraries; explicit cache release raises when
+unsupported. Cohere timings remain the runtime's existing estimates. VibeVoice
+has native utterance times but requires forced alignment for word times. The
+new cache-release wrapper uses the existing process-wide aligner lock; no real
+GPU VRAM counter measurement has been performed in this work.
+
+Bounded optional follow-up: preserve native tokens through the remaining
+word-only legacy Parakeet overlap-merge and Japanese slice/gap-fill routes.
+Default non-Japanese shared CLI/session orchestration already retains its
+available tokens. Hoist the legacy routes into shared orchestration, retaining
+native token-to-word ownership through window selection/deduplication; never
+fabricate token times or reconstruct fake tokens from words. Acceptance: tiny
+recorded window fixtures prove exact retained native token bytes/probabilities,
+correct absolute offsets, no seam duplicates, and matching CLI/C ABI results;
+then validate one Japanese multi-window clip through both frontends. This is
+separate from the four implemented #549 surface changes.
+
+Updated 2026-10-18. This file contains current actions, dependencies and a
 legacy audit inventory. Completed work and experiment receipts live in
 [HISTORY.md](HISTORY.md#plan-reconciliation-archive--2026-10-15).
 The archived snapshot preserves detailed older requirements without treating
@@ -50,16 +78,16 @@ not establish native speech acceptance.
 See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
 entry points, bounded next action, acceptance gates and external dependencies.
 No task remains assigned to a departed agent. Inspect existing Echo runs first;
-then reproduce new Nemotron streaming issue547 on reporter/current source with
-exact offered fixtures and fresh/reused session controls. Actual MiMo71-row
+then audit the current-main #547 fix and its validation before repeating
+streaming diagnosis. Actual MiMo71-row
 Q/K/V capture follows. Research and hardware waits are explicitly separate.
 
-Issue547 was read in full on2026-10-17 (no comments then). Exact WAV/PCM fixtures
-are not attached. The adapter already resets and the encoder clears backend
-cache on its first call; the reported stale-cache explanation is unproven.
-Acceptance requires nonempty correct finals for consecutive standalone-recognized
-turns, partials and reset/counter/cache evidence, then C-ABI/session and Windows
-CPU checks. Do not patch teardown or suppress empty events speculatively.
+Issue #547 now has the streaming utterance-open throttle fix on main in
+`dd14099c3`, including literal boundary tests and the dedicated
+`tools/ci-heavy/issue547_nemotron_multiturn.py` validation worker. Do not repeat
+the old stale-cache hypothesis or reimplement that fix. Audit the worker's
+existing runs/results and fresh/reused-session/multi-turn acceptance before
+claiming full hardware validation; this #549 task did not execute that worker.
 
 ## Ordered roadmap
 
