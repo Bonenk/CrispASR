@@ -2,6 +2,8 @@ package whisper
 
 import (
 	"errors"
+	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -102,6 +104,26 @@ type Params struct {
 	vadModelPathSet  bool
 }
 
+// AlignmentHeadsPreset selects built-in Whisper DTW alignment heads.
+// Custom head arrays are not supported by these constructors.
+type AlignmentHeadsPreset int
+
+const (
+	AHEADS_N_TOP_MOST     AlignmentHeadsPreset = C.CRISPASR_AHEADS_N_TOP_MOST
+	AHEADS_TINY_EN        AlignmentHeadsPreset = C.CRISPASR_AHEADS_TINY_EN
+	AHEADS_TINY           AlignmentHeadsPreset = C.CRISPASR_AHEADS_TINY
+	AHEADS_BASE_EN        AlignmentHeadsPreset = C.CRISPASR_AHEADS_BASE_EN
+	AHEADS_BASE           AlignmentHeadsPreset = C.CRISPASR_AHEADS_BASE
+	AHEADS_SMALL_EN       AlignmentHeadsPreset = C.CRISPASR_AHEADS_SMALL_EN
+	AHEADS_SMALL          AlignmentHeadsPreset = C.CRISPASR_AHEADS_SMALL
+	AHEADS_MEDIUM_EN      AlignmentHeadsPreset = C.CRISPASR_AHEADS_MEDIUM_EN
+	AHEADS_MEDIUM         AlignmentHeadsPreset = C.CRISPASR_AHEADS_MEDIUM
+	AHEADS_LARGE_V1       AlignmentHeadsPreset = C.CRISPASR_AHEADS_LARGE_V1
+	AHEADS_LARGE_V2       AlignmentHeadsPreset = C.CRISPASR_AHEADS_LARGE_V2
+	AHEADS_LARGE_V3       AlignmentHeadsPreset = C.CRISPASR_AHEADS_LARGE_V3
+	AHEADS_LARGE_V3_TURBO AlignmentHeadsPreset = C.CRISPASR_AHEADS_LARGE_V3_TURBO
+)
+
 ///////////////////////////////////////////////////////////////////////////////
 // GLOBALS
 
@@ -131,13 +153,48 @@ var (
 // Allocates all memory needed for the model and loads the model from the given file.
 // Returns NULL on failure.
 func Whisper_init(path string) *Context {
+	ctx, _ := whisperInit(path, nil)
+	return ctx
+}
+
+// Whisper_init_with_dtw loads Whisper with experimental DTW token alignment.
+// N_TOP_MOST requires positive nTop; model presets require nTop == 0. The
+// native loader validates that the selected heads/layers fit the actual model.
+func Whisper_init_with_dtw(path string, preset AlignmentHeadsPreset, nTop int) (*Context, error) {
+	if preset == AHEADS_N_TOP_MOST {
+		if nTop <= 0 || uint64(nTop) > 2147483647 {
+			return nil, errors.New("DTW requires positive int32 top layers")
+		}
+	} else if preset < AHEADS_TINY_EN || preset > AHEADS_LARGE_V3_TURBO || nTop != 0 {
+		return nil, errors.New("unsupported DTW preset or nonzero top layers for a model preset")
+	}
+	return whisperInit(path, &dtwConfig{preset, nTop})
+}
+
+type dtwConfig struct {
+	preset AlignmentHeadsPreset
+	top    int
+}
+
+func whisperInit(path string, dtw *dtwConfig) (*Context, error) {
+	if path == "" || strings.IndexByte(path, 0) >= 0 {
+		return nil, errors.New("nonempty NUL-free model path required")
+	}
 	cPath := C.CString(path)
 	defer C.free(unsafe.Pointer(cPath))
-	if ctx := C.whisper_init_from_file_with_params(cPath, C.whisper_context_default_params()); ctx != nil {
-		return (*Context)(ctx)
-	} else {
-		return nil
+	params := C.whisper_context_default_params_by_ref()
+	if params == nil {
+		return nil, errors.New("could not allocate Whisper context parameters")
 	}
+	defer C.whisper_free_context_params(params)
+	if dtw != nil {
+		C.crispasr_ctx_params_set_dtw(params, true, C.int(dtw.preset), C.int(dtw.top))
+	}
+	ctx := C.whisper_init_from_file_with_params_by_ref(cPath, params)
+	if ctx == nil {
+		return nil, errors.New("failed to load Whisper model")
+	}
+	return (*Context)(ctx), nil
 }
 
 // Frees all memory allocated by the model.
@@ -431,6 +488,23 @@ func (ctx *Context) Whisper_full_n_tokens(segment int) int {
 	return int(C.whisper_full_n_tokens((*C.struct_whisper_context)(ctx), C.int(segment)))
 }
 
+// Whisper_full_get_token_dtw_t returns native DTW centiseconds, preserving -1
+// when unavailable. Indices are checked before the native indexed token access.
+func (ctx *Context) Whisper_full_get_token_dtw_t(segment, token int) (int64, error) {
+	if ctx == nil || segment < 0 || token < 0 || uint64(segment) > 2147483647 || uint64(token) > 2147483647 {
+		return 0, errors.New("context and nonnegative int32 token indices required")
+	}
+	segments := ctx.Whisper_full_n_segments()
+	if segments < 0 || segment >= segments {
+		return 0, errors.New("segment index outside native results")
+	}
+	tokens := ctx.Whisper_full_n_tokens(segment)
+	if tokens < 0 || token >= tokens {
+		return 0, errors.New("token index outside native results")
+	}
+	return int64(C.crispasr_token_dtw_t((*C.struct_whisper_context)(ctx), C.int(segment), C.int(token))), nil
+}
+
 // Get the token text of the specified token index in the specified segment.
 func (ctx *Context) Whisper_full_get_token_text(segment int, token int) string {
 	return C.GoString(C.whisper_full_get_token_text((*C.struct_whisper_context)(ctx), C.int(segment), C.int(token)))
@@ -456,12 +530,15 @@ func (ctx *Context) Whisper_full_get_token_p(segment int, token int) float32 {
 // CALLBACKS
 
 var (
+	callbackMu     sync.RWMutex
 	cbNewSegment   = make(map[unsafe.Pointer]func(int))
 	cbProgress     = make(map[unsafe.Pointer]func(int))
 	cbEncoderBegin = make(map[unsafe.Pointer]func() bool)
 )
 
 func registerNewSegmentCallback(ctx *Context, fn func(int)) {
+	callbackMu.Lock()
+	defer callbackMu.Unlock()
 	if fn == nil {
 		delete(cbNewSegment, unsafe.Pointer(ctx))
 	} else {
@@ -470,6 +547,8 @@ func registerNewSegmentCallback(ctx *Context, fn func(int)) {
 }
 
 func registerProgressCallback(ctx *Context, fn func(int)) {
+	callbackMu.Lock()
+	defer callbackMu.Unlock()
 	if fn == nil {
 		delete(cbProgress, unsafe.Pointer(ctx))
 	} else {
@@ -478,6 +557,8 @@ func registerProgressCallback(ctx *Context, fn func(int)) {
 }
 
 func registerEncoderBeginCallback(ctx *Context, fn func() bool) {
+	callbackMu.Lock()
+	defer callbackMu.Unlock()
 	if fn == nil {
 		delete(cbEncoderBegin, unsafe.Pointer(ctx))
 	} else {
@@ -487,21 +568,33 @@ func registerEncoderBeginCallback(ctx *Context, fn func() bool) {
 
 //export callNewSegment
 func callNewSegment(user_data unsafe.Pointer, new C.int) {
-	if fn, ok := cbNewSegment[user_data]; ok {
+	callbackMu.RLock()
+	fn := cbNewSegment[user_data]
+	callbackMu.RUnlock()
+	// Invoke outside the registry lock: callbacks may update their registration.
+	if fn != nil {
 		fn(int(new))
 	}
 }
 
 //export callProgress
 func callProgress(user_data unsafe.Pointer, progress C.int) {
-	if fn, ok := cbProgress[user_data]; ok {
+	callbackMu.RLock()
+	fn := cbProgress[user_data]
+	callbackMu.RUnlock()
+	// Invoke outside the registry lock: callbacks may update their registration.
+	if fn != nil {
 		fn(int(progress))
 	}
 }
 
 //export callEncoderBegin
 func callEncoderBegin(user_data unsafe.Pointer) C.bool {
-	if fn, ok := cbEncoderBegin[user_data]; ok {
+	callbackMu.RLock()
+	fn := cbEncoderBegin[user_data]
+	callbackMu.RUnlock()
+	// Invoke outside the registry lock: callbacks may update their registration.
+	if fn != nil {
 		if fn() {
 			return C.bool(true)
 		} else {
@@ -517,6 +610,11 @@ func (t TokenData) T0() int64 {
 
 func (t TokenData) T1() int64 {
 	return int64(t.t1)
+}
+
+// TDtw returns native DTW centiseconds, preserving -1 when unavailable.
+func (t TokenData) TDtw() int64 {
+	return int64(t.t_dtw)
 }
 
 func (t TokenData) Id() Token {

@@ -10,6 +10,7 @@ on:
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
       - 'tests/build_legacy_wrapper_probe.py'
+      - 'src/crispasr_c_api.cpp'
       - 'tools/run-wrapper-contract.py'
       - 'tools/sync_ruby_context_guards.py'
       - 'include/crispasr*.h'
@@ -23,6 +24,7 @@ on:
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
       - 'tests/build_legacy_wrapper_probe.py'
+      - 'src/crispasr_c_api.cpp'
       - 'tools/run-wrapper-contract.py'
       - 'tools/sync_ruby_context_guards.py'
       - 'include/crispasr*.h'
@@ -91,4 +93,6 @@ jobs:
           "$browser_path" --version
           echo "CRISPASR_CHROME=$browser_path" >> "$GITHUB_ENV"
       - name: Compile and exercise actual wrapper adapters
+        env:
+          CRISPASR_GO_RACE: ${{ matrix.language == 'go-rust' && '1' || '0' }}
         run: python3 tools/run-wrapper-contract.py ${{ matrix.language }}

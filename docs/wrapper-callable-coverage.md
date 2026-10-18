@@ -205,8 +205,20 @@ encoder/segment/progress callbacks, GC and callback retirement after success
 and native failure. This proves routing, not actual model progress frequency.
 `TestProbeLegacyEmptyPCMReturnsError` reproduced the old index-out-of-range
 panic and now passes. The contract also compiles the higher-level package;
-that compilation does not run its model-dependent tests. DTW and remaining
-legacy context/token/resource paths are still pending.
+that compilation does not run its model-dependent tests.
+
+`Whisper_init_with_dtw` and high-level `NewWithDTW` now expose built-in DTW
+presets/top-layer selection. Ordinary `Whisper_init` also uses native pointer
+parameters with matching cleanup. `Whisper_full_get_token_dtw_t` validates
+indices/counts; `TokenData.TDtw()` exposes the copied field. Both preserve native
+centiseconds and -1. `TestProbeLegacyDTWConstruction` checks all presets,
+constructor cleanup/errors, incompatible flash attention, invalid indexed access
+and DTW sentinels; `TestProbeModelDTWConstructor` exercises the higher-level model
+constructor and close. Those are operation probes, not model-dependent tests.
+`TestProbeLegacyCallbacksAcrossContexts` exercises eight contexts through native
+callbacks, including registration changes within delivery. The strict hosted
+Go/Rust contract enables Go's race detector. Custom heads, higher-level DTW
+output and remaining legacy token/context/resource paths are still pending.
 
 
 WASM token polling copies all NUL-separated strings into owned C++ storage
@@ -274,7 +286,10 @@ not prove each backend emits every hook; real-model event acceptance is in PLAN.
 Rust `CrispASR::new` and `transcribe_pcm[_with_strategy/_with_options]` retain
 source-compatible sys function names that link to native pointer-parameter
 exports. The deprecated path remains deprecated; the symbol repair does not
-change its native exception-safety limitations. The literal-header Go/Rust
+change its native exception-safety limitations. `new_with_dtw` configures built-in
+heads or positive top layers before native initialization; the native helper
+selects compatible attention. `token_dtw_timestamp` validates result indices
+and returns native centiseconds/-1. The literal-header Go/Rust
 fixture exercises initialization, copied segments, VAD plus tinydiarize, native
 failure/null parameters, input rejection and parameter/context cleanup.
 

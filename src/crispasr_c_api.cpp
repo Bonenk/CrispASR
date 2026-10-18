@@ -631,6 +631,10 @@ CA_EXPORT void crispasr_ctx_params_set_dtw(whisper_context_params* p, bool enabl
                                            int n_top) {
     if (!p)
         return;
+    // The native loader disables DTW when flash attention is also enabled.
+    // Enabling DTW must therefore select the compatible attention path.
+    if (enable)
+        p->flash_attn = false;
     p->dtw_token_timestamps = enable;
     p->dtw_aheads_preset = static_cast<whisper_alignment_heads_preset>(aheads_preset);
     p->dtw_n_top = n_top;

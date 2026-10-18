@@ -178,6 +178,23 @@ and invalid parallel processor counts are rejected before native calls.
 Serialize operations on a native context and do not mutate one `Params` value
 concurrently; independent value copies may be configured separately.
 
+`Whisper_init_with_dtw(path, AHEADS_BASE_EN, 0)` enables experimental DTW
+before model loading. The higher-level package exposes `NewWithDTW` with the
+same arguments. `AHEADS_N_TOP_MOST` requires a positive int32 top-layer count;
+model presets require zero. Native loading checks the preset against model
+dimensions. Unsupported/custom presets, invalid paths and null allocations
+return errors. Ordinary `Whisper_init` keeps its nil-on-error signature and
+native defaults; both constructors use pointer parameters and matching frees.
+Use a native library whose DTW helper disables incompatible flash attention.
+`Whisper_full_get_token_dtw_t` checks indices and returns native centiseconds,
+preserving `-1` when unavailable; copied `TokenData` also exposes `TDtw()`.
+The older high-level `Token` struct does not yet carry DTW output.
+
+Callback registry access is synchronized across contexts. The registry lock is
+released before invoking a callback, allowing registration changes during
+callback delivery. Continue to serialize inference/close/re-entry on the same
+native context; registry synchronization does not enforce that ownership rule.
+
 `Whisper_full_parallel` uses the native pointer-parameter parallel wrapper,
 including CrispASR's global progress lifecycle. The additive
 `Whisper_full_parallel_with_progress` also accepts a per-call progress callback;

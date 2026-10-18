@@ -58,6 +58,7 @@ whisper_context_params* whisper_context_default_params_by_ref() {
         return nullptr;
     auto p = new whisper_context_params{};
     p->use_gpu = true;
+    p->flash_attn = true;
     ++live;
     return p;
 }

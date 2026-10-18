@@ -736,6 +736,18 @@ negative/nonfinite probabilities, empty codes and malformed UTF-8; zero
 probability is a valid result. Model progress frequency and detection accuracy
 require separate model acceptance.
 
+DTW must be configured before context creation. Native defaults enable flash
+attention, and the loader disables DTW if both remain enabled. The shared
+`crispasr_ctx_params_set_dtw` helper therefore disables flash attention when
+DTW is enabled; disabling DTW leaves that choice unchanged. Probe with the
+actual native default, not a zeroed fake flash flag. The literal native helper
+policy is checked by `test_python_legacy_pointer.py`; Go/Rust probes also check
+preset mappings, top-layer validation, context cleanup and indexed DTW output.
+The high-level Go DTW constructor now has an operation test in addition to
+package compilation. Go's hosted wrapper contract enables the race detector;
+callback registry locks must be released before invoking user callbacks. Registry
+locking alone does not serialize same-context inference and close.
+
 
 Java native defaults must be copied into Java-owned parameter storage, then
 freed with the matching native destructor; never `Native.free()` a C++-allocated

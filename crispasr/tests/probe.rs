@@ -1025,3 +1025,74 @@ fn probe_legacy_rust_parallel_and_audio_language_detection() {
     assert_eq!(unsafe { probe_live_get() }, 0);
     assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
 }
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_dtw_context_construction() {
+    use crispasr::DtwPreset::*;
+    extern "C" {
+        fn probe_dtw_enabled() -> c_int;
+        fn probe_legacy_context_flash() -> c_int;
+        fn probe_dtw_preset() -> c_int;
+        fn probe_dtw_top() -> c_int;
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe { probe_reset() };
+    for (preset, expected, top) in [
+        (TopMost(3), 1, 3),
+        (TinyEn, 3, 0),
+        (Tiny, 4, 0),
+        (BaseEn, 5, 0),
+        (Base, 6, 0),
+        (SmallEn, 7, 0),
+        (Small, 8, 0),
+        (MediumEn, 9, 0),
+        (Medium, 10, 0),
+        (LargeV1, 11, 0),
+        (LargeV2, 12, 0),
+        (LargeV3, 13, 0),
+        (LargeV3Turbo, 14, 0),
+    ] {
+        let model = crispasr::CrispASR::new_with_dtw("model", preset).unwrap();
+        assert_eq!(unsafe { probe_dtw_enabled() }, 1);
+        assert_eq!(unsafe { probe_legacy_context_flash() }, 0);
+        assert_eq!(unsafe { probe_dtw_preset() }, expected);
+        assert_eq!(unsafe { probe_dtw_top() }, top);
+        assert_eq!(model.token_dtw_timestamp(0, 0).unwrap(), 100);
+        assert_eq!(model.token_dtw_timestamp(0, 1).unwrap(), 101);
+        for (segment, token) in [(-1, 0), (0, -1), (1, 0), (0, 2)] {
+            assert!(model.token_dtw_timestamp(segment, token).is_err());
+        }
+        for mode in [1, 12, 20, 21] {
+            unsafe { probe_mode_set(mode) };
+            assert!(model.token_dtw_timestamp(0, 0).is_err());
+        }
+        unsafe { probe_mode_set(22) };
+        assert_eq!(model.token_dtw_timestamp(0, 0).unwrap(), -1);
+        unsafe { probe_mode_set(0) };
+        assert_eq!(unsafe { probe_live_get() }, 0);
+        drop(model);
+        assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+    }
+    // Ordinary construction must keep native DTW defaults.
+    drop(crispasr::CrispASR::new("model").unwrap());
+    assert_eq!(unsafe { probe_dtw_enabled() }, 0);
+    assert_eq!(unsafe { probe_legacy_context_flash() }, 1);
+    let calls = unsafe { probe_calls_get() };
+    for preset in [TopMost(0), TopMost(-1)] {
+        assert!(crispasr::CrispASR::new_with_dtw("model", preset).is_err());
+    }
+    for path in ["", "bad\0path"] {
+        assert!(crispasr::CrispASR::new_with_dtw(path, TinyEn).is_err());
+        assert!(crispasr::CrispASR::new(path).is_err());
+    }
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    assert!(crispasr::CrispASR::new_with_dtw("fail", TinyEn).is_err());
+    for mode in [10, 19] {
+        unsafe { probe_mode_set(mode) };
+        assert!(crispasr::CrispASR::new_with_dtw("model", TinyEn).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+        assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+    }
+    unsafe { probe_mode_set(0) };
+}

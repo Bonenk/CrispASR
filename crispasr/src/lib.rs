@@ -45,6 +45,48 @@ pub struct TranscribeOptions {
     pub tdrz: bool,
 }
 
+/// Built-in experimental Whisper DTW alignment heads. Custom head arrays are
+/// not supported here. Native loading checks heads against the model dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DtwPreset {
+    /// Use every attention head in the last N text layers. N must be positive.
+    TopMost(i32),
+    TinyEn,
+    Tiny,
+    BaseEn,
+    Base,
+    SmallEn,
+    Small,
+    MediumEn,
+    Medium,
+    LargeV1,
+    LargeV2,
+    LargeV3,
+    LargeV3Turbo,
+}
+
+impl DtwPreset {
+    fn native(self) -> Result<(i32, i32), String> {
+        use crispasr_sys::*;
+        Ok(match self {
+            Self::TopMost(n) if n > 0 => (CRISPASR_AHEADS_N_TOP_MOST, n),
+            Self::TopMost(_) => return Err("DTW requires positive top layers".into()),
+            Self::TinyEn => (CRISPASR_AHEADS_TINY_EN, 0),
+            Self::Tiny => (CRISPASR_AHEADS_TINY, 0),
+            Self::BaseEn => (CRISPASR_AHEADS_BASE_EN, 0),
+            Self::Base => (CRISPASR_AHEADS_BASE, 0),
+            Self::SmallEn => (CRISPASR_AHEADS_SMALL_EN, 0),
+            Self::Small => (CRISPASR_AHEADS_SMALL, 0),
+            Self::MediumEn => (CRISPASR_AHEADS_MEDIUM_EN, 0),
+            Self::Medium => (CRISPASR_AHEADS_MEDIUM, 0),
+            Self::LargeV1 => (CRISPASR_AHEADS_LARGE_V1, 0),
+            Self::LargeV2 => (CRISPASR_AHEADS_LARGE_V2, 0),
+            Self::LargeV3 => (CRISPASR_AHEADS_LARGE_V3, 0),
+            Self::LargeV3Turbo => (CRISPASR_AHEADS_LARGE_V3_TURBO, 0),
+        })
+    }
+}
+
 /// A loaded CrispASR model (whisper-only, legacy API).
 ///
 /// **Deprecated:** Use [`Session`] instead. `CrispASR` wraps `whisper_full()`
@@ -65,10 +107,27 @@ unsafe impl Send for CrispASR {}
 impl CrispASR {
     /// Load a GGUF/GGML whisper model file.
     pub fn new(model_path: &str) -> Result<Self, String> {
+        Self::new_impl(model_path, None)
+    }
+
+    /// Load Whisper with experimental DTW token alignment. The native loader
+    /// checks the preset/top-layer count against the actual model dimensions.
+    pub fn new_with_dtw(model_path: &str, preset: DtwPreset) -> Result<Self, String> {
+        Self::new_impl(model_path, Some(preset))
+    }
+
+    fn new_impl(model_path: &str, dtw: Option<DtwPreset>) -> Result<Self, String> {
+        if model_path.is_empty() {
+            return Err("nonempty model path required".into());
+        }
+        let dtw = dtw.map(DtwPreset::native).transpose()?;
         let path = CString::new(model_path).map_err(|e| format!("invalid path: {e}"))?;
         let cparams = unsafe { crispasr_sys::whisper_context_default_params_by_ref() };
         if cparams.is_null() {
             return Err("could not allocate context parameters".into());
+        }
+        if let Some((preset, top)) = dtw {
+            unsafe { crispasr_sys::crispasr_ctx_params_set_dtw(cparams, true, preset, top) };
         }
         let ctx =
             unsafe { crispasr_sys::whisper_init_from_file_with_params(path.as_ptr(), cparams) };
@@ -242,6 +301,24 @@ impl CrispASR {
         }
 
         Ok(segments)
+    }
+
+    /// Return a token's DTW timestamp in native centiseconds. Native -1 means
+    /// unavailable and is preserved. Requires a model loaded with DTW enabled.
+    /// Segment/token indices are checked before native indexed access.
+    pub fn token_dtw_timestamp(&self, segment: i32, token: i32) -> Result<i64, String> {
+        if segment < 0 || token < 0 {
+            return Err("nonnegative segment and token indices required".into());
+        }
+        let segments = unsafe { crispasr_sys::whisper_full_n_segments(self.ctx) };
+        if segments < 0 || segment >= segments {
+            return Err("segment index outside native results".into());
+        }
+        let tokens = unsafe { crispasr_sys::whisper_full_n_tokens(self.ctx, segment) };
+        if tokens < 0 || token >= tokens {
+            return Err("token index outside native results".into());
+        }
+        Ok(unsafe { crispasr_sys::crispasr_token_dtw_t(self.ctx, segment, token) })
     }
 
     /// Detect language directly from mono 16 kHz PCM, returning an owned language

@@ -38,16 +38,24 @@ class GoRustWrapperContract(unittest.TestCase):
             env['CGO_LDFLAGS']=' '.join([shlex.quote('-L'+str(lib)),shlex.quote('-Wl,-rpath,'+str(lib)),env.get('CGO_LDFLAGS','')]).strip()
             env['LD_LIBRARY_PATH']=str(lib)+os.pathsep+env.get('LD_LIBRARY_PATH','')
             # Every run gets a fresh linked binary. No fallback to a discovered build.
-            result=subprocess.run(['go','test','-tags','probe','-run','TestProbe','-count=1','-v'],
+            go_test=['go','test']
+            if env.get('CRISPASR_GO_RACE')=='1':
+                go_test.append('-race');print('Go race detector enabled')
+            result=subprocess.run(go_test+['-tags','probe','-run','TestProbe','-count=1','-timeout=60s','-v'],
                 cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS',result.stdout);print(result.stdout)
             # Compile the higher-level public interface against the same isolated
             # library; do not run its model-dependent tests in this contract.
-            result=subprocess.run(['go','test','./pkg/whisper','-run','^$'],
+            result=subprocess.run(go_test+['./pkg/whisper','-run','^$'],
                 cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             print('PASS Go high-level package compilation (no model tests run)')
+            result=subprocess.run(go_test+['-tags','probe','./pkg/whisper','-run','TestProbe','-count=1','-timeout=60s','-v'],
+                cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS',result.stdout);print(result.stdout)
+
             env['CRISPASR_SYS_LIB_DIR']=str(tmp)
             env.pop('CRISPASR_LIB_DIR',None)
             env.pop('CRISPASR_LIB_NAME',None)

@@ -74,6 +74,15 @@ or VAD settings, NUL-containing VAD paths and null native parameters return erro
 VAD and tinydiarize can be enabled together. Native parameter allocations are
 freed on success and native failure; the VAD path remains alive through inference.
 
+`CrispASR::new_with_dtw(path, DtwPreset::BaseEn)` enables experimental DTW
+alignment before loading. `DtwPreset::TopMost(n)` requires positive `n`; the
+native loader checks the selected layers/heads against the model dimensions.
+Custom head arrays are not exposed. Use a native library whose DTW helper
+disables incompatible flash attention when enabling DTW; older helpers can
+leave flash enabled and the loader then disables DTW. Ordinary `new` keeps
+native defaults. `token_dtw_timestamp(segment, token)` checks result indices
+and returns native centiseconds, preserving `-1` when unavailable.
+
 `transcribe_pcm_parallel(&pcm, &options, processors)` uses the native
 progress-tracked pointer API, retaining the same option validation, VAD-path
 lifetime and copied segments as sequential decoding. Processors must be positive;

@@ -1,3 +1,48 @@
+## DTW constructors/getters and Go callback registry races — 2026-10-18
+
+Rust's deprecated `CrispASR` now supports `new_with_dtw` and typed `DtwPreset`
+selection, including positive top-layer counts and all twelve built-in model
+presets. Go exposes the same preset family through `Whisper_init_with_dtw` and
+higher-level `NewWithDTW`. Ordinary Go initialization also now uses native
+pointer parameters, validates model paths and frees context parameters with the
+matching destructor. Its existing nil-on-error signature is preserved. Native
+model loading retains responsibility for checking selected heads/layers against
+actual model dimensions. Custom head arrays are not exposed by these additions.
+
+Rust `token_dtw_timestamp` and Go `Whisper_full_get_token_dtw_t` validate segment
+and token indices/counts before native indexed access. They return native
+centiseconds and preserve the unavailable -1 sentinel. Copied Go `TokenData`
+also exposes `TDtw()`. The older higher-level Go `Token` result still lacks DTW
+output; the compatible result-surface task remains in PLAN.md.
+
+Inspection found a prerequisite missed by the original zeroed test fixtures:
+real Whisper defaults enable flash attention, and native loading disables DTW
+if both flags are enabled. A probe compiling the literal runtime DTW helper
+reproduced flash remaining enabled. `crispasr_ctx_params_set_dtw` now disables
+incompatible flash attention when enabling DTW; disabling DTW leaves the current
+attention setting unchanged. Both public declarations document this policy.
+Native-default probes now start with flash enabled, test default construction,
+and check helper enable/disable/null behavior and context cleanup.
+
+Eight concurrent Go contexts reproduced a fatal concurrent-map-write crash in
+the shared callback registries. Registration and lookup now synchronize with a
+mutex; delivery snapshots the callback and releases the lock before invoking it.
+The regression executes 512 native callback sequences, including registration
+changes within delivery. Native fixture counters are atomic. Same-context
+inference/close/re-entry still requires caller serialization; the registry fix
+does not establish model lifecycle safety. Hosted Go/Rust ABI contracts now
+enable Go's race detector and run the higher-level DTW constructor operation
+test, in addition to package compilation. Changes to the native C API source
+also trigger the contract workflow because its literal adapters are tested.
+
+Validation: **36 low-level Go tests plus one higher-level operation test with
+the race detector**, **31 Rust tests and five doctests**, **five Python tests**,
+**35 C# legacy assertions**, **224 Java assertions plus 44 legacy assertions in
+each of two encodings**, and **37 Dart tests with a clean analyzer** pass.
+Formatting, documentation anchors and workflow shell checks pass. These establish
+component transport, ownership and registry synchronization; full native/model,
+GPU alignment quality, actual DTW timing and platform acceptance remain pending.
+
 ## Rust legacy parallel/LID and Go parallel progress — 2026-10-18
 
 Rust's deprecated `CrispASR` now exposes `transcribe_pcm_parallel` with the same

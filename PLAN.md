@@ -2,12 +2,11 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: legacy DTW/token/parameter callable
-inventory, followed by the remaining ownership/coercion audits. Rust parallel
-and PCM language detection plus Go parallel progress routing are implemented;
-validation evidence is archived in HISTORY.md. Continue the cross-language wrapper
-task; the bounded external agent tasks have ended. Completed source repairs and measured
-probe counts are archived in HISTORY.md. Start with the incremental
+Owner: maintainer coordinator. Active next: remaining legacy token/parameter
+inventory and ownership/coercion audits after the Rust/Go DTW and callback
+checkpoints. Completed repairs and measured probe counts are archived in
+HISTORY.md. Continue the cross-language wrapper task; the bounded external
+agent tasks have ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
 The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
 Do not reimplement rows merely because an older note says they are missing.
@@ -45,15 +44,22 @@ Recommended implementation order and concrete acceptance:
    progress frequency. Continue DTW,
    remaining token introspection and legacy context/callback lifecycle auditing.
    Review higher-level APIs as well as the low-level bindings.
-   Concrete next Rust/Go acceptance: expose context-time DTW configuration
-   (`crispasr_ctx_params_set_dtw`) through actual public constructors, validate
-   preset/top-layer semantics against the native enum, and own custom-head
-   storage for context lifetime if supported. Return copied token IDs/raw bytes,
-   timing/probability, DTW positions and alternatives via the native token
-   helpers; preserve unavailable sentinels and split UTF-8 bytes. Extend
+   Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
+   high-level model constructor now have operation probes. The shared helper
+   disables incompatible flash attention. Go's high-level `Token` still lacks
+   DTW output; add a compatible public result surface with an operation probe.
+   Custom-head configuration remains pending: own the head storage for model
+   lifetime and validate model dimensions if exposing it. Return copied token
+   IDs/raw bytes, timing/probability and alternatives through safe public
+   operations; preserve unavailable sentinels and split UTF-8 bytes. Extend
    `tests/fixtures/go-rust-wrapper-abi.c` and the actual Rust/Go public-method
    probes, including invalid indices/counts, null/empty native output and cleanup.
-   Native declarations alone do not satisfy these rows. Rust scalar decode
+   Native declarations alone do not satisfy these rows. Go callback registries
+   now synchronize concurrent contexts without holding locks through user
+   callbacks, with a hosted race-detector gate. Same-context inference/close/
+   re-entry still requires caller serialization; audit/enforce that lifecycle
+   in low-level and high-level APIs, including foreign callback threads.
+   Rust scalar decode
    controls still need a compatible public options surface; avoid silently
    breaking downstream `TranscribeOptions` struct literals when extending it.
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
