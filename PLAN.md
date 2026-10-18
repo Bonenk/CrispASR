@@ -1,5 +1,19 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-10-18 — #217 independent subword workspace experiment
+
+Owner: maintainer coordinator; isolated branch `perf/217-alignment-cleanroom`.
+Profile and reduce the native `canary_ctc_align_words` workspace independently
+of the character kernel and external implementations. Freeze our current
+`deaf9c010` tokenizer/DP as the reference; preserve its new invalid-path contract.
+Candidate scope: opt-in one-frame log-softmax workspace and flat traceback;
+no model, tokenizer, score-order, path-tie or timestamp changes. Default stays off.
+Acceptance: exact return/text/centisecond output against frozen own code on
+random/tied/repeated/Unicode/invalid fixtures, independent tiny path checks,
+measured live heap/allocation reductions, and bounded local timing. Hosted
+large-shape profiling and full-library CI/lint remain separate gates; no model
+or Japanese quality/performance claim follows from synthetic postprocessing.
+
 ## #217 — comparison complete; opt-in character CTC candidate validated locally
 
 Owner: maintainer coordinator. Work is isolated on
