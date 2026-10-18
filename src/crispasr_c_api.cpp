@@ -6068,6 +6068,9 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
     for (int i = 0; i < pr->n_words; ++i)
         word_t0.push_back(pr->words[i].t0);
     const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
+    const auto token_ranges =
+        core_parakeet_words::token_ranges(pr->n_tokens, [&](int i) { return pr->tokens[i].text; });
+    const bool own_tokens = token_ranges.size() == (size_t)pr->n_words;
     int ti = 0;
     for (size_t si = 0; si < starts.size(); ++si) {
         const int w_begin = starts[si];
@@ -6089,10 +6092,12 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
         seg.text = std::move(text);
         seg.t0 = seg.words.front().t0;
         seg.t1 = seg.words.back().t1;
-        // Same strict boundary as the shared CLI splitter: a token at the
-        // next segment's first-word start belongs to that next segment.
+        // Match shared CLI ownership: a word's final token can share the
+        // next word's first frame. Index ranges keep it with its own word;
+        // timestamp fallback is only for results without consistent groups.
         const int64_t next_start = (w_end < pr->n_words) ? pr->words[w_end].t0 : INT64_MAX;
-        for (; ti < pr->n_tokens && pr->tokens[ti].t0 < next_start; ++ti) {
+        const int token_end = own_tokens ? token_ranges[w_end - 1].second : pr->n_tokens;
+        for (; ti < token_end && (own_tokens || pr->tokens[ti].t0 < next_start); ++ti) {
             const auto& t = pr->tokens[ti];
             seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
         }

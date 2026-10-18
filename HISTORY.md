@@ -1,3 +1,13 @@
+## #549 explicit-output tied-frame token ownership — 2026-10-18
+
+A native-grouped continuation token sharing the next word's start frame was
+misassigned to the next output segment by both legacy and shared splitters.
+Observed that failure first, then used the shared native word/token ranges to
+keep it with its own word. Word segmentation and timestamps stay unchanged;
+token-less/inconsistent-group fallback and token-only results retain existing
+behavior. All 12 metadata and six window tests pass under GCC and Clang.
+Full-library CI and real Japanese ASR validation remain pending in PLAN.md.
+
 ## #549 remaining Python token packaging and contributing guide — 2026-10-18
 
 Reproduced three defects with tiny literal native fixtures: Japanese slice and

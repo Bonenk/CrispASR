@@ -27,9 +27,10 @@ behavior; no empty segment or invented token is added.
 
 Default non-Japanese shared gap repair also selects tokens by these groups,
 preventing duplicate/cross-assigned tokens at equal-frame word boundaries. The
-legacy explicit-output splitter keeps its existing strict next-segment boundary
-rule, matching the shared CLI splitter; no-word token-only single results retain
-their native token bounds. The generic CLI postprocessor's own gap-fill logic
+legacy and shared explicit-output splitters also use native word/token ranges:
+a word's continuation at the next word's first frame stays with its own segment.
+Timestamp fallback is retained for results with no consistent word/token groups;
+no-word token-only single results retain their native token bounds. The generic CLI postprocessor's own gap-fill logic
 is a separate path, so model-level parity still needs the actual audio checks
 in PLAN.md; these packaging tests do not establish long-form speech accuracy.
 
@@ -113,3 +114,8 @@ A 2,000-case comparison against frozen own native grouping preserves exact word
 text, times and F32 probabilities. `CRISPASR_LIB` selects actual built-library
 getters; full-library CI and real Japanese model validation remain pending for
 this follow-up. No public POD layout or Python constructor changed.
+
+The metadata suite also creates an actual native-grouped word whose final
+continuation token shares the next segment's first frame. Both shared and
+legacy splitters retain that token with the preceding word; all token bytes
+still appear exactly once. This case failed on both paths before the follow-up.

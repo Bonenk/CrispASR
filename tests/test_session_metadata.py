@@ -42,11 +42,13 @@ class SessionMetadataTest(unittest.TestCase):
 #include "cohere.h"
 #include "crispasr_vad.h"
 #include "parakeet_orchestrate.h"
+#include "core/parakeet_word_ranges.h"
 #define CA_EXPORT extern "C"
 '''
         for marker in ('struct crispasr_session_seg {', 'struct crispasr_session_result {'):
             code += definition(source, marker) + ';\n'
         code += 'using ca_token_record = crispasr_session_seg::token;\n'
+        code += definition((ROOT / 'src/parakeet.cpp').read_text(), 'static bool parakeet_group_words(') + '\n'
         for marker in ('static std::vector<crispasr_session_seg::word> emit_words_from_tokens(',
                        'static void filter_words_by_ngram_collapse(',
                        'static void filter_tokens_by_ngram_collapse('):
@@ -156,6 +158,12 @@ extern "C" crispasr_session_result* inject_split(int fixture, int seg_seconds, b
     if (fixture == 3) { native.text = empty; native.words = nullptr; native.n_words = 0;
                         native.tokens = nullptr; native.n_tokens = 0; }
     if (fixture == 4) { native.tokens = nullptr; native.n_tokens = 0; }
+    if (fixture == 6) {
+        tokens[1].t0 = 110; tokens[1].t1 = 118;
+        native.n_tokens = 4; native.words = nullptr; native.n_words = 0;
+        parakeet_group_words(&native, 8);
+    }
+    struct WordOwner { parakeet_result* r; bool own; ~WordOwner() { if (own) free(r->words); } } owner{&native,fixture==6};
     auto* pr = fixture == 5 ? nullptr : &native;
     auto* r = new crispasr_session_result;
     if (!shared) {
@@ -273,6 +281,15 @@ extern "C" crispasr_session_result* inject_remapped() {
         seg, = self.read(self.fixture.inject_moss(b'plain text'))
         self.assertEqual(seg.text, 'plain text')
         self.assertEqual(seg.speaker, '')
+
+    def test_chunk_boundary_keeps_continuation_with_its_native_word(self):
+        for shared in (False, True):
+            with self.subTest(shared=shared):
+                segs = self.read(self.fixture.inject_split(6, 1, shared))
+                self.assertEqual(segs[0].text, 'Hello')
+                self.assertEqual([t.raw_text for t in segs[0].tokens], [b' Hel', b'lo'])
+                self.assertEqual([t.raw_text for s in segs for t in s.tokens],
+                                 [b' Hel', b'lo', ' 世界'.encode(), b' again'])
 
     def test_missing_word_times_and_split_utf8_bytes(self):
         seg, = self.read(self.fixture.inject_untimed())

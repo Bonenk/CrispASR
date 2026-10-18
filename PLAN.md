@@ -127,17 +127,6 @@ parameters, exact feature recipes or source may be reused. The comparison and
 licensing/provenance constraints are in
 [the audit](docs/alignment-cleanroom-2026-10-18.md).
 
-## CLAIMED 2026-10-18 — #549 final explicit-output boundary ownership
-
-Owner: maintainer coordinator, `perf/217-alignment-cleanroom`. Extend native
-index ownership to both shared and legacy explicit-output segment splitters:
-a previous word's continuation token can share the next word's first frame.
-Preserve word segments/times; change only token assignment to its native owner.
-Keep timestamp fallback for token-less/inconsistent external fixtures. Add a
-real native-grouping tied-frame fixture and compare both packaging surfaces.
-Frozen window-fix source `aaa5f21a9` has CI39117671481/lint39117673618 pending;
-this follow-up needs its own final integrated checks.
-
 ## #549 — token ownership implemented; follow-up CI/audio validation pending
 
 Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
@@ -163,13 +152,18 @@ exercise production grouping/window/repair functions, opaque getters and the
 Python result reader: equal frames, UTF-8 fragments, exact F32 probabilities,
 BOS/empty ownership, offset slices and token-less native words. Grouping also
 matches frozen own `08aea3537` word text/times/probabilities on 2,000 cases.
-All 11 existing metadata tests remain green. CTest registers the new suite;
+The expanded metadata suite now has 12 tests, including a native-grouped
+continuation token sharing the next output segment's first frame. Both legacy
+and shared output splitters keep it with its own word, without changing word
+segments; all 18 metadata/window tests pass under GCC and Clang. CTest registers the new suite;
 ordinary CI runs it with `CRISPASR_LIB` against actual exported getters.
 `docs/contributing.md` now requires explicit result-field and multi-route wrapper
 parity and corrects the claim that Dart symbol checks auto-discover new APIs.
 
 Keep the issue open for full-library/platform follow-up and reporter validation.
-Freeze the complete source, run CI/lint, and audit the actual exported-getter
+The first window-only source `aaa5f21a9` has CI39117671481/lint39117673618
+pending; final source also includes the explicit-output boundary fix. Freeze
+that complete source, run CI/lint, and audit the actual exported-getter
 step for both metadata suites. Earlier green source `741141118` does not validate
 this follow-up. Then use a licensed Japanese ASR multi-window fixture: keep
 original native decodes/window choices fixed, require identical word/text/time

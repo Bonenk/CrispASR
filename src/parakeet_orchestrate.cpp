@@ -82,6 +82,8 @@ std::vector<parakeet_seg> split_result_to_segs(const parakeet_result* r, int64_t
         word_t0.push_back(r->words[i].t0);
     const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
 
+    const auto token_ranges = core_parakeet_words::token_ranges(r->n_tokens, [&](int i) { return r->tokens[i].text; });
+    const bool own_tokens = token_ranges.size() == (size_t)r->n_words;
     int ti = 0;
     for (size_t si = 0; si < starts.size(); si++) {
         const int w_begin = starts[si];
@@ -104,7 +106,8 @@ std::vector<parakeet_seg> split_result_to_segs(const parakeet_result* r, int64_t
         seg.t0 = seg.words.front().t0;
         seg.t1 = seg.words.back().t1;
         const int64_t next_start = (w_end < r->n_words) ? r->words[w_end].t0 : INT64_MAX;
-        for (; ti < r->n_tokens && r->tokens[ti].t0 < next_start; ti++) {
+        const int token_end = own_tokens ? token_ranges[w_end - 1].second : r->n_tokens;
+        for (; ti < token_end && (own_tokens || r->tokens[ti].t0 < next_start); ti++) {
             const auto& t = r->tokens[ti];
             parakeet_seg::token ct;
             ct.text = t.text;

@@ -382,7 +382,7 @@ chunk/slice/repair paths. For every field produced by the runtime:
   tagged/structured outputs; do not return inline speaker/time tags as plain
   transcript or decode the model twice to recover metadata.
 - Keep token ownership by native grouping/index through window selection,
-  overlap splicing, deduplication and gap repair. Timestamp equality is not
+  overlap splicing, output segmentation, deduplication and gap repair. Timestamp equality is not
   ownership: distinct words can share one TDT frame. Moving a selected word
   must move its token block, and rejecting it must reject that block too.
   `src/core/parakeet_word_ranges.h` shares Parakeet's actual grouping rules;
