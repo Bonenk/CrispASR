@@ -10,6 +10,16 @@ No non-Python runtime fix is claimed by this audit. `docs/bindings.md` no longer
 claims universal full parity. Declaration/symbol-mention counts are not callable
 API coverage; legacy Parakeet token readers do not cover shared session tokens.
 
+
+Implementation is now claimed by the maintainer coordinator for all wrapper
+families. Work proceeds with two bounded Hermes tasks (Dart; Go/Rust) and the
+coordinator handling Python utilities, C# safety and Java/Ruby/WASM, tests and
+integration. Agents may edit only their assigned wrapper directories and test
+files; the coordinator owns shared headers, manifests, documentation, commits
+and pushes. No model/graph math changes or heavy local builds. Each public API
+must have a callable implementation, correct result/ownership handling and
+behavioral validation; a declaration alone does not close a gap.
+
 Repair order and acceptance:
 
 0. **Close the census boundary:** extend Python's guard across both public
