@@ -29,6 +29,7 @@ static crispasr_session* g_asr_session=nullptr;
 extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
 extern "C" int probe_calls(void);
+extern "C" void probe_poison_drained_tokens(void);
 extern "C" void probe_registry_mode(int);
 extern "C" void probe_diarize_mode(int);
 extern "C" int probe_diarize_calls(void);
@@ -82,6 +83,7 @@ EMSCRIPTEN_BINDINGS(wrapper_probe) {
     emscripten::function("probeMode",&probe_mode);
     emscripten::function("probeLive",&probe_live);
     emscripten::function("probeCalls",&probe_calls);
+    emscripten::function("poisonDrainedTokens",&probe_poison_drained_tokens);
     emscripten::function("registryMode",&probe_registry_mode);
     emscripten::function("diarizeMode",&probe_diarize_mode);
     emscripten::function("diarizeCalls",&probe_diarize_calls);
@@ -206,7 +208,15 @@ require(process.argv[2])().then(m=>{
  m.resultCountMode(8);const transcription=m.readLogits();eq(transcription.logits.nFrames,1);eq(transcription.logits.nVocab,2);eq(Array.from(transcription.logits.data),[-1,2]);eq(transcription.segments[0].t0,1.23);eq(m.logitsEnabled(),0);
  const U8=global.Uint8Array;try{global.Uint8Array=function(){throw new Error('encoding failure')};frees=m.resultFrees();rejects(()=>m.readLogits());eq(m.resultFrees(),frees+1);eq(m.logitsEnabled(),0);}finally{global.Uint8Array=U8;}
  m.resultCountMode(0);eq(m.readLogits().logits,null);eq(transcription.logits.data[1],2);
- console.log('PASS WASM ABI: '+n+' assertions');
+ const ExpectedTokens=[[0xe6,0x97],[0xa5],[],[101,110,100]];
+ const OriginalU8=global.Uint8Array;
+ try {
+   global.Uint8Array=class extends OriginalU8 { constructor(...args){super(...args);m.poisonDrainedTokens();} };
+   eq(m.drainStreamedTokenBytes().map(x=>Array.from(x)),ExpectedTokens);
+ } finally {global.Uint8Array=OriginalU8;}
+ for(const mode of [8,9]){m.probeMode(mode);rejects(()=>m.drainStreamedTokenBytes());}
+ for(const mode of [10,11]){m.probeMode(mode);eq(m.drainStreamedTokenBytes(),[]);}m.probeMode(0);
+ console.log('PASS WASM ABI: ' +n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
 '''
 

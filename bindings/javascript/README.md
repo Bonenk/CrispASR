@@ -161,3 +161,11 @@ accepts `threshold`, `min_speech_duration_ms`, `min_silence_duration_ms`,
 maximum-length splitting. Invalid settings or native transcription failure throw.
 Both operations are synchronous and need the same browser scheduling care as
 other synchronous inference calls.
+
+
+`drainStreamedTokenBytes()` returns owned `Uint8Array` fragments, preserving
+partial UTF-8 sequences and empty tokens. Assemble the fragments before decoding
+text. The wrapper copies every native string before creating JS arrays, so JS
+constructor re-entry cannot change later tokens. Negative counts or positive
+counts with a null buffer throw. Concurrent native compute/drain/close still
+requires the browser dispatch/ownership work tracked in PLAN.md.

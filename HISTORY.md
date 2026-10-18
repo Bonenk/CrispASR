@@ -1,3 +1,16 @@
+## WASM token drain copies before JS re-entry — 2026-10-18
+
+Token polling now copies all NUL-separated native strings into owned C++ storage
+before creating any JS arrays. A regression poisoned the borrowed native buffer
+from a typed-array constructor and reproduced corruption of later fragments;
+the copied fragments now survive. Partial UTF-8 and empty tokens remain intact.
+Negative counts and positive counts with null buffers throw; zero-count drains
+return empty arrays.
+
+Validation: **284 WASM operation assertions plus 39 chat assertions** pass.
+This repairs servicer-side JS constructor re-entry. It does not establish safe
+concurrent compute/drain/session-close scheduling, which remains in PLAN.md.
+
 ## Go legacy parameter strings and decode controls — 2026-10-18
 
 Legacy `Params` retains prompt/VAD paths as Go strings and creates temporary C

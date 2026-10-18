@@ -219,14 +219,19 @@ static void binding_register_utilities() {
                              binding_check_reentry();
                              int n = 0;
                              auto p = crispasr_drain_streamed_tokens(&n);
-                             auto out = val::array();
-                             if (!p)
-                                 return out;
+                             if (n < 0 || (n && !p))
+                                 throw std::runtime_error("Invalid native token drain");
+                             // JS constructors/setters can re-enter the module. Finish
+                             // reading the borrowed native buffer before any JS call.
+                             std::vector<std::string> pieces;
+                             pieces.reserve(n);
                              for (int i = 0; i < n; ++i) {
-                                 std::string piece(p);
-                                 out.call<void>("push", binding_bytes(piece));
-                                 p += piece.size() + 1;
+                                 pieces.emplace_back(p);
+                                 p += pieces.back().size() + 1;
                              }
+                             auto out = val::array();
+                             for (const auto& piece : pieces)
+                                 out.call<void>("push", binding_bytes(piece));
                              return out;
                          }));
     emscripten::function("resetStreamedSegments", emscripten::optional_override([]() {

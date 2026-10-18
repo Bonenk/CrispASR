@@ -49,6 +49,20 @@ Recommended implementation order and concrete acceptance:
    include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
    work and callback delivery are safely proxied. Measure complete default
    and opt-in module sizes and instantiate actual models in a browser.
+   Concrete remaining WASM acceptance:
+   - Retained segment/token/progress callbacks must deliver copied native events
+     on the servicer, preserve raw token bytes, clear on replacement/close, and
+     contain callback errors/re-entry. Never move emval objects to compute threads.
+   - Own child stream handles and close them before parent replacement/free;
+     probe feed/flush/text/options, native failure and retired handles.
+   - Repair dispatch work/encoding/callback exceptions and failed proxy delivery,
+     then enforce one active operation against close/replacement/inference. Keep
+     supported atomic progress queries usable while work runs. Test an actual
+     threaded proxy module and browser event-loop responsiveness.
+   - Add async v2 load-options routes once dispatch ownership is safe; current
+     synchronous options routes do not make browser loading nonblocking.
+   - Token polling now copies before JS constructors run; still serialize the
+     globally selected native borrowed drain against concurrent compute/close.
 5. **Residual public options and polling ownership.** Go/Rust now have load
    options, standalone truecase/PCS and owned segment polling; Rust text scoring
    and Go capability queries have compiled probes. Review remaining ledger

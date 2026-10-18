@@ -258,10 +258,15 @@ void probe_callbacks(void) {
     if (tok_cb)
         tok_cb("\xe6\x97", 9, token_user);
 }
+static char drained_tokens[32];
+void probe_poison_drained_tokens(void) {
+    memset(drained_tokens, 0, sizeof(drained_tokens));
+}
 const char* crispasr_drain_streamed_tokens(int* n) {
     static const char data[] = "\xe6\x97\0\xa5\0\0end\0";
-    *n = 4;
-    return data;
+    memcpy(drained_tokens, data, sizeof(data));
+    *n = mode == 8 ? -1 : mode == 9 ? 1 : mode == 10 || mode == 11 ? 0 : 4;
+    return mode == 9 || mode == 10 ? NULL : drained_tokens;
 }
 int crispasr_backend_caps_list_abi(char* out, int32_t cap) {
     const char* data = "foo\tasr,tts\nbar\t\n";

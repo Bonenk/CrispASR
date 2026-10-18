@@ -644,6 +644,9 @@ packages when changing a low-level options representation or public interface.
 Polling counts are element counts, not byte lengths. For native NUL-separated
 tokens read exactly that many terminated strings; never estimate a byte length.
 The Go regression places the buffer immediately before a protected memory page.
+WASM must copy every borrowed token before constructing any JS values: a JS
+constructor can re-enter and mutate the drain buffer. The operation probe
+poisons that native buffer from a typed-array constructor to test the boundary.
 For manually mirrored option structs, derive pointer fields from the target
 ABI rather than hard-coding 64-bit offsets. Validate returned counts against
 allocated capacity, and reject short stereo channels before the native call.

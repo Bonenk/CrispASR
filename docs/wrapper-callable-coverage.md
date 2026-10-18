@@ -202,3 +202,11 @@ processor counts and NUL strings never reach the native oracle.
 panic and now passes. The contract also compiles the higher-level package;
 that compilation does not run its model-dependent tests. DTW and remaining
 legacy context/token/resource paths are still pending.
+
+
+WASM token polling copies all NUL-separated strings into owned C++ storage
+before constructing JS arrays. A regression replaces the JS typed-array
+constructor with one that poisons the borrowed native buffer: later fragments
+were corrupted before the fix and now survive. Negative counts and positive/null
+pairs throw; zero-count drains return empty arrays. This covers servicer-side
+JS re-entry; concurrent compute/session-close ownership remains pending.
