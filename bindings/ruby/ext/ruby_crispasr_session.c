@@ -1706,7 +1706,7 @@ static VALUE rb_registry_list_backends(VALUE self) {
 }
 
 // Explicitly owned direct-context handles reject closed/foreign pointers.
-static VALUE rb_parakeet_handles = Qnil, rb_titanet_handles = Qnil;
+static VALUE rb_parakeet_handles = Qnil, rb_titanet_handles = Qnil, rb_speaker_db_handles = Qnil;
 static VALUE rb_direct_context_map(VALUE* map) {
     if (*map == Qnil) {
         *map = rb_hash_new();
@@ -1832,43 +1832,60 @@ static VALUE rb_titanet_embed(VALUE self, VALUE handle, VALUE pcm_arr) {
 static VALUE rb_speaker_db_open(VALUE self, VALUE dir_path, VALUE expected_names, VALUE consent) {
     if (!RTEST(consent))
         rb_raise(rb_eRuntimeError, "speaker_db_open requires an explicit consent attestation (GDPR Art. 9)");
-    void* h = crispasr_speaker_db_open(StringValueCStr(dir_path), StringValueCStr(expected_names), 1);
+    VALUE live = rb_direct_context_map(&rb_speaker_db_handles);
+    if (RSTRING_LEN(StringValue(expected_names)) == 0)
+        rb_raise(rb_eArgError, "Participant roster required");
+    VALUE roots = rb_ary_new();
+    const char* path = rb_chat_owned_cstring(dir_path, roots);
+    const char* roster = rb_chat_owned_cstring(expected_names, roots);
+    void* h = crispasr_speaker_db_open(path, roster, 1);
+    RB_GC_GUARD(roots);
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_speaker_db_open failed");
-    return ULL2NUM((uintptr_t)h);
+    VALUE key = ULL2NUM((uintptr_t)h);
+    rb_hash_aset(live, key, Qtrue);
+    return key;
 }
 static VALUE rb_speaker_db_free(VALUE self, VALUE handle) {
-    void* h = (void*)NUM2ULL(handle);
-    if (h)
-        crispasr_speaker_db_free(h);
+    if (rb_speaker_db_handles == Qnil || NIL_P(rb_hash_delete(rb_speaker_db_handles, handle)))
+        return Qnil;
+    crispasr_speaker_db_free((void*)(uintptr_t)NUM2ULL(handle));
     return Qnil;
 }
 static VALUE rb_speaker_db_count(VALUE self, VALUE handle) {
-    void* h = (void*)NUM2ULL(handle);
+    rb_direct_context_check(rb_speaker_db_handles, handle);
+    void* h = (void*)(uintptr_t)NUM2ULL(handle);
     return INT2NUM(crispasr_speaker_db_count(h));
 }
 static VALUE rb_speaker_db_match(VALUE self, VALUE handle, VALUE emb_arr, VALUE threshold) {
-    void* h = (void*)NUM2ULL(handle);
+    rb_direct_context_check(rb_speaker_db_handles, handle);
+    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    VALUE storage = rb_aux_pcm_storage(emb_arr);
     long dim = RARRAY_LEN(emb_arr);
-    float* emb = (float*)calloc(dim > 0 ? dim : 1, sizeof(float));
-    for (long i = 0; i < dim; i++)
-        emb[i] = (float)NUM2DBL(rb_ary_entry(emb_arr, i));
+    if (!dim)
+        rb_raise(rb_eArgError, "Nonempty embedding required");
     char name[256] = {0};
-    float score = crispasr_speaker_db_match(h, emb, (int32_t)dim, (float)NUM2DBL(threshold), name, 256);
-    free(emb);
-    VALUE result =
-        rb_ary_new3(2, score >= (float)NUM2DBL(threshold) ? rb_utf8_str_new_cstr(name) : Qnil, DBL2NUM(score));
+    float limit = (float)NUM2DBL(threshold);
+    if (!isfinite(limit))
+        rb_raise(rb_eArgError, "Finite threshold required");
+    float score = crispasr_speaker_db_match(h, (float*)RSTRING_PTR(storage), (int32_t)dim, limit, name, 256);
+    RB_GC_GUARD(storage);
+    VALUE result = rb_ary_new3(2, score >= 0 && score >= limit ? rb_utf8_str_new_cstr(name) : Qnil, DBL2NUM(score));
     return result;
 }
 static VALUE rb_speaker_db_enroll(VALUE self, VALUE dir_path, VALUE name, VALUE emb_arr, VALUE consent) {
     if (!RTEST(consent))
         rb_raise(rb_eRuntimeError, "speaker_db_enroll requires an explicit consent attestation (GDPR Art. 9)");
+    VALUE storage = rb_aux_pcm_storage(emb_arr);
     long dim = RARRAY_LEN(emb_arr);
-    float* emb = (float*)calloc(dim > 0 ? dim : 1, sizeof(float));
-    for (long i = 0; i < dim; i++)
-        emb[i] = (float)NUM2DBL(rb_ary_entry(emb_arr, i));
-    int32_t rc = crispasr_speaker_db_enroll2(StringValueCStr(dir_path), StringValueCStr(name), emb, (int32_t)dim, 1);
-    free(emb);
+    if (!dim)
+        rb_raise(rb_eArgError, "Nonempty embedding required");
+    VALUE roots = rb_ary_new();
+    const char* path = rb_chat_owned_cstring(dir_path, roots);
+    const char* label = rb_chat_owned_cstring(name, roots);
+    int32_t rc = crispasr_speaker_db_enroll2(path, label, (float*)RSTRING_PTR(storage), (int32_t)dim, 1);
+    RB_GC_GUARD(roots);
+    RB_GC_GUARD(storage);
     if (rc != 0)
         rb_raise(rb_eRuntimeError, "speaker_db_enroll failed");
     return Qtrue;
@@ -1922,18 +1939,17 @@ static VALUE rb_stream_set_live_decode(VALUE self, VALUE handle, VALUE enabled) 
 }
 
 static VALUE rb_titanet_cosine_sim(VALUE self, VALUE a_arr, VALUE b_arr) {
-    long na = RARRAY_LEN(a_arr);
-    long nb = RARRAY_LEN(b_arr);
-    long dim = na < nb ? na : nb;
-    float* a = (float*)calloc(dim > 0 ? dim : 1, sizeof(float));
-    float* b = (float*)calloc(dim > 0 ? dim : 1, sizeof(float));
-    for (long i = 0; i < dim; i++) {
-        a[i] = (float)NUM2DBL(rb_ary_entry(a_arr, i));
-        b[i] = (float)NUM2DBL(rb_ary_entry(b_arr, i));
-    }
-    float sim = crispasr_titanet_cosine_sim(a, b, (int32_t)dim);
-    free(a);
-    free(b);
+    Check_Type(a_arr, T_ARRAY);
+    Check_Type(b_arr, T_ARRAY);
+    long dim = RARRAY_LEN(a_arr);
+    if (dim != RARRAY_LEN(b_arr))
+        rb_raise(rb_eArgError, "Embedding dimensions must match");
+    if (!dim)
+        return DBL2NUM(0);
+    VALUE a = rb_aux_pcm_storage(a_arr), b = rb_aux_pcm_storage(b_arr);
+    float sim = crispasr_titanet_cosine_sim((float*)RSTRING_PTR(a), (float*)RSTRING_PTR(b), (int32_t)dim);
+    RB_GC_GUARD(a);
+    RB_GC_GUARD(b);
     return DBL2NUM(sim);
 }
 

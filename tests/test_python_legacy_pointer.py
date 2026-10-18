@@ -9,7 +9,7 @@ import numpy as np
 from build_legacy_wrapper_probe import build
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'python'))
-from crispasr import CrispASR, Parakeet, TitaNet
+from crispasr import CrispASR, Parakeet, TitaNet, SpeakerDB
 
 class LegacyPointerContract(unittest.TestCase):
     def test_native_parameters_parallel_dtw_and_cleanup(self):
@@ -72,5 +72,30 @@ class LegacyPointerContract(unittest.TestCase):
             calls=lib.probe_titanet_calls()
             with self.assertRaises(RuntimeError):model.embed(pcm)
             self.assertEqual(lib.probe_titanet_calls(),calls)
+
+    def test_speaker_database_roster_scores_enrollment_and_lifetime(self):
+        with tempfile.TemporaryDirectory(prefix='python-speaker-db-') as tmp:
+            path=Path(tmp)/'libcrispasr.so'
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-speaker-db.c'),'-o',str(path)],check=True)
+            lib=C.CDLL(str(path));emb=np.array([1,3,5],dtype=np.float32)
+            before=lib.probe_db_calls()
+            with self.assertRaises(ValueError):SpeakerDB('db','Alice,Bob',False,lib_path=str(path))
+            with self.assertRaises(ValueError):SpeakerDB('db','',True,lib_path=str(path))
+            self.assertEqual(lib.probe_db_calls(),before)
+            db=SpeakerDB('db','Alice,Bob',True,lib_path=str(path));self.assertEqual(db.count,2)
+            matched=db.match(emb);self.assertEqual(matched,('アリス',.875));self.assertEqual(lib.probe_db_live(),1)
+            lib.probe_db_mode(1);self.assertEqual(db.match(emb,threshold=-1),(None,-1.0))
+            self.assertEqual(matched[0],'アリス');lib.probe_db_mode(0)
+            for invalid in ([],[[1,2]]):
+                with self.assertRaises(ValueError):db.match(invalid)
+                with self.assertRaises(ValueError):db.enroll('Alice',invalid)
+            with self.assertRaises(ValueError):db.match(emb,threshold=float('nan'))
+            self.assertTrue(db.enroll('Alice',emb));lib.probe_db_mode(3);self.assertFalse(db.enroll('Alice',emb))
+            lib.probe_db_mode(2)
+            with self.assertRaises(RuntimeError):SpeakerDB('db','Alice,Bob',True,lib_path=str(path))
+            db.close();db.close();self.assertEqual(lib.probe_db_live(),0);before=lib.probe_db_calls()
+            with self.assertRaises(RuntimeError):db.match(emb)
+            with self.assertRaises(RuntimeError):db.enroll('Alice',emb)
+            self.assertEqual(lib.probe_db_calls(),before)
 
 if __name__=='__main__':unittest.main()

@@ -833,3 +833,100 @@ func TestProbeTitaNetFloatCountAndClosedContext(t *testing.T) {
 		t.Fatal("empty cosine")
 	}
 }
+
+// A count is not a byte length. The Linux fixture ends exactly at a protected page.
+func TestProbeDrainStreamedTokensExactBufferAndRawFragments(t *testing.T) {
+	defer probeModeSet(0)
+	probeModeSet(5)
+	tokens, err := DrainStreamedTokens()
+	if err != nil || len(tokens) != 3 {
+		t.Fatalf("drain: %q %v", tokens, err)
+	}
+	if !bytes.Equal([]byte(tokens[0]), []byte{0xe6, 0x97}) || !bytes.Equal([]byte(tokens[1]), []byte{0xa5}) || tokens[2] != "" {
+		t.Fatalf("raw fragments or empty token lost: %q", tokens)
+	}
+	probeModeSet(0)
+	normal, err := DrainStreamedTokens()
+	if err != nil || len(normal) != 2 || normal[0] != "tok1" || tokens[2] != "" {
+		t.Fatalf("independent drain: %q %v", normal, err)
+	}
+	probeModeSet(1)
+	empty, err := DrainStreamedTokens()
+	if err != nil || len(empty) != 0 {
+		t.Fatalf("empty drain: %q %v", empty, err)
+	}
+	for _, mode := range []int{2, 3} {
+		probeModeSet(mode)
+		if _, err := DrainStreamedTokens(); err == nil {
+			t.Fatalf("invalid mode %d accepted", mode)
+		}
+	}
+}
+
+func TestProbeSpeakerDatabaseRosterScoresEnrollmentAndLifetime(t *testing.T) {
+	probeDbMode(0)
+	defer probeDbMode(0)
+	emb := []float32{1, 3, 5}
+	before := probeDbCalls()
+	if _, err := SpeakerDBOpen("db", "Alice,Bob", false); err == nil {
+		t.Fatal("consent missing")
+	}
+	if _, err := SpeakerDBOpen("db", "", true); err == nil {
+		t.Fatal("roster missing")
+	}
+	if probeDbCalls() != before {
+		t.Fatal("invalid open reached native")
+	}
+	db, err := SpeakerDBOpen("db", "Alice,Bob", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if db.Count() != 2 || probeDbLive() != 1 {
+		t.Fatal("count/lifetime")
+	}
+	name, score := db.Match(emb, .5)
+	if name != "アリス" || score != .875 {
+		t.Fatalf("match: %q %v", name, score)
+	}
+	probeDbMode(1)
+	if name, score := db.Match(emb, -1); name != "" || score != -1 {
+		t.Fatal("negative score became match")
+	}
+	probeDbMode(0)
+	if name, score := db.Match(nil, .5); name != "" || score != -1 {
+		t.Fatal("empty embedding accepted")
+	}
+	if err := db.Enroll("Alice", emb, false); err == nil {
+		t.Fatal("consent missing")
+	}
+	if err := db.Enroll("Alice", nil, true); err == nil {
+		t.Fatal("empty enroll accepted")
+	}
+	if err := db.Enroll("Alice", emb, true); err != nil {
+		t.Fatal(err)
+	}
+	probeDbMode(3)
+	if err := db.Enroll("Alice", emb, true); err == nil {
+		t.Fatal("positive failure accepted")
+	}
+	probeDbMode(2)
+	if _, err := SpeakerDBOpen("db", "Alice,Bob", true); err == nil {
+		t.Fatal("null open accepted")
+	}
+	db.Close()
+	db.Close()
+	before = probeDbCalls()
+	if probeDbLive() != 0 || db.Count() != 0 {
+		t.Fatal("closed DB live")
+	}
+	if name, score := db.Match(emb, .5); name != "" || score != -1 {
+		t.Fatal("closed match accepted")
+	}
+	if err := db.Enroll("Alice", emb, true); err == nil {
+		t.Fatal("closed enroll accepted")
+	}
+	if probeDbCalls() != before {
+		t.Fatal("closed call reached native")
+	}
+}

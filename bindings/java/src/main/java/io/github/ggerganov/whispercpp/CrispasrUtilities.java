@@ -40,6 +40,10 @@ public abstract class CrispasrUtilities {
     Pointer crispasr_c2pa_sign(
         byte[] data, SizeT size, String format, String cert, String key, Pointer outSize);
     void crispasr_c2pa_free(Pointer p);
+    Pointer crispasr_punc_init(String path);
+    Pointer crispasr_punc_process(Pointer ctx, String text);
+    void crispasr_punc_free_text(Pointer text);
+    void crispasr_punc_free(Pointer ctx);
     Pointer crispasr_truecase_init(String path);
     Pointer crispasr_truecase_process(Pointer ctx, String text);
     void crispasr_truecase_free_text(Pointer text);
@@ -205,42 +209,75 @@ public abstract class CrispasrUtilities {
           Utilities.INSTANCE.crispasr_c2pa_sign(data, new SizeT(data.length), format, cert, key, size), size);
     }
   }
+  public enum TextProcessorKind { TRUECASE, PCS, PUNCTUATION }
   public static final class TextProcessor implements AutoCloseable {
     private Pointer handle;
-    private final boolean pcs;
+    private final TextProcessorKind kind;
     public TextProcessor(String model, boolean punctuationCapitalizationSegmentation) {
-      pcs = punctuationCapitalizationSegmentation;
-      Objects.requireNonNull(model);
-      handle = pcs ? Utilities.INSTANCE.crispasr_pcs_init(model)
-                   : Utilities.INSTANCE.crispasr_truecase_init(model);
+      this(model, punctuationCapitalizationSegmentation ? TextProcessorKind.PCS : TextProcessorKind.TRUECASE);
+    }
+    public TextProcessor(String model, TextProcessorKind kind) {
+      this.kind = Objects.requireNonNull(kind, "kind");
+      Objects.requireNonNull(model, "model");
+      switch (kind) {
+        case PCS:
+          handle = Utilities.INSTANCE.crispasr_pcs_init(model);
+          break;
+        case PUNCTUATION:
+          handle = Utilities.INSTANCE.crispasr_punc_init(model);
+          break;
+        default:
+          handle = Utilities.INSTANCE.crispasr_truecase_init(model);
+      }
       if (handle == null)
         throw new IllegalStateException("text processor could not open");
     }
-    public String process(String text) {
+    public synchronized String process(String text) {
       if (handle == null)
         throw new IllegalStateException("text processor is closed");
-      Objects.requireNonNull(text);
-      Pointer out = pcs ? Utilities.INSTANCE.crispasr_pcs_process(handle, text)
-                        : Utilities.INSTANCE.crispasr_truecase_process(handle, text);
+      Objects.requireNonNull(text, "text");
+      Pointer out;
+      switch (kind) {
+        case PCS:
+          out = Utilities.INSTANCE.crispasr_pcs_process(handle, text);
+          break;
+        case PUNCTUATION:
+          out = Utilities.INSTANCE.crispasr_punc_process(handle, text);
+          break;
+        default:
+          out = Utilities.INSTANCE.crispasr_truecase_process(handle, text);
+      }
       try {
         if (out == null)
           throw new IllegalStateException("text processing failed");
         return out.getString(0, "UTF-8");
       } finally {
         if (out != null) {
-          if (pcs)
-            Utilities.INSTANCE.crispasr_pcs_free_text(out);
-          else
-            Utilities.INSTANCE.crispasr_truecase_free_text(out);
+          switch (kind) {
+            case PCS:
+              Utilities.INSTANCE.crispasr_pcs_free_text(out);
+              break;
+            case PUNCTUATION:
+              Utilities.INSTANCE.crispasr_punc_free_text(out);
+              break;
+            default:
+              Utilities.INSTANCE.crispasr_truecase_free_text(out);
+          }
         }
       }
     }
-    public void close() {
+    public synchronized void close() {
       if (handle != null) {
-        if (pcs)
-          Utilities.INSTANCE.crispasr_pcs_free(handle);
-        else
-          Utilities.INSTANCE.crispasr_truecase_free(handle);
+        switch (kind) {
+          case PCS:
+            Utilities.INSTANCE.crispasr_pcs_free(handle);
+            break;
+          case PUNCTUATION:
+            Utilities.INSTANCE.crispasr_punc_free(handle);
+            break;
+          default:
+            Utilities.INSTANCE.crispasr_truecase_free(handle);
+        }
         handle = null;
       }
     }

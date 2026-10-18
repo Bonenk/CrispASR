@@ -1,134 +1,67 @@
 # CrispASR — Pending work
 
-## NOW — non-Python wrapper parity audit and scoped repairs
+## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Source audit at
-`c12707299c5dcbca7bafe60a073688250238cdd9` confirms gaps across Dart, Go,
-Rust, Java, Ruby, C# and WASM. See
-[the per-wrapper findings and source entry points](docs/binding-gaps-2026-10-18.md).
-No non-Python runtime fix is claimed by this audit. `docs/bindings.md` no longer
-claims universal full parity. Declaration/symbol-mention counts are not callable
-API coverage; legacy Parakeet token readers do not cover shared session tokens.
+Owner: maintainer coordinator. Continue the cross-language wrapper task; the
+bounded external agent tasks have ended. Completed source repairs and measured
+probe counts are archived in HISTORY.md. Start with the incremental
+[callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
+The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
+Do not reimplement rows merely because an older note says they are missing.
 
+The shared census covers **297 unique `crispasr_*` exports** across the two
+shared headers, plus **14 separate chat exports**. It does not include every
+upstream `whisper_*` declaration. Source declarations/mentions are not proof
+of a public operation. Full parity and real-model acceptance remain open.
 
-Implementation is owned by the maintainer coordinator for all wrapper families.
-The bounded external wrapper tasks have ended; their results were reviewed and
-corrected against native code. No model/graph math changes are part of this
-work. A public API needs correct callable behavior, result ownership and tests;
-a declaration alone does not close a gap.
+Recommended implementation order and concrete acceptance:
 
-Validated implementation checkpoint (model-free ABI transport):
+1. **Complete the callable ledger.** For each export, identify the actual
+   public method/result in Python, C#, Java, Go, Rust, Dart, Ruby and WASM.
+   Record bulk/superset equivalents, retired refusing stubs and deliberate
+   platform exclusions separately. TitaNet and roster DB now have reviewed
+   public paths in all eight; extend the ledger beyond those families.
+2. **Legacy Whisper controls.** C#/Python/Dart have pointer-safe parameter,
+   DTW and parallel probes; inspect Go's compiled parameter routes and finish
+   Java/Rust/Ruby/WASM callable gaps. Cover scalar setters, language detection,
+   native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
+   Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
+   implementation. Direct Parakeet uses an integer centisecond offset.
+3. **Ruby remaining auxiliary/lifetime work.** Add usable generic speaker
+   embedder, clustering and pyannote-cache methods where only declarations
+   exist. Audit raw Whisper/stream handles and every allocation-returning
+   audio/container/processor/scoring path for exceptions and callback re-entry.
+   Native buffers crossing Ruby coercion or callbacks must remain stable
+   through GC compaction; a rooted String alone is insufficient.
+4. **WASM remaining adapters and dispatch.** Implement registry/cache, generic
+   speaker/clustering/pyannote/diarization, shared session options, typed ASR
+   callback setters, VAD-transcription/language options and legacy controls.
+   Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
+   work and callback delivery are safely proxied. Measure complete default
+   and opt-in module sizes and instantiate actual models in a browser.
+5. **Go/Rust and residual public options.** Check session-open options, text
+   processors/scoring, global polling/reset/drained-segment metadata and all
+   capability queries against actual callable methods. In Rust, a safe polling
+   adapter must account for the borrowed native buffer and globally selected
+   session; do not permit another thread to close/free it while copying.
+   Finish per-call VAD settings in languages beyond the C#/Java/Dart/Python
+   paths already implemented; probe actual option fields and language.
+6. **Platform and model acceptance.** Run full-library/compiler checks and
+   representative real tasks on pinned source/models/inputs, including TTS→ASR
+   roundtrips. Exercise 32-bit Java/Dart diarization marshaling on actual target
+   runtimes; the new pointer-aware layouts and 64-bit probes are not that proof.
+   Review real CI logs before acceptance. No release from fixture success or
+   queued jobs.
 
-- Python now inventories **297** functions across both shared headers: 292
-  bound, three equivalents/compiled adapters and two retired stubs. Native
-  pointer initialization/inference works without a separate helper library.
-- C# has **225 assertions**: core/old-library 69, utilities 23, chat 26,
-  registry/open-options/embedder/clustering/cache/LID/VAD/diarization 40, and
-  legacy Whisper 35, legacy Parakeet 18 and TitaNet 14. `WhisperContext` copies tokens/raw bytes/alternatives/DTW
-  times and retains native parameter strings. New real-library registry/bool
-  smoke is registered with the existing required-live C# suite; hosted result
-  remains pending.
-- Java has **172 assertions** (63 core, six older-library, 103 auxiliary/legacy).
-  `CrispasrAuxiliary` provides usable registry/cache, session options,
-  speaker/embedder/clustering, pyannote/diarization, text-LID and VAD slices.
-  Kokoro bool exports use byte-sized returns instead of JNA boolean32.
-- Dart strict analyzer and **35 FFI tests** pass. Legacy Whisper now rejects
-  unsafe by-value fallbacks, frees context/default decode parameters and
-  supports DTW and pointer-safe parallel decoding. Split token fragments use
-  replacement for display; native byte-preserving session tokens remain owned.
-- WASM has **122 Embind/Node assertions**: 83 operation/result/utility/analysis
-  and 39 chat. Added measured character alignment and VAD spans/slices with
-  cleanup even on partial native errors. Chat is opt-in and currently requires
-  `CRISPASR_WASM_SINGLE_THREAD=ON`; the default bundle reports unavailable.
-  Streaming returns owned raw bytes and callback failures after native returns.
-- Ruby auxiliary changes were reviewed beyond their initial passing probe.
-  Removed a dummy diarization implementation, made options real, fixed ignored
-  chat options/string keys, callback re-entry, audio error leaks/stereo aliases,
-  and restricted direct callback-test entry points to probe builds. **175
-  assertions** now include native struct/argument checks, actual speaker turns,
-  changed chat context/sampler options, GC during callbacks and audio errors.
-  This does not certify every legacy Ruby wrapper or every allocation path.
-
-`crispasr_transcribe_parallel_by_ref` is a new shared ABI export (C API version
-0.7.1; no release bump). The Python/C#/Dart probes compile literal native
-setters, token and parallel adapters against the actual Whisper structs. They
-prove pointer layout, DTW, retained UTF-8 strings and cleanup, not ASR accuracy.
-
-Go/Rust now pass **24 Go tests, 21 Rust tests and five Rust doctests**.
-New music/conversion/TTS/audio/metadata implementations and typed ASR callbacks
-are exercised through isolated header-checked probes. Callback roots survive
-native calls; panic errors are deferred until results are freed. Go rejects
-same-session re-entry; Rust stream ownership is an exclusive parent borrow,
-with a compile-fail doctest. The existing stack Rust progress callback now also
-catches panics and restores the previously registered callback. Probes stay out
-of ordinary build discovery, and the Rust probe uses an explicit Cargo feature.
-
-Using the actual C header exposed a legacy Parakeet signature bug in Python,
-Go, Rust, Java, Ruby and Dart: the final transcription argument is **int64
-centiseconds**, not a language pointer. All now pass an integer offset. Existing
-optional empty/English hints remain compatible; unsupported language hints
-raise instead of pretending to be native parameters. Added usable direct
-Parakeet classes to C#/Java/WASM and raw fragment access where needed. A shared
-real-header fixture checks default/123 offsets, missing timing, split bytes,
-owned results and closed contexts in applicable wrappers.
-
-TitaNet return-count audit: a compiled probe was observed failing in C# on
-native success (`rc=192`). C# now requires the documented 192 floats rather
-than zero; Python/Go/Ruby/Dart reject short/oversized counts and closed/empty
-inputs. Added callable TitaNet classes to Java/Rust/WASM; all eight wrappers
-now have a real path to this family. The native similarity helper is a dot
-product for TitaNet's L2-normalized embeddings; no normalization formula was
-changed. Ruby direct TitaNet/Parakeet ownership maps reject closed handles and
-make repeated close harmless. Dart DTW reads now validate both index bounds.
-These are transport checks; actual speaker accuracy still needs model fixtures.
-
-The exhaustive callable inventory remains open: **297 shared-header functions
-plus 14 chat functions**, mapped to actual public methods/results in all eight
-languages with explicit equivalents/retired/platform exclusions. A rejected
-symbol-mention manifest is not evidence. Remaining rows must be checked against
-code, including legacy Whisper/Parakeet helpers, typed ASR callbacks, speaker
-DB/auxiliary families and WASM registry/diarization/browser scheduling.
-
-Current implementation is on main at
-`e7a369e905a9ae5a4eebbbea299983c4d16f8037`, frozen as
-`diag/wrapper-aux-20261018`. The six-language ABI workflow run
-[39131299304](https://github.com/CrispStrobe/CrispASR/actions/runs/39131299304)
-was queued at dispatch. Review the exact source SHA and actual job logs before
-claiming hosted acceptance. A Ruby follow-up additionally reproduces callback
-GC-compaction invalidating chat input strings: native message/stop/string buffers
-now use Ruby-owned stable data payloads and abort userdata selects a rooted
-session-keyed callback rather than storing a movable Proc VALUE. The strengthened
-166-assertion probe passes; full native/model acceptance remains pending.
-
-Repair order and acceptance:
-
-1. **Complete the callable inventory:** map both headers and chat to public
-   methods/results in every wrapper. Explicitly classify bulk equivalents,
-   retired stubs and platform exclusions. A declaration is not coverage.
-2. **Finish legacy/helper inventory:** confirm every exposed Whisper scalar
-   setter, DTW configuration, native progress/parallel route and direct
-   Parakeet operation has a public callable path. C#/Java/WASM direct Parakeet
-   now exists; do not repeat the language-pointer bug. Record deliberate
-   low-level/by-ref equivalents by language, not a global Python exception.
-3. **Finish Ruby lifetime/ownership:** audit all malloc-returning container/
-   processor/scoring helpers for Ruby allocation exceptions, and raw legacy
-   context/stream handles for close/re-entry. Replace remaining declaration-only
-   auxiliary APIs with usable methods; keep native centisecond/VAD-second units.
-4. **Finish WASM auxiliary and browser dispatch:** typed ASR callback setters,
-   registry/cache/speaker/diarization families, and complete compute/servicer
-   scheduling. Chat is intentionally unavailable in threaded modules until
-   native work and callback delivery are safely proxied. Measure full-module
-   size (default and chat opt-in), instantiate real models and prove browser
-   behavior; the tiny probes do not establish those claims.
-5. **Close remaining per-wrapper rows:** check C#/Java/Dart speaker-DB/TitaNet,
-   legacy controls and stream disposal against actual public methods. Use
-   `SessionAuxiliary.cs`, `WhisperContext.cs`, `ParakeetContext.cs`,
-   `CrispasrAuxiliary.java` and their probes as starting points, not missing-row
-   assumptions from the historical audit. Go/Rust already have safe music,
-   conversion, TTS and retained ASR callbacks with passing isolated tests.
-6. **Hosted/model acceptance:** full library/compiler jobs and representative
-   real tasks through each wrapper, pinned models/source/inputs and TTS→ASR
-   roundtrips. No release from declaration counts, fixture probes or queued CI.
+The latest pushed TitaNet checkpoint is
+`2f7bd0b0946aa53cec5746ec6b89f8b96813b54b`; its ABI run
+[39133837807](https://github.com/CrispStrobe/CrispASR/actions/runs/39133837807)
+was queued at the last inspection. The subsequent speaker/options/polling
+checkpoint is frozen as `diag/wrapper-speaker-20261018`; inspect that ref's
+exact SHA and hosted results before promoting any platform/model claim.
+Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
+maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
+only in ignored maintainer notes.
 
 ## Python shared-header expansion — hosted/model acceptance pending
 

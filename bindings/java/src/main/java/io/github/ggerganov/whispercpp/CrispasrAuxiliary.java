@@ -31,6 +31,74 @@ public final class CrispasrAuxiliary {
     return m;
   }
 
+  /** Closed-roster speaker database. Opening/enrollment require the native consent attestation. */
+  public static final class SpeakerDb implements AutoCloseable {
+    private Pointer handle;
+    public SpeakerDb(String directory, String expectedNamesCsv, boolean consentAttested) {
+      Objects.requireNonNull(directory, "directory");
+      Objects.requireNonNull(expectedNamesCsv, "expectedNamesCsv");
+      if (!consentAttested || expectedNamesCsv.trim().isEmpty())
+        throw new IllegalArgumentException(
+            "An explicit consent attestation and participant roster are required");
+      handle = CrispasrSession.Lib.INSTANCE.crispasr_speaker_db_open(directory, expectedNamesCsv, 1);
+      if (handle == null)
+        throw new IllegalStateException("speaker_db_open failed");
+    }
+    private Pointer checkedHandle() {
+      if (handle == null)
+        throw new IllegalStateException("SpeakerDb is closed");
+      return handle;
+    }
+    public synchronized int count() {
+      return CrispasrSession.Lib.INSTANCE.crispasr_speaker_db_count(checkedHandle());
+    }
+    /** A negative native score means no match, even with a negative threshold. */
+    public synchronized SpeakerMatch match(float[] embedding, float threshold) {
+      Pointer db = checkedHandle();
+      checkEmbedding(embedding);
+      if (!Float.isFinite(threshold))
+        throw new IllegalArgumentException("threshold must be finite");
+      byte[] name = new byte[256];
+      float score = CrispasrSession.Lib.INSTANCE.crispasr_speaker_db_match(
+          db, embedding, embedding.length, threshold, name, name.length);
+      return new SpeakerMatch(score < 0 || score < threshold ? null : nullTerminated(name), score);
+    }
+    public synchronized SpeakerMatch match(float[] embedding) {
+      return match(embedding, 0.5f);
+    }
+    public static void enroll(String directory, String name, float[] embedding, boolean consentAttested) {
+      Objects.requireNonNull(directory, "directory");
+      Objects.requireNonNull(name, "name");
+      checkEmbedding(embedding);
+      if (!consentAttested)
+        throw new IllegalArgumentException("An explicit consent attestation is required");
+      int rc = CrispasrSession.Lib.INSTANCE.crispasr_speaker_db_enroll2(
+          directory, name, embedding, embedding.length, 1);
+      if (rc != 0)
+        throw new IllegalStateException("speaker_db_enroll2 failed (rc=" + rc + ")");
+    }
+    private static void checkEmbedding(float[] embedding) {
+      Objects.requireNonNull(embedding, "embedding");
+      if (embedding.length == 0)
+        throw new IllegalArgumentException("embedding must not be empty");
+    }
+    @Override
+    public synchronized void close() {
+      if (handle != null) {
+        CrispasrSession.Lib.INSTANCE.crispasr_speaker_db_free(handle);
+        handle = null;
+      }
+    }
+  }
+  public static final class SpeakerMatch {
+    public final String name;
+    public final float score;
+    SpeakerMatch(String name, float score) {
+      this.name = name;
+      this.score = score;
+    }
+  }
+
   // -----------------------------------------------------------------
   // Registry
   // -----------------------------------------------------------------
@@ -509,7 +577,9 @@ public final class CrispasrAuxiliary {
       throw new IllegalArgumentException("method out of range 0..5: " + opts.method);
     if (!Double.isFinite((double) opts.sliceOffsetCs))
       throw new IllegalArgumentException("slice offset not finite");
-    Memory mem = new Memory(48);
+    int embedderOffset = 16 + Native.POINTER_SIZE;
+    int speakersOffset = 16 + 2 * Native.POINTER_SIZE;
+    Memory mem = new Memory(speakersOffset + 16);
     mem.clear();
     mem.setInt(0, opts.method);
     mem.setInt(4, opts.nThreads);
@@ -526,14 +596,14 @@ public final class CrispasrAuxiliary {
     if (opts.foxNoseEmbedderPath != null) {
       embedMem = utf8(opts.foxNoseEmbedderPath);
       toKeep[1] = embedMem;
-      mem.setPointer(24, embedMem);
+      mem.setPointer(embedderOffset, embedMem);
     } else {
-      mem.setPointer(24, null);
+      mem.setPointer(embedderOffset, null);
     }
-    mem.setInt(32, opts.minSpeakers);
-    mem.setInt(36, opts.maxSpeakers);
-    mem.setInt(40, opts.numSpeakers);
-    mem.setInt(44, 0);
+    mem.setInt(speakersOffset, opts.minSpeakers);
+    mem.setInt(speakersOffset + 4, opts.maxSpeakers);
+    mem.setInt(speakersOffset + 8, opts.numSpeakers);
+    mem.setInt(speakersOffset + 12, 0);
     return mem;
   }
 

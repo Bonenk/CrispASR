@@ -97,3 +97,17 @@ bool crispasr_kokoro_lang_has_native_voice_abi(const char* lang) {
 }
 
 #endif
+
+#ifdef CRISPASR_PROBE_JAVA_RNNOISE
+int crispasr_enhance_audio_rnnoise(const float* pcm, int32_t n, float* out, int32_t cap) {
+    if (!pcm || n <= 0 || cap < n)
+        return -1;
+    if (utility_mode == 2)
+        return -2;
+    if (utility_mode == 4)
+        return 1;
+    for (int i = 0; i < n; ++i)
+        out[i] = pcm[i] * .5f;
+    return 0;
+}
+#endif

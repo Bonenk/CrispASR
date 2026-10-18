@@ -964,28 +964,25 @@ func ResetProgress() { C.crispasr_reset_progress() }
 func GetStreamedSegmentCount() int { return int(C.crispasr_get_streamed_segment_count()) }
 func ResetStreamedSegments()       { C.crispasr_reset_streamed_segments() }
 func GetStreamedTokenCount() int   { return int(C.crispasr_get_streamed_token_count()) }
+
+// DrainStreamedTokens copies the native NUL-separated token buffer. Go strings
+// preserve raw UTF-8 fragments. Serialize polling with session inference/close:
+// the C API's buffer belongs to the session that most recently streamed.
 func DrainStreamedTokens() ([]string, error) {
 	var n C.int
 	ptr := C.crispasr_drain_streamed_tokens(&n)
-	if ptr == nil || int(n) == 0 {
+	if n < 0 || (n > 0 && ptr == nil) {
+		return nil, errors.New("invalid native streamed token buffer")
+	}
+	if n == 0 {
 		return nil, nil
 	}
-	// ptr is null-separated UTF-8 strings
-	raw := C.GoBytes(unsafe.Pointer(ptr), C.int(n*16)) // conservative; actual parsing handled by caller
-	_ = raw
-	// Simpler: read as bytes and split on NUL
-	// But we need actual count; we have n
-	// For now return split of first n strings from GoString with manual
-	count := int(n)
-	// The native returns a single buffer with NUL-separated strings; we need to parse
-	// We'll retrieve via GoBytes with enough size: estimate
-	// Actually we can get pointer and manually read
-	var out []string
+	out := make([]string, 0, int(n))
 	base := unsafe.Pointer(ptr)
-	for i := 0; i < count; i++ {
-		s := C.GoString((*C.char)(base))
-		out = append(out, s)
-		base = unsafe.Pointer(uintptr(base) + uintptr(len(s)+1))
+	for i := 0; i < int(n); i++ {
+		token := C.GoString((*C.char)(base))
+		out = append(out, token)
+		base = unsafe.Add(base, len(token)+1)
 	}
 	return out, nil
 }

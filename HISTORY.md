@@ -1,3 +1,40 @@
+## Wrapper options, roster DB and bounded polling repairs — 2026-10-18
+
+Added callable per-call VAD language/options in C# and Java, preserving the
+three-argument default routes. Literal native option-layout probes validate
+all six fields and result cleanup when a callback throws. Java now exposes
+text translation, RNNoise and the punctuation processor, with allocated UTF-8
+copied before its native pointer is freed. Corrected the raw punctuation
+pointer signatures as well.
+
+Completed usable roster DB paths across all eight wrappers. Rust previously
+called retired native load/enrollment stubs; it now has `SpeakerDB::open`
+with the current attestation/roster contract and consent-aware enrollment.
+Java and WASM gained public DB classes. Other bindings gained closed/empty
+input checks and allocation cleanup. A negative score always means no match,
+even with a negative threshold. The shared C-header fixture verifies actual
+UTF-8 copies, native failure codes, roster/attestation transport and lifetime.
+
+A protected-page probe reproduced Go token polling crashing in `C.GoBytes`:
+it guessed `token_count * 16` bytes for a NUL-separated buffer. It now copies
+exactly the reported number of strings, preserving empty and partial UTF-8
+fragments, and rejects malformed native counts/pointers.
+
+Dart diarization previously accepted malformed native turn counts; the new
+probe was observed failing before repair. It now checks count/capacity and
+stereo lengths, uses target-width FFI structs and frees its arena on every
+exit. Java's corresponding pointer offsets now use `Native.POINTER_SIZE`.
+Actual 32-bit runtime validation remains pending. Dart's cached probe library
+now lives for the entire test suite rather than being deleted after whichever
+test happened to compile it first.
+
+Validation: C# **259 assertions**, Java **224**, Ruby **196**, WASM **140**;
+Dart strict analyzer/**37 FFI tests**; Go **26 tests**, Rust **23 tests/five
+doctests**; Python **four legacy/speaker regressions**. All are model-free
+transport/ownership checks. The incremental callable ledger is
+`docs/wrapper-callable-coverage.md`; exhaustive mapping, remaining adapters,
+full-library/browser/model acceptance and queued CI are still tracked in PLAN.md.
+
 ## TitaNet wrapper return-count and lifetime repairs — 2026-10-18
 
 A new public-header probe reproduced C# treating a successful 192-float native

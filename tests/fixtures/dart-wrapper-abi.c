@@ -1211,37 +1211,7 @@ float crispasr_titanet_cosine_sim(const float* a, const float* b, int32_t dim) {
     (void)dim;
     return 0.9f;
 }
-void* crispasr_speaker_db_open(const char* dir, const char* exp, int32_t c) {
-    (void)dir;
-    (void)exp;
-    (void)c;
-    return (void*)1;
-}
-void crispasr_speaker_db_free(void* db) {
-    (void)db;
-}
-int32_t crispasr_speaker_db_count(const void* db) {
-    (void)db;
-    return 1;
-}
-float crispasr_speaker_db_match(const void* db, const float* emb, int32_t dim, float th, char* out, int32_t cap) {
-    (void)db;
-    (void)emb;
-    (void)dim;
-    if (cap > 4) {
-        strcpy(out, "Alice");
-        return 0.8f;
-    }
-    return 0;
-}
-int32_t crispasr_speaker_db_enroll2(const char* dir, const char* n, const float* emb, int32_t dim, int32_t c) {
-    (void)dir;
-    (void)n;
-    (void)emb;
-    (void)dim;
-    (void)c;
-    return 0;
-}
+#include "wrapper-speaker-db.c"
 void* crispasr_speaker_db_load(const char* dir) {
     (void)dir;
     return NULL;

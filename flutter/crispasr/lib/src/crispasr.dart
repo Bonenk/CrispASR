@@ -301,6 +301,36 @@ class DiarizeTurn {
       {required this.t0, required this.t1, required this.speaker});
 }
 
+// FFI uses the target C ABI's pointer width/alignment, including 32-bit builds.
+final class _DiarizeSpanAbi extends Struct {
+  @Int64()
+  external int t0;
+  @Int64()
+  external int t1;
+  @Int32()
+  external int speaker;
+  @Int32()
+  external int padding;
+}
+final class _DiarizeOptionsAbi extends Struct {
+  @Int32()
+  external int method;
+  @Int32()
+  external int threads;
+  @Int64()
+  external int sliceOffset;
+  external Pointer<Utf8> model;
+  external Pointer<Utf8> embedder;
+  @Int32()
+  external int minSpeakers;
+  @Int32()
+  external int maxSpeakers;
+  @Int32()
+  external int numSpeakers;
+  @Int32()
+  external int padding;
+}
+
 enum DiarizeMethod {
   /// Stereo only. |L| vs |R| energy per segment, 1.1× margin.
   energy,
@@ -351,7 +381,7 @@ enum DiarizeMethod {
 ///
 /// [sortformerModelPath] (required for [DiarizeMethod.sortformer]) is the
 /// Nemotron-3-Diarization GGUF. The C ABI reads it from the same struct
-/// field as the pyannote model, so the 48-byte layout is unchanged.
+/// field as the pyannote model. The FFI struct follows the target pointer width.
 ///
 /// When [outTurns] is supplied, the function calls the CrispASR 0.8.30+
 /// turn-returning ABI and replaces that list with the audio-derived turns
@@ -375,142 +405,76 @@ bool diarizeSegments({
 }) {
   outTurns?.clear();
   if (segs.isEmpty || left.isEmpty) return true;
+  if (isStereo && (right == null || right.length != left.length)) {
+    throw ArgumentError('Stereo channels must have equal lengths');
+  }
+  if (!sliceT0.isFinite || nThreads < 1 || minSpeakers < 0 || maxSpeakers < 0 || numSpeakers < 0) {
+    throw ArgumentError('Invalid diarization offset, threads or speaker counts');
+  }
+  for (final seg in segs) {
+    if (!seg.t0.isFinite || !seg.t1.isFinite || seg.t1 < seg.t0) {
+      throw ArgumentError('Segment times must be finite and ordered');
+    }
+  }
   lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
-
-  final n = left.length;
-  final leftPtr = calloc<Float>(n);
-  for (var i = 0; i < n; i++) {
-    leftPtr[i] = left[i];
-  }
-
-  Pointer<Float> rightPtr = leftPtr;
-  if (isStereo && right != null) {
-    rightPtr = calloc<Float>(right.length);
-    for (var i = 0; i < right.length; i++) {
-      rightPtr[i] = right[i];
+  final arena = Arena();
+  try {
+    final n=left.length;
+    final leftPtr=arena<Float>(n)..asTypedList(n).setAll(0,left);
+    final rightPtr=isStereo ? (arena<Float>(n)..asTypedList(n).setAll(0,right!)) : leftPtr;
+    final segments=arena<_DiarizeSpanAbi>(segs.length);
+    for (var i=0;i<segs.length;i++) {
+      segments[i].t0=(segs[i].t0*100).round();
+      segments[i].t1=(segs[i].t1*100).round();
+      segments[i].speaker=segs[i].speaker;
     }
-  }
-
-  // ABI struct layout must match `crispasr_diarize_seg_abi`:
-  // int64 t0_cs, int64 t1_cs, int32 speaker, int32 _pad. 24 bytes each.
-  final segsPtr = calloc<Uint8>(24 * segs.length);
-  for (var i = 0; i < segs.length; i++) {
-    final base = segsPtr + i * 24;
-    base.cast<Int64>().value = (segs[i].t0 * 100).round();
-    (base + 8).cast<Int64>().value = (segs[i].t1 * 100).round();
-    (base + 16).cast<Int32>().value = segs[i].speaker;
-    (base + 20).cast<Int32>().value = 0;
-  }
-
-  // ABI opts layout — hand-maintained mirror of the APPEND-ONLY
-  // `crispasr_diarize_opts_abi` in src/crispasr_c_api.cpp. The C side reads
-  // every field unconditionally, so the buffer must cover the full struct:
-  // int32 method, int32 n_threads, int64 slice_t0_cs,
-  // const char* pyannote_model_path, const char* foxnose_embedder_path,
-  // int32 min_speakers, int32 max_speakers, int32 num_speakers, int32 _pad2.
-  // 4+4+8+8+8+4+4+4+4 = 48 bytes on 64-bit. We write each field explicitly.
-  final optsPtr = calloc<Uint8>(48);
-  optsPtr.cast<Int32>().value = method.index;
-  (optsPtr + 4).cast<Int32>().value = nThreads;
-  (optsPtr + 8).cast<Int64>().value = (sliceT0 * 100).round();
-  // One model-path slot serves pyannote (method 3) and sortformer (5).
-  final modelPath = switch (method) {
-    DiarizeMethod.pyannote => pyannoteModelPath,
-    DiarizeMethod.sortformer => sortformerModelPath,
-    _ => null,
-  };
-  final pathPtr = (modelPath != null && modelPath.isNotEmpty)
-      ? modelPath.toNativeUtf8()
-      : nullptr;
-  (optsPtr + 16).cast<IntPtr>().value = pathPtr.address;
-  final foxPathPtr = (method == DiarizeMethod.foxNose &&
-          foxnoseEmbedderPath != null &&
-          foxnoseEmbedderPath.isNotEmpty)
-      ? foxnoseEmbedderPath.toNativeUtf8()
-      : nullptr;
-  (optsPtr + 24).cast<IntPtr>().value = foxPathPtr.address;
-  (optsPtr + 32).cast<Int32>().value = minSpeakers;
-  (optsPtr + 36).cast<Int32>().value = maxSpeakers;
-  (optsPtr + 40).cast<Int32>().value = numSpeakers;
-  (optsPtr + 44).cast<Int32>().value = 0;
-
-  var rc = 0;
-  if (outTurns == null) {
-    final fn = lib.lookupFunction<
-        Int32 Function(Pointer<Float>, Pointer<Float>, Int32, Int32,
-            Pointer<Uint8>, Int32, Pointer<Uint8>),
-        int Function(Pointer<Float>, Pointer<Float>, int, int, Pointer<Uint8>,
-            int, Pointer<Uint8>)>('crispasr_diarize_segments_abi');
-    rc = fn(
-        leftPtr, rightPtr, n, isStereo ? 1 : 0, segsPtr, segs.length, optsPtr);
-  } else {
-    final fn = lib.lookupFunction<
-        Int32 Function(
-            Pointer<Float>,
-            Pointer<Float>,
-            Int32,
-            Int32,
-            Pointer<Uint8>,
-            Int32,
-            Pointer<Uint8>,
-            Pointer<Uint8>,
-            Int32,
-            Pointer<Int32>),
-        int Function(
-            Pointer<Float>,
-            Pointer<Float>,
-            int,
-            int,
-            Pointer<Uint8>,
-            int,
-            Pointer<Uint8>,
-            Pointer<Uint8>,
-            int,
-            Pointer<Int32>)>('crispasr_diarize_segments_turns_abi');
-    var turnCap = ((n + 7999) ~/ 8000) + segs.length + 16;
-    for (var attempt = 0; attempt < 2; attempt++) {
-      final turnsPtr = calloc<Uint8>(turnCap * 24);
-      final nTurnsPtr = calloc<Int32>();
-      rc = fn(leftPtr, rightPtr, n, isStereo ? 1 : 0, segsPtr, segs.length,
-          optsPtr, turnsPtr, turnCap, nTurnsPtr);
-      final required = nTurnsPtr.value;
-      if (rc == 2 && attempt == 0 && required > turnCap) {
-        calloc.free(turnsPtr);
-        calloc.free(nTurnsPtr);
-        turnCap = required;
-        continue;
-      }
-      if (rc == 0) {
-        final count = required < turnCap ? required : turnCap;
-        for (var i = 0; i < count; i++) {
-          final base = turnsPtr + i * 24;
-          outTurns.add(DiarizeTurn(
-            t0: base.cast<Int64>().value / 100.0,
-            t1: (base + 8).cast<Int64>().value / 100.0,
-            speaker: (base + 16).cast<Int32>().value,
-          ));
+    final opts=arena<_DiarizeOptionsAbi>();
+    opts.ref.method=method.index;
+    opts.ref.threads=nThreads;
+    opts.ref.sliceOffset=(sliceT0*100).round();
+    final modelPath=switch(method) {
+      DiarizeMethod.pyannote => pyannoteModelPath,
+      DiarizeMethod.sortformer => sortformerModelPath,
+      _ => null,
+    };
+    opts.ref.model=modelPath == null || modelPath.isEmpty ? nullptr : modelPath.toNativeUtf8(allocator:arena);
+    opts.ref.embedder=method == DiarizeMethod.foxNose && foxnoseEmbedderPath != null && foxnoseEmbedderPath.isNotEmpty
+      ? foxnoseEmbedderPath.toNativeUtf8(allocator:arena) : nullptr;
+    opts.ref.minSpeakers=minSpeakers;
+    opts.ref.maxSpeakers=maxSpeakers;
+    opts.ref.numSpeakers=numSpeakers;
+    var rc=0;
+    if (outTurns == null) {
+      final fn=lib.lookupFunction<
+        Int32 Function(Pointer<Float>,Pointer<Float>,Int32,Int32,Pointer<_DiarizeSpanAbi>,Int32,Pointer<_DiarizeOptionsAbi>),
+        int Function(Pointer<Float>,Pointer<Float>,int,int,Pointer<_DiarizeSpanAbi>,int,Pointer<_DiarizeOptionsAbi>)>('crispasr_diarize_segments_abi');
+      rc=fn(leftPtr,rightPtr,n,isStereo ? 1:0,segments,segs.length,opts);
+    } else {
+      final fn=lib.lookupFunction<
+        Int32 Function(Pointer<Float>,Pointer<Float>,Int32,Int32,Pointer<_DiarizeSpanAbi>,Int32,Pointer<_DiarizeOptionsAbi>,Pointer<_DiarizeSpanAbi>,Int32,Pointer<Int32>),
+        int Function(Pointer<Float>,Pointer<Float>,int,int,Pointer<_DiarizeSpanAbi>,int,Pointer<_DiarizeOptionsAbi>,Pointer<_DiarizeSpanAbi>,int,Pointer<Int32>)>('crispasr_diarize_segments_turns_abi');
+      var cap=((n+7999)~/8000)+segs.length+16;
+      for(var attempt=0;attempt<2;attempt++) {
+        final turns=arena<_DiarizeSpanAbi>(cap);
+        final count=arena<Int32>();
+        rc=fn(leftPtr,rightPtr,n,isStereo ? 1:0,segments,segs.length,opts,turns,cap,count);
+        if(rc==2 && attempt==0 && count.value>cap) { cap=count.value;continue; }
+        if(rc==0) {
+          if(count.value<0 || count.value>cap) throw StateError('Invalid native diarization turn count');
+          for(var i=0;i<count.value;i++) {
+            outTurns.add(DiarizeTurn(t0:turns[i].t0/100.0,t1:turns[i].t1/100.0,speaker:turns[i].speaker));
+          }
         }
+        break;
       }
-      calloc.free(turnsPtr);
-      calloc.free(nTurnsPtr);
-      break;
     }
-  }
-
-  if (rc == 0) {
-    for (var i = 0; i < segs.length; i++) {
-      segs[i].speaker = (segsPtr + i * 24 + 16).cast<Int32>().value;
+    if(rc==0) {
+      for(var i=0;i<segs.length;i++) { segs[i].speaker=segments[i].speaker; }
     }
+    return rc==0;
+  } finally {
+    arena.releaseAll();
   }
-
-  calloc.free(leftPtr);
-  if (rightPtr != leftPtr) calloc.free(rightPtr);
-  calloc.free(segsPtr);
-  calloc.free(optsPtr);
-  if (pathPtr != nullptr) calloc.free(pathPtr);
-  if (foxPathPtr != nullptr) calloc.free(foxPathPtr);
-
-  return rc == 0;
 }
 
 /// A registry entry returned by [registryLookup] / [registryLookupByFilename].
@@ -6573,96 +6537,58 @@ class CrispasrSpeakerDB {
   final String dirPath;
 
   CrispasrSpeakerDB(DynamicLibrary lib, this.dirPath,
-      {required String expectedNames, required bool consentAttested})
-      : _lib = lib {
-    if (!consentAttested) {
-      throw StateError(
-          'CrispasrSpeakerDB requires an explicit consent attestation (GDPR Art. 9)');
-    }
-    final openFn = lib.lookupFunction<
-        Pointer<Void> Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
-        Pointer<Void> Function(
-            Pointer<Utf8>, Pointer<Utf8>, int)>('crispasr_speaker_db_open');
-    final dp = dirPath.toNativeUtf8();
-    final en = expectedNames.toNativeUtf8();
-    _handle = openFn(dp, en, 1);
-    malloc.free(dp);
-    malloc.free(en);
+      {required String expectedNames, required bool consentAttested}) : _lib=lib {
+    if (!consentAttested) throw StateError('Speaker DB requires an explicit consent attestation');
+    if (expectedNames.trim().isEmpty) throw ArgumentError('Participant roster required');
+    final arena=Arena();
+    try {
+      final fn=_lib.lookupFunction<Pointer<Void> Function(Pointer<Utf8>,Pointer<Utf8>,Int32),Pointer<Void> Function(Pointer<Utf8>,Pointer<Utf8>,int)>('crispasr_speaker_db_open');
+      _handle=fn(dirPath.toNativeUtf8(allocator:arena),expectedNames.toNativeUtf8(allocator:arena),1);
+      if (_handle==nullptr) throw StateError('speaker_db_open failed');
+    } finally { arena.releaseAll(); }
   }
-
+  void _checkOpen() {
+    if (_handle==nullptr) throw StateError('Speaker DB is closed');
+  }
   int get count {
-    final countFn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
-        int Function(Pointer<Void>)>('crispasr_speaker_db_count');
-    return countFn(_handle);
+    _checkOpen();
+    return _lib.lookupFunction<Int32 Function(Pointer<Void>),int Function(Pointer<Void>)>('crispasr_speaker_db_count')(_handle);
   }
-
-  /// Match embedding against DB. Returns (name, score) or (null, score).
-  (String?, double) match(Float32List embedding, {double threshold = 0.7}) {
-    final matchFn = _lib.lookupFunction<
-        Float Function(
-            Pointer<Void>, Pointer<Float>, Int32, Float, Pointer<Utf8>, Int32),
-        double Function(Pointer<Void>, Pointer<Float>, int, double,
-            Pointer<Utf8>, int)>('crispasr_speaker_db_match');
-    final embPtr = malloc<Float>(embedding.length);
-    embPtr.asTypedList(embedding.length).setAll(0, embedding);
-    final nameBuf = malloc<Uint8>(256);
-    final score = matchFn(
-        _handle, embPtr, embedding.length, threshold, nameBuf.cast(), 256);
-    malloc.free(embPtr);
-    String? name;
-    if (score >= threshold) {
-      name = nameBuf.cast<Utf8>().toDartString();
-    }
-    malloc.free(nameBuf);
-    return (name, score);
+  /// A negative native score always means no match.
+  (String?,double) match(Float32List embedding,{double threshold=0.7}) {
+    _checkOpen();
+    if(embedding.isEmpty || !threshold.isFinite) throw ArgumentError('Nonempty embedding and finite threshold required');
+    final arena=Arena();
+    try {
+      final pcm=arena<Float>(embedding.length)..asTypedList(embedding.length).setAll(0,embedding);
+      final name=arena<Uint8>(256).cast<Utf8>();
+      final fn=_lib.lookupFunction<Float Function(Pointer<Void>,Pointer<Float>,Int32,Float,Pointer<Utf8>,Int32),double Function(Pointer<Void>,Pointer<Float>,int,double,Pointer<Utf8>,int)>('crispasr_speaker_db_match');
+      final score=fn(_handle,pcm,embedding.length,threshold,name,256);
+      return (score>=0 && score>=threshold ? name.toDartString():null,score);
+    } finally { arena.releaseAll(); }
   }
-
-  /// Enroll a speaker with the given name and embedding. The consent
-  /// attestation given at construction is recorded in the profile.
-  ///
-  /// On libcrispasr builds that export `crispasr_speaker_db_enroll_into`
-  /// the enrolled name becomes matchable on THIS handle immediately
-  /// (subject to the retained roster). Older dylibs only write the
-  /// profile to disk — there a caller must close and reopen the DB
-  /// before [match] can resolve the new name (the contract
-  /// SpeakerIdService has always followed).
-  bool enroll(String name, Float32List embedding) {
-    final np = name.toNativeUtf8();
-    final embPtr = malloc<Float>(embedding.length);
-    embPtr.asTypedList(embedding.length).setAll(0, embedding);
-    int rc;
-    if (_lib.providesSymbol('crispasr_speaker_db_enroll_into')) {
-      final fn = _lib.lookupFunction<
-          Int32 Function(
-              Pointer<Void>, Pointer<Utf8>, Pointer<Float>, Int32, Int32),
-          int Function(Pointer<Void>, Pointer<Utf8>, Pointer<Float>, int,
-              int)>('crispasr_speaker_db_enroll_into');
-      rc = fn(_handle, np, embPtr, embedding.length, 1);
-      // rc 3 = written to disk but outside this handle's retained roster;
-      // the profile exists, so report success — matching it needs a
-      // reopen with the name claimed, which the C side logs.
-      if (rc == 3) rc = 0;
-    } else {
-      final enrollFn = _lib.lookupFunction<
-          Int32 Function(
-              Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>, Int32, Int32),
-          int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>, int,
-              int)>('crispasr_speaker_db_enroll2');
-      final dp = dirPath.toNativeUtf8();
-      rc = enrollFn(dp, np, embPtr, embedding.length, 1);
-      malloc.free(dp);
-    }
-    malloc.free(np);
-    malloc.free(embPtr);
-    return rc == 0;
+  /// Writes a consent-attested profile. Older libraries need a reopen to refresh the roster.
+  bool enroll(String name,Float32List embedding) {
+    _checkOpen();
+    if(embedding.isEmpty) throw ArgumentError('Nonempty embedding required');
+    final arena=Arena();
+    try {
+      final pcm=arena<Float>(embedding.length)..asTypedList(embedding.length).setAll(0,embedding);
+      final np=name.toNativeUtf8(allocator:arena);
+      if(_lib.providesSymbol('crispasr_speaker_db_enroll_into')) {
+        final fn=_lib.lookupFunction<Int32 Function(Pointer<Void>,Pointer<Utf8>,Pointer<Float>,Int32,Int32),int Function(Pointer<Void>,Pointer<Utf8>,Pointer<Float>,int,int)>('crispasr_speaker_db_enroll_into');
+        final rc=fn(_handle,np,pcm,embedding.length,1);
+        return rc==0 || rc==3;
+      }
+      final fn=_lib.lookupFunction<Int32 Function(Pointer<Utf8>,Pointer<Utf8>,Pointer<Float>,Int32,Int32),int Function(Pointer<Utf8>,Pointer<Utf8>,Pointer<Float>,int,int)>('crispasr_speaker_db_enroll2');
+      return fn(dirPath.toNativeUtf8(allocator:arena),np,pcm,embedding.length,1)==0;
+    } finally { arena.releaseAll(); }
   }
-
   void close() {
-    if (_handle == nullptr) return;
-    final freeFn = _lib.lookupFunction<Void Function(Pointer<Void>),
-        void Function(Pointer<Void>)>('crispasr_speaker_db_free');
-    freeFn(_handle);
-    _handle = nullptr;
+    if(_handle!=nullptr) {
+      _lib.lookupFunction<Void Function(Pointer<Void>),void Function(Pointer<Void>)>('crispasr_speaker_db_free')(_handle);
+      _handle=nullptr;
+    }
   }
 }
 

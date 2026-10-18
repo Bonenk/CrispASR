@@ -637,3 +637,59 @@ fn probe_titanet_float_count_and_ownership() {
     );
     assert!(crispasr::TitaNet::cosine_sim(&[1.], &[]).is_err());
 }
+
+#[test]
+fn probe_speaker_database_roster_scores_enrollment_and_lifetime() {
+    extern "C" {
+        fn probe_db_mode(mode: c_int);
+        fn probe_db_live() -> c_int;
+        fn probe_db_calls() -> c_int;
+    }
+    unsafe {
+        probe_db_mode(0);
+    }
+    let emb = [1.0, 3.0, 5.0];
+    let before = unsafe { probe_db_calls() };
+    assert!(crispasr::SpeakerDB::open("db", "Alice,Bob", false).is_err());
+    assert!(crispasr::SpeakerDB::open("db", "", true).is_err());
+    assert_eq!(unsafe { probe_db_calls() }, before);
+    let db = crispasr::SpeakerDB::open("db", "Alice,Bob", true).unwrap();
+    assert_eq!(db.count(), 2);
+    assert_eq!(unsafe { probe_db_live() }, 1);
+    let matched = db.match_embedding(&emb, 0.5);
+    assert_eq!(matched, (Some("アリス".into()), 0.875));
+    unsafe {
+        probe_db_mode(1);
+    }
+    assert_eq!(db.match_embedding(&emb, -1.0), (None, -1.0));
+    assert_eq!(matched.0.as_deref(), Some("アリス"));
+    unsafe {
+        probe_db_mode(0);
+    }
+    assert_eq!(db.match_embedding(&[], 0.5), (None, -1.0));
+    assert_eq!(db.match_embedding(&emb, f32::NAN), (None, -1.0));
+    assert!(db.enroll("Alice", &[]).is_err());
+    db.enroll("Alice", &emb).unwrap();
+    unsafe {
+        probe_db_mode(3);
+    }
+    assert!(db.enroll("Alice", &emb).is_err());
+    unsafe {
+        probe_db_mode(2);
+    }
+    assert!(crispasr::SpeakerDB::open("db", "Alice,Bob", true).is_err());
+    drop(db);
+    assert_eq!(unsafe { probe_db_live() }, 0);
+    unsafe {
+        probe_db_mode(0);
+    }
+}
+
+#[test]
+fn probe_legacy_titanet_similarity_rejects_dimension_truncation() {
+    assert_eq!(crispasr::titanet_cosine_sim(&[1.0, 0.0], &[1.0, 0.0]), 1.0);
+    assert_eq!(crispasr::titanet_cosine_sim(&[], &[]), 0.0);
+    assert!(
+        std::panic::catch_unwind(|| crispasr::titanet_cosine_sim(&[1.0], &[1.0, 0.0])).is_err()
+    );
+}

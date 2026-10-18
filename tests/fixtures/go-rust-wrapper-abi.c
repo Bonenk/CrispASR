@@ -1,3 +1,6 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 
 // Combined probe for Go/Rust wrapper tests
 // Merges python-wrapper-abi.c and wrapper-session-metadata.c with extensions
@@ -8,6 +11,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
+#if defined(__linux__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 static int probe_mode = 0; // 0=normal, 1=empty, 2=error
 static int probe_live = 0;
@@ -775,6 +782,36 @@ int crispasr_get_streamed_token_count(void) {
 }
 const char* crispasr_drain_streamed_tokens(int* n) {
     static const char data[] = "tok1\0tok2\0";
+    if (probe_mode == 1) {
+        *n = 0;
+        return NULL;
+    }
+    if (probe_mode == 2) {
+        *n = -1;
+        return NULL;
+    }
+    if (probe_mode == 3) {
+        *n = 2;
+        return NULL;
+    }
+    if (probe_mode == 5) {
+        static const char fragments[] = {(char)0xe6, (char)0x97, 0, (char)0xa5, 0, 0};
+        *n = 3;
+#if defined(__linux__)
+        static char* guarded;
+        if (!guarded) {
+            long page = sysconf(_SC_PAGESIZE);
+            char* memory = mmap(NULL, (size_t)page * 2, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (memory == MAP_FAILED || mprotect(memory + page, (size_t)page, PROT_NONE))
+                abort();
+            guarded = memory + page - sizeof(fragments);
+            memcpy(guarded, fragments, sizeof(fragments));
+        }
+        return guarded;
+#else
+        return fragments;
+#endif
+    }
     *n = 2;
     return data;
 }
@@ -947,6 +984,10 @@ int crispasr_session_set_speaker_identity(crispasr_session* s, const char* id) {
 
 // --- Unexercised legacy/chat/whisper stubs MUST abort, never fake success ---
 #include <stdio.h>
+#if defined(__linux__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 #define STUB_ABORT()                                                                                                   \
     do {                                                                                                               \
         fprintf(stderr, "probe stub %s called but not exercised\n", __func__);                                         \
@@ -1415,27 +1456,7 @@ int crispasr_kokoro_resolve_fallback_voice_abi(const char* model_path, const cha
     return 0;
 }
 #include "wrapper-titanet-legacy.c"
-void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv, int32_t consent_attested) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_speaker_db_free(void* db) {
-    STUB_ABORT();
-}
-int32_t crispasr_speaker_db_count(const void* db) {
-    STUB_ABORT();
-    return 0;
-}
-float crispasr_speaker_db_match(const void* db, const float* embedding, int32_t dim, float threshold, char* out_name,
-                                int32_t out_cap) {
-    STUB_ABORT();
-    return 0;
-}
-int32_t crispasr_speaker_db_enroll2(const char* dir_path, const char* name, const float* embedding, int32_t dim,
-                                    int32_t consent_attested) {
-    STUB_ABORT();
-    return 0;
-}
+#include "wrapper-speaker-db.c"
 void* crispasr_speaker_db_load(const char* dir_path) {
     STUB_ABORT();
     return 0;

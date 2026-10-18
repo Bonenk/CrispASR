@@ -86,6 +86,7 @@ import (
 	"fmt"
 	"math"
 	"runtime/cgo"
+	"strings"
 	"sync/atomic"
 	"unsafe"
 )
@@ -2815,7 +2816,7 @@ type SpeakerDB struct {
 // lawful basis + explicit consent from every enrolled person (GDPR
 // Art. 9); the call fails without it.
 func SpeakerDBOpen(dirPath, expectedNames string, consentAttested bool) (*SpeakerDB, error) {
-	if !consentAttested {
+	if !consentAttested || strings.TrimSpace(expectedNames) == "" {
 		return nil, fmt.Errorf("speaker db requires an explicit consent attestation (GDPR Art. 9)")
 	}
 	cd := C.CString(dirPath)
@@ -2831,17 +2832,23 @@ func SpeakerDBOpen(dirPath, expectedNames string, consentAttested bool) (*Speake
 
 // Count returns the number of enrolled speakers.
 func (db *SpeakerDB) Count() int {
+	if db == nil || db.handle == nil {
+		return 0
+	}
 	return int(C.crispasr_speaker_db_count(db.handle))
 }
 
 // Match returns (name, score) for the best match, or ("", score) if below threshold.
 func (db *SpeakerDB) Match(embedding []float32, threshold float32) (string, float32) {
+	if db == nil || db.handle == nil || len(embedding) == 0 || len(embedding) > math.MaxInt32 || math.IsNaN(float64(threshold)) || math.IsInf(float64(threshold), 0) {
+		return "", -1
+	}
 	var name [256]C.char
 	score := C.crispasr_speaker_db_match(db.handle,
 		(*C.float)(unsafe.Pointer(&embedding[0])), C.int(len(embedding)),
 		C.float(threshold), &name[0], 256)
 	n := ""
-	if float32(score) >= threshold {
+	if score >= 0 && float32(score) >= threshold {
 		n = C.GoString(&name[0])
 	}
 	return n, float32(score)
@@ -2851,6 +2858,12 @@ func (db *SpeakerDB) Match(embedding []float32, threshold float32) (string, floa
 // enrolled person's explicit consent (GDPR Art. 9); it is recorded in
 // the profile and enrollment refuses without it.
 func (db *SpeakerDB) Enroll(name string, embedding []float32, consentAttested bool) error {
+	if db == nil || db.handle == nil {
+		return errors.New("speaker db is closed")
+	}
+	if len(embedding) == 0 || len(embedding) > math.MaxInt32 {
+		return errors.New("expected a nonempty embedding with an int32 length")
+	}
 	if !consentAttested {
 		return fmt.Errorf("enrollment requires an explicit consent attestation (GDPR Art. 9)")
 	}

@@ -386,8 +386,10 @@ static VALUE rb_aux_pcm_storage(VALUE array) {
     if (n > INT_MAX)
         rb_raise(rb_eArgError, "PCM too large");
     VALUE storage = rb_str_new(NULL, n * sizeof(float));
-    for (long i = 0; i < n; ++i)
-        ((float*)RSTRING_PTR(storage))[i] = NUM2DBL(rb_ary_entry(array, i));
+    for (long i = 0; i < n; ++i) {
+        float value = NUM2DBL(rb_ary_entry(array, i));
+        ((float*)RSTRING_PTR(storage))[i] = value;
+    }
     return storage;
 }
 static VALUE rb_aux_audio_resample(VALUE self, VALUE pcm, VALUE source, VALUE target) {
@@ -1178,7 +1180,7 @@ static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p) {
     RB_CHAT_OPEN_BOOL(use_mlock)
     RB_CHAT_OPEN_BOOL(embeddings)
 #undef RB_CHAT_OPEN_BOOL
-        v = rb_chat_get_field(params, "chat_template");
+    v = rb_chat_get_field(params, "chat_template");
     if (!NIL_P(v))
         p->chat_template = StringValueCStr(v);
 }
@@ -1423,6 +1425,15 @@ static VALUE rb_chat_ai_disclosure(VALUE self) {
 
 /* Test-only direct callback routing probes. */
 #ifdef CRISPASR_WRAPPER_PROBE
+extern void probe_db_mode(int);
+extern int probe_db_live(void);
+static VALUE rb_test_db_mode(VALUE self, VALUE mode) {
+    probe_db_mode(NUM2INT(mode));
+    return Qnil;
+}
+static VALUE rb_test_db_live(VALUE self) {
+    return INT2NUM(probe_db_live());
+}
 extern void probe_titanet_mode(int);
 extern int probe_titanet_live(void);
 static VALUE rb_test_titanet_mode(VALUE self, VALUE mode) {
@@ -1532,6 +1543,8 @@ static void rb_aux_init(void) {
 #ifdef CRISPASR_WRAPPER_PROBE
     rb_define_singleton_method(mCrispASR, "test_audio_mode", rb_test_audio_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_audio_live", rb_test_audio_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_db_mode", rb_test_db_mode, 1);
+    rb_define_singleton_method(mCrispASR, "test_db_live", rb_test_db_live, 0);
     rb_define_singleton_method(mCrispASR, "test_titanet_mode", rb_test_titanet_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_titanet_live", rb_test_titanet_live, 0);
     // Test helpers (routing verification)

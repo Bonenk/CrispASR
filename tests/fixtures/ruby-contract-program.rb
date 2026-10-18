@@ -296,5 +296,24 @@ eq(s.titanet_embed(titan,[1,3,5]).length,192);eq(s.titanet_embed(titan,[1,3,5]).
 reject(ArgumentError){s.titanet_embed(titan,[])};s.titanet_free(titan);s.titanet_free(titan)
 eq(c.test_titanet_live,0);reject(RuntimeError){s.titanet_embed(titan,[1,3,5])}
 s.parakeet_free(pk);reject(RuntimeError){s.parakeet_transcribe(pk,[1,3,5],0)}
+eq(s.titanet_cosine_sim([1,0],[1,0]),1.0)
+eq(s.titanet_cosine_sim([],[]),0.0)
+reject(ArgumentError){s.titanet_cosine_sim([1],[1,0])}
+coercible=Object.new
+def coercible.to_f; GC.compact if GC.respond_to?(:compact);1.0;end
+eq(s.titanet_cosine_sim([coercible,0],[1,0]),1.0)
+c.test_db_mode(0)
+reject(RuntimeError){s.speaker_db_open('db','Alice,Bob',false)}
+reject(ArgumentError){s.speaker_db_open('db','',true)}
+db=s.speaker_db_open('db','Alice,Bob',true);eq(s.speaker_db_count(db),2);eq(c.test_db_live,1)
+matched=s.speaker_db_match(db,[1,3,5],0.5);eq(matched,['アリス',0.875])
+c.test_db_mode(1);eq(s.speaker_db_match(db,[1,3,5],-1),[nil,-1.0]);eq(matched.first,'アリス');c.test_db_mode(0)
+reject(ArgumentError){s.speaker_db_match(db,[],0.5)};reject(ArgumentError){s.speaker_db_match(db,[1,3,5],Float::NAN)}
+reject(RuntimeError){s.speaker_db_enroll('db','Alice',[1,3,5],false)};reject(ArgumentError){s.speaker_db_enroll('db','Alice',[],true)}
+eq(s.speaker_db_enroll('db','Alice',[1,3,5],true),true)
+c.test_db_mode(3);reject(RuntimeError){s.speaker_db_enroll('db','Alice',[1,3,5],true)}
+c.test_db_mode(2);reject(RuntimeError){s.speaker_db_open('db','Alice,Bob',true)};c.test_db_mode(0)
+s.speaker_db_free(db);s.speaker_db_free(db);eq(c.test_db_live,0)
+reject(RuntimeError){s.speaker_db_count(db)};reject(RuntimeError){s.speaker_db_match(db,[1,3,5],0.5)}
 s.close(h)
 puts "PASS Ruby ABI: #{$count} assertions"

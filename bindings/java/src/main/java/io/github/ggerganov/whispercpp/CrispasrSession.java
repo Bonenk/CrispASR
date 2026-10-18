@@ -202,8 +202,8 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
 
         // --- Punctuation (PLAN #59) ---
         Pointer crispasr_punc_init(String modelPath);
-        String  crispasr_punc_process(Pointer ctx, String text);
-        void    crispasr_punc_free_text(String text);
+        Pointer crispasr_punc_process(Pointer ctx, String text);
+        void    crispasr_punc_free_text(Pointer text);
         void    crispasr_punc_free(Pointer ctx);
 
         // --- Registry + cache (PLAN #59) ---
@@ -658,10 +658,30 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
         return new String(outLang, 0, n, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    // PLAN #59: translateText, enhanceAudioRnnoise, textDetectLanguage,
-    // detectBackendFromGguf — deferred to a separate PR after JNA ABI
-    // testing. The JNA interface eagerly resolves all declared symbols,
-    // and type mismatches cause "Invalid memory access" at load time.
+    /** Translate text using a translation-capable session, copying and freeing native UTF-8. */
+    public String translateText(String text, String sourceLanguage, String targetLanguage, int maxTokens) {
+        Pointer session = nativeHandle();
+        java.util.Objects.requireNonNull(text, "text");
+        java.util.Objects.requireNonNull(sourceLanguage, "sourceLanguage");
+        java.util.Objects.requireNonNull(targetLanguage, "targetLanguage");
+        Pointer out = Lib.INSTANCE.crispasr_session_translate_text(session, text, sourceLanguage, targetLanguage, maxTokens);
+        if (out == null) throw new IllegalStateException("translate_text failed");
+        try { return out.getString(0, "UTF-8"); }
+        finally { Lib.INSTANCE.crispasr_session_translate_text_free(out); }
+    }
+    public String translateText(String text, String sourceLanguage, String targetLanguage) {
+        return translateText(text, sourceLanguage, targetLanguage, 256);
+    }
+
+    /** RNNoise denoising of 48 kHz mono PCM. Throws if RNNoise is unavailable in the native build. */
+    public static float[] enhanceAudioRnnoise(float[] pcm) {
+        java.util.Objects.requireNonNull(pcm, "pcm");
+        if (pcm.length == 0) return new float[0];
+        float[] out = new float[pcm.length];
+        int rc = Lib.INSTANCE.crispasr_enhance_audio_rnnoise(pcm, pcm.length, out, out.length);
+        if (rc != 0) throw new IllegalStateException("enhance_audio_rnnoise failed (rc=" + rc + ")");
+        return out;
+    }
 
     /**
      * Load a separate codec GGUF. Required for qwen3-tts (12 Hz tokenizer)
@@ -1283,12 +1303,46 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
         return Lib.INSTANCE.crispasr_get_progress();
     }
 
-    /** Transcribe with VAD segmentation. */
+    /** Settings for shared VAD transcription. Durations are milliseconds. */
+    public static final class VadOptions {
+        public float threshold = 0.5f;
+        public int minSpeechDurationMs = 250, minSilenceDurationMs = 100, speechPadMs = 30;
+        /** Maximum chunk length in seconds; zero disables splitting. */
+        public int chunkSeconds = 30, nThreads = 4;
+
+        private Memory nativeMemory() {
+            if (!Float.isFinite(threshold) || threshold < 0 || threshold > 1
+                    || minSpeechDurationMs < 0 || minSilenceDurationMs < 0 || speechPadMs < 0
+                    || chunkSeconds < 0 || nThreads < 1)
+                throw new IllegalArgumentException("Invalid VAD threshold, durations or thread count");
+            Memory p = new Memory(24);
+            p.setFloat(0, threshold); p.setInt(4, minSpeechDurationMs);
+            p.setInt(8, minSilenceDurationMs); p.setInt(12, speechPadMs);
+            p.setInt(16, chunkSeconds); p.setInt(20, nThreads);
+            return p;
+        }
+    }
+
+    /** Transcribe with default VAD segmentation. */
     public Segment[] transcribeVad(float[] pcm, int sampleRate, String vadModelPath) {
-        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_vad(
-                nativeHandle(), pcm, pcm.length, sampleRate, vadModelPath, null);
-        if (r == null) throw new RuntimeException("transcription with VAD failed");
-        try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
+        return transcribeVad(pcm, sampleRate, vadModelPath, null, null);
+    }
+
+    /** Transcribe with a per-call language and optional VAD settings. */
+    public Segment[] transcribeVad(float[] pcm, int sampleRate, String vadModelPath,
+            String language, VadOptions options) {
+        Pointer session = nativeHandle();
+        java.util.Objects.requireNonNull(pcm, "pcm");
+        java.util.Objects.requireNonNull(vadModelPath, "vadModelPath");
+        if (pcm.length == 0 || sampleRate <= 0)
+            throw new IllegalArgumentException("PCM must be nonempty and sample rate positive");
+        try (Memory opts = options == null ? null : options.nativeMemory()) {
+            Pointer r = language == null
+                    ? Lib.INSTANCE.crispasr_session_transcribe_vad(session, pcm, pcm.length, sampleRate, vadModelPath, opts)
+                    : Lib.INSTANCE.crispasr_session_transcribe_vad_lang(session, pcm, pcm.length, sampleRate, vadModelPath, opts, language);
+            if (r == null) throw new IllegalStateException("transcription with VAD failed");
+            try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
+        }
     }
 
     private Segment[] extractSegments(Pointer r) {

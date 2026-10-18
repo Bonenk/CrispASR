@@ -17,7 +17,7 @@ import java.nio.charset.StandardCharsets;
 public class WrapperAbiProbe {
     public interface Probe extends Library {
         Probe INSTANCE=Native.load("crispasr",Probe.class);
-        void probe_mode(int n);void probe_mutate();int probe_live();int probe_invalid_frees();int probe_result_frees();int probe_calls();void probe_utility_mode(int mode);int probe_utility_live();
+        void probe_vad_expect(int n);int probe_vad_calls();void probe_mode(int n);void probe_mutate();int probe_live();int probe_invalid_frees();int probe_result_frees();int probe_calls();void probe_utility_mode(int mode);int probe_utility_live();
     }
     static int assertions;
     static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b);assertions++;}
@@ -37,6 +37,22 @@ public class WrapperAbiProbe {
             eq(new String(new byte[]{a.tokens[0].rawText[0],a.tokens[0].rawText[1],a.tokens[1].rawText[0]},StandardCharsets.UTF_8),"日");
             eq(s.transcribeChunked(pcm,0,-1,null)[0].tokens.length,2);
             eq(s.transcribeVad(pcm,16000,"vad")[0].tokens.length,2);
+            CrispasrSession.VadOptions vad=new CrispasrSession.VadOptions();
+            vad.threshold=.375f;vad.minSpeechDurationMs=123;vad.minSilenceDurationMs=456;vad.speechPadMs=78;vad.chunkSeconds=9;vad.nThreads=2;
+            Probe.INSTANCE.probe_vad_expect(1);eq(s.transcribeVad(pcm,16000,"vad","ja",vad)[0].tokens.length,2);
+            Probe.INSTANCE.probe_vad_expect(2);eq(s.transcribeVad(pcm,16000,"vad","ja",null)[0].tokens.length,2);
+            int vadCalls=Probe.INSTANCE.probe_vad_calls();
+            reject(IllegalArgumentException.class,()->s.transcribeVad(new float[0],16000,"vad","ja",vad));
+            reject(NullPointerException.class,()->s.transcribeVad(null,16000,"vad","ja",vad));
+            reject(IllegalArgumentException.class,()->s.transcribeVad(pcm,0,"vad","ja",vad));
+            vad.threshold=Float.NaN;reject(IllegalArgumentException.class,()->s.transcribeVad(pcm,16000,"vad","ja",vad));
+            vad.threshold=.375f;vad.nThreads=0;reject(IllegalArgumentException.class,()->s.transcribeVad(pcm,16000,"vad","ja",vad));
+            eq(Probe.INSTANCE.probe_vad_calls(),vadCalls);vad.nThreads=2;
+            Probe.INSTANCE.probe_vad_expect(3);reject(IllegalStateException.class,()->s.transcribeVad(pcm,16000,"vad","ja",vad));
+            Probe.INSTANCE.probe_vad_expect(1);int vadFrees=Probe.INSTANCE.probe_result_frees();
+            s.setTokenCallback((x,i)->{throw new IllegalArgumentException("vad callback");});
+            reject(IllegalArgumentException.class,()->s.transcribeVad(pcm,16000,"vad","ja",vad));
+            eq(Probe.INSTANCE.probe_result_frees(),vadFrees+1);s.setTokenCallback(null);Probe.INSTANCE.probe_vad_expect(0);
             eq(s.transcribeWithLogits(pcm,null).segments[0].tokens.length,2);
             CrispasrSessionTasks.PianoResult piano=s.piano(pcm);eq(piano.programs[1],128);eq(piano.sampleRate,16000);
             eq(s.chords(pcm,16000).names[1],"Am");eq(s.beats(pcm).tempoBpm,123.5f);
@@ -53,6 +69,19 @@ public class WrapperAbiProbe {
             reject(IllegalStateException.class,()->CrispasrSession.loadAudioStereo("x"));
             reject(IllegalStateException.class,()->CrispasrSession.signC2pa(new byte[]{1},"audio/wav",null,null));
             eq(Probe.INSTANCE.probe_utility_live(),0);Probe.INSTANCE.probe_utility_mode(0);
+            String translated=s.translateText("hello","en","ja");eq(translated,"こんにちは");eq(Probe.INSTANCE.probe_live(),0);
+            Probe.INSTANCE.probe_mode(1);eq(s.translateText("","en","ja",0),"");Probe.INSTANCE.probe_mode(2);
+            reject(IllegalStateException.class,()->s.translateText("hello","en","ja"));Probe.INSTANCE.probe_mode(0);
+            reject(NullPointerException.class,()->s.translateText(null,"en","ja"));eq(translated,"こんにちは");
+            eq(CrispasrSession.enhanceAudioRnnoise(pcm)[0],.5f);eq(pcm[0],1f);
+            eq(CrispasrSession.enhanceAudioRnnoise(new float[0]).length,0);reject(NullPointerException.class,()->CrispasrSession.enhanceAudioRnnoise(null));
+            Probe.INSTANCE.probe_utility_mode(2);reject(IllegalStateException.class,()->CrispasrSession.enhanceAudioRnnoise(pcm));
+            Probe.INSTANCE.probe_utility_mode(4);reject(IllegalStateException.class,()->CrispasrSession.enhanceAudioRnnoise(pcm));Probe.INSTANCE.probe_utility_mode(0);
+            CrispasrUtilities.TextProcessor punc=new CrispasrUtilities.TextProcessor("probe",CrispasrUtilities.TextProcessorKind.PUNCTUATION);
+            eq(punc.process("hello"),"Hello!");eq(Probe.INSTANCE.probe_live(),0);
+            Probe.INSTANCE.probe_mode(1);eq(punc.process(""),"");Probe.INSTANCE.probe_mode(2);
+            reject(IllegalStateException.class,()->punc.process("hello"));Probe.INSTANCE.probe_mode(0);
+            reject(NullPointerException.class,()->punc.process(null));punc.close();punc.close();reject(IllegalStateException.class,()->punc.process("hello"));
             eq(s.scoreTexts(pcm,new String[]{"one","two"},null,null).tokenCounts[1],3);
             eq(CrispasrSession.kokoroLanguageIsGerman("de"),true);eq(CrispasrSession.kokoroLanguageIsGerman("en"),false);
             eq(CrispasrSession.kokoroLanguageHasNativeVoice("en"),true);eq(CrispasrSession.kokoroLanguageHasNativeVoice("xx"),false);
@@ -96,7 +125,7 @@ import java.nio.charset.StandardCharsets;
 public class WrapperAuxProbe {
     public interface Probe extends Library {
         Probe INSTANCE=Native.load("crispasr",Probe.class);
-        void probe_titanet_mode(int n);int probe_titanet_live();void probe_aux_mode(int n);int probe_aux_live();int probe_aux_segment_size();int probe_aux_options_size();
+        void probe_db_mode(int n);int probe_db_live();int probe_db_calls();void probe_titanet_mode(int n);int probe_titanet_live();void probe_aux_mode(int n);int probe_aux_live();int probe_aux_segment_size();int probe_aux_options_size();
     }
     static int assertions;
     static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b+" expected "+b+" got "+a);assertions++;}
@@ -244,6 +273,25 @@ public class WrapperAuxProbe {
         CrispasrAuxiliary.TitaNet titan=new CrispasrAuxiliary.TitaNet("probe",4);float[] embedding=titan.embed(new float[]{1,3,5});eq(embedding.length,192);eqFloat(embedding[0],1);
         for(int mode:new int[]{2,3,4}){Probe.INSTANCE.probe_titanet_mode(mode);reject(IllegalStateException.class,()->titan.embed(new float[]{1,3,5}));}Probe.INSTANCE.probe_titanet_mode(0);
         reject(IllegalArgumentException.class,()->titan.embed(new float[0]));titan.close();titan.close();reject(IllegalStateException.class,()->titan.embed(new float[]{1,3,5}));eq(Probe.INSTANCE.probe_titanet_live(),0);
+        // Usable closed-roster speaker DB API, including native negative no-match scores.
+        float[] dbEmbedding={1,3,5};int dbCalls=Probe.INSTANCE.probe_db_calls();
+        reject(IllegalArgumentException.class,()->new CrispasrAuxiliary.SpeakerDb("db","Alice,Bob",false));
+        reject(IllegalArgumentException.class,()->new CrispasrAuxiliary.SpeakerDb("db","",true));eq(Probe.INSTANCE.probe_db_calls(),dbCalls);
+        CrispasrAuxiliary.SpeakerDb db=new CrispasrAuxiliary.SpeakerDb("db","Alice,Bob",true);
+        eq(db.count(),2);eq(Probe.INSTANCE.probe_db_live(),1);
+        CrispasrAuxiliary.SpeakerMatch match=db.match(dbEmbedding);eq(match.name,"アリス");eqFloat(match.score,.875f);
+        Probe.INSTANCE.probe_db_mode(1);eq(db.match(dbEmbedding).name,null);eqFloat(db.match(dbEmbedding).score,-1f);
+        eq(db.match(dbEmbedding,-1f).name,null);eq(match.name,"アリス");Probe.INSTANCE.probe_db_mode(0);
+        reject(IllegalArgumentException.class,()->db.match(new float[0]));reject(NullPointerException.class,()->db.match(null));
+        reject(IllegalArgumentException.class,()->db.match(dbEmbedding,Float.NaN));
+        reject(IllegalArgumentException.class,()->CrispasrAuxiliary.SpeakerDb.enroll("db","Alice",dbEmbedding,false));
+        reject(IllegalArgumentException.class,()->CrispasrAuxiliary.SpeakerDb.enroll("db","Alice",new float[0],true));
+        CrispasrAuxiliary.SpeakerDb.enroll("db","Alice",dbEmbedding,true);assertions++;
+        Probe.INSTANCE.probe_db_mode(3);reject(IllegalStateException.class,()->CrispasrAuxiliary.SpeakerDb.enroll("db","Alice",dbEmbedding,true));
+        Probe.INSTANCE.probe_db_mode(2);reject(IllegalStateException.class,()->new CrispasrAuxiliary.SpeakerDb("db","Alice,Bob",true));Probe.INSTANCE.probe_db_mode(0);
+        db.close();db.close();eq(Probe.INSTANCE.probe_db_live(),0);dbCalls=Probe.INSTANCE.probe_db_calls();
+        reject(IllegalStateException.class,()->db.count());reject(IllegalStateException.class,()->db.match(dbEmbedding));
+        eq(Probe.INSTANCE.probe_db_calls(),dbCalls);
         // closed handles and buffer cleanup already checked via live
         eq(Probe.INSTANCE.probe_aux_live(),0);
         System.out.println("PASS Java auxiliary: "+assertions+" assertions");
@@ -257,6 +305,9 @@ class JavaWrapperContract(unittest.TestCase):
     def test_transport_ownership_metadata_and_task_operations(self):
         with tempfile.TemporaryDirectory(prefix='java-contract-') as tmp:
             path=Path(tmp);(path/'WrapperAbiProbe.java').write_text(PROGRAM)
+            src=(ROOT/'src/crispasr_c_api.cpp').read_text()
+            start=src.index('struct crispasr_vad_abi_opts {')
+            (path/'runtime-vad-layout.h').write_text(src[start:src.index('};',start)+2])
             sources=[ROOT/'bindings/java/src/main/java/io/github/ggerganov/whispercpp'/name
                      for name in ('CrispasrSession.java','CrispasrSessionTasks.java','CrispasrUtilities.java')]
             javac=shutil.which('javac')
@@ -266,7 +317,7 @@ class JavaWrapperContract(unittest.TestCase):
                 directory=path/('old' if old else 'current');directory.mkdir()
                 cc=os.environ.get('CC') or 'cc'
                 subprocess.run([cc,'-std=c11','-shared','-fPIC','-Werror',
-                                '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-DCRISPASR_PROBE_EXISTING_STREAM_OPS', *(['-DCRISPASR_PROBE_OLD_TOKENS'] if old else []),
+                                '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-I'+str(path), '-DCRISPASR_PROBE_JAVA_RNNOISE', '-DCRISPASR_PROBE_VAD_ARGUMENTS', '-DCRISPASR_PROBE_EXISTING_STREAM_OPS', *(['-DCRISPASR_PROBE_OLD_TOKENS'] if old else []),
                                 str(ROOT/'tests/fixtures/python-wrapper-abi.c'),str(ROOT/'tests/fixtures/wrapper-session-metadata.c'),str(ROOT/'tests/fixtures/wrapper-stream-lifetime.c'),str(ROOT/'tests/fixtures/wrapper-audio-utilities.c'),
                                 '-o',str(directory/'libcrispasr.so')],check=True)
                 run=subprocess.run([JAVA,'-Djna.tmpdir='+str(path),'-Djna.library.path='+str(directory),
@@ -300,7 +351,7 @@ class JavaAuxWrapperContract(unittest.TestCase):
                             '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-I'+str(path),
                             str(ROOT/'tests/fixtures/python-wrapper-abi.c'),
                             str(ROOT/'tests/fixtures/wrapper-session-metadata.c'),
-                            str(ROOT/'tests/fixtures/csharp-wrapper-aux.c'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),str(ROOT/'tests/fixtures/wrapper-titanet-legacy.c'),
+                            str(ROOT/'tests/fixtures/csharp-wrapper-aux.c'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),str(ROOT/'tests/fixtures/wrapper-titanet-legacy.c'),str(ROOT/'tests/fixtures/wrapper-speaker-db.c'),
                             '-o',str(directory/'libcrispasr.so')],check=True)
             run=subprocess.run([JAVA,'-Djna.tmpdir='+str(path),'-Djna.library.path='+str(directory),
                                 '-cp',str(path)+os.pathsep+JAR,'WrapperAuxProbe'],capture_output=True,text=True)

@@ -1,6 +1,9 @@
 // Shared decoded-result probe for language wrappers. No model inference.
 #include "crispasr_session.h"
 #include <string.h>
+#ifdef CRISPASR_PROBE_VAD_ARGUMENTS
+#include "wrapper-vad-arguments.h"
+#endif
 static char token_head[3], token_tail[2];
 static int result_frees;
 extern void probe_callbacks(void);
@@ -35,11 +38,19 @@ crispasr_session_result* crispasr_session_transcribe_chunked_lang(crispasr_sessi
 }
 crispasr_session_result* crispasr_session_transcribe_vad(crispasr_session* s, const float* p, int n, int sr,
                                                          const char* model, const crispasr_vad_abi_opts* opts) {
+#ifdef CRISPASR_PROBE_VAD_ARGUMENTS
+    if (!probe_vad_arguments(p, n, sr, model, opts, NULL))
+        return NULL;
+#endif
     return new_result();
 }
 crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr_session* s, const float* p, int n, int sr,
                                                               const char* model, const crispasr_vad_abi_opts* opts,
                                                               const char* lang) {
+#ifdef CRISPASR_PROBE_VAD_ARGUMENTS
+    if (!probe_vad_arguments(p, n, sr, model, opts, lang))
+        return NULL;
+#endif
     return new_result();
 }
 int crispasr_session_set_return_logits(crispasr_session* s, int value) {

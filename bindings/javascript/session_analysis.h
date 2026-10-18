@@ -107,8 +107,69 @@ public:
         return binding_floats(output.data(), output.size());
     }
 };
+class BindingSpeakerDb {
+    void* handle = nullptr;
+    std::string directory;
+
+public:
+    BindingSpeakerDb(const std::string& dir, const std::string& roster, bool consent) : directory(dir) {
+        binding_check_reentry();
+        if (!consent || roster.empty())
+            throw std::invalid_argument("Consent attestation and participant roster required");
+        handle = crispasr_speaker_db_open(dir.c_str(), roster.c_str(), 1);
+        if (!handle)
+            throw std::runtime_error("speaker_db_open failed");
+    }
+    BindingSpeakerDb(const BindingSpeakerDb&) = delete;
+    ~BindingSpeakerDb() {
+        if (handle)
+            crispasr_speaker_db_free(handle);
+    }
+    void check() const {
+        binding_check_reentry();
+        if (!handle)
+            throw std::runtime_error("Speaker DB is closed");
+    }
+    int count() const {
+        check();
+        return crispasr_speaker_db_count(handle);
+    }
+    void close() {
+        binding_check_reentry();
+        if (handle) {
+            crispasr_speaker_db_free(handle);
+            handle = nullptr;
+        }
+    }
+    emscripten::val match(const emscripten::val& embedding, float threshold) const {
+        check();
+        if (!std::isfinite(threshold))
+            throw std::invalid_argument("Finite threshold required");
+        auto pcm = binding_pcm(embedding);
+        char name[256] = {};
+        float score = crispasr_speaker_db_match(handle, pcm.data(), pcm.size(), threshold, name, sizeof(name));
+        auto out = emscripten::val::object();
+        out.set("score", score);
+        out.set("name",
+                score >= 0 && score >= threshold ? emscripten::val(std::string(name)) : emscripten::val::null());
+        return out;
+    }
+    void enroll(const std::string& name, const emscripten::val& embedding) const {
+        check();
+        auto pcm = binding_pcm(embedding);
+        int rc = crispasr_speaker_db_enroll2(directory.c_str(), name.c_str(), pcm.data(), pcm.size(), 1);
+        if (rc != 0)
+            throw std::runtime_error("speaker_db_enroll2 failed");
+    }
+};
 static void binding_register_analysis() {
     using namespace emscripten;
+    class_<BindingSpeakerDb>("SpeakerDB")
+        .constructor<const std::string&, const std::string&, bool>()
+        .function("count", &BindingSpeakerDb::count)
+        .function("match", &BindingSpeakerDb::match)
+        .function("enroll", &BindingSpeakerDb::enroll)
+        .function("close", &BindingSpeakerDb::close);
     class_<BindingTitaNet>("TitaNet")
         .constructor<const std::string&, int>()
         .function("embed", &BindingTitaNet::embed)

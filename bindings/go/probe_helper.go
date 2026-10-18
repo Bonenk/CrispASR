@@ -10,6 +10,9 @@ package whisper
 #include "crispasr_chat.h"
 typedef struct crispasr_session CrispasrSession;
 void probe_mode_set(int m);
+void probe_db_mode(int mode);
+int probe_db_live(void);
+int probe_db_calls(void);
 void probe_titanet_mode(int mode);
 int probe_titanet_live(void);
 int probe_live_get(void);
@@ -46,3 +49,7 @@ func probeStreamCloses() int    { return int(C.probe_stream_closes_get()) }
 
 func probeTitaNetMode(mode int) { C.probe_titanet_mode(C.int(mode)) }
 func probeTitaNetLive() int     { return int(C.probe_titanet_live()) }
+
+func probeDbMode(mode int) { C.probe_db_mode(C.int(mode)) }
+func probeDbLive() int     { return int(C.probe_db_live()) }
+func probeDbCalls() int    { return int(C.probe_db_calls()) }

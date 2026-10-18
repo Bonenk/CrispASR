@@ -196,3 +196,11 @@ converts the offset to native centiseconds. It has no language parameter; use
 number of floats written, not a zero status. The binding rejects other counts
 and calls after disposal. Similarity helpers expect embeddings already
 normalized to unit L2 length by TitaNet.
+
+`TranscribeVad(pcm, sampleRate, model, language, new VadOptions { ... })`
+accepts per-call language and all six native VAD controls. Threshold defaults
+to 0.5; speech/silence/padding durations are milliseconds; chunk length is
+seconds. The original three-argument overload retains native defaults.
+`SpeakerDb.Match` preserves a negative native score as no match, and DB
+operations reject disposed handles. `SpeakerDb.Enroll` writes to disk;
+reopen an existing DB to refresh the retained roster.

@@ -3,9 +3,10 @@
 The Python package exposes the public operations in
 `include/crispasr_session.h`, with equivalent bulk/superset entry points where
 appropriate. `tools/check-python-api-coverage.py` inventories every unique
-function declaration, rather than the older curated 155-symbol smoke list.
+`crispasr_*` function declaration, rather than the older curated 155-symbol smoke list.
 The inventory now reads both `include/crispasr_session.h` and
-`include/crispasr.h`: 297 unique functions. The eight additional audio/container/
+`include/crispasr.h`: 297 unique `crispasr_*` functions. Upstream `whisper_*`
+declarations are outside this census. The eight additional audio/container/
 channel omissions from the [initial expanded audit](binding-gaps-2026-10-18.md#python-census-boundary)
 are implemented and tested through model-free native probes.
 The inventory is a source drift guard; it does not establish model accuracy,

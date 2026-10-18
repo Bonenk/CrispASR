@@ -191,7 +191,7 @@ void* crispasr_punc_init(const char* model) {
     return (void*)1;
 }
 const char* crispasr_punc_process(void* ctx, const char* text) {
-    return alloc_text("Hello!");
+    return mode == 2 ? NULL : alloc_text(mode == 1 ? "" : "Hello!");
 }
 void crispasr_punc_free_text(const char* p) {
     free_text(p);
@@ -199,7 +199,7 @@ void crispasr_punc_free_text(const char* p) {
 void crispasr_punc_free(void* ctx) {}
 char* crispasr_session_translate_text(crispasr_session* s, const char* text, const char* src, const char* tgt,
                                       int max) {
-    return alloc_text(mode == 1 ? "" : "こんにちは");
+    return mode == 2 ? NULL : alloc_text(mode == 1 ? "" : "こんにちは");
 }
 void crispasr_session_translate_text_free(char* text) {
     free_text(text);

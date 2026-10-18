@@ -465,7 +465,8 @@ per-wrapper setter table.
 
 Some ABI entry points take struct pointers whose layout is defined only in
 `src/crispasr_c_api.cpp` (`crispasr_diarize_seg_abi`, `crispasr_diarize_opts_abi`)
-or in `include/crispasr_session.h` (`crispasr_vad_abi_opts`). Bindings that
+or forward-declared in `include/crispasr_session.h` (`crispasr_vad_abi_opts`,
+whose fields also live in the runtime implementation). Bindings that
 cannot include a C header lay these structs out **by hand**, byte for byte:
 the Go cgo preamble, `crispasr-sys/src/lib.rs` (`#[repr(C)]` mirrors), and the
 flutter binding's offset-written buffers in `crispasr.dart`.
@@ -613,6 +614,21 @@ Return conventions belong to each function. For example,
 `crispasr_speaker_embedder_embed_abi` succeeds with **1**. Treating either as a
 zero-success API breaks valid calls. Check the native implementation and test
 successful data, errors and malformed counts separately.
+
+The [callable ledger](wrapper-callable-coverage.md) records reviewed public
+methods, not declarations. Preserve each native return convention: a negative
+speaker-DB similarity is no match even at a negative threshold; enrollment
+uses the current consent-aware API, never the retired refusing stubs. An
+allocated punctuation/translation result must stay a pointer until copied and
+freed. Per-call VAD options need all six fields and language forwarding tested
+against the literal runtime layout.
+
+Polling counts are element counts, not byte lengths. For native NUL-separated
+tokens read exactly that many terminated strings; never estimate a byte length.
+The Go regression places the buffer immediately before a protected memory page.
+For manually mirrored option structs, derive pointer fields from the target
+ABI rather than hard-coding 64-bit offsets. Validate returned counts against
+allocated capacity, and reject short stereo channels before the native call.
 
 Ruby callbacks must use stable native buffers when calling code that can run
 `GC.compact`. A rooted Ruby String does not guarantee a stable data pointer.

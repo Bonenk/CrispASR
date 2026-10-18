@@ -4309,8 +4309,7 @@ pub fn enhance_audio_rnnoise(pcm: &[f32]) -> Result<Vec<f32>, String> {
 
 /// TitaNet cosine similarity between two embeddings.
 pub fn titanet_cosine_sim(a: &[f32], b: &[f32]) -> f32 {
-    let dim = a.len().min(b.len()) as i32;
-    unsafe { crispasr_sys::crispasr_titanet_cosine_sim(a.as_ptr(), b.as_ptr(), dim) }
+    TitaNet::cosine_sim(a, b).expect("Embedding dimensions must match and fit int32")
 }
 
 /// Speaker database wrapper.
@@ -4322,16 +4321,34 @@ pub struct SpeakerDB {
 unsafe impl Send for SpeakerDB {}
 
 impl SpeakerDB {
-    pub fn load(dir_path: &str) -> Result<Self, String> {
-        let c_path = CString::new(dir_path).map_err(|e| e.to_string())?;
-        let handle = unsafe { crispasr_sys::crispasr_speaker_db_load(c_path.as_ptr()) };
+    /// Open the native consent-gated, closed participant roster.
+    pub fn open(
+        dir_path: &str,
+        expected_names: &str,
+        consent_attested: bool,
+    ) -> Result<Self, String> {
+        if !consent_attested || expected_names.trim().is_empty() {
+            return Err(
+                "An explicit consent attestation and participant roster are required".into(),
+            );
+        }
+        let path = CString::new(dir_path).map_err(|e| e.to_string())?;
+        let roster = CString::new(expected_names).map_err(|e| e.to_string())?;
+        let handle =
+            unsafe { crispasr_sys::crispasr_speaker_db_open(path.as_ptr(), roster.as_ptr(), 1) };
         if handle.is_null() {
-            return Err(format!("Failed to load speaker DB: {dir_path}"));
+            return Err("speaker_db_open failed".into());
         }
         Ok(Self {
             handle,
-            dir_path: dir_path.to_string(),
+            dir_path: dir_path.to_owned(),
         })
+    }
+
+    /// The native ungated load entry point was retired. Use [`Self::open`].
+    #[deprecated(note = "Use SpeakerDB::open with a participant roster and consent attestation")]
+    pub fn load(_dir_path: &str) -> Result<Self, String> {
+        Err("SpeakerDB::open requires a participant roster and consent attestation".into())
     }
 
     pub fn count(&self) -> i32 {
@@ -4339,6 +4356,9 @@ impl SpeakerDB {
     }
 
     pub fn match_embedding(&self, embedding: &[f32], threshold: f32) -> (Option<String>, f32) {
+        if embedding.is_empty() || embedding.len() > i32::MAX as usize || !threshold.is_finite() {
+            return (None, -1.0);
+        }
         let mut name_buf = vec![0u8; 256];
         let score = unsafe {
             crispasr_sys::crispasr_speaker_db_match(
@@ -4350,7 +4370,7 @@ impl SpeakerDB {
                 256,
             )
         };
-        let name = if score >= threshold {
+        let name = if score >= 0.0 && score >= threshold {
             let c_str = unsafe { CStr::from_ptr(name_buf.as_ptr() as *const c_char) };
             Some(c_str.to_string_lossy().into_owned())
         } else {
@@ -4360,14 +4380,18 @@ impl SpeakerDB {
     }
 
     pub fn enroll(&self, name: &str, embedding: &[f32]) -> Result<(), String> {
+        if embedding.is_empty() || embedding.len() > i32::MAX as usize {
+            return Err("Expected a nonempty embedding with an int32 length".into());
+        }
         let c_dir = CString::new(&*self.dir_path).map_err(|e| e.to_string())?;
         let c_name = CString::new(name).map_err(|e| e.to_string())?;
         let rc = unsafe {
-            crispasr_sys::crispasr_speaker_db_enroll(
+            crispasr_sys::crispasr_speaker_db_enroll2(
                 c_dir.as_ptr(),
                 c_name.as_ptr(),
                 embedding.as_ptr(),
                 embedding.len() as i32,
+                1, // attested by construction through open()
             )
         };
         if rc != 0 {

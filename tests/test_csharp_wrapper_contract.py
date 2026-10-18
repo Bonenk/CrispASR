@@ -35,6 +35,7 @@ void probe_mutate(void) { audio[0]=999; }
 PROBE += r"""
 #include <stdlib.h>
 #include <string.h>
+#include "wrapper-vad-arguments.h"
 static char token0[3],token1[2];
 static int frees,owned;
 static crispasr_token_callback token_cb;
@@ -48,7 +49,8 @@ static crispasr_session_result* result(void) {
 }
 crispasr_session_result* crispasr_session_transcribe_lang(crispasr_session* s,const float* p,int n,const char* lang) { return result(); }
 crispasr_session_result* crispasr_session_transcribe_chunked_lang(crispasr_session* s,const float* p,int n,int c,int overlap,const char* lang) { return result(); }
-crispasr_session_result* crispasr_session_transcribe_vad(crispasr_session* s,const float* p,int n,int sr,const char* model,const crispasr_vad_abi_opts* opts) { return result(); }
+crispasr_session_result* crispasr_session_transcribe_vad(crispasr_session* s,const float* p,int n,int sr,const char* model,const crispasr_vad_abi_opts* opts) { return probe_vad_arguments(p,n,sr,model,opts,NULL) ? result():NULL; }
+crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr_session* s,const float* p,int n,int sr,const char* model,const crispasr_vad_abi_opts* opts,const char* lang) { return probe_vad_arguments(p,n,sr,model,opts,lang) ? result():NULL; }
 int crispasr_session_set_return_logits(crispasr_session* s,int on) { return 0; }
 int crispasr_session_result_n_logit_frames(crispasr_session_result* r) { return 0; }
 int crispasr_session_result_n_logit_vocab(crispasr_session_result* r) { return 0; }
@@ -98,6 +100,8 @@ class Program {
     [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)] static extern void probe_mutate();
     [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)] static extern int probe_frees();
     [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)] static extern int probe_owned();
+    [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)]static extern void probe_vad_expect(int n);
+    [DllImport("crispasr",CallingConvention=CallingConvention.Cdecl)]static extern int probe_vad_calls();
     static int assertions;
     static void Equal<T>(T a,T b) { if(!Equals(a,b))throw new Exception($"{a} != {b}");assertions++; }
     static void Reject<T>(Action action) where T:Exception {
@@ -132,6 +136,22 @@ class Program {
                 var bytes=new byte[]{seg.Tokens[0].RawText[0],seg.Tokens[0].RawText[1],seg.Tokens[1].RawText[0]};
                 Equal(System.Text.Encoding.UTF8.GetString(bytes),"日");
             }
+            var vad = new VadOptions { Threshold=.375f, MinSpeechDurationMs=123, MinSilenceDurationMs=456,
+                SpeechPadMs=78, ChunkSeconds=9, NThreads=2 };
+            probe_vad_expect(1);Equal(s.TranscribeVad(f0,16000,"vad","ja",vad)[0].Tokens.Length,2);
+            probe_vad_expect(2);Equal(s.TranscribeVad(f0,16000,"vad","ja")[0].Tokens.Length,2);
+            int vadCalls=probe_vad_calls();
+            Reject<ArgumentException>(()=>s.TranscribeVad(Array.Empty<float>(),16000,"vad","ja",vad));
+            Reject<ArgumentNullException>(()=>s.TranscribeVad(null!,16000,"vad","ja",vad));
+            Reject<ArgumentOutOfRangeException>(()=>s.TranscribeVad(f0,0,"vad","ja",vad));
+            vad.Threshold=float.NaN;Reject<ArgumentOutOfRangeException>(()=>s.TranscribeVad(f0,16000,"vad","ja",vad));
+            vad.Threshold=.375f;vad.NThreads=0;Reject<ArgumentOutOfRangeException>(()=>s.TranscribeVad(f0,16000,"vad","ja",vad));
+            Equal(probe_vad_calls(),vadCalls);vad.NThreads=2;
+            probe_vad_expect(3);Reject<InvalidOperationException>(()=>s.TranscribeVad(f0,16000,"vad","ja",vad));
+            probe_vad_expect(1);int vadFrees=probe_frees();
+            s.SetTokenCallback((_,__)=>throw new ArgumentException("vad callback"));
+            Reject<ArgumentException>(()=>s.TranscribeVad(f0,16000,"vad","ja",vad));
+            Equal(probe_frees(),vadFrees+1);s.SetTokenCallback(null);probe_vad_expect(0);
             s.SetVoiceSamples(f0,24000);s.SetTtsCfgScale(1.5f);s.TadaSetMakerefModels();
             Reject<InvalidOperationException>(()=>s.SetTtsCfgScale(2));
             Equal(Session.DisclaimerText,"AI generated");Equal(s.GetDisclaimerPcm()[0],.25f);Equal(probe_owned(),0);
@@ -158,6 +178,9 @@ class CSharpWrapperContract(unittest.TestCase):
     def test_replay_buffers_and_older_library(self):
         with tempfile.TemporaryDirectory(prefix='csharp-contract-') as temporary:
             path = Path(temporary)
+            src=(ROOT/'src/crispasr_c_api.cpp').read_text()
+            start=src.index('struct crispasr_vad_abi_opts {')
+            (path/'runtime-vad-layout.h').write_text(src[start:src.index('};',start)+2])
             (path/'probe.c').write_text(PROBE)
             (path/'Program.cs').write_text(PROGRAM)
             (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup>
@@ -171,7 +194,7 @@ class CSharpWrapperContract(unittest.TestCase):
             for old in (False,True):
                 library=path/('old.so' if old else 'probe.so')
                 subprocess.run(['cc','-shared','-fPIC','-std=c11','-Werror',
-                                '-I'+str(ROOT/'include'), *(['-DOLD_PROBE'] if old else []),
+                                '-I'+str(ROOT/'include'), '-I'+str(ROOT/'tests/fixtures'), '-I'+str(path), *(['-DOLD_PROBE'] if old else []),
                                 str(path/'probe.c'),str(ROOT/'tests/fixtures/wrapper-stream-lifetime.c'),'-o',str(library)],check=True)
                 result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll'),
                                        *(['old'] if old else [])],
@@ -353,6 +376,23 @@ class CSharpTitaNetContract(unittest.TestCase):
             result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS C# TitaNet:',result.stdout);print(result.stdout.strip())
+
+
+
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('cc'), '.NET SDK and C compiler required')
+class CSharpSpeakerDbContract(unittest.TestCase):
+    def test_speaker_roster_scores_enrollment_and_disposal(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-speaker-db-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text((ROOT/'tests/fixtures/csharp-speaker-db-program.cs').read_text())
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-speaker-db.c'),'-o',str(path/'libcrispasr.so')],check=True)
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS C# speaker DB:',result.stdout);print(result.stdout.strip())
 
 
 if __name__=='__main__': unittest.main()

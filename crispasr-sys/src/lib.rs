@@ -901,6 +901,18 @@ extern "C" {
     pub fn crispasr_titanet_cosine_sim(a: *const c_float, b: *const c_float, dim: i32) -> c_float;
 
     // Speaker profile database
+    pub fn crispasr_speaker_db_open(
+        dir_path: *const c_char,
+        expected_names_csv: *const c_char,
+        consent_attested: i32,
+    ) -> *mut c_void;
+    pub fn crispasr_speaker_db_enroll2(
+        dir_path: *const c_char,
+        name: *const c_char,
+        embedding: *const c_float,
+        dim: i32,
+        consent_attested: i32,
+    ) -> i32;
     pub fn crispasr_speaker_db_load(dir_path: *const c_char) -> *mut c_void;
     pub fn crispasr_speaker_db_free(db: *mut c_void);
     pub fn crispasr_speaker_db_count(db: *const c_void) -> i32;

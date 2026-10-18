@@ -3687,8 +3687,11 @@ class SpeakerDB:
                 "identification (GDPR Art. 9); affirm a lawful basis + explicit consent "
                 "from every enrolled person"
             )
-        if expected_names:
-            self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
+        if not expected_names or not expected_names.strip():
+            raise ValueError("SpeakerDB requires an explicit participant roster")
+        self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
+        if not self._db:
+            raise RuntimeError("speaker_db_open failed")
         self._dir = dir_path
 
     @property
@@ -3696,25 +3699,29 @@ class SpeakerDB:
         return self._lib.crispasr_speaker_db_count(self._db) if self._db else 0
 
     def match(self, embedding, threshold=0.7):
-        """Match embedding against DB. Returns (name, score) or (None, score)."""
+        """Return (name, score); a negative native score always means no match."""
+        if not self._db:
+            raise RuntimeError("SpeakerDB is closed")
         import numpy as np
         emb = np.ascontiguousarray(embedding, dtype=np.float32)
+        if emb.ndim != 1 or not emb.size or not np.isfinite(threshold):
+            raise ValueError("Expected a nonempty embedding and finite threshold")
         name_buf = ctypes.create_string_buffer(256)
         score = self._lib.crispasr_speaker_db_match(
             self._db, emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             len(emb), threshold, name_buf, 256,
         )
-        name = name_buf.value.decode() if score >= threshold else None
+        name = name_buf.value.decode() if score >= 0 and score >= threshold else None
         return name, float(score)
 
     def enroll(self, name, embedding):
-        """Enroll a speaker with the given name and embedding.
-
-        The consent attestation given at construction is recorded in the
-        v2 .spkr profile (audit trail).
-        """
+        """Enroll on disk with the attestation from construction; reopen to refresh the roster."""
+        if not self._db:
+            raise RuntimeError("SpeakerDB is closed")
         import numpy as np
         emb = np.ascontiguousarray(embedding, dtype=np.float32)
+        if emb.ndim != 1 or not emb.size:
+            raise ValueError("Expected a nonempty embedding")
         rc = self._lib.crispasr_speaker_db_enroll2(
             self._dir.encode(), name.encode(),
             emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(emb), 1,

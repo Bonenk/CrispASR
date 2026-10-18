@@ -11,6 +11,7 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:crispasr/crispasr.dart';
 
+final _probeTemporaryDirectories = <Directory>[];
 String? _cachedProbePath;
 String? _cachedOldProbePath;
 
@@ -97,16 +98,21 @@ String _compileProbe({bool oldTokens = false}) {
       : 'tests/fixtures/dart-wrapper-abi.c';
   final tmp = Directory(_tmpDir()).createTempSync('crispasr-dart-probe-');
   final outPath = '${tmp.path}/${oldTokens ? "old" : "current"}.so';
-  addTearDown(() {
-    if (tmp.existsSync()) tmp.deleteSync(recursive: true);
-  });
+  _probeTemporaryDirectories.add(tmp);
 
+  final nativeSource = File('$repo/src/crispasr_c_api.cpp').readAsStringSync();
+  final layouts = ['crispasr_diarize_seg_abi', 'crispasr_diarize_turn_abi', 'crispasr_diarize_opts_abi'].map((name) {
+    final start = nativeSource.indexOf('struct $name {');
+    return nativeSource.substring(start, nativeSource.indexOf('};', start) + 2);
+  }).join('\n');
+  File('${tmp.path}/runtime-abi-layout.h').writeAsStringSync(layouts);
   final cc = Platform.environment['CC'] ?? 'cc';
   final includeArgs = [
     '-I',
     '$repo/include',
     '-I',
     '$repo/ggml/include',
+    '-I', tmp.path,
   ];
   final args = [
     '-std=c11',
@@ -116,6 +122,7 @@ String _compileProbe({bool oldTokens = false}) {
     ...includeArgs,
     if (oldTokens) '-DCRISPASR_PROBE_OLD_TOKENS',
     srcPath,
+    '$repo/tests/fixtures/wrapper-diarize-arguments.c',
     '-o',
     outPath,
   ];
@@ -168,6 +175,49 @@ void _probeMutate({bool old = false}) {
 Float32List _pcm123() => Float32List.fromList([1, 3, 5]);
 
 void main() {
+  tearDownAll(() {
+    for (final dir in _probeTemporaryDirectories) {
+      if (dir.existsSync()) dir.deleteSync(recursive:true);
+    }
+  });
+  test('speaker database roster, negative scores, enrollment and closed guards', () {
+    final lib=_openProbe();
+    final mode=lib.lookupFunction<Void Function(Int32),void Function(int)>('probe_db_mode');
+    final live=lib.lookupFunction<Int32 Function(),int Function()>('probe_db_live');
+    final calls=lib.lookupFunction<Int32 Function(),int Function()>('probe_db_calls');
+    final emb=_pcm123();mode(0);final before=calls();
+    expect(()=>CrispasrSpeakerDB(lib,'db',expectedNames:'Alice,Bob',consentAttested:false),throwsStateError);
+    expect(()=>CrispasrSpeakerDB(lib,'db',expectedNames:'',consentAttested:true),throwsArgumentError);expect(calls(),before);
+    final db=CrispasrSpeakerDB(lib,'db',expectedNames:'Alice,Bob',consentAttested:true);
+    expect(db.count,2);expect(live(),1);final match=db.match(emb);expect(match,('アリス',.875));
+    mode(1);expect(db.match(emb,threshold:-1),(null,-1.0));expect(match.$1,'アリス');mode(0);
+    expect(()=>db.match(Float32List(0)),throwsArgumentError);expect(()=>db.match(emb,threshold:double.nan),throwsArgumentError);
+    expect(()=>db.enroll('Alice',Float32List(0)),throwsArgumentError);expect(db.enroll('Alice',emb),true);
+    mode(3);expect(db.enroll('Alice',emb),false);mode(2);
+    expect(()=>CrispasrSpeakerDB(lib,'db',expectedNames:'Alice,Bob',consentAttested:true),throwsStateError);
+    db.close();db.close();expect(live(),0);final closed=calls();
+    expect(()=>db.count,throwsStateError);expect(()=>db.match(emb),throwsStateError);expect(()=>db.enroll('Alice',emb),throwsStateError);expect(calls(),closed);mode(0);
+  });
+  test('diarization options, turn sizing, native counts and stereo bounds', () {
+    final lib=_openProbe();
+    final mode=lib.lookupFunction<Void Function(Int32),void Function(int)>('probe_diarize_mode');
+    final calls=lib.lookupFunction<Int32 Function(),int Function()>('probe_diarize_calls');
+    final segs=[DiarizeSegment(t0:1.25,t1:1.75),DiarizeSegment(t0:2,t1:2.5)];
+    final turns=<DiarizeTurn>[];
+    bool run({Float32List? right, bool stereo=false, List<DiarizeTurn>? output}) => diarizeSegments(
+      segs:segs,left:_pcm123(),right:right,isStereo:stereo,method:DiarizeMethod.foxNose,
+      foxnoseEmbedderPath:'embed',nThreads:2,sliceT0:1.25,minSpeakers:2,maxSpeakers:4,numSpeakers:3,outTurns:output,lib:lib);
+    mode(0);expect(run(),true);expect(segs.map((s)=>s.speaker),[1,0]);
+    mode(1);final before=calls();expect(run(output:turns),true);expect(calls(),before+2);
+    expect(turns.length,2);expect(turns.first.t0,1.25);expect(turns.last.t1,2.5);expect(turns.last.speaker,0);
+    mode(2);expect(()=>run(output:turns),throwsStateError);
+    mode(3);expect(()=>run(output:turns),throwsStateError);
+    mode(4);expect(run(),false);expect(run(output:turns),false);expect(turns,isEmpty);
+    mode(0);final validCalls=calls();
+    expect(()=>run(stereo:true,right:Float32List(1)),throwsArgumentError);
+    expect(()=>run(stereo:true),throwsArgumentError);expect(calls(),validCalls);
+    expect(run(stereo:true,right:_pcm123()),true);
+  });
   test('legacy native pointer parameters, parallel decoding, DTW and cleanup', () {
     final tmp = Directory(_tmpDir()).createTempSync('dart-legacy-');
     addTearDown(() => tmp.deleteSync(recursive: true));

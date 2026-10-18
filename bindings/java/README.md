@@ -121,6 +121,26 @@ on `CRISPASR_CHAT_TEST_MODEL`, self-skipping when it is unset:
 CRISPASR_CHAT_TEST_MODEL=/models/gemma-3-1b-it-Q4_K_M.gguf ./gradlew test
 ```
 
+## Shared auxiliary operations
+
+`CrispasrSession.transcribeVad(pcm, rate, model, language, options)` accepts
+`CrispasrSession.VadOptions`; the original three-argument overload keeps native
+defaults. Durations are milliseconds, chunk length is seconds, and the language
+applies only to this transcription.
+
+`session.translateText(text, sourceLanguage, targetLanguage)` copies and frees
+native UTF-8. `CrispasrSession.enhanceAudioRnnoise(pcm48kMono)` returns independent
+PCM or throws when the native build lacks RNNoise. Use
+`new CrispasrUtilities.TextProcessor(model, TextProcessorKind.PUNCTUATION)`
+for standalone punctuation; the existing boolean constructor still selects
+truecase or PCS.
+
+`CrispasrAuxiliary.SpeakerDb(directory, expectedNamesCsv, consentAttested)`
+provides `count`, `match`, `close` and static `enroll`. Negative native scores
+are no match; enrollment writes to disk, so reopen to refresh the roster.
+See the [callable ledger](../../docs/wrapper-callable-coverage.md) for reviewed
+families and PLAN.md for remaining wrapper/platform/model gates.
+
 ## Building & Testing
 
 In order to build, you need to have the JDK 8 or higher installed. Run the tests with:
