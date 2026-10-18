@@ -5626,6 +5626,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+    add_test(NAME test-parakeet-window-metadata
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_parakeet_window_metadata.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-parakeet-window-metadata PROPERTIES LABELS "unit;session;bindings;parakeet" TIMEOUT 120)
     add_test(NAME test-session-metadata
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_metadata.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

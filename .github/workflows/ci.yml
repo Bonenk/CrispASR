@@ -228,6 +228,7 @@ jobs:
           library=$(find build \( -type f -o -type l \) -name libcrispasr.so -print -quit)
           test -n "$library"
           CRISPASR_LIB="$PWD/$library" python3 tests/test_session_metadata.py -v
+          CRISPASR_LIB="$PWD/$library" python3 tests/test_parakeet_window_metadata.py -v
 
 
       - name: Breeze session reference and instruction composition

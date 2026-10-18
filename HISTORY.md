@@ -1,3 +1,22 @@
+## #549 remaining Python token packaging and contributing guide — 2026-10-18
+
+Reproduced three defects with tiny literal native fixtures: Japanese slice and
+legacy overlap results dropped every token, and shared repair duplicated tokens
+across equal-frame words. Added native grouping/index ownership shared with word
+construction. Retained words now move their exact token blocks through splice,
+dedup and gap repair; raw UTF-8 fragments and native F32 probabilities survive.
+Six new GCC/Clang tests pass, including 2,000 frozen-own-grouping comparisons,
+offset Japanese slices, BOS/empty ownership and token-less words. The existing
+11 metadata tests pass. CTest and the full-library CI getter step include the
+new suite; full hosted and Japanese audio acceptance remain pending in PLAN.md.
+No public POD or Python constructor change, model math or window-choice change.
+
+`docs/contributing.md` now distinguishes automatic backend dispatch from explicit
+wrapper methods/result fields, corrects Dart lookup auto-discovery prose, and
+requires missing-time/byte/ownership/cache lifetime and multi-route checks.
+The Python README and metadata guide describe the new main-branch behavior;
+published v0.8.43 wheels do not contain these changes.
+
 ## #217 hosted character CTC synthetic result — 2026-10-18
 
 Heavy CPU39112822169 on frozen source567fc431e passes all seven shapes, with

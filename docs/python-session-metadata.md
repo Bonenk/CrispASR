@@ -14,13 +14,24 @@ when unavailable. Word confidence retains its existing fallback of `1.0`.
 | MOSS-Transcribe-Diarize | Native parsed timestamp/speaker segments | Native segment times; no word/token timings exposed by this backend |
 | VibeVoice | Parsed native utterances and speaker labels | Native utterance times; word/token times unavailable |
 
-Tokens remain empty when a backend or route does not produce them. In
-particular, legacy Parakeet word-only merge and Japanese gap-fill routes do not
-provide a token stream. Default non-Japanese Parakeet orchestration retains
-the shared CLI token stream, including explicit chunked calls. The legacy
-explicit-output splitter also preserves those tokens, using the same strict
-next-segment boundary rule as the shared CLI splitter; no-word token-only
-results retain their native token bounds.
+Tokens remain empty when the native source does not produce them. Parakeet
+session paths retain tokens through default/shared orchestration, legacy
+window splicing/deduplication and Japanese slice/gap-fill. Metadata moves with
+the selected word's native token block; equal timestamps do not identify token
+ownership. The native grouping rules are shared with word construction, so
+probabilities and raw byte fragments survive without retokenizing word text.
+Empty/BOS tokens before the first word belong to it; skipped tokens between
+words and at the end belong to the preceding word. Removing a word removes its
+block. Entirely wordless windows still follow the existing merge's empty-output
+behavior; no empty segment or invented token is added.
+
+Default non-Japanese shared gap repair also selects tokens by these groups,
+preventing duplicate/cross-assigned tokens at equal-frame word boundaries. The
+legacy explicit-output splitter keeps its existing strict next-segment boundary
+rule, matching the shared CLI splitter; no-word token-only single results retain
+their native token bounds. The generic CLI postprocessor's own gap-fill logic
+is a separate path, so model-level parity still needs the actual audio checks
+in PLAN.md; these packaging tests do not establish long-form speech accuracy.
 
 Speaker labels use the CLI form `(Speaker N) `, stored separately from text.
 Speaker numbers are local to a decode/chunk; matching numbers across calls do
@@ -91,3 +102,14 @@ to a complete build it also exercises exported getters and real ctypes
 signature setup. CTest and GitHub CI run this suite; the linked native ABI
 null test also exercises the actual cache release twice without a model.
 These are packaging checks, not a new neural accuracy or GPU-memory benchmark.
+
+`python3 tests/test_parakeet_window_metadata.py -v` additionally reproduces and
+repairs the former Japanese/legacy empty-token output and shared-repair tied-frame
+duplicates. It compiles literal production grouping/window/repair functions and
+reads production C ABI getters through the shipped Python result reader. Six
+checks cover splice/dedup, two offset Japanese slices with gap recovery, equal
+frames, split UTF-8 bytes, empty/BOS ownership and token-less native words.
+A 2,000-case comparison against frozen own native grouping preserves exact word
+text, times and F32 probabilities. `CRISPASR_LIB` selects actual built-library
+getters; full-library CI and real Japanese model validation remain pending for
+this follow-up. No public POD layout or Python constructor changed.

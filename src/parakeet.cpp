@@ -13,6 +13,7 @@
 //              8198 = 8192 vocab + 1 blank + 5 TDT durations {0,1,2,3,4}
 
 #include "parakeet.h"
+#include "core/parakeet_word_ranges.h"
 #include "core/crispasr_env.h"
 #include "core/sys_mem.h"
 #include "parakeet_ja_detect.h"
@@ -3819,40 +3820,8 @@ static bool parakeet_group_words(parakeet_result* r, int frame_dur_cs) {
     std::vector<parakeet_word_data> words;
     words.reserve(r->n_tokens);
 
-    // Detect tokenizer style: count tokens that look like real
-    // word-starts (leading space + at least one more char). A
-    // standalone " " token (BOS-ish) doesn't count.
-    int n_space_word_starts = 0;
-    for (int i = 0; i < r->n_tokens; i++) {
-        const char* t = r->tokens[i].text;
-        if (t[0] == ' ' && t[1] != '\0')
-            n_space_word_starts++;
-    }
-    const bool space_prefix_style = (n_space_word_starts >= 2);
-
-    auto is_punct_only = [](const char* s) {
-        if (!s || !*s)
-            return false;
-        const unsigned char* p = (const unsigned char*)s;
-        while (*p) {
-            unsigned char c = *p;
-            if (c < 0x80) {
-                if (!(c == '.' || c == ',' || c == '?' || c == '!' || c == ';' || c == ':' || c == '\'' || c == '"' ||
-                      c == '(' || c == ')' || c == '-'))
-                    return false;
-                p++;
-            } else if (c == 0xE3 && p[1] == 0x80 && p[2] >= 0x80 && p[2] <= 0xBF) {
-                p += 3; // U+3000–U+303F CJK Symbols and Punctuation
-            } else if (c == 0xE3 && p[1] == 0x83 && p[2] == 0xBB) {
-                p += 3; // U+30FB ・
-            } else if (c == 0xEF && p[1] == 0xBC && ((p[2] >= 0x81 && p[2] <= 0x8F) || p[2] == 0x9F)) {
-                p += 3; // U+FF01–U+FF0F, U+FF1F
-            } else {
-                return false;
-            }
-        }
-        return true;
-    };
+    const auto ranges = core_parakeet_words::token_ranges(r->n_tokens, [&](int i) { return r->tokens[i].text; });
+    size_t group = 0;
 
     auto ends_with_sentence_punct = [](const char* s) {
         size_t len = s ? strlen(s) : 0;
@@ -3890,10 +3859,10 @@ static bool parakeet_group_words(parakeet_result* r, int frame_dur_cs) {
             continue; // standalone space / BOS marker
 
         const bool has_leading_space = (td.text[0] == ' ');
-        const bool is_punct = is_punct_only(td.text);
-        const bool is_new_word = !is_punct && (has_leading_space || !space_prefix_style);
+        const bool is_new_word = group + 1 < ranges.size() && i == ranges[group].second;
 
         if (is_new_word && have_cur) {
+            ++group;
             flush_cur();
             cur = {};
             cur_p_sum = 0.0f;

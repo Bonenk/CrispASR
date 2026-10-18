@@ -1,19 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-10-18 — #549 remaining Python/native token ownership
-
-Owner: maintainer coordinator; isolated branch `perf/217-alignment-cleanroom`.
-Preserve original native token blocks through legacy Parakeet overlap splice,
-word dedup and Japanese slice/gap-fill selection. Replace timestamp-based token
-selection in shared gap repair with the actual native grouping rules/indices;
-share those rules with native word grouping so equal-frame words are unambiguous.
-No public ABI struct extension, tokenizer/inference/window-decision changes or
-fabricated tokens/times. Tiny tests compare grouping against frozen own native
-code, exercise seams/tied times/UTF-8 fragments/offsets and read results through
-production C ABI/Python getters. Real model proof/full-library CI stay separate.
-Audit/update `docs/contributing.md` to distinguish backend dispatch from explicit
-wrapper methods/result metadata, and require session/CLI/chunked route parity.
-
 ## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
 
 Owner: maintainer coordinator. Work is isolated on
@@ -141,7 +127,7 @@ parameters, exact feature recipes or source may be reused. The comparison and
 licensing/provenance constraints are in
 [the audit](docs/alignment-cleanroom-2026-10-18.md).
 
-## #549 — full-library CI accepted; Japanese/legacy merge tokens remain
+## #549 — token ownership implemented; follow-up CI/audio validation pending
 
 Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
 (`39104662258`) and all 10 lint jobs (`39104663518`). Independent audit checked
@@ -152,18 +138,37 @@ commits through the initial #217 claim alter documentation only relative to
 this validated source. Preserve this frozen proof; do not repeat it merely
 because documentation tips differ. The API fixes remain unreleased in v0.8.43.
 
-Keep the issue open for the known long-Japanese path limitation and reporter
-validation. Next implementation scope: preserve native tokens through the
-remaining word-only legacy Parakeet overlap-merge and Japanese slice/gap-fill
-routes. Carry token-to-word ownership through window selection and deduplication;
-matching by timestamp alone is ambiguous when words share frame timestamps.
-Do not fabricate tokens or timings from word strings. Hoist shared orchestration
-where practical without changing existing inference/window decisions.
-Acceptance: tiny native window fixtures prove exact retained token bytes and
-probabilities, offsets, equal-time boundary handling and no seam duplicates;
-then one licensed Japanese multi-window clip through CLI and C ABI. Document
-remaining token-less backend routes explicitly. No new graph or model behavior
-may be inferred from metadata tests.
+The remaining native packaging gaps are now implemented: legacy overlap
+splice/dedup and Japanese slice/gap-fill carry owned token blocks with retained
+words. Shared non-JA gap repair uses native grouping indices instead of inclusive
+timestamp matching, which duplicated both words' tokens when frames were tied.
+The grouping rules live in `src/core/parakeet_word_ranges.h` and are used by
+native word construction, so no word-string/timestamp reconstruction is needed.
+No public POD layout, decoder, window decision or Python constructor changed.
+
+Six new tests pass under GCC and Clang, after first reproducing empty tokens
+on JA/legacy routes and tied-frame duplicate tokens in shared repair. They
+exercise production grouping/window/repair functions, opaque getters and the
+Python result reader: equal frames, UTF-8 fragments, exact F32 probabilities,
+BOS/empty ownership, offset slices and token-less native words. Grouping also
+matches frozen own `08aea3537` word text/times/probabilities on 2,000 cases.
+All 11 existing metadata tests remain green. CTest registers the new suite;
+ordinary CI runs it with `CRISPASR_LIB` against actual exported getters.
+`docs/contributing.md` now requires explicit result-field and multi-route wrapper
+parity and corrects the claim that Dart symbol checks auto-discover new APIs.
+
+Keep the issue open for full-library/platform follow-up and reporter validation.
+Freeze the complete source, run CI/lint, and audit the actual exported-getter
+step for both metadata suites. Earlier green source `741141118` does not validate
+this follow-up. Then use a licensed Japanese ASR multi-window fixture: keep
+original native decodes/window choices fixed, require identical word/text/time
+outputs and exact retained token bytes/probabilities/offsets, without dropped
+units or duplicate seams. The CTC-aligner profile for #217 is a different model
+route and cannot stand in for this transcription validation. Generic CLI
+postprocessing (`examples/cli/crispasr_gap_fill.h`) retains timestamp-based token
+filtering for multiple model families; audit that separately before claiming
+full long-form CLI/session token identity, without applying Parakeet-specific
+grouping to unrelated tokenizers. Record token-less native routes explicitly.
 
 See [session metadata](docs/python-session-metadata.md) for `None` timing,
 byte-fragment handling, cache-release lifetime and older-library compatibility.

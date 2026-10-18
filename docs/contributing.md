@@ -1,8 +1,9 @@
 # Contributing — adding a new backend
 
-Adding a new ASR model to CrispASR is a focused exercise in five
-files. The worked examples to copy from are the existing
-`crispasr_backend_*.cpp` adapters.
+Use the existing runtimes and `crispasr_backend_*.cpp` adapters as templates.
+A backend is complete when runtime, factory/build, shared C ABI, wrapper result
+metadata and applicable tests are wired. CLI success alone does not establish
+binding parity; follow §6 as well as the adapter steps.
 
 > **‼️ `clang-format` MUST be v18 — never use v22 (Homebrew's default
 > `clang-format` keg, or Xcode's bundled clang-format, both currently
@@ -340,7 +341,13 @@ if (TARGET yourmodel_lib)
 endif()
 ```
 
-### Bindings — docstrings only for a new *backend* (dispatch is automatic once the C ABI is wired)
+### Bindings — backend dispatch and explicit result/API wiring
+
+Existing session operations can dispatch a new backend once its C ABI is wired.
+That does not expose new methods, getters or result fields automatically. Audit
+the returned structure as well as whether a model opens, and follow the metadata
+and explicit-method checklists below.
+
 - `python/crispasr/_binding.py` — add the name to the TTS-backend lists in
   the `synthesize` comment + docstring.
 - `bindings/go/crispasr_session.go` — add to the header/type comments.
@@ -360,8 +367,59 @@ endif()
   `tools/check-backend-wiring.py` runs the `--check` form; a failure prints
   `RESULT: FAIL (Go cgo LDFLAGS drift)` and names this script.
 - `flutter/crispasr/lib/src/crispasr.dart` — add to the synthesize
-  docstring. Dart uses `DynamicLibrary.lookupFunction` with symbol-presence
-  checks, so new C-ABI functions are discovered automatically.
+  docstring. Dart uses explicit `DynamicLibrary.lookupFunction` calls with
+  symbol-presence checks; a new function still needs a lookup and public method.
+  Presence checks support older libraries; they do not discover new APIs.
+
+### Result metadata parity — CLI → shared C ABI → wrappers
+
+A shared backend name does not guarantee shared packaging. In particular,
+`Session` reaches `src/crispasr_c_api.cpp`, while CLI adapters may use different
+chunk/slice/repair paths. For every field produced by the runtime:
+
+- Preserve segment text, times, speaker labels, words, tokens and native
+  probabilities through each applicable path. Use the shared native parser for
+  tagged/structured outputs; do not return inline speaker/time tags as plain
+  transcript or decode the model twice to recover metadata.
+- Keep token ownership by native grouping/index through window selection,
+  overlap splicing, deduplication and gap repair. Timestamp equality is not
+  ownership: distinct words can share one TDT frame. Moving a selected word
+  must move its token block, and rejecting it must reject that block too.
+  `src/core/parakeet_word_ranges.h` shares Parakeet's actual grouping rules;
+  do not apply those model-specific rules to unrelated tokenizers.
+- Preserve original token bytes, probability and native timestamps. UTF-8 may
+  cross token boundaries; Python `SessionToken.raw_text` is lossless even when
+  its display `text` needs replacement characters. Do not fabricate tokens
+  from words. Empty/BOS tokens need a defined ownership rule; native sources
+  without tokens keep an empty list.
+- Preserve native missing-time sentinels through offsets and VAD remapping;
+  Python exposes missing word/token times as `None` and `has_timestamps`.
+  Segment timing does not imply measured word timing. Identify estimated
+  timings (for example Cohere's existing estimates) separately from alignment.
+- Add opaque-result getters to `include/crispasr_session.h` and native code
+  when needed, then explicit typed wrapper fields/readout and compatibility
+  checks. Keep existing positional constructors stable and mutable defaults
+  independent. New metadata is not covered by automatic backend dispatch.
+- Check every Python result entry point: `transcribe`, `transcribe_chunked`,
+  `transcribe_vad`, and `transcribe_with_logits`, plus native legacy/shared and
+  language-specific routes. Test retained bytes/probabilities, equal-time
+  boundaries, offsets, missing times and seam duplicates. A short default
+  transcription does not exercise long-Japanese slice/gap-fill packaging.
+- Exercise the actual exported getters and Python signatures against the newly
+  built `crispasr-lib`, not only a CLI executable or a stand-in library.
+  `tests/test_session_metadata.py` and `tests/test_parakeet_window_metadata.py`
+  provide tiny decoded-fixture coverage and accept `CRISPASR_LIB` for the full
+  library's getters; CI runs both that way. CTest also registers the fixtures.
+  Keep real audio/CLI/C-ABI model validation separate from packaging proof.
+- When exposing a process-wide resource cache, provide explicit release at the
+  shared C ABI and wrapper levels, document ownership and locking, and verify
+  repeat release and continued session use. Measure device memory separately
+  before claiming a VRAM reduction from `free_aligner_cache()`.
+
+See [Python session metadata](python-session-metadata.md) for current supported
+fields and compatibility, and PLAN.md for unvalidated model/platform routes.
+The other language wrappers also need explicit metadata/API handling for the
+fields they expose; do not claim full wrapper parity from Python tests alone.
 
 ### Bindings — adding a new *session setter* (`crispasr_session_set_*`) or *method*
 This applies to any explicit session entry point — the `crispasr_session_set_*`

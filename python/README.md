@@ -77,7 +77,11 @@ native segment times but no native word times. Use `align_words()` for word
 alignment, then `free_aligner_cache()` or `session.free_aligner_cache()` to
 release the process-wide aligner allocation. Older libraries return empty
 token lists and report cache release as unavailable. See
-[session metadata and compatibility](../docs/python-session-metadata.md).
+[session metadata and compatibility](../docs/python-session-metadata.md). Parakeet
+metadata is retained through Japanese slice/gap-fill and legacy overlap selection;
+raw token blocks follow retained words even when timestamps are tied. These
+main-branch changes require the matching native library and are not in v0.8.43.
+
 
 ## API
 

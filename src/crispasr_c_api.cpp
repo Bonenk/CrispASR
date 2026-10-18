@@ -26,6 +26,7 @@
 #include "core/asr_time_order.h"
 #include "core/segment_hygiene.h" // §W2/§W5/§W6 opt-in segment cleanup    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
 #include "parakeet_orchestrate.h" // improvements Phase 1: shared parakeet transcribe orchestration
+#include "core/parakeet_word_ranges.h"
 #include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
 #include "core/audio_resample.h"   // Sidon S2S input-rate conversion
 #include "core/wav_reader.h"       // fireredtts3 set_voice WAV decode
@@ -5892,6 +5893,38 @@ static std::string parakeet_norm_word(const char* s) {
     return o;
 }
 
+// Metadata moves with the exact word selected by window splice/dedup, even
+// when several words have identical timestamps. This is private C++ state;
+// public opaque-result and POD ABI layouts remain unchanged.
+struct parakeet_session_owned_word : crispasr_session_seg::word {
+    std::vector<crispasr_session_seg::token> native_tokens;
+};
+
+static std::vector<parakeet_session_owned_word> parakeet_session_copy_words(const parakeet_result* r) {
+    std::vector<parakeet_session_owned_word> out;
+    if (!r)
+        return out;
+    const auto ranges = core_parakeet_words::token_ranges(r->n_tokens, [&](int i) { return r->tokens[i].text; });
+    out.reserve(r->n_words);
+    for (int i = 0; i < r->n_words; ++i) {
+        parakeet_session_owned_word word;
+        word.text = r->words[i].text;
+        word.t0 = r->words[i].t0;
+        word.t1 = r->words[i].t1;
+        word.p = r->words[i].p > 0.0f ? r->words[i].p : 1.0f;
+        // A token-less result still retains its words. Never guess ownership
+        // if a foreign/inconsistent result did not use native grouping.
+        if (ranges.size() == (size_t)r->n_words) {
+            for (int ti = ranges[i].first; ti < ranges[i].second; ++ti) {
+                const auto& t = r->tokens[ti];
+                word.native_tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+            }
+        }
+        out.push_back(std::move(word));
+    }
+    return out;
+}
+
 // Long-audio transcription that loses no words and adds no duplicates.
 //
 // Parakeet's bidirectional FastConformer encoder + TDT decoder silently
@@ -5925,11 +5958,7 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         overlap_samples = chunk_samples / 3;
     const int stride = std::max(SR / 2, chunk_samples - overlap_samples);
 
-    struct MWord {
-        std::string text;
-        int64_t t0, t1;
-        float p;
-    };
+    using MWord = parakeet_session_owned_word;
     std::vector<MWord> merged;
     int64_t prev_end_cs = -1;
 
@@ -5938,10 +5967,10 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         const int64_t pos_cs = (int64_t)((double)pos / SR * 100.0);
         parakeet_result* r = parakeet_transcribe_ex(ctx, samples + pos, end - pos, pos_cs);
         if (r) {
+            auto window = parakeet_session_copy_words(r);
             if (merged.empty()) {
-                for (int i = 0; i < r->n_words; ++i)
-                    merged.push_back({r->words[i].text, r->words[i].t0, r->words[i].t1,
-                                      r->words[i].p > 0.0f ? r->words[i].p : 1.0f});
+                for (auto& word : window)
+                    merged.push_back(std::move(word));
             } else {
                 // Splice at the midpoint of the overlap [pos_cs, prev_end_cs]:
                 // drop merged's tail past the midpoint (the new window saw it
@@ -5955,10 +5984,9 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
                 while (!merged.empty() && merged.back().t0 >= mid_cs)
                     merged.pop_back();
                 const int64_t cont_cs = merged.empty() ? mid_cs : merged.back().t1;
-                for (int i = 0; i < r->n_words; ++i) {
-                    if (r->words[i].t1 > cont_cs)
-                        merged.push_back({r->words[i].text, r->words[i].t0, r->words[i].t1,
-                                          r->words[i].p > 0.0f ? r->words[i].p : 1.0f});
+                for (auto& word : window) {
+                    if (word.t1 > cont_cs)
+                        merged.push_back(std::move(word));
                 }
             }
             prev_end_cs = (int64_t)((double)end / SR * 100.0);
@@ -6000,6 +6028,8 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         sw.t1 = w.t1;
         sw.p = w.p;
         seg.words.push_back(std::move(sw));
+        for (auto& token : w.native_tokens)
+            seg.tokens.push_back(std::move(token));
     }
     seg.text = std::move(text);
     seg.t0 = dedup.front().t0;
@@ -6423,24 +6453,19 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             constexpr int64_t kCoverSlopCs = 30;
 
             const auto slices = crispasr_energy_chunk_slices(audio, n, sr, cap_s, 2.0f);
-            std::vector<crispasr_session_seg::word> words;
-            auto run_window = [&](int w0, int w1, int64_t t0_cs, std::vector<crispasr_session_seg::word>& out) {
+            std::vector<parakeet_session_owned_word> words;
+            auto run_window = [&](int w0, int w1, int64_t t0_cs, std::vector<parakeet_session_owned_word>& out) {
                 parakeet_result* pr = parakeet_transcribe_ex(s->parakeet_ctx, audio + w0, w1 - w0, t0_cs);
                 if (!pr)
                     return;
-                for (int i = 0; i < pr->n_words; ++i) {
-                    crispasr_session_seg::word w;
-                    w.text = pr->words[i].text;
-                    w.t0 = pr->words[i].t0;
-                    w.t1 = pr->words[i].t1;
-                    w.p = pr->words[i].p > 0.0f ? pr->words[i].p : 1.0f;
-                    out.push_back(std::move(w));
-                }
+                auto window = parakeet_session_copy_words(pr);
+                for (auto& word : window)
+                    out.push_back(std::move(word));
                 parakeet_result_free(pr);
             };
             for (size_t si = 0; si < slices.size(); ++si) {
                 const auto& sl = slices[si];
-                std::vector<crispasr_session_seg::word> sw;
+                std::vector<parakeet_session_owned_word> sw;
                 run_window(sl.start, sl.end, sl.t0_cs, sw);
                 // Gap-fill rounds within this slice.
                 for (int round = 0; gap_fill && round < 2; ++round) {
@@ -6476,7 +6501,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                         const int w1 = std::min(n, (int)(win1_cs * sr / 100));
                         if (w1 - w0 < sr / 4)
                             continue;
-                        std::vector<crispasr_session_seg::word> fw;
+                        std::vector<parakeet_session_owned_word> fw;
                         run_window(w0, w1, win0_cs, fw);
                         for (auto& w : fw) {
                             const int64_t mid = (w.t0 + w.t1) / 2;
@@ -6534,7 +6559,12 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 seg.t0 = words.front().t0;
                 seg.t1 = words.back().t1;
             }
-            seg.words = std::move(words);
+            seg.words.reserve(words.size());
+            for (auto& word : words) {
+                for (auto& token : word.native_tokens)
+                    seg.tokens.push_back(std::move(token));
+                seg.words.push_back(std::move(word));
+            }
             return seg;
         };
 
