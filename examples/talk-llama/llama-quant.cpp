@@ -3,6 +3,7 @@
 #include "llama-model.h"
 #include "llama-model-loader.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <string>
