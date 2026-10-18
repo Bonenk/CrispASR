@@ -1,25 +1,31 @@
 # CrispASR — Pending work
 
-## CLAIMED — #549 legacy Parakeet segmented-token parity (2026-10-18)
+## #549 follow-up — legacy segmented tokens implemented (2026-10-18)
 
-Owner: maintainer agent; branch `fix/549-python-metadata-parity`, isolated
-worktree `${CRISPASR_WORKTREES}/crispasr-issue549-20261018`.
-Scope: retain native token arrays in the legacy explicit-output splitter,
-matching the existing shared CLI splitter exactly, including no-word results,
-word-boundary splits, timestamp ties and trailing tokens. Preserve decoded
-text/words/probabilities and all inference/path-selection behavior. Acceptance:
-compile both production splitters against the same tiny native results and
-compare output segment/token fields; exercise the real C getters/Python reader.
-The separate Japanese gap-fill ownership work remains explicitly pending.
-Integration CI `39104177158` has started Linux/macOS jobs; lint `39104177171`
-is still queued. Audit those exact-source results independently.
+Owner: next maintainer for terminal CI audit. The legacy explicit-output
+Parakeet splitter now retains native token bytes/times/probabilities, including
+no-word token-only results and tokens on exact segment boundaries. A differential
+fixture compiles the real shared CLI splitter and legacy session splitter,
+passes identical decoded results through both, and compares C ABI/Python output
+across 30 fixture/window combinations. It failed in 15 cases before the fix;
+all 30 combinations now pass, with the full 11-test metadata suite green.
+The remaining word-only overlap-merge and Japanese gap-fill work below is
+unchanged. No decoder/inference or strategy changes are included in this fix.
+
+CI `39104177158` was cancelled by the required claim/checkpoint main push;
+it never completed full-library validation. Do not reuse it as a green result.
+Frozen validation branch: `diag/549-legacy-split-validation-20261018`.
+Audit its CI/lint runs and integrating main. Discover the immutable dispatched
+source/run IDs with `gh run list --repo CrispStrobe/CrispASR --branch
+ diag/549-legacy-split-validation-20261018` (put the command on one line).
+Later documentation checkpoints must not cancel that branch's build.
 
 ## Issue #549 — implementation complete; full-library CI pending (2026-10-18)
 
 Owner: next maintainer for terminal CI audit. Implementation: `5e7694516`,
 fixed-array token-copy follow-up `8d844c610`; integrated with this checkpoint.
 See [session metadata](docs/python-session-metadata.md) and HISTORY.md.
-Local acceptance passes: 10 production-packaging/C ABI/Python metadata tests,
+Local acceptance passes: 11 production-packaging/C ABI/Python metadata tests,
 4 existing UTF-8 tests, 8 Python/native resampling tests, and all 5 secret/privacy
 checks unskipped. Python utility checks pass 11 with one optional full-library
 smoke skipped locally. These do not establish full-library/platform build success.

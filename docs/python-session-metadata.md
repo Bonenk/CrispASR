@@ -17,7 +17,10 @@ when unavailable. Word confidence retains its existing fallback of `1.0`.
 Tokens remain empty when a backend or route does not produce them. In
 particular, legacy Parakeet word-only merge and Japanese gap-fill routes do not
 provide a token stream. Default non-Japanese Parakeet orchestration retains
-the shared CLI token stream, including explicit chunked calls.
+the shared CLI token stream, including explicit chunked calls. The legacy
+explicit-output splitter also preserves those tokens, using the same strict
+next-segment boundary rule as the shared CLI splitter; no-word token-only
+results retain their native token bounds.
 
 Speaker labels use the CLI form `(Speaker N) `, stored separately from text.
 Speaker numbers are local to a decode/chunk; matching numbers across calls do
@@ -82,7 +85,8 @@ unsupported. Existing positional `SessionSegment` arguments retain their order;
 getter functions against decoded fixtures. It covers Cohere/Parakeet token
 preservation, MOSS native segments/fallback, missing times, byte fragments,
 chunk/VAD timing transforms, all four Python entry points, older libraries,
-null/bounds checks, and cache-release forwarding. With `CRISPASR_LIB` pointing
+null/bounds checks, cache-release forwarding, and a direct comparison of the
+legacy and shared CLI splitters over identical native results. With `CRISPASR_LIB` pointing
 to a complete build it also exercises exported getters and real ctypes
 signature setup. CTest and GitHub CI run this suite; the linked native ABI
 null test also exercises the actual cache release twice without a model.

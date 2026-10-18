@@ -37,6 +37,7 @@ class SessionMetadataTest(unittest.TestCase):
 #include <string>
 #include <vector>
 #include "core/ngram_loop_fix.h"
+#include "core/asr_segment_group.h"
 #include "core/moss_diarize_segments.h"
 #include "cohere.h"
 #include "crispasr_vad.h"
@@ -133,6 +134,39 @@ extern "C" crispasr_session_result* inject_parakeet() {
 '''
         code += definition(source, 'for (auto& ps : parakeet_transcribe_segments(')
         code += '\nreturn r; }\n'
+        orchestrate = (ROOT / 'src/parakeet_orchestrate.cpp').read_text()
+        code += 'namespace cli_split {\n'
+        code += definition(orchestrate, 'parakeet_seg result_to_seg(') + '\n'
+        code += definition(orchestrate, 'std::vector<parakeet_seg> split_result_to_segs(') + '\n}\n'
+        code += definition(source, 'static void parakeet_result_to_session_segs(') + '\n'
+        code += r'''
+extern "C" crispasr_session_result* inject_split(int fixture, int seg_seconds, bool shared) {
+    parakeet_word_data words[] = {
+        {"Hello", 10, 20, .5f}, {"世界", 110, 115, .75f},
+        {"again", 110, 130, .625f}, {"last", 240, 260, .875f}};
+    parakeet_token_data tokens[] = {
+        {1, " Hel", 10, 15, .5f}, {2, "lo", 15, 20, .75f},
+        {3, " 世界", 110, 115, .625f}, {4, " again", 110, 130, .875f},
+        {5, " last", 240, 260, .5f}, {6, "!", INT64_MAX, INT64_MAX, .25f}};
+    char text[] = "Hello 世界 again last!";
+    char empty[] = "";
+    parakeet_result native = {text, tokens, 6, words, 4};
+    if (fixture == 1) { native.words = nullptr; native.n_words = 0; }
+    if (fixture == 2) { native.text = empty; native.words = nullptr; native.n_words = 0; }
+    if (fixture == 3) { native.text = empty; native.words = nullptr; native.n_words = 0;
+                        native.tokens = nullptr; native.n_tokens = 0; }
+    if (fixture == 4) { native.tokens = nullptr; native.n_tokens = 0; }
+    auto* pr = fixture == 5 ? nullptr : &native;
+    auto* r = new crispasr_session_result;
+    if (!shared) {
+        parakeet_result_to_session_segs(pr, seg_seconds, r->segments);
+        return r;
+    }
+'''
+        adapter = definition(source, 'for (auto& ps : parakeet_transcribe_segments(')
+        adapter = adapter.replace('parakeet_transcribe_segments(s->parakeet_ctx, pcm, n_samples, 0, is_ja, oo)',
+                                  'cli_split::split_result_to_segs(pr, 0, seg_seconds)')
+        code += adapter + '\nreturn r; }\n'
         code += r'''
 extern "C" crispasr_session_result* inject_shifted() {
     auto* part = inject_untimed(); auto* merged = new crispasr_session_result;
@@ -165,7 +199,8 @@ extern "C" crispasr_session_result* inject_remapped() {
                         '-I', str(ROOT / 'src'), str(path / 'test.cpp'), '-o', str(path / 'test.so')], check=True)
         cls.fixture = ctypes.CDLL(str(path / 'test.so'))
         for name, args in [('cohere', [ctypes.c_char_p]), ('moss', [ctypes.c_char_p]),
-                           ('untimed', []), ('parakeet', []), ('shifted', []), ('remapped', [])]:
+                           ('untimed', []), ('parakeet', []), ('shifted', []), ('remapped', []),
+                           ('split', [ctypes.c_int, ctypes.c_int, ctypes.c_bool])]:
             fn = getattr(cls.fixture, 'inject_' + name)
             fn.argtypes = args
             fn.restype = ctypes.c_void_p
@@ -215,6 +250,15 @@ extern "C" crispasr_session_result* inject_remapped() {
         seg, = self.read(self.fixture.inject_parakeet())
         self.assertEqual([(t.text, t.start, t.end, t.confidence) for t in seg.tokens],
                          [(' Hel', .5, .6, .5), ('lo', .6, .75, .75)])
+
+    def test_legacy_split_matches_shared_cli_for_all_metadata(self):
+        for fixture in range(6):
+            for seconds in (-1, 0, 1, 2, 20):
+                with self.subTest(fixture=fixture, seconds=seconds):
+                    expected = self.read(self.fixture.inject_split(fixture, seconds, True))
+                    actual = self.read(self.fixture.inject_split(fixture, seconds, False))
+                    self.assertEqual(actual, expected)
+                    self.assertEqual(sum(len(s.tokens) for s in actual), 0 if fixture >= 3 else 6)
 
     def test_moss_native_segments_and_speakers(self):
         segs = self.read(self.fixture.inject_moss('[0.12][S01] Hello [0.87][1.0][S02] 世界[2.0]'.encode()))

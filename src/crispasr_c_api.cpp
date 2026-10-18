@@ -6011,8 +6011,8 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
 // segments, snapped to word boundaries. Mirrors the CLI adapter's
 // split_result_into_segments so the session API (server / language bindings)
 // emits per-segment offsets for an explicit `--chunk-seconds`, instead of one
-// giant segment. session_seg carries words only (no per-token array), so we
-// group words; text is re-joined with single spaces (non-JA path).
+// giant segment. Group by words and retain the corresponding native tokens;
+// text is re-joined with single spaces (non-JA path).
 static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_seconds,
                                             std::vector<crispasr_session_seg>& out) {
     if (!pr)
@@ -6021,7 +6021,15 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
         // No word timings → one segment with whatever text we have.
         crispasr_session_seg seg;
         seg.text = pr->text ? pr->text : "";
-        if (!seg.text.empty())
+        for (int i = 0; i < pr->n_tokens; ++i) {
+            const auto& t = pr->tokens[i];
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+        }
+        if (!seg.tokens.empty()) {
+            seg.t0 = seg.tokens.front().t0;
+            seg.t1 = seg.tokens.back().t1;
+        }
+        if (!seg.text.empty() || !seg.tokens.empty())
             out.push_back(std::move(seg));
         return;
     }
@@ -6030,6 +6038,7 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
     for (int i = 0; i < pr->n_words; ++i)
         word_t0.push_back(pr->words[i].t0);
     const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
+    int ti = 0;
     for (size_t si = 0; si < starts.size(); ++si) {
         const int w_begin = starts[si];
         const int w_end = (si + 1 < starts.size()) ? starts[si + 1] : pr->n_words;
@@ -6050,7 +6059,19 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
         seg.text = std::move(text);
         seg.t0 = seg.words.front().t0;
         seg.t1 = seg.words.back().t1;
+        // Same strict boundary as the shared CLI splitter: a token at the
+        // next segment's first-word start belongs to that next segment.
+        const int64_t next_start = (w_end < pr->n_words) ? pr->words[w_end].t0 : INT64_MAX;
+        for (; ti < pr->n_tokens && pr->tokens[ti].t0 < next_start; ++ti) {
+            const auto& t = pr->tokens[ti];
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+        }
         out.push_back(std::move(seg));
+    }
+    // Keep even tokens at INT64_MAX, matching the shared splitter's tail.
+    for (; ti < pr->n_tokens && !out.empty(); ++ti) {
+        const auto& t = pr->tokens[ti];
+        out.back().tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
     }
 }
 #endif

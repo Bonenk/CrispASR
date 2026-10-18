@@ -1,3 +1,17 @@
+## #549 legacy Parakeet segmented-token preservation — 2026-10-18
+
+The legacy explicit-output splitter discarded its native token array, and
+no-word results lost token bounds or disappeared when text was empty. It now
+uses the existing shared CLI splitter's strict next-segment boundary rule and
+retains token-only and trailing-token output. No decoding or word selection
+changes. A literal-production differential test was observed failing in 15
+fixture/window combinations before the fix. All 30 combinations now match the
+shared CLI splitter through native getters and the Python result reader,
+including timestamp ties, token-only/empty/null results, and non-positive
+segment windows. The metadata suite passes 11 tests. Complete-library CI remains
+pending; cancelled run `39104177158` is not acceptance. Japanese gap-fill and
+legacy overlap-merge token ownership remain scoped in PLAN.md.
+
 ## Issue #549 — Python/native metadata implementation — 2026-10-18
 
 Read the complete issue (four reported discrepancies; no comments at inspection)
