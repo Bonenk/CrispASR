@@ -24,8 +24,11 @@ Local synthetic measurements and their noisy timing ranges are retained in
 `docs/alignment-ctc-local-2026-10-18.json`; they do not measure encoder/model
 or Japanese Parakeet/Canary subword performance.
 
-Next: dispatch/audit `tools/ci-heavy/alignment_ctc_bench.py --large` with NumPy
-on an immutable published source branch. It compiles only our model-free kernel
+Frozen character-performance source `567fc431e333d3cf1e2cb895f3d2895364e54328`
+is on `diag/217-ctc-workspace-20261018`. Heavy CPU `39112822169` runs
+`tools/ci-heavy/alignment_ctc_bench.py --large` with NumPy. CI `39112823566`
+and lint `39112825190` were also dispatched for that source; audit terminal
+results and verify source pins before accepting any hosted result. It compiles only our model-free kernel
 and frozen own baseline; no external models/code are needed. Audit all receipt
 output parity, kernel-time distributions, actual allocation counts and tracked
 peak heap, source hashes, compiler/CPU/flags, and the independent test suite.
@@ -33,18 +36,22 @@ Run ordinary full-library CI and lint on the same frozen source. Keep that branc
 immutable while documentation checkpoints advance. No default promotion until
 those gates and representative model alignment acceptance are satisfied.
 
-## CLAIMED — #217 subword CTC failure contract (2026-10-18)
+## #217 subword CTC failure contract — implemented; full CI pending
 
-Owner: coordinator in the existing isolated #217 worktree. Independent audit of
-our `canary_ctc_align_words` finds no complete-path check before traceback.
-Scope: prove the failure on tiny native-tokenizer fixtures, then reject
-unreachable/nonfinite terminal states and invalid ABI inputs. This is a separate
-correctness change, not a subword speedup. Preserve valid word text and native
-centisecond bounds; no encoder, tokenizer or DP arithmetic change.
-Acceptance: demonstrate the pre-fix failure, verify repeated-label minimum-frame
-constraints and known valid paths, reject null/out-of-range arguments, and run
-the existing character-kernel acceptance suite unchanged. The frozen character
-benchmark source/branch must remain immutable.
+The tiny production-tokenizer/DP test was first observed returning success with
+zero times for a two-label transcript and one frame. The independent CTC
+feasibility assertion failed before the fix. `canary_ctc_align_words` now rejects
+unreachable/nonfinite terminal states and invalid ABI/token-ID inputs. All four
+contract tests pass, including repeated-label minimum frames and known valid
+centisecond bounds. No encoder, tokenizer or valid-path DP arithmetic changes;
+this is a correctness fix, not a Japanese Parakeet speedup. CTest/ordinary CI
+run this suite. The independent character-kernel source remains unchanged.
+
+Audit the combined source's full-library CI/lint separately from the immutable
+character-only performance source. Do not treat a synthetic token fixture as
+proof of long-form model accuracy. Character-path nonfinite-input policy still
+follows its frozen baseline; any future policy unification needs separate
+valid-output and error-contract acceptance, not a concealed speed change.
 
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 

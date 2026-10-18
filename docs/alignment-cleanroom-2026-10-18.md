@@ -12,6 +12,7 @@ reproduce the reported accuracy improvement.
 | Aspect | Subtimer at the pinned commit | Current CrispASR |
 | --- | --- | --- |
 | Main output | Ordered Japanese dialogue-line intervals | Standalone text/SRT alignment; word/character timing where supported; cue-preserving SRT output |
+| Input timing guides | Optional guide segments | Align-only SRT cue text/structure is retained, but original cue times are not used as alignment priors |
 | Acoustic dependency | Its README requires external CrispASR bundles and a Japanese Parakeet model, plus other speech dependencies | Native ggml encoders and separate CTC/forced-aligner families |
 | CTC path search | Includes Triton GPU and Numba CPU kernels | Current character and subword Viterbi loops run on CPU, independently of the acoustic encoder device |
 | Boundary method | Research identifies several speech signals, alignment proposals, and fitted boundary refinement | Native aligner timing, transcript normalization, cue/audio interval handling; no equivalent imported fitted selector |
@@ -126,6 +127,19 @@ candidate before integration. Its source checksum identifies the exact bytes.
 Larger model-free cases and full-library CI must pass on frozen published
 source before considering default promotion. This does not reduce the
 unmodified raw-logit input or acoustic encoder allocations.
+
+## Separate correctness fix in our subword aligner
+
+Independent inspection of `canary_ctc_align_words` found that it traced back
+even when neither terminal CTC state was reachable. A literal production test
+with one frame and two distinct transcript labels returned success with zero
+word times before the fix. Two identical labels also require an intervening
+blank, so they cannot fit into two frames. The function now returns an error
+for unreachable or nonfinite terminal states, and rejects null pointers or
+out-of-range token IDs before indexing. Known valid paths retain their native centisecond
+timestamps. Four model-free tests compile the actual tokenizer and postprocessor
+and cover those contracts. This changes error handling, not the subword DP's
+speed, encoder computation or tokenization.
 
 ## Remaining comparison work
 

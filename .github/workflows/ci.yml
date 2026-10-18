@@ -208,6 +208,9 @@ jobs:
       - name: Breeze session sampler controls
         run: python3 tests/test_breeze_session_controls.py -v
 
+      - name: Subword CTC feasibility and ABI failure contracts
+        run: python3 tests/test_canary_align_contract.py -v
+
       - name: CTC compact workspace, frozen parity and exhaustive path oracle
         run: python3 tests/test_align_compact.py -v
 

@@ -1162,10 +1162,12 @@ static int argmax_int(const std::vector<float>& v) {
 
 extern "C" int canary_ctc_align_words(struct canary_ctc_context* ctx, const float* logits, int T_enc, int V,
                                       const char** words, int n_words, struct canary_ctc_word* out_words) {
-    if (T_enc <= 0 || V <= 0 || n_words <= 0)
+    if (!ctx || !logits || !words || !out_words || T_enc <= 0 || V <= 0 || n_words <= 0)
         return -1;
     const int blank_id = (int)ctx->model.hparams.blank_id;
     const int frame_dur_cs = (int)ctx->model.hparams.frame_dur_cs;
+    if (blank_id < 0 || blank_id >= V)
+        return -1;
 
     // ----- 1. Tokenise each word and build per-word token ranges in `chars` -----
     struct word_range {
@@ -1197,6 +1199,9 @@ extern "C" int canary_ctc_align_words(struct canary_ctc_context* ctx, const floa
     int N = (int)chars.size();
     if (N == 0)
         return -2;
+    for (int token : chars)
+        if (token < 0 || token >= V)
+            return -1;
 
     // ----- 2. CTC-expanded label sequence with blanks between every label -----
     int S = 2 * N + 1;
@@ -1260,6 +1265,10 @@ extern "C" int canary_ctc_align_words(struct canary_ctc_context* ctx, const floa
     // ----- 5. Traceback -----
     std::vector<int> path(T_enc);
     int j_cur = (alpha[S - 1] >= alpha[S - 2]) ? S - 1 : S - 2;
+    // A transcript that cannot reach either terminal state has no complete
+    // CTC path. Do not turn default backpointers into successful zero times.
+    if (!std::isfinite(alpha[j_cur]) || alpha[j_cur] <= NEG_INF)
+        return -1;
     for (int t = T_enc - 1; t >= 0; t--) {
         path[t] = j_cur;
         if (t > 0) {

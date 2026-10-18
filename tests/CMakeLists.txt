@@ -5634,6 +5634,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_align_compact.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
+    add_test(NAME test-canary-align-contract
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_canary_align_contract.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-canary-align-contract PROPERTIES LABELS "unit;align;abi" TIMEOUT 60)
     add_test(NAME test-breeze-session-modes
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

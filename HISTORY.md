@@ -1,3 +1,15 @@
+## #217 subword CTC failure semantics — 2026-10-18
+
+A literal production tokenizer/Viterbi fixture proved that an impossible
+transcript (two distinct labels, one frame) incorrectly returned success with
+zero timestamps. Added complete-path/finite-terminal rejection and ABI/token-ID
+bounds checks to `canary_ctc_align_words`; valid known paths retain native
+centisecond bounds. Four model-free contract tests pass after first observing
+the pre-fix failure. The encoder, tokenizer and valid-path DP arithmetic are
+unchanged. CTest/CI wiring is added; combined full-library CI remains pending.
+This is an independent own-code correctness repair, separate from the opt-in
+character-path memory/performance experiment and unmeasured Subtimer comparison.
+
 ## #217 clean-room comparison and local CTC experiment — 2026-10-18
 
 Read the full #217 discussion and pinned the referenced new Subtimer release.

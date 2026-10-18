@@ -63,9 +63,11 @@ struct canary_ctc_word {
 // runs the Viterbi DP, and returns per-word (t0, t1) in centiseconds
 // relative to the start of the audio.
 //
-// Returns 0 on success. The caller passes a pre-allocated array of
-// `n_words` canary_ctc_word slots. The .text field is filled with the
-// original word.
+// Returns 0 only when a complete, finite CTC path exists. Negative values
+// report invalid arguments/token IDs, no tokenizable labels, or an unreachable
+// path; callers must ignore output timings on failure. The caller passes a
+// pre-allocated array of `n_words` canary_ctc_word slots. The .text field is
+// filled with the original word.
 int canary_ctc_align_words(struct canary_ctc_context* ctx,
                            const float* logits, // [T_enc * vocab_total] (from canary_ctc_compute_logits)
                            int T_enc, int vocab_total,
