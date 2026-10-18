@@ -1,3 +1,14 @@
+## In flight — issue #549 Python metadata parity (2026-10-18)
+
+Owner: maintainer agent. Branch: `fix/549-python-metadata-parity`, based on
+current main. Scope: expose native token metadata through additive C ABI
+accessors and Python session results; preserve MOSS native diarization segments;
+expose process-wide aligner cache release; represent unavailable word timing
+explicitly. Preserve existing positional Python constructors and compatibility
+with older shared libraries. Validate native packaging and Python conversion
+with small fixtures, run the relevant checks, and record any model-dependent
+validation still outstanding. No inference graph or model changes are planned.
+
 # CrispASR — Pending work
 
 Updated 2026-10-17. This file contains current actions, dependencies and a
