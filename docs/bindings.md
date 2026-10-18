@@ -657,7 +657,7 @@ fmt.Println("Transcript:", result.Transcript)
 ### Current wrapper repair validation
 
 The model-free ABI suites run through actual .NET, JNA, Ruby-extension and
-Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|wasm`
+Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|dart|wasm`
 (select one language). SDK requirements and the difference between optional
 CTest skips and strict CI are documented in [contributing](contributing.md).
 These suites exercise transport, ownership and lifecycle; they do not establish
@@ -668,7 +668,7 @@ Shared token results retain raw UTF-8 bytes because individual tokens may split
 a Unicode character. Decode concatenated raw pieces to reconstruct text; each
 token's display text may contain replacement characters. Existing language
 time units remain stable, and unavailable timing is exposed as `-1` plus an
-availability predicate. Java `asr` results and Ruby's ordinary transcription
+availability predicate. Java session results and Ruby's ordinary transcription
 results use centiseconds; WASM `session*`, C# and Dart expose seconds. Ruby's
 existing `transcribe_vad_lang` route uses seconds.
 
@@ -678,3 +678,12 @@ native synthesis returns. Check both the native status and callback error.
 Callback exceptions stay on the JS side until native unwinds; re-entry is
 rejected. Browser worker scheduling and backend availability still require the
 full WASM build/model gates.
+
+C# text chat is available through `ChatSession.Open`, `Generate`,
+`GenerateStreaming`, `CountTokens`, `Reset`, and the context/template/memory
+queries. Pass the whole conversation to preserve native KV-prefix reuse.
+Streaming delivers owned raw UTF-8 byte chunks; concatenate before decoding.
+`CancellationToken` and registered abort predicates map native abort code 40
+to `OperationCanceledException`. Abort/token callbacks must be fast and cannot
+re-enter or dispose their session; callback exceptions propagate after native
+returns. The chat disclosure string is exposed through `AiDisclosureText`.

@@ -49,6 +49,7 @@ static CrispasrSession* g_asr_session = nullptr;
 
 struct whisper_context* g_context;
 #include "session_tasks.h"
+#include "session_utilities.h"
 
 #ifdef __EMSCRIPTEN_PTHREADS__
 // Present only in threaded builds. Under -sPROXY_TO_PTHREAD this runs on pthread-0
@@ -98,6 +99,7 @@ static void browser_dispatch(std::function<T()> work, std::function<emscripten::
 
 EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_session_tasks();
+    binding_register_utilities();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
                              binding_check_reentry();

@@ -230,4 +230,59 @@ class CSharpUtilityContract(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertIn('PASS C# utilities:',result.stdout);print(result.stdout.strip())
 
 
+CHAT_PROGRAM=r'''
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+using CrispASR;
+class ChatProbe {
+    [DllImport("crispasr")]static extern int probe_chat_sessions();
+    [DllImport("crispasr")]static extern int probe_chat_strings();
+    [DllImport("crispasr")]static extern int probe_chat_resets();
+    [DllImport("crispasr")]static extern int probe_chat_open_size();
+    [DllImport("crispasr")]static extern int probe_chat_generate_size();
+    static int checks;
+    static void Eq<T>(T a,T b){if(!object.Equals(a,b))throw new Exception($"{a} != {b}");checks++;}
+    static void Reject<T>(Action f)where T:Exception{try{f();}catch(T){checks++;return;}throw new Exception("Expected "+typeof(T));}
+    static void Main(){
+        Eq(Marshal.SizeOf<ChatNative.OpenParams>(),probe_chat_open_size());Eq(Marshal.SizeOf<ChatNative.GenerateParams>(),probe_chat_generate_size());
+        var messages=new[]{new ChatMessage("system","prompt"),new ChatMessage("user","日本語")};
+        Reject<ChatException>(()=>ChatSession.Open("fail"));Eq(probe_chat_sessions(),0);
+        try{ChatSession.Open("fail");}catch(ChatException e){Eq(e.NativeCode,3);Eq(e.Message,"cannot open");}
+        var options=new ChatOptions{ContextSize=321,GpuLayers=0,UseMmap=false,Template="gemma"};
+        using(var chat=ChatSession.Open("probe",options)){
+            Eq(chat.ContextSize,321);Eq(chat.TemplateName,"probe-template");Eq(chat.CountTokens(messages),9);
+            Eq(chat.Generate(messages),"Grüße");Eq(probe_chat_strings(),0);
+            Eq(chat.Generate(messages,new ChatGenerateOptions{MaxTokens=7,Seed=uint.MaxValue,Stop=new[]{"STOP"},PrefillOnly=true}),"");
+            var chunks=new List<byte[]>();chat.GenerateStreaming(messages,x=>chunks.Add(x));Eq(chunks.Count,2);Eq(chunks[0][0],(byte)0xe6);Eq(System.Text.Encoding.UTF8.GetString(new[]{chunks[0][0],chunks[0][1],chunks[1][0]}),"日");
+            Reject<ArgumentException>(()=>chat.GenerateStreaming(messages,x=>throw new ArgumentException("sentinel")));
+            Reject<InvalidOperationException>(()=>chat.GenerateStreaming(messages,x=>chat.Dispose()));
+            using(var token=new CancellationTokenSource()){token.Cancel();Reject<OperationCanceledException>(()=>chat.Generate(messages,cancellationToken:token.Token));}
+            chat.SetAbortCallback(()=>false);Reject<OperationCanceledException>(()=>chat.Generate(messages));
+            chat.SetAbortCallback(()=>throw new ArgumentException("abort sentinel"));Reject<ArgumentException>(()=>chat.Generate(messages));chat.SetAbortCallback(null);
+            chat.Reset();Eq(probe_chat_resets(),1);
+        }
+        Eq(probe_chat_sessions(),0);Eq(probe_chat_strings(),0);Eq(ChatSession.MemoryEstimate("probe"),(1UL<<40)+123);Eq(ChatSession.AiDisclosureText,"You are talking to an AI.");
+        var closed=ChatSession.Open("probe");closed.Dispose();closed.Dispose();Reject<ObjectDisposedException>(()=>closed.Reset());
+        Console.WriteLine($"PASS C# chat: {checks} assertions");
+    }
+}
+'''
+
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('cc'), '.NET SDK and C compiler required')
+class CSharpChatContract(unittest.TestCase):
+    def test_chat_layout_lifetime_streaming_and_cancellation(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-chat-contract-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text(CHAT_PROGRAM)
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-chat-abi.c'),'-o',str(path/'libcrispasr.so')],check=True)
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertIn('PASS C# chat:',result.stdout);print(result.stdout.strip())
+
+
 if __name__=='__main__': unittest.main()

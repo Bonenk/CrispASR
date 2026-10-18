@@ -43,60 +43,62 @@ compiled probes. C# additionally closes child streams before session teardown:
 WASM adapter passes local single-thread syntax compilation against public
 headers; manually duplicated extern declarations were removed. Threaded/full
 hosted builds and the remaining auxiliary/chat APIs are not yet accepted.
-Dart and Go/Rust agents are revising their probes: fixed private paths, simulated
-rather than actual fallback tests and struct-only tests were rejected. Their
-edits remain unaccepted. Broader auxiliary API inventory and separate chat gaps,
-plus hosted/model acceptance, remain open; this checkpoint is not all-wrapper
-completion.
+Dart now passes strict analyzer checks and 32 actual FFI tests, including a
+separate older-library process, shared metadata on drained segments, raw token
+polling, callback re-entry across native getters/setters, and successful audio/
+binary ownership transport. Fixed stereo alias double-free and partial-error
+buffer leaks. Probes compile in unique directories rather than reusing stale
+binaries. C# now exposes the 14 chat APIs and passes 26 chat-specific layout,
+lifetime, cancellation and raw-stream assertions (118 total .NET assertions).
+These are model-free checks, not model/cryptographic acceptance.
+
+Go/Rust source and harness remain under review. A first harness revision was
+rejected because it embedded a private include path, put fake libraries into
+ordinary build directories and could compile a probe C file into the production
+Go package. The corrective task requires temporary isolated link outputs,
+aborting unexercised stubs, clean cgo handles and actual language/native tests.
+Do not accept its current partial edits. Ruby's remaining auxiliary + chat APIs
+are in a separate bounded task. WASM auxiliary implementations pass 56 actual Embind assertions; full
+model/browser and separate chat/platform wiring is pending.
+
+Remaining full inventory: both shared headers (296 functions), chat (14),
+per-wrapper public methods/results and explicit equivalent/retired/platform
+classifications. C# still needs registry/speaker-embedder/clustering/cache,
+text-LID/VAD-slices/open-options integration; Dart stream-parent lifetimes are now guarded and tested; Java legacy helper equivalents need proof. Register actual behavioral
+checks for each repaired family, then full library/platform and pinned real
+model outputs/roundtrips. These checkpoints are not all-wrapper completion.
 
 Repair order and acceptance:
 
-0. **Close the census boundary:** extend Python's guard across both public
-   headers (and retain the separate chat-header guard). Add the eight confirmed
-   missing functions in `crispasr.h`: mono/native-rate/stereo audio loading,
-   PCM-to-WAV, C2PA sign/free, and input/output channel getters. Read each native
-   ownership/error contract, expose usable public functions and test allocated
-   buffers, stereo shape, output rates, zero/error results and unavailable
-   optional signing support. Do not describe the 282-function session-header
-   census as the complete public C ABI.
+1. **Complete the callable inventory:** map both headers and chat to public
+   methods/results in every wrapper. Explicitly classify bulk equivalents,
+   retired stubs and platform exclusions. A declaration is not coverage.
+2. **Accept Go/Rust:** isolate their link probes from normal build outputs;
+   prove all result readers, raw bytes, alternatives, callbacks/panics and
+   replay bounds through the real safe wrappers, then land the reviewed source.
+3. **Finish Ruby auxiliary/chat:** audio/container ownership, processors,
+   pitch/separation, callback registration/polling, runtime queries, registry/
+   scoring and all chat operations. Retain centisecond/legacy-VAD-second units.
+4. **Finish WASM auxiliary/chat:** behavioral tests for newly compiled helpers,
+   VAD/character-alignment and callback routes, full static export registration,
+   browser scheduling and build-size/backend availability. Keep exceptions out
+   of native callback frames and preserve owned data across compute threads.
+5. **Complete remaining C#/Java/Dart families:** C# registry/embedder/cache/LID/
+   VAD/open-options; verify Java legacy controls/equivalents and platform-specific stream
+   disposal paths. Close every remaining manifest row against actual code.
+6. **Hosted/model acceptance:** full library/compiler jobs and representative
+   real tasks through each wrapper, pinned models/source/inputs and TTS→ASR
+   roundtrips. No release from declaration counts, fixture probes or queued CI.
 
-1. **C# replay-noise bounds:** bind the new model dimension getters; validate
-   optional conversion noise lengths with checked products before P/Invoke.
-   Add short-buffer rejection tests proving native conversion is not entered,
-   valid-buffer forwarding/copying tests and older-library behavior. Run the
-   .NET tests and `bindings-csharp.yml` on Linux/Windows.
-2. **Shared result contract, Dart first:** add owned token bytes/text,
-   timestamps/probabilities and default-empty token lists to all seven wrappers;
-   preserve speaker labels, word alternatives and missing-time availability.
-   Fix Dart/Rust's `-1` → `-0.01` conversion. Update every transcribe/chunked/
-   VAD/logits/stream result reader. Preserve existing constructors and documented
-   units; test split UTF-8, null/absent timing, offsets and post-free ownership
-   against the same compiled native fixtures/library. Rust additionally needs
-   safe segment speaker fields; Go/Java/Rust need usable word alternatives.
-3. **Dart operations:** chords, tablature, ContentVec conversion with safe
-   replay noise; PCM voice references, TTS CFG-scale, TADA companions,
-   disclosure/synthesis errors and sentence streaming. Use polling/isolate-safe
-   delivery where native callbacks cannot run safely on the Dart isolate.
-   Keep existing piano/program and beat functionality. Add analyzer/tests,
-   disposal and actual FFI failure/empty-result/ownership checks.
-4. **Go/Rust operations**, then **Java/Ruby/C#/WASM**: close each audit matrix
-   row, including public entry points, registration, native declarations,
-   result types, ownership and feature availability. Register a complete
-   per-language coverage manifest/guard; classify equivalent/retired/platform
-   cases explicitly. Run language compiler/tests and applicable hosted jobs.
-5. **Model acceptance:** representative real audio/task outputs and TTS→ASR
-   roundtrips through each completed wrapper, using pinned models, source and
-   inputs. A source inventory or Python test does not satisfy this gate.
-
-## Python session-header expansion — additional ABI gaps and hosted/model acceptance pending
+## Python shared-header expansion — hosted/model acceptance pending
 
 Owner: maintainer coordinator. Source inventory and operation contracts are in
 [Python API coverage](docs/python-api-coverage.md); completed implementation is
-archived in HISTORY.md. The header census now accounts for 282 unique functions
-(277 bound, three equivalent/compiled adapters, two retired native stubs).
-This census is limited to that header. Eight additional Python omissions in
-`include/crispasr.h` are now scoped above; this is not complete public C-ABI,
-other-language or model acceptance.
+archived in HISTORY.md. The census now reads both shared public headers: 296 unique functions
+(291 bound, three equivalent/compiled adapters, two retired native stubs).
+The eight additional audio/container/channel functions were implemented and
+probed; completed work is in HISTORY.md. Separate chat, other-language callable
+coverage and real-model acceptance remain independent gates.
 
 New operation/metadata probes pass with GCC and Clang. They exercise compiled C
 ABI transport, actual native metadata functions, allocated-buffer ownership,

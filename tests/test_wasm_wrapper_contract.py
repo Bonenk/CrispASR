@@ -1,5 +1,6 @@
 """Actual Embind result/task adapters, compiled into a tiny WASM module."""
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,9 +17,12 @@ SHIM=r'''
 static crispasr_session* g_tts_session=(crispasr_session*)1;
 #include "session_results.h"
 #include "session_tasks.h"
+#include "session_utilities.h"
 extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
 extern "C" int probe_invalid_frees(void);
+extern "C" void probe_utility_mode(int);
+extern "C" int probe_utility_live(void);
 static emscripten::val read_result(bool seconds) {
     binding_check_reentry();float p[]={1,3,5};auto r=crispasr_session_transcribe(g_tts_session,p,3);
     auto owned=binding_copy_segments(r);crispasr_session_result_free(r);
@@ -26,6 +30,9 @@ static emscripten::val read_result(bool seconds) {
 }
 EMSCRIPTEN_BINDINGS(wrapper_probe) {
     binding_register_session_tasks();
+    binding_register_utilities();
+    emscripten::function("utilityMode",&probe_utility_mode);
+    emscripten::function("utilityLive",&probe_utility_live);
     emscripten::function("readResult",&read_result);
     emscripten::function("probeMode",&probe_mode);
     emscripten::function("probeLive",&probe_live);
@@ -51,6 +58,16 @@ require(process.argv[2])().then(m=>{
  eq(result.failed,false);eq(result.status,0);eq(chunks.length,2);eq(chunks[0][0][0],0.25);eq(chunks[1][0][0],0.75);eq(chunks[1][1],true);
  const error=new Error('sentinel');result=m.sessionSynthesizeStreaming('test',()=>{throw error});eq(result.failed,true);eq(result.error,error);
  result=m.sessionSynthesizeStreaming('test',()=>m.readResult(true));eq(result.failed,true);eq(result.error.message.includes('re-entry'),true);
+ eq(m.audioLoad('x',24000).sampleRate,24000);eq(Array.from(m.audioLoad('x',16000).samples),[.25,.5,.75]);
+ eq(m.audioLoadStereo('x').sourceChannels,2);m.utilityMode(3);eq(m.audioLoadStereo('x').sourceChannels,1);
+ eq(m.audioResample(pcm,16000,24000)[0],.25);m.utilityMode(2);
+ rejects(()=>m.audioLoad('x',16000));rejects(()=>m.audioLoadStereo('x'));rejects(()=>m.audioResample(pcm,16000,24000));eq(m.utilityLive(),0);m.utilityMode(0);
+ eq(m.backendCapabilities('foo'),'asr,tts');eq(m.allBackendCapabilities().includes('foo'),true);eq(m.cApiVersion(),'probe');
+ let processor=new m.TextProcessor('x',1);eq(processor.process('text'),'Grüße');processor.close();rejects(()=>processor.process('text'));processor.delete();
+ processor=new m.TextProcessor('x',2);eq(processor.process('text'),'Hello.');processor.delete();
+ eq(m.sessionScoreTexts(pcm,['one','two'],'','').tokenCounts[1],3);eq(m.sessionSetPcmSampleRate(16000),0);eq(m.sessionSetGrammarStrict(true),0);
+ const stem=m.sessionSeparate(new Float32Array([1,2,3,4,5,6]))[0];eq(stem.name,'voice');eq(stem.samples.length,6);eq(stem.sampleRate,44100);
+ eq(m.watermarkDetect(pcm),.75);eq(m.utilityLive(),0);
  eq(m.probeLive(),0);eq(m.probeInvalidFrees(),0);
  console.log('PASS WASM ABI: '+n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
@@ -61,14 +78,30 @@ class WasmWrapperContract(unittest.TestCase):
     def test_owned_metadata_music_conversion_and_stream_callbacks(self):
         with tempfile.TemporaryDirectory(prefix='wasm-wrapper-abi-') as tmp:
             tmp=Path(tmp);objects=[]
-            for name in ['python-wrapper-abi','wrapper-session-metadata']:
+            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities']:
                 obj=tmp/(name+'.o');objects.append(str(obj))
-                subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
+                subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
+            # Unexercised registration dependencies abort if accidentally called.
+            # Concrete public-header probes supply every operation asserted below.
+            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities']
+            concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h'])
+            headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
+            headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
+            unused=[]
+            for name in sorted(set(re.findall(r'\b(crispasr_\w+)\s*\(',adapters))):
+                if re.search(r'\b'+name+r'\s*\([^;]*?\)\s*\{',concrete,re.S):
+                    continue
+                declaration=re.search(r'CRISPASR_(?:SESSION_)?API\s+([\w\s*]+?\b'+name+r'\s*\([^;]*);',headers,re.S)
+                if not declaration:raise AssertionError('No public declaration for '+name)
+                unused.append(declaration.group(1)+' { abort(); }')
+            stubs=tmp/'unused.c';stubs.write_text('#include "crispasr.h"\n#include "crispasr_session.h"\n#include <stdlib.h>\n'+'\n'.join(unused))
+            obj=tmp/'unused.o';subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(stubs),'-o',str(obj)],check=True);objects.append(str(obj))
             source=tmp/'probe.cpp';source.write_text(SHIM)
             module=tmp/'probe.js'
             subprocess.run([EMXX,'-std=c++17','-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0','--bind','-sSINGLE_FILE=1',
                 '-sMODULARIZE=1','-sENVIRONMENT=node','-sALLOW_MEMORY_GROWTH=1','-I'+str(ROOT/'include'),
-                '-I'+str(ROOT/'bindings/javascript'),str(source),*objects,'-o',str(module)],check=True)
+                '-I'+str(ROOT/'ggml/include'),'-I'+str(ROOT/'bindings/javascript'),str(source),*objects,'-o',str(module)],check=True)
             program=tmp/'test.cjs';program.write_text(PROGRAM)
             result=subprocess.run([NODE,str(program),str(module)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

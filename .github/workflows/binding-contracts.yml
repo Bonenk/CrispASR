@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'bindings/**'
+      - 'flutter/crispasr/**'
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
       - 'tools/run-wrapper-contract.py'
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - 'bindings/**'
+      - 'flutter/crispasr/**'
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
       - 'tools/run-wrapper-contract.py'
@@ -32,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [csharp, java, ruby, wasm]
+        language: [csharp, java, ruby, dart, wasm]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -54,6 +56,10 @@ jobs:
         run: |
           curl --fail --retry 3 --location https://repo.maven.apache.org/maven2/net/java/dev/jna/jna/5.13.0/jna-5.13.0.jar --output "$RUNNER_TEMP/jna.jar"
           echo "CRISPASR_JNA_JAR=$RUNNER_TEMP/jna.jar" >> "$GITHUB_ENV"
+      - uses: dart-lang/setup-dart@v1
+        if: matrix.language == 'dart'
+        with:
+          sdk: '3.12.1'
       - uses: ruby/setup-ruby@v1
         if: matrix.language == 'ruby'
         with:

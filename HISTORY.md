@@ -1,3 +1,34 @@
+## WASM auxiliary transport — 2026-10-18
+
+Added audio loading/resampling with RAII cleanup and stereo alias handling,
+truecase/PCS processors, capabilities/runtime/GPU queries, watermark helpers,
+session backend/configuration/scoring, raw streamed-token/shared-segment polling
+and stereo separation results. The actual Embind suite now passes 56 assertions
+with concrete header-checked probes. Unexercised registration dependencies use
+aborting stubs and provide no acceptance evidence. Full library/browser/model
+acceptance and chat/platform integration remain in PLAN.md.
+
+## Dart session/task/utility repairs and C# chat — 2026-10-18
+
+Dart now exposes owned shared token bytes and alternatives across normal,
+chunked, VAD, logits and drained results. Added raw streamed-token polling,
+missing-time availability, chords/tab/conversion, PCM references, CFG scale,
+TADA/disclosure and synchronous sentence callbacks. All session native calls
+reject callback re-entry. Audio helpers free partial error allocations and
+aliased stereo buffers safely; container lengths use native unsigned size_t.
+Both unified and legacy Dart streaming handles retain their owner; parents
+close children before releasing native model state. The native probes compile
+in unique temporary directories, including a true older-library process. Strict analyzer passes and 32 actual FFI tests pass.
+
+Added the missing C# text-chat surface for all 14 header functions: native
+option defaults, messages/stop arrays, one-shot and raw streamed generation,
+context/template/token/memory queries, cancellation, abort callback, reset,
+disclosure and disposal. Callback failures are deferred past native frames;
+re-entry/close is rejected. Twenty-six new .NET/native assertions cover bool/
+size_t struct layouts, UTF-8 transport, cancellation, callbacks and cleanup.
+Together with the earlier suites, C# has 118 model-free assertions. Native model
+acceptance remains pending; these checks do not prove full wrapper parity.
+
 ## Java/C# audio and utility expansion; stream lifetime — 2026-10-18
 
 Added mono/native-rate/stereo loading, in-memory resampling, binary WAV/C2PA

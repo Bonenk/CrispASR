@@ -7,7 +7,7 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = {'csharp': 'test_csharp_wrapper_contract.py', 'java': 'test_java_wrapper_contract.py',
+TESTS = {'dart': 'test_dart_wrapper_contract.py', 'csharp': 'test_csharp_wrapper_contract.py', 'java': 'test_java_wrapper_contract.py',
          'ruby': 'test_ruby_wrapper_contract.py', 'wasm': 'test_wasm_wrapper_contract.py'}
 
 

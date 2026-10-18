@@ -40,6 +40,7 @@ HEADER = os.path.join(REPO, "include", "crispasr_chat.h")
 # split across files (Java: a JNA interface plus the session wrapper) may
 # satisfy a symbol from any of them.
 BINDINGS: dict[str, list[str]] = {
+    "csharp": ["bindings/csharp/CrispASR/ChatSession.cs"],
     "python": ["python/crispasr/_binding.py"],
     "go": ["bindings/go/chat.go"],
     "rust": ["crispasr-sys/src/lib.rs"],
