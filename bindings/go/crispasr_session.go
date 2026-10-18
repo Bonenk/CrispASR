@@ -2762,11 +2762,17 @@ func TitaNetInit(modelPath string, nThreads int) (*TitaNetContext, error) {
 
 // Embed extracts a 192-d speaker embedding from 16 kHz mono PCM.
 func (t *TitaNetContext) Embed(pcm16k []float32) ([]float32, error) {
+	if t == nil || t.handle == nil {
+		return nil, errors.New("TitaNet context is closed")
+	}
+	if len(pcm16k) == 0 {
+		return nil, errors.New("nonempty PCM required")
+	}
 	out := make([]float32, 192)
 	dim := C.crispasr_titanet_embed(t.handle,
 		(*C.float)(unsafe.Pointer(&pcm16k[0])), C.int(len(pcm16k)),
 		(*C.float)(unsafe.Pointer(&out[0])))
-	if dim <= 0 {
+	if dim != 192 {
 		return nil, fmt.Errorf("titanet_embed failed")
 	}
 	return out[:int(dim)], nil
@@ -2782,14 +2788,13 @@ func (t *TitaNetContext) Close() {
 
 // TitaNetCosineSim returns the cosine similarity between two embeddings.
 func TitaNetCosineSim(a, b []float32) float32 {
-	dim := len(a)
-	if len(b) < dim {
-		dim = len(b)
+	if len(a) != len(b) {
+		panic("TitaNet embeddings must have matching dimensions")
 	}
-	return float32(C.crispasr_titanet_cosine_sim(
-		(*C.float)(unsafe.Pointer(&a[0])),
-		(*C.float)(unsafe.Pointer(&b[0])),
-		C.int(dim)))
+	if len(a) == 0 {
+		return 0
+	}
+	return float32(C.crispasr_titanet_cosine_sim((*C.float)(unsafe.Pointer(&a[0])), (*C.float)(unsafe.Pointer(&b[0])), C.int(len(a))))
 }
 
 // ---------------------------------------------------------------------------

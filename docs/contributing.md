@@ -608,6 +608,20 @@ timestamp availability, allocated-buffer cleanup, replay-noise bounds and
 callback errors need behavioral assertions. Counting native declarations or
 constructing an output struct does not establish wrapper coverage.
 
+Return conventions belong to each function. For example,
+`crispasr_titanet_embed` succeeds with **192 floats written** and fails with zero;
+`crispasr_speaker_embedder_embed_abi` succeeds with **1**. Treating either as a
+zero-success API breaks valid calls. Check the native implementation and test
+successful data, errors and malformed counts separately.
+
+Ruby callbacks must use stable native buffers when calling code that can run
+`GC.compact`. A rooted Ruby String does not guarantee a stable data pointer.
+The chat adapter uses Ruby-owned data payloads for messages/strings/stop arrays,
+a session-keyed rooted Proc map, and Ruby thread/fiber storage for deferred
+exceptions. Do not hide a movable Proc VALUE in C userdata or keep an unmarked
+VALUE in C thread-local storage. Every Ruby allocation/dispatch from a native
+callback needs protection; rethrow only after freeing native results.
+
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.
 Keep both public header inventories and the separate chat API in the audit.

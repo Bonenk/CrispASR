@@ -339,4 +339,20 @@ class CSharpParakeetContract(unittest.TestCase):
             self.assertIn('PASS C# legacy Parakeet:',result.stdout);print(result.stdout.strip())
 
 
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('c++'), '.NET SDK and C++ compiler required')
+class CSharpTitaNetContract(unittest.TestCase):
+    def test_titanet_success_count_failure_and_disposal(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-titanet-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text((ROOT/'tests/fixtures/csharp-titanet-program.cs').read_text())
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-titanet-legacy.c'),'-o',str(path/'libcrispasr.so')],check=True)
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS C# TitaNet:',result.stdout);print(result.stdout.strip())
+
+
 if __name__=='__main__': unittest.main()

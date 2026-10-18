@@ -191,3 +191,8 @@ to close all of its child streams.
 tokens before freeing the native result. `Transcribe(pcm, offsetSeconds: 1.23)`
 converts the offset to native centiseconds. It has no language parameter; use
 `Session` when selecting language hints.
+
+`TitaNet.Embed` returns an owned 192-float vector. Native success reports the
+number of floats written, not a zero status. The binding rejects other counts
+and calls after disposal. Similarity helpers expect embeddings already
+normalized to unit L2 length by TitaNet.

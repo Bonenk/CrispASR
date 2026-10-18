@@ -3,7 +3,7 @@
 //! All returned native views are copied before the next native call can replace session-owned storage.
 
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_float, c_int};
+use std::os::raw::{c_char, c_float, c_int, c_void};
 
 use crate::Session;
 
@@ -965,4 +965,49 @@ pub fn dart_helpers_version() -> String {
         return String::new();
     }
     unsafe { CStr::from_ptr(ptr).to_string_lossy().into_owned() }
+}
+
+/// Direct TitaNet speaker embedding context; embeddings are 192-dimensional.
+/// Requires external synchronization when moving it between threads.
+pub struct TitaNet {
+    handle: *mut c_void,
+}
+unsafe impl Send for TitaNet {}
+impl TitaNet {
+    pub fn new(model: &str, threads: i32) -> Result<Self, String> {
+        let model = CString::new(model).map_err(|e| e.to_string())?;
+        let handle = unsafe { crispasr_sys::crispasr_titanet_init(model.as_ptr(), threads) };
+        if handle.is_null() {
+            return Err("TitaNet model could not open".into());
+        }
+        Ok(Self { handle })
+    }
+    pub fn embed(&self, pcm: &[f32]) -> Result<Vec<f32>, String> {
+        if pcm.is_empty() {
+            return Err("Nonempty PCM required".into());
+        }
+        let n = c_int::try_from(pcm.len()).map_err(|_| "PCM exceeds native count range")?;
+        let mut output = vec![0.0; 192];
+        let dim = unsafe {
+            crispasr_sys::crispasr_titanet_embed(self.handle, pcm.as_ptr(), n, output.as_mut_ptr())
+        };
+        if dim != 192 {
+            return Err(format!("TitaNet must return 192 floats (got {dim})"));
+        }
+        Ok(output)
+    }
+    /// Dot product for embeddings normalized to unit L2 length by TitaNet.
+    pub fn cosine_sim(a: &[f32], b: &[f32]) -> Result<f32, String> {
+        if a.len() != b.len() {
+            return Err("Embedding dimensions must match".into());
+        }
+        let dim =
+            c_int::try_from(a.len()).map_err(|_| "Embedding dimension exceeds native range")?;
+        Ok(unsafe { crispasr_sys::crispasr_titanet_cosine_sim(a.as_ptr(), b.as_ptr(), dim) })
+    }
+}
+impl Drop for TitaNet {
+    fn drop(&mut self) {
+        unsafe { crispasr_sys::crispasr_titanet_free(self.handle) };
+    }
 }

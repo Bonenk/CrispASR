@@ -1213,9 +1213,12 @@ namespace CrispASR
         /// <summary>Compute a 192-dim speaker embedding from 16 kHz mono PCM.</summary>
         public float[] Embed(float[] pcm16k)
         {
+            ArgumentNullException.ThrowIfNull(pcm16k);
+            if(_handle==IntPtr.Zero)throw new ObjectDisposedException(nameof(TitaNet));
+            if(pcm16k.Length==0)throw new ArgumentException("Nonempty PCM required");
             var emb = new float[EmbeddingDim];
             int rc = NativeMethods.crispasr_titanet_embed(_handle, pcm16k, pcm16k.Length, emb);
-            if (rc != 0) throw new InvalidOperationException($"titanet_embed failed (rc={rc})");
+            if (rc != EmbeddingDim) throw new InvalidOperationException($"titanet_embed failed (rc={rc})");
             return emb;
         }
 

@@ -1705,14 +1705,32 @@ static VALUE rb_registry_list_backends(VALUE self) {
     return rb_utf8_str_new_cstr(buf);
 }
 
+// Explicitly owned direct-context handles reject closed/foreign pointers.
+static VALUE rb_parakeet_handles = Qnil, rb_titanet_handles = Qnil;
+static VALUE rb_direct_context_map(VALUE* map) {
+    if (*map == Qnil) {
+        *map = rb_hash_new();
+        rb_global_variable(map);
+    }
+    return *map;
+}
+static void rb_direct_context_check(VALUE map, VALUE handle) {
+    if (map == Qnil || NIL_P(rb_hash_aref(map, handle)))
+        rb_raise(rb_eRuntimeError, "Native context is closed");
+}
 // --- Parakeet direct API ---
 static VALUE rb_parakeet_init(VALUE self, VALUE model_path, VALUE n_threads, VALUE use_flash) {
+    VALUE live = rb_direct_context_map(&rb_parakeet_handles);
     void* h = crispasr_parakeet_init(StringValueCStr(model_path), NUM2INT(n_threads), RTEST(use_flash) ? 1 : 0);
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_parakeet_init failed");
-    return ULL2NUM((uintptr_t)h);
+    VALUE key = ULL2NUM((uintptr_t)h);
+    rb_hash_aset(live, key, Qtrue);
+    return key;
 }
 static VALUE rb_parakeet_free(VALUE self, VALUE handle) {
+    if (rb_parakeet_handles == Qnil || NIL_P(rb_hash_delete(rb_parakeet_handles, handle)))
+        return Qnil;
     void* h = (void*)NUM2ULL(handle);
     if (h)
         crispasr_parakeet_free(h);
@@ -1746,6 +1764,7 @@ static VALUE rb_parakeet_copy_result(VALUE raw) {
     return hash;
 }
 static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VALUE language) {
+    rb_direct_context_check(rb_parakeet_handles, handle);
     void* h = (void*)(uintptr_t)NUM2ULL(handle);
     if (!h)
         rb_raise(rb_eRuntimeError, "Parakeet context is closed");
@@ -1772,27 +1791,33 @@ static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VAL
 
 // --- TitaNet ---
 static VALUE rb_titanet_init(VALUE self, VALUE model_path, VALUE n_threads) {
+    VALUE live = rb_direct_context_map(&rb_titanet_handles);
     void* h = crispasr_titanet_init(StringValueCStr(model_path), NUM2INT(n_threads));
     if (!h)
         rb_raise(rb_eRuntimeError, "crispasr_titanet_init failed");
-    return ULL2NUM((uintptr_t)h);
+    VALUE key = ULL2NUM((uintptr_t)h);
+    rb_hash_aset(live, key, Qtrue);
+    return key;
 }
 static VALUE rb_titanet_free(VALUE self, VALUE handle) {
+    if (rb_titanet_handles == Qnil || NIL_P(rb_hash_delete(rb_titanet_handles, handle)))
+        return Qnil;
     void* h = (void*)NUM2ULL(handle);
     if (h)
         crispasr_titanet_free(h);
     return Qnil;
 }
 static VALUE rb_titanet_embed(VALUE self, VALUE handle, VALUE pcm_arr) {
-    void* h = (void*)NUM2ULL(handle);
+    rb_direct_context_check(rb_titanet_handles, handle);
+    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    VALUE storage = rb_aux_pcm_storage(pcm_arr);
     long n = RARRAY_LEN(pcm_arr);
-    float* pcm = (float*)calloc(n > 0 ? n : 1, sizeof(float));
-    for (long i = 0; i < n; i++)
-        pcm[i] = (float)NUM2DBL(rb_ary_entry(pcm_arr, i));
+    if (!n)
+        rb_raise(rb_eArgError, "Nonempty PCM required");
     float out[192];
-    int32_t dim = crispasr_titanet_embed(h, pcm, (int32_t)n, out);
-    free(pcm);
-    if (dim <= 0)
+    int32_t dim = crispasr_titanet_embed(h, (float*)RSTRING_PTR(storage), (int32_t)n, out);
+    RB_GC_GUARD(storage);
+    if (dim != 192)
         rb_raise(rb_eRuntimeError, "titanet_embed failed");
     VALUE result = rb_ary_new_capa(dim);
     for (int i = 0; i < dim; i++)

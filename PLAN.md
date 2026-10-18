@@ -22,21 +22,21 @@ Validated implementation checkpoint (model-free ABI transport):
 - Python now inventories **297** functions across both shared headers: 292
   bound, three equivalents/compiled adapters and two retired stubs. Native
   pointer initialization/inference works without a separate helper library.
-- C# has **211 assertions**: core/old-library 69, utilities 23, chat 26,
+- C# has **225 assertions**: core/old-library 69, utilities 23, chat 26,
   registry/open-options/embedder/clustering/cache/LID/VAD/diarization 40, and
-  legacy Whisper 35 and legacy Parakeet 18. `WhisperContext` copies tokens/raw bytes/alternatives/DTW
+  legacy Whisper 35, legacy Parakeet 18 and TitaNet 14. `WhisperContext` copies tokens/raw bytes/alternatives/DTW
   times and retains native parameter strings. New real-library registry/bool
   smoke is registered with the existing required-live C# suite; hosted result
   remains pending.
-- Java has **164 assertions** (63 core, six older-library, 95 auxiliary/Parakeet).
+- Java has **172 assertions** (63 core, six older-library, 103 auxiliary/legacy).
   `CrispasrAuxiliary` provides usable registry/cache, session options,
   speaker/embedder/clustering, pyannote/diarization, text-LID and VAD slices.
   Kokoro bool exports use byte-sized returns instead of JNA boolean32.
-- Dart strict analyzer and **34 FFI tests** pass. Legacy Whisper now rejects
+- Dart strict analyzer and **35 FFI tests** pass. Legacy Whisper now rejects
   unsafe by-value fallbacks, frees context/default decode parameters and
   supports DTW and pointer-safe parallel decoding. Split token fragments use
   replacement for display; native byte-preserving session tokens remain owned.
-- WASM has **115 Embind/Node assertions**: 76 operation/result/utility/analysis
+- WASM has **122 Embind/Node assertions**: 83 operation/result/utility/analysis
   and 39 chat. Added measured character alignment and VAD spans/slices with
   cleanup even on partial native errors. Chat is opt-in and currently requires
   `CRISPASR_WASM_SINGLE_THREAD=ON`; the default bundle reports unavailable.
@@ -44,7 +44,7 @@ Validated implementation checkpoint (model-free ABI transport):
 - Ruby auxiliary changes were reviewed beyond their initial passing probe.
   Removed a dummy diarization implementation, made options real, fixed ignored
   chat options/string keys, callback re-entry, audio error leaks/stereo aliases,
-  and restricted direct callback-test entry points to probe builds. **166
+  and restricted direct callback-test entry points to probe builds. **175
   assertions** now include native struct/argument checks, actual speaker turns,
   changed chat context/sampler options, GC during callbacks and audio errors.
   This does not certify every legacy Ruby wrapper or every allocation path.
@@ -54,7 +54,7 @@ Validated implementation checkpoint (model-free ABI transport):
 setters, token and parallel adapters against the actual Whisper structs. They
 prove pointer layout, DTW, retained UTF-8 strings and cleanup, not ASR accuracy.
 
-Go/Rust now pass **23 Go tests, 20 Rust tests and five Rust doctests**.
+Go/Rust now pass **24 Go tests, 21 Rust tests and five Rust doctests**.
 New music/conversion/TTS/audio/metadata implementations and typed ASR callbacks
 are exercised through isolated header-checked probes. Callback roots survive
 native calls; panic errors are deferred until results are freed. Go rejects
@@ -71,6 +71,16 @@ raise instead of pretending to be native parameters. Added usable direct
 Parakeet classes to C#/Java/WASM and raw fragment access where needed. A shared
 real-header fixture checks default/123 offsets, missing timing, split bytes,
 owned results and closed contexts in applicable wrappers.
+
+TitaNet return-count audit: a compiled probe was observed failing in C# on
+native success (`rc=192`). C# now requires the documented 192 floats rather
+than zero; Python/Go/Ruby/Dart reject short/oversized counts and closed/empty
+inputs. Added callable TitaNet classes to Java/Rust/WASM; all eight wrappers
+now have a real path to this family. The native similarity helper is a dot
+product for TitaNet's L2-normalized embeddings; no normalization formula was
+changed. Ruby direct TitaNet/Parakeet ownership maps reject closed handles and
+make repeated close harmless. Dart DTW reads now validate both index bounds.
+These are transport checks; actual speaker accuracy still needs model fixtures.
 
 The exhaustive callable inventory remains open: **297 shared-header functions
 plus 14 chat functions**, mapped to actual public methods/results in all eight

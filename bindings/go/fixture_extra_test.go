@@ -799,3 +799,37 @@ func TestProbeParakeetIntegerOffset(t *testing.T) {
 		t.Fatal("closed context entered native")
 	}
 }
+
+func TestProbeTitaNetFloatCountAndClosedContext(t *testing.T) {
+	probeTitaNetMode(0)
+	ctx, err := TitaNetInit("probe", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pcm := []float32{1, 3, 5}
+	out, err := ctx.Embed(pcm)
+	if err != nil || len(out) != 192 || out[0] != 1 {
+		t.Fatalf("TitaNet transport: %v %v", out, err)
+	}
+	for _, mode := range []int{2, 3, 4} {
+		probeTitaNetMode(mode)
+		if _, err = ctx.Embed(pcm); err == nil {
+			t.Fatal("bad native count accepted", mode)
+		}
+	}
+	probeTitaNetMode(0)
+	if _, err = ctx.Embed(nil); err == nil {
+		t.Fatal("empty PCM accepted")
+	}
+	ctx.Close()
+	ctx.Close()
+	if probeTitaNetLive() != 0 {
+		t.Fatal("TitaNet leaked")
+	}
+	if _, err = ctx.Embed(pcm); err == nil {
+		t.Fatal("closed context accepted")
+	}
+	if TitaNetCosineSim(nil, nil) != 0 {
+		t.Fatal("empty cosine")
+	}
+}

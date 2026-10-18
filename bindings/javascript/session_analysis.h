@@ -73,8 +73,53 @@ public:
         return out;
     }
 };
+class BindingTitaNet {
+    void* handle = nullptr;
+
+public:
+    BindingTitaNet(const std::string& model, int threads) {
+        binding_check_reentry();
+        handle = crispasr_titanet_init(model.c_str(), threads);
+        if (!handle)
+            throw std::runtime_error("TitaNet model could not open");
+    }
+    BindingTitaNet(const BindingTitaNet&) = delete;
+    ~BindingTitaNet() {
+        if (handle)
+            crispasr_titanet_free(handle);
+    }
+    void close() {
+        binding_check_reentry();
+        if (handle) {
+            crispasr_titanet_free(handle);
+            handle = nullptr;
+        }
+    }
+    emscripten::val embed(const emscripten::val& audio) {
+        binding_check_reentry();
+        if (!handle)
+            throw std::runtime_error("TitaNet context is closed");
+        auto pcm = binding_pcm(audio);
+        std::vector<float> output(192);
+        int n = crispasr_titanet_embed(handle, pcm.data(), pcm.size(), output.data());
+        if (n != 192)
+            throw std::runtime_error("TitaNet must return 192 floats");
+        return binding_floats(output.data(), output.size());
+    }
+};
 static void binding_register_analysis() {
     using namespace emscripten;
+    class_<BindingTitaNet>("TitaNet")
+        .constructor<const std::string&, int>()
+        .function("embed", &BindingTitaNet::embed)
+        .function("close", &BindingTitaNet::close);
+    function("titanetCosineSimilarity", optional_override([](const val& left, const val& right) {
+                 binding_check_reentry();
+                 auto a = binding_pcm(left, true), b = binding_pcm(right, true);
+                 if (a.size() != b.size())
+                     throw std::invalid_argument("Embedding dimensions must match");
+                 return crispasr_titanet_cosine_sim(a.data(), b.data(), a.size());
+             }));
     class_<BindingParakeet>("ParakeetContext")
         .constructor<const std::string&, int, bool>()
         .function("transcribe", &BindingParakeet::transcribe)

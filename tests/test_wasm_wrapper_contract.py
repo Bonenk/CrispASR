@@ -23,6 +23,8 @@ extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
 extern "C" int probe_analysis_live(void);
 extern "C" void probe_analysis_mode(int);
+extern "C" void probe_titanet_mode(int);
+extern "C" int probe_titanet_live(void);
 extern "C" int probe_invalid_frees(void);
 extern "C" void probe_utility_mode(int);
 extern "C" int probe_utility_live(void);
@@ -35,6 +37,8 @@ EMSCRIPTEN_BINDINGS(wrapper_probe) {
     binding_register_session_tasks();
     binding_register_utilities();
     binding_register_analysis();
+    emscripten::function("titanetMode",&probe_titanet_mode);
+    emscripten::function("titanetLive",&probe_titanet_live);
     emscripten::function("analysisLive",&probe_analysis_live);
     emscripten::function("analysisMode",&probe_analysis_mode);
     emscripten::function("utilityMode",&probe_utility_mode);
@@ -75,6 +79,8 @@ require(process.argv[2])().then(m=>{
  const stem=m.sessionSeparate(new Float32Array([1,2,3,4,5,6]))[0];eq(stem.name,'voice');eq(stem.samples.length,6);eq(stem.sampleRate,44100);
  eq(m.watermarkDetect(pcm),.75);eq(m.utilityLive(),0);
  const pk=new m.ParakeetContext('probe',4,true);const pkResult=pk.transcribe(pcm,123);eq(pkResult.text,'日本語');eq(pkResult.words[0].t0,223);eq(pkResult.tokens[0].t0,-1);eq(Array.from(pkResult.tokens[0].rawText),[0xe6,0x97]);pk.close();pk.close();rejects(()=>pk.transcribe(pcm,0));pk.delete();
+ const titan=new m.TitaNet('probe',4);eq(titan.embed(pcm).length,192);eq(titan.embed(pcm)[0],1);
+ for(const mode of [2,3,4]){m.titanetMode(mode);rejects(()=>titan.embed(pcm));}m.titanetMode(0);titan.close();titan.close();rejects(()=>titan.embed(pcm));titan.delete();eq(m.titanetLive(),0);
  const alignment=m.alignWords(pcm,'model','日本語',123,4);eq(alignment[0].text,'日本語');eq(alignment[0].t0,123);eq(alignment[0].characters[1].text,'本');eq(alignment[0].characters[1].t1,165);eq(m.analysisLive(),0);
  eq(m.vadSpans(pcm,'vad',16000,.5,250,100,4,false)[0].start,1.25);eq(m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4)[0].end,2.5);eq(m.analysisLive(),0);
  m.analysisMode(1);eq(m.alignWords(pcm,'model','日本語',123,4).length,0);eq(m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4).length,0);eq(m.analysisLive(),0);
@@ -89,12 +95,12 @@ class WasmWrapperContract(unittest.TestCase):
     def test_owned_metadata_music_conversion_and_stream_callbacks(self):
         with tempfile.TemporaryDirectory(prefix='wasm-wrapper-abi-') as tmp:
             tmp=Path(tmp);objects=[]
-            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy']:
+            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy']:
                 obj=tmp/(name+'.o');objects.append(str(obj))
                 subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
             # Unexercised registration dependencies abort if accidentally called.
             # Concrete public-header probes supply every operation asserted below.
-            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy']
+            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
             adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h','session_analysis.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])

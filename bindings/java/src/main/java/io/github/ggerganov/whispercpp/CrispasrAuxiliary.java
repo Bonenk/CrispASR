@@ -775,4 +775,39 @@ public final class CrispasrAuxiliary {
       this.tokens = tokens;
     }
   }
+
+  /** Direct TitaNet model. Native embed returns a float count, exactly 192. */
+  public static final class TitaNet implements AutoCloseable {
+    private Pointer handle;
+    public TitaNet(String model, int threads) {
+      handle = CrispasrSession.Lib.INSTANCE.crispasr_titanet_init(Objects.requireNonNull(model), threads);
+      if (handle == null)
+        throw new IllegalStateException("TitaNet model could not open");
+    }
+    public synchronized float[] embed(float[] pcm) {
+      Objects.requireNonNull(pcm);
+      if (handle == null)
+        throw new IllegalStateException("TitaNet context closed");
+      if (pcm.length == 0)
+        throw new IllegalArgumentException("Nonempty PCM required");
+      float[] output = new float[192];
+      int n = CrispasrSession.Lib.INSTANCE.crispasr_titanet_embed(handle, pcm, pcm.length, output);
+      if (n != 192)
+        throw new IllegalStateException("TitaNet must return 192 floats (got " + n + ")");
+      return output;
+    }
+    public static float cosineSimilarity(float[] a, float[] b) {
+      Objects.requireNonNull(a);
+      Objects.requireNonNull(b);
+      if (a.length != b.length)
+        throw new IllegalArgumentException("Embedding dimensions must match");
+      return CrispasrSession.Lib.INSTANCE.crispasr_titanet_cosine_sim(a, b, a.length);
+    }
+    public synchronized void close() {
+      if (handle != null) {
+        CrispasrSession.Lib.INSTANCE.crispasr_titanet_free(handle);
+        handle = null;
+      }
+    }
+  }
 }

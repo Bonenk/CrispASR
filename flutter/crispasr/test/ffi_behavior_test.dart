@@ -195,6 +195,7 @@ void main() {
     expect(resultSegments.single.words.first.text,contains('�'));
     expect(resultSegments.single.words.first.alts.single.text,'alternative');
     expect(model.tokenDtwTime(0,0),1.4);
+    expect(()=>model.tokenDtwTime(1,0),throwsRangeError);expect(()=>model.tokenDtwTime(0,2),throwsRangeError);
     mode(2);expect(() => model.transcribePcm(Float32List.fromList([1,3,5]),options:opts),throwsException);expect(live(),0);
     mode(3);expect(() => model.transcribePcm(Float32List.fromList([1,3,5]),options:opts),throwsStateError);expect(live(),0);mode(0);
     model.dispose();expect(contexts(),0);
@@ -211,6 +212,16 @@ void main() {
     expect(()=>ctx.transcribe(Float32List.fromList([1,3,5]),language:'de'),throwsArgumentError);
     result.free();result.free();expect(()=>result.text,throwsStateError);ctx.close();ctx.close();expect(()=>ctx.transcribe(Float32List.fromList([1])),throwsStateError);
     final contexts=lib.lookupFunction<Int32 Function(),int Function()>('probe_parakeet_contexts');final results=lib.lookupFunction<Int32 Function(),int Function()>('probe_parakeet_results');expect(contexts(),0);expect(results(),0);
+  });
+
+  test('TitaNet float count, error counts and closed-context guards', () {
+    final tmp=Directory(_tmpDir()).createTempSync('dart-titanet-');addTearDown(()=>tmp.deleteSync(recursive:true));final path='${tmp.path}/titanet.so';final root=_repoRoot();
+    final cc=Process.runSync('cc',['-shared','-fPIC','-Werror','-I$root/include','$root/tests/fixtures/wrapper-titanet-legacy.c','-o',path]);expect(cc.exitCode,0,reason:'${cc.stderr}');
+    final lib=DynamicLibrary.open(path);final mode=lib.lookupFunction<Void Function(Int32),void Function(int)>('probe_titanet_mode');final live=lib.lookupFunction<Int32 Function(),int Function()>('probe_titanet_live');
+    final ctx=CrispasrTitaNet(lib,'probe');final pcm=Float32List.fromList([1,3,5]);final result=ctx.embed(pcm);expect(result.length,192);expect(result[0],1);
+    for(final m in [2,3,4]){mode(m);expect(()=>ctx.embed(pcm),throwsStateError);}mode(0);
+    expect(()=>ctx.embed(Float32List(0)),throwsArgumentError);expect(()=>CrispasrTitaNet.cosineSim(lib,Float32List(1),Float32List(2)),throwsArgumentError);
+    expect(CrispasrTitaNet.cosineSim(lib,Float32List(0),Float32List(0)),0);ctx.close();ctx.close();expect(live(),0);expect(()=>ctx.embed(pcm),throwsStateError);
   });
 
   // Ensure probes compile

@@ -2171,7 +2171,10 @@ class CrispASR {
   /// Native DTW timestamp in seconds, or -1 when unavailable.
   double tokenDtwTime(int segment, int token) {
     _checkDisposed();
-    if (segment < 0 || token < 0) throw ArgumentError('negative token index');
+    if (segment < 0 || segment >= _nSegments(_ctx)) throw RangeError('Segment index out of range');
+    final nTokens = _fullNTokens;
+    if (nTokens == null) throw UnsupportedError('Native token counts unavailable');
+    if (token < 0 || token >= nTokens(_ctx, segment)) throw RangeError('Token index out of range');
     if (!_lib.providesSymbol('crispasr_token_dtw_t')) return -1;
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32, Int32),
         int Function(Pointer<Void>, int, int)>('crispasr_token_dtw_t');
@@ -6523,39 +6526,30 @@ class CrispasrTitaNet {
 
   /// Extract 192-d speaker embedding from 16 kHz mono float32 PCM.
   Float32List embed(Float32List pcm16k) {
-    final embedFn = _lib.lookupFunction<
-        Int32 Function(Pointer<Void>, Pointer<Float>, Int32, Pointer<Float>),
-        int Function(Pointer<Void>, Pointer<Float>, int,
-            Pointer<Float>)>('crispasr_titanet_embed');
-    final pcmPtr = malloc<Float>(pcm16k.length);
-    pcmPtr.asTypedList(pcm16k.length).setAll(0, pcm16k);
-    final outPtr = malloc<Float>(192);
-    final dim = embedFn(_handle, pcmPtr, pcm16k.length, outPtr);
-    malloc.free(pcmPtr);
-    if (dim <= 0) {
-      malloc.free(outPtr);
-      throw Exception('TitaNet embedding failed');
-    }
-    final result = Float32List.fromList(outPtr.asTypedList(dim));
-    malloc.free(outPtr);
-    return result;
+    if (_handle==nullptr) throw StateError('TitaNet context is closed');
+    if (pcm16k.isEmpty) throw ArgumentError('Nonempty PCM required');
+    final fn=_lib.lookupFunction<Int32 Function(Pointer<Void>,Pointer<Float>,Int32,Pointer<Float>),int Function(Pointer<Void>,Pointer<Float>,int,Pointer<Float>)>('crispasr_titanet_embed');
+    final pcmPtr=malloc<Float>(pcm16k.length);
+    try {
+      pcmPtr.asTypedList(pcm16k.length).setAll(0,pcm16k);final output=malloc<Float>(192);
+      try {
+        final dim=fn(_handle,pcmPtr,pcm16k.length,output);
+        if(dim!=192)throw StateError('TitaNet must return 192 floats (got $dim)');
+        return Float32List.fromList(output.asTypedList(192));
+      }finally{malloc.free(output);}
+    }finally{malloc.free(pcmPtr);}
   }
 
-  /// Cosine similarity between two embeddings.
-  static double cosineSim(DynamicLibrary lib, Float32List a, Float32List b) {
-    final fn = lib.lookupFunction<
-        Float Function(Pointer<Float>, Pointer<Float>, Int32),
-        double Function(Pointer<Float>, Pointer<Float>,
-            int)>('crispasr_titanet_cosine_sim');
-    final dim = a.length < b.length ? a.length : b.length;
-    final aPtr = malloc<Float>(dim);
-    aPtr.asTypedList(dim).setAll(0, a.sublist(0, dim));
-    final bPtr = malloc<Float>(dim);
-    bPtr.asTypedList(dim).setAll(0, b.sublist(0, dim));
-    final sim = fn(aPtr, bPtr, dim);
-    malloc.free(aPtr);
-    malloc.free(bPtr);
-    return sim;
+  /// Dot product for embeddings normalized to unit L2 length by TitaNet.
+  static double cosineSim(DynamicLibrary lib,Float32List a,Float32List b) {
+    if(a.length!=b.length)throw ArgumentError('Embedding dimensions must match');
+    if(a.isEmpty)return 0;
+    final fn=lib.lookupFunction<Float Function(Pointer<Float>,Pointer<Float>,Int32),double Function(Pointer<Float>,Pointer<Float>,int)>('crispasr_titanet_cosine_sim');
+    final ap=malloc<Float>(a.length);
+    try {
+      ap.asTypedList(a.length).setAll(0,a);final bp=malloc<Float>(b.length);
+      try{bp.asTypedList(b.length).setAll(0,b);return fn(ap,bp,a.length);}finally{malloc.free(bp);}
+    }finally{malloc.free(ap);}
   }
 
   void close() {

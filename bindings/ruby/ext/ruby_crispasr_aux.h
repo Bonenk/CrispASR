@@ -1175,7 +1175,8 @@ static void rb_chat_open_options(VALUE params, crispasr_chat_open_params* p) {
     if (!NIL_P(v))                                                                                                     \
         p->field = RTEST(v);
     RB_CHAT_OPEN_BOOL(use_mmap)
-    RB_CHAT_OPEN_BOOL(use_mlock) RB_CHAT_OPEN_BOOL(embeddings)
+    RB_CHAT_OPEN_BOOL(use_mlock)
+    RB_CHAT_OPEN_BOOL(embeddings)
 #undef RB_CHAT_OPEN_BOOL
         v = rb_chat_get_field(params, "chat_template");
     if (!NIL_P(v))
@@ -1422,6 +1423,15 @@ static VALUE rb_chat_ai_disclosure(VALUE self) {
 
 /* Test-only direct callback routing probes. */
 #ifdef CRISPASR_WRAPPER_PROBE
+extern void probe_titanet_mode(int);
+extern int probe_titanet_live(void);
+static VALUE rb_test_titanet_mode(VALUE self, VALUE mode) {
+    probe_titanet_mode(NUM2INT(mode));
+    return Qnil;
+}
+static VALUE rb_test_titanet_live(VALUE self) {
+    return INT2NUM(probe_titanet_live());
+}
 extern void probe_utility_mode(int);
 extern int probe_utility_live(void);
 static VALUE rb_test_audio_mode(VALUE self, VALUE mode) {
@@ -1522,6 +1532,8 @@ static void rb_aux_init(void) {
 #ifdef CRISPASR_WRAPPER_PROBE
     rb_define_singleton_method(mCrispASR, "test_audio_mode", rb_test_audio_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_audio_live", rb_test_audio_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_titanet_mode", rb_test_titanet_mode, 1);
+    rb_define_singleton_method(mCrispASR, "test_titanet_live", rb_test_titanet_live, 0);
     // Test helpers (routing verification)
     rb_define_singleton_method(mCrispASR, "test_invoke_progress", rb_test_invoke_progress, 1);
     rb_define_singleton_method(mCrispASR, "test_invoke_segment", rb_test_invoke_segment, 1);

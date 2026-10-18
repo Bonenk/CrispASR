@@ -610,3 +610,30 @@ fn probe_parakeet_integer_offset() {
     assert!(context.transcribe(pcm, Some("de")).is_err());
     assert!(context.transcribe_at(&[], 0).is_err());
 }
+
+#[test]
+fn probe_titanet_float_count_and_ownership() {
+    extern "C" {
+        fn probe_titanet_mode(mode: c_int);
+        fn probe_titanet_live() -> c_int;
+    }
+    unsafe { probe_titanet_mode(0) };
+    let context = crispasr::TitaNet::new("probe", 4).unwrap();
+    let pcm = &[1., 3., 5.];
+    let output = context.embed(pcm).unwrap();
+    assert_eq!(output.len(), 192);
+    assert_eq!(output[0], 1.);
+    for mode in [2, 3, 4] {
+        unsafe { probe_titanet_mode(mode) };
+        assert!(context.embed(pcm).is_err());
+    }
+    unsafe { probe_titanet_mode(0) };
+    assert!(context.embed(&[]).is_err());
+    drop(context);
+    assert_eq!(unsafe { probe_titanet_live() }, 0);
+    assert_eq!(
+        crispasr::TitaNet::cosine_sim(&[1., 0.], &[1., 0.]).unwrap(),
+        1.
+    );
+    assert!(crispasr::TitaNet::cosine_sim(&[1.], &[]).is_err());
+}

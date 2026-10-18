@@ -1,3 +1,19 @@
+## TitaNet wrapper return-count and lifetime repairs — 2026-10-18
+
+A new public-header probe reproduced C# treating a successful 192-float native
+embedding as an error. Fixed the return-count contract and closed/empty input
+checks; other existing wrappers now reject short/oversized counts. Added usable
+TitaNet classes to Java, Rust and WASM, completing that family across the eight
+wrappers. The native similarity helper remains a dot product on normalized
+embeddings. Ruby tracks ownership of its direct TitaNet/Parakeet contexts to
+reject closed handles and avoid repeated native frees; Dart DTW reads check
+upper as well as lower index bounds.
+
+Validation: 14 new C# assertions (225 total across the suites), Java 172, Ruby
+175, WASM 122, Dart analyzer/35 tests, Go 24 tests, Rust 21 tests/five doctests,
+and three Python legacy regressions. These are model-free ownership/ABI gates;
+full-library, browser and real-model gates remain in PLAN.md.
+
 ## Ruby chat GC compaction lifetime — 2026-10-18
 
 A new abort-callback test calls `GC.compact` during native generation and was

@@ -1414,21 +1414,7 @@ int crispasr_kokoro_resolve_fallback_voice_abi(const char* model_path, const cha
     STUB_ABORT();
     return 0;
 }
-void* crispasr_titanet_init(const char* model_path, int32_t n_threads) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_titanet_free(void* ctx) {
-    STUB_ABORT();
-}
-int32_t crispasr_titanet_embed(void* ctx, const float* pcm_16k, int32_t n_samples, float* out) {
-    STUB_ABORT();
-    return 0;
-}
-float crispasr_titanet_cosine_sim(const float* a, const float* b, int32_t dim) {
-    STUB_ABORT();
-    return 0;
-}
+#include "wrapper-titanet-legacy.c"
 void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv, int32_t consent_attested) {
     STUB_ABORT();
     return 0;

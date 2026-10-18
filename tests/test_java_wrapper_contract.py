@@ -96,7 +96,7 @@ import java.nio.charset.StandardCharsets;
 public class WrapperAuxProbe {
     public interface Probe extends Library {
         Probe INSTANCE=Native.load("crispasr",Probe.class);
-        void probe_aux_mode(int n);int probe_aux_live();int probe_aux_segment_size();int probe_aux_options_size();
+        void probe_titanet_mode(int n);int probe_titanet_live();void probe_aux_mode(int n);int probe_aux_live();int probe_aux_segment_size();int probe_aux_options_size();
     }
     static int assertions;
     static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b+" expected "+b+" got "+a);assertions++;}
@@ -241,6 +241,9 @@ public class WrapperAuxProbe {
         CrispasrAuxiliary.ParakeetTranscript pr=pk.transcribe(new float[]{1,3,5},123);
         eq(pr.text,"日本語");eq(pr.words[0].t0,223L);eq(pr.tokens[0].t0,-1L);eq(pr.tokens[0].rawText[0],(byte)0xe6);
         reject(IllegalArgumentException.class,()->pk.transcribe(new float[0],0));pk.close();pk.close();reject(IllegalStateException.class,()->pk.transcribe(new float[]{1},0));
+        CrispasrAuxiliary.TitaNet titan=new CrispasrAuxiliary.TitaNet("probe",4);float[] embedding=titan.embed(new float[]{1,3,5});eq(embedding.length,192);eqFloat(embedding[0],1);
+        for(int mode:new int[]{2,3,4}){Probe.INSTANCE.probe_titanet_mode(mode);reject(IllegalStateException.class,()->titan.embed(new float[]{1,3,5}));}Probe.INSTANCE.probe_titanet_mode(0);
+        reject(IllegalArgumentException.class,()->titan.embed(new float[0]));titan.close();titan.close();reject(IllegalStateException.class,()->titan.embed(new float[]{1,3,5}));eq(Probe.INSTANCE.probe_titanet_live(),0);
         // closed handles and buffer cleanup already checked via live
         eq(Probe.INSTANCE.probe_aux_live(),0);
         System.out.println("PASS Java auxiliary: "+assertions+" assertions");
@@ -297,7 +300,7 @@ class JavaAuxWrapperContract(unittest.TestCase):
                             '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-I'+str(path),
                             str(ROOT/'tests/fixtures/python-wrapper-abi.c'),
                             str(ROOT/'tests/fixtures/wrapper-session-metadata.c'),
-                            str(ROOT/'tests/fixtures/csharp-wrapper-aux.c'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),
+                            str(ROOT/'tests/fixtures/csharp-wrapper-aux.c'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),str(ROOT/'tests/fixtures/wrapper-titanet-legacy.c'),
                             '-o',str(directory/'libcrispasr.so')],check=True)
             run=subprocess.run([JAVA,'-Djna.tmpdir='+str(path),'-Djna.library.path='+str(directory),
                                 '-cp',str(path)+os.pathsep+JAR,'WrapperAuxProbe'],capture_output=True,text=True)

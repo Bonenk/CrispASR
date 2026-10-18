@@ -290,5 +290,11 @@ pkr=s.parakeet_transcribe(pk,[1,3,5],123)
 eq(pkr[:text],'日本語');eq(pkr[:words].first[1],223);eq(pkr[:tokens].first[1],-1);eq(pkr[:tokens].map{|t|t[0]}.join.force_encoding('UTF-8'),'日')
 reject(ArgumentError){s.parakeet_transcribe(pk,[1,3,5],'de')}
 s.parakeet_free(pk)
+titan=s.titanet_init('probe',4)
+eq(s.titanet_embed(titan,[1,3,5]).length,192);eq(s.titanet_embed(titan,[1,3,5]).first,1.0)
+[2,3,4].each{|mode|c.test_titanet_mode(mode);reject(RuntimeError){s.titanet_embed(titan,[1,3,5])}};c.test_titanet_mode(0)
+reject(ArgumentError){s.titanet_embed(titan,[])};s.titanet_free(titan);s.titanet_free(titan)
+eq(c.test_titanet_live,0);reject(RuntimeError){s.titanet_embed(titan,[1,3,5])}
+s.parakeet_free(pk);reject(RuntimeError){s.parakeet_transcribe(pk,[1,3,5],0)}
 s.close(h)
 puts "PASS Ruby ABI: #{$count} assertions"

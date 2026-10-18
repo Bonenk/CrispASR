@@ -9,7 +9,7 @@ import numpy as np
 from build_legacy_wrapper_probe import build
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'python'))
-from crispasr import CrispASR, Parakeet
+from crispasr import CrispASR, Parakeet, TitaNet
 
 class LegacyPointerContract(unittest.TestCase):
     def test_native_parameters_parallel_dtw_and_cleanup(self):
@@ -56,5 +56,21 @@ class LegacyPointerContract(unittest.TestCase):
             with self.assertRaises(ValueError):model.transcribe(np.array([],dtype=np.float32))
             model.close();model.close();self.assertEqual(lib.probe_parakeet_contexts(),0)
             with self.assertRaises(RuntimeError):model.transcribe(pcm)
+
+    def test_titanet_requires_192_float_success_and_rejects_closed_context(self):
+        with tempfile.TemporaryDirectory(prefix='python-titanet-') as tmp:
+            path=Path(tmp)/'libcrispasr.so'
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-titanet-legacy.c'),'-o',str(path)],check=True)
+            lib=C.CDLL(str(path));model=TitaNet('probe',lib_path=str(path));pcm=np.array([1,3,5],dtype=np.float32)
+            result=model.embed(pcm);self.assertEqual(result.shape,(192,));self.assertEqual(result[0],1)
+            for mode in (2,3,4):
+                lib.probe_titanet_mode(mode)
+                with self.assertRaises(RuntimeError):model.embed(pcm)
+            lib.probe_titanet_mode(0)
+            with self.assertRaises(ValueError):model.embed([])
+            model.close();model.close();self.assertEqual(lib.probe_titanet_live(),0)
+            calls=lib.probe_titanet_calls()
+            with self.assertRaises(RuntimeError):model.embed(pcm)
+            self.assertEqual(lib.probe_titanet_calls(),calls)
 
 if __name__=='__main__':unittest.main()

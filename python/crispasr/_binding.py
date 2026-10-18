@@ -3610,7 +3610,9 @@ class TitaNet:
     def embed(self, pcm_16k):
         """Extract 192-d speaker embedding from 16 kHz mono float32 PCM."""
         import numpy as np
+        if not self._ctx: raise RuntimeError("TitaNet context is closed")
         pcm = np.ascontiguousarray(pcm_16k, dtype=np.float32)
+        if pcm.ndim!=1 or not pcm.size: raise ValueError("nonempty mono PCM required")
         out = np.zeros(192, dtype=np.float32)
         dim = self._lib.crispasr_titanet_embed(
             self._ctx,
@@ -3618,7 +3620,7 @@ class TitaNet:
             len(pcm),
             out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         )
-        if dim <= 0:
+        if dim != 192:
             raise RuntimeError("TitaNet embedding extraction failed")
         return out[:dim]
 
