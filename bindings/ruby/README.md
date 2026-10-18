@@ -463,3 +463,15 @@ The same to [crispasr][].
 
 [crispasr]: https://github.com/CrispStrobe/CrispASR
 [models]: https://github.com/CrispStrobe/CrispASR/tree/main/models
+
+## Generic speaker primitives
+
+`Whisper::CrispASR::SpeakerEmbedder.new(model, threads = 4, cache_dir = nil)`
+provides `dimension`, `name`, `embed(pcm16k)` and `close`. Ruby owns the native
+context and frees it on GC; `close` is idempotent. Generic embedding success
+is distinct from the 192-float TitaNet API.
+
+`Whisper::CrispASR.speaker_cluster(rows, threshold = 0.7, maximum = 8)` returns
+`{labels:, n_clusters:}`. `Whisper::CrispASR::PyannoteCache.new(pcm, model,
+threads = 4)` provides `apply(segments, offset_cs = 0)` and `close`. Segment
+hashes use native centiseconds and return copied `{t0:, t1:, speaker:}` records.

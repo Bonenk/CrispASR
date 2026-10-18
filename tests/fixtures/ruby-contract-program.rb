@@ -315,5 +315,38 @@ c.test_db_mode(3);reject(RuntimeError){s.speaker_db_enroll('db','Alice',[1,3,5],
 c.test_db_mode(2);reject(RuntimeError){s.speaker_db_open('db','Alice,Bob',true)};c.test_db_mode(0)
 s.speaker_db_free(db);s.speaker_db_free(db);eq(c.test_db_live,0)
 reject(RuntimeError){s.speaker_db_count(db)};reject(RuntimeError){s.speaker_db_match(db,[1,3,5],0.5)}
+c.test_speaker_mode(0)
+# Ruby coercion can re-enter initialize before native ownership is installed.
+recursive=c::SpeakerEmbedder.allocate
+model=Object.new
+model.define_singleton_method(:to_str){recursive.send(:initialize,'embed',2,'cache');'embed'}
+reject(RuntimeError){recursive.send(:initialize,model,2,'cache')};eq(c.test_speaker_live,1);recursive.close;eq(c.test_speaker_live,0)
+recursive_cache=c::PyannoteCache.allocate
+cache_model=Object.new
+cache_model.define_singleton_method(:to_str){recursive_cache.send(:initialize,[1,3,5],'seg',2);'seg'}
+reject(RuntimeError){recursive_cache.send(:initialize,[1,3,5],cache_model,2)};eq(c.test_speaker_live,1);recursive_cache.close;eq(c.test_speaker_live,0)
+embedder=c::SpeakerEmbedder.new('embed',2,'cache');eq(embedder.dimension,3);eq(embedder.name,'generic')
+embedding=embedder.embed([1,3,5]);eq(embedding,[0.25,0.5,0.75]);eq(c.test_speaker_live,1)
+reject(ArgumentError){embedder.embed([])};reject(ArgumentError){c::SpeakerEmbedder.new('embed',0)}
+[2,4].each{|mode|c.test_speaker_mode(mode);reject(RuntimeError){embedder.embed([1,3,5])}};c.test_speaker_mode(0)
+embedder.close;embedder.close;eq(c.test_speaker_live,0);eq(embedding,[0.25,0.5,0.75])
+reject(RuntimeError){embedder.dimension};reject(RuntimeError){embedder.name};reject(RuntimeError){embedder.embed([1,3,5])}
+[1,3].each{|mode|c.test_speaker_mode(mode);reject(RuntimeError){c::SpeakerEmbedder.new('embed',2,'cache')}};eq(c.test_speaker_live,0);c.test_speaker_mode(0)
+eq(c.speaker_cluster([[coercible,2,3],[4,5,6]],0.6,3)[:labels],[0,1])
+cluster=c.speaker_cluster([[1,2,3],[4,5,6]],0.6,3);eq(cluster[:labels],[0,1]);eq(cluster[:n_clusters],2)
+reject(ArgumentError){c.speaker_cluster([],0.6,3)};reject(ArgumentError){c.speaker_cluster([[1],[2,3]],0.6,3)}
+reject(ArgumentError){c.speaker_cluster([[1,2,3],[4,5,6]],Float::NAN,3)}
+[2,6].each{|mode|c.test_speaker_mode(mode);reject(RuntimeError){c.speaker_cluster([[1,2,3],[4,5,6]],0.6,3)}};c.test_speaker_mode(0)
+cache=c::PyannoteCache.new([1,3,5],'seg',2);grid=[{t0:125,t1:175},{'t0'=>200,'t1'=>250}]
+time=Object.new;def time.to_int;GC.compact if GC.respond_to?(:compact);125;end
+eq(cache.apply([{t0:time,t1:175},{t0:200,t1:250}],125).first[:speaker],2)
+assigned=cache.apply(grid,125);eq(assigned.map{|s|s[:speaker]},[2,1]);eq(assigned.first[:t0],125);eq(grid.first[:speaker],nil)
+[2,5].each{|mode|c.test_speaker_mode(mode);reject(RuntimeError){cache.apply(grid,125)}};c.test_speaker_mode(0)
+reject(ArgumentError){cache.apply([],125)};reject(ArgumentError){cache.apply([{t0:200,t1:100}],125)}
+cache.close;cache.close;eq(c.test_speaker_live,0);eq(assigned.last[:speaker],1);reject(RuntimeError){cache.apply(grid,125)}
+c.test_speaker_mode(1);reject(RuntimeError){c::PyannoteCache.new([1,3,5],'seg',2)};c.test_speaker_mode(0)
+reject(ArgumentError){c::PyannoteCache.new([],'seg',2)}
+def orphan_speaker(c); c::SpeakerEmbedder.new('embed');nil;end
+orphan_speaker(c);GC.start;eq(c.test_speaker_live,0)
 s.close(h)
 puts "PASS Ruby ABI: #{$count} assertions"

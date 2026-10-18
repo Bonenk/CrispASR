@@ -19,10 +19,13 @@ static crispasr_session* g_tts_session=(crispasr_session*)1;
 #include "session_tasks.h"
 #include "session_utilities.h"
 #include "session_analysis.h"
+#include "session_speaker.h"
 extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
 extern "C" int probe_analysis_live(void);
 extern "C" void probe_analysis_mode(int);
+extern "C" void probe_speaker_mode(int);
+extern "C" int probe_speaker_live(void);
 extern "C" void probe_db_mode(int);
 extern "C" int probe_db_live(void);
 extern "C" void probe_titanet_mode(int);
@@ -39,6 +42,9 @@ EMSCRIPTEN_BINDINGS(wrapper_probe) {
     binding_register_session_tasks();
     binding_register_utilities();
     binding_register_analysis();
+    binding_register_speaker();
+    emscripten::function("speakerMode",&probe_speaker_mode);
+    emscripten::function("speakerLive",&probe_speaker_live);
     emscripten::function("dbMode",&probe_db_mode);
     emscripten::function("dbLive",&probe_db_live);
     emscripten::function("titanetMode",&probe_titanet_mode);
@@ -97,6 +103,21 @@ require(process.argv[2])().then(m=>{
  m.analysisMode(1);eq(m.alignWords(pcm,'model','日本語',123,4).length,0);eq(m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4).length,0);eq(m.analysisLive(),0);
  m.analysisMode(2);rejects(()=>m.alignWords(pcm,'model','日本語',123,4));rejects(()=>m.vadSpans(pcm,'vad',16000,.5,250,100,4,false));rejects(()=>m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4));eq(m.analysisLive(),0);
  eq(m.probeLive(),0);eq(m.probeInvalidFrees(),0);
+ const embedder=new m.SpeakerEmbedder('embed',2,'cache');eq(embedder.dimension(),3);eq(embedder.name(),'generic');
+ const embedding=embedder.embed(pcm);eq(Array.from(embedding),[.25,.5,.75]);eq(m.speakerLive(),1);
+ rejects(()=>embedder.embed(new Float32Array(0)));rejects(()=>new m.SpeakerEmbedder('embed',0,''));
+ for(const mode of [2,4]){m.speakerMode(mode);rejects(()=>embedder.embed(pcm));}m.speakerMode(0);
+ embedder.close();embedder.close();eq(m.speakerLive(),0);eq(embedding[2],.75);rejects(()=>embedder.dimension());rejects(()=>embedder.embed(pcm));embedder.delete();
+ for(const mode of [1,3]){m.speakerMode(mode);rejects(()=>new m.SpeakerEmbedder('embed',2,'cache'));}m.speakerMode(0);eq(m.speakerLive(),0);
+ const cluster=m.speakerCluster([[1,2,3],[4,5,6]],.6,3);eq(cluster.labels,[0,1]);eq(cluster.nClusters,2);
+ rejects(()=>m.speakerCluster([],.6,3));rejects(()=>m.speakerCluster([[1],[2,3]],.6,3));rejects(()=>m.speakerCluster([[1],[2]],NaN,3));
+ for(const mode of [2,6]){m.speakerMode(mode);rejects(()=>m.speakerCluster([[1,2,3],[4,5,6]],.6,3));}m.speakerMode(0);
+ const cache=new m.PyannoteCache(pcm,'seg',2),grid=[{t0:125,t1:175},{t0:200,t1:250}];
+ const assigned=cache.apply(grid,125);eq(assigned.map(x=>x.speaker),[2,1]);eq(assigned[0].t0,125);eq(grid[0].speaker,undefined);
+ for(const mode of [2,5]){m.speakerMode(mode);rejects(()=>cache.apply(grid,125));}m.speakerMode(0);
+ rejects(()=>cache.apply([],125));rejects(()=>cache.apply([{t0:200,t1:100}],125));
+ cache.close();cache.close();eq(m.speakerLive(),0);eq(assigned[1].speaker,1);rejects(()=>cache.apply(grid,125));cache.delete();
+ m.speakerMode(1);rejects(()=>new m.PyannoteCache(pcm,'seg',2));m.speakerMode(0);rejects(()=>new m.PyannoteCache(new Float32Array(0),'seg',2));
  console.log('PASS WASM ABI: '+n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
 '''
@@ -106,14 +127,18 @@ class WasmWrapperContract(unittest.TestCase):
     def test_owned_metadata_music_conversion_and_stream_callbacks(self):
         with tempfile.TemporaryDirectory(prefix='wasm-wrapper-abi-') as tmp:
             tmp=Path(tmp);objects=[]
-            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db']:
+            src=(ROOT/'src/crispasr_c_api.cpp').read_text();layouts=[]
+            for name in ['crispasr_diarize_seg_abi','crispasr_diarize_turn_abi','crispasr_diarize_opts_abi']:
+                start=src.index('struct '+name+' {');layouts.append(src[start:src.index('};',start)+2])
+            (tmp/'runtime-abi-layout.h').write_text('\n'.join(layouts))
+            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives']:
                 obj=tmp/(name+'.o');objects.append(str(obj))
-                subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
+                subprocess.run([EMCC,'-I'+str(tmp),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
             # Unexercised registration dependencies abort if accidentally called.
             # Concrete public-header probes supply every operation asserted below.
-            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db']
+            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
-            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h','session_analysis.h'])
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
             headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
             unused=[]

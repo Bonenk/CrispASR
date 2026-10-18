@@ -52,6 +52,7 @@ struct whisper_context* g_context;
 #include "session_utilities.h"
 #include "session_chat.h"
 #include "session_analysis.h"
+#include "session_speaker.h"
 
 #ifdef __EMSCRIPTEN_PTHREADS__
 // Present only in threaded builds. Under -sPROXY_TO_PTHREAD this runs on pthread-0
@@ -104,6 +105,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_utilities();
     binding_register_chat();
     binding_register_analysis();
+    binding_register_speaker();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
                              binding_check_reentry();

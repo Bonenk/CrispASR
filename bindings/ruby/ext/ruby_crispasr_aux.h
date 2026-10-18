@@ -1425,6 +1425,15 @@ static VALUE rb_chat_ai_disclosure(VALUE self) {
 
 /* Test-only direct callback routing probes. */
 #ifdef CRISPASR_WRAPPER_PROBE
+extern void probe_speaker_mode(int);
+extern int probe_speaker_live(void);
+static VALUE rb_test_speaker_mode(VALUE self, VALUE mode) {
+    probe_speaker_mode(NUM2INT(mode));
+    return Qnil;
+}
+static VALUE rb_test_speaker_live(VALUE self) {
+    return INT2NUM(probe_speaker_live());
+}
 extern void probe_db_mode(int);
 extern int probe_db_live(void);
 static VALUE rb_test_db_mode(VALUE self, VALUE mode) {
@@ -1473,8 +1482,11 @@ static VALUE rb_test_invoke_token(VALUE self, VALUE handle) {
 
 #endif
 
+#include "ruby_crispasr_speaker.h"
+
 /* Registration helper called from Init */
 static void rb_aux_init(void) {
+    rb_speaker_aux_init();
     // CrispASR module already defined as mCrispASR
     // Audio / container
     rb_define_singleton_method(mCrispASR, "audio_load", rb_aux_audio_load, 1);
@@ -1543,6 +1555,8 @@ static void rb_aux_init(void) {
 #ifdef CRISPASR_WRAPPER_PROBE
     rb_define_singleton_method(mCrispASR, "test_audio_mode", rb_test_audio_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_audio_live", rb_test_audio_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_speaker_mode", rb_test_speaker_mode, 1);
+    rb_define_singleton_method(mCrispASR, "test_speaker_live", rb_test_speaker_live, 0);
     rb_define_singleton_method(mCrispASR, "test_db_mode", rb_test_db_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_db_live", rb_test_db_live, 0);
     rb_define_singleton_method(mCrispASR, "test_titanet_mode", rb_test_titanet_mode, 1);

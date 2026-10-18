@@ -55,6 +55,23 @@ now explicitly directs callers to `open`, rather than invoking a retired
 native function. The operation fixture checks actual UTF-8 result copies,
 missing consent/roster, native failure codes, no-match semantics and lifetime.
 
+## Generic speaker primitives: Ruby and WASM follow-up
+
+Native `crispasr_speaker_embedder_*_abi` has make/free/dim/name/embed operations;
+embedding succeeds with **1**. `crispasr_speaker_cluster_abi` returns the number
+of clusters, with negative failure. Pyannote cache compute/free/apply uses
+zero-success apply and native centisecond segment/offset fields.
+
+| Wrapper | Public operations | Operation proof |
+| --- | --- | --- |
+| Ruby | `CrispASR::SpeakerEmbedder.new`, `.dimension`, `.name`, `.embed`, `.close`; `CrispASR.speaker_cluster(rows, threshold, maximum)`; `CrispASR::PyannoteCache.new`, `.apply(segments, offset_cs)`, `.close` | `RubyWrapperContract`, native shared fixture; TypedData GC and recursive coercion/GC checks |
+| WASM | `SpeakerEmbedder`, `.dimension`, `.name`, `.embed`, `.close`/`.delete`; `speakerCluster(rows, threshold, maximum)`; `PyannoteCache`, `.apply(segments, offsetCs)`, `.close`/`.delete` | `WasmWrapperContract`, same shared fixture compiled into WASM |
+
+Clustering returns labels plus `n_clusters` (Ruby) / `nClusters` (WASM).
+Cache apply returns owned `{t0,t1,speaker}` records and leaves input records
+unchanged. Explicit close is idempotent; subsequent operations raise. Other
+languages' existing generic primitives still need their ledger rows reviewed.
+
 ## Additional reviewed paths
 
 - C# `Session.TranscribeVad(pcm, rate, model, language, options)` and Java

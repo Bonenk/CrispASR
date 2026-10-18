@@ -27,16 +27,17 @@ Recommended implementation order and concrete acceptance:
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
    implementation. Direct Parakeet uses an integer centisecond offset.
-3. **Ruby remaining auxiliary/lifetime work.** Add usable generic speaker
-   embedder, clustering and pyannote-cache methods where only declarations
-   exist. Audit raw Whisper/stream handles and every allocation-returning
+3. **Ruby remaining lifetime work.** Generic speaker embedder, clustering and
+   pyannote cache now have typed owners and compiled probes (see HISTORY.md).
+   Audit raw Whisper/stream handles and every allocation-returning
    audio/container/processor/scoring path for exceptions and callback re-entry.
    Native buffers crossing Ruby coercion or callbacks must remain stable
    through GC compaction; a rooted String alone is insufficient.
 4. **WASM remaining adapters and dispatch.** Implement registry/cache, generic
-   speaker/clustering/pyannote/diarization, shared session options, typed ASR
+   diarization, shared session options, typed ASR
    callback setters, VAD-transcription/language options and legacy controls.
-   Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
+   Generic speaker/clustering/pyannote adapters now have operation probes;
+   include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
    work and callback delivery are safely proxied. Measure complete default
    and opt-in module sizes and instantiate actual models in a browser.
 5. **Go/Rust and residual public options.** Check session-open options, text
@@ -57,8 +58,10 @@ The latest pushed TitaNet checkpoint is
 `2f7bd0b0946aa53cec5746ec6b89f8b96813b54b`; its ABI run
 [39133837807](https://github.com/CrispStrobe/CrispASR/actions/runs/39133837807)
 was queued at the last inspection. The subsequent speaker/options/polling
-checkpoint is frozen as `diag/wrapper-speaker-20261018`; inspect that ref's
-exact SHA and hosted results before promoting any platform/model claim.
+checkpoint is `f78b2a9ecc8c80a17059a9866d85a25499094e8e`, frozen as
+`diag/wrapper-speaker-20261018`; its ABI run
+[39135417705](https://github.com/CrispStrobe/CrispASR/actions/runs/39135417705)
+was also queued. Inspect the exact SHA and hosted results before promoting any platform/model claim.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.

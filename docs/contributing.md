@@ -638,6 +638,12 @@ exceptions. Do not hide a movable Proc VALUE in C userdata or keep an unmarked
 VALUE in C thread-local storage. Every Ruby allocation/dispatch from a native
 callback needs protection; rethrow only after freeing native results.
 
+Generic speaker embedding returns one-success, clustering returns a cluster
+count, and pyannote cache apply uses zero-success. Ruby and WASM now have
+compiled operation probes for these families, including malformed counts and
+positive error codes. Ruby typed owners must reject recursive initialization
+from argument coercion before overwriting native ownership.
+
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.
 Keep both public header inventories and the separate chat API in the audit.

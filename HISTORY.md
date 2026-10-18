@@ -1,3 +1,18 @@
+## Ruby/WASM generic speaker primitives — 2026-10-18
+
+Added usable generic `SpeakerEmbedder`, `PyannoteCache` and clustering APIs in
+Ruby and WASM. Ruby TypedData owners and C++ destructors free contexts, with
+idempotent explicit close. Ruby input/output buffers use stable owned payloads
+across coercion/GC compaction; an observed failing recursive-initialization
+probe now rejects replacement of an already installed native context.
+
+The shared fixture compiles public signatures and literal native diarization
+PODs, validating dimension/name/PCM/options, one-success embedding, cluster
+counts, centisecond segments, cache errors and independent outputs. Ruby now
+passes **240 assertions**; WASM passes **135 operation assertions plus 39 chat**.
+The full WASM adapter passes single-thread/chat and pthread syntax checks.
+These are operation/ownership checks; model and browser acceptance remain open.
+
 ## Wrapper options, roster DB and bounded polling repairs — 2026-10-18
 
 Added callable per-call VAD language/options in C# and Java, preserving the
