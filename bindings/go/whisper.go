@@ -102,7 +102,7 @@ const (
 )
 
 const (
-	SampleRate = C.CRISPASR_SAMPLE_RATE                 // Expected sample rate, samples per second
+	SampleRate = C.CRISPASR_SAMPLE_RATE                // Expected sample rate, samples per second
 	SampleBits = uint16(unsafe.Sizeof(C.float(0))) * 8 // Sample size in bits
 	NumFFT     = C.CRISPASR_N_FFT
 	HopLength  = C.CRISPASR_HOP_LENGTH

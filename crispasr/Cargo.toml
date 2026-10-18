@@ -22,6 +22,8 @@ crispasr-sys = { path = "../crispasr-sys", version = "0.8.43" }
 
 [features]
 default = []
+# Dedicated native-probe integration tests; production/native-model tests omit it.
+abi-probe = []
 cuda = ["crispasr-sys/cuda"]
 metal = ["crispasr-sys/metal"]
 vulkan = ["crispasr-sys/vulkan"]

@@ -265,7 +265,7 @@ class WrapperOperations(unittest.TestCase):
             with self.assertRaises(IndexError): model.tokens(-1)
             with self.assertRaises(IndexError): model.token_dtw_time(0,2)
             model._helpers=None
-            with self.assertRaisesRegex(RuntimeError,'requires libcrispasr_helpers'):
+            with self.assertRaisesRegex(RuntimeError,'requires native pointer wrappers or libcrispasr_helpers'):
                 model.transcribe_pcm(self.pcm)
             self.assertEqual(model._lib.probe_live(),0)
 

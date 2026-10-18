@@ -8,6 +8,16 @@ target_link_libraries(${TARGET} PRIVATE
     whisper
     )
 
+# Chat pulls the llama model registry into the link; keep the default browser
+# bundle unchanged until the opt-in full-module size/model gates have passed.
+option(CRISPASR_WASM_CHAT "Expose the text-chat C ABI through Embind" OFF)
+if(CRISPASR_WASM_CHAT AND NOT CRISPASR_WASM_SINGLE_THREAD)
+    message(FATAL_ERROR "WASM chat currently requires CRISPASR_WASM_SINGLE_THREAD=ON")
+endif()
+if(CRISPASR_WASM_CHAT)
+    target_compile_definitions(${TARGET} PRIVATE CRISPASR_WASM_CHAT=1)
+endif()
+
 unset(EXTRA_FLAGS)
 
 if (CRISPASR_WASM_SINGLE_FILE)

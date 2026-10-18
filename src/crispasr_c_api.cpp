@@ -13025,12 +13025,21 @@ CA_EXPORT int crispasr_transcribe_parallel(struct whisper_context* ctx, struct w
     return rc;
 }
 
+CA_EXPORT int crispasr_transcribe_parallel_by_ref(struct whisper_context* ctx, const struct whisper_full_params* params,
+                                                  const float* samples, int n_samples, int n_processors) {
+    if (!ctx || !params || !samples || n_samples <= 0 || n_processors <= 0)
+        return -1;
+    return crispasr_transcribe_parallel(ctx, *params, samples, n_samples, n_processors);
+}
+
 // =========================================================================
 // Version reporting — identifies the C-ABI build to every consumer
 // (CLI, Dart, Python, Rust). Bump when breaking or extending the surface.
 // =========================================================================
 
 CA_EXPORT const char* crispasr_c_api_version(void) {
+    // 0.7.1 — Pointer-safe progress-tracking parallel Whisper transcription.
+    // Existing struct-by-value callers remain supported.
     // 0.7.0 — Adds exact canonical default-bundle enumeration for the
     // model registry (primary, companion, extras, and licence gate).
     // Pure addition; no symbol renames or signature changes.
@@ -13049,7 +13058,7 @@ CA_EXPORT const char* crispasr_c_api_version(void) {
     // `crispasr_detect_language_pcm` return-code contract.
     // 0.5.1 — Adds `crispasr_session_translate_text_free`.
     // Pure addition; no symbol renames or signature changes.
-    return "0.7.0";
+    return "0.7.1";
 }
 
 // Backwards-compatibility alias. The Dart smoke test and any 0.4.x-era

@@ -168,6 +168,51 @@ void _probeMutate({bool old = false}) {
 Float32List _pcm123() => Float32List.fromList([1, 3, 5]);
 
 void main() {
+  test('legacy native pointer parameters, parallel decoding, DTW and cleanup', () {
+    final tmp = Directory(_tmpDir()).createTempSync('dart-legacy-');
+    addTearDown(() => tmp.deleteSync(recursive: true));
+    final path = '${tmp.path}/legacy.so';
+    final result = Process.runSync('python3',
+        ['${_repoRoot()}/tests/build_legacy_wrapper_probe.py', path]);
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    final lib = DynamicLibrary.open(path);
+    final live = lib.lookupFunction<Int32 Function(), int Function()>('probe_legacy_live');
+    final contexts = lib.lookupFunction<Int32 Function(), int Function()>('probe_legacy_contexts');
+    final mode = lib.lookupFunction<Void Function(Int32), void Function(int)>('probe_legacy_mode');
+    final processors = lib.lookupFunction<Int32 Function(), int Function()>('probe_legacy_processors');
+    final dtw = lib.lookupFunction<Int32 Function(), int Function()>('probe_legacy_dtw');
+    final zero = lib.lookupFunction<Int32 Function(), int Function()>('probe_legacy_progress_zero');
+    expect(() => CrispASR('probe',libPath:path,dtw:true,dtwPreset:2), throwsArgumentError);
+    expect(() => CrispASR('fail',libPath:path), throwsException);
+    expect(live(),0);
+    final model = CrispASR('probe',libPath:path,dtw:true,dtwTop:2);
+    expect(dtw(),102);expect(live(),0);expect(contexts(),1);
+    final opts = TranscribeOptions(language:'de',initialPrompt:'Grüße',wordTimestamps:true);
+    final resultSegments = model.transcribePcm(Float32List.fromList([1,3,5]),options:opts,nProcessors:2);
+    expect(processors(),2);expect(zero(),1);expect(live(),0);
+    expect(resultSegments.single.text,'日');expect(resultSegments.single.start,1.0);
+    expect(resultSegments.single.words.first.start,-1);expect(resultSegments.single.words.first.end,-1);
+    expect(resultSegments.single.words.first.text,contains('�'));
+    expect(resultSegments.single.words.first.alts.single.text,'alternative');
+    expect(model.tokenDtwTime(0,0),1.4);
+    mode(2);expect(() => model.transcribePcm(Float32List.fromList([1,3,5]),options:opts),throwsException);expect(live(),0);
+    mode(3);expect(() => model.transcribePcm(Float32List.fromList([1,3,5]),options:opts),throwsStateError);expect(live(),0);mode(0);
+    model.dispose();expect(contexts(),0);
+    expect(() => model.tokenDtwTime(0,0),throwsStateError);
+  });
+
+  test('direct Parakeet passes integer offsets and owns independent results', () {
+    final tmp=Directory(_tmpDir()).createTempSync('dart-parakeet-');addTearDown(()=>tmp.deleteSync(recursive:true));
+    final path='${tmp.path}/parakeet.so';final root=_repoRoot();
+    final cc=Process.runSync('cc',['-shared','-fPIC','-Werror','-I$root/include','$root/tests/fixtures/wrapper-parakeet-legacy.c','-o',path]);expect(cc.exitCode,0,reason:'${cc.stderr}');
+    final lib=DynamicLibrary.open(path);final ctx=CrispasrParakeet(lib,'probe');
+    final result=ctx.transcribe(Float32List.fromList([1,3,5]),offsetCs:123);expect(result.text,'日本語');expect(result.wordT0(0),223);expect(result.tokenT0(0),-1);
+    expect(utf8.decode([...result.tokenBytes(0),...result.tokenBytes(1)]),'日');expect(result.tokenText(0),contains('�'));
+    expect(()=>ctx.transcribe(Float32List.fromList([1,3,5]),language:'de'),throwsArgumentError);
+    result.free();result.free();expect(()=>result.text,throwsStateError);ctx.close();ctx.close();expect(()=>ctx.transcribe(Float32List.fromList([1])),throwsStateError);
+    final contexts=lib.lookupFunction<Int32 Function(),int Function()>('probe_parakeet_contexts');final results=lib.lookupFunction<Int32 Function(),int Function()>('probe_parakeet_results');expect(contexts(),0);expect(results(),0);
+  });
+
   // Ensure probes compile
   test('probe compiles and loads', () {
     final path = probePath;

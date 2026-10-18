@@ -10,6 +10,9 @@ static int programs[2] = {24, 128};
 static crispasr_segment_callback seg_cb;
 static crispasr_token_callback tok_cb;
 static crispasr_progress_callback progress_cb;
+static void* progress_user;
+static void* segment_user;
+static void* token_user;
 void probe_mode(int m) {
     mode = m;
 }
@@ -235,20 +238,23 @@ int crispasr_session_accept_marking_responsibility(crispasr_session* s, const ch
 }
 void crispasr_session_set_segment_callback(crispasr_session* s, crispasr_segment_callback cb, void* ud) {
     seg_cb = cb;
+    segment_user = ud;
 }
 void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb, void* ud) {
     tok_cb = cb;
+    token_user = ud;
 }
 void crispasr_session_set_progress_callback(crispasr_session* s, crispasr_progress_callback cb, void* ud) {
     progress_cb = cb;
+    progress_user = ud;
 }
 void probe_callbacks(void) {
     if (progress_cb)
-        progress_cb(3, 6, NULL);
+        progress_cb(3, 6, progress_user);
     if (seg_cb)
-        seg_cb("日本語", 123, 456, 7, NULL);
+        seg_cb("日本語", 123, 456, 7, segment_user);
     if (tok_cb)
-        tok_cb("\xe6\x97", 9, NULL);
+        tok_cb("\xe6\x97", 9, token_user);
 }
 const char* crispasr_drain_streamed_tokens(int* n) {
     static const char data[] = "\xe6\x97\0\xa5\0\0end\0";

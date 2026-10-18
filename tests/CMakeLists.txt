@@ -5631,6 +5631,14 @@ if(UNIX AND Python3_EXECUTABLE)
         set_tests_properties(test-${wrapper_language}-wrapper-contract PROPERTIES
             LABELS "unit;bindings" TIMEOUT 600)
     endforeach()
+    add_test(NAME test-go-rust-wrapper-contract
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_go_rust_wrapper_contract.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-go-rust-wrapper-contract PROPERTIES LABELS "unit;bindings" TIMEOUT 600)
+    add_test(NAME test-python-legacy-pointer
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_legacy_pointer.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-legacy-pointer PROPERTIES LABELS "unit;bindings;whisper" TIMEOUT 60)
     add_test(NAME test-python-audio-utilities
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_audio_utilities.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

@@ -1,0 +1,57 @@
+"""Compile isolated native probes and exercise the actual Go/Rust wrappers."""
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+ROOT=Path(__file__).resolve().parents[1]
+TOOLS=all(shutil.which(name) for name in ('cc','ar','go','cargo'))
+SYSTEM_LIBS={'stdc++','c++','m','c','dl','pthread','rt','atomic','gcc','gcc_s'}
+
+
+@unittest.skipUnless(TOOLS and sys.platform.startswith('linux'),'Linux C/Go/Rust toolchains required')
+class GoRustWrapperContract(unittest.TestCase):
+    def test_native_metadata_tasks_ownership_and_callbacks(self):
+        with tempfile.TemporaryDirectory(prefix='go-rust-abi-') as directory:
+            tmp=Path(directory);lib=tmp/'src';lib.mkdir()
+            obj=tmp/'probe.o'
+            subprocess.run(['cc','-std=c11','-Werror','-fPIC','-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
+                '-c',str(ROOT/'tests/fixtures/go-rust-wrapper-abi.c'),'-o',str(obj)],check=True)
+            subprocess.run(['cc','-shared',str(obj),'-o',str(lib/'libcrispasr.so')],check=True)
+            subprocess.run(['ar','rcs',str(lib/'libcrispasr.a'),str(obj)],check=True)
+            # Read generated cgo dependencies instead of maintaining another list.
+            flags=(ROOT/'bindings/go/whisper.go').read_text()
+            names=set(re.findall(r'-l([A-Za-z0-9_+.-]+)',flags))-SYSTEM_LIBS-{'crispasr'}
+            for name in sorted(names):
+                subprocess.run(['ar','rcs',str(lib/('lib'+name+'.a'))],check=True)
+            env=os.environ.copy()
+            env['CGO_LDFLAGS']=' '.join([shlex.quote('-L'+str(lib)),shlex.quote('-Wl,-rpath,'+str(lib)),env.get('CGO_LDFLAGS','')]).strip()
+            env['LD_LIBRARY_PATH']=str(lib)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            # Every run gets a fresh linked binary. No fallback to a discovered build.
+            result=subprocess.run(['go','test','-tags','probe','-run','TestProbe','-count=1','-v'],
+                cwd=ROOT/'bindings/go',env=env,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS',result.stdout);print(result.stdout)
+            env['CRISPASR_SYS_LIB_DIR']=str(tmp)
+            env.pop('CRISPASR_LIB_DIR',None)
+            env.pop('CRISPASR_LIB_NAME',None)
+            env.setdefault('CARGO_TARGET_DIR',str(tmp/'cargo-target'))
+            # The fixture's mode/buffers are process-global; serialize its tests.
+            result=subprocess.run(['cargo','test','--features','abi-probe','--test','probe','--','--nocapture','--test-threads=1'],
+                cwd=ROOT/'crispasr',env=env,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertRegex(result.stdout,r'test result: ok\. [1-9][0-9]* passed; 0 failed')
+            print(result.stdout)
+            # Includes compile-fail ownership examples; no model inference occurs.
+            result=subprocess.run(['cargo','test','--doc'],cwd=ROOT/'crispasr',env=env,text=True,capture_output=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('test result: ok.',result.stdout);print(result.stdout)
+
+
+if __name__=='__main__':
+    unittest.main()

@@ -1056,6 +1056,12 @@ CRISPASR_API int crispasr_audio_load_stereo(const char* path, float** out_left, 
 CRISPASR_API int crispasr_transcribe_parallel(struct whisper_context* ctx, struct whisper_full_params params,
                                               const float* samples, int n_samples, int n_processors);
 
+// Pointer form for bindings that cannot safely pass whisper_full_params by value.
+// Uses the same progress-tracking path; rejects null params/context and bad counts.
+CRISPASR_API int crispasr_transcribe_parallel_by_ref(struct whisper_context* ctx,
+                                                     const struct whisper_full_params* params, const float* samples,
+                                                     int n_samples, int n_processors);
+
 // ─── DTW timestamp helpers ──────────────────────────────────────────
 //
 // crispasr_ctx_params_set_dtw: configure DTW token-level timestamps

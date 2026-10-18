@@ -593,14 +593,14 @@ python tools/check-backend-wiring.py --crispasr ./build/bin/crispasr --require-l
 When changing result readers, callbacks, or new session operations, run the
 actual language adapter against a tiny native probe, in addition to the native
 model tests. `python3 tools/run-wrapper-contract.py LANGUAGE` currently supports
-`csharp`, `java`, `ruby`, `dart`, and `wasm`. This strict runner fails on missing SDKs or
+`csharp`, `java`, `ruby`, `dart`, `wasm`, and `go-rust`. This strict runner fails on missing SDKs or
 skipped checks. CTest's optional versions may skip on ordinary developer clones.
 The `Binding ABI contracts` workflow installs the SDKs and runs these checks
 without building the full model library.
 
 Java requires a JDK and `CRISPASR_JNA_JAR` pointing to JNA 5.13.0; Ruby requires
 its C headers; C# requires .NET 8; Dart requires the Dart SDK and a C compiler;
-WASM requires Emscripten and Node. The tiny
+WASM requires Emscripten and Node; Go/Rust requires both language SDKs. The tiny
 probes include the public C header. Ruby's unexercised legacy registration
 symbols are aborting stubs; calling one fails the test. Such stubs provide no
 acceptance evidence for those APIs. Shared token bytes, alternative text,
@@ -611,6 +611,32 @@ constructing an output struct does not establish wrapper coverage.
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.
 Keep both public header inventories and the separate chat API in the audit.
+
+Legacy Whisper parameter structs must pass through native `*_by_ref` exports
+(or Python's separately compiled helpers), never a pointer masquerading as a
+struct by value. Use `crispasr_transcribe_parallel_by_ref` for parallel inference
+with progress tracking. Retain the language/prompt/VAD-model string storage
+until inference returns, and free opaque parameter objects on every path.
+`tests/build_legacy_wrapper_probe.py` compiles the literal runtime setters and
+parallel/token adapters against the real Whisper structs; Python, C# and Dart
+exercise these adapters with a model-free decoder.
+
+`crispasr_parakeet_transcribe` takes an **int64 centisecond offset** as its fourth
+argument. It has no language-string argument. Use unified session language hints
+for that purpose. The shared `wrapper-parakeet-legacy.c` oracle checks this
+signature through real language wrappers; a declaration census cannot catch
+this class of mistranslation.
+
+For WASM chat, configure a single-thread module with `CRISPASR_WASM_CHAT=ON`;
+the default bundle excludes chat. Check `chatAvailable()` before using
+`ChatSession`. `generate(messages, options, callbackOrNull)` returns
+`{status, text, message, failed, error}`: check both native `status` and callback
+`failed`. Stream callbacks receive owned `Uint8Array` pieces; concatenate before
+UTF-8 decoding. `setAbortCallback` returns true to continue, false to cancel.
+Callback exceptions are captured on the JS side and returned after native
+frames finish. Full native/browser/model and opt-in bundle-size gates are
+required separately from the tiny Embind probe. Threaded browser chat remains
+pending a servicer/compute dispatch implementation.
 
 ## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
 

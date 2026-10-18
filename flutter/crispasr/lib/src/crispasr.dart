@@ -1764,7 +1764,14 @@ class CrispASR {
   bool get supportsExtended => _detectLang != null;
   bool get supportsStreaming => _streamOpen != null;
 
-  CrispASR(String modelPath, {String? libPath}) {
+  CrispASR(String modelPath,
+      {String? libPath, bool dtw = false, int dtwPreset = 1, int dtwTop = 2}) {
+    if (dtw &&
+        !((dtwPreset == 1 && dtwTop > 0) ||
+            (dtwPreset >= 3 && dtwPreset <= 14))) {
+      throw ArgumentError(
+          'DTW requires positive top-head count or a model preset (3..14)');
+    }
     _lib = DynamicLibrary.open(libPath ?? _findLib());
 
     _free = _lib.lookupFunction<_VoidPtrC, _VoidPtr>('whisper_free');
@@ -1791,37 +1798,42 @@ class CrispASR {
     // `whisper_full_params` reaching `whisper_full`, e.g. VAD enabled
     // with a garbage `vad_model_path`, producing
     //   `whisper_vad_init_from_file_with_params: failed to open VAD model '…'`
-    // even though the caller passed `vad: false`. Fall back to the
-    // by-value entry points when running against an older libwhisper so
-    // existing macOS / ARM64 builds keep loading.
+    // even though the caller passed `vad: false`. Older libraries without
+    // pointer adapters are rejected before model initialization.
     final hasInitByRef =
         _lib.providesSymbol('whisper_init_from_file_with_params_by_ref');
     final hasFullByRef = _lib.providesSymbol('whisper_full_by_ref');
-    if (hasInitByRef) {
-      _initByRef = _lib.lookupFunction<_WhisperInitNative, _WhisperInit>(
-          'whisper_init_from_file_with_params_by_ref');
-    } else {
-      _initByRef = _lib.lookupFunction<_WhisperInitNative, _WhisperInit>(
-          'whisper_init_from_file_with_params');
+    if (!hasInitByRef || !hasFullByRef) {
+      throw UnsupportedError(
+          'Legacy Whisper requires pointer-safe init/full exports; use a current library');
     }
-    if (hasFullByRef) {
-      _full = _lib.lookupFunction<_WhisperFullNative, _WhisperFull>(
-          'whisper_full_by_ref');
-    } else {
-      _full =
-          _lib.lookupFunction<_WhisperFullNative, _WhisperFull>('whisper_full');
-    }
-
+    _initByRef = _lib.lookupFunction<_WhisperInitNative, _WhisperInit>(
+        'whisper_init_from_file_with_params_by_ref');
+    _full = _lib.lookupFunction<_WhisperFullNative, _WhisperFull>(
+        'whisper_full_by_ref');
+    final freeContextParams = _lib.lookupFunction<Void Function(Pointer<Void>),
+        void Function(Pointer<Void>)>('whisper_free_context_params');
     final ctxDefault =
         _lib.lookupFunction<_DefaultCtxParamsNative, _DefaultCtxParams>(
             'whisper_context_default_params_by_ref')();
-    final pathPtr = modelPath.toNativeUtf8();
-    _ctx = _initByRef(pathPtr, ctxDefault);
-    calloc.free(pathPtr);
-
-    if (_ctx == nullptr) {
-      throw Exception('Failed to load model: $modelPath');
+    if (ctxDefault == nullptr) {
+      throw StateError('Whisper context parameter allocation failed');
     }
+    final pathPtr = modelPath.toNativeUtf8();
+    try {
+      if (dtw) {
+        final configure = _lib.lookupFunction<
+            Void Function(Pointer<Void>, Bool, Int32, Int32),
+            void Function(
+                Pointer<Void>, bool, int, int)>('crispasr_ctx_params_set_dtw');
+        configure(ctxDefault, true, dtwPreset, dtwTop);
+      }
+      _ctx = _initByRef(pathPtr, ctxDefault);
+    } finally {
+      calloc.free(pathPtr);
+      freeContextParams(ctxDefault);
+    }
+    if (_ctx == nullptr) throw Exception('Failed to load model: $modelPath');
 
     _tryBindExtended();
   }
@@ -2064,8 +2076,12 @@ class CrispASR {
     Float32List pcm, {
     int strategy = 0,
     TranscribeOptions? options,
+    int nProcessors = 1,
   }) {
     _checkDisposed();
+    if (nProcessors < 1) {
+      throw ArgumentError.value(nProcessors, "nProcessors", "must be positive");
+    }
 
     final opts = options ?? TranscribeOptions(strategy: strategy);
 
@@ -2076,6 +2092,10 @@ class CrispASR {
     }
 
     final params = _defaultParams(opts.strategy);
+    if (params == nullptr) {
+      calloc.free(samples);
+      throw StateError("Whisper decode parameter allocation failed");
+    }
     Pointer<Utf8>? langPtr;
     Pointer<Utf8>? promptPtr;
     Pointer<Utf8>? vadPathPtr;
@@ -2125,7 +2145,17 @@ class CrispASR {
       // the setter — silently skip so callers stay forward-compatible.
       if (opts.altN > 0) _paramsSetAltN?.call(params, opts.altN);
 
-      final ret = _full(_ctx, params, samples, pcm.length);
+      final int ret;
+      if (nProcessors == 1) {
+        ret = _full(_ctx, params, samples, pcm.length);
+      } else {
+        final parallel = _lib.lookupFunction<
+            Int32 Function(
+                Pointer<Void>, Pointer<Void>, Pointer<Float>, Int32, Int32),
+            int Function(Pointer<Void>, Pointer<Void>, Pointer<Float>, int,
+                int)>('crispasr_transcribe_parallel_by_ref');
+        ret = parallel(_ctx, params, samples, pcm.length, nProcessors);
+      }
       if (ret != 0) throw Exception('Transcription failed (error $ret)');
 
       return _collectSegments(wantWords: opts.wordTimestamps);
@@ -2138,14 +2168,26 @@ class CrispASR {
     }
   }
 
+  /// Native DTW timestamp in seconds, or -1 when unavailable.
+  double tokenDtwTime(int segment, int token) {
+    _checkDisposed();
+    if (segment < 0 || token < 0) throw ArgumentError('negative token index');
+    if (!_lib.providesSymbol('crispasr_token_dtw_t')) return -1;
+    final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32, Int32),
+        int Function(Pointer<Void>, int, int)>('crispasr_token_dtw_t');
+    final time = fn(_ctx, segment, token);
+    return time < 0 ? -1 : time / 100.0;
+  }
+
   List<Segment> _collectSegments({required bool wantWords}) {
     final n = _nSegments(_ctx);
     final segments = <Segment>[];
     for (var i = 0; i < n; i++) {
       final textPtr = _getText(_ctx, i);
       final text = textPtr == nullptr ? '' : textPtr.toDartString();
-      final t0 = _getT0(_ctx, i) / 100.0;
-      final t1 = _getT1(_ctx, i) / 100.0;
+      final rawT0 = _getT0(_ctx, i), rawT1 = _getT1(_ctx, i);
+      final t0 = _hasTs(rawT0, rawT1) ? rawT0 / 100.0 : -1.0;
+      final t1 = _hasTs(rawT0, rawT1) ? rawT1 / 100.0 : -1.0;
       final nsp = _getNSP(_ctx, i);
 
       final words = <Word>[];
@@ -2158,7 +2200,7 @@ class CrispASR {
         final nTokens = _fullNTokens!(_ctx, i);
         for (var k = 0; k < nTokens; k++) {
           final tp = _tokenText!(_ctx, i, k);
-          final tok = tp == nullptr ? '' : tp.toDartString();
+          final tok = tp == nullptr ? '' : _decodeCString(tp, allowMalformed: true);
           if (tok.isEmpty) continue;
           // Skip the special-token brackets whisper emits inline.
           if (tok.startsWith('[_') || tok.startsWith('<|')) continue;
@@ -2187,8 +2229,12 @@ class CrispASR {
           }
           words.add(Word(
             text: tok,
-            start: _tokenT0!(_ctx, i, k) / 100.0,
-            end: _tokenT1!(_ctx, i, k) / 100.0,
+            start: _tokenT0!(_ctx, i, k) < 0
+                ? -1.0
+                : _tokenT0!(_ctx, i, k) / 100.0,
+            end: _tokenT1!(_ctx, i, k) < 0
+                ? -1.0
+                : _tokenT1!(_ctx, i, k) / 100.0,
             p: _tokenP!(_ctx, i, k),
             alts: alts,
           ));
@@ -6821,17 +6867,19 @@ class ParakeetResult {
 
   ParakeetResult._(this._lib, this._handle);
 
+  Pointer<Void> get _checked {if(_handle==nullptr)throw StateError("Parakeet result freed");return _handle;}
+
   String get text {
     final fn = _lib.lookupFunction<Pointer<Utf8> Function(Pointer<Void>),
         Pointer<Utf8> Function(Pointer<Void>)>('crispasr_parakeet_result_text');
-    final p = fn(_handle);
-    return p == nullptr ? '' : p.toDartString();
+    final p = fn(_checked);
+    return p == nullptr ? '' : _decodeCString(p, allowMalformed: true);
   }
 
   int get nWords {
     final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
         int Function(Pointer<Void>)>('crispasr_parakeet_result_n_words');
-    return fn(_handle);
+    return fn(_checked);
   }
 
   String wordText(int i) {
@@ -6839,26 +6887,26 @@ class ParakeetResult {
         Pointer<Utf8> Function(Pointer<Void>, Int32),
         Pointer<Utf8> Function(
             Pointer<Void>, int)>('crispasr_parakeet_result_word_text');
-    final p = fn(_handle, i);
-    return p == nullptr ? '' : p.toDartString();
+    final p = fn(_checked, i);
+    return p == nullptr ? '' : _decodeCString(p, allowMalformed: true);
   }
 
   int wordT0(int i) {
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_parakeet_result_word_t0');
-    return fn(_handle, i);
+    return fn(_checked, i);
   }
 
   int wordT1(int i) {
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_parakeet_result_word_t1');
-    return fn(_handle, i);
+    return fn(_checked, i);
   }
 
   int get nTokens {
     final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
         int Function(Pointer<Void>)>('crispasr_parakeet_result_n_tokens');
-    return fn(_handle);
+    return fn(_checked);
   }
 
   String tokenText(int i) {
@@ -6866,20 +6914,25 @@ class ParakeetResult {
         Pointer<Utf8> Function(Pointer<Void>, Int32),
         Pointer<Utf8> Function(
             Pointer<Void>, int)>('crispasr_parakeet_result_token_text');
-    final p = fn(_handle, i);
-    return p == nullptr ? '' : p.toDartString();
+    final p = fn(_checked, i);
+    return p == nullptr ? '' : _decodeCString(p, allowMalformed: true);
+  }
+
+  Uint8List tokenBytes(int i) {
+    final fn=_lib.lookupFunction<Pointer<Utf8> Function(Pointer<Void>,Int32),Pointer<Utf8> Function(Pointer<Void>,int)>('crispasr_parakeet_result_token_text');
+    return _copyCStringBytes(fn(_checked,i));
   }
 
   int tokenT0(int i) {
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_parakeet_result_token_t0');
-    return fn(_handle, i);
+    return fn(_checked, i);
   }
 
   int tokenT1(int i) {
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_parakeet_result_token_t1');
-    return fn(_handle, i);
+    return fn(_checked, i);
   }
 
   double tokenP(int i) {
@@ -6887,14 +6940,14 @@ class ParakeetResult {
         Float Function(Pointer<Void>, Int32),
         double Function(
             Pointer<Void>, int)>('crispasr_parakeet_result_token_p');
-    return fn(_handle, i);
+    return fn(_checked, i);
   }
 
   void free() {
     if (_handle == nullptr) return;
     final fn = _lib.lookupFunction<Void Function(Pointer<Void>),
         void Function(Pointer<Void>)>('crispasr_parakeet_result_free');
-    fn(_handle);
+    fn(_checked);
     _handle = nullptr;
   }
 }
@@ -6922,25 +6975,20 @@ class CrispasrParakeet {
 
   /// Transcribe mono 16 kHz float32 PCM. The returned [ParakeetResult]
   /// must be freed by the caller via [ParakeetResult.free].
-  ParakeetResult transcribe(Float32List pcm16k, {String? language}) {
-    final pcmPtr = malloc<Float>(pcm16k.length);
-    pcmPtr.asTypedList(pcm16k.length).setAll(0, pcm16k);
-    final langPtr = language != null ? language.toNativeUtf8() : nullptr;
-    try {
-      final fn = _lib.lookupFunction<
-          Pointer<Void> Function(
-              Pointer<Void>, Pointer<Float>, Int32, Pointer<Utf8>),
-          Pointer<Void> Function(Pointer<Void>, Pointer<Float>, int,
-              Pointer<Utf8>)>('crispasr_parakeet_transcribe');
-      final res = fn(_handle, pcmPtr, pcm16k.length, langPtr.cast<Utf8>());
-      if (res == nullptr) {
-        throw Exception('crispasr_parakeet_transcribe returned null');
-      }
-      return ParakeetResult._(_lib, res);
-    } finally {
-      malloc.free(pcmPtr);
-      if (langPtr != nullptr) malloc.free(langPtr);
+  ParakeetResult transcribe(Float32List pcm16k, {String? language, int offsetCs=0}) {
+    if (_handle == nullptr) throw StateError('Parakeet context is closed');
+    if (pcm16k.isEmpty) throw ArgumentError('Nonempty PCM required');
+    if (language != null && language.isNotEmpty && language != 'en') {
+      throw ArgumentError('Legacy Parakeet has no language parameter; use a unified Session');
     }
+    final pcmPtr=malloc<Float>(pcm16k.length);
+    try {
+      pcmPtr.asTypedList(pcm16k.length).setAll(0,pcm16k);
+      final fn=_lib.lookupFunction<Pointer<Void> Function(Pointer<Void>,Pointer<Float>,Int32,Int64),Pointer<Void> Function(Pointer<Void>,Pointer<Float>,int,int)>('crispasr_parakeet_transcribe');
+      final result=fn(_handle,pcmPtr,pcm16k.length,offsetCs);
+      if(result==nullptr)throw StateError('Parakeet transcription failed');
+      return ParakeetResult._(_lib,result);
+    }finally{malloc.free(pcmPtr);}
   }
 
   void close() {

@@ -129,7 +129,11 @@ int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const crispasr_cha
     return n ? strlen(m[n - 1].content) : 0;
 }
 size_t crispasr_chat_memory_estimate(const char* path, const crispasr_chat_open_params* p, crispasr_chat_error* e) {
+#if SIZE_MAX > UINT32_MAX
     return ((size_t)1 << 40) + 123;
+#else
+    return 123;
+#endif
 }
 void crispasr_chat_string_free(char* text) {
     if (text) {

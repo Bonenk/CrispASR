@@ -1119,15 +1119,17 @@ namespace CrispASR
     {
         private IntPtr _handle;
 
-        private readonly Session _owner;
-        internal StreamDecoder(Session owner, IntPtr handle) { _owner=owner;_handle = handle; }
+        private readonly Action _checkOwner;
+        private readonly Action<StreamDecoder> _onClosed;
+        internal StreamDecoder(Session owner, IntPtr handle) : this(owner.CheckStreamOwner,owner.StreamClosed,handle) {}
+        internal StreamDecoder(Action checkOwner,Action<StreamDecoder> onClosed,IntPtr handle) {_checkOwner=checkOwner;_onClosed=onClosed;_handle=handle;}
         public void SetLiveDecode(bool enabled) => NativeMethods.crispasr_stream_set_live_decode(Handle,enabled?1:0);
 
         private IntPtr Handle
         {
             get
             {
-                _owner.CheckStreamOwner();
+                _checkOwner();
                 if (_handle == IntPtr.Zero) throw new ObjectDisposedException(nameof(StreamDecoder));
                 return _handle;
             }
@@ -1167,9 +1169,9 @@ namespace CrispASR
         {
             if (_handle != IntPtr.Zero)
             {
-                _owner.CheckStreamOwner();
+                _checkOwner();
                 NativeMethods.crispasr_stream_close(_handle);
-                _owner.StreamClosed(this);
+                _onClosed(this);
                 _handle = IntPtr.Zero;
             }
         }

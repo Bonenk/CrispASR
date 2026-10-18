@@ -294,14 +294,14 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
         // Direct Parakeet API
         Pointer crispasr_parakeet_init(String modelPath, int nThreads, int useFlash);
         void    crispasr_parakeet_free(Pointer ctx);
-        Pointer crispasr_parakeet_transcribe(Pointer ctx, float[] pcm, int nSamples, String language);
+        Pointer crispasr_parakeet_transcribe(Pointer ctx, float[] pcm, int nSamples, long offsetCs);
         String  crispasr_parakeet_result_text(Pointer r);
         int     crispasr_parakeet_result_n_words(Pointer r);
         String  crispasr_parakeet_result_word_text(Pointer r, int i);
         long    crispasr_parakeet_result_word_t0(Pointer r, int i);
         long    crispasr_parakeet_result_word_t1(Pointer r, int i);
         int     crispasr_parakeet_result_n_tokens(Pointer r);
-        String  crispasr_parakeet_result_token_text(Pointer r, int i);
+        Pointer crispasr_parakeet_result_token_text(Pointer r, int i);
         long    crispasr_parakeet_result_token_t0(Pointer r, int i);
         long    crispasr_parakeet_result_token_t1(Pointer r, int i);
         float   crispasr_parakeet_result_token_p(Pointer r, int i);
@@ -340,8 +340,6 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
                                                   Pointer segs, int nSegs);
 
         // Kokoro lang helpers
-        boolean crispasr_kokoro_lang_is_german_abi(String lang);
-        boolean crispasr_kokoro_lang_has_native_voice_abi(String lang);
 
         // Backend detection
         int crispasr_detect_backend_from_gguf(String path, byte[] outName, int outCap);
@@ -431,6 +429,10 @@ public final class CrispasrSession extends CrispasrSessionTasks implements AutoC
             throw new IllegalStateException("crispasr_session_open: failed to open " + modelPath);
         }
         return new CrispasrSession(p);
+    }
+
+    static CrispasrSession wrap(Pointer handle) {
+        return new CrispasrSession(handle);
     }
 
     /**

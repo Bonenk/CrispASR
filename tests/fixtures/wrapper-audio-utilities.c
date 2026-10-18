@@ -76,6 +76,7 @@ void crispasr_c2pa_free(unsigned char* p) {
         free(p);
     }
 }
+#ifndef CRISPASR_PROBE_AUDIO_ONLY
 int crispasr_watermark_load_model(const char* path) {
     return utility_mode == 2 ? -1 : 0;
 }
@@ -87,3 +88,12 @@ int crispasr_session_score_texts(crispasr_session* s, const float* pcm, int n, c
     }
     return 0;
 }
+
+bool crispasr_kokoro_lang_is_german_abi(const char* lang) {
+    return !strcmp(lang, "de");
+}
+bool crispasr_kokoro_lang_has_native_voice_abi(const char* lang) {
+    return !strcmp(lang, "en");
+}
+
+#endif

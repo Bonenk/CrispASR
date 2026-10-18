@@ -169,6 +169,8 @@ CRISPASR_SESSION_API void crispasr_params_set_vad_threshold(whisper_full_params*
 CRISPASR_SESSION_API void crispasr_params_set_vad_min_speech_ms(whisper_full_params* p, int ms);
 CRISPASR_SESSION_API void crispasr_params_set_vad_min_silence_ms(whisper_full_params* p, int ms);
 CRISPASR_SESSION_API void crispasr_params_set_tdrz(whisper_full_params* p, int v);
+CRISPASR_SESSION_API int crispasr_transcribe_parallel_by_ref(whisper_context* ctx, const whisper_full_params* params,
+                                                             const float* samples, int n_samples, int n_processors);
 CRISPASR_SESSION_API void crispasr_ctx_params_set_dtw(whisper_context_params* p, bool enable, int aheads_preset,
                                                       int n_top);
 CRISPASR_SESSION_API int64_t crispasr_token_t0(whisper_context* ctx, int i_seg, int i_tok);

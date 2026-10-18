@@ -754,7 +754,10 @@ fn vad_slices_real_model_is_not_a_load_failure() {
     };
     let pcm = vec![0.0f32; 16000];
     let result = crispasr::vad_slices(&model, &pcm, 16000, 0.5, 250, 100, 30, 30.0, 1);
-    assert!(result.is_ok(), "a loadable VAD model must not error: {result:?}");
+    assert!(
+        result.is_ok(),
+        "a loadable VAD model must not error: {result:?}"
+    );
 }
 
 // -------------------------------------------------------------------------
@@ -1782,7 +1785,10 @@ fn separate_returns_named_stems_at_the_models_own_rate() {
     // The rate accessor is the thing a caller needs BEFORE they can feed it
     // anything, and its absence is why the reporter saw 0.
     let sr = s.separate_sample_rate();
-    assert!(sr > 0, "separate_sample_rate must be known once loaded, got {sr}");
+    assert!(
+        sr > 0,
+        "separate_sample_rate must be known once loaded, got {sr}"
+    );
 
     // 2 s of interleaved stereo at the model's own rate. Not silence: a quiet
     // tone, so a backend that returns its input unchanged is still exercised.

@@ -44,6 +44,14 @@ static void rb_extra_check(int rc, const char* name) {
         rb_raise(rb_eRuntimeError, "%s failed (rc=%d)", name, rc);
 }
 static _Thread_local int rb_extra_in_stream;
+static _Thread_local VALUE rb_aux_pending_exc = Qnil;
+static inline void rb_aux_check_pending(void) {
+    if (rb_aux_pending_exc != Qnil) {
+        VALUE e = rb_aux_pending_exc;
+        rb_aux_pending_exc = Qnil;
+        rb_exc_raise(e);
+    }
+}
 static struct CrispasrSession* rb_extra_handle(VALUE handle) {
     if (rb_extra_in_stream)
         rb_raise(rb_eRuntimeError, "session re-entry during streaming callback");

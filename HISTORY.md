@@ -1,3 +1,33 @@
+## Wrapper auxiliary and legacy pointer repairs — 2026-10-18
+
+Added usable C#/Java registry, cache, session options, speaker embedder and
+clustering, pyannote cache, diarization/turns, text-LID and VAD-slice APIs.
+C# also adds `WhisperContext` with opaque parameters, raw token/alternative/
+DTW results and pointer-safe parallel inference. The new shared
+`crispasr_transcribe_parallel_by_ref` delegates to the existing progress-tracking
+implementation; C API self-ID is 0.7.1. Python now prefers native pointer
+exports and retains VAD-model strings. Dart rejects unsafe struct-by-value
+fallbacks and frees context parameters, exposes DTW and parallel decoding,
+and handles incomplete legacy UTF-8 tokens without throwing.
+
+WASM adds measured character alignment and VAD spans/slices, and opt-in chat
+with native option defaults, owned streamed bytes, abort/error transport and
+shared ownership during callback deletion. Chat is restricted to single-thread
+modules until browser compute/servicer dispatch is implemented. Ruby adds
+auxiliary/chat operations; review removed dummy diarization and ignored chat
+options, corrected bool signatures, protected callback routing and fixed
+partial-error/alias audio ownership. Direct callback probes are test-only.
+
+Local validation: C# 211 assertions, Java 164, Ruby 159, WASM 115, Dart analyzer
+plus 34 FFI tests, and two Python native-pointer/Parakeet regressions. These are ABI
+transport/ownership checks with model-free decoders, not model quality or full
+platform acceptance. Go/Rust add metadata/music/conversion/TTS/audio and typed ASR callbacks:
+23 Go tests, 20 Rust tests and five ownership doctests pass. Native headers
+exposed the incorrect legacy Parakeet language-pointer argument; corrected it
+to a 64-bit centisecond offset across affected wrappers and added direct
+C#/Java/WASM classes. Exhaustive callable inventory and full platform gates
+remain in PLAN.md. No release/tag was cut.
+
 ## WASM auxiliary transport — 2026-10-18
 
 Added audio loading/resampling with RAII cleanup and stereo alias handling,

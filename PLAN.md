@@ -11,81 +11,100 @@ claims universal full parity. Declaration/symbol-mention counts are not callable
 API coverage; legacy Parakeet token readers do not cover shared session tokens.
 
 
-Implementation is now claimed by the maintainer coordinator for all wrapper
-families. Work proceeds with two bounded Hermes tasks (Dart; Go/Rust) and the
-coordinator handling Python utilities, C# safety and Java/Ruby/WASM, tests and
-integration. Agents may edit only their assigned wrapper directories and test
-files; the coordinator owns shared headers, manifests, documentation, commits
-and pushes. No model/graph math changes or heavy local builds. Each public API
-must have a callable implementation, correct result/ownership handling and
-behavioral validation; a declaration alone does not close a gap.
+Implementation is owned by the maintainer coordinator for all wrapper families.
+The bounded external wrapper tasks have ended; their results were reviewed and
+corrected against native code. No model/graph math changes are part of this
+work. A public API needs correct callable behavior, result ownership and tests;
+a declaration alone does not close a gap.
 
+Validated implementation checkpoint (model-free ABI transport):
 
-Coordinator checkpoint: Python's eight additional audio/container/channel APIs
-are implemented, and its guard now inventories both headers (296 unique
-functions, including explicit equivalent/retired cases). Three compiled-probe
-tests pass, including literal native WAV/sign wrapper functions with a mocked
-signing backend; this is not cryptographic trust/real-signing acceptance.
-C# replay-noise tests first failed on an undersized buffer reaching native code;
-length/overflow checks now pass. Shared C# tokens/raw bytes, all four result
-routes and TTS/callback additions pass 61 actual .NET/C-ABI assertions across
-current and older probe libraries. Other C# utilities remain in progress.
-Java operations/utilities pass 59 actual JNA/native assertions plus six older-token-API checks;
-Ruby's compiled extension passes 29 assertions. Both now copy shared tokens and
-alternatives in their normal/chunked/VAD/logits result readers, and expose music,
-conversion and the new TTS operations. Java streaming handles now retain their
-session and close before it. WASM shared metadata, beats/tab/conversion and TTS adapters pass 33 actual
-Embind/Node assertions (local Emscripten 6.0.0). The async compute-to-servicer
-path uses the same owned metadata; full native/browser builds remain pending.
-Java/C# native audio/container/capability/text-processor/scoring APIs now pass
-compiled probes. C# additionally closes child streams before session teardown:
-69 core current/old-ABI assertions plus 23 utility assertions. The complete
-WASM adapter passes local single-thread syntax compilation against public
-headers; manually duplicated extern declarations were removed. Threaded/full
-hosted builds and the remaining auxiliary/chat APIs are not yet accepted.
-Dart now passes strict analyzer checks and 32 actual FFI tests, including a
-separate older-library process, shared metadata on drained segments, raw token
-polling, callback re-entry across native getters/setters, and successful audio/
-binary ownership transport. Fixed stereo alias double-free and partial-error
-buffer leaks. Probes compile in unique directories rather than reusing stale
-binaries. C# now exposes the 14 chat APIs and passes 26 chat-specific layout,
-lifetime, cancellation and raw-stream assertions (118 total .NET assertions).
-These are model-free checks, not model/cryptographic acceptance.
+- Python now inventories **297** functions across both shared headers: 292
+  bound, three equivalents/compiled adapters and two retired stubs. Native
+  pointer initialization/inference works without a separate helper library.
+- C# has **211 assertions**: core/old-library 69, utilities 23, chat 26,
+  registry/open-options/embedder/clustering/cache/LID/VAD/diarization 40, and
+  legacy Whisper 35 and legacy Parakeet 18. `WhisperContext` copies tokens/raw bytes/alternatives/DTW
+  times and retains native parameter strings. New real-library registry/bool
+  smoke is registered with the existing required-live C# suite; hosted result
+  remains pending.
+- Java has **164 assertions** (63 core, six older-library, 95 auxiliary/Parakeet).
+  `CrispasrAuxiliary` provides usable registry/cache, session options,
+  speaker/embedder/clustering, pyannote/diarization, text-LID and VAD slices.
+  Kokoro bool exports use byte-sized returns instead of JNA boolean32.
+- Dart strict analyzer and **34 FFI tests** pass. Legacy Whisper now rejects
+  unsafe by-value fallbacks, frees context/default decode parameters and
+  supports DTW and pointer-safe parallel decoding. Split token fragments use
+  replacement for display; native byte-preserving session tokens remain owned.
+- WASM has **115 Embind/Node assertions**: 76 operation/result/utility/analysis
+  and 39 chat. Added measured character alignment and VAD spans/slices with
+  cleanup even on partial native errors. Chat is opt-in and currently requires
+  `CRISPASR_WASM_SINGLE_THREAD=ON`; the default bundle reports unavailable.
+  Streaming returns owned raw bytes and callback failures after native returns.
+- Ruby auxiliary changes were reviewed beyond their initial passing probe.
+  Removed a dummy diarization implementation, made options real, fixed ignored
+  chat options/string keys, callback re-entry, audio error leaks/stereo aliases,
+  and restricted direct callback-test entry points to probe builds. **159
+  assertions** now include native struct/argument checks, actual speaker turns,
+  changed chat context/sampler options, GC during callbacks and audio errors.
+  This does not certify every legacy Ruby wrapper or every allocation path.
 
-Go/Rust source and harness remain under review. A first harness revision was
-rejected because it embedded a private include path, put fake libraries into
-ordinary build directories and could compile a probe C file into the production
-Go package. The corrective task requires temporary isolated link outputs,
-aborting unexercised stubs, clean cgo handles and actual language/native tests.
-Do not accept its current partial edits. Ruby's remaining auxiliary + chat APIs
-are in a separate bounded task. WASM auxiliary implementations pass 56 actual Embind assertions; full
-model/browser and separate chat/platform wiring is pending.
+`crispasr_transcribe_parallel_by_ref` is a new shared ABI export (C API version
+0.7.1; no release bump). The Python/C#/Dart probes compile literal native
+setters, token and parallel adapters against the actual Whisper structs. They
+prove pointer layout, DTW, retained UTF-8 strings and cleanup, not ASR accuracy.
 
-Remaining full inventory: both shared headers (296 functions), chat (14),
-per-wrapper public methods/results and explicit equivalent/retired/platform
-classifications. C# still needs registry/speaker-embedder/clustering/cache,
-text-LID/VAD-slices/open-options integration; Dart stream-parent lifetimes are now guarded and tested; Java legacy helper equivalents need proof. Register actual behavioral
-checks for each repaired family, then full library/platform and pinned real
-model outputs/roundtrips. These checkpoints are not all-wrapper completion.
+Go/Rust now pass **23 Go tests, 20 Rust tests and five Rust doctests**.
+New music/conversion/TTS/audio/metadata implementations and typed ASR callbacks
+are exercised through isolated header-checked probes. Callback roots survive
+native calls; panic errors are deferred until results are freed. Go rejects
+same-session re-entry; Rust stream ownership is an exclusive parent borrow,
+with a compile-fail doctest. The existing stack Rust progress callback now also
+catches panics and restores the previously registered callback. Probes stay out
+of ordinary build discovery, and the Rust probe uses an explicit Cargo feature.
+
+Using the actual C header exposed a legacy Parakeet signature bug in Python,
+Go, Rust, Java, Ruby and Dart: the final transcription argument is **int64
+centiseconds**, not a language pointer. All now pass an integer offset. Existing
+optional empty/English hints remain compatible; unsupported language hints
+raise instead of pretending to be native parameters. Added usable direct
+Parakeet classes to C#/Java/WASM and raw fragment access where needed. A shared
+real-header fixture checks default/123 offsets, missing timing, split bytes,
+owned results and closed contexts in applicable wrappers.
+
+The exhaustive callable inventory remains open: **297 shared-header functions
+plus 14 chat functions**, mapped to actual public methods/results in all eight
+languages with explicit equivalents/retired/platform exclusions. A rejected
+symbol-mention manifest is not evidence. Remaining rows must be checked against
+code, including legacy Whisper/Parakeet helpers, typed ASR callbacks, speaker
+DB/auxiliary families and WASM registry/diarization/browser scheduling.
 
 Repair order and acceptance:
 
 1. **Complete the callable inventory:** map both headers and chat to public
    methods/results in every wrapper. Explicitly classify bulk equivalents,
    retired stubs and platform exclusions. A declaration is not coverage.
-2. **Accept Go/Rust:** isolate their link probes from normal build outputs;
-   prove all result readers, raw bytes, alternatives, callbacks/panics and
-   replay bounds through the real safe wrappers, then land the reviewed source.
-3. **Finish Ruby auxiliary/chat:** audio/container ownership, processors,
-   pitch/separation, callback registration/polling, runtime queries, registry/
-   scoring and all chat operations. Retain centisecond/legacy-VAD-second units.
-4. **Finish WASM auxiliary/chat:** behavioral tests for newly compiled helpers,
-   VAD/character-alignment and callback routes, full static export registration,
-   browser scheduling and build-size/backend availability. Keep exceptions out
-   of native callback frames and preserve owned data across compute threads.
-5. **Complete remaining C#/Java/Dart families:** C# registry/embedder/cache/LID/
-   VAD/open-options; verify Java legacy controls/equivalents and platform-specific stream
-   disposal paths. Close every remaining manifest row against actual code.
+2. **Finish legacy/helper inventory:** confirm every exposed Whisper scalar
+   setter, DTW configuration, native progress/parallel route and direct
+   Parakeet operation has a public callable path. C#/Java/WASM direct Parakeet
+   now exists; do not repeat the language-pointer bug. Record deliberate
+   low-level/by-ref equivalents by language, not a global Python exception.
+3. **Finish Ruby lifetime/ownership:** audit all malloc-returning container/
+   processor/scoring helpers for Ruby allocation exceptions, and raw legacy
+   context/stream handles for close/re-entry. Replace remaining declaration-only
+   auxiliary APIs with usable methods; keep native centisecond/VAD-second units.
+4. **Finish WASM auxiliary and browser dispatch:** typed ASR callback setters,
+   registry/cache/speaker/diarization families, and complete compute/servicer
+   scheduling. Chat is intentionally unavailable in threaded modules until
+   native work and callback delivery are safely proxied. Measure full-module
+   size (default and chat opt-in), instantiate real models and prove browser
+   behavior; the tiny probes do not establish those claims.
+5. **Close remaining per-wrapper rows:** check C#/Java/Dart speaker-DB/TitaNet,
+   legacy controls and stream disposal against actual public methods. Use
+   `SessionAuxiliary.cs`, `WhisperContext.cs`, `ParakeetContext.cs`,
+   `CrispasrAuxiliary.java` and their probes as starting points, not missing-row
+   assumptions from the historical audit. Go/Rust already have safe music,
+   conversion, TTS and retained ASR callbacks with passing isolated tests.
 6. **Hosted/model acceptance:** full library/compiler jobs and representative
    real tasks through each wrapper, pinned models/source/inputs and TTS→ASR
    roundtrips. No release from declaration counts, fixture probes or queued CI.
@@ -94,8 +113,8 @@ Repair order and acceptance:
 
 Owner: maintainer coordinator. Source inventory and operation contracts are in
 [Python API coverage](docs/python-api-coverage.md); completed implementation is
-archived in HISTORY.md. The census now reads both shared public headers: 296 unique functions
-(291 bound, three equivalent/compiled adapters, two retired native stubs).
+archived in HISTORY.md. The census now reads both shared public headers: 297 unique functions
+(292 bound, three equivalent/compiled adapters, two retired native stubs).
 The eight additional audio/container/channel functions were implemented and
 probed; completed work is in HISTORY.md. Separate chat, other-language callable
 coverage and real-model acceptance remain independent gates.

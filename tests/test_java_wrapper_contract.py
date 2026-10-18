@@ -54,6 +54,8 @@ public class WrapperAbiProbe {
             reject(IllegalStateException.class,()->CrispasrSession.signC2pa(new byte[]{1},"audio/wav",null,null));
             eq(Probe.INSTANCE.probe_utility_live(),0);Probe.INSTANCE.probe_utility_mode(0);
             eq(s.scoreTexts(pcm,new String[]{"one","two"},null,null).tokenCounts[1],3);
+            eq(CrispasrSession.kokoroLanguageIsGerman("de"),true);eq(CrispasrSession.kokoroLanguageIsGerman("en"),false);
+            eq(CrispasrSession.kokoroLanguageHasNativeVoice("en"),true);eq(CrispasrSession.kokoroLanguageHasNativeVoice("xx"),false);
             eq(CrispasrSession.cApiVersion(),"probe");eq(CrispasrSession.helperVersion(),"probe-helpers");
             eq(CrispasrSession.backendCapabilities("foo")[0],"asr");
             try(CrispasrUtilities.TextProcessor processor=new CrispasrUtilities.TextProcessor("probe",false)){eq(processor.process("test"),"Grüße");}
@@ -86,6 +88,165 @@ public class WrapperAbiProbe {
     }
 }
 '''
+PROGRAM_AUX=r'''
+import io.github.ggerganov.whispercpp.*;
+import com.sun.jna.*;
+import java.util.*;
+import java.nio.charset.StandardCharsets;
+public class WrapperAuxProbe {
+    public interface Probe extends Library {
+        Probe INSTANCE=Native.load("crispasr",Probe.class);
+        void probe_aux_mode(int n);int probe_aux_live();int probe_aux_segment_size();int probe_aux_options_size();
+    }
+    static int assertions;
+    static void eq(Object a,Object b){if(!Objects.equals(a,b))throw new AssertionError(a+" != "+b+" expected "+b+" got "+a);assertions++;}
+    static void eqFloat(float a,float b){if(Math.abs(a-b)>1e-6)throw new AssertionError(a+" != "+b);assertions++;}
+    static void reject(Class<? extends Throwable> cls,Runnable fn) {
+        try {fn.run();}catch(Throwable t){if(cls.isInstance(t)){assertions++;return;}throw new AssertionError("expected "+cls.getName()+" got "+t,t);}
+        throw new AssertionError("expected "+cls.getName());
+    }
+    public static void main(String[] args) {
+        // pointer width / layout assertions (literal runtime structs)
+        eq(24, Probe.INSTANCE.probe_aux_segment_size());
+        eq(48, Probe.INSTANCE.probe_aux_options_size());
+        // 64-bit pointer width check
+        if (Native.POINTER_SIZE != 8) throw new AssertionError("expected 64-bit pointer size");
+        assertions++;
+
+        // v2 session open options
+        CrispasrAuxiliary.SessionOptions opts=new CrispasrAuxiliary.SessionOptions().threads(7).useGpu(false).verbosity(2).flashAttention(false).gpuLayers(3);
+        try(CrispasrSession s=CrispasrAuxiliary.openWithOptions("probe","probe",opts)){
+            eq(s.backend(),"probe");
+        }
+        // malformed open options are implicit via native null return - not testing invalid threads here
+
+        // registry
+        CrispasrAuxiliary.RegistryEntry e=CrispasrAuxiliary.registryLookup("foo");
+        eq(e.filename,"model.gguf");eq(e.url,"https://test/model");eq(e.size,"1MB");
+        eq(CrispasrAuxiliary.registryLookup("missing"),null);
+        eq(CrispasrAuxiliary.registryLookupByFilename("model.gguf").filename,"model.gguf");
+        String[] backs=CrispasrAuxiliary.registryListBackends();
+        eq(backs.length,2);eq(backs[0],"foo");eq(backs[1],"bar");
+        CrispasrAuxiliary.RegistryBundle bundle=CrispasrAuxiliary.registryDefaultBundle("foo");
+        eq(bundle.backend,"foo");eq(bundle.license,"Apache-2.0");eq(bundle.requiresAcceptance,false);
+        eq(bundle.artifacts.length,1);eq(bundle.artifacts[0].kind,1);eq(bundle.artifacts[0].entry.filename,"model.gguf");
+        eq(CrispasrAuxiliary.cacheDir(null),"cache");
+        eq(CrispasrAuxiliary.cacheEnsureFile("model.gguf","https://test/model",true,null),"cache/model.gguf");
+        // positive failure propagation
+        Probe.INSTANCE.probe_aux_mode(2);
+        reject(IllegalStateException.class, ()-> CrispasrAuxiliary.cacheDir(null));
+        reject(IllegalStateException.class, ()-> CrispasrAuxiliary.cacheEnsureFile("model.gguf","https://test/model",true,null));
+        Probe.INSTANCE.probe_aux_mode(0);
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.registryLookup(null));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.registryLookupByFilename(null));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.registryDefaultBundle(null));
+
+        // speaker embedder lifecycle/dim/name/embed
+        float[] pcm={1,3,5};
+        try(CrispasrAuxiliary.SpeakerEmbedder emb=new CrispasrAuxiliary.SpeakerEmbedder("probe")){
+            eq(emb.dim(),3);eq(emb.name(),"embed-probe");
+            float[] out=emb.embed(pcm);
+            eqFloat(out[2],0.75f);
+            out[2]=999f; float[] out2=emb.embed(pcm); eqFloat(out2[2],0.75f); // copy test
+            Probe.INSTANCE.probe_aux_mode(2); reject(IllegalStateException.class, ()-> emb.embed(pcm)); Probe.INSTANCE.probe_aux_mode(0);
+        }
+        CrispasrAuxiliary.SpeakerEmbedder emb2=new CrispasrAuxiliary.SpeakerEmbedder("probe");
+        emb2.close();
+        reject(IllegalStateException.class, ()-> emb2.dim());
+        reject(IllegalStateException.class, ()-> emb2.embed(pcm));
+        reject(IllegalStateException.class, ()-> emb2.name());
+        emb2.close(); // double close safe
+        reject(NullPointerException.class, ()-> new CrispasrAuxiliary.SpeakerEmbedder(null));
+        reject(IllegalArgumentException.class, ()-> new CrispasrAuxiliary.SpeakerEmbedder("",4,null));
+        reject(IllegalArgumentException.class, ()-> new CrispasrAuxiliary.SpeakerEmbedder("probe",0,null));
+        reject(NullPointerException.class, ()-> { try(CrispasrAuxiliary.SpeakerEmbedder x=new CrispasrAuxiliary.SpeakerEmbedder("probe")){ x.embed(null); } });
+
+        // clustering
+        CrispasrAuxiliary.ClusterResult cr=CrispasrAuxiliary.cluster(new float[]{1,0,0,0,1,0},3,0.65f,8);
+        eq(cr.clusterCount,2);eq(cr.labels[1],1);
+        // copy check: mutating returned labels doesn't affect native
+        cr.labels[0]=99; CrispasrAuxiliary.ClusterResult cr2=CrispasrAuxiliary.cluster(new float[]{1,0,0,0,1,0},3,0.65f,8); eq(cr2.labels[0],0);
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.cluster(new float[5],3,0.65f,8));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.cluster(new float[]{1,2},0,0.65f,8));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.cluster(null,3,0.65f,8));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.cluster(new float[]{1,2,3},3,Float.NaN,8));
+
+        // pyannote cache compute/apply/free
+        CrispasrAuxiliary.DiarizationSegment[] segs={new CrispasrAuxiliary.DiarizationSegment(100,200)};
+        try(CrispasrAuxiliary.PyannoteCache cache=new CrispasrAuxiliary.PyannoteCache(pcm,"model")){
+            CrispasrAuxiliary.DiarizationSegment[] res=cache.apply(segs,250);
+            eq(res[0].speaker,2); eq(res[0].t0,100L);
+            eq(segs[0].speaker,-1); // original not mutated -> copy test
+            // mutate returned and re-apply should give same
+            res[0]=new CrispasrAuxiliary.DiarizationSegment(0,0,99);
+            CrispasrAuxiliary.DiarizationSegment[] res2=cache.apply(segs,250); eq(res2[0].speaker,2);
+            cache.close();
+            reject(IllegalStateException.class, ()-> cache.apply(segs,250));
+        }
+        try(CrispasrAuxiliary.PyannoteCache c2=new CrispasrAuxiliary.PyannoteCache(pcm,"model")){
+            reject(IllegalArgumentException.class, ()-> c2.apply(new CrispasrAuxiliary.DiarizationSegment[0],250));
+            reject(NullPointerException.class, ()-> c2.apply(null,250));
+        }
+        reject(NullPointerException.class, ()-> new CrispasrAuxiliary.PyannoteCache(null,"model"));
+        reject(NullPointerException.class, ()-> new CrispasrAuxiliary.PyannoteCache(pcm,null));
+        reject(IllegalArgumentException.class, ()-> new CrispasrAuxiliary.PyannoteCache(new float[0],"model"));
+
+        // diarize segments+turns options
+        CrispasrAuxiliary.DiarizationOptions dopts=new CrispasrAuxiliary.DiarizationOptions().method(4).nThreads(7).sliceOffsetCs(125).pyannoteModelPath("model").foxNoseEmbedderPath("embed").minSpeakers(1).maxSpeakers(3).numSpeakers(2);
+        CrispasrAuxiliary.DiarizationSegment[] inSegs={new CrispasrAuxiliary.DiarizationSegment(100,200)};
+        CrispasrAuxiliary.DiarizationResult dr=CrispasrAuxiliary.diarize(pcm,null,inSegs,dopts);
+        eq(dr.segments[0].speaker,1); eq(dr.turns[0].t0,125L); eq(dr.turns[0].t1,250L); eq(dr.turns[0].speaker,1);
+        eq(inSegs[0].speaker,-1); // copy test
+        // without turns
+        CrispasrAuxiliary.DiarizationResult dr2=CrispasrAuxiliary.diarizeWithoutTurns(pcm,inSegs,dopts);
+        eq(dr2.turns.length,0); eq(dr2.segments[0].speaker,1);
+        // malformed
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.diarize(pcm,new float[1],inSegs,dopts));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.diarize(pcm,null,new CrispasrAuxiliary.DiarizationSegment[0],dopts));
+        CrispasrAuxiliary.DiarizationOptions badOpts=new CrispasrAuxiliary.DiarizationOptions().method(99);
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.diarize(pcm,null,inSegs,badOpts));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.diarize(null,null,inSegs,dopts));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.diarize(pcm,null,null,dopts));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.diarize(pcm,null,inSegs,null));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.diarize(pcm,null,new CrispasrAuxiliary.DiarizationSegment[]{new CrispasrAuxiliary.DiarizationSegment(-1,10)},dopts));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.diarize(new float[0],null,inSegs,dopts));
+
+        // text language detection
+        CrispasrAuxiliary.LanguageDetection ld=CrispasrAuxiliary.detectTextLanguage("test","model");
+        eq(ld.label,"de"); eqFloat(ld.confidence,0.875f);
+        // copy test: label string is root retained but Java returns copy, mutating not possible but check second call same
+        CrispasrAuxiliary.LanguageDetection ld2=CrispasrAuxiliary.detectTextLanguage("test","model"); eq(ld2.label,"de");
+        Probe.INSTANCE.probe_aux_mode(2); reject(IllegalStateException.class, ()-> CrispasrAuxiliary.detectTextLanguage("test","model")); Probe.INSTANCE.probe_aux_mode(0);
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.detectTextLanguage(null,"model"));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.detectTextLanguage("test",null));
+
+        // VAD slices (seconds)
+        CrispasrSession.VADSpan[] spans=CrispasrAuxiliary.vadSlices("vad",pcm,16000,0.5f,250,100,30,0f,4);
+        eq(spans.length,1); eq(spans[0].t0,1.25); eq(spans[0].t1,2.5);
+        // copy test
+        double beforeT0=spans[0].t0; spans[0]=null; CrispasrSession.VADSpan[] spans2=CrispasrAuxiliary.vadSlices("vad",pcm); eq(spans2[0].t0,1.25);
+        Probe.INSTANCE.probe_aux_mode(1); eq(CrispasrAuxiliary.vadSlices("vad",pcm).length,0); Probe.INSTANCE.probe_aux_mode(0);
+        Probe.INSTANCE.probe_aux_mode(2); reject(IllegalStateException.class, ()-> CrispasrAuxiliary.vadSlices("vad",pcm)); Probe.INSTANCE.probe_aux_mode(0);
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.vadSlices(null,pcm));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.vadSlices("vad",pcm,0,0.5f,250,100,30,0f,4));
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.vadSlices("vad",null));
+        eq(CrispasrAuxiliary.vadSlices("vad",new float[0]).length,0);
+
+        // lcs
+        eq(CrispasrAuxiliary.lcsDedupPrefixCount(new int[]{1,2},new int[]{2,3},3),1);
+        reject(NullPointerException.class, ()-> CrispasrAuxiliary.lcsDedupPrefixCount(null,new int[]{1},3));
+        reject(IllegalArgumentException.class, ()-> CrispasrAuxiliary.lcsDedupPrefixCount(new int[]{1},new int[]{1},0));
+
+        CrispasrAuxiliary.Parakeet pk=new CrispasrAuxiliary.Parakeet("probe",4,true);
+        CrispasrAuxiliary.ParakeetTranscript pr=pk.transcribe(new float[]{1,3,5},123);
+        eq(pr.text,"日本語");eq(pr.words[0].t0,223L);eq(pr.tokens[0].t0,-1L);eq(pr.tokens[0].rawText[0],(byte)0xe6);
+        reject(IllegalArgumentException.class,()->pk.transcribe(new float[0],0));pk.close();pk.close();reject(IllegalStateException.class,()->pk.transcribe(new float[]{1},0));
+        // closed handles and buffer cleanup already checked via live
+        eq(Probe.INSTANCE.probe_aux_live(),0);
+        System.out.println("PASS Java auxiliary: "+assertions+" assertions");
+    }
+}
+'''
 
 
 @unittest.skipUnless(JAVA and JAR and Path(JAR).is_file(), 'Java runtime/compiler and CRISPASR_JNA_JAR required')
@@ -100,7 +261,8 @@ class JavaWrapperContract(unittest.TestCase):
             subprocess.run(compiler+['-encoding','UTF-8','-cp',JAR,'-d',str(path),*map(str,sources),str(path/'WrapperAbiProbe.java')],check=True)
             for old in (False,True):
                 directory=path/('old' if old else 'current');directory.mkdir()
-                subprocess.run([os.environ.get('CC','cc'),'-std=c11','-shared','-fPIC','-Werror',
+                cc=os.environ.get('CC') or 'cc'
+                subprocess.run([cc,'-std=c11','-shared','-fPIC','-Werror',
                                 '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-DCRISPASR_PROBE_EXISTING_STREAM_OPS', *(['-DCRISPASR_PROBE_OLD_TOKENS'] if old else []),
                                 str(ROOT/'tests/fixtures/python-wrapper-abi.c'),str(ROOT/'tests/fixtures/wrapper-session-metadata.c'),str(ROOT/'tests/fixtures/wrapper-stream-lifetime.c'),str(ROOT/'tests/fixtures/wrapper-audio-utilities.c'),
                                 '-o',str(directory/'libcrispasr.so')],check=True)
@@ -108,6 +270,40 @@ class JavaWrapperContract(unittest.TestCase):
                                     '-cp',str(path)+os.pathsep+JAR,'WrapperAbiProbe',*(['old'] if old else [])],capture_output=True,text=True)
                 self.assertEqual(run.returncode,0,run.stdout+run.stderr);self.assertIn('PASS Java',run.stdout)
                 print(run.stdout.strip())
+
+
+@unittest.skipUnless(JAVA and JAR and Path(JAR).is_file(), 'Java runtime/compiler and CRISPASR_JNA_JAR required')
+class JavaAuxWrapperContract(unittest.TestCase):
+    def test_auxiliary_registry_speaker_diarize_vad_and_session_options(self):
+        with tempfile.TemporaryDirectory(prefix='java-aux-') as tmp:
+            path=Path(tmp)
+            (path/'WrapperAuxProbe.java').write_text(PROGRAM_AUX)
+            sources=[ROOT/'bindings/java/src/main/java/io/github/ggerganov/whispercpp'/name
+                     for name in ('CrispasrSession.java','CrispasrSessionTasks.java','CrispasrUtilities.java','CrispasrAuxiliary.java')]
+            javac=shutil.which('javac')
+            compiler=[javac] if javac else [JAVA,'-m','jdk.compiler/com.sun.tools.javac.Main']
+            subprocess.run(compiler+['-encoding','UTF-8','-cp',JAR,'-d',str(path),*map(str,sources),str(path/'WrapperAuxProbe.java')],check=True)
+            # Extract literal POD layouts from src/crispasr_c_api.cpp
+            src=(ROOT/'src/crispasr_c_api.cpp').read_text()
+            layouts=[]
+            for name in ['crispasr_diarize_seg_abi','crispasr_diarize_turn_abi','crispasr_diarize_opts_abi']:
+                start=src.index('struct '+name+' {')
+                end=src.index('};',start)+2
+                layouts.append(src[start:end])
+            (path/'runtime-abi-layout.h').write_text('\n'.join(layouts))
+            directory=path/'current';directory.mkdir()
+            cc2=os.environ.get('CC') or 'cc'
+            subprocess.run([cc2,'-std=c11','-shared','-fPIC','-Werror',
+                            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'ggml/include'), '-I'+str(path),
+                            str(ROOT/'tests/fixtures/python-wrapper-abi.c'),
+                            str(ROOT/'tests/fixtures/wrapper-session-metadata.c'),
+                            str(ROOT/'tests/fixtures/csharp-wrapper-aux.c'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),
+                            '-o',str(directory/'libcrispasr.so')],check=True)
+            run=subprocess.run([JAVA,'-Djna.tmpdir='+str(path),'-Djna.library.path='+str(directory),
+                                '-cp',str(path)+os.pathsep+JAR,'WrapperAuxProbe'],capture_output=True,text=True)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            self.assertIn('PASS Java auxiliary:',run.stdout)
+            print(run.stdout.strip())
 
 
 if __name__=='__main__':unittest.main()

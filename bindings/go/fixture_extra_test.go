@@ -1,0 +1,801 @@
+//go:build probe
+
+package whisper
+
+import (
+	"bytes"
+	"testing"
+)
+
+func TestProbeTokenRawBytesAfterFree(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	res, err := sess.Transcribe(pcm)
+	if err != nil {
+		t.Fatalf("Transcribe failed: %v", err)
+	}
+	if len(res.Segments) != 1 {
+		t.Fatalf("expected 1 segment, got %d", len(res.Segments))
+	}
+	seg := res.Segments[0]
+	if seg.Text != "世" {
+		t.Fatalf("segment text mismatch: got %q want %q", seg.Text, "世")
+	}
+	if seg.T0 != 100 || seg.T1 != 200 {
+		t.Fatalf("segment times mismatch: %d/%d", seg.T0, seg.T1)
+	}
+	if seg.Speaker != "(Speaker 1) " {
+		t.Fatalf("speaker mismatch: %q", seg.Speaker)
+	}
+	if seg.NoSpeechProb != -1.0 {
+		t.Fatalf("no_speech_prob should be -1 sentinel, got %f", seg.NoSpeechProb)
+	}
+	if !seg.HasTimestamps() {
+		t.Fatalf("segment should have timestamps")
+	}
+	if len(seg.Words) != 1 {
+		t.Fatalf("expected 1 word, got %d", len(seg.Words))
+	}
+	w := seg.Words[0]
+	if w.Text != "世" {
+		t.Fatalf("word text mismatch: %q", w.Text)
+	}
+	if w.T0 != -1 || w.T1 != -1 {
+		t.Fatalf("word times should be -1 sentinel, got %d/%d", w.T0, w.T1)
+	}
+	if w.HasTimestamps() {
+		t.Fatalf("word with sentinel should not have timestamps")
+	}
+	if w.P != 0.9 {
+		t.Fatalf("word p mismatch: %f", w.P)
+	}
+	if len(w.Alternatives) != 1 {
+		t.Fatalf("expected 1 alternative, got %d", len(w.Alternatives))
+	}
+	if w.Alternatives[0].Text != "alternative" || w.Alternatives[0].P != 0.25 {
+		t.Fatalf("alternative mismatch: %+v", w.Alternatives[0])
+	}
+	if len(seg.Tokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d", len(seg.Tokens))
+	}
+	tok0 := seg.Tokens[0]
+	tok1 := seg.Tokens[1]
+	if !bytes.Equal(tok0.Raw, []byte{0xe6, 0x97}) {
+		t.Fatalf("tok0 raw mismatch: %v", tok0.Raw)
+	}
+	if !bytes.Equal(tok1.Raw, []byte{0xa5}) {
+		t.Fatalf("tok1 raw mismatch: %v", tok1.Raw)
+	}
+	combined := append([]byte{}, tok0.Raw...)
+	combined = append(combined, tok1.Raw...)
+	if string(combined) != "日" {
+		t.Fatalf("combined raw should be 日, got %q", string(combined))
+	}
+	if tok0.T0 != -1 || tok0.T1 != -1 {
+		t.Fatalf("tok0 times should be -1 sentinel, got %d/%d", tok0.T0, tok0.T1)
+	}
+	if tok0.HasTimestamps() {
+		t.Fatalf("tok0 with sentinel should not have timestamps")
+	}
+	if tok1.T0 != 123 || tok1.T1 != 124 {
+		t.Fatalf("tok1 times mismatch: %d/%d", tok1.T0, tok1.T1)
+	}
+	if !tok1.HasTimestamps() {
+		t.Fatalf("tok1 should have timestamps")
+	}
+	if tok1.P != 0.75 {
+		t.Fatalf("tok1 p mismatch: %f", tok1.P)
+	}
+	if probeResultFreesGet() != 1 {
+		t.Fatalf("result should have been freed exactly once, got %d", probeResultFreesGet())
+	}
+	probeMutate()
+	if !bytes.Equal(tok0.Raw, []byte{0xe6, 0x97}) {
+		t.Fatalf("raw bytes not copied before free/mutate, got %v", tok0.Raw)
+	}
+}
+
+func TestProbeAllResultReaders(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	entryPoints := []struct {
+		name string
+		fn   func() (*TranscribeResult, error)
+	}{
+		{"Transcribe", func() (*TranscribeResult, error) { return sess.Transcribe(pcm) }},
+		{"TranscribeLang", func() (*TranscribeResult, error) { return sess.TranscribeLang(pcm, "en") }},
+		{"TranscribeChunked", func() (*TranscribeResult, error) { return sess.TranscribeChunked(pcm, 30, 1, "") }},
+		{"TranscribeVAD", func() (*TranscribeResult, error) { return sess.TranscribeVAD(pcm, 16000, "vad.gguf") }},
+		{"TranscribeWithLogits", func() (*TranscribeResult, error) { r, _, err := sess.TranscribeWithLogits(pcm); return r, err }},
+	}
+	for _, ep := range entryPoints {
+		probeReset()
+		probeModeSet(0)
+		res, err := ep.fn()
+		if err != nil {
+			t.Fatalf("%s failed: %v", ep.name, err)
+		}
+		if len(res.Segments) == 0 {
+			t.Fatalf("%s should return segments", ep.name)
+		}
+		seg := res.Segments[0]
+		if seg.Text == "" {
+			t.Fatalf("%s segment text empty", ep.name)
+		}
+		if len(seg.Tokens) != 2 {
+			t.Fatalf("%s tokens not preserved: %d", ep.name, len(seg.Tokens))
+		}
+		if len(seg.Words) == 0 || len(seg.Words[0].Alternatives) == 0 {
+			t.Fatalf("%s alternatives not preserved", ep.name)
+		}
+		if seg.Speaker == "" {
+			t.Fatalf("%s speaker not preserved", ep.name)
+		}
+	}
+}
+
+func TestProbeEmptyResult(t *testing.T) {
+	probeReset()
+	probeModeSet(1)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	res, err := sess.Transcribe(pcm)
+	if err != nil {
+		t.Fatalf("empty Transcribe should not error: %v", err)
+	}
+	if len(res.Segments) != 0 {
+		t.Fatalf("empty result should have 0 segments, got %d", len(res.Segments))
+	}
+	pianoRes, err := sess.Piano(pcm)
+	if err != nil {
+		t.Fatalf("Piano empty should not error: %v", err)
+	}
+	if len(pianoRes.Notes) != 0 || len(pianoRes.Programs) != 0 {
+		t.Fatalf("Piano empty should have no notes, got %d/%d", len(pianoRes.Notes), len(pianoRes.Programs))
+	}
+	chRes, err := sess.Chords(pcm, 16000)
+	if err != nil {
+		t.Fatalf("Chords empty should not error: %v", err)
+	}
+	if len(chRes.Spans) != 0 {
+		t.Fatalf("Chords empty should have no spans")
+	}
+	beatRes, err := sess.Beats(pcm, 22050)
+	if err != nil {
+		t.Fatalf("Beats empty should not error: %v", err)
+	}
+	if len(beatRes.Events) != 0 {
+		t.Fatalf("Beats empty should have no events")
+	}
+	tabRes, err := sess.Tab(pcm, 16000)
+	if err != nil {
+		t.Fatalf("Tab empty should not error: %v", err)
+	}
+	if tabRes.Frames != 0 || len(tabRes.Emissions) != 0 {
+		t.Fatalf("Tab empty should have 0 frames, got %d", tabRes.Frames)
+	}
+}
+
+func TestProbeErrorResult(t *testing.T) {
+	probeReset()
+	probeModeSet(2)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	if _, err := sess.Transcribe(pcm); err == nil {
+		t.Fatalf("Transcribe should error in mode 2")
+	}
+	if _, err := sess.Piano(pcm); err == nil {
+		t.Fatalf("Piano should error in mode 2")
+	}
+	if _, err := sess.Chords(pcm, 16000); err == nil {
+		t.Fatalf("Chords should error in mode 2")
+	}
+	if _, err := sess.Beats(pcm, 22050); err == nil {
+		t.Fatalf("Beats should error in mode 2")
+	}
+	if _, err := sess.Tab(pcm, 16000); err == nil {
+		t.Fatalf("Tab should error in mode 2")
+	}
+	probeModeSet(0)
+	if _, err := sess.Beats(pcm, 16000); err == nil {
+		t.Fatalf("Beats with mismatched rate 16000 should error")
+	}
+}
+
+func TestProbeReplayNoiseRejectedBeforeNative(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	nFrames := 3
+	contentDim := sess.ConvertContentDim()
+	if contentDim != 2 {
+		t.Fatalf("content dim should be 2, got %d", contentDim)
+	}
+	content := make([]float32, nFrames*contentDim)
+	content[1] = 1
+	f0 := make([]float32, nFrames)
+	f0[2] = 5
+	interCh := sess.ConvertInterChannels()
+	upsample := sess.ConvertUpsampleProduct()
+	if interCh != 2 || upsample != 4 {
+		t.Fatalf("interCh/upsample mismatch: %d/%d", interCh, upsample)
+	}
+	noiseZp := make([]float32, interCh*nFrames)
+	noiseZp[5] = 5
+	noiseSine := make([]float32, nFrames*upsample)
+	noiseSine[11] = 11
+	callsBefore := probeCallsGet()
+	if _, err := sess.Convert(content, nFrames, f0, 0, noiseZp, noiseSine); err != nil {
+		t.Fatalf("Convert with correct noise should succeed: %v", err)
+	}
+	if probeCallsGet() != callsBefore+1 {
+		t.Fatalf("Convert should have called native once")
+	}
+	probeReset()
+	shortZp := make([]float32, 2)
+	if _, err := sess.Convert(content, nFrames, f0, 0, shortZp, noiseSine); err == nil {
+		t.Fatalf("Convert with short noiseZp should error")
+	}
+	if probeCallsGet() != 0 {
+		t.Fatalf("short noiseZp should be rejected BEFORE native, calls=%d", probeCallsGet())
+	}
+	shortSine := make([]float32, 2)
+	if _, err := sess.Convert(content, nFrames, f0, 0, noiseZp, shortSine); err == nil {
+		t.Fatalf("Convert with short noiseSine should error")
+	}
+	if probeCallsGet() != 0 {
+		t.Fatalf("short noiseSine should be rejected BEFORE native")
+	}
+	if _, err := sess.Convert([]float32{1, 2}, 1000000000, f0, 0, nil, nil); err == nil {
+		t.Fatalf("Convert with huge nFrames should error")
+	}
+}
+
+func TestProbeAllocatedPCMFrees(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	liveBefore := probeLiveGet()
+	pcm, err := sess.GetDisclaimerPCM()
+	if err != nil {
+		t.Fatalf("GetDisclaimerPCM failed: %v", err)
+	}
+	if len(pcm) != 2 || pcm[0] != 0.25 || pcm[1] != 0.5 {
+		t.Fatalf("disclaimer pcm mismatch: %v", pcm)
+	}
+	if probeLiveGet() != liveBefore {
+		t.Fatalf("GetDisclaimerPCM should free allocated PCM, live before %d after %d", liveBefore, probeLiveGet())
+	}
+	liveBefore = probeLiveGet()
+	pcm2, err := sess.Synthesize("hello")
+	if err != nil {
+		t.Fatalf("Synthesize failed: %v", err)
+	}
+	if len(pcm2) != 2 {
+		t.Fatalf("Synthesize pcm len mismatch")
+	}
+	if probeLiveGet() != liveBefore {
+		t.Fatalf("Synthesize should free PCM, leak detected")
+	}
+	probeModeSet(1)
+	if _, err := sess.GetDisclaimerPCM(); err == nil {
+		t.Fatalf("GetDisclaimerPCM with 0 should error")
+	}
+	if probeLiveGet() != liveBefore {
+		t.Fatalf("error case should not leak, live %d", probeLiveGet())
+	}
+}
+
+func TestProbeSynchronousStreaming(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	var chunks [][]float32
+	var finals []bool
+	err := sess.SynthesizeStreaming("hello", func(pcm []float32, isFinal bool) {
+		cp := make([]float32, len(pcm))
+		copy(cp, pcm)
+		chunks = append(chunks, cp)
+		finals = append(finals, isFinal)
+		if len(pcm) > 0 {
+			pcm[0] = 999
+		}
+	})
+	if err != nil {
+		t.Fatalf("SynthesizeStreaming failed: %v", err)
+	}
+	if len(chunks) != 2 {
+		t.Fatalf("expected 2 synchronous chunks, got %d", len(chunks))
+	}
+	if chunks[0][0] != 0.25 || chunks[0][1] != 0.5 {
+		t.Fatalf("first chunk mismatch: %v", chunks[0])
+	}
+	if chunks[1][0] != 0.75 || chunks[1][1] != 1.0 {
+		t.Fatalf("second chunk mismatch: %v", chunks[1])
+	}
+	if finals[0] != false || finals[1] != true {
+		t.Fatalf("final flags mismatch: %v", finals)
+	}
+	if chunks[0][0] == 999 {
+		t.Fatalf("wrapper did not copy PCM before callback, mutation leaked")
+	}
+}
+
+func TestProbeStreamingPanicRecovery(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	err := sess.SynthesizeStreaming("hello", func(pcm []float32, isFinal bool) {
+		panic("test panic")
+	})
+	if err == nil {
+		t.Fatalf("panic in callback should be recovered as error")
+	}
+	probeModeSet(0)
+	var chunks int
+	err = sess.SynthesizeStreaming("hello", func(pcm []float32, isFinal bool) {
+		chunks++
+	})
+	if err != nil {
+		t.Fatalf("session should be usable after panic: %v", err)
+	}
+	if chunks != 2 {
+		t.Fatalf("expected 2 chunks after recovery, got %d", chunks)
+	}
+}
+
+func TestProbeMusicOperations(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	piano, err := sess.Piano(pcm)
+	if err != nil {
+		t.Fatalf("Piano failed: %v", err)
+	}
+	if len(piano.Notes) != 2 || len(piano.Programs) != 2 {
+		t.Fatalf("Piano counts mismatch: %d/%d", len(piano.Notes), len(piano.Programs))
+	}
+	if piano.SampleRate != 16000 {
+		t.Fatalf("Piano sample rate mismatch: %d", piano.SampleRate)
+	}
+	if piano.Notes[0].OnsetMs != 0 || piano.Notes[0].OffsetMs != 1 {
+		t.Fatalf("Piano note data mismatch: %+v", piano.Notes[0])
+	}
+	if piano.Programs[0] != 24 || piano.Programs[1] != 128 {
+		t.Fatalf("Piano programs mismatch: %v", piano.Programs)
+	}
+	chords, err := sess.Chords(pcm, 16000)
+	if err != nil {
+		t.Fatalf("Chords failed: %v", err)
+	}
+	if len(chords.Spans) != 2 {
+		t.Fatalf("Chords spans mismatch: %d", len(chords.Spans))
+	}
+	if chords.Spans[0].Name != "C" || chords.Spans[1].Name != "Am" {
+		t.Fatalf("Chords names mismatch: %v", chords.Spans)
+	}
+	if chords.VocabSize != 170 {
+		t.Fatalf("Chords vocab mismatch: %d", chords.VocabSize)
+	}
+	beats, err := sess.Beats(pcm, 22050)
+	if err != nil {
+		t.Fatalf("Beats failed: %v", err)
+	}
+	if len(beats.Events) != 2 {
+		t.Fatalf("Beats events mismatch: %d", len(beats.Events))
+	}
+	if beats.SampleRate != 22050 || beats.TempoBPM != 123.5 {
+		t.Fatalf("Beats metadata mismatch: %d/%f", beats.SampleRate, beats.TempoBPM)
+	}
+	tab, err := sess.Tab(pcm, 16000)
+	if err != nil {
+		t.Fatalf("Tab failed: %v", err)
+	}
+	if tab.Frames != 2 || tab.Strings != 2 || tab.Classes != 3 {
+		t.Fatalf("Tab dims mismatch: %d/%d/%d", tab.Frames, tab.Strings, tab.Classes)
+	}
+	if len(tab.Emissions) != 12 {
+		t.Fatalf("Tab emissions len mismatch: %d", len(tab.Emissions))
+	}
+	if tab.SilentClass != 2 || tab.FramePeriod != 0.02 {
+		t.Fatalf("Tab metadata mismatch")
+	}
+	if len(tab.OpenMidi) != 2 || tab.OpenMidi[0] != 40 {
+		t.Fatalf("Tab openMidi mismatch: %v", tab.OpenMidi)
+	}
+	pitch, err := sess.Pitch(pcm, 10.0)
+	if err != nil {
+		t.Fatalf("Pitch failed: %v", err)
+	}
+	if len(pitch) != 2 {
+		t.Fatalf("Pitch frames mismatch: %d", len(pitch))
+	}
+	content := make([]float32, 6)
+	content[1] = 1
+	f0 := make([]float32, 3)
+	f0[2] = 5
+	noiseZp := make([]float32, 6)
+	noiseZp[5] = 5
+	noiseSine := make([]float32, 12)
+	noiseSine[11] = 11
+	audio, err := sess.Convert(content, 3, f0, 0, noiseZp, noiseSine)
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+	if len(audio) != 6 || audio[0] != 0 || audio[5] != 5 {
+		t.Fatalf("Convert audio mismatch: %v", audio)
+	}
+}
+
+func TestProbeConvertValidation(t *testing.T) {
+	probeReset()
+	sess := newProbeSession(t)
+	if _, err := sess.Convert(nil, 0, nil, 0, nil, nil); err == nil {
+		t.Fatalf("Convert with nFrames 0 should error")
+	}
+	content := make([]float32, 6)
+	content[1] = 1
+	f0 := make([]float32, 3)
+	f0[2] = 5
+	if _, err := sess.Convert(content, 3, f0, 5, nil, nil); err == nil {
+		t.Fatalf("Convert with invalid speaker should error")
+	}
+	if _, err := sess.Convert(content, 1<<30, f0, 0, nil, nil); err == nil {
+		t.Fatalf("Convert with huge nFrames should error")
+	}
+}
+
+func TestProbeBeatNativeRateMismatch(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	if _, err := sess.Beats(pcm, 22050); err != nil {
+		t.Fatalf("Beats with correct rate should succeed: %v", err)
+	}
+	if _, err := sess.Beats(pcm, 16000); err == nil {
+		t.Fatalf("Beats with mismatched rate 16000 should error")
+	}
+	if _, err := sess.Beats(nil, 22050); err == nil {
+		t.Fatalf("Beats with empty PCM should error before native")
+	}
+}
+
+func TestProbeTabOverflow(t *testing.T) {
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	tab, err := sess.Tab(pcm, 16000)
+	if err != nil {
+		t.Fatalf("Tab failed: %v", err)
+	}
+	if len(tab.Emissions) != int(tab.Frames)*int(tab.Strings)*int(tab.Classes) {
+		t.Fatalf("Tab emissions length should match product")
+	}
+}
+
+func TestProbeHasTimestamps(t *testing.T) {
+	seg := TranscribeSegment{T0: 100, T1: 200}
+	if !seg.HasTimestamps() {
+		t.Fatalf("valid segment should have timestamps")
+	}
+	seg2 := TranscribeSegment{T0: -1, T1: -1}
+	if seg2.HasTimestamps() {
+		t.Fatalf("sentinel segment should not have timestamps")
+	}
+	word := TranscribeWord{T0: 50, T1: 100}
+	if !word.HasTimestamps() {
+		t.Fatalf("valid word should have timestamps")
+	}
+	tok := SessionToken{T0: 123, T1: 124}
+	if !tok.HasTimestamps() {
+		t.Fatalf("valid token should have timestamps")
+	}
+	tok2 := SessionToken{T0: -1, T1: -1}
+	if tok2.HasTimestamps() {
+		t.Fatalf("sentinel token should not have timestamps")
+	}
+}
+
+func TestProbeDisclaimerAndLastError(t *testing.T) {
+	txt := DisclaimerText()
+	if txt != "AI generated" {
+		t.Fatalf("DisclaimerText should be 'AI generated', got %q", txt)
+	}
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	errStr := sess.LastSynthError()
+	if errStr != "probe synthesis failure" {
+		t.Fatalf("LastSynthError mismatch: %q", errStr)
+	}
+	if err := sess.SetTTSCfgScale(1.5); err != nil {
+		t.Fatalf("SetTTSCfgScale with 1.5 should succeed: %v", err)
+	}
+	if err := sess.SetTTSCfgScale(1.0); err == nil {
+		t.Fatalf("SetTTSCfgScale with 1.0 should fail")
+	}
+}
+
+func TestProbeSynthesisStreamingCallbackLifetime(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	var firstCopy []float32
+	err := sess.SynthesizeStreaming("test", func(pcm []float32, isFinal bool) {
+		if !isFinal {
+			firstCopy = make([]float32, len(pcm))
+			copy(firstCopy, pcm)
+		}
+		for i := range pcm {
+			pcm[i] = 0
+		}
+	})
+	if err != nil {
+		t.Fatalf("SynthesizeStreaming failed: %v", err)
+	}
+	if len(firstCopy) != 2 || firstCopy[0] != 0.25 {
+		t.Fatalf("callback lifetime: first chunk not preserved, got %v", firstCopy)
+	}
+	if err := sess.SynthesizeStreaming("test", nil); err == nil {
+		t.Fatalf("nil callback should error")
+	}
+}
+
+func TestProbeSetVoiceSamples(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	if err := sess.SetVoiceSamples(pcm, 24000, "hello"); err != nil {
+		t.Fatalf("SetVoiceSamples valid should succeed: %v", err)
+	}
+	if err := sess.SetVoiceSamples(pcm, 16000, "hello"); err == nil {
+		t.Fatalf("SetVoiceSamples with wrong rate should fail")
+	}
+	if err := sess.SetVoiceSamples(nil, 24000, "hello"); err == nil {
+		t.Fatalf("SetVoiceSamples with empty PCM should fail before native")
+	}
+}
+
+func TestProbeAudioHelpers(t *testing.T) {
+	if _, err := PcmToWav(nil, 16000); err == nil {
+		t.Fatalf("PcmToWav with empty PCM should error before native")
+	}
+	if _, err := PcmToWav([]float32{1, 2}, 0); err == nil {
+		t.Fatalf("PcmToWav with invalid rate should error")
+	}
+}
+
+func TestProbeCopyBeforeFree(t *testing.T) {
+	probeReset()
+	probeModeSet(0)
+	sess := newProbeSession(t)
+	pcm := []float32{1, 3, 5}
+	res, err := sess.Transcribe(pcm)
+	if err != nil {
+		t.Fatalf("Transcribe failed: %v", err)
+	}
+	seg := res.Segments[0]
+	origRaw := make([]byte, len(seg.Tokens[0].Raw))
+	copy(origRaw, seg.Tokens[0].Raw)
+	probeMutate()
+	if !bytes.Equal(seg.Tokens[0].Raw, origRaw) {
+		t.Fatalf("token raw not copied before free, mutated to %v", seg.Tokens[0].Raw)
+	}
+	origAlt := seg.Words[0].Alternatives[0].Text
+	probeMutate()
+	if seg.Words[0].Alternatives[0].Text != origAlt {
+		t.Fatalf("alternative not copied")
+	}
+	origSpeaker := seg.Speaker
+	probeMutate()
+	if seg.Speaker != origSpeaker {
+		t.Fatalf("speaker not copied")
+	}
+}
+
+func TestProbeKokoroLangHelpers(t *testing.T) {
+	// Exercise both true and false branches to catch garbage upper bits on bool return.
+	// The probe fixture returns true only for de/de-DE (german) and en/de (native voice).
+	if !KokoroLangIsGerman("de") {
+		t.Fatalf("KokoroLangIsGerman(de) should be true")
+	}
+	if !KokoroLangIsGerman("de-DE") {
+		t.Fatalf("KokoroLangIsGerman(de-DE) should be true")
+	}
+	if KokoroLangIsGerman("en") {
+		t.Fatalf("KokoroLangIsGerman(en) should be false")
+	}
+	if KokoroLangIsGerman("fr") {
+		t.Fatalf("KokoroLangIsGerman(fr) should be false")
+	}
+	if KokoroLangIsGerman("") {
+		t.Fatalf("KokoroLangIsGerman(\"\") should be false")
+	}
+	if !KokoroLangHasNativeVoice("en") {
+		t.Fatalf("KokoroLangHasNativeVoice(en) should be true")
+	}
+	if !KokoroLangHasNativeVoice("de") {
+		t.Fatalf("KokoroLangHasNativeVoice(de) should be true")
+	}
+	if KokoroLangHasNativeVoice("fr") {
+		t.Fatalf("KokoroLangHasNativeVoice(fr) should be false")
+	}
+	if KokoroLangHasNativeVoice("") {
+		t.Fatalf("KokoroLangHasNativeVoice(\"\") should be false")
+	}
+}
+
+func TestProbeAudioAllocationErrorsAndAliases(t *testing.T) {
+	probeUtilityMode(0)
+	audio, rate, err := AudioLoad("probe", 24000)
+	if err != nil || rate != 24000 || audio[0] != .25 {
+		t.Fatalf("audio load transport: %v %v %v", audio, rate, err)
+	}
+	probeUtilityMode(3)
+	left, right, _, _, channels, err := AudioLoadStereo("probe")
+	if err != nil || channels != 1 {
+		t.Fatalf("stereo alias transport: %v", err)
+	}
+	left[0] = 999
+	if right[0] != .25 {
+		t.Fatal("stereo outputs alias each other")
+	}
+	pcm := []float32{1, 3, 5}
+	out, err := AudioResample(pcm, 16000, 24000)
+	if err != nil || out[0] != .25 {
+		t.Fatalf("resample transport: %v", err)
+	}
+	wav, err := PcmToWav(pcm, 16000)
+	if err != nil || !bytes.Equal(wav, []byte{87, 0, 65, 86}) {
+		t.Fatalf("binary WAV transport: %v %v", wav, err)
+	}
+	signed, err := C2paSign([]byte{1, 0, 2}, "audio/wav", "", "")
+	if err != nil || !bytes.Equal(signed, []byte{1, 0, 2}) {
+		t.Fatalf("binary signing transport: %v", err)
+	}
+	probeUtilityMode(2)
+	if _, _, err = AudioLoad("probe", 16000); err == nil {
+		t.Fatal("load error swallowed")
+	}
+	if _, _, _, _, _, err = AudioLoadStereo("probe"); err == nil {
+		t.Fatal("stereo error swallowed")
+	}
+	if _, err = AudioResample(pcm, 16000, 24000); err == nil {
+		t.Fatal("resample error swallowed")
+	}
+	if probeUtilityLive() != 0 {
+		t.Fatal("native audio allocation leak")
+	}
+	probeUtilityMode(0)
+}
+func TestProbeCallbackReentryAndStreamParent(t *testing.T) {
+	probeModeSet(0)
+	session := newProbeSession(t)
+	if err := session.SynthesizeStreaming("test", func(_ []float32, _ bool) { session.Close() }); err == nil {
+		t.Fatal("callback closed live model")
+	}
+	if err := session.SynthesizeStreaming("test", func(_ []float32, _ bool) { session.InputSampleRate() }); err == nil {
+		t.Fatal("callback re-entered native getter")
+	}
+	before := probeStreamCloses()
+	stream, err := session.StreamOpen(3000, 10000, 200, "en", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session.Close()
+	if probeStreamCloses() != before+1 {
+		t.Fatal("parent did not close child stream")
+	}
+	stream.Close()
+	if _, err = stream.Feed([]float32{1}); err == nil {
+		t.Fatal("closed child entered native")
+	}
+}
+
+func TestProbeTypedAsrCallbacksAllRoutes(t *testing.T) {
+	probeReset()
+	session := newProbeSession(t)
+	defer session.Close()
+	pcm := []float32{1, 3, 5}
+	calls := 0
+	routes := []func() error{
+		func() error { _, e := session.Transcribe(pcm); return e },
+		func() error { _, e := session.TranscribeLang(pcm, "en"); return e },
+		func() error { _, e := session.TranscribeChunked(pcm, 30, 1, ""); return e },
+		func() error { _, e := session.TranscribeVAD(pcm, 16000, "vad"); return e },
+		func() error { _, _, e := session.TranscribeWithLogits(pcm); return e },
+		func() error { _, e := session.TranscribeVadLang(pcm, 16000, "vad", "en"); return e },
+	}
+	session.SetProgressCallback(func(processed, total int) {
+		if processed != 3 || total != 6 {
+			panic("progress arguments")
+		}
+		calls++
+	})
+	session.SetSegmentCallback(func(text string, t0, t1 int64, index int) {
+		if text != "日本語" || t0 != 123 || t1 != 456 || index != 7 {
+			panic("segment arguments")
+		}
+		calls++
+	})
+	var raw []byte
+	session.SetTokenCallback(func(bytes []byte, index int) {
+		if index != 9 {
+			panic("index")
+		}
+		raw = bytes
+		calls++
+	})
+	for _, run := range routes {
+		if err := run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 18 || !bytes.Equal(raw, []byte{0xe6, 0x97}) {
+		t.Fatalf("callback transport %d %v", calls, raw)
+	}
+	session.SetProgressCallback(nil)
+	session.SetSegmentCallback(nil)
+	session.SetTokenCallback(nil)
+	if err := routes[0](); err != nil || calls != 18 {
+		t.Fatal("cleared callbacks fired", err)
+	}
+	for _, kind := range []string{"progress", "segment", "token"} {
+		if kind == "progress" {
+			session.SetProgressCallback(func(int, int) { panic("callback sentinel") })
+		}
+		if kind == "segment" {
+			session.SetSegmentCallback(func(string, int64, int64, int) { session.InputSampleRate() })
+		}
+		if kind == "token" {
+			session.SetTokenCallback(func([]byte, int) { session.Close() })
+		}
+		for _, run := range routes {
+			before := probeResultFreesGet()
+			if err := run(); err == nil {
+				t.Fatal("callback panic escaped error transport", kind)
+			}
+			if probeResultFreesGet() != before+1 {
+				t.Fatal("callback failure leaked result", kind)
+			}
+		}
+		session.SetProgressCallback(nil)
+		session.SetSegmentCallback(nil)
+		session.SetTokenCallback(nil)
+		if err := routes[0](); err != nil {
+			t.Fatal("stale callback error", err)
+		}
+	}
+}
+
+func TestProbeParakeetIntegerOffset(t *testing.T) {
+	ctx, err := ParakeetInit("probe", 4, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pcm := []float32{1, 3, 5}
+	result, err := ctx.TranscribeAt(pcm, 123)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Text != "日本語" || result.Words[0].T0 != 223 || result.Tokens[0].T0 != -1 {
+		t.Fatalf("bad Parakeet offset transport: %#v", result)
+	}
+	if result.Tokens[0].Text+result.Tokens[1].Text != "日" {
+		t.Fatal("legacy token bytes changed")
+	}
+	if _, err = ctx.Transcribe(pcm, "de"); err == nil {
+		t.Fatal("accepted nonexistent language parameter")
+	}
+	ctx.Close()
+	ctx.Close()
+	if _, err = ctx.Transcribe(pcm, ""); err == nil {
+		t.Fatal("closed context entered native")
+	}
+}

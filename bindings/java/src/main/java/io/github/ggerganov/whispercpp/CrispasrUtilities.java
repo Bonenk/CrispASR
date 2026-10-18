@@ -18,6 +18,8 @@ public abstract class CrispasrUtilities {
   }
   interface Utilities extends Library {
     Utilities INSTANCE = Native.load("crispasr", Utilities.class, CrispasrSession.nativeOptions());
+    byte crispasr_kokoro_lang_is_german_abi(String language);
+    byte crispasr_kokoro_lang_has_native_voice_abi(String language);
     String crispasr_c_api_version();
     String crispasr_dart_helpers_version();
     void crispasr_set_gpu_backend(String backend);
@@ -62,6 +64,13 @@ public abstract class CrispasrUtilities {
     int n = 0;
     while (n < bytes.length && bytes[n] != 0) n++;
     return new String(bytes, 0, n, StandardCharsets.UTF_8);
+  }
+  public static boolean kokoroLanguageIsGerman(String language) {
+    return Utilities.INSTANCE.crispasr_kokoro_lang_is_german_abi(Objects.requireNonNull(language)) != 0;
+  }
+  public static boolean kokoroLanguageHasNativeVoice(String language) {
+    return Utilities.INSTANCE.crispasr_kokoro_lang_has_native_voice_abi(Objects.requireNonNull(language))
+        != 0;
   }
   public static String cApiVersion() {
     return Utilities.INSTANCE.crispasr_c_api_version();

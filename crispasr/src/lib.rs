@@ -13,8 +13,13 @@
 //! }
 //! ```
 
+use std::cell::UnsafeCell;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_float, c_int};
+use std::os::raw::{c_char, c_float, c_int, c_void};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub mod extra;
+pub use extra::*;
 
 /// A transcription segment with timing information.
 #[derive(Debug, Clone)]
@@ -216,6 +221,7 @@ impl Drop for CrispASR {
 #[derive(Debug, Clone)]
 pub struct SessionWord {
     pub text: String,
+    /// Start time in seconds; -1.0 sentinel means unavailable (check `has_timestamps`).
     pub start: f64,
     pub end: f64,
     /// Per-word probability in `[0, 1]`. Backends that don't emit a real
@@ -223,6 +229,41 @@ pub struct SessionWord {
     /// uniformly. The C-side `crispasr_session_result_word_p` returns
     /// `-1.0` for "no data" — that case is folded to `1.0` here.
     pub confidence: f32,
+    /// Word alternatives when `alt_n>0` (empty otherwise).
+    pub alternatives: Vec<WordAlternative>,
+}
+
+impl SessionWord {
+    /// Whether word timing is available (native -1 sentinel preserved, not scaled to -0.01).
+    pub fn has_timestamps(&self) -> bool {
+        self.start >= 0.0 && self.end >= 0.0 && self.end >= self.start
+    }
+}
+
+/// Word alternative candidate.
+#[derive(Debug, Clone)]
+pub struct WordAlternative {
+    pub text: String,
+    pub confidence: f32,
+}
+
+/// Native token metadata with raw bytes preserved.
+#[derive(Debug, Clone)]
+pub struct SessionToken {
+    /// Display text decoded with replacement (may be UTF-8 fragment).
+    pub text: String,
+    /// Lossless raw bytes (may be split UTF-8 across tokens).
+    pub raw: Vec<u8>,
+    /// Start time in seconds; -1.0 sentinel means unavailable.
+    pub start: f64,
+    pub end: f64,
+    pub confidence: f32,
+}
+
+impl SessionToken {
+    pub fn has_timestamps(&self) -> bool {
+        self.start >= 0.0 && self.end >= 0.0 && self.end >= self.start
+    }
 }
 
 /// A segment of a unified-session transcription.
@@ -233,11 +274,21 @@ pub struct SessionSegment {
     pub end: f64,
     pub words: Vec<SessionWord>,
     /// Whisper's per-segment probability that the segment is non-speech (the
-    /// `<|nospeech|>` token posterior), in `[0, 1]`. Only the whisper backend
+    /// `< |nospeech|>` token posterior), in `[0, 1]`. Only the whisper backend
     /// produces it; every other backend leaves the `-1.0` sentinel ("no
     /// data"), so a consumer can tell "unavailable" apart from a genuine low
     /// no-speech probability.
     pub no_speech_prob: f32,
+    /// Native per-segment speaker label in "(Speaker N) " form or "" when none.
+    pub speaker: String,
+    /// Native tokens (empty for backends/routes without token output). Raw bytes preserved.
+    pub tokens: Vec<SessionToken>,
+}
+
+impl SessionSegment {
+    pub fn has_timestamps(&self) -> bool {
+        self.start >= 0.0 && self.end >= 0.0 && self.end >= self.start
+    }
 }
 
 /// Per-frame CTC logits captured from a CTC backend.
@@ -265,9 +316,30 @@ pub struct Stem {
     pub pcm: Vec<f32>,
 }
 
+struct SessionCallbacks {
+    progress: Option<Box<dyn FnMut(i32, i32) + Send + 'static>>,
+    segment: Option<Box<dyn FnMut(String, f64, f64, i32) + Send + 'static>>,
+    token: Option<Box<dyn FnMut(Vec<u8>, i32) + Send + 'static>>,
+    progress_err: Option<String>,
+    segment_err: Option<String>,
+    token_err: Option<String>,
+    active: AtomicBool,
+}
+
+impl SessionCallbacks {
+    fn take_error(&mut self) -> Option<String> {
+        let progress = self.progress_err.take();
+        let segment = self.segment_err.take();
+        let token = self.token_err.take();
+        progress.or(segment).or(token)
+    }
+}
+
 pub struct Session {
     handle: *mut crispasr_sys::CrispasrSession,
     n_threads: c_int,
+    callbacks: Box<UnsafeCell<SessionCallbacks>>,
+    callback_active: AtomicBool,
 }
 
 // Not `Sync` — do not share between threads without external sync.
@@ -308,7 +380,21 @@ impl Session {
                 "Failed to open {model_path:?}. Library was built with: [{avail}]"
             ));
         }
-        Ok(Self { handle, n_threads })
+        let callbacks = Box::new(UnsafeCell::new(SessionCallbacks {
+            progress: None,
+            segment: None,
+            token: None,
+            progress_err: None,
+            segment_err: None,
+            token_err: None,
+            active: AtomicBool::new(false),
+        }));
+        Ok(Self {
+            handle,
+            n_threads,
+            callbacks,
+            callback_active: AtomicBool::new(false),
+        })
     }
 
     /// List of backend names the loaded CrispASR library was compiled with.
@@ -355,7 +441,11 @@ impl Session {
         let name = CString::new(backend).map_err(|e| format!("invalid backend: {e}"))?;
         let mut buf = [0i8; 1024];
         let n = unsafe {
-            crispasr_sys::crispasr_backend_caps_abi(name.as_ptr(), buf.as_mut_ptr(), buf.len() as i32)
+            crispasr_sys::crispasr_backend_caps_abi(
+                name.as_ptr(),
+                buf.as_mut_ptr(),
+                buf.len() as i32,
+            )
         };
         if n == -3 {
             return Err(format!("unknown backend '{backend}'"));
@@ -363,8 +453,13 @@ impl Session {
         if n < 0 {
             return Err(format!("backend_caps failed (code {n})"));
         }
-        let s = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_string_lossy().into_owned();
-        Ok(s.split(',').filter(|x| !x.is_empty()).map(|x| x.to_string()).collect())
+        let s = unsafe { CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
+        Ok(s.split(',')
+            .filter(|x| !x.is_empty())
+            .map(|x| x.to_string())
+            .collect())
     }
 
     /// Every backend paired with its verbs (#433).
@@ -384,7 +479,9 @@ impl Session {
         if n < 0 {
             return Err(format!("list_backends_with_caps failed (code {n})"));
         }
-        let s = unsafe { CStr::from_ptr(buf.as_ptr()) }.to_string_lossy().into_owned();
+        let s = unsafe { CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned();
         Ok(s.lines()
             .filter(|l| !l.is_empty())
             .map(|l| {
@@ -437,7 +534,10 @@ impl Session {
         let s = unsafe { CStr::from_ptr(buf.as_ptr()) }
             .to_string_lossy()
             .into_owned();
-        Ok(s.lines().filter(|l| !l.is_empty()).map(|l| l.to_string()).collect())
+        Ok(s.lines()
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect())
     }
 
     /// Detect the backend from a GGUF file without opening it.
@@ -529,6 +629,7 @@ impl Session {
         pcm: &[f32],
         language: Option<&str>,
     ) -> Result<Vec<SessionSegment>, String> {
+        self.check_callback_active()?;
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -553,6 +654,12 @@ impl Session {
                 ),
             }
         };
+        if let Some(err) = self.take_callback_error() {
+            if !res.is_null() {
+                unsafe { crispasr_sys::crispasr_session_result_free(res) };
+            }
+            return Err(err);
+        }
         self.parse_session_result(res, "crispasr_session_transcribe")
     }
 
@@ -580,6 +687,7 @@ impl Session {
         &self,
         pcm: &[f32],
     ) -> Result<(Vec<SessionSegment>, Option<CtcLogits>), String> {
+        self.check_callback_active()?;
         if pcm.is_empty() {
             return Ok((Vec::new(), None));
         }
@@ -587,8 +695,18 @@ impl Session {
         let res = unsafe {
             crispasr_sys::crispasr_session_transcribe(self.handle, pcm.as_ptr(), pcm.len() as i32)
         };
+        if let Some(err) = self.take_callback_error() {
+            if !res.is_null() {
+                unsafe { crispasr_sys::crispasr_session_result_free(res) };
+            }
+            let _ = self.set_return_logits(false);
+            return Err(err);
+        }
         let parsed = self.parse_session_result_logits(res, "crispasr_session_transcribe");
         let _ = self.set_return_logits(false);
+        if let Some(err) = self.take_callback_error() {
+            return Err(err);
+        }
         parsed
     }
 
@@ -623,6 +741,7 @@ impl Session {
         overlap_seconds: i32,
         language: Option<&str>,
     ) -> Result<Vec<SessionSegment>, String> {
+        self.check_callback_active()?;
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -642,6 +761,12 @@ impl Session {
                 lang_c.as_ref().map_or(std::ptr::null(), |c| c.as_ptr()),
             )
         };
+        if let Some(err) = self.take_callback_error() {
+            if !res.is_null() {
+                unsafe { crispasr_sys::crispasr_session_result_free(res) };
+            }
+            return Err(err);
+        }
         self.parse_session_result(res, "crispasr_session_transcribe_chunked")
     }
 
@@ -659,8 +784,9 @@ impl Session {
         chunk_seconds: i32,
         overlap_seconds: i32,
         language: Option<&str>,
-        mut progress: F,
+        progress: F,
     ) -> Result<Vec<SessionSegment>, String> {
+        self.check_callback_active()?;
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -671,28 +797,38 @@ impl Session {
             _ => None,
         };
 
+        struct ProgressCall<F> {
+            callback: F,
+            error: Option<String>,
+        }
         extern "C" fn trampoline<F: FnMut(i32, i32)>(
             processed: c_int,
             total: c_int,
             ud: *mut c_void,
         ) {
-            if ud.is_null() {
+            let call = unsafe { &mut *(ud as *mut ProgressCall<F>) };
+            if call.error.is_some() {
                 return;
             }
-            // SAFETY: `ud` is the `&mut F` registered just below. The C side
-            // only invokes this synchronously from within the transcribe call
-            // (same thread), so the reference is live and unaliased here.
-            let f = unsafe { &mut *(ud as *mut F) };
-            f(processed, total);
+            if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                (call.callback)(processed, total)
+            }))
+            .is_err()
+            {
+                call.error = Some("progress callback panicked".into());
+            }
         }
-
+        let mut call = ProgressCall {
+            callback: progress,
+            error: None,
+        };
         // Register for the duration of this call only, then clear — a raw
         // pointer to a stack closure must never outlive this frame.
         unsafe {
             crispasr_sys::crispasr_session_set_progress_callback(
                 self.handle,
                 Some(trampoline::<F>),
-                &mut progress as *mut F as *mut c_void,
+                &mut call as *mut ProgressCall<F> as *mut c_void,
             );
         }
         let res = unsafe {
@@ -706,11 +842,23 @@ impl Session {
             )
         };
         unsafe {
+            let registered = (&*self.callbacks.get()).progress.is_some();
             crispasr_sys::crispasr_session_set_progress_callback(
                 self.handle,
-                None,
-                std::ptr::null_mut(),
+                if registered {
+                    Some(progress_trampoline)
+                } else {
+                    None
+                },
+                self.callbacks_ptr(),
             );
+        }
+        let callback_error = self.take_callback_error();
+        if let Some(err) = call.error.or(callback_error) {
+            if !res.is_null() {
+                unsafe { crispasr_sys::crispasr_session_result_free(res) }
+            }
+            return Err(err);
         }
         self.parse_session_result(res, "crispasr_session_transcribe_chunked")
     }
@@ -739,6 +887,15 @@ impl Session {
             return Err(format!("{ctx} failed for backend {:?}", self.backend()));
         }
 
+        // Helper: centiseconds -> seconds, preserving -1 sentinel (not -0.01)
+        fn cs_to_sec(cs: i64) -> f64 {
+            if cs < 0 {
+                -1.0
+            } else {
+                cs as f64 / 100.0
+            }
+        }
+
         let mut out = Vec::new();
         unsafe {
             let n = crispasr_sys::crispasr_session_result_n_segments(res);
@@ -749,8 +906,14 @@ impl Session {
                 } else {
                     CStr::from_ptr(tp).to_string_lossy().into_owned()
                 };
-                let t0 = crispasr_sys::crispasr_session_result_segment_t0(res, i) as f64 / 100.0;
-                let t1 = crispasr_sys::crispasr_session_result_segment_t1(res, i) as f64 / 100.0;
+                let raw_t0 = crispasr_sys::crispasr_session_result_segment_t0(res, i);
+                let raw_t1 = crispasr_sys::crispasr_session_result_segment_t1(res, i);
+                // Preserve missing sentinel; Python's times() returns None when t0<0 or t1<t0
+                let (t0, t1) = if raw_t0 < 0 || raw_t1 < 0 || raw_t1 < raw_t0 {
+                    (-1.0, -1.0)
+                } else {
+                    (cs_to_sec(raw_t0), cs_to_sec(raw_t1))
+                };
 
                 let wn = crispasr_sys::crispasr_session_result_n_words(res, i);
                 let mut words = Vec::with_capacity(wn as usize);
@@ -761,14 +924,73 @@ impl Session {
                     } else {
                         CStr::from_ptr(wtp).to_string_lossy().into_owned()
                     };
+                    let raw_wt0 = crispasr_sys::crispasr_session_result_word_t0(res, i, j);
+                    let raw_wt1 = crispasr_sys::crispasr_session_result_word_t1(res, i, j);
+                    let (w_start, w_end) = if raw_wt0 < 0 || raw_wt1 < 0 || raw_wt1 < raw_wt0 {
+                        (-1.0, -1.0)
+                    } else {
+                        (cs_to_sec(raw_wt0), cs_to_sec(raw_wt1))
+                    };
                     let raw_p = crispasr_sys::crispasr_session_result_word_p(res, i, j);
+                    // Word alternatives — copied before free, no fabrication
+                    let n_alts = crispasr_sys::crispasr_session_result_word_n_alts(res, i, j);
+                    let mut alts = Vec::with_capacity(n_alts as usize);
+                    for k in 0..n_alts {
+                        let alt_ptr =
+                            crispasr_sys::crispasr_session_result_word_alt_text(res, i, j, k);
+                        let alt_text = if alt_ptr.is_null() {
+                            String::new()
+                        } else {
+                            CStr::from_ptr(alt_ptr).to_string_lossy().into_owned()
+                        };
+                        let alt_p = crispasr_sys::crispasr_session_result_word_alt_p(res, i, j, k);
+                        alts.push(WordAlternative {
+                            text: alt_text,
+                            confidence: alt_p,
+                        });
+                    }
                     words.push(SessionWord {
                         text: wt,
-                        start: crispasr_sys::crispasr_session_result_word_t0(res, i, j) as f64
-                            / 100.0,
-                        end: crispasr_sys::crispasr_session_result_word_t1(res, i, j) as f64
-                            / 100.0,
+                        start: w_start,
+                        end: w_end,
                         confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
+                        alternatives: alts,
+                    });
+                }
+                // Segment speaker — native per-segment label in "(Speaker N) " form or "" when none
+                let spk_ptr = crispasr_sys::crispasr_session_result_segment_speaker(res, i);
+                let speaker = if spk_ptr.is_null() {
+                    String::new()
+                } else {
+                    CStr::from_ptr(spk_ptr).to_string_lossy().into_owned()
+                };
+                // Native tokens — raw bytes preserved, sentinel preserved, empty when absent, copied before free
+                let n_toks = crispasr_sys::crispasr_session_result_n_tokens(res, i);
+                let mut tokens = Vec::with_capacity(n_toks as usize);
+                for j in 0..n_toks {
+                    let tok_ptr = crispasr_sys::crispasr_session_result_token_text(res, i, j);
+                    let (tok_text, tok_raw) = if tok_ptr.is_null() {
+                        (String::new(), Vec::new())
+                    } else {
+                        // Preserve raw bytes (may be UTF-8 fragment split across tokens)
+                        let raw = CStr::from_ptr(tok_ptr).to_bytes().to_vec();
+                        let txt = String::from_utf8_lossy(&raw).into_owned();
+                        (txt, raw)
+                    };
+                    let raw_tt0 = crispasr_sys::crispasr_session_result_token_t0(res, i, j);
+                    let raw_tt1 = crispasr_sys::crispasr_session_result_token_t1(res, i, j);
+                    let (tok_start, tok_end) = if raw_tt0 < 0 || raw_tt1 < 0 || raw_tt1 < raw_tt0 {
+                        (-1.0, -1.0)
+                    } else {
+                        (cs_to_sec(raw_tt0), cs_to_sec(raw_tt1))
+                    };
+                    let tok_p = crispasr_sys::crispasr_session_result_token_p(res, i, j);
+                    tokens.push(SessionToken {
+                        text: tok_text,
+                        raw: tok_raw,
+                        start: tok_start,
+                        end: tok_end,
+                        confidence: tok_p,
                     });
                 }
                 let nsp = crispasr_sys::crispasr_session_result_segment_no_speech_prob(res, i);
@@ -778,6 +1000,8 @@ impl Session {
                     end: t1,
                     words,
                     no_speech_prob: nsp,
+                    speaker,
+                    tokens,
                 });
             }
             // Lift out the raw CTC logits (if any) before the handle is freed.
@@ -785,12 +1009,18 @@ impl Session {
             let n_vocab = crispasr_sys::crispasr_session_result_n_logit_vocab(res);
             let lp = crispasr_sys::crispasr_session_result_logits(res);
             let logits = if n_frames > 0 && n_vocab > 0 && !lp.is_null() {
-                let n = n_vocab as usize * n_frames as usize;
-                Some(CtcLogits {
-                    n_vocab: n_vocab as usize,
-                    n_frames: n_frames as usize,
-                    data: std::slice::from_raw_parts(lp, n).to_vec(),
-                })
+                let n = (n_vocab as usize)
+                    .checked_mul(n_frames as usize)
+                    .unwrap_or(0);
+                if n == 0 {
+                    None
+                } else {
+                    Some(CtcLogits {
+                        n_vocab: n_vocab as usize,
+                        n_frames: n_frames as usize,
+                        data: std::slice::from_raw_parts(lp, n).to_vec(),
+                    })
+                }
             } else {
                 None
             };
@@ -833,6 +1063,7 @@ impl Session {
         opts: Option<VadOptions>,
         language: Option<&str>,
     ) -> Result<Vec<SessionSegment>, String> {
+        self.check_callback_active()?;
         if pcm.is_empty() {
             return Ok(Vec::new());
         }
@@ -868,6 +1099,12 @@ impl Session {
                 ),
             }
         };
+        if let Some(err) = self.take_callback_error() {
+            if !res.is_null() {
+                unsafe { crispasr_sys::crispasr_session_result_free(res) };
+            }
+            return Err(err);
+        }
         if res.is_null() {
             return Err(format!(
                 "crispasr_session_transcribe_vad failed for backend {:?}",
@@ -876,6 +1113,13 @@ impl Session {
         }
 
         let mut out = Vec::new();
+        fn cs_to_sec_vad(cs: i64) -> f64 {
+            if cs < 0 {
+                -1.0
+            } else {
+                cs as f64 / 100.0
+            }
+        }
         unsafe {
             let n = crispasr_sys::crispasr_session_result_n_segments(res);
             for i in 0..n {
@@ -885,8 +1129,13 @@ impl Session {
                 } else {
                     CStr::from_ptr(tp).to_string_lossy().into_owned()
                 };
-                let t0 = crispasr_sys::crispasr_session_result_segment_t0(res, i) as f64 / 100.0;
-                let t1 = crispasr_sys::crispasr_session_result_segment_t1(res, i) as f64 / 100.0;
+                let raw_t0 = crispasr_sys::crispasr_session_result_segment_t0(res, i);
+                let raw_t1 = crispasr_sys::crispasr_session_result_segment_t1(res, i);
+                let (t0, t1) = if raw_t0 < 0 || raw_t1 < 0 || raw_t1 < raw_t0 {
+                    (-1.0, -1.0)
+                } else {
+                    (cs_to_sec_vad(raw_t0), cs_to_sec_vad(raw_t1))
+                };
 
                 let wn = crispasr_sys::crispasr_session_result_n_words(res, i);
                 let mut words = Vec::with_capacity(wn as usize);
@@ -897,14 +1146,72 @@ impl Session {
                     } else {
                         CStr::from_ptr(wtp).to_string_lossy().into_owned()
                     };
+                    let raw_wt0 = crispasr_sys::crispasr_session_result_word_t0(res, i, j);
+                    let raw_wt1 = crispasr_sys::crispasr_session_result_word_t1(res, i, j);
+                    let (w_start, w_end) = if raw_wt0 < 0 || raw_wt1 < 0 || raw_wt1 < raw_wt0 {
+                        (-1.0, -1.0)
+                    } else {
+                        (cs_to_sec_vad(raw_wt0), cs_to_sec_vad(raw_wt1))
+                    };
                     let raw_p = crispasr_sys::crispasr_session_result_word_p(res, i, j);
+                    let n_alts = crispasr_sys::crispasr_session_result_word_n_alts(res, i, j);
+                    let mut alts = Vec::with_capacity(n_alts as usize);
+                    for k in 0..n_alts {
+                        let alt_ptr =
+                            crispasr_sys::crispasr_session_result_word_alt_text(res, i, j, k);
+                        let alt_text = if alt_ptr.is_null() {
+                            String::new()
+                        } else {
+                            CStr::from_ptr(alt_ptr).to_string_lossy().into_owned()
+                        };
+                        let alt_p = crispasr_sys::crispasr_session_result_word_alt_p(res, i, j, k);
+                        alts.push(WordAlternative {
+                            text: alt_text,
+                            confidence: alt_p,
+                        });
+                    }
                     words.push(SessionWord {
                         text: wt,
-                        start: crispasr_sys::crispasr_session_result_word_t0(res, i, j) as f64
-                            / 100.0,
-                        end: crispasr_sys::crispasr_session_result_word_t1(res, i, j) as f64
-                            / 100.0,
+                        start: w_start,
+                        end: w_end,
                         confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
+                        alternatives: alts,
+                    });
+                }
+                // Segment speaker — native per-segment label in "(Speaker N) " form or "" when none
+                let spk_ptr = crispasr_sys::crispasr_session_result_segment_speaker(res, i);
+                let speaker = if spk_ptr.is_null() {
+                    String::new()
+                } else {
+                    CStr::from_ptr(spk_ptr).to_string_lossy().into_owned()
+                };
+                // Native tokens — raw bytes preserved, sentinel preserved, empty when absent, copied before free
+                let n_toks = crispasr_sys::crispasr_session_result_n_tokens(res, i);
+                let mut tokens = Vec::with_capacity(n_toks as usize);
+                for j in 0..n_toks {
+                    let tok_ptr = crispasr_sys::crispasr_session_result_token_text(res, i, j);
+                    let (tok_text, tok_raw) = if tok_ptr.is_null() {
+                        (String::new(), Vec::new())
+                    } else {
+                        // Preserve raw bytes (may be UTF-8 fragment split across tokens)
+                        let raw = CStr::from_ptr(tok_ptr).to_bytes().to_vec();
+                        let txt = String::from_utf8_lossy(&raw).into_owned();
+                        (txt, raw)
+                    };
+                    let raw_tt0 = crispasr_sys::crispasr_session_result_token_t0(res, i, j);
+                    let raw_tt1 = crispasr_sys::crispasr_session_result_token_t1(res, i, j);
+                    let (tok_start, tok_end) = if raw_tt0 < 0 || raw_tt1 < 0 || raw_tt1 < raw_tt0 {
+                        (-1.0, -1.0)
+                    } else {
+                        (cs_to_sec_vad(raw_tt0), cs_to_sec_vad(raw_tt1))
+                    };
+                    let tok_p = crispasr_sys::crispasr_session_result_token_p(res, i, j);
+                    tokens.push(SessionToken {
+                        text: tok_text,
+                        raw: tok_raw,
+                        start: tok_start,
+                        end: tok_end,
+                        confidence: tok_p,
                     });
                 }
                 let nsp = crispasr_sys::crispasr_session_result_segment_no_speech_prob(res, i);
@@ -914,6 +1221,8 @@ impl Session {
                     end: t1,
                     words,
                     no_speech_prob: nsp,
+                    speaker,
+                    tokens,
                 });
             }
             crispasr_sys::crispasr_session_result_free(res);
@@ -982,7 +1291,9 @@ impl Session {
             return Err("set_voice_samples: empty sample buffer".to_string());
         }
         if sample_rate <= 0 {
-            return Err(format!("set_voice_samples: invalid sample_rate {sample_rate}"));
+            return Err(format!(
+                "set_voice_samples: invalid sample_rate {sample_rate}"
+            ));
         }
         let crt = match ref_text {
             Some(t) => Some(CString::new(t).map_err(|e| e.to_string())?),
@@ -1063,9 +1374,18 @@ impl Session {
                 &mut n as *mut c_int,
             )
         };
-        if ptr.is_null() || n <= 0 {
+        if n <= 0 {
+            if !ptr.is_null() {
+                unsafe { crispasr_sys::crispasr_pcm_free(ptr) };
+            }
             return Err(format!(
                 "synthesize returned no audio for backend {:?}",
+                self.backend()
+            ));
+        }
+        if ptr.is_null() {
+            return Err(format!(
+                "synthesize null pointer with positive length for backend {:?}",
                 self.backend()
             ));
         }
@@ -1094,7 +1414,10 @@ impl Session {
                 &mut n as *mut c_int,
             )
         };
-        if ptr.is_null() || n <= 0 {
+        if n <= 0 {
+            if !ptr.is_null() {
+                unsafe { crispasr_sys::crispasr_pcm_free(ptr) };
+            }
             if !text_ptr.is_null() {
                 unsafe { crispasr_sys::crispasr_session_translate_text_free(text_ptr) };
             }
@@ -1102,6 +1425,15 @@ impl Session {
                 "speech_to_speech returned no audio for backend {:?} (S2S may be unsupported). \
                  Separation models (htdemucs, mel-band-roformer) are not S2S — use \
                  Session::separate() instead (#359).",
+                self.backend()
+            ));
+        }
+        if ptr.is_null() {
+            if !text_ptr.is_null() {
+                unsafe { crispasr_sys::crispasr_session_translate_text_free(text_ptr) };
+            }
+            return Err(format!(
+                "speech_to_speech null pointer with positive length for backend {:?}",
                 self.backend()
             ));
         }
@@ -1167,12 +1499,20 @@ impl Session {
                     &mut n_out as *mut c_int,
                 )
             };
-            if ptr.is_null() || n_out <= 0 {
+            if n_out <= 0 {
                 return Err(format!("stem {} ({}) came back empty", i, name));
             }
+            if ptr.is_null() {
+                return Err(format!(
+                    "stem {} ({}) null pointer with positive length",
+                    i, name
+                ));
+            }
             // n_out is per-channel; the buffer is interleaved stereo.
-            let pcm =
-                unsafe { std::slice::from_raw_parts(ptr, (n_out as usize) * 2).to_vec() };
+            let len = (n_out as usize)
+                .checked_mul(2)
+                .ok_or(format!("stem {} length overflow", i))?;
+            let pcm = unsafe { std::slice::from_raw_parts(ptr, len).to_vec() };
             stems.push(Stem { name, pcm });
         }
         Ok(stems)
@@ -1306,9 +1646,18 @@ impl Session {
                 &mut n as *mut c_int,
             )
         };
-        if ptr.is_null() || n <= 0 {
+        if n <= 0 {
+            if !ptr.is_null() {
+                unsafe { crispasr_sys::crispasr_pcm_free(ptr) };
+            }
             return Err(format!(
                 "synthesize_raw returned no audio for backend {:?} (call accept_marking_responsibility first?)",
+                self.backend()
+            ));
+        }
+        if ptr.is_null() {
+            return Err(format!(
+                "synthesize_raw null pointer with positive length for backend {:?}",
                 self.backend()
             ));
         }
@@ -1482,13 +1831,13 @@ impl Session {
     /// carried over (default 200). `language` empty = auto-detect;
     /// `translate` enables EN-target speech translation (whisper).
     pub fn stream_open(
-        &self,
+        &mut self,
         step_ms: i32,
         length_ms: i32,
         keep_ms: i32,
         language: &str,
         translate: bool,
-    ) -> Result<Stream, String> {
+    ) -> Result<Stream<'_>, String> {
         self.stream_open_ex(step_ms, length_ms, keep_ms, language, translate, false)
     }
 
@@ -1498,14 +1847,14 @@ impl Session {
     /// arrives (PLAN #7 phase 3). No-op for backends without audio-injection
     /// prompt decode.
     pub fn stream_open_ex(
-        &self,
+        &mut self,
         step_ms: i32,
         length_ms: i32,
         keep_ms: i32,
         language: &str,
         translate: bool,
         live: bool,
-    ) -> Result<Stream, String> {
+    ) -> Result<Stream<'_>, String> {
         let lang_c = CString::new(language).map_err(|e| e.to_string())?;
         let h = unsafe {
             crispasr_sys::crispasr_session_stream_open(
@@ -1527,7 +1876,10 @@ impl Session {
         if live {
             unsafe { crispasr_sys::crispasr_stream_set_live_decode(h, 1) };
         }
-        Ok(Stream { handle: h })
+        Ok(Stream {
+            handle: h,
+            _owner: std::marker::PhantomData,
+        })
     }
 
     /// Set decoder temperature on backends that support runtime control
@@ -1850,7 +2202,12 @@ impl Session {
     /// Pad N ms of silence at the beginning of TTS output. Useful to bypass VLC playback bugs
     /// where it drops the first ~1.5s of audio while parsing a large C2PA chunk.
     pub fn set_tts_pad_silence_ms(&self, ms: i32) {
-        unsafe { crispasr_sys::crispasr_session_set_tts_pad_silence_ms(self.handle, ms as std::os::raw::c_int) };
+        unsafe {
+            crispasr_sys::crispasr_session_set_tts_pad_silence_ms(
+                self.handle,
+                ms as std::os::raw::c_int,
+            )
+        };
     }
 
     /// Select + load a punctuation-restoration model (`auto`/`firered`/`fullstop`/
@@ -2086,9 +2443,286 @@ impl VadOptions {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Typed ASR callbacks (issue #217) — retained, typed, panic/error transport.
+// ---------------------------------------------------------------------------
+
+unsafe extern "C" fn progress_trampoline(processed: c_int, total: c_int, user_data: *mut c_void) {
+    if user_data.is_null() {
+        return;
+    }
+    let cell = &*(user_data as *const UnsafeCell<SessionCallbacks>);
+    let callbacks = &mut *cell.get();
+    if callbacks.progress_err.is_some() {
+        return;
+    }
+    if let Some(cb) = callbacks.progress.as_mut() {
+        callbacks.active.store(true, Ordering::SeqCst);
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            cb(processed, total);
+        }));
+        callbacks.active.store(false, Ordering::SeqCst);
+        if let Err(payload) = res {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "progress callback panicked".to_string()
+            };
+            callbacks.progress_err = Some(msg);
+        }
+    }
+}
+
+unsafe extern "C" fn segment_trampoline(
+    text: *const c_char,
+    t0_cs: i64,
+    t1_cs: i64,
+    segment_index: c_int,
+    user_data: *mut c_void,
+) {
+    if user_data.is_null() {
+        return;
+    }
+    let cell = &*(user_data as *const UnsafeCell<SessionCallbacks>);
+    let callbacks = &mut *cell.get();
+    if callbacks.segment_err.is_some() {
+        return;
+    }
+    if let Some(cb) = callbacks.segment.as_mut() {
+        callbacks.active.store(true, Ordering::SeqCst);
+        let t0 = if t0_cs < 0 {
+            -1.0
+        } else {
+            t0_cs as f64 / 100.0
+        };
+        let t1 = if t1_cs < 0 {
+            -1.0
+        } else {
+            t1_cs as f64 / 100.0
+        };
+        let txt = if text.is_null() {
+            String::new()
+        } else {
+            CStr::from_ptr(text).to_string_lossy().into_owned()
+        };
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            cb(txt, t0, t1, segment_index);
+        }));
+        callbacks.active.store(false, Ordering::SeqCst);
+        if let Err(payload) = res {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "segment callback panicked".to_string()
+            };
+            callbacks.segment_err = Some(msg);
+        }
+    }
+}
+
+unsafe extern "C" fn asr_token_trampoline(
+    token_text: *const c_char,
+    token_index: c_int,
+    user_data: *mut c_void,
+) {
+    if user_data.is_null() {
+        return;
+    }
+    let cell = &*(user_data as *const UnsafeCell<SessionCallbacks>);
+    let callbacks = &mut *cell.get();
+    if callbacks.token_err.is_some() {
+        return;
+    }
+    if let Some(cb) = callbacks.token.as_mut() {
+        callbacks.active.store(true, Ordering::SeqCst);
+        let raw = if token_text.is_null() {
+            Vec::new()
+        } else {
+            CStr::from_ptr(token_text).to_bytes().to_vec()
+        };
+        let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            cb(raw, token_index);
+        }));
+        callbacks.active.store(false, Ordering::SeqCst);
+        if let Err(payload) = res {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "token callback panicked".to_string()
+            };
+            callbacks.token_err = Some(msg);
+        }
+    }
+}
+
+impl Session {
+    fn callbacks_ptr(&self) -> *mut c_void {
+        self.callbacks.get() as *mut c_void
+    }
+
+    fn check_callback_active(&self) -> Result<(), String> {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) {
+            return Err("do not re-enter a session from its callback".to_string());
+        }
+        if self.callback_active.load(Ordering::SeqCst) {
+            return Err("do not re-enter a session from its callback".to_string());
+        }
+        Ok(())
+    }
+
+    fn take_callback_error(&self) -> Option<String> {
+        let cb = unsafe { &mut *self.callbacks.get() };
+        cb.take_error()
+    }
+
+    /// Register a progress callback for long-form (chunked) transcription.
+    /// `callback(processed, total)` is invoked on the transcribe thread.
+    /// Pass `clear_progress_callback` to remove. Callback must be Send + 'static.
+    pub fn set_progress_callback<F>(&mut self, callback: F)
+    where
+        F: FnMut(i32, i32) + Send + 'static,
+    {
+        // Check reentry without needing Result return; panic matches Go behavior.
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.progress = Some(Box::new(callback));
+        cell.progress_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_progress_callback(
+                self.handle,
+                Some(progress_trampoline),
+                self.callbacks_ptr(),
+            );
+        }
+    }
+
+    pub fn clear_progress_callback(&mut self) {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.progress = None;
+        cell.progress_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_progress_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+        }
+    }
+
+    /// Register a per-segment callback. `callback(text, start_sec, end_sec, index)`
+    /// Times are seconds with -1.0 sentinel for unavailable.
+    pub fn set_segment_callback<F>(&mut self, callback: F)
+    where
+        F: FnMut(String, f64, f64, i32) + Send + 'static,
+    {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.segment = Some(Box::new(callback));
+        cell.segment_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_segment_callback(
+                self.handle,
+                Some(segment_trampoline),
+                self.callbacks_ptr(),
+            );
+        }
+    }
+
+    pub fn clear_segment_callback(&mut self) {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.segment = None;
+        cell.segment_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_segment_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+        }
+    }
+
+    /// Register a per-token callback. `callback(raw_bytes, index)` where raw_bytes
+    /// is the lossless token bytes (may be UTF-8 fragment).
+    pub fn set_token_callback<F>(&mut self, callback: F)
+    where
+        F: FnMut(Vec<u8>, i32) + Send + 'static,
+    {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.token = Some(Box::new(callback));
+        cell.token_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_token_callback(
+                self.handle,
+                Some(asr_token_trampoline),
+                self.callbacks_ptr(),
+            );
+        }
+    }
+
+    pub fn clear_token_callback(&mut self) {
+        let cb = unsafe { &*self.callbacks.get() };
+        if cb.active.load(Ordering::SeqCst) || self.callback_active.load(Ordering::SeqCst) {
+            panic!("do not re-enter a session from its callback");
+        }
+        let cell = unsafe { &mut *self.callbacks.get() };
+        cell.token = None;
+        cell.token_err = None;
+        unsafe {
+            crispasr_sys::crispasr_session_set_token_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+        }
+    }
+}
+
 impl Drop for Session {
     fn drop(&mut self) {
-        unsafe { crispasr_sys::crispasr_session_close(self.handle) }
+        // Clear callbacks before closing native handle so trampolines won't fire on dead handle.
+        unsafe {
+            crispasr_sys::crispasr_session_set_progress_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+            crispasr_sys::crispasr_session_set_segment_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+            crispasr_sys::crispasr_session_set_token_callback(
+                self.handle,
+                None,
+                std::ptr::null_mut(),
+            );
+            crispasr_sys::crispasr_session_close(self.handle)
+        }
     }
 }
 
@@ -2109,13 +2743,22 @@ pub struct StreamingUpdate {
 /// Streaming-decoder handle returned by [`Session::stream_open`]. Feed
 /// PCM with [`Stream::feed`], pull text with [`Stream::get_text`],
 /// finalize with [`Stream::flush`]. Auto-closes on drop.
-pub struct Stream {
+/// The stream holds an exclusive borrow of its parent until dropped.
+/// ```compile_fail
+/// use crispasr::Session;
+/// let mut session=Session::open("model.gguf").unwrap();
+/// let stream=session.stream_open(3000,10000,200,"en",false).unwrap();
+/// drop(session); // cannot release the model while the stream still borrows it
+/// stream.flush().unwrap();
+/// ```
+pub struct Stream<'a> {
     handle: *mut crispasr_sys::CrispasrStream,
+    _owner: std::marker::PhantomData<&'a mut Session>,
 }
 
-unsafe impl Send for Stream {}
+unsafe impl Send for Stream<'_> {}
 
-impl Stream {
+impl Stream<'_> {
     /// Toggle voxtral4b live-captions decode-during-feed (PLAN #7
     /// phase 3). When enabled, each new audio_embed produced during
     /// `feed` triggers one greedy decode step; tokens commit
@@ -2181,7 +2824,7 @@ impl Stream {
     }
 }
 
-impl Drop for Stream {
+impl Drop for Stream<'_> {
     fn drop(&mut self) {
         unsafe { crispasr_sys::crispasr_stream_close(self.handle) }
     }
@@ -2191,7 +2834,6 @@ impl Drop for Stream {
 // Microphone capture (PLAN #62d) — cross-platform via miniaudio.
 // =========================================================================
 
-use std::os::raw::c_void;
 use std::sync::Mutex;
 
 /// Library-level microphone handle. The user-supplied callback is
@@ -2626,7 +3268,8 @@ pub fn align_words(
                     } else {
                         CStr::from_ptr(cp).to_string_lossy().into_owned()
                     },
-                    start: crispasr_sys::crispasr_align_result_character_t0(res, i, j) as f64 / 100.0,
+                    start: crispasr_sys::crispasr_align_result_character_t0(res, i, j) as f64
+                        / 100.0,
                     end: crispasr_sys::crispasr_align_result_character_t1(res, i, j) as f64 / 100.0,
                 });
             }
@@ -3455,6 +4098,15 @@ impl ParakeetResult {
             unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
         }
     }
+    /// Copy a possibly incomplete UTF-8 piece without decoding it.
+    pub fn token_bytes(&self, i: i32) -> Vec<u8> {
+        let p = unsafe { crispasr_sys::crispasr_parakeet_result_token_text(self.handle, i) };
+        if p.is_null() {
+            Vec::new()
+        } else {
+            unsafe { CStr::from_ptr(p) }.to_bytes().to_vec()
+        }
+    }
     pub fn token_t0(&self, i: i32) -> i64 {
         unsafe { crispasr_sys::crispasr_parakeet_result_token_t0(self.handle, i) }
     }
@@ -3496,15 +4148,21 @@ impl Parakeet {
         pcm: &[f32],
         language: Option<&str>,
     ) -> Result<ParakeetResult, String> {
-        let lang = language.map(|l| CString::new(l).unwrap_or_default());
-        let lang_ptr = lang.as_ref().map_or(std::ptr::null(), |c| c.as_ptr());
+        if !matches!(language, None | Some("") | Some("en")) {
+            return Err(
+                "legacy Parakeet has no language parameter; use Session for language hints".into(),
+            );
+        }
+        self.transcribe_at(pcm, 0)
+    }
+    /// Run the legacy decoder with an absolute centisecond offset.
+    pub fn transcribe_at(&self, pcm: &[f32], t_offset_cs: i64) -> Result<ParakeetResult, String> {
+        if pcm.is_empty() {
+            return Err("nonempty PCM required".into());
+        }
+        let n = c_int::try_from(pcm.len()).map_err(|_| "PCM exceeds native count range")?;
         let res = unsafe {
-            crispasr_sys::crispasr_parakeet_transcribe(
-                self.handle,
-                pcm.as_ptr(),
-                pcm.len() as c_int,
-                lang_ptr,
-            )
+            crispasr_sys::crispasr_parakeet_transcribe(self.handle, pcm.as_ptr(), n, t_offset_cs)
         };
         if res.is_null() {
             return Err("crispasr_parakeet_transcribe returned null".to_string());

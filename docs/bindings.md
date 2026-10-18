@@ -657,7 +657,7 @@ fmt.Println("Transcript:", result.Transcript)
 ### Current wrapper repair validation
 
 The model-free ABI suites run through actual .NET, JNA, Ruby-extension and
-Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|dart|wasm`
+Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|dart|wasm|go-rust`
 (select one language). SDK requirements and the difference between optional
 CTest skips and strict CI are documented in [contributing](contributing.md).
 These suites exercise transport, ownership and lifecycle; they do not establish
@@ -687,3 +687,15 @@ Streaming delivers owned raw UTF-8 byte chunks; concatenate before decoding.
 to `OperationCanceledException`. Abort/token callbacks must be fast and cannot
 re-enter or dispose their session; callback exceptions propagate after native
 returns. The chat disclosure string is exposed through `AiDisclosureText`.
+
+### Legacy Parakeet offset contract
+
+The direct legacy C entry point accepts a 64-bit **centisecond offset**, not a
+language string. Current wrappers pass that offset explicitly. Python exposes
+`t_offset_cs`, Go/Rust expose `TranscribeAt`/`transcribe_at`, Java's
+`CrispasrAuxiliary.Parakeet` and WASM's `ParakeetContext` accept centiseconds,
+Dart exposes `offsetCs`, and Ruby's direct method accepts an integer fourth
+argument. C# `ParakeetContext.Transcribe` uses seconds like the rest of its API.
+Existing empty/English hints in applicable wrappers map to zero offset; use a
+unified session for actual per-call language selection. Token pieces can split
+UTF-8: concatenate the owned raw bytes before decoding.

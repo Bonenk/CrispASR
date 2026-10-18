@@ -3,19 +3,25 @@ on:
   push:
     branches: [main]
     paths:
+      - 'crispasr/**'
+      - 'crispasr-sys/**'
       - 'bindings/**'
       - 'flutter/crispasr/**'
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
+      - 'tests/build_legacy_wrapper_probe.py'
       - 'tools/run-wrapper-contract.py'
       - 'include/crispasr*.h'
       - '.github/workflows/binding-contracts.yml'
   pull_request:
     paths:
+      - 'crispasr/**'
+      - 'crispasr-sys/**'
       - 'bindings/**'
       - 'flutter/crispasr/**'
       - 'tests/test_*_wrapper_contract.py'
       - 'tests/fixtures/**'
+      - 'tests/build_legacy_wrapper_probe.py'
       - 'tools/run-wrapper-contract.py'
       - 'include/crispasr*.h'
       - '.github/workflows/binding-contracts.yml'
@@ -34,7 +40,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [csharp, java, ruby, dart, wasm]
+        language: [csharp, java, ruby, dart, wasm, go-rust]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,6 +48,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go-rust'
+        with:
+          go-version-file: bindings/go/go.mod
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.language == 'go-rust'
       - uses: actions/setup-dotnet@v4
         if: matrix.language == 'csharp'
         with:

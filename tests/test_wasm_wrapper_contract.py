@@ -18,8 +18,11 @@ static crispasr_session* g_tts_session=(crispasr_session*)1;
 #include "session_results.h"
 #include "session_tasks.h"
 #include "session_utilities.h"
+#include "session_analysis.h"
 extern "C" void probe_mode(int);
 extern "C" int probe_live(void);
+extern "C" int probe_analysis_live(void);
+extern "C" void probe_analysis_mode(int);
 extern "C" int probe_invalid_frees(void);
 extern "C" void probe_utility_mode(int);
 extern "C" int probe_utility_live(void);
@@ -31,6 +34,9 @@ static emscripten::val read_result(bool seconds) {
 EMSCRIPTEN_BINDINGS(wrapper_probe) {
     binding_register_session_tasks();
     binding_register_utilities();
+    binding_register_analysis();
+    emscripten::function("analysisLive",&probe_analysis_live);
+    emscripten::function("analysisMode",&probe_analysis_mode);
     emscripten::function("utilityMode",&probe_utility_mode);
     emscripten::function("utilityLive",&probe_utility_live);
     emscripten::function("readResult",&read_result);
@@ -68,6 +74,11 @@ require(process.argv[2])().then(m=>{
  eq(m.sessionScoreTexts(pcm,['one','two'],'','').tokenCounts[1],3);eq(m.sessionSetPcmSampleRate(16000),0);eq(m.sessionSetGrammarStrict(true),0);
  const stem=m.sessionSeparate(new Float32Array([1,2,3,4,5,6]))[0];eq(stem.name,'voice');eq(stem.samples.length,6);eq(stem.sampleRate,44100);
  eq(m.watermarkDetect(pcm),.75);eq(m.utilityLive(),0);
+ const pk=new m.ParakeetContext('probe',4,true);const pkResult=pk.transcribe(pcm,123);eq(pkResult.text,'日本語');eq(pkResult.words[0].t0,223);eq(pkResult.tokens[0].t0,-1);eq(Array.from(pkResult.tokens[0].rawText),[0xe6,0x97]);pk.close();pk.close();rejects(()=>pk.transcribe(pcm,0));pk.delete();
+ const alignment=m.alignWords(pcm,'model','日本語',123,4);eq(alignment[0].text,'日本語');eq(alignment[0].t0,123);eq(alignment[0].characters[1].text,'本');eq(alignment[0].characters[1].t1,165);eq(m.analysisLive(),0);
+ eq(m.vadSpans(pcm,'vad',16000,.5,250,100,4,false)[0].start,1.25);eq(m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4)[0].end,2.5);eq(m.analysisLive(),0);
+ m.analysisMode(1);eq(m.alignWords(pcm,'model','日本語',123,4).length,0);eq(m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4).length,0);eq(m.analysisLive(),0);
+ m.analysisMode(2);rejects(()=>m.alignWords(pcm,'model','日本語',123,4));rejects(()=>m.vadSpans(pcm,'vad',16000,.5,250,100,4,false));rejects(()=>m.vadSlices(pcm,'vad',16000,.5,250,100,0,0,4));eq(m.analysisLive(),0);
  eq(m.probeLive(),0);eq(m.probeInvalidFrees(),0);
  console.log('PASS WASM ABI: '+n+' assertions');
 }).catch(e=>{console.error(e);process.exitCode=1});
@@ -78,14 +89,14 @@ class WasmWrapperContract(unittest.TestCase):
     def test_owned_metadata_music_conversion_and_stream_callbacks(self):
         with tempfile.TemporaryDirectory(prefix='wasm-wrapper-abi-') as tmp:
             tmp=Path(tmp);objects=[]
-            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities']:
+            for name in ['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy']:
                 obj=tmp/(name+'.o');objects.append(str(obj))
                 subprocess.run([EMCC,'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-c',str(ROOT/'tests/fixtures'/(name+'.c')),'-o',str(obj)],check=True)
             # Unexercised registration dependencies abort if accidentally called.
             # Concrete public-header probes supply every operation asserted below.
-            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities']
+            fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
-            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h'])
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_tasks.h','session_utilities.h','session_analysis.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
             headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
             unused=[]
@@ -106,5 +117,32 @@ class WasmWrapperContract(unittest.TestCase):
             result=subprocess.run([NODE,str(program),str(module)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS WASM ABI:',result.stdout);print(result.stdout.strip())
+
+@unittest.skipUnless(EMCC and EMXX and NODE,'Emscripten C/C++ compilers and Node required')
+class WasmChatContract(unittest.TestCase):
+    def test_chat_options_owned_bytes_callback_errors_and_lifecycle(self):
+        with tempfile.TemporaryDirectory(prefix='wasm-chat-abi-') as tmp:
+            tmp=Path(tmp)
+            obj=tmp/'chat.o'
+            subprocess.run([EMCC,'-Werror','-I'+str(ROOT/'include'),'-c',str(ROOT/'tests/fixtures/wrapper-chat-abi.c'),'-o',str(obj)],check=True)
+            source=tmp/'probe.cpp'
+            source.write_text(r'''
+#include <emscripten.h>
+#include <emscripten/bind.h>
+EM_JS(void,binding_check_reentry,(),{if(Module['crispasrInCallback'])throw new Error('Session re-entry from callback');});
+#define CRISPASR_WASM_CHAT 1
+#include "session_chat.h"
+extern "C" int probe_chat_sessions(void);
+extern "C" int probe_chat_strings(void);
+extern "C" int probe_chat_resets(void);
+EMSCRIPTEN_BINDINGS(chat_probe){binding_register_chat();emscripten::function("chatLiveSessions",&probe_chat_sessions);emscripten::function("chatLiveStrings",&probe_chat_strings);emscripten::function("chatResets",&probe_chat_resets);}
+''')
+            module=tmp/'chat.js'
+            subprocess.run([EMXX,'-std=c++17','-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0','--bind','-sSINGLE_FILE=1',
+                '-sMODULARIZE=1','-sENVIRONMENT=node','-sALLOW_MEMORY_GROWTH=1','-I'+str(ROOT/'include'),
+                '-I'+str(ROOT/'bindings/javascript'),str(source),str(obj),'-o',str(module)],check=True)
+            result=subprocess.run([NODE,str(ROOT/'tests/fixtures/wasm-chat-program.cjs'),str(module)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS WASM chat:',result.stdout);print(result.stdout.strip())
 
 if __name__=='__main__':unittest.main()

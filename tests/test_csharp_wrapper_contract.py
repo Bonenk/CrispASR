@@ -285,4 +285,58 @@ class CSharpChatContract(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertIn('PASS C# chat:',result.stdout);print(result.stdout.strip())
 
 
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('cc'), '.NET SDK and C compiler required')
+class CSharpSessionAuxiliaryContract(unittest.TestCase):
+    def test_registry_options_speaker_and_diarization_operations(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-session-aux-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text((ROOT/'tests/fixtures/csharp-aux-program.cs').read_text())
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            # Compile the literal native POD layouts, not a second guessed mirror.
+            source=(ROOT/'src/crispasr_c_api.cpp').read_text();layouts=[]
+            for name in ['crispasr_diarize_seg_abi','crispasr_diarize_turn_abi','crispasr_diarize_opts_abi']:
+                start=source.index('struct '+name+' {');end=source.index('};',start)+2;layouts.append(source[start:end])
+            (path/'runtime-abi-layout.h').write_text('\n'.join(layouts))
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),'-I'+str(path),
+                *[str(ROOT/'tests/fixtures'/name) for name in ['python-wrapper-abi.c','wrapper-session-metadata.c','csharp-wrapper-aux.c']],'-o',str(path/'libcrispasr.so')],check=True)
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr);self.assertIn('PASS C# auxiliary:',result.stdout);print(result.stdout.strip())
+
+
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('c++'), '.NET SDK and C++ compiler required')
+class CSharpWhisperContract(unittest.TestCase):
+    def test_native_pointer_parameters_parallel_dtw_tokens_and_cleanup(self):
+        from build_legacy_wrapper_probe import build
+        with tempfile.TemporaryDirectory(prefix='csharp-legacy-whisper-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text((ROOT/'tests/fixtures/csharp-whisper-program.cs').read_text())
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            build(path/'libcrispasr.so')
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS C# legacy Whisper:',result.stdout);print(result.stdout.strip())
+
+
+@unittest.skipUnless(shutil.which('dotnet') and shutil.which('c++'), '.NET SDK and C++ compiler required')
+class CSharpParakeetContract(unittest.TestCase):
+    def test_legacy_parakeet_offset_copy_and_disposal(self):
+        with tempfile.TemporaryDirectory(prefix='csharp-legacy-whisper-') as tmp:
+            path=Path(tmp);sources=ROOT/'bindings/csharp/CrispASR'
+            (path/'Probe.csproj').write_text(f'''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><EnableDefaultCompileItems>false</EnableDefaultCompileItems></PropertyGroup><ItemGroup><Compile Include="{sources}/*.cs"/><Compile Include="Program.cs"/></ItemGroup></Project>''')
+            (path/'Program.cs').write_text((ROOT/'tests/fixtures/csharp-parakeet-program.cs').read_text())
+            result=subprocess.run(['dotnet','build',str(path/'Probe.csproj'),'-c','Release','--nologo','-v','quiet'],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            subprocess.run(['cc','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),str(ROOT/'tests/fixtures/wrapper-parakeet-legacy.c'),'-o',str(path/'libcrispasr.so')],check=True)
+            env=os.environ.copy();env['LD_LIBRARY_PATH']=str(path)+os.pathsep+env.get('LD_LIBRARY_PATH','')
+            result=subprocess.run(['dotnet',str(path/'bin/Release/net8.0/Probe.dll')],capture_output=True,text=True,env=env)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn('PASS C# legacy Parakeet:',result.stdout);print(result.stdout.strip())
+
+
 if __name__=='__main__': unittest.main()

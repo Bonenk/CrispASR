@@ -24,6 +24,7 @@
 #include <ruby/thread.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -244,7 +245,7 @@ extern int crispasr_lcs_dedup_prefix_count(const int32_t* prev_tail_tokens, int 
 // Direct Parakeet API
 extern void* crispasr_parakeet_init(const char* model_path, int n_threads, int use_flash);
 extern void crispasr_parakeet_free(void* ctx);
-extern void* crispasr_parakeet_transcribe(void* ctx, const float* pcm, int n_samples, const char* language);
+extern void* crispasr_parakeet_transcribe(void* ctx, const float* pcm, int n_samples, int64_t offset_cs);
 extern const char* crispasr_parakeet_result_text(void* r);
 extern int crispasr_parakeet_result_n_words(void* r);
 extern const char* crispasr_parakeet_result_word_text(void* r, int i);
@@ -286,8 +287,8 @@ extern void crispasr_pyannote_cache_free_abi(void* cache);
 extern int32_t crispasr_pyannote_cache_apply_abi(const void* cache, int64_t slice_t0_cs, void* segs, int32_t n_segs);
 
 // Kokoro lang helpers
-extern int crispasr_kokoro_lang_is_german_abi(const char* lang);
-extern int crispasr_kokoro_lang_has_native_voice_abi(const char* lang);
+extern bool crispasr_kokoro_lang_is_german_abi(const char* lang);
+extern bool crispasr_kokoro_lang_has_native_voice_abi(const char* lang);
 
 // Backend detection
 extern int crispasr_detect_backend_from_gguf(const char* path, char* out_name, int out_cap);
@@ -447,6 +448,8 @@ static VALUE mSession;
 static VALUE mStream;
 static VALUE mMic;
 
+#include "ruby_crispasr_aux.h"
+
 static VALUE rb_session_open(VALUE self, VALUE model_path, VALUE n_threads) {
     struct CrispasrSession* s = crispasr_session_open(StringValueCStr(model_path), NUM2INT(n_threads));
     if (!s)
@@ -456,8 +459,12 @@ static VALUE rb_session_open(VALUE self, VALUE model_path, VALUE n_threads) {
 
 static VALUE rb_session_close(VALUE self, VALUE handle) {
     struct CrispasrSession* s = rb_extra_handle(handle);
-    if (s)
+    if (s) {
+        // Clear any rooted callbacks before freeing native state.
+        if (rb_aux_callbacks != Qnil)
+            rb_hash_delete(rb_aux_callbacks, handle);
         crispasr_session_close(s);
+    }
     return Qnil;
 }
 
@@ -1074,6 +1081,7 @@ static VALUE rb_session_transcribe(VALUE self, VALUE handle, VALUE pcm_arr) {
 
     VALUE segments = rb_session_copy_segments(r);
     crispasr_session_result_free(r);
+    rb_aux_check_pending();
     return segments;
 }
 
@@ -1121,6 +1129,7 @@ static VALUE rb_session_transcribe_with_logits(VALUE self, VALUE handle, VALUE p
     }
     crispasr_session_result_free(r);
     crispasr_session_set_return_logits(s, 0);
+    rb_aux_check_pending();
 
     VALUE out = rb_ary_new_capa(2);
     rb_ary_push(out, segments);
@@ -1168,6 +1177,7 @@ static VALUE rb_session_transcribe_chunked(VALUE self, VALUE handle, VALUE pcm_a
 
     VALUE segments = rb_session_copy_segments(r);
     crispasr_session_result_free(r);
+    rb_aux_check_pending();
     return segments;
 }
 
@@ -1708,17 +1718,8 @@ static VALUE rb_parakeet_free(VALUE self, VALUE handle) {
         crispasr_parakeet_free(h);
     return Qnil;
 }
-static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VALUE language) {
-    void* h = (void*)NUM2ULL(handle);
-    long n = RARRAY_LEN(pcm_arr);
-    float* pcm = (float*)calloc(n > 0 ? n : 1, sizeof(float));
-    for (long i = 0; i < n; i++)
-        pcm[i] = (float)NUM2DBL(rb_ary_entry(pcm_arr, i));
-    const char* lang = NIL_P(language) ? NULL : StringValueCStr(language);
-    void* res = crispasr_parakeet_transcribe(h, pcm, (int)n, lang);
-    free(pcm);
-    if (!res)
-        rb_raise(rb_eRuntimeError, "crispasr_parakeet_transcribe failed");
+static VALUE rb_parakeet_copy_result(VALUE raw) {
+    void* res = (void*)raw;
     // Build a hash with text, words, tokens
     VALUE hash = rb_hash_new();
     const char* txt = crispasr_parakeet_result_text(res);
@@ -1742,8 +1743,31 @@ static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VAL
         rb_ary_push(tokens, t);
     }
     rb_hash_aset(hash, ID2SYM(rb_intern("tokens")), tokens);
-    crispasr_parakeet_result_free(res);
     return hash;
+}
+static VALUE rb_parakeet_transcribe(VALUE self, VALUE handle, VALUE pcm_arr, VALUE language) {
+    void* h = (void*)(uintptr_t)NUM2ULL(handle);
+    if (!h)
+        rb_raise(rb_eRuntimeError, "Parakeet context is closed");
+    int64_t offset = 0;
+    if (RB_INTEGER_TYPE_P(language))
+        offset = NUM2LL(language);
+    else if (!NIL_P(language) && strcmp(StringValueCStr(language), "en") && RSTRING_LEN(language))
+        rb_raise(rb_eArgError, "Legacy Parakeet has no language parameter; use a unified Session");
+    VALUE storage = rb_aux_pcm_storage(pcm_arr);
+    long n = RARRAY_LEN(pcm_arr);
+    if (!n)
+        rb_raise(rb_eArgError, "Nonempty PCM required");
+    void* result = crispasr_parakeet_transcribe(h, (float*)RSTRING_PTR(storage), n, offset);
+    RB_GC_GUARD(storage);
+    if (!result)
+        rb_raise(rb_eRuntimeError, "Parakeet transcription failed");
+    int state = 0;
+    VALUE out = rb_protect(rb_parakeet_copy_result, (VALUE)result, &state);
+    crispasr_parakeet_result_free(result);
+    if (state)
+        rb_jump_tag(state);
+    return out;
 }
 
 // --- TitaNet ---
@@ -1851,6 +1875,7 @@ static VALUE rb_session_transcribe_vad_lang(int argc, VALUE* argv, VALUE self) {
             rb_session_seconds(rb_ary_entry(tokens, j));
     }
     crispasr_session_result_free(res);
+    rb_aux_check_pending();
     return segs;
 }
 
@@ -1868,13 +1893,6 @@ static VALUE rb_session_result_word_alt_p(VALUE self, VALUE res_handle, VALUE i_
 static VALUE rb_stream_set_live_decode(VALUE self, VALUE handle, VALUE enabled) {
     struct CrispasrStream* s = (struct CrispasrStream*)NUM2ULL(handle);
     crispasr_stream_set_live_decode(s, RTEST(enabled) ? 1 : 0);
-    return Qnil;
-}
-
-// --- Diarize segments ---
-static VALUE rb_diarize_segments(VALUE self, VALUE left_arr, VALUE right_arr, VALUE is_stereo) {
-    // Minimal wrapper — full diarize needs segment structs which are complex in Ruby.
-    // This is a placeholder that validates the symbol is callable.
     return Qnil;
 }
 
@@ -2034,4 +2052,6 @@ void init_ruby_crispasr_session(VALUE* mWhisper) {
     rb_define_singleton_method(mMic, "stop", rb_mic_stop, 1);
     rb_define_singleton_method(mMic, "close", rb_mic_close, 1);
     rb_define_singleton_method(mMic, "default_device_name", rb_mic_default_device_name, 0);
+
+    rb_aux_init();
 }

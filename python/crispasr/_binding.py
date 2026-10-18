@@ -251,31 +251,32 @@ class CrispASR:
                 self._helpers = ctypes.CDLL(hp)
                 break
 
-        if self._helpers:
-            # Use pointer-based wrappers (avoids by-value struct issues)
-            self._helpers.whisper_init_from_file_ptr.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
-            self._helpers.whisper_init_from_file_ptr.restype = ctypes.c_void_p
-            self._helpers.whisper_full_ptr.argtypes = [
-                ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-            ]
-            self._helpers.whisper_full_ptr.restype = ctypes.c_int
-
+        native_pointer_init = getattr(self._lib, "whisper_init_from_file_with_params_by_ref", None)
+        if native_pointer_init is not None or self._helpers:
+            init = native_pointer_init or self._helpers.whisper_init_from_file_ptr
+            init.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
+            init.restype = ctypes.c_void_p
+            if self._helpers:
+                self._helpers.whisper_full_ptr.argtypes = [
+                    ctypes.c_void_p, ctypes.c_void_p,
+                    ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+                ]
+                self._helpers.whisper_full_ptr.restype = ctypes.c_int
             cparams = self._lib.whisper_context_default_params_by_ref()
+            if not cparams:
+                raise RuntimeError("Whisper context parameter allocation failed")
             try:
                 if dtw:
                     from ._session_extra import function
                     function(self._lib, "crispasr_ctx_params_set_dtw",
                              [ctypes.c_void_p, ctypes.c_bool, ctypes.c_int, ctypes.c_int], None)(
                                  cparams, True, dtw_aheads_preset, dtw_n_top)
-                self._ctx = self._helpers.whisper_init_from_file_ptr(
-                    model_path.encode("utf-8"), cparams)
+                self._ctx = init(model_path.encode("utf-8"), cparams)
             finally:
                 self._lib.whisper_free_context_params(cparams)
         else:
             if dtw:
-                raise RuntimeError("DTW configuration requires libcrispasr_helpers")
-            # Fallback: use deprecated simple init (no params)
+                raise RuntimeError("DTW configuration requires native pointer wrappers or libcrispasr_helpers")
             self._lib.whisper_init_from_file.argtypes = [ctypes.c_char_p]
             self._lib.whisper_init_from_file.restype = ctypes.c_void_p
             self._ctx = self._lib.whisper_init_from_file(model_path.encode("utf-8"))
@@ -303,13 +304,6 @@ class CrispASR:
 
         lib.whisper_free_params.argtypes = [ctypes.c_void_p]
         lib.whisper_free_params.restype = None
-
-        # whisper_full (takes params by value — needs helpers lib for pointer variant)
-        lib.whisper_full.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ]
-        lib.whisper_full.restype = ctypes.c_int
 
         # Results (ctx-based variants)
         lib.whisper_full_n_segments.argtypes = [ctypes.c_void_p]
@@ -466,31 +460,36 @@ class CrispASR:
         pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
+        if n_processors < 1:
+            raise ValueError("n_processors must be positive")
         # Get default params
         params_ptr = self._lib.whisper_full_default_params_by_ref(strategy)
+        if not params_ptr:
+            raise RuntimeError("Whisper decode parameter allocation failed")
 
-        # 0.4.2: VAD + tdrz. Setters are optional — older dylibs don't
-        # have them, the lookup-time hasattr() guard skipped the argtypes
-        # declaration so these calls no-op silently.
-        if vad and hasattr(self._lib, "crispasr_params_set_vad"):
-            self._lib.crispasr_params_set_vad(params_ptr, 1)
-            if hasattr(self._lib, "crispasr_params_set_vad_threshold"):
-                self._lib.crispasr_params_set_vad_threshold(params_ptr, vad_threshold)
-            if hasattr(self._lib, "crispasr_params_set_vad_min_speech_ms"):
-                self._lib.crispasr_params_set_vad_min_speech_ms(params_ptr, vad_min_speech_ms)
-            if hasattr(self._lib, "crispasr_params_set_vad_min_silence_ms"):
-                self._lib.crispasr_params_set_vad_min_silence_ms(params_ptr, vad_min_silence_ms)
-            if vad_model_path and hasattr(self._lib, "crispasr_params_set_vad_model_path"):
-                self._lib.crispasr_params_set_vad_model_path(
-                    params_ptr, vad_model_path.encode("utf-8")
-                )
-        if tdrz and hasattr(self._lib, "crispasr_params_set_tdrz"):
-            self._lib.crispasr_params_set_tdrz(params_ptr, 1)
-
-        # Struct-by-value APIs must go through compiled pointer adapters.
+        # Native parameter setters may retain string pointers until decode returns.
         try:
-            if not self._helpers:
-                raise RuntimeError("legacy Whisper inference requires libcrispasr_helpers; use Session otherwise")
+            # 0.4.2: VAD + tdrz. Setters are optional — older dylibs don't
+            # have them, the lookup-time hasattr() guard skipped the argtypes
+            # declaration so these calls no-op silently.
+            if vad and hasattr(self._lib, "crispasr_params_set_vad"):
+                self._lib.crispasr_params_set_vad(params_ptr, 1)
+                if hasattr(self._lib, "crispasr_params_set_vad_threshold"):
+                    self._lib.crispasr_params_set_vad_threshold(params_ptr, vad_threshold)
+                if hasattr(self._lib, "crispasr_params_set_vad_min_speech_ms"):
+                    self._lib.crispasr_params_set_vad_min_speech_ms(params_ptr, vad_min_speech_ms)
+                if hasattr(self._lib, "crispasr_params_set_vad_min_silence_ms"):
+                    self._lib.crispasr_params_set_vad_min_silence_ms(params_ptr, vad_min_silence_ms)
+                if vad_model_path and hasattr(self._lib, "crispasr_params_set_vad_model_path"):
+                    vad_path_bytes = vad_model_path.encode("utf-8")
+                    self._lib.crispasr_params_set_vad_model_path(params_ptr, vad_path_bytes)
+            if tdrz and hasattr(self._lib, "crispasr_params_set_tdrz"):
+                self._lib.crispasr_params_set_tdrz(params_ptr, 1)
+
+            full_pointer = getattr(self._lib, "whisper_full_by_ref", None)
+            parallel_pointer = getattr(self._lib, "crispasr_transcribe_parallel_by_ref", None)
+            if not self._helpers and (full_pointer is None or (n_processors > 1 and parallel_pointer is None)):
+                raise RuntimeError("legacy Whisper inference requires native pointer wrappers or libcrispasr_helpers")
             if n_processors < 1:
                 raise ValueError("n_processors must be positive")
             # Keep strings alive until inference returns: native setters retain
@@ -516,10 +515,14 @@ class CrispASR:
                 language_bytes = language.encode("utf-8")
                 self._lib.crispasr_params_set_language(params_ptr, language_bytes)
             if n_processors == 1:
-                ret = self._helpers.whisper_full_ptr(self._ctx, params_ptr, samples_ptr, len(pcm))
+                fn = full_pointer or self._helpers.whisper_full_ptr
+                fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                fn.restype = ctypes.c_int
+                ret = fn(self._ctx, params_ptr, samples_ptr, len(pcm))
             else:
                 from ._session_extra import function
-                fn = function(self._helpers, "crispasr_transcribe_parallel_ptr",
+                fn = function(self._lib if parallel_pointer is not None else self._helpers,
+                              "crispasr_transcribe_parallel_by_ref" if parallel_pointer is not None else "crispasr_transcribe_parallel_ptr",
                               [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
                                ctypes.c_int, ctypes.c_int], ctypes.c_int)
                 ret = fn(self._ctx, params_ptr, samples_ptr, len(pcm), n_processors)
@@ -4127,19 +4130,24 @@ class Parakeet:
         if not self._handle:
             raise RuntimeError(f"Failed to load Parakeet model: {model_path}")
 
-    def transcribe(self, pcm: "np.ndarray", language: Optional[str] = None):
+    def transcribe(self, pcm: "np.ndarray", language: Optional[str] = None, *, t_offset_cs: int = 0):
         """Transcribe mono 16 kHz float32 PCM. Returns a dict with text,
         words [(text, t0_cs, t1_cs)], and tokens [(text, t0_cs, t1_cs, p)]."""
+        if not self._handle: raise RuntimeError("Parakeet context is closed")
+        if language not in (None,"","en"):
+            raise ValueError("legacy Parakeet has no language parameter; use Session for language hints")
+        t_offset_cs = operator.index(t_offset_cs)
+        if not -(1<<63) <= t_offset_cs < (1<<63): raise OverflowError("offset exceeds int64")
         pcm_arr = np.ascontiguousarray(pcm, dtype=np.float32)
+        if pcm_arr.ndim != 1 or not pcm_arr.size: raise ValueError("nonempty mono PCM required")
         lib = self._lib
         fn = lib.crispasr_parakeet_transcribe
         fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
-                       ctypes.c_int, ctypes.c_char_p]
+                       ctypes.c_int, ctypes.c_int64]
         fn.restype = ctypes.c_void_p
-        lang = language.encode("utf-8") if language else None
         res = fn(self._handle,
                  pcm_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                 int(pcm_arr.size), lang)
+                 int(pcm_arr.size), t_offset_cs)
         if not res:
             raise RuntimeError("crispasr_parakeet_transcribe returned null")
         try:
@@ -4147,7 +4155,7 @@ class Parakeet:
             lib.crispasr_parakeet_result_text.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_text.restype = ctypes.c_char_p
             raw = lib.crispasr_parakeet_result_text(res)
-            text = raw.decode("utf-8") if raw else ""
+            text = raw.decode("utf-8", errors="replace") if raw else ""
             # Words
             lib.crispasr_parakeet_result_n_words.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_n_words.restype = ctypes.c_int
@@ -4179,15 +4187,17 @@ class Parakeet:
             lib.crispasr_parakeet_result_token_p.restype = ctypes.c_float
             nt = lib.crispasr_parakeet_result_n_tokens(res)
             tokens = []
+            token_bytes = []
             for i in range(nt):
                 tt = lib.crispasr_parakeet_result_token_text(res, i)
+                token_bytes.append(tt or b"")
                 tokens.append((
-                    tt.decode("utf-8") if tt else "",
+                    tt.decode("utf-8", errors="replace") if tt else "",
                     lib.crispasr_parakeet_result_token_t0(res, i),
                     lib.crispasr_parakeet_result_token_t1(res, i),
                     float(lib.crispasr_parakeet_result_token_p(res, i)),
                 ))
-            return {"text": text, "words": words, "tokens": tokens}
+            return {"text": text, "words": words, "tokens": tokens, "token_bytes": token_bytes}
         finally:
             lib.crispasr_parakeet_result_free.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_free.restype = None
