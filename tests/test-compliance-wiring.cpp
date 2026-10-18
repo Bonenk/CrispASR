@@ -184,6 +184,10 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
     // them could answer it. Same shape as the earlier gap where a binding could
     // opt out of marking (synthesize_raw) but had no way to mark the result —
     // a duty you can be told about and cannot discharge is not a mechanism.
+    //
+    // The ruby entry names the registered function, so it follows the
+    // rb_context_guard_* symbol the context-guard refactor registered the
+    // calls through (tools/sync_ruby_context_guards.py).
     struct Binding {
         const char* file;
         const char* needle;
@@ -193,7 +197,8 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
         {"bindings/go/crispasr_session.go", "func (s *CrispasrSession) SetSpeakerIdentity(identity string) error"},
         {"crispasr/src/lib.rs", "pub fn set_speaker_identity(&self, identity: &str)"},
         {"crispasr-sys/src/lib.rs", "pub fn crispasr_session_set_speaker_identity("},
-        {"bindings/ruby/ext/ruby_crispasr_session.c", "\"set_speaker_identity\", rb_session_set_speaker_identity"},
+        {"bindings/ruby/ext/ruby_crispasr_session.c",
+         "\"set_speaker_identity\", rb_context_guard_rb_session_set_speaker_identity"},
         {"bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java",
          "public void setSpeakerIdentity(String identity)"},
         {"bindings/csharp/CrispASR/Session.cs", "public void SetSpeakerIdentity(string identity)"},
@@ -541,7 +546,7 @@ TEST_CASE("every binding that can opt out of marking can also mark", "[unit][com
     }
     SECTION("ruby") {
         REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
-                         "\"watermark_embed\", rb_watermark_embed"));
+                         "\"watermark_embed\", rb_context_guard_rb_watermark_embed"));
     }
     SECTION("java") {
         REQUIRE(contains(read_file("bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java"),
