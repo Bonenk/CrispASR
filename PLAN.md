@@ -1,5 +1,19 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-10-18 — #549 remaining Python/native token ownership
+
+Owner: maintainer coordinator; isolated branch `perf/217-alignment-cleanroom`.
+Preserve original native token blocks through legacy Parakeet overlap splice,
+word dedup and Japanese slice/gap-fill selection. Replace timestamp-based token
+selection in shared gap repair with the actual native grouping rules/indices;
+share those rules with native word grouping so equal-frame words are unambiguous.
+No public ABI struct extension, tokenizer/inference/window-decision changes or
+fabricated tokens/times. Tiny tests compare grouping against frozen own native
+code, exercise seams/tied times/UTF-8 fragments/offsets and read results through
+production C ABI/Python getters. Real model proof/full-library CI stay separate.
+Audit/update `docs/contributing.md` to distinguish backend dispatch from explicit
+wrapper methods/result metadata, and require session/CLI/chunked route parity.
+
 ## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
 
 Owner: maintainer coordinator. Work is isolated on
