@@ -5630,6 +5630,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_metadata.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-session-metadata PROPERTIES LABELS "unit;session;bindings" TIMEOUT 60)
+    add_test(NAME test-align-compact
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_align_compact.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
     add_test(NAME test-breeze-session-modes
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

@@ -208,6 +208,9 @@ jobs:
       - name: Breeze session sampler controls
         run: python3 tests/test_breeze_session_controls.py -v
 
+      - name: CTC compact workspace, frozen parity and exhaustive path oracle
+        run: python3 tests/test_align_compact.py -v
+
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v
 

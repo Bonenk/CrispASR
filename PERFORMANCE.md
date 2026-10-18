@@ -1,5 +1,15 @@
 # CrispASR — Performance benchmarks
 
+Character CTC workspace experiment (2026-10-18): opt-in
+`CRISPASR_CTC_ALIGN_OPT=1` preserves the existing default. On four local
+model-free fixtures (`T=256`, 20 words, vocabulary 16–4096), exact-output kernel
+medians improve 1.20–1.51x and tracked peak heap drops 1.33–14.52x. Shared-host
+timings are noisy; hosted larger-case validation is pending. These are not
+end-to-end model speeds or Japanese Parakeet/Canary subword results. See
+[the comparison, clean-room provenance and measurements](docs/alignment-cleanroom-2026-10-18.md)
+and [the local receipt](docs/alignment-ctc-local-2026-10-18.json).
+
+
 Ascend checkpoint (2026-10-13): physical ARM64/310P3, SDK 9.1.0,
 ACL graphs off, has operator-level float correctness evidence. Broad ADD and
 MUL_MAT abort on unsupported BF16 inputs. No model-throughput or speech-quality
@@ -765,7 +775,7 @@ the §232 campaign. Verified against current code, not carried from this doc.
 | **P2** | Scalar CPU hotpaths | RNN-T LSTM pred+joint; granite cpu_linear+depthwise; paraformer CIF; rvq encode; istft IRFFT; titanet mel front-end; diarize `apply_xcorr` | Per-token/frame scalar loops |
 | ~~P2~~ **CLOSED** | parakeet | Batched TDT decode validated on Kaggle CPU (#81, 2026-07-18): **0.73–0.80× = SLOWER**, byte-identical → keep default OFF, do NOT flip | Predicted win, measured a loss |
 | **OPEN** | parakeet CPU vs onnx-asr | crispasr parakeet-tdt CPU 4.0×/3.0× vs onnx-asr int8 8.6×/5.8× ⇒ **~2.1× slower on CPU** (the real #81 residual). Needs a CPU BLAS/kernel lever — batched decode is ruled out | GPU is fine (P100 36.9×/50.9×) |
-| **P2** | align_wav2vec2_ctc | **Reloads the 300MB–1GB model every call** (`crispasr_aligner.cpp:315`) — missing the §176e ctx-cache | Concrete single-file win |
+| **DONE** | align_wav2vec2_ctc | Current shared §176e context cache reuses the model by path; the old per-call reload warning is superseded. CPU CTC workspace experiment: see the 2026-10-18 receipt above. | No reload fix remains to implement |
 | **P2** | paraformer / voxcpm2 | CPU-only, no GPU backend (paraformer leaks 256MB buffer) | GPU offload available |
 | **P3** | Threading | Hardcoded default 4 threads in ~90 sites; only whisper-core caps to `min(4, hw)` | Idle cores on big hosts |
 | **P3** | Misc | pyannote per-slice not once-over-audio (#107); RNNoise recreates state+resamplers/call; glm mel padded to 3000 always | Localized |

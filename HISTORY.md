@@ -1,3 +1,32 @@
+## #217 clean-room comparison and local CTC experiment — 2026-10-18
+
+Read the full #217 discussion and pinned the referenced new Subtimer release.
+The public comparison separates architecture from unmeasured accuracy/runtime;
+no project-wide license declaration was found, and no implementation, fitted
+weights, native patch or model asset is ported/vendored. Separate research and
+implementation sessions supplied an independently authored opt-in character-CTC
+candidate. The first design's repeated-label memory regression was independently
+caught (161,756 versus 62,428 tracked heap bytes), rejected and corrected.
+The revised unique-token workspace passes the six-test frozen-reference and
+exhaustive-oracle suite. Local synthetic receipts retain bit-exact output and
+noisy timing/memory results; hosted/full-library acceptance and model-level
+quality are still pending in PLAN.md. Default behavior remains unchanged, and
+no Japanese Parakeet/Canary or Subtimer end-to-end speedup is claimed.
+
+## #549 terminal validation accepted — 2026-10-18
+
+Independently audited frozen source
+`741141118335643adc7d29b61bc95e1d77c7f43a`: all 13 CI jobs
+([39104662258](https://github.com/CrispStrobe/CrispASR/actions/runs/39104662258))
+and all 10 lint jobs
+([39104663518](https://github.com/CrispStrobe/CrispASR/actions/runs/39104663518))
+pass. The complete Linux log confirms 2,033 CTest unit cases and all 11
+exported-C-ABI/Python metadata tests pass, including the 30 legacy/shared
+splitter combinations. Later documentation-only main checkpoints preserve the
+validated source bytes. This supersedes earlier queued/cancelled observations.
+Long-Japanese/legacy overlap token ownership stays scoped in PLAN.md; metadata
+acceptance does not establish model accuracy or measured VRAM release.
+
 ## #549 legacy Parakeet segmented-token preservation — 2026-10-18
 
 The legacy explicit-output splitter discarded its native token array, and

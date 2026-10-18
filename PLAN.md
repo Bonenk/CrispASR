@@ -1,91 +1,86 @@
 # CrispASR — Pending work
 
-## CLAIMED — #217 alignment comparison and clean-room optimization (2026-10-18)
+## #217 — comparison complete; opt-in character CTC candidate validated locally
 
-Owner: maintainer coordinator with isolated research/implementation assistants.
-Coordinator branch `perf/217-alignment-cleanroom`, worktree
-`${CRISPASR_WORKTREES}/crispasr-issue217-20261018`. Read the full issue including
-the October reporter follow-up. Pin the external review to Subtimer commit
-`4a894d0e166191d41ebc734b61d68f5c531fb55b`. No third-party source, native
-patches, fitted assets or learned parameters may be ported or vendored.
-The research assistant may inspect external text read-only and returns an
-ideas-only report. A fresh implementation assistant receives only our source
-and a sanitized functional brief, without external source/history context.
+Owner: maintainer coordinator. Work is isolated on
+`perf/217-alignment-cleanroom`; no third-party source or fitted data is copied
+into this tree. The external review is pinned to Subtimer
+`4a894d0e166191d41ebc734b61d68f5c531fb55b`; project-wide licensing is absent
+from inspected metadata, while native/vendor notices have their own scope.
+Read [the full comparison and clean-room record](docs/alignment-cleanroom-2026-10-18.md).
+No matched Subtimer/current-CrispASR accuracy/runtime benchmark exists here.
+A research agent's unsupported DP-bottleneck and small-banding-quality-cost
+claims were rejected; do not promote them as measurements.
 
-Scope: distinguish alignment accuracy from wall-clock speed, identify actually
-published comparisons, audit current CrispASR alignment bottlenecks, then build
-an independently authored exact-output CTC optimization and benchmark it against
-our frozen baseline. Local tiny fixtures only; heavy/model runs use GH workers,
-large artifacts stay on maintainer storage. Acceptance: exact word/character
-stamps and tie/failure semantics versus baseline plus independent tiny oracle;
-record CPU/memory measurements with dimensions/flags/source pins. No claimed
-Subtimer speedup or accuracy advantage without a matched corpus/hardware test.
-Preserve existing alignment behavior; keep further long-form/VAD accuracy ideas
-separately scoped until quality evidence exists. Frozen #549 validation branch
-and runs must remain untouched during this additional work.
+A fresh implementation agent authored an independent opt-in character-CTC
+workspace candidate using only our source and sanitized requirements. The first
+T*S emission design was rejected on measured memory regression. Corrected
+source SHA256 `d089c141e03fa61970a5136d1c8f9b92a05e306ae36bab78d6b8b8597b68cfd5`
+uses unique-token emission columns, flat traceback storage and character-derived
+word bounds. Only `CRISPASR_CTC_ALIGN_OPT=1` enables it; default stays unchanged.
+Six acceptance tests pass: 240 randomized cases, 60 unique-optimum exhaustive
+path checks, ties/repeats/Unicode, invalid/nonfinite cases, and memory acceptance.
+Local synthetic measurements and their noisy timing ranges are retained in
+`docs/alignment-ctc-local-2026-10-18.json`; they do not measure encoder/model
+or Japanese Parakeet/Canary subword performance.
 
-## #549 follow-up — legacy segmented tokens implemented (2026-10-18)
+Next: dispatch/audit `tools/ci-heavy/alignment_ctc_bench.py --large` with NumPy
+on an immutable published source branch. It compiles only our model-free kernel
+and frozen own baseline; no external models/code are needed. Audit all receipt
+output parity, kernel-time distributions, actual allocation counts and tracked
+peak heap, source hashes, compiler/CPU/flags, and the independent test suite.
+Run ordinary full-library CI and lint on the same frozen source. Keep that branch
+immutable while documentation checkpoints advance. No default promotion until
+those gates and representative model alignment acceptance are satisfied.
 
-Owner: next maintainer for terminal CI audit. The legacy explicit-output
-Parakeet splitter now retains native token bytes/times/probabilities, including
-no-word token-only results and tokens on exact segment boundaries. A differential
-fixture compiles the real shared CLI splitter and legacy session splitter,
-passes identical decoded results through both, and compares C ABI/Python output
-across 30 fixture/window combinations. It failed in 15 cases before the fix;
-all 30 combinations now pass, with the full 11-test metadata suite green.
-The remaining word-only overlap-merge and Japanese gap-fill work below is
-unchanged. No decoder/inference or strategy changes are included in this fix.
+## #217 clean-room accuracy follow-ups — bounded next tasks
 
-CI `39104177158` was cancelled by the required claim/checkpoint main push;
-it never completed full-library validation. Do not reuse it as a green result.
-Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` is on
-`diag/549-legacy-split-validation-20261018`. CI `39104662258` and lint
-`39104663518` are dispatched and queued; audit both terminal results. Their
-source includes the original four #549 fixes and the legacy splitter follow-up.
-Later documentation checkpoints must not cancel or mutate that branch's build.
-After green CI, verify all non-document source bytes match integrating main,
-then answer/close #549 with the compatibility notes below. Preserve the separate
-Japanese/legacy overlap token-ownership task until its own acceptance passes.
+After the exact-output CPU kernel experiment, profile the separate
+`canary_ctc_align_words` path on frozen logits and the encoder on a matched
+Japanese clip. Character CTC timings alone do not characterize Parakeet.
+Independently implement any shared workspace improvements with exact native
+centisecond-output and tokenizer parity; keep original behavior available for
+A/B, and separate any existing invalid-path semantic repair from a speed change.
 
+Long-form accuracy requires audio/text anchors before changing the current
+proportional Qwen chunk assignment or unbounded CTC encoder use. Build a small
+licensed Japanese boundary-labeled corpus with long pauses, music, repeated
+phrases and subtitle omissions. Acceptance: no dropped/reordered lines, correct
+absolute offsets, reported median/p95 boundary error and coverage, and bounded
+RAM/VRAM on a long clip. Evaluate optional VAD/vocal signals and independently
+trained boundary refinement against a raw-audio baseline. No external fitted
+parameters, exact feature recipes or source may be reused. The comparison and
+licensing/provenance constraints are in
+[the audit](docs/alignment-cleanroom-2026-10-18.md).
 
-## Issue #549 — implementation complete; full-library CI pending (2026-10-18)
+## #549 — full-library CI accepted; Japanese/legacy merge tokens remain
 
-Owner: next maintainer for terminal CI audit. Implementation: `5e7694516`,
-fixed-array token-copy follow-up `8d844c610`; integrated with this checkpoint.
-See [session metadata](docs/python-session-metadata.md) and HISTORY.md.
-Local acceptance passes: 11 production-packaging/C ABI/Python metadata tests,
-4 existing UTF-8 tests, 8 Python/native resampling tests, and all 5 secret/privacy
-checks unskipped. Python utility checks pass 11 with one optional full-library
-smoke skipped locally. These do not establish full-library/platform build success.
+Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
+(`39104662258`) and all 10 lint jobs (`39104663518`). Independent audit checked
+terminal metadata, exact source and the complete Linux unit log: 2,033 CTest
+unit cases pass; the exported-C-ABI/Python metadata suite passes all 11 tests,
+including all 30 legacy/shared splitter fixture/window combinations. Later main
+commits through the initial #217 claim alter documentation only relative to
+this validated source. Preserve this frozen proof; do not repeat it merely
+because documentation tips differ. The API fixes remain unreleased in v0.8.43.
 
-Next action: inspect CI and lint for the integrating main commit. The initial
-feature-source runs CI `39103971446` and lint `39103972664` were queued without
-starting any job and are superseded by integrating-main checks. Do not count a
-queued run as success. The `linux-unit` job must pass both the linked native
-null/cache-release test and `tests/test_session_metadata.py` with `CRISPASR_LIB`
-pointing at the newly built complete library; the latter exercises actual
-exported getters and ctypes signature setup. Resolve build/test failures, then
-answer/close #549 with the validated commit and the compatibility notes below.
-No release/tag is implied; installed v0.8.43 wheels do not contain this patch.
+Keep the issue open for the known long-Japanese path limitation and reporter
+validation. Next implementation scope: preserve native tokens through the
+remaining word-only legacy Parakeet overlap-merge and Japanese slice/gap-fill
+routes. Carry token-to-word ownership through window selection and deduplication;
+matching by timestamp alone is ambiguous when words share frame timestamps.
+Do not fabricate tokens or timings from word strings. Hoist shared orchestration
+where practical without changing existing inference/window decisions.
+Acceptance: tiny native window fixtures prove exact retained token bytes and
+probabilities, offsets, equal-time boundary handling and no seam duplicates;
+then one licensed Japanese multi-window clip through CLI and C ABI. Document
+remaining token-less backend routes explicitly. No new graph or model behavior
+may be inferred from metadata tests.
 
-Compatibility: unavailable Python word/token times are now `None` and have a
-`has_timestamps` property; valid numeric times are unchanged. Tokens default to
-an independent empty list on old libraries; explicit cache release raises when
-unsupported. Cohere timings remain the runtime's existing estimates. VibeVoice
-has native utterance times but requires forced alignment for word times. The
-new cache-release wrapper uses the existing process-wide aligner lock; no real
-GPU VRAM counter measurement has been performed in this work.
-
-Bounded optional follow-up: preserve native tokens through the remaining
-word-only legacy Parakeet overlap-merge and Japanese slice/gap-fill routes.
-Default non-Japanese shared CLI/session orchestration already retains its
-available tokens. Hoist the legacy routes into shared orchestration, retaining
-native token-to-word ownership through window selection/deduplication; never
-fabricate token times or reconstruct fake tokens from words. Acceptance: tiny
-recorded window fixtures prove exact retained native token bytes/probabilities,
-correct absolute offsets, no seam duplicates, and matching CLI/C ABI results;
-then validate one Japanese multi-window clip through both frontends. This is
-separate from the four implemented #549 surface changes.
+See [session metadata](docs/python-session-metadata.md) for `None` timing,
+byte-fragment handling, cache-release lifetime and older-library compatibility.
+The process-wide aligner cache wrapper is tested, but no real VRAM-counter
+measurement has been made. No release/tag is implied by the CI acceptance.
 
 Updated 2026-10-18. This file contains current actions, dependencies and a
 legacy audit inventory. Completed work and experiment receipts live in
