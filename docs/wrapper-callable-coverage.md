@@ -228,3 +228,20 @@ PCM, native errors and a throwing JS typed-array constructor. Native PCM is
 freed before encoding. The same assertion program runs in Node and headless
 Chromium with actual pthreads and COOP/COEP. These are component contracts,
 not real-model transcript/roundtrip or full-module acceptance.
+
+
+## WASM retained session streams
+
+Native `crispasr_session_stream_kind/open` and stream close/feed/flush/text/
+live-decode operations have public `asrStreamKind/Open/Close/Feed/Flush/GetText/SetLiveDecode`
+adapters. The legacy Whisper-context `crispasr_stream_open` is a distinct pending
+ledger row. Sync stream methods serve single-thread modules; threaded modules
+provide the corresponding six `*Async` operations plus `asrCloseAsync`.
+
+`WasmStreamContract` and `WasmDispatchContract` compile these actual adapters
+against the public stream declarations and a native ownership/thread oracle.
+The probes cover exact options and PCM, native failure, text growth, copied
+UTF-8/time/counter results, ticket retirement and parent replacement/close.
+Only one child is supported per session, matching the native ABI contract;
+batch ASR inference refuses while that child exists. Typed retained ASR event
+callbacks and real-model acceptance remain pending in PLAN.md.

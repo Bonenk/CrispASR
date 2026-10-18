@@ -1,3 +1,34 @@
+## WASM retained stream ownership and Ruby GC probe repair — 2026-10-18
+
+WASM now exposes session stream kind/open/feed/flush/text/live-decode/close.
+Public handles are nonreused opaque tickets, with one child per model session
+as required by the native ABI. Batch ASR inference refuses while a child exists.
+Every parent close/replacement path closes its child before freeing the parent,
+including v2 and legacy async opens. Threaded stream operations and the new
+`asrCloseAsync` use the compute dispatcher; sync stream calls refuse in threaded
+modules, and sync parent replacement with a child preserves the parent while
+directing callers to async cleanup. Async methods require proxied compute.
+
+The adapters validate stream options and int32 sample-count limits, copy PCM
+before submission, preserve native failure, retry growing text, and return owned
+UTF-8/time/counter snapshots without rounding large counters. JS input copying
+catches JS exceptions before crossing native scratch frames, then rechecks busy
+and ticket state. Option conversion also detects parent replacement. Probes
+exercise retirement and async work submitted from JS conversion. A deliberate
+omission of child cleanup made the ownership test fail before restoring it.
+
+Hosted binding contracts at `1bd1447d3` passed C#, Java, Dart, Go/Rust and WASM,
+but Ruby failed its immediate-GC assertion for a discarded speaker owner. The
+finalizer probe now allocates on a finished thread, removing conservative roots
+from the active VM/C stack before asserting native cleanup.
+
+Validation: **289 WASM ABI assertions, 39 chat assertions, 58 single-thread
+stream assertions, and 151 threaded assertions in each of Node and Chromium**
+pass. The strict Ruby probe passes **340 assertions**. Both single-thread/chat
+and pthread main WASM translation units pass syntax checks; formatting, doc
+anchors and workflow-shell checks pass. These are component/SDK probes;
+full hosted builds, actual models and platform acceptance remain in PLAN.md.
+
 ## WASM dispatch failure state independent of error text — 2026-10-18
 
 A regression reproduced an empty-message native exception being encoded as a

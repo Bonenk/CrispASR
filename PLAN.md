@@ -2,9 +2,9 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: retained WASM stream lifetime and
-ASR callbacks after the dispatch checkpoint. Continue the cross-language wrapper task; the
-bounded external agent tasks have ended. Completed source repairs and measured
+Owner: maintainer coordinator. Active next: retained WASM ASR callbacks after
+stream ownership and dispatch checkpoints. Continue the cross-language wrapper
+task; the bounded external agent tasks have ended. Completed source repairs and measured
 probe counts are archived in HISTORY.md. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
 The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
@@ -45,7 +45,8 @@ Recommended implementation order and concrete acceptance:
    probes; validate their full-module size and browser filesystem/download behavior.
    Generic diarization/turns, language-aware VAD and owned logits results now
    have compiled operation probes; include them in real-model/browser acceptance.
-   Implement typed ASR callback setters, streaming and remaining legacy controls.
+   Implement typed ASR callback setters and remaining legacy controls. Retained
+   session streams now have public ticket adapters; validate real backend behavior.
    Generic speaker/clustering/pyannote adapters now have operation probes;
    include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
    work and callback delivery are safely proxied. Measure complete default
@@ -54,8 +55,12 @@ Recommended implementation order and concrete acceptance:
    - Retained segment/token/progress callbacks must deliver copied native events
      on the servicer, preserve raw token bytes, clear on replacement/close, and
      contain callback errors/re-entry. Never move emval objects to compute threads.
-   - Own child stream handles and close them before parent replacement/free;
-     probe feed/flush/text/options, native failure and retired handles.
+   - Validate retained stream adapters with actual models: feed/flush/text/live
+     decode, backend stream-kind semantics, finalization and browser responsiveness.
+     The compiled probes cover native transport and child-before-parent ownership,
+     including async replacement/close. Threaded callers must use async stream
+     methods and async parent replacement/close while a child exists. Check actual
+     backend cleanup and module instantiation in hosted full builds.
    - Dispatch now has real pthread Node/browser operation probes, including
      native/encoder/callback errors, overlap guards and progress responsiveness.
      Extend acceptance to full models and module variants. Audit remaining ASR/
@@ -88,9 +93,12 @@ Recommended implementation order and concrete acceptance:
 The dispatch baseline is `1ebaf240cf8f06d40be4a5ce88b58d2fc89ddef1`.
 Its [binding ABI run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146277899)
 and [full WASM run](https://github.com/CrispStrobe/CrispASR/actions/runs/39146278024)
-were queued at inspection. The subsequent explicit failure-state guard has local
-Node/browser regressions. Require hosted results for the actual tip before
-acceptance; older frozen wrapper checkpoints are historical evidence only.
+were queued at inspection. At the subsequent `1bd1447d3` checkpoint the binding
+run passed C#, Java, Dart, Go/Rust and WASM, but failed Ruby's conservative-GC
+finalizer assumption. That test now allocates on a finished thread; the strict
+340-assertion Ruby probe passes locally. Require a hosted rerun. The explicit
+failure-state guard has local Node/browser regressions. Require hosted results
+for the actual tip before acceptance; older frozen wrapper checkpoints are historical evidence only.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.

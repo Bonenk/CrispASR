@@ -245,7 +245,7 @@ class WasmWrapperContract(unittest.TestCase):
             # Concrete public-header probes supply every operation asserted below.
             fixture_names=['python-wrapper-abi','wrapper-session-metadata','wrapper-audio-utilities','wasm-wrapper-utilities','wasm-wrapper-analysis','wrapper-parakeet-legacy','wrapper-titanet-legacy','wrapper-speaker-db','wrapper-speaker-primitives','wrapper-registry','wrapper-diarize-arguments']
             concrete='\n'.join((ROOT/'tests/fixtures'/(n+'.c')).read_text() for n in fixture_names)
-            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_transcription.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_registry.h','session_diarization.h','session_vad.h'])
+            adapters='\n'.join((ROOT/'bindings/javascript'/n).read_text() for n in ['session_results.h','session_transcription.h','session_tasks.h','session_utilities.h','session_analysis.h','session_speaker.h','session_options.h','session_lifetime.h','session_registry.h','session_diarization.h','session_vad.h'])
             headers='\n'.join((ROOT/'include'/n).read_text() for n in ['crispasr.h','crispasr_session.h'])
             headers=re.sub(r'/\*.*?\*/|//[^\n]*','',headers,flags=re.S)
             unused=[]
@@ -307,7 +307,7 @@ class WasmDispatchContract(unittest.TestCase):
                 '-sSINGLE_FILE=1','-sMODULARIZE=1','-sENVIRONMENT=web,node,worker','-sINITIAL_MEMORY=32MB',
                 '-sEXPORT_NAME=dispatchFactory','-sEXPORTED_RUNTIME_METHODS=count_emval_handles',
                 '-I'+str(ROOT/'bindings/javascript'),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),'-I'+str(tmp),
-                str(ROOT/'tests/fixtures/wasm-dispatch-probe.cpp'),str(ROOT/'tests/fixtures/wasm-async-open.cpp'),
+                str(ROOT/'tests/fixtures/wasm-dispatch-probe.cpp'),str(ROOT/'tests/fixtures/wasm-async-open.cpp'),str(ROOT/'tests/fixtures/wasm-stream-native.cpp'),
                 '-o',str(module)],check=True)
             program=tmp/'test.cjs';program.write_text(r'''
 const assert=require('node:assert/strict');
@@ -348,6 +348,43 @@ require(process.argv[2])().then(async m=>{
   finally {globalThis.Float32Array=F32;}
   eq(m.audioLive(),0);eq(m.count_emval_handles(),handles);
   rejects(()=>m.ttsSynthesizeAsync('bad\0text',()=>{}));eq(m.audioLive(),0);
+  const streamOpts={step_ms:100,length_ms:300,keep_ms:20,language:'ja'};
+  const streamOpen=opts=>new Promise(r=>m.asrStreamOpenAsync(opts,r));
+  const streamCall=(name,...args)=>new Promise(r=>m[name](...args,r));
+  const stream=await streamOpen(streamOpts);eq(typeof stream,'number');eq(m.streamLive(),1);eq(m.asrStreamKind(),2);
+  rejects(()=>m.batchAllowed());rejects(()=>m.closeAsr());eq(m.openLive(),2);eq(m.streamLive(),1);
+  rejects(()=>m.asrStreamFeed(stream,new Float32Array([.25,.5,.75])));
+  eq(typeof (await streamOpen(streamOpts)).error,'string');eq(m.streamLive(),1);
+  eq(await streamCall('asrStreamFeedAsync',stream,new Float32Array([.25,.5,.75])),1);
+  eq(await streamCall('asrStreamFlushAsync',stream),1);
+  const text=await streamCall('asrStreamGetTextAsync',stream);eq(text,{text:'日本語',t0:1.25,t1:2.5,counter:3});
+  eq(await streamCall('asrStreamSetLiveDecodeAsync',stream,true),0);
+  eq((await streamCall('asrStreamGetTextAsync',stream)).counter,4294967297);
+  m.streamMode(5);eq((await streamCall('asrStreamGetTextAsync',stream)).text,'a'.repeat(5000)+'日本語');m.streamMode(0);
+  for(const mode of [3,4,6]){m.streamMode(mode);eq(typeof (await streamCall('asrStreamGetTextAsync',stream)).error,'string');}m.streamMode(0);
+  m.streamMode(2);eq(typeof (await streamCall('asrStreamFeedAsync',stream,new Float32Array([.25,.5,.75]))).error,'string');eq(typeof (await streamCall('asrStreamFlushAsync',stream)).error,'string');m.streamMode(0);
+  for(const bad of [0,-1,NaN,Infinity,1.5,4294967296+stream])rejects(()=>m.asrStreamFlushAsync(bad,()=>{}));
+  rejects(()=>m.asrStreamFeedAsync(stream,[],()=>{}));rejects(()=>m.asrStreamFeedAsync(stream,new Float32Array(0),()=>{}));
+  const originalSet=Float32Array.prototype.set;
+  try {Float32Array.prototype.set=function(){throw new Error('copy sentinel')};rejects(()=>m.asrStreamFeedAsync(stream,new Float32Array([.25,.5,.75]),()=>{}));}
+  finally {Float32Array.prototype.set=originalSet;}
+  let copiedJob;const beforeCopy=m.streamCalls();
+  try {Float32Array.prototype.set=function(source){originalSet.call(this,source);copiedJob=dispatch(0);};rejects(()=>m.asrStreamFeedAsync(stream,new Float32Array([.25,.5,.75]),()=>{}));}
+  finally {Float32Array.prototype.set=originalSet;}
+  eq(await copiedJob,42);eq(m.streamCalls(),beforeCopy);eq(m.streamLive(),1);eq(m.count_emval_handles(),handles);
+  const getText=streamCall('asrStreamGetTextAsync',stream);rejects(()=>m.asrStreamCloseAsync(stream,()=>{}));await getText;
+  eq(await new Promise(r=>m.asrOpenWithOptionsAsync('model','',null,r)),true);
+  eq(m.streamLive(),0);eq(m.streamOrderErrors(),0);eq(m.openLive(),2);
+  eq(typeof (await streamCall('asrStreamFlushAsync',stream)).error,'string');eq(text.text,'日本語');
+  eq(await streamCall('asrStreamCloseAsync',stream),0);eq(m.streamLive(),0);
+  const newer=await streamOpen(streamOpts);eq(newer>stream,true);
+  const calls=m.streamCalls();rejects(()=>m.asrStreamOpenAsync({...streamOpts,keep_ms:-1},()=>{}));eq(m.streamCalls(),calls);
+  eq(await new Promise(r=>m.asrCloseAsync(r)),0);eq(m.streamLive(),0);eq(m.streamOrderErrors(),0);eq(m.openLive(),1);
+  eq(typeof (await streamCall('asrStreamGetTextAsync',newer)).error,'string');
+  eq(await new Promise(r=>m.asrOpenWithOptionsAsync('model','',null,r)),true);
+  m.streamMode(1);eq(typeof (await streamOpen(streamOpts)).error,'string');eq(m.streamLive(),0);m.streamMode(0);
+  const third=await streamOpen(streamOpts);eq(await streamCall('asrStreamCloseAsync',third),0);eq(await streamCall('asrStreamCloseAsync',third),0);
+  eq(m.streamLive(),0);eq(m.streamOrderErrors(),0);eq(m.batchAllowed(),true);eq(m.count_emval_handles(),handles);
   m.closeAsr();m.closeTts();eq(m.openLive(),0);eq(m.livePayloads(),0);eq(m.checkIdle(),true);eq(m.count_emval_handles(),handles);
   console.log('PASS WASM threaded dispatch: '+n+' assertions');process.exit(0);
 }).catch(e=>{console.error(e);process.exit(1)});
@@ -402,6 +439,78 @@ dispatchFactory().then(async m=>{
                     except subprocess.TimeoutExpired:process.kill();process.wait()
         finally:
             server.shutdown();server.server_close();thread.join(timeout=5)
+
+
+@unittest.skipUnless(EMCC and EMXX and NODE,'Emscripten C/C++ compilers and Node required')
+class WasmStreamContract(unittest.TestCase):
+    def test_single_thread_stream_tickets_options_and_parent_lifetime(self):
+        with tempfile.TemporaryDirectory(prefix='wasm-stream-') as directory:
+            tmp=Path(directory)
+            src=(ROOT/'src/crispasr_c_api.cpp').read_text()
+            start=src.index('struct crispasr_open_params_v1 {')
+            (tmp/'runtime-open-layout.h').write_text(src[start:src.index('};',start)+2])
+            source=tmp/'probe.cpp'
+            source.write_text(r'''#include <emscripten/bind.h>
+#include "crispasr_session.h"
+static crispasr_session* g_asr_session=nullptr;
+static crispasr_session* g_tts_session=nullptr;
+#include "session_guard.h"
+#include "session_options.h"
+#include "session_streams.h"
+#include "wasm-stream-probe.h"
+extern "C" void probe_async_open_defaults(int);
+extern "C" int probe_async_open_live();
+EMSCRIPTEN_BINDINGS(stream_probe) {
+    binding_register_open_options(); binding_register_streams(); register_stream_probe();
+    emscripten::function("openDefaults",&probe_async_open_defaults);
+    emscripten::function("openLive",&probe_async_open_live);
+    emscripten::function("closeAsr",emscripten::optional_override([](){binding_check_reentry();binding_native_close_session(g_asr_session);}));
+}
+''')
+            module=tmp/'stream.js'
+            subprocess.run([EMXX,'-std=c++17','-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0','--bind','-sSINGLE_FILE=1',
+                '-sMODULARIZE=1','-sENVIRONMENT=node','-I'+str(tmp),'-I'+str(ROOT/'include'),
+                '-I'+str(ROOT/'bindings/javascript'),'-I'+str(ROOT/'tests/fixtures'),str(source),
+                str(ROOT/'tests/fixtures/wasm-async-open.cpp'),str(ROOT/'tests/fixtures/wasm-stream-native.cpp'),
+                '-o',str(module)],check=True)
+            program=tmp/'test.cjs'
+            program.write_text(r'''const assert=require('node:assert/strict');
+require(process.argv[2])().then(m=>{
+ let n=0;const eq=(a,b)=>{assert.deepEqual(a,b);n++};const rejects=fn=>{assert.throws(fn);n++};
+ const opts={step_ms:100,length_ms:300,keep_ms:20,language:'ja'}, pcm=new Float32Array([.25,.5,.75]);
+ m.openDefaults(1);eq(m.asrStreamKind(),0);rejects(()=>m.asrStreamOpen(opts));
+ eq(m.asrOpenWithOptions('model','',null),true);eq(m.openLive(),1);eq(m.asrStreamKind(),2);
+ const stream=m.asrStreamOpen(opts);eq(typeof stream,'number');eq(m.streamLive(),1);rejects(()=>m.asrStreamOpen(opts));rejects(()=>m.batchAllowed());
+ eq(m.asrStreamFeed(stream,pcm),1);eq(m.asrStreamFlush(stream),1);
+ const result=m.asrStreamGetText(stream);eq(result,{text:'日本語',t0:1.25,t1:2.5,counter:3});
+ m.asrStreamSetLiveDecode(stream,true);eq(m.asrStreamGetText(stream).counter,4294967297);
+ m.streamMode(5);eq(m.asrStreamGetText(stream).text,'a'.repeat(5000)+'日本語');m.streamMode(0);
+ for(const mode of [3,4,6]){m.streamMode(mode);rejects(()=>m.asrStreamGetText(stream));}m.streamMode(0);
+ m.streamMode(2);rejects(()=>m.asrStreamFeed(stream,pcm));rejects(()=>m.asrStreamFlush(stream));m.streamMode(0);
+ for(const bad of [0,-1,NaN,Infinity,1.5,4294967296+stream])rejects(()=>m.asrStreamFlush(bad));
+ rejects(()=>m.asrStreamFeed(stream,[]));rejects(()=>m.asrStreamFeed(stream,new Float32Array(0)));
+ const calls=m.streamCalls();for(const invalid of [{keep_ms:-1},{step_ms:0},{length_ms:2147483647},{n_threads:2},{translate:1},{language:'a\0b'}])rejects(()=>m.asrStreamOpen({...opts,...invalid}));eq(m.streamCalls(),calls);
+ eq(m.asrOpenWithOptions('model','',null),true);eq(m.streamLive(),0);eq(m.streamOrderErrors(),0);eq(m.openLive(),1);
+ rejects(()=>m.asrStreamFlush(stream));eq(m.asrStreamClose(stream),0);eq(result.text,'日本語');
+ const next=m.asrStreamOpen(opts);eq(next>stream,true);
+ const originalSet=Float32Array.prototype.set;
+ try {Float32Array.prototype.set=function(){throw new Error('copy sentinel')};rejects(()=>m.asrStreamFeed(next,pcm));}
+ finally {Float32Array.prototype.set=originalSet;}
+ const beforeCopy=m.streamCalls();
+ try {Float32Array.prototype.set=function(source){originalSet.call(this,source);m.asrStreamClose(next);};rejects(()=>m.asrStreamFeed(next,pcm));}
+ finally {Float32Array.prototype.set=originalSet;}
+ eq(m.streamCalls(),beforeCopy);eq(m.streamLive(),0);eq(m.asrStreamClose(next),0);eq(m.asrStreamClose(next),0);eq(m.batchAllowed(),true);
+ m.streamMode(1);rejects(()=>m.asrStreamOpen(opts));eq(m.streamLive(),0);m.streamMode(0);
+ // Option getters may retire/reopen a parent at the same native allocation address.
+ const changed={...opts,get language(){m.closeAsr();m.asrOpenWithOptions('model','',null);return 'ja'}};
+ rejects(()=>m.asrStreamOpen(changed));eq(m.streamLive(),0);eq(m.openLive(),1);
+ const last=m.asrStreamOpen(opts);m.closeAsr();eq(m.streamLive(),0);eq(m.openLive(),0);eq(m.streamOrderErrors(),0);rejects(()=>m.asrStreamGetText(last));
+ console.log('PASS WASM single-thread streams: '+n+' assertions');
+}).catch(e=>{console.error(e);process.exit(1)});
+''')
+            result=subprocess.run([NODE,str(program),str(module)],capture_output=True,text=True,timeout=25)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            print(result.stdout.strip())
 
 
 if __name__=='__main__':unittest.main()

@@ -49,6 +49,7 @@ static CrispasrSession* g_tts_session = nullptr;
 static CrispasrSession* g_asr_session = nullptr;
 
 struct whisper_context* g_context;
+#include "session_lifetime.h"
 #include "session_tasks.h"
 #include "session_utilities.h"
 #include "session_chat.h"
@@ -76,6 +77,7 @@ int main() {
 #include "session_dispatch.h"
 #include "session_async_options.h"
 #include "session_async_audio.h"
+#include "session_streams.h"
 
 EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_session_tasks();
@@ -89,6 +91,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     binding_register_registry();
     binding_register_diarization();
     binding_register_vad();
+    binding_register_streams();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
                              binding_check_callback();
@@ -100,10 +103,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
             binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    auto* old = g_asr_session;
-                    g_asr_session = nullptr;
-                    if (old)
-                        crispasr_session_close(old);
+                    binding_native_close_session(g_asr_session);
                     g_asr_session = backend.empty()
                                         ? crispasr_session_open(path.c_str(), threads)
                                         : crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
@@ -117,10 +117,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
             binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    auto* old = g_tts_session;
-                    g_tts_session = nullptr;
-                    if (old)
-                        crispasr_session_close(old);
+                    binding_native_close_session(g_tts_session);
                     g_tts_session = crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
                     return g_tts_session != nullptr;
                 },
@@ -133,6 +130,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
             auto pcm = std::make_shared<std::vector<float>>(binding_pcm(audio));
             browser_dispatch<std::vector<binding_segment>>(
                 [pcm, lang]() {
+                    binding_require_no_stream(g_asr_session);
                     std::vector<binding_segment> segments;
                     crispasr_session_result* result =
                         g_asr_session ? crispasr_session_transcribe_lang(g_asr_session, pcm->data(), (int)pcm->size(),
@@ -236,10 +234,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
         "asrOpen",
         emscripten::optional_override([](const std::string& model_path, const std::string& backend, int n_threads) {
             binding_check_reentry();
-            if (g_asr_session) {
-                crispasr_session_close(g_asr_session);
-                g_asr_session = nullptr;
-            }
+            binding_native_close_session(g_asr_session);
             g_asr_session = backend.empty()
                                 ? crispasr_session_open(model_path.c_str(), n_threads)
                                 : crispasr_session_open_explicit(model_path.c_str(), backend.c_str(), n_threads);
@@ -248,10 +243,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     emscripten::function("asrClose", emscripten::optional_override([]() {
                              binding_check_reentry();
-                             if (g_asr_session) {
-                                 crispasr_session_close(g_asr_session);
-                                 g_asr_session = nullptr;
-                             }
+                             binding_native_close_session(g_asr_session);
                          }));
 
     emscripten::function("asrSetSourceLanguage", emscripten::optional_override([](const std::string& lang) {
@@ -323,6 +315,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
             emscripten::val view = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcmf32.data()), n);
             view.call<void>("set", audio);
 
+            binding_check_reentry();
+            binding_require_no_stream(g_asr_session);
             crispasr_session_result* r = crispasr_session_transcribe_lang(g_asr_session, pcmf32.data(), n,
                                                                           lang.empty() ? nullptr : lang.c_str());
             if (!r)
@@ -350,6 +344,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
             emscripten::val view = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcmf32.data()), n);
             view.call<void>("set", audio);
 
+            binding_check_reentry();
+            binding_require_no_stream(g_asr_session);
             crispasr_session_result* r = crispasr_session_transcribe_chunked_lang(
                 g_asr_session, pcmf32.data(), n, chunkSeconds, overlapSeconds, lang.empty() ? nullptr : lang.c_str());
             if (!r)
@@ -372,10 +368,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     emscripten::function("ttsOpen", emscripten::optional_override([](const std::string& model_path, int n_threads) {
                              binding_check_reentry();
-                             if (g_tts_session != nullptr) {
-                                 crispasr_session_close(g_tts_session);
-                                 g_tts_session = nullptr;
-                             }
+                             binding_native_close_session(g_tts_session);
                              g_tts_session = crispasr_session_open(model_path.c_str(), n_threads <= 0 ? 1 : n_threads);
                              return g_tts_session != nullptr;
                          }));
@@ -386,10 +379,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
         "ttsOpenExplicit",
         emscripten::optional_override([](const std::string& model_path, const std::string& backend, int n_threads) {
             binding_check_reentry();
-            if (g_tts_session != nullptr) {
-                crispasr_session_close(g_tts_session);
-                g_tts_session = nullptr;
-            }
+            binding_native_close_session(g_tts_session);
             const int nt = n_threads <= 0 ? 1 : n_threads;
             g_tts_session = backend.empty() ? crispasr_session_open(model_path.c_str(), nt)
                                             : crispasr_session_open_explicit(model_path.c_str(), backend.c_str(), nt);
@@ -398,10 +388,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     emscripten::function("ttsClose", emscripten::optional_override([]() {
                              binding_check_reentry();
-                             if (g_tts_session) {
-                                 crispasr_session_close(g_tts_session);
-                                 g_tts_session = nullptr;
-                             }
+                             binding_native_close_session(g_tts_session);
                          }));
 
     emscripten::function("ttsSetCodecPath", emscripten::optional_override([](const std::string& path) {

@@ -32,6 +32,8 @@ static crispasr_session* g_tts_session = nullptr;
 #include "session_options.h"
 #include "session_async_options.h"
 #include "session_async_audio.h"
+#include "session_streams.h"
+#include "wasm-stream-probe.h"
 extern "C" int probe_async_audio_live();
 extern "C" int probe_async_open_live();
 extern "C" int probe_async_open_calls();
@@ -88,23 +90,19 @@ static void dispatch_probe(int mode, emscripten::val callback) {
 EMSCRIPTEN_BINDINGS(dispatch_probe) {
     binding_register_async_options();
     binding_register_async_audio();
+    binding_register_streams();
+    register_stream_probe();
     emscripten::function("audioLive", &probe_async_audio_live);
     emscripten::function("openLive", &probe_async_open_live);
     emscripten::function("openCalls", &probe_async_open_calls);
     emscripten::function("openDefaults", &probe_async_open_defaults);
     emscripten::function("closeAsr", emscripten::optional_override([]() {
                              binding_check_reentry();
-                             auto* old = g_asr_session;
-                             g_asr_session = nullptr;
-                             if (old)
-                                 crispasr_session_close(old);
+                             binding_native_close_session(g_asr_session);
                          }));
     emscripten::function("closeTts", emscripten::optional_override([]() {
                              binding_check_reentry();
-                             auto* old = g_tts_session;
-                             g_tts_session = nullptr;
-                             if (old)
-                                 crispasr_session_close(old);
+                             binding_native_close_session(g_tts_session);
                          }));
     emscripten::function("dispatchProbe", &dispatch_probe);
     emscripten::function("computeReady", emscripten::optional_override([]() { return g_compute_thread_set.load(); }));

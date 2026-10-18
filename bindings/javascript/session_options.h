@@ -1,5 +1,6 @@
 #pragma once
 #include "crispasr_session.h"
+#include "session_lifetime.h"
 #include <cmath>
 #include <climits>
 #include <cstddef>
@@ -71,10 +72,7 @@ static void binding_validate_open_path(const std::string& model, const std::stri
 // Plain native inputs only: usable on compute without creating any emval.
 static bool binding_native_open_options(crispasr_session*& session, const std::string& model,
                                         const std::string& backend, const crispasr_open_params_v1& params) {
-    auto* old = session;
-    session = nullptr;
-    if (old)
-        crispasr_session_close(old);
+    binding_native_close_session(session);
     session = crispasr_session_open_with_params(model.c_str(), backend.empty() ? nullptr : backend.c_str(), &params);
     return session != nullptr;
 }
@@ -84,6 +82,7 @@ static bool binding_open_with_options(crispasr_session*& session, const std::str
     binding_validate_open_path(model, backend);
     // Validate before replacing a live singleton; close first bounds model memory.
     auto params = binding_open_options(options);
+    binding_check_reentry();
     return binding_native_open_options(session, model, backend, params);
 }
 static void binding_register_open_options() {

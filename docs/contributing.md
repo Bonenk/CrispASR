@@ -688,6 +688,17 @@ pthread work errors, encoder/callback errors, rejected queues, overlapping calls
 callback chaining, progress responsiveness and native/emval allocation baselines.
 Set `CRISPASR_CHROME` to exercise the same assertions under browser COOP/COEP;
 the binding CI locates its required Chrome executable before running the suite.
+Retained WASM streams use nonreused opaque tickets and a native-only owner table.
+Close children before replacing/freeing their parent, including every async open
+route. The native ABI supports one active stream/inference per parent: reject a
+second stream and batch inference until close. Backend stream cleanup can join
+decoder threads, so threaded modules use compute-dispatched stream methods and
+async parent close/replacement. Probe the real worker thread, retired tickets,
+text-buffer growth and JS input-copy re-entry, not just symbol declarations.
+
+Ruby GC resource tests must not assume that a discarded temporary on an active
+VM/C stack is immediately unreachable. Exercise owner finalization after the
+allocating thread has finished, then assert the native allocation baseline.
 
 These checks establish ABI transport and ownership. Real model transcripts,
 structured music results and TTS→ASR roundtrips remain separate acceptance gates.

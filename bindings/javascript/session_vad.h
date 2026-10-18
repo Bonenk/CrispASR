@@ -1,4 +1,5 @@
 #pragma once
+#include "session_lifetime.h"
 #include "session_options.h"
 #include <memory>
 
@@ -47,6 +48,8 @@ static emscripten::val binding_transcribe_vad(const emscripten::val& audio, int 
             p.chunk_seconds < 0 || p.n_threads <= 0)
             throw std::invalid_argument("Invalid VAD options");
     }
+    binding_check_reentry();
+    binding_require_no_stream(g_asr_session);
     auto r =
         crispasr_session_transcribe_vad_lang(g_asr_session, pcm.data(), pcm.size(), sampleRate, model.c_str(),
                                              hasOptions ? &p : nullptr, language.empty() ? nullptr : language.c_str());

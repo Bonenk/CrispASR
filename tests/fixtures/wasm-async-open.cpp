@@ -22,13 +22,18 @@ extern "C" void probe_async_open_defaults(int value) {
 extern "C" crispasr_session* crispasr_session_open_with_params(const char* model, const char* backend,
                                                                const crispasr_open_params_v1* p) {
     ++calls;
+#ifdef __EMSCRIPTEN_PTHREADS__
     if (pthread_equal(pthread_self(), emscripten_main_runtime_thread_id()))
         return nullptr;
+    const int default_threads = 4;
+#else
+    const int default_threads = 1;
+#endif
     if (!std::strcmp(model, "throw"))
         throw std::runtime_error("open sentinel");
     if (std::strcmp(model, "model"))
         return nullptr;
-    if (p->abi_version != 2 || p->n_threads != (defaults ? 4 : 7) || p->use_gpu != (defaults ? 1 : 0) ||
+    if (p->abi_version != 2 || p->n_threads != (defaults ? default_threads : 7) || p->use_gpu != (defaults ? 1 : 0) ||
         p->verbosity != (defaults ? 0 : 2) || p->flash_attn != (defaults ? 1 : 0) ||
         p->n_gpu_layers != (defaults ? -1 : 3))
         return nullptr;
@@ -40,8 +45,10 @@ extern "C" crispasr_session* crispasr_session_open_with_params(const char* model
     ++live;
     return new crispasr_session{42};
 }
+extern "C" void probe_stream_parent_closing(crispasr_session*);
 extern "C" void crispasr_session_close(crispasr_session* session) {
     if (session) {
+        probe_stream_parent_closing(session);
         --live;
         delete session;
     }

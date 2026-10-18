@@ -198,3 +198,44 @@ in a headless browser served with COOP/COEP headers; the binding CI requires thi
 browser pass. These checks cover dispatch, load-option transport and TTS-buffer
 ownership. Full model accuracy, module size and other hardware paths remain
 separate validation gates.
+
+
+## Retained ASR streams
+
+After opening the ASR singleton, `asrStreamKind()` reports native availability:
+0 unavailable, 1 rolling windows, 2 persistent caches, 3 text-prefix streaming.
+Only one stream/inference operation per model session is supported. Batch ASR
+calls reject while a retained stream is open.
+
+Single-thread modules provide `asrStreamOpen(options)`, returning an opaque
+integer ticket. Options are `n_threads` (1), `step_ms` (3000), `length_ms`
+(10000), `keep_ms` (200), `language` (automatic when empty), and `translate`
+(false). Step must be positive, length at least step, keep nonnegative, and
+length plus keep must fit native int32 sample counts at 16 kHz. Translation
+support depends on the backend. Pass a nonempty `Float32Array` of 16 kHz mono
+PCM to `asrStreamFeed(ticket, pcm)`. `asrStreamFlush(ticket)` processes the tail;
+both preserve the native nonnegative status and throw on native failure.
+`asrStreamSetLiveDecode(ticket, enabled)` forwards the backend toggle.
+`asrStreamGetText(ticket)` returns an owned `{text, t0, t1, counter}` snapshot,
+with times in seconds and an exactly representable nonnegative JS counter.
+It retries truncated native text rather than silently clipping it.
+`asrStreamClose(ticket)` retires a ticket; repeated close is harmless and
+other operations on retired tickets fail. Tickets never contain native pointers
+and are never reused. Parent close/replacement closes its child first.
+
+Threaded modules require the corresponding `asrStreamOpenAsync`,
+`asrStreamFeedAsync`, `asrStreamFlushAsync`, `asrStreamGetTextAsync`,
+`asrStreamSetLiveDecodeAsync`, and `asrStreamCloseAsync` methods, with a final
+completion callback. These routes require a ready `PROXY_TO_PTHREAD` compute
+thread; an ordinary pthread module without it refuses dispatch. Stream open
+defaults to four threads. These run native
+work and backend cleanup on compute, and deliver owned results on the servicer
+using the shared dispatch/error contract above. Async live-decode and close
+complete with zero. Use `asrCloseAsync(callback)` or an async ASR open to retire
+a parent with a retained child; synchronous parent close/replacement refuses
+that case without changing the live parent. Sync stream methods also refuse
+in threaded modules. Finish one callback before submitting the next operation.
+
+The tiny Node/browser probes establish transport, scheduling and ownership.
+Actual backend/model accuracy, browser memory and decoder responsiveness remain
+separate acceptance work in PLAN.md. Native event callbacks are still pending.

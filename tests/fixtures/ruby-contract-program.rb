@@ -347,7 +347,9 @@ cache.close;cache.close;eq(c.test_speaker_live,0);eq(assigned.last[:speaker],1);
 c.test_speaker_mode(1);reject(RuntimeError){c::PyannoteCache.new([1,3,5],'seg',2)};c.test_speaker_mode(0)
 reject(ArgumentError){c::PyannoteCache.new([],'seg',2)}
 def orphan_speaker(c); c::SpeakerEmbedder.new('embed');nil;end
-orphan_speaker(c);GC.start;eq(c.test_speaker_live,0)
+# A live VM/C stack may conservatively retain a discarded temporary. Allocate
+# on a finished thread so collection does not depend on register/stack contents.
+Thread.new { orphan_speaker(c) }.join;GC.start;eq(c.test_speaker_live,0)
 # A reused native address must never resurrect an already closed public handle.
 c.test_titanet_reuse(true)
 stale=s.titanet_init('probe',4);s.titanet_free(stale)
