@@ -5622,10 +5622,63 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    # Model-free language ABI probes skip on developer machines without SDKs.
+    # binding-contracts.yml uses the strict runner and rejects every skip.
+    foreach(wrapper_language csharp java ruby dart wasm)
+        add_test(NAME test-${wrapper_language}-wrapper-contract
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_${wrapper_language}_wrapper_contract.py
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+        set_tests_properties(test-${wrapper_language}-wrapper-contract PROPERTIES
+            LABELS "unit;bindings" TIMEOUT 600)
+    endforeach()
+    add_test(NAME test-go-rust-wrapper-contract
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_go_rust_wrapper_contract.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-go-rust-wrapper-contract PROPERTIES LABELS "unit;bindings" TIMEOUT 600)
+    add_test(NAME test-python-legacy-pointer
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_legacy_pointer.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-legacy-pointer PROPERTIES LABELS "unit;bindings;whisper" TIMEOUT 60)
+    add_test(NAME test-python-audio-utilities
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_audio_utilities.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-audio-utilities PROPERTIES LABELS "unit;bindings;audio" TIMEOUT 60)
+    add_test(NAME test-python-wrapper-operations
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_python_wrapper_operations.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-wrapper-operations PROPERTIES LABELS "unit;session;bindings" TIMEOUT 60)
+    add_test(NAME test-python-api-coverage
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/check-python-api-coverage.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-python-api-coverage PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
     add_test(NAME test-session-utf8
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_utf8.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-session-utf8 PROPERTIES LABELS "unit;session" TIMEOUT 60)
+    add_test(NAME test-parakeet-window-metadata
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_parakeet_window_metadata.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-parakeet-window-metadata PROPERTIES LABELS "unit;session;bindings;parakeet" TIMEOUT 120)
+    add_test(NAME test-session-metadata
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_session_metadata.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-session-metadata PROPERTIES LABELS "unit;session;bindings" TIMEOUT 60)
+    add_test(NAME test-align-compact
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_align_compact.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
+    add_test(NAME test-alignment-model-profile
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_model_profile.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-alignment-model-profile PROPERTIES LABELS "unit;align" TIMEOUT 60)
+    add_test(NAME test-subword-align-compact
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_subword_align_compact.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-subword-align-compact PROPERTIES LABELS "unit;align" TIMEOUT 120)
+    add_test(NAME test-canary-align-contract
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_canary_align_contract.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-canary-align-contract PROPERTIES LABELS "unit;align;abi" TIMEOUT 60)
     add_test(NAME test-breeze-session-modes
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_breeze_session_modes.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

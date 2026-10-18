@@ -1,3 +1,687 @@
+## WASM retained ASR event callbacks — 2026-10-18
+
+New `asrSetSegmentCallback`, `asrSetTokenCallback` and
+`asrSetProgressCallback` adapters retain JS functions on the servicer. Native
+callbacks enqueue copied text/raw bytes and metadata using nonreused generation
+tickets as userdata, with no JS/emval objects on compute or producer threads.
+`asrDispatchEvents` drains copied events even while compute is active; an
+automatic servicer pump delivers them and stops when no callbacks remain.
+Committed events drain before async completion. Single-thread synchronous work
+queues events until native return or explicit draining.
+
+Callback replacement retires stale generations and pending events for that hook.
+Parent close clears all native hooks before stream/model teardown; servicer
+references retire at the next pump, before async completion. Null restores the
+native default segment/token pollers. Registration/clearing requires idle
+compute without a retained stream because native setters are plain field writes.
+Callback/encoder errors are contained, with each popped native event retired in
+a JS finally. A deterministic native/servicer handshake reproduced a blocking
+queue drain; generation reads are now atomic and draining defers on a busy mutex
+instead of waiting for the producer. The bounded 4096-event/8-MiB queue reports lost events on overflow,
+invalid metadata or allocation failure; it does not silently promise complete
+incremental output. Native work continues after a callback error.
+
+Fixtures compile the actual typed callback declarations and mutate borrowed
+buffers immediately after emission. They cover raw partial/empty UTF-8 tokens,
+centisecond segment metadata, progress sample counts, foreign-thread production,
+stale userdata, replacement/close, exceptions, deterministic queue backpressure,
+and native/emval/timer cleanup. Generation exhaustion refuses new callbacks
+while still permitting clear/teardown. Deliberately omitting cleanup after a callback
+exception reproduced one leaked native event; restoring the finally passes.
+New stream/event JS bridges also normalize wasm32 pointers to unsigned heap
+offsets. Actual large-heap/platform acceptance remains separate.
+
+Validation: **289 WASM ABI assertions, 39 chat assertions, 71 single-thread
+stream/event assertions, and 192 threaded assertions in each of Node and
+Chromium** pass. Both main WASM syntax variants, formatting, doc anchors and
+workflow-shell checks pass. The preceding stream checkpoint
+`f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all six hosted binding contract
+jobs, including Ruby. These component gates do not establish which actual
+models/backends emit each native event hook; that acceptance remains in PLAN.md.
+
+## WASM retained stream ownership and Ruby GC probe repair — 2026-10-18
+
+WASM now exposes session stream kind/open/feed/flush/text/live-decode/close.
+Public handles are nonreused opaque tickets, with one child per model session
+as required by the native ABI. Batch ASR inference refuses while a child exists.
+Every parent close/replacement path closes its child before freeing the parent,
+including v2 and legacy async opens. Threaded stream operations and the new
+`asrCloseAsync` use the compute dispatcher; sync stream calls refuse in threaded
+modules, and sync parent replacement with a child preserves the parent while
+directing callers to async cleanup. Async methods require proxied compute.
+
+The adapters validate stream options and int32 sample-count limits, copy PCM
+before submission, preserve native failure, retry growing text, and return owned
+UTF-8/time/counter snapshots without rounding large counters. JS input copying
+catches JS exceptions before crossing native scratch frames, then rechecks busy
+and ticket state. Option conversion also detects parent replacement. Probes
+exercise retirement and async work submitted from JS conversion. A deliberate
+omission of child cleanup made the ownership test fail before restoring it.
+
+Hosted binding contracts at `1bd1447d3` passed C#, Java, Dart, Go/Rust and WASM,
+but Ruby failed its immediate-GC assertion for a discarded speaker owner. The
+finalizer probe now allocates on a finished thread, removing conservative roots
+from the active VM/C stack before asserting native cleanup.
+
+Validation: **289 WASM ABI assertions, 39 chat assertions, 58 single-thread
+stream assertions, and 151 threaded assertions in each of Node and Chromium**
+pass. The strict Ruby probe passes **340 assertions**. Both single-thread/chat
+and pthread main WASM translation units pass syntax checks; formatting, doc
+anchors and workflow-shell checks pass. These are component/SDK probes;
+full hosted builds, actual models and platform acceptance remain in PLAN.md.
+
+## WASM dispatch failure state independent of error text — 2026-10-18
+
+A regression reproduced an empty-message native exception being encoded as a
+successful default value. Dispatch now records failure separately from its
+message, preserving `{error: ""}` as an error completion. Callers check for the
+error property instead of message truthiness.
+
+Validation: **90 threaded dispatch assertions in each of Node and Chromium**
+pass, including allocation/handle baselines after this failure. The broader
+289-assertion ABI and 39-assertion chat suites passed at the dispatch baseline;
+full hosted/model acceptance remains pending in PLAN.md.
+
+## WASM proxied dispatch ownership and browser validation — 2026-10-18
+
+Async ASR, loading and TTS now share a dispatcher. Only native inputs/results
+cross to compute; the creating servicer retains callbacks and encoders. A
+regression reproduced an uncaught work exception aborting the old pthread.
+Work and encoder failures now reach the callback as error objects; callback
+exceptions are contained in `crispasrLastCallbackError`. A JS finally retires
+delivery even when JS throws skip default Emscripten C++ destructors. Servicer
+completion polling eliminates the failing return-proxy ownership path.
+
+A shared busy guard rejects overlap, close/replacement and borrowed token/segment
+polling during compute. Atomic ASR progress remains available. Completion can
+chain another job, and an unrelated readiness error cannot release its busy
+lease. Model replacement clears the old singleton before opening, including on
+C++ failure. New async v2 ASR/TTS load routes validate on the servicer and pass
+plain POD options to compute.
+
+The actual async TTS adapter copies PCM on compute and frees native allocations
+before JS encoding. Empty/allocated-empty output, invalid counts/null buffers,
+native throws and JS typed-array constructor errors have operation probes.
+
+Validation: **289 ABI assertions, 39 chat assertions and 86 threaded dispatch
+assertions in each of Node and headless Chromium** pass. The browser module uses
+real pthreads and COOP/COEP and checks event-loop/progress responsiveness. Tests
+check native payload/PCM counts and emval baselines, queue-failure injection,
+callback chaining and literal runtime load-option layout. Both complete main
+source syntax configurations pass. CI now requires Chrome for the browser probe.
+Full model/module variants, retained ASR events/streams and remaining encoder
+coercion/resource audits stay in PLAN.md; this is component/browser acceptance,
+not model parity or a release gate.
+
+## WASM token drain copies before JS re-entry — 2026-10-18
+
+Token polling now copies all NUL-separated native strings into owned C++ storage
+before creating any JS arrays. A regression poisoned the borrowed native buffer
+from a typed-array constructor and reproduced corruption of later fragments;
+the copied fragments now survive. Partial UTF-8 and empty tokens remain intact.
+Negative counts and positive counts with null buffers throw; zero-count drains
+return empty arrays.
+
+Validation: **284 WASM operation assertions plus 39 chat assertions** pass.
+This repairs servicer-side JS constructor re-entry. It does not establish safe
+concurrent compute/drain/session-close scheduling, which remains in PLAN.md.
+
+## Go legacy parameter strings and decode controls — 2026-10-18
+
+Legacy `Params` retains prompt/VAD paths as Go strings and creates temporary C
+strings only for a sequential or parallel inference call, with deferred release
+on all returns. Value copies preserve independent settings without shared native
+string lifetimes or a new close requirement. Borrowed native defaults remain
+untouched. Nil contexts, empty/oversized PCM, invalid processor counts and NUL
+strings return errors before native dispatch; the old empty-input panic was
+reproduced in a regression.
+
+Both Go APIs gain the five missing scalar controls: best-of, language detection,
+blank suppression, tinydiarize and alternative count (native 0–32 clamp). The
+higher-level Context interface includes those methods; custom implementers/mocks
+must supply them. The options wrapper keeps the native struct private.
+
+Validation: **34 Go tests, 28 Rust tests and five Rust doctests** pass using the
+isolated native fixture library. Parameter tests exercise native public-header
+struct transport, repeated replacements, copied UTF-8 strings, GC inside
+callbacks, sequential/parallel success and native errors. The higher-level Go
+package compiles against the same isolated fixture; its model tests were not
+run. Remaining DTW/context/token paths and real-model/platform acceptance stay
+in PLAN.md.
+
+## Ruby microphone tickets and pump cleanup — 2026-10-18
+
+Microphone handles now use the shared opaque-ticket namespace, with private
+native storage. Close retires the ticket before releasing the GVL for a join,
+so repeated/concurrent close cannot dereference freed records. Closing from
+the callback skips self-join; a regression reproduced the former `ThreadError`.
+The pump's ensure owns final release, including native close, queued PCM,
+dequeued pending PCM, Ruby GC roots and synchronization primitives.
+
+Queue state is mutex-protected, and native producer threads stop before their
+userdata/queue storage is freed. Argument conversion precedes allocation;
+open/start/stop failures preserve cleanup. Callback exceptions keep the existing
+swallow-and-continue policy and clear errinfo. Pump interruption also retires
+the ticket and native device.
+
+Validation: **340 Ruby assertions** pass. A real pthread producer supplies PCM
+in the model/device-free fixture. Cases cover callback-close, concurrent/repeated
+close, stale/foreign tickets, native errors, queue overflow, GC compaction,
+callback exceptions, pump kill and an injected copy failure after dequeue. A
+test-only atomic chunk counter returns to zero after normal and error cleanup.
+Real audio-device drivers and remaining legacy/resource paths stay in PLAN.md.
+
+## WASM diarization, VAD and owned transcription results — 2026-10-18
+
+Generic diarization now exposes segment labeling and derived speaker turns,
+with distinct model/embedder fields and absolute centisecond times. Compiled
+wasm32 probes use the literal runtime structs and cover mono/stereo transport,
+empty turns, invalid counts and bounded turn-buffer retries. Language-aware
+VAD transcription exposes all six per-call controls and native-default null
+options while preserving word/token metadata.
+
+A regression reproduced silent acceptance of negative native segment, word,
+alternative and token counts; the shared reader now rejects them. Ordinary ASR
+result copies use RAII cleanup. The logits path now validates dimensions and
+multiplication, rejects missing positive-sized buffers, and copies segments and
+logits into owned C++ data before JS encoding. Native results are freed and the
+session logit flag reset even when copying fails or JS encoding throws.
+
+Validation: **279 WASM operation assertions plus 39 chat assertions** pass.
+Both complete main-source syntax configurations (pthread and single-thread/chat)
+pass. The Python model-free operation suite also passes (16 tests, one expected
+real-library skip). Full module size, models and browser scheduling remain
+pending; these are transport and ownership checks.
+
+## WASM load options and registry/cache adapters — 2026-10-18
+
+WASM exposes v2 ASR/TTS load options with all five controls and zeroed reserved
+padding, checked against the literal native POD. Invalid options leave the
+current singleton untouched; valid native load failure follows the existing
+close-first replacement convention. Single-thread modules reject multiple
+threads instead of accepting an unsupported setting.
+
+Registry lookup, filename lookup, backend enumeration and complete default
+bundles now have public Embind adapters. Bundles retain canonical backend,
+license/acceptance metadata and primary/companion/extra artifacts; unknown
+backends remain distinct from known empty bundles. Cache directory/file helpers
+preserve native status codes, grow buffers only for documented size errors,
+and reject unterminated output or excessive retries.
+
+Validation: **191 WASM operation assertions plus 39 chat assertions** pass in
+compiled Node modules. Full main source syntax passes with single-thread/chat
+and pthread configurations. Browser networking, full module sizes and actual
+model loading remain pending; the tiny cache fixture performs no downloads.
+
+## Ruby session ownership, re-entry and opaque handles — 2026-10-18
+
+Ruby closes child streams before their parent session, rejects closed/foreign
+handles and makes explicit close idempotent. A native ordering oracle rejected
+the old parent-close path. Stream feeding now uses Ruby-managed scratch storage
+and defers callback errors until native code returns.
+
+Session/Stream/Chat operations now hold a per-context borrow through argument
+coercion, callbacks and Ruby thread/fiber switches. A regression demonstrated
+that coercion could close a borrowed context; same-context re-entry now raises
+before native mutation. The guard preserves method arities and Ruby aliases.
+Its 155 operation wrappers are synchronized by
+`tools/sync_ruby_context_guards.py`; the Ruby contract and workflow enforce it.
+
+Tracked integer handles are now opaque monotonic tickets, with native pointers
+kept in private owner maps. Reusing a native allocation address cannot revive
+an old closed handle. A forced-address-reuse fixture reproduced the prior
+failure and now passes. Native callbacks still receive actual native userdata,
+including 64-bit pointers; caller-facing tickets are never native pointers.
+
+Punctuation/truecase/PCS handles enforce their native type, close exactly once,
+and free allocated text even if Ruby copying raises. Chat open/template strings
+use stable owned payloads through model-path coercion and GC compaction.
+Ruby also gains `Session.open_with_options`, covering the v2 native load fields
+against the literal runtime POD layout.
+
+Validation: **307 Ruby assertions** pass, including coercion, cross-thread
+callback close, address reuse, native parent/child close ordering, real wrapper
+opens for callback routing, arities/aliases, native pointer transport and errors.
+Mic and remaining legacy Whisper/resource paths still need their scoped audit;
+full-library/model/platform validation remains pending in PLAN.md.
+
+## Go/Rust public options, text processors and polling — 2026-10-18
+
+Go `SessionOpenWithOptions` and Rust `Session::open_with_options` expose all
+v2 load fields. Their fixture compiles the literal 48-byte native struct and
+checks custom/default values plus zero reserved fields. Go adds backend verb
+queries, including buffer growth and unknown-backend errors. Rust adds owned
+candidate text scoring; Go scoring validates counts and NUL-containing input.
+
+Go and Rust now expose standalone truecase/PCS models. Prefix-specific native
+fixtures verify allocated text is freed by the matching function, empty success
+is distinct from null failure, and context/output ownership survives close.
+Go's new text owners serialize processing and close; Rust uses mutable processing
+and Drop. Existing Go punctuation now rejects closed contexts and embedded NUL.
+
+Both languages now drain owned streamed segment metadata. Rust's VAD route
+shares its ordinary result reader, with RAII cleanup on invalid counts. Missing
+word confidence remains the native **-1** instead of fabricated **1.0**; a probe
+was observed failing before repair. Readers reject negative counts and invalid/
+overflowing logits before copying and free the result on failure.
+
+Rust adds progress/count/reset polling helpers. Its raw-token drain explicitly
+requires unsafe caller synchronization because the C ABI returns a borrowed
+buffer selected globally; it does not invent a safe ownership guarantee.
+
+A separate probe reproduced Go leaking an allocated native container whose
+reported length was zero. Container owners now free before all failure returns;
+Go/Rust also reject impossible lengths before copying. Rust signing options
+return errors for NUL paths/unpaired keys rather than panicking.
+
+Validation: **32 Go tests, 28 Rust tests and five doctests** pass against isolated
+header-checked probes. The protected-page token test, native default/custom
+load fields, UTF-8 metadata, positive errors and allocation counters are included.
+Full-library/platform/model acceptance remains pending.
+
+## Ruby/WASM generic speaker primitives — 2026-10-18
+
+Added usable generic `SpeakerEmbedder`, `PyannoteCache` and clustering APIs in
+Ruby and WASM. Ruby TypedData owners and C++ destructors free contexts, with
+idempotent explicit close. Ruby input/output buffers use stable owned payloads
+across coercion/GC compaction; an observed failing recursive-initialization
+probe now rejects replacement of an already installed native context.
+
+The shared fixture compiles public signatures and literal native diarization
+PODs, validating dimension/name/PCM/options, one-success embedding, cluster
+counts, centisecond segments, cache errors and independent outputs. Ruby now
+passes **240 assertions**; WASM passes **135 operation assertions plus 39 chat**.
+The full WASM adapter passes single-thread/chat and pthread syntax checks.
+These are operation/ownership checks; model and browser acceptance remain open.
+
+## Wrapper options, roster DB and bounded polling repairs — 2026-10-18
+
+Added callable per-call VAD language/options in C# and Java, preserving the
+three-argument default routes. Literal native option-layout probes validate
+all six fields and result cleanup when a callback throws. Java now exposes
+text translation, RNNoise and the punctuation processor, with allocated UTF-8
+copied before its native pointer is freed. Corrected the raw punctuation
+pointer signatures as well.
+
+Completed usable roster DB paths across all eight wrappers. Rust previously
+called retired native load/enrollment stubs; it now has `SpeakerDB::open`
+with the current attestation/roster contract and consent-aware enrollment.
+Java and WASM gained public DB classes. Other bindings gained closed/empty
+input checks and allocation cleanup. A negative score always means no match,
+even with a negative threshold. The shared C-header fixture verifies actual
+UTF-8 copies, native failure codes, roster/attestation transport and lifetime.
+
+A protected-page probe reproduced Go token polling crashing in `C.GoBytes`:
+it guessed `token_count * 16` bytes for a NUL-separated buffer. It now copies
+exactly the reported number of strings, preserving empty and partial UTF-8
+fragments, and rejects malformed native counts/pointers.
+
+Dart diarization previously accepted malformed native turn counts; the new
+probe was observed failing before repair. It now checks count/capacity and
+stereo lengths, uses target-width FFI structs and frees its arena on every
+exit. Java's corresponding pointer offsets now use `Native.POINTER_SIZE`.
+Actual 32-bit runtime validation remains pending. Dart's cached probe library
+now lives for the entire test suite rather than being deleted after whichever
+test happened to compile it first.
+
+Validation: C# **259 assertions**, Java **224**, Ruby **196**, WASM **140**;
+Dart strict analyzer/**37 FFI tests**; Go **26 tests**, Rust **23 tests/five
+doctests**; Python **four legacy/speaker regressions**. All are model-free
+transport/ownership checks. The incremental callable ledger is
+`docs/wrapper-callable-coverage.md`; exhaustive mapping, remaining adapters,
+full-library/browser/model acceptance and queued CI are still tracked in PLAN.md.
+
+## TitaNet wrapper return-count and lifetime repairs — 2026-10-18
+
+A new public-header probe reproduced C# treating a successful 192-float native
+embedding as an error. Fixed the return-count contract and closed/empty input
+checks; other existing wrappers now reject short/oversized counts. Added usable
+TitaNet classes to Java, Rust and WASM, completing that family across the eight
+wrappers. The native similarity helper remains a dot product on normalized
+embeddings. Ruby tracks ownership of its direct TitaNet/Parakeet contexts to
+reject closed handles and avoid repeated native frees; Dart DTW reads check
+upper as well as lower index bounds.
+
+Validation: 14 new C# assertions (225 total across the suites), Java 172, Ruby
+175, WASM 122, Dart analyzer/35 tests, Go 24 tests, Rust 21 tests/five doctests,
+and three Python legacy regressions. These are model-free ownership/ABI gates;
+full-library, browser and real-model gates remain in PLAN.md.
+
+## Ruby chat GC compaction lifetime — 2026-10-18
+
+A new abort-callback test calls `GC.compact` during native generation and was
+observed failing with cleared message bytes. Rooting Ruby Strings, increasing
+their capacity/length and explicit address registration did not preserve their
+native data pointers. Chat now holds messages, strings and stop arrays in
+Ruby-owned opaque data payloads with stable native addresses. Abort userdata is
+a native session key resolved through the rooted callback map, avoiding a
+movable Proc VALUE in C userdata. The two-session/compaction regression passes;
+Ruby now has 166 model-free assertions; deferred exceptions are rooted in
+Ruby thread/fiber storage so later callbacks may collect safely. Removed a dead Java layout placeholder
+and an orphan Dart streaming comment. Full platform/model gates remain pending.
+
+## Wrapper auxiliary and legacy pointer repairs — 2026-10-18
+
+Added usable C#/Java registry, cache, session options, speaker embedder and
+clustering, pyannote cache, diarization/turns, text-LID and VAD-slice APIs.
+C# also adds `WhisperContext` with opaque parameters, raw token/alternative/
+DTW results and pointer-safe parallel inference. The new shared
+`crispasr_transcribe_parallel_by_ref` delegates to the existing progress-tracking
+implementation; C API self-ID is 0.7.1. Python now prefers native pointer
+exports and retains VAD-model strings. Dart rejects unsafe struct-by-value
+fallbacks and frees context parameters, exposes DTW and parallel decoding,
+and handles incomplete legacy UTF-8 tokens without throwing.
+
+WASM adds measured character alignment and VAD spans/slices, and opt-in chat
+with native option defaults, owned streamed bytes, abort/error transport and
+shared ownership during callback deletion. Chat is restricted to single-thread
+modules until browser compute/servicer dispatch is implemented. Ruby adds
+auxiliary/chat operations; review removed dummy diarization and ignored chat
+options, corrected bool signatures, protected callback routing and fixed
+partial-error/alias audio ownership. Direct callback probes are test-only.
+
+Local validation: C# 211 assertions, Java 164, Ruby 159, WASM 115, Dart analyzer
+plus 34 FFI tests, and two Python native-pointer/Parakeet regressions. These are ABI
+transport/ownership checks with model-free decoders, not model quality or full
+platform acceptance. Go/Rust add metadata/music/conversion/TTS/audio and typed ASR callbacks:
+23 Go tests, 20 Rust tests and five ownership doctests pass. Native headers
+exposed the incorrect legacy Parakeet language-pointer argument; corrected it
+to a 64-bit centisecond offset across affected wrappers and added direct
+C#/Java/WASM classes. Exhaustive callable inventory and full platform gates
+remain in PLAN.md. No release/tag was cut.
+
+## WASM auxiliary transport — 2026-10-18
+
+Added audio loading/resampling with RAII cleanup and stereo alias handling,
+truecase/PCS processors, capabilities/runtime/GPU queries, watermark helpers,
+session backend/configuration/scoring, raw streamed-token/shared-segment polling
+and stereo separation results. The actual Embind suite now passes 56 assertions
+with concrete header-checked probes. Unexercised registration dependencies use
+aborting stubs and provide no acceptance evidence. Full library/browser/model
+acceptance and chat/platform integration remain in PLAN.md.
+
+## Dart session/task/utility repairs and C# chat — 2026-10-18
+
+Dart now exposes owned shared token bytes and alternatives across normal,
+chunked, VAD, logits and drained results. Added raw streamed-token polling,
+missing-time availability, chords/tab/conversion, PCM references, CFG scale,
+TADA/disclosure and synchronous sentence callbacks. All session native calls
+reject callback re-entry. Audio helpers free partial error allocations and
+aliased stereo buffers safely; container lengths use native unsigned size_t.
+Both unified and legacy Dart streaming handles retain their owner; parents
+close children before releasing native model state. The native probes compile
+in unique temporary directories, including a true older-library process. Strict analyzer passes and 32 actual FFI tests pass.
+
+Added the missing C# text-chat surface for all 14 header functions: native
+option defaults, messages/stop arrays, one-shot and raw streamed generation,
+context/template/token/memory queries, cancellation, abort callback, reset,
+disclosure and disposal. Callback failures are deferred past native frames;
+re-entry/close is rejected. Twenty-six new .NET/native assertions cover bool/
+size_t struct layouts, UTF-8 transport, cancellation, callbacks and cleanup.
+Together with the earlier suites, C# has 118 model-free assertions. Native model
+acceptance remains pending; these checks do not prove full wrapper parity.
+
+## Java/C# audio and utility expansion; stream lifetime — 2026-10-18
+
+Added mono/native-rate/stereo loading, in-memory resampling, binary WAV/C2PA
+transport, runtime/capability queries, truecase/PCS processors and candidate
+scoring to Java and completed the corresponding C# gaps. Buffers are copied
+and freed on errors, including partial audio allocations and aliased stereo
+pointers. C# mono loading now frees a buffer returned alongside an error, and
+WAV lengths use a checked size conversion. Native signing failure is an error;
+there is no unsigned fallback. Signing probes validate binary transport only.
+
+Java and C# stream handles retain the parent and close before it; calls after
+parent disposal are rejected. Added live-decode setters. Current probes pass
+59 Java assertions plus six older-ABI checks; C# passes 69 current/older core
+assertions plus 23 utility assertions. These checks do not establish full API,
+cryptographic or real-model acceptance. Remaining scope is in PLAN.md.
+
+## WASM shared metadata and task adapters — 2026-10-18
+
+Added one owned result collector/encoder for synchronous ASR, session/logits and
+browser async transport, retaining tokens/raw bytes, word alternatives, speakers
+and missing-time availability. Existing `asr*` centiseconds and `session*`
+seconds remain intact. Added beats, tablature, bounded replay conversion, PCM
+references, CFG scale, TADA companion controls and disclosure/error access.
+Sentence synthesis catches callback exceptions in JS before native frames and
+returns `{status, failed, error}` after native returns. Existing adapter entry
+points reject callback re-entry. Adapter exception handling is enabled for
+scratch-buffer cleanup, retaining the separate C2PA native-EH mode.
+
+A tiny actual Embind module passes 33 Node assertions with Emscripten 6.0.0;
+this is model-free adapter evidence. Hosted 6.0.2 full builds, browser scheduling
+and real models remain pending. Added the strict `Binding ABI contracts`
+workflow and optional CTest registrations for .NET, Java, Ruby and WASM.
+
+## Java and Ruby session operations and metadata — 2026-10-18
+
+Added owned shared token bytes/text and word alternatives to Java and Ruby
+normal, chunked, VAD and logits results. Existing time units remain intact;
+Ruby's VAD-language seconds retain the `-1` unavailable sentinel. Added piano/
+programs, chords, beats, tablature, conversion with replay-buffer bounds, PCM
+voice references, distinct CFG scale, TADA companions, disclosure/error access
+and synchronous sentence synthesis. Callback errors are deferred until native
+returns; re-entry is rejected. Java stream handles retain the owner and close
+before session teardown.
+
+Model-free compiled probes pass 40 Java current-ABI assertions, six older-ABI
+checks and 29 Ruby assertions. This establishes adapter transport/ownership,
+not real model accuracy or full auxiliary/chat API parity. Pending work is in
+PLAN.md.
+
+## Python second-header utilities and C# safety/metadata — 2026-10-18
+
+Added Python mono/native-rate/stereo native loading, WAV/C2PA byte helpers and
+channel getters, with copies and allocator-matched cleanup including errors.
+The Python guard now reads both public headers (296 unique functions). Three
+model-free tests exercise literal native container wrappers and mocked decode/
+signing backends; real signing/model acceptance is separate.
+
+Observed C# passing undersized replay noise into native conversion, then added
+model-derived exact lengths, checked products, speaker bounds and clear older-
+library failure while preserving random draws without new dimension probes.
+Added owned shared tokens/raw bytes and missing-time availability to all four
+result readers, plus TTS reference/CFG/TADA/disclosure/streaming and callback
+transport/polling. Actual compiled .NET/C probe tests pass 58 current + 3 older
+library assertions, including copies after free and deferred callback errors.
+Remaining cross-language implementation/hosted gates are tracked in PLAN.md.
+
+## Cross-language wrapper source audit — 2026-10-18
+
+Audited Dart, Go, Rust, Java, Ruby, C# and WASM entry points/result readers;
+removed unsupported universal full-parity claims from `docs/bindings.md`.
+Recorded existing functionality, confirmed omissions and the Python guard's
+session-header boundary in `docs/binding-gaps-2026-10-18.md`. No non-Python
+runtime fix is claimed by this audit; repairs and acceptance are scoped in
+PLAN.md, including C# replay-buffer validation and shared metadata preservation.
+
+## Python session-header wrapper expansion — 2026-10-18
+
+Added music results (piano/programs, chords/names, beats/tempo, tablature
+emissions), ContentVec voice conversion with validated replay noise, TTS
+streaming/reference PCM/TADA/disclosure/CFG helpers, persistent callbacks and
+stream polling, truecase/PCS processors, capability/version/GPU utilities and
+missing package exports. Session loading now exposes GPU/flash-attention/layer
+options. Word alternatives and legacy Whisper tokens/alternatives/DTW/parallel
+controls reach Python. Added two native model-dimension getters to validate
+replay noise instead of guessing buffer sizes, plus the missing C typedef that
+prevented the session header from compiling standalone as C.
+
+Fixed allocated-string pointer loss in punctuation/translation, audio/text
+cleanup on error, stereo/strided input handling, closed stream/session use,
+stream parent lifetime, callback exception transport and callback re-entry.
+Legacy by-value Whisper inference uses a compiled pointer adapter and fails
+clearly when the helper is absent. Frozen pre-change punctuation replay against
+the ownership probe produced one invalid free and one outstanding allocation;
+the corrected wrapper passes the same ownership contract. The helper compiles
+against real headers with all three pointer adapters exported.
+
+A complete header drift guard accounts for 282 unique functions: 277 bound,
+three equivalent/bulk/compiled routes and two retired native stubs. It is
+separate from behavioral evidence. GCC and Clang wrapper/metadata probes pass;
+CI/CTest run the new suites and hosted CI additionally checks the complete
+library and compiles/loads its helper. Removed a stale machine-specific native
+library fallback and the already-stale curated symbol count from the smoke
+suite. The complete native-build/model acceptance status belongs in PLAN.md.
+`docs/python-api-coverage.md` records operations, units, ownership and limits;
+`docs/contributing.md` now requires the guard and behavioral checks without
+assuming every wrapper already has full parity.
+
+## #549 explicit-output tied-frame token ownership — 2026-10-18
+
+A native-grouped continuation token sharing the next word's start frame was
+misassigned to the next output segment by both legacy and shared splitters.
+Observed that failure first, then used the shared native word/token ranges to
+keep it with its own word. Word segmentation and timestamps stay unchanged;
+token-less/inconsistent-group fallback and token-only results retain existing
+behavior. All 12 metadata and six window tests pass under GCC and Clang.
+Full-library CI and real Japanese ASR validation remain pending in PLAN.md.
+
+## #549 remaining Python token packaging and contributing guide — 2026-10-18
+
+Reproduced three defects with tiny literal native fixtures: Japanese slice and
+legacy overlap results dropped every token, and shared repair duplicated tokens
+across equal-frame words. Added native grouping/index ownership shared with word
+construction. Retained words now move their exact token blocks through splice,
+dedup and gap repair; raw UTF-8 fragments and native F32 probabilities survive.
+Six new GCC/Clang tests pass, including 2,000 frozen-own-grouping comparisons,
+offset Japanese slices, BOS/empty ownership and token-less words. The existing
+11 metadata tests pass. CTest and the full-library CI getter step include the
+new suite; full hosted and Japanese audio acceptance remain pending in PLAN.md.
+No public POD or Python constructor change, model math or window-choice change.
+
+`docs/contributing.md` now distinguishes automatic backend dispatch from explicit
+wrapper methods/result fields, corrects Dart lookup auto-discovery prose, and
+requires missing-time/byte/ownership/cache lifetime and multi-route checks.
+The Python README and metadata guide describe the new main-branch behavior;
+published v0.8.43 wheels do not contain these changes.
+
+## #217 hosted character CTC synthetic result — 2026-10-18
+
+Heavy CPU39112822169 on frozen source567fc431e passes all seven shapes, with
+worker exact-output assertions against our immutable reference. Independent
+terminal/source/hash/log/receipt audit verifies the aggregate values. EPYC7763,
+GCC13.3 strict flags: gate-off/on medians1.124–1.215×; largest T4096/V16384/W256
+339.608→288.506ms, tracked heap275,986,668→7,556,460 bytes (36.52×).
+Frozen-reference timing differs and remains visible; it yields1.089–1.388×
+ratios. The [raw receipt](docs/alignment-ctc-hosted-2026-10-18.json) retains
+ranges/counts/hashes but no per-call raw payloads. This is synthetic character
+DP only; full-library and actual-model acceptance remain in PLAN.md, default off.
+
+## #217 actual-model alignment profiling worker — 2026-10-18
+
+Prepared a hosted-only native CPU worker for pinned Japanese CTC 1.1B F16 and
+a pinned, attributed CC BY 4.0 FLEURS recording. It separates load/encoder/DP
+scopes, retains actual OFF/ON/OFF logits and exact own-reference replay, and
+checks the shipped Python/exported C ABI, offsets and real CLI against native
+word times. Six model-free rejection-contract tests pass, including duplicate
+sentence IDs, physical hashes, close-but-different tensors, dropped/invalid
+words and non-centisecond drift; CTest and CI include them. No production
+source/default change. Model execution/acceptance remains pending in PLAN.md;
+see [method and limitations](tools/ci-heavy/alignment-model-profile/README.md).
+
+## #217 independent subword workspace experiment — 2026-10-18
+
+Implemented default-off `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` from our own source:
+one-frame normalized emissions and flat traceback, preserving vocabulary-wide
+F32 score order and output semantics against immutable own source `deaf9c010`.
+Five new acceptance tests pass under GCC and Clang, including 240 random cases
+and 60 independently enumerated unique-optimum tiny paths. The four failure
+contracts pass with both gates, and the six character tests still pass. CTest
+and ordinary CI include the new suite. Local synthetic medians show noisy
+1.07–1.75× runtime ratios and 1.97–106.84× lower tracked heap; full ranges,
+source hashes and scope are retained in the [audit](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
+No foreign code/asset, encoder change or production/default promotion; hosted
+and real-model acceptance remain in PLAN.md.
+
+## #217 subword CTC failure semantics — 2026-10-18
+
+A literal production tokenizer/Viterbi fixture proved that an impossible
+transcript (two distinct labels, one frame) incorrectly returned success with
+zero timestamps. Added complete-path/finite-terminal rejection and ABI/token-ID
+bounds checks to `canary_ctc_align_words`; valid known paths retain native
+centisecond bounds. Four model-free contract tests pass after first observing
+the pre-fix failure. The encoder, tokenizer and valid-path DP arithmetic are
+unchanged. CTest/CI wiring is added; combined full-library CI remains pending.
+This is an independent own-code correctness repair, separate from the opt-in
+character-path memory/performance experiment and unmeasured Subtimer comparison.
+
+## #217 clean-room comparison and local CTC experiment — 2026-10-18
+
+Read the full #217 discussion and pinned the referenced new Subtimer release.
+The public comparison separates architecture from unmeasured accuracy/runtime;
+no project-wide license declaration was found, and no implementation, fitted
+weights, native patch or model asset is ported/vendored. Separate research and
+implementation sessions supplied an independently authored opt-in character-CTC
+candidate. The first design's repeated-label memory regression was independently
+caught (161,756 versus 62,428 tracked heap bytes), rejected and corrected.
+The revised unique-token workspace passes the six-test frozen-reference and
+exhaustive-oracle suite. Local synthetic receipts retain bit-exact output and
+noisy timing/memory results; hosted/full-library acceptance and model-level
+quality are still pending in PLAN.md. Default behavior remains unchanged, and
+no Japanese Parakeet/Canary or Subtimer end-to-end speedup is claimed.
+
+## #549 terminal validation accepted — 2026-10-18
+
+Independently audited frozen source
+`741141118335643adc7d29b61bc95e1d77c7f43a`: all 13 CI jobs
+([39104662258](https://github.com/CrispStrobe/CrispASR/actions/runs/39104662258))
+and all 10 lint jobs
+([39104663518](https://github.com/CrispStrobe/CrispASR/actions/runs/39104663518))
+pass. The complete Linux log confirms 2,033 CTest unit cases and all 11
+exported-C-ABI/Python metadata tests pass, including the 30 legacy/shared
+splitter combinations. Later documentation-only main checkpoints preserve the
+validated source bytes. This supersedes earlier queued/cancelled observations.
+Long-Japanese/legacy overlap token ownership stays scoped in PLAN.md; metadata
+acceptance does not establish model accuracy or measured VRAM release.
+
+## #549 legacy Parakeet segmented-token preservation — 2026-10-18
+
+The legacy explicit-output splitter discarded its native token array, and
+no-word results lost token bounds or disappeared when text was empty. It now
+uses the existing shared CLI splitter's strict next-segment boundary rule and
+retains token-only and trailing-token output. No decoding or word selection
+changes. A literal-production differential test was observed failing in 15
+fixture/window combinations before the fix. All 30 combinations now match the
+shared CLI splitter through native getters and the Python result reader,
+including timestamp ties, token-only/empty/null results, and non-positive
+segment windows. The metadata suite passes 11 tests. Complete-library CI remains
+pending; cancelled run `39104177158` is not acceptance. Japanese gap-fill and
+legacy overlap-merge token ownership remain scoped in PLAN.md.
+
+## Issue #549 — Python/native metadata implementation — 2026-10-18
+
+Read the complete issue (four reported discrepancies; no comments at inspection)
+and based work on current GitHub main `dd14099c3` in an isolated checkout.
+Implementation `5e7694516` plus fixed-array copy cleanup `8d844c610` adds opaque
+result token storage/accessors and `SessionToken`, preserving decoded bytes,
+timing and probability through the Python session result reader. All four
+transcription entry points use that reader; existing positional segment
+constructors and older-library fallbacks remain supported.
+
+MOSS-Transcribe-Diarize sessions use the same parser as the native segment API,
+with structured times/speakers, plain-text fallback, one decode, and no fixed
+256-segment cap in the session path. The parser's existing format and bounded
+per-segment text storage are unchanged. An unmangled C wrapper and module/session
+`free_aligner_cache()` expose the existing lock-protected cache release.
+Unavailable word/token times become Python `None`; chunk offsets and VAD
+remapping preserve native missing-time sentinels. Cohere's runtime estimates
+remain estimates; VibeVoice word times are not synthesized.
+
+Validation: 10 metadata tests compile production packaging/getter functions and
+exercise Python conversion, all four entry points, older libraries, byte-fragment
+preservation, chunk/VAD transforms and cache forwarding. The existing 4 UTF-8
+and 8 Python/native resampling tests pass. Python utility checks pass 11 with
+one optional full-library smoke skipped locally. All 5 secret/privacy guards
+pass unskipped; changed C/C++ files pass clang-format 18, workflow shell blocks
+parse, and the generated learnings index is current. CTest and ordinary GH CI
+now run the metadata contract; a linked native ABI test checks actual new exports
+and repeated cache release. Initial feature-source CI/lint were queued, so
+full-library/platform results remain pending in PLAN.md. No model accuracy,
+new native word alignment, GPU-memory measurement, version bump or release
+acceptance is claimed. See [the API contract](docs/python-session-metadata.md).
+
 ## Diagnostic integration and portable maintainer handoff — 2026-10-17
 
 Integrated the unchanged attention diagnostic from02bd2aee (all13 CI39003202215

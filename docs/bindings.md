@@ -1,9 +1,10 @@
 # Language bindings
 
-All wrappers are thin shells over the same C-ABI surface in
-`src/crispasr_c_api.cpp`. Anything the CLI can do — transcribe, VAD,
-diarize, LID, align, download — is one function call in every
-language.
+The wrappers expose parts of the shared C ABI in `src/crispasr_c_api.cpp`.
+Coverage differs by language; adding a native function does not expose it
+through every wrapper. The [2026-10-18 source audit](binding-gaps-2026-10-18.md)
+records confirmed gaps and PLAN.md tracks their repair. Python's separate
+[API inventory](python-api-coverage.md) does not establish other-language parity.
 
 ## Session audio-format getters (#332)
 
@@ -53,10 +54,11 @@ its stream; allow only one active stream or inference call per model session.
 
 ## Session setter reference
 
-All generation-control setters are available in every binding. Each
-call is a thin proxy over the C-ABI function of the same name.
-Setters that return an error code `-2` are soft no-ops — the active
-backend doesn't expose that knob, but the call is safe to make.
+The table below maps intended generation controls to binding names; it is not
+a complete verified availability matrix. Check the actual public method and
+native call in each wrapper. Error-code meanings are function-specific:
+`-2` can mean an unsupported backend knob, but for `set_sensitivity` it means an
+invalid preset and must raise. Do not universally swallow this code.
 
 | C-ABI setter | Bindings name (Python/Rust/Go/Java) | Notes |
 |---|---|---|
@@ -94,8 +96,9 @@ backend doesn't expose that knob, but the call is safe to make.
 
 Everything a transcription result carries is read back through per-index
 accessors on the opaque `crispasr_session_result`, so adding a field is a new
-symbol rather than a layout change — old callers keep working. Every wrapper
-exposes them as struct/class members on its segment type.
+symbol rather than a layout change — old callers keep working. Wrappers must
+explicitly copy each field into their result types. Several still omit shared
+session tokens or other metadata; see the source audit linked above.
 
 | C-ABI accessor | Member (Python/Rust/Go/Dart/Java/C#/Ruby) | Notes |
 |---|---|---|
@@ -139,26 +142,24 @@ exposes them as struct/class members on its segment type.
 > `ctc_vocab` / `CtcVocab` returns raw token pieces where the backend exposes a
 > CTC vocabulary.
 
-| Language | Status | Surface |
-|---|---|---|
-| C / C++ | ✓ | Full (the C-ABI is the source of truth) |
-| Python | ✓ | Full — transcribe, VAD, diarize, LID, align, registry |
-| Rust | ✓ | Full — same surface as Python |
-| Dart / Flutter | ✓ | Full — used by [CrisperWeaver](https://github.com/CrispStrobe/CrisperWeaver) |
-| Go | ✓ | Full (all 11 capabilities) |
-| Java | ✓ | Transcribe + align + LID; full session-setter parity (JNA) |
-| Ruby | ✓ | Transcribe; full session-setter parity (C ext) |
-| C# / .NET | ✓ | Transcribe + align + LID + VAD + the music task surface; full session-setter parity (P/Invoke). CI-tested on ubuntu + windows (`bindings-csharp.yml`) |
-| JavaScript / WASM | ✓ | `asrOpen`/`asrTranscribe` + session setters (backend-agnostic); plus the whisper-only `init`/`full_default` and the TTS surface. Built with emcc. |
+| Language | Current scope / verification |
+|---|---|
+| C / C++ | Public C ABI is the wrapper reference; CLI/native task surfaces still differ. |
+| Python | Session-header source census with documented equivalents/retired cases; the eight additional audio/container/channel functions in `crispasr.h` are now implemented and covered by the expanded guard. Local behavior probes pass; native/model acceptance pending. |
+| Dart / Flutter | Broad ASR/auxiliary APIs, piano/programs and beats; shared tokens, additional task/TTS operations and missing-time fixes pending. |
+| Go | ASR/auxiliary APIs and session controls; metadata and task/TTS gaps pending. |
+| Rust | ASR/auxiliary APIs, safe PCM voice references; safe result fields and task/TTS gaps pending. |
+| Java | ASR/auxiliary APIs and session controls; result and task/TTS gaps pending. |
+| Ruby | ASR/auxiliary APIs and session controls; result and task/TTS gaps pending. |
+| C# / .NET | Broad music/conversion API; shared tokens, replay-noise validation and initial TTS additions now have model-free .NET/ABI proof; auxiliary API/hosted acceptance remains pending. Dedicated workflow: `bindings-csharp.yml`. |
+| JavaScript / WASM | Session ASR/setters, piano/programs and chords; result and additional task/TTS gaps pending, subject to WASM backend availability. |
 
-> **Setter parity.** Python, Rust (`crispasr-sys` + `crispasr` at the repo root),
-> Go, Dart, Java, Ruby, and C# all expose the complete `crispasr_session_set_*`
-> surface declared in `include/crispasr_session.h` and `include/crispasr.h`
-> (a handful — `set_sensitivity`, `set_pcm_sample_rate` — live in the latter).
-> The native Node addon
-> (`examples/addon.node`) reaches it via `transcribeSession`; the WASM/JS binding
-> (`bindings/javascript/emscripten.cpp`) via the `asr*` functions
-> (`asrOpen`/`asrTranscribe`/`asrSet…`).
+> **Setter coverage.** The wrappers share many session controls, but the claim
+> that all expose the complete `crispasr_session_set_*` surface is not supported
+> by the current code. For example, the distinct `set_tts_cfg_scale` and PCM
+> `set_voice_samples` APIs are not wired universally. Curated setter tests cover
+> a subset. Require an explicit per-language API/result mapping and behavior
+> tests before claiming full parity.
 >
 > **Long audio auto-chunks.** `transcribe` slices audio longer than
 > ~30 s at energy minima and transcribes each piece (like the CLI/server),
@@ -652,3 +653,49 @@ result, _ := s.SpeechToSpeech(inputPCM)
 fmt.Println("Transcript:", result.Transcript)
 // result.PCM is []float32 at 24 kHz
 ```
+
+### Current wrapper repair validation
+
+The model-free ABI suites run through actual .NET, JNA, Ruby-extension and
+Embind calls: `python3 tools/run-wrapper-contract.py csharp|java|ruby|dart|wasm|go-rust`
+(select one language). SDK requirements and the difference between optional
+CTest skips and strict CI are documented in [contributing](contributing.md).
+These suites exercise transport, ownership and lifecycle; they do not establish
+real model accuracy or complete API parity. Current remaining work is in
+[PLAN.md](../PLAN.md), with completed checkpoints in [HISTORY.md](../HISTORY.md).
+
+Shared token results retain raw UTF-8 bytes because individual tokens may split
+a Unicode character. Decode concatenated raw pieces to reconstruct text; each
+token's display text may contain replacement characters. Existing language
+time units remain stable, and unavailable timing is exposed as `-1` plus an
+availability predicate. Java session results and Ruby's ordinary transcription
+results use centiseconds; WASM `session*`, C# and Dart expose seconds. Ruby's
+existing `transcribe_vad_lang` route uses seconds.
+
+WASM `sessionSynthesizeStreaming(text, callback)` delivers synchronous sentence
+chunks as copied `Float32Array`s. It returns `{status, failed, error}` after
+native synthesis returns. Check both the native status and callback error.
+Callback exceptions stay on the JS side until native unwinds; re-entry is
+rejected. Browser worker scheduling and backend availability still require the
+full WASM build/model gates.
+
+C# text chat is available through `ChatSession.Open`, `Generate`,
+`GenerateStreaming`, `CountTokens`, `Reset`, and the context/template/memory
+queries. Pass the whole conversation to preserve native KV-prefix reuse.
+Streaming delivers owned raw UTF-8 byte chunks; concatenate before decoding.
+`CancellationToken` and registered abort predicates map native abort code 40
+to `OperationCanceledException`. Abort/token callbacks must be fast and cannot
+re-enter or dispose their session; callback exceptions propagate after native
+returns. The chat disclosure string is exposed through `AiDisclosureText`.
+
+### Legacy Parakeet offset contract
+
+The direct legacy C entry point accepts a 64-bit **centisecond offset**, not a
+language string. Current wrappers pass that offset explicitly. Python exposes
+`t_offset_cs`, Go/Rust expose `TranscribeAt`/`transcribe_at`, Java's
+`CrispasrAuxiliary.Parakeet` and WASM's `ParakeetContext` accept centiseconds,
+Dart exposes `offsetCs`, and Ruby's direct method accepts an integer fourth
+argument. C# `ParakeetContext.Transcribe` uses seconds like the rest of its API.
+Existing empty/English hints in applicable wrappers map to zero offset; use a
+unified session for actual per-call language selection. Token pieces can split
+UTF-8: concatenate the owned raw bytes before decoding.

@@ -4,6 +4,13 @@ Python bindings for [CrispASR](https://github.com/CrispStrobe/CrispASR) — ligh
 
 Supports the ASR backends compiled into the linked CrispASR library, including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, VibeVoice-ASR, and Index-Echo.
 
+The package also exposes TTS, speech-to-speech, music analysis, ContentVec voice
+conversion, alignment, diarization, VAD, text processors and model utilities.
+See [the Python API inventory](../docs/python-api-coverage.md) for entry points,
+result units, ownership, callback rules and verification limits. These additions
+require a matching native build; current source coverage does not imply an
+older published wheel contains the same APIs.
+
 ## Install
 
 ```bash
@@ -70,12 +77,26 @@ decoder beside it, then call `s.set_target_language("en")` (also `ja` or `es`).
 Each segment contains `transcript\ntranslation` and generated subtitle times.
 Place Silero v6.2 beside the pair for the released full-file window recipe.
 
+Session segments expose `tokens` (`SessionToken`: text, start/end seconds,
+confidence, and lossless `raw_text` bytes). Missing word or token timestamps
+are `None`; check `word.has_timestamps` before doing arithmetic. VibeVoice has
+native segment times but no native word times. Use `align_words()` for word
+alignment, then `free_aligner_cache()` or `session.free_aligner_cache()` to
+release the process-wide aligner allocation. Older libraries return empty
+token lists and report cache release as unavailable. See
+[session metadata and compatibility](../docs/python-session-metadata.md). Parakeet
+metadata is retained through Japanese slice/gap-fill and legacy overlap selection;
+raw token blocks follow retained words even when timestamps are tied. These
+main-branch changes require the matching native library and are not in v0.8.43.
+
+
 ## API
 
 - `CrispASR` — Whisper-compatible high-level API
 - `Session` — unified API across all backends compiled into `libcrispasr`
 - `ChatSession` — text → text chat over a GGUF chat model: one-shot and streaming generation, prompt-token counting, and cancellation through an abort predicate
 - `align_words(...)` — word-level CTC alignment
+- `free_aligner_cache(...)` — release the process-wide forced-aligner cache
 - `diarize_segments(...)` — speaker diarization (energy / xcorr / vad-turns / pyannote / FoxNose)
 - `diarize_segments_with_turns(...)` — label segments and return FoxNose's
   finer audio-derived speaker turns

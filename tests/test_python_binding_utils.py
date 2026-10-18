@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 # Import the binding module
-sys.path.insert(0, str(Path(__file__).parent.parent / "python" / "crispasr"))
-import _binding
+sys.path.insert(0, str(Path(__file__).parent.parent / "python"))
+from crispasr import _binding
 
 
 class TestFunctionSignatures:

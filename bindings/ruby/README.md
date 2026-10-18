@@ -463,3 +463,51 @@ The same to [crispasr][].
 
 [crispasr]: https://github.com/CrispStrobe/CrispASR
 [models]: https://github.com/CrispStrobe/CrispASR/tree/main/models
+
+## Generic speaker primitives
+
+`Whisper::CrispASR::SpeakerEmbedder.new(model, threads = 4, cache_dir = nil)`
+provides `dimension`, `name`, `embed(pcm16k)` and `close`. Ruby owns the native
+context and frees it on GC; `close` is idempotent. Generic embedding success
+is distinct from the 192-float TitaNet API.
+
+`Whisper::CrispASR.speaker_cluster(rows, threshold = 0.7, maximum = 8)` returns
+`{labels:, n_clusters:}`. `Whisper::CrispASR::PyannoteCache.new(pcm, model,
+threads = 4)` provides `apply(segments, offset_cs = 0)` and `close`. Segment
+hashes use native centiseconds and return copied `{t0:, t1:, speaker:}` records.
+
+## Session ownership and load options
+
+Handles returned by the Session/Stream/Chat, direct Parakeet/TitaNet, speaker
+DB, microphone and text processor APIs are opaque integer tickets. Pass them back through
+the Ruby APIs; they are not native memory addresses. Closed tickets stay closed
+when a native allocator reuses an address. Close is idempotent and a session
+closes its child `Whisper::CrispASR::Session::Stream` handles first.
+
+Same-context re-entry from argument conversion, a callback or another Ruby
+thread raises while an operation borrows the context. Other operations remain
+available after a deferred callback error. Existing method arities and aliases
+are preserved.
+
+`Whisper::CrispASR::Session.open_with_options(model, backend = nil, options = nil)`
+accepts `n_threads`, `use_gpu`, `verbosity`, `flash_attn`, and `n_gpu_layers` as
+symbol or string hash keys. Boolean controls require true/false; defaults match
+the native v2 loader. Release the returned handle with `Session.close`.
+
+
+## Microphone lifetime
+
+`Whisper::CrispASR::Mic.open(sample_rate, channels) { |pcm| ... }` returns an
+opaque ticket. `start(ticket)` begins capture; `stop(ticket)` stops it and
+reports native driver errors. `close(ticket)` retires the ticket and releases
+the device. Stop/close are idempotent after close; starting a closed or foreign
+ticket raises. The native callback copies PCM into a bounded queue, then a Ruby
+pump invokes the block with an owned float array. When the queue fills, the
+oldest chunk is dropped.
+
+Closing from the block is supported and does not join the current thread.
+Other callers wait for pump cleanup. Native producer threads stop before queue
+storage is released. Callback exceptions retain the existing policy of being
+swallowed so capture can continue; handle application errors inside the block
+when they need reporting. Killing/interruption of the pump also releases its
+native device. Close each microphone explicitly when finished.

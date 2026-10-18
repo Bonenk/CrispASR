@@ -17,10 +17,18 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 extern "C" {
 struct crispasr_session;
+struct crispasr_session_result;
+int crispasr_session_result_n_tokens(crispasr_session_result*, int);
+const char* crispasr_session_result_token_text(crispasr_session_result*, int, int);
+int64_t crispasr_session_result_token_t0(crispasr_session_result*, int, int);
+int64_t crispasr_session_result_token_t1(crispasr_session_result*, int, int);
+float crispasr_session_result_token_p(crispasr_session_result*, int, int);
+void crispasr_free_aligner_cache(void);
 int crispasr_session_input_sample_rate(crispasr_session* s);
 int crispasr_session_output_sample_rate(crispasr_session* s);
 int crispasr_session_input_channels(crispasr_session* s);
@@ -262,4 +270,14 @@ TEST_CASE("turns ABI: FoxNose with a missing embedder still fails with 1", "[uni
     int32_t n_turns = -7;
     CHECK(crispasr_diarize_segments_turns_abi(pcm.data(), nullptr, 16000, 0, &seg, 1, &opts, turns, 4, &n_turns) == 1);
     CHECK(n_turns == -7); // a failed run writes no count
+}
+
+TEST_CASE("Session token ABI nulls and repeated aligner cache release", "[unit][abi][session]") {
+    CHECK(crispasr_session_result_n_tokens(nullptr, 0) == 0);
+    CHECK(std::string(crispasr_session_result_token_text(nullptr, 0, 0)).empty());
+    CHECK(crispasr_session_result_token_t0(nullptr, 0, 0) == -1);
+    CHECK(crispasr_session_result_token_t1(nullptr, 0, 0) == -1);
+    CHECK(crispasr_session_result_token_p(nullptr, 0, 0) == -1.0f);
+    crispasr_free_aligner_cache();
+    crispasr_free_aligner_cache();
 }

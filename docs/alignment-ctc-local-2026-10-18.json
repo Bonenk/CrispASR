@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "scope": "character CTC postprocessor only; no encoder/model/audio",
+  "source_commit": "f40d3abcee266f20bd353e7fb56760773525198d",
+  "source_file_dirty": true,
+  "source_sha256": "d089c141e03fa61970a5136d1c8f9b92a05e306ae36bab78d6b8b8597b68cfd5",
+  "baseline_commit": "8c59ed5838861f2f2fa4650a014e7d0d42aa03f8",
+  "baseline_source_sha256": "3a09740cb1c4fdaa278c34e63dbd0a613479d13fd02172e436b40f76ab0e9ec8",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "flags": [
+    "-std=c++17",
+    "-O3",
+    "-DNDEBUG",
+    "-fno-fast-math"
+  ],
+  "cpu": "Intel Xeon Processor (Skylake, IBRS, no TSX)",
+  "architecture": "x86_64",
+  "platform": "Linux",
+  "gate": "CRISPASR_CTC_ALIGN_OPT",
+  "repeats": 9,
+  "warmup_calls_per_arm": 1,
+  "cases": [
+    {
+      "T": 256,
+      "V": 16,
+      "words": 20,
+      "labels": 59,
+      "unique_labels_including_blank": 4,
+      "output_parity": "bit-exact word and character stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 0.262623,
+          "min_ms": 0.239747,
+          "max_ms": 0.329117,
+          "peak_heap_bytes": 62428,
+          "allocations": 343
+        },
+        "gate_off": {
+          "median_ms": 0.314711,
+          "min_ms": 0.219479,
+          "max_ms": 0.361807,
+          "peak_heap_bytes": 62428,
+          "allocations": 343
+        },
+        "gate_on": {
+          "median_ms": 0.228025,
+          "min_ms": 0.190365,
+          "max_ms": 0.338051,
+          "peak_heap_bytes": 46940,
+          "allocations": 93
+        }
+      },
+      "speedup_vs_gate_off": 1.3801600701677448,
+      "heap_reduction_vs_gate_off": 1.3299531316574351
+    },
+    {
+      "T": 256,
+      "V": 64,
+      "words": 20,
+      "labels": 59,
+      "unique_labels_including_blank": 4,
+      "output_parity": "bit-exact word and character stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 0.331626,
+          "min_ms": 0.242633,
+          "max_ms": 0.413138,
+          "peak_heap_bytes": 114668,
+          "allocations": 391
+        },
+        "gate_off": {
+          "median_ms": 0.31497,
+          "min_ms": 0.273623,
+          "max_ms": 0.507474,
+          "peak_heap_bytes": 114668,
+          "allocations": 391
+        },
+        "gate_on": {
+          "median_ms": 0.263514,
+          "min_ms": 0.223971,
+          "max_ms": 0.434903,
+          "peak_heap_bytes": 50028,
+          "allocations": 141
+        }
+      },
+      "speedup_vs_gate_off": 1.1952685625811152,
+      "heap_reduction_vs_gate_off": 2.2920764371951705
+    },
+    {
+      "T": 256,
+      "V": 1024,
+      "words": 20,
+      "labels": 59,
+      "unique_labels_including_blank": 4,
+      "output_parity": "bit-exact word and character stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 7.0648,
+          "min_ms": 4.432957,
+          "max_ms": 8.812145,
+          "peak_heap_bytes": 1159180,
+          "allocations": 1351
+        },
+        "gate_off": {
+          "median_ms": 5.015427,
+          "min_ms": 4.229306,
+          "max_ms": 10.021666,
+          "peak_heap_bytes": 1159180,
+          "allocations": 1351
+        },
+        "gate_on": {
+          "median_ms": 3.652834,
+          "min_ms": 2.522413,
+          "max_ms": 4.664306,
+          "peak_heap_bytes": 111500,
+          "allocations": 1101
+        }
+      },
+      "speedup_vs_gate_off": 1.3730235209155413,
+      "heap_reduction_vs_gate_off": 10.396233183856502
+    },
+    {
+      "T": 256,
+      "V": 4096,
+      "words": 20,
+      "labels": 59,
+      "unique_labels_including_blank": 4,
+      "output_parity": "bit-exact word and character stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 18.010681,
+          "min_ms": 11.379492,
+          "max_ms": 21.263507,
+          "peak_heap_bytes": 4503484,
+          "allocations": 4423
+        },
+        "gate_off": {
+          "median_ms": 17.686005,
+          "min_ms": 14.131008,
+          "max_ms": 25.024551,
+          "peak_heap_bytes": 4503484,
+          "allocations": 4423
+        },
+        "gate_on": {
+          "median_ms": 11.725369,
+          "min_ms": 8.744984,
+          "max_ms": 21.877679,
+          "peak_heap_bytes": 310076,
+          "allocations": 4173
+        }
+      },
+      "speedup_vs_gate_off": 1.508353809590129,
+      "heap_reduction_vs_gate_off": 14.523807066654626
+    }
+  ],
+  "memory_scope": "peak live C++ allocations inside kernel; excludes input/model/IPC/setup",
+  "measurement_status": "preliminary local synthetic fixtures; frozen hosted validation pending"
+}

@@ -5,6 +5,7 @@
 // adapter path (verified by the surface-parity harness + CLI A/B).
 
 #include "parakeet_orchestrate.h"
+#include "core/parakeet_word_ranges.h"
 
 #include "core/asr_segment_group.h"
 #include "core/sys_mem.h"
@@ -81,6 +82,8 @@ std::vector<parakeet_seg> split_result_to_segs(const parakeet_result* r, int64_t
         word_t0.push_back(r->words[i].t0);
     const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
 
+    const auto token_ranges = core_parakeet_words::token_ranges(r->n_tokens, [&](int i) { return r->tokens[i].text; });
+    const bool own_tokens = token_ranges.size() == (size_t)r->n_words;
     int ti = 0;
     for (size_t si = 0; si < starts.size(); si++) {
         const int w_begin = starts[si];
@@ -103,7 +106,8 @@ std::vector<parakeet_seg> split_result_to_segs(const parakeet_result* r, int64_t
         seg.t0 = seg.words.front().t0;
         seg.t1 = seg.words.back().t1;
         const int64_t next_start = (w_end < r->n_words) ? r->words[w_end].t0 : INT64_MAX;
-        for (; ti < r->n_tokens && r->tokens[ti].t0 < next_start; ti++) {
+        const int token_end = own_tokens ? token_ranges[w_end - 1].second : r->n_tokens;
+        for (; ti < token_end && (own_tokens || r->tokens[ti].t0 < next_start); ti++) {
             const auto& t = r->tokens[ti];
             parakeet_seg::token ct;
             ct.text = t.text;
@@ -299,7 +303,10 @@ int gap_fill_segments(parakeet_context* ctx, const float* samples, int n_samples
             parakeet_seg got = result_to_seg(r, win0_cs);
             parakeet_result_free(r);
 
-            for (auto& w : got.words) {
+            const auto ranges = core_parakeet_words::token_ranges((int)got.tokens.size(),
+                                                                  [&](int i) { return got.tokens[i].text.c_str(); });
+            for (size_t wi = 0; wi < got.words.size(); ++wi) {
+                auto& w = got.words[wi];
                 const int64_t mid = (w.t0 + w.t1) / 2;
                 if (mid < g.first - kCoverSlopCs || mid >= g.second + kCoverSlopCs)
                     continue; // context word from outside the hole
@@ -344,12 +351,10 @@ int gap_fill_segments(parakeet_context* ctx, const float* samples, int n_samples
                 }
                 dirty[si] = true;
                 seam.push_back({w.t0, norm_word(w.text)}); // guard the next window's edge too
-                std::vector<parakeet_seg::token> keep;
-                for (auto& tk : got.tokens)
-                    if (tk.t0 >= w.t0 && tk.t0 <= w.t1)
-                        keep.push_back(tk);
-                for (auto& tk : keep)
-                    segs[si].tokens.push_back(std::move(tk));
+                if (ranges.size() == got.words.size()) {
+                    for (int ti = ranges[wi].first; ti < ranges[wi].second; ++ti)
+                        segs[si].tokens.push_back(got.tokens[ti]);
+                }
                 segs[si].words.push_back(std::move(w));
                 ++recovered;
             }

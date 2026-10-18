@@ -90,8 +90,17 @@ type (
 	Token            C.whisper_token
 	TokenData        C.struct_whisper_token_data
 	SamplingStrategy C.enum_whisper_sampling_strategy
-	Params           C.struct_whisper_full_params
 )
+
+// Params is a copyable set of legacy Whisper options. Go strings are retained
+// as Go values; native calls create temporary C strings with scoped cleanup.
+type Params struct {
+	native           C.struct_whisper_full_params
+	initialPrompt    string
+	initialPromptSet bool
+	vadModelPath     string
+	vadModelPathSet  bool
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // GLOBALS
@@ -102,7 +111,7 @@ const (
 )
 
 const (
-	SampleRate = C.CRISPASR_SAMPLE_RATE                 // Expected sample rate, samples per second
+	SampleRate = C.CRISPASR_SAMPLE_RATE                // Expected sample rate, samples per second
 	SampleBits = uint16(unsafe.Sizeof(C.float(0))) * 8 // Sample size in bits
 	NumFFT     = C.CRISPASR_N_FFT
 	HopLength  = C.CRISPASR_HOP_LENGTH
@@ -318,7 +327,7 @@ func Whisper_print_system_info() string {
 // Return default parameters for a strategy
 func (ctx *Context) Whisper_full_default_params(strategy SamplingStrategy) Params {
 	// Get default parameters
-	return Params(C.whisper_full_default_params_cb((*C.struct_whisper_context)(ctx), C.enum_whisper_sampling_strategy(strategy)))
+	return Params{native: C.whisper_full_default_params_cb((*C.struct_whisper_context)(ctx), C.enum_whisper_sampling_strategy(strategy))}
 }
 
 // Run the entire model: PCM -> log mel spectrogram -> encoder -> decoder -> text
@@ -330,13 +339,21 @@ func (ctx *Context) Whisper_full(
 	newSegmentCallback func(int),
 	progressCallback func(int),
 ) error {
+	if ctx == nil || len(samples) == 0 || uint64(len(samples)) > 2147483647 {
+		return errors.New("legacy Whisper requires a context and nonempty int32-sized PCM")
+	}
+	native, release, err := params.nativeForCall()
+	if err != nil {
+		return err
+	}
+	defer release()
 	registerEncoderBeginCallback(ctx, encoderBeginCallback)
 	registerNewSegmentCallback(ctx, newSegmentCallback)
 	registerProgressCallback(ctx, progressCallback)
 	defer registerEncoderBeginCallback(ctx, nil)
 	defer registerNewSegmentCallback(ctx, nil)
 	defer registerProgressCallback(ctx, nil)
-	if C.whisper_full((*C.struct_whisper_context)(ctx), (C.struct_whisper_full_params)(params), (*C.float)(&samples[0]), C.int(len(samples))) == 0 {
+	if C.whisper_full((*C.struct_whisper_context)(ctx), native, (*C.float)(&samples[0]), C.int(len(samples))) == 0 {
 		return nil
 	} else {
 		return ErrConversionFailed
@@ -347,12 +364,20 @@ func (ctx *Context) Whisper_full(
 // It seems this approach can offer some speedup in some cases.
 // However, the transcription accuracy can be worse at the beginning and end of each chunk.
 func (ctx *Context) Whisper_full_parallel(params Params, samples []float32, processors int, encoderBeginCallback func() bool, newSegmentCallback func(int)) error {
+	if ctx == nil || len(samples) == 0 || uint64(len(samples)) > 2147483647 || processors < 1 || uint64(processors) > 2147483647 {
+		return errors.New("legacy parallel Whisper requires a context, PCM and positive int32 processors")
+	}
+	native, release, err := params.nativeForCall()
+	if err != nil {
+		return err
+	}
+	defer release()
 	registerEncoderBeginCallback(ctx, encoderBeginCallback)
 	registerNewSegmentCallback(ctx, newSegmentCallback)
 	defer registerEncoderBeginCallback(ctx, nil)
 	defer registerNewSegmentCallback(ctx, nil)
 
-	if C.whisper_full_parallel((*C.struct_whisper_context)(ctx), (C.struct_whisper_full_params)(params), (*C.float)(&samples[0]), C.int(len(samples)), C.int(processors)) == 0 {
+	if C.whisper_full_parallel((*C.struct_whisper_context)(ctx), native, (*C.float)(&samples[0]), C.int(len(samples)), C.int(processors)) == 0 {
 		return nil
 	} else {
 		return ErrConversionFailed

@@ -41,6 +41,7 @@ ALL_SYMBOLS = [
     "crispasr_diarize_segments_abi",
     "crispasr_diarize_segments_turns_abi",
     "crispasr_enhance_audio_rnnoise",
+    "crispasr_free_aligner_cache",
     "crispasr_kokoro_lang_has_native_voice_abi",
     "crispasr_kokoro_lang_is_german_abi",
     "crispasr_kokoro_resolve_fallback_voice_abi",
@@ -107,6 +108,11 @@ ALL_SYMBOLS = [
     "crispasr_session_result_free",
     "crispasr_session_result_n_segments",
     "crispasr_session_result_n_words",
+    "crispasr_session_result_n_tokens",
+    "crispasr_session_result_token_text",
+    "crispasr_session_result_token_t0",
+    "crispasr_session_result_token_t1",
+    "crispasr_session_result_token_p",
     "crispasr_session_result_segment_t0",
     "crispasr_session_result_segment_t1",
     "crispasr_session_result_word_alt_p",
@@ -194,12 +200,11 @@ ALL_SYMBOLS = [
 
 @pytest.fixture(scope="module")
 def lib():
-    lib_path = os.environ.get("CRISPASR_LIB_PATH")
+    lib_path = os.environ.get("CRISPASR_LIB_PATH") or os.environ.get("CRISPASR_LIB")
     if not lib_path:
         # Try common build paths
         for candidate in [
             "build/src/libcrispasr.so",
-            "/mnt/volume1/build-main/src/libcrispasr.so",
             "build/libcrispasr.so",
         ]:
             if os.path.exists(candidate):
@@ -216,9 +221,9 @@ def test_symbol_resolves(lib, symbol):
     assert hasattr(lib, symbol), f"symbol {symbol} not found in loaded libcrispasr"
 
 
-def test_symbol_count(lib):
-    """Sanity-check accidental edits to the maintained symbol set."""
-    assert len(ALL_SYMBOLS) == 155, f"expected 155 symbols, got {len(ALL_SYMBOLS)}"
+def test_symbol_count():
+    """The curated subset has no duplicates; full coverage comes from the header."""
+    assert len(ALL_SYMBOLS) == len(set(ALL_SYMBOLS))
 
 
 def test_python_binding_imports():
@@ -234,7 +239,7 @@ def test_python_binding_imports():
 
 
 def test_python_binding_declares_all_symbols():
-    """Every CA_EXPORT symbol must appear somewhere in _binding.py."""
+    """The legacy curated smoke subset remains declared in _binding.py."""
     binding_path = os.path.join(
         os.path.dirname(__file__), "..", "python", "crispasr", "_binding.py"
     )
@@ -242,3 +247,11 @@ def test_python_binding_declares_all_symbols():
         content = f.read()
     missing = [s for s in ALL_SYMBOLS if s not in content]
     assert missing == [], f"Python binding missing symbols: {missing}"
+
+
+def test_complete_public_session_header_coverage():
+    """The curated smoke list is supplemented by a complete header census."""
+    import runpy
+    from pathlib import Path
+    check = runpy.run_path(str(Path(__file__).resolve().parents[1] / "tools/check-python-api-coverage.py"))
+    check["main"]([])

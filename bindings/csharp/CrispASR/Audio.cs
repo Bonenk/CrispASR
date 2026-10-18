@@ -16,7 +16,7 @@ namespace CrispASR
     /// <see cref="Load(string)"/> and the two paths decode identically.
     /// </para>
     /// </summary>
-    public static class Audio
+    public static partial class Audio
     {
         /// <summary>The sample rate every ASR backend expects.</summary>
         public const int AsrSampleRate = 16000;
@@ -46,12 +46,10 @@ namespace CrispASR
 
             int rc = NativeMethods.crispasr_audio_load_at_rate(
                 path, targetRate, out IntPtr pcm, out int nSamples, out sampleRate);
-            if (rc != 0 || pcm == IntPtr.Zero)
-                throw new InvalidOperationException(
-                    $"Failed to decode audio file '{path}' (rc={rc}). " +
-                    "Supported: WAV/MP3/FLAC/OGG/Opus/AAC/M4A/WebM/AMR.");
             try
             {
+                if (rc != 0 || (pcm == IntPtr.Zero && nSamples > 0))
+                    throw new InvalidOperationException($"Failed to decode audio file '{path}' (rc={rc})");
                 if (nSamples <= 0) return Array.Empty<float>();
                 var managed = new float[nSamples];
                 Marshal.Copy(pcm, managed, 0, nSamples);
@@ -80,7 +78,7 @@ namespace CrispASR
                 throw new InvalidOperationException("crispasr_pcm_to_wav failed");
             try
             {
-                var bytes = new byte[(int)len];
+                var bytes = new byte[checked((int)len.ToUInt64())];
                 Marshal.Copy(wav, bytes, 0, bytes.Length);
                 return bytes;
             }

@@ -32,6 +32,7 @@ extern "C" {
 struct whisper_context;
 struct whisper_context_params;
 struct whisper_full_params;
+typedef struct whisper_full_params whisper_full_params;
 
 struct crispasr_align_result;
 typedef struct crispasr_align_result crispasr_align_result;
@@ -168,6 +169,8 @@ CRISPASR_SESSION_API void crispasr_params_set_vad_threshold(whisper_full_params*
 CRISPASR_SESSION_API void crispasr_params_set_vad_min_speech_ms(whisper_full_params* p, int ms);
 CRISPASR_SESSION_API void crispasr_params_set_vad_min_silence_ms(whisper_full_params* p, int ms);
 CRISPASR_SESSION_API void crispasr_params_set_tdrz(whisper_full_params* p, int v);
+CRISPASR_SESSION_API int crispasr_transcribe_parallel_by_ref(whisper_context* ctx, const whisper_full_params* params,
+                                                             const float* samples, int n_samples, int n_processors);
 CRISPASR_SESSION_API void crispasr_ctx_params_set_dtw(whisper_context_params* p, bool enable, int aheads_preset,
                                                       int n_top);
 CRISPASR_SESSION_API int64_t crispasr_token_t0(whisper_context* ctx, int i_seg, int i_tok);
@@ -407,6 +410,18 @@ CRISPASR_SESSION_API const char* crispasr_session_result_word_text(crispasr_sess
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API float crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
+// Native token metadata (#549). Empty for backends/routes without token output.
+// t0/t1 use centiseconds; negative means unavailable (never interpolate).
+// Token text may contain a UTF-8 byte fragment: concatenate bytes before decoding
+// to reconstruct the transcript. Returned pointers live until result_free.
+CRISPASR_SESSION_API int crispasr_session_result_n_tokens(crispasr_session_result* r, int i_seg);
+CRISPASR_SESSION_API const char* crispasr_session_result_token_text(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API int64_t crispasr_session_result_token_t0(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API int64_t crispasr_session_result_token_t1(crispasr_session_result* r, int i_seg, int i_token);
+CRISPASR_SESSION_API float crispasr_session_result_token_p(crispasr_session_result* r, int i_seg, int i_token);
+// Release the process-wide forced-aligner cache. Safe to repeat; waits for an
+// active alignment to finish. The next alignment reloads its requested model.
+CRISPASR_SESSION_API void crispasr_free_aligner_cache(void);
 // Whisper's per-segment no-speech probability (the <|nospeech|> token
 // posterior) in [0, 1]. Only the whisper backend populates it; other backends
 // and out-of-range indices return the -1.0 sentinel ("no data").
@@ -586,6 +601,10 @@ CRISPASR_SESSION_API int crispasr_session_convert_content_dim(crispasr_session* 
 CRISPASR_SESSION_API int crispasr_session_convert_n_speakers(crispasr_session* s);
 // The checkpoint's native rate (32k/40k/48k) — not a constant.
 CRISPASR_SESSION_API int crispasr_session_convert_sample_rate(crispasr_session* s);
+// Explicit replay noise uses [inter_channels, n_frames] and
+// [n_frames, upsample_product] row-major arrays respectively.
+CRISPASR_SESSION_API int crispasr_session_convert_inter_channels(crispasr_session* s);
+CRISPASR_SESSION_API int crispasr_session_convert_upsample_product(crispasr_session* s);
 
 // Chord recognition: mono PCM at any rate (resampled internally to the
 // model's 22050 Hz) -> a chord timeline. Returns the span count (>0) on

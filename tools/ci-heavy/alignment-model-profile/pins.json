@@ -1,0 +1,31 @@
+{
+  "model": {
+    "repo": "cstr/parakeet-ctc-1.1b-ja-GGUF",
+    "revision": "033e8bf08d60a582b47a92bba07ca9e392982861",
+    "file": "parakeet-ctc-1.1b-ja-f16.gguf",
+    "sha256": "34dd3128275c9bca2b4296f53c5f831feb258fcf3fdd28c29c0dc2d2f7d5ede7",
+    "bytes": 2134533952,
+    "license": "Apache-2.0"
+  },
+  "dataset": {
+    "repo": "google/fleurs",
+    "revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "file": "parquet-data/ja_jp/test-00000-of-00001.parquet",
+    "sha256": "e954b67e934b9a31d7a74a070a75225379660d50c8d1aacdb755852c57f23e6b",
+    "bytes": 541651710,
+    "tsv": "data/ja_jp/test.tsv",
+    "tsv_sha256": "5dd9643511437414681ad3f23508596c621cdf78978724a09f1f06fefe9d300b",
+    "license": "CC-BY-4.0",
+    "attribution": "Google FLEURS: Few-shot Learning Evaluation of Universal Representations of Speech (Conneau et al., 2022). Japanese test recording; source metadata and pinned dataset card retained with results.",
+    "source_url": "https://huggingface.co/datasets/google/fleurs/tree/70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "recording": {
+    "id": 1731,
+    "filename": "12677001980660723842.wav",
+    "num_samples": 101760,
+    "sample_rate": 16000,
+    "raw_transcription": "群島や湖では、必ずしもヨットは必要ありません。",
+    "transcription": "群島や湖では 必ずしもヨットは必要ありません"
+  }
+}

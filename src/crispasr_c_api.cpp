@@ -26,6 +26,7 @@
 #include "core/asr_time_order.h"
 #include "core/segment_hygiene.h" // §W2/§W5/§W6 opt-in segment cleanup    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
 #include "parakeet_orchestrate.h" // improvements Phase 1: shared parakeet transcribe orchestration
+#include "core/parakeet_word_ranges.h"
 #include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
 #include "core/audio_resample.h"   // Sidon S2S input-rate conversion
 #include "core/wav_reader.h"       // fireredtts3 set_voice WAV decode
@@ -377,6 +378,7 @@
 #endif
 #if __has_include("moss_transcribe_diarize.h")
 #include "moss_transcribe_diarize.h"
+#include "core/moss_diarize_segments.h"
 #define CA_HAVE_MOSS_DIARIZE 1
 #endif
 #if __has_include("glm_asr.h")
@@ -1832,6 +1834,14 @@ struct crispasr_session_seg {
         std::vector<word_alt> alts;
     };
     std::vector<word> words;
+    struct token {
+        std::string text;
+        int64_t t0 = -1; // native centiseconds; -1 means unavailable
+        int64_t t1 = -1;
+        float p = -1.0f;
+        std::vector<word_alt> alts;
+    };
+    std::vector<token> tokens;
 };
 
 struct crispasr_session {
@@ -2638,18 +2648,7 @@ static void _fire_segment_callbacks(crispasr_session* s, crispasr_session_result
 // token-prob APIs project into this shape so the word-grouping logic stays
 // in one place. Defined before _fire_token_callbacks so that function can
 // dereference its members (MSVC rejects an incomplete type there).
-struct ca_token_record {
-    std::string text;
-    int64_t t0;
-    int64_t t1;
-    float p;
-    // Optional per-token top-N alternative candidates. Only the
-    // whisper-greedy path populates these (when alt_n > 0); other
-    // backends leave it empty. emit_words_from_tokens attaches the
-    // alts of each word's first content-bearing token to the emitted
-    // word — see the inline note there for why first-token only.
-    std::vector<crispasr_session_seg::word_alt> alts;
-};
+using ca_token_record = crispasr_session_seg::token;
 
 // Fire the session's per-token callback for a vector of ca_token_record
 // entries. Called from the transcribe paths after a segment's tokens have
@@ -2741,6 +2740,19 @@ static std::vector<crispasr_session_seg::word> emit_words_from_tokens(const std:
     if (have_cur)
         flush();
     return out;
+}
+
+// Match the CLI token-array cleanup while preserving native timing/probability.
+static void filter_tokens_by_ngram_collapse(std::vector<ca_token_record>& tokens) {
+    std::vector<std::string> texts;
+    for (const auto& t : tokens)
+        texts.push_back(t.text);
+    const auto keep = core_ngram::fix_loops_keep_indices(texts);
+    std::vector<ca_token_record> kept;
+    kept.reserve(keep.size());
+    for (int i : keep)
+        kept.push_back(std::move(tokens[i]));
+    tokens = std::move(kept);
 }
 
 // issue #218 follow-up: fix_loops() cleans a segment's flat `seg.text`, but
@@ -5528,6 +5540,7 @@ static crispasr_session_result* run_voxtral_family(Ctx* ctx, const VoxtralFamily
     seg.t0 = 0;
     seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
     seg.words = emit_words_from_tokens(toks);
+    seg.tokens = std::move(toks);
     r->segments.push_back(std::move(seg));
     return r;
 }
@@ -5614,9 +5627,18 @@ static crispasr_session_result* transcribe_autochunk(crispasr_session* s, const 
             seg.t0 += off_cs;
             seg.t1 += off_cs;
             for (auto& w : seg.words) {
-                w.t0 += off_cs;
-                w.t1 += off_cs;
+                if (w.t0 >= 0)
+                    w.t0 += off_cs;
+                if (w.t1 >= 0)
+                    w.t1 += off_cs;
             }
+            for (auto& t : seg.tokens) {
+                if (t.t0 >= 0)
+                    t.t0 += off_cs;
+                if (t.t1 >= 0)
+                    t.t1 += off_cs;
+            }
+            filter_tokens_by_ngram_collapse(seg.tokens);
             // Chunked long audio can send a short-segment model (moonshine) into
             // an n-gram repetition loop on a hard slice ("I'm sorry, I'm sorry,
             // …"). Collapse it like the cohere/granite adapters do (issue #218);
@@ -5871,6 +5893,38 @@ static std::string parakeet_norm_word(const char* s) {
     return o;
 }
 
+// Metadata moves with the exact word selected by window splice/dedup, even
+// when several words have identical timestamps. This is private C++ state;
+// public opaque-result and POD ABI layouts remain unchanged.
+struct parakeet_session_owned_word : crispasr_session_seg::word {
+    std::vector<crispasr_session_seg::token> native_tokens;
+};
+
+static std::vector<parakeet_session_owned_word> parakeet_session_copy_words(const parakeet_result* r) {
+    std::vector<parakeet_session_owned_word> out;
+    if (!r)
+        return out;
+    const auto ranges = core_parakeet_words::token_ranges(r->n_tokens, [&](int i) { return r->tokens[i].text; });
+    out.reserve(r->n_words);
+    for (int i = 0; i < r->n_words; ++i) {
+        parakeet_session_owned_word word;
+        word.text = r->words[i].text;
+        word.t0 = r->words[i].t0;
+        word.t1 = r->words[i].t1;
+        word.p = r->words[i].p > 0.0f ? r->words[i].p : 1.0f;
+        // A token-less result still retains its words. Never guess ownership
+        // if a foreign/inconsistent result did not use native grouping.
+        if (ranges.size() == (size_t)r->n_words) {
+            for (int ti = ranges[i].first; ti < ranges[i].second; ++ti) {
+                const auto& t = r->tokens[ti];
+                word.native_tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+            }
+        }
+        out.push_back(std::move(word));
+    }
+    return out;
+}
+
 // Long-audio transcription that loses no words and adds no duplicates.
 //
 // Parakeet's bidirectional FastConformer encoder + TDT decoder silently
@@ -5904,11 +5958,7 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         overlap_samples = chunk_samples / 3;
     const int stride = std::max(SR / 2, chunk_samples - overlap_samples);
 
-    struct MWord {
-        std::string text;
-        int64_t t0, t1;
-        float p;
-    };
+    using MWord = parakeet_session_owned_word;
     std::vector<MWord> merged;
     int64_t prev_end_cs = -1;
 
@@ -5917,10 +5967,10 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         const int64_t pos_cs = (int64_t)((double)pos / SR * 100.0);
         parakeet_result* r = parakeet_transcribe_ex(ctx, samples + pos, end - pos, pos_cs);
         if (r) {
+            auto window = parakeet_session_copy_words(r);
             if (merged.empty()) {
-                for (int i = 0; i < r->n_words; ++i)
-                    merged.push_back({r->words[i].text, r->words[i].t0, r->words[i].t1,
-                                      r->words[i].p > 0.0f ? r->words[i].p : 1.0f});
+                for (auto& word : window)
+                    merged.push_back(std::move(word));
             } else {
                 // Splice at the midpoint of the overlap [pos_cs, prev_end_cs]:
                 // drop merged's tail past the midpoint (the new window saw it
@@ -5934,10 +5984,9 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
                 while (!merged.empty() && merged.back().t0 >= mid_cs)
                     merged.pop_back();
                 const int64_t cont_cs = merged.empty() ? mid_cs : merged.back().t1;
-                for (int i = 0; i < r->n_words; ++i) {
-                    if (r->words[i].t1 > cont_cs)
-                        merged.push_back({r->words[i].text, r->words[i].t0, r->words[i].t1,
-                                          r->words[i].p > 0.0f ? r->words[i].p : 1.0f});
+                for (auto& word : window) {
+                    if (word.t1 > cont_cs)
+                        merged.push_back(std::move(word));
                 }
             }
             prev_end_cs = (int64_t)((double)end / SR * 100.0);
@@ -5979,6 +6028,8 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
         sw.t1 = w.t1;
         sw.p = w.p;
         seg.words.push_back(std::move(sw));
+        for (auto& token : w.native_tokens)
+            seg.tokens.push_back(std::move(token));
     }
     seg.text = std::move(text);
     seg.t0 = dedup.front().t0;
@@ -5990,8 +6041,8 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
 // segments, snapped to word boundaries. Mirrors the CLI adapter's
 // split_result_into_segments so the session API (server / language bindings)
 // emits per-segment offsets for an explicit `--chunk-seconds`, instead of one
-// giant segment. session_seg carries words only (no per-token array), so we
-// group words; text is re-joined with single spaces (non-JA path).
+// giant segment. Group by words and retain the corresponding native tokens;
+// text is re-joined with single spaces (non-JA path).
 static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_seconds,
                                             std::vector<crispasr_session_seg>& out) {
     if (!pr)
@@ -6000,7 +6051,15 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
         // No word timings → one segment with whatever text we have.
         crispasr_session_seg seg;
         seg.text = pr->text ? pr->text : "";
-        if (!seg.text.empty())
+        for (int i = 0; i < pr->n_tokens; ++i) {
+            const auto& t = pr->tokens[i];
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+        }
+        if (!seg.tokens.empty()) {
+            seg.t0 = seg.tokens.front().t0;
+            seg.t1 = seg.tokens.back().t1;
+        }
+        if (!seg.text.empty() || !seg.tokens.empty())
             out.push_back(std::move(seg));
         return;
     }
@@ -6009,6 +6068,10 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
     for (int i = 0; i < pr->n_words; ++i)
         word_t0.push_back(pr->words[i].t0);
     const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
+    const auto token_ranges =
+        core_parakeet_words::token_ranges(pr->n_tokens, [&](int i) { return pr->tokens[i].text; });
+    const bool own_tokens = token_ranges.size() == (size_t)pr->n_words;
+    int ti = 0;
     for (size_t si = 0; si < starts.size(); ++si) {
         const int w_begin = starts[si];
         const int w_end = (si + 1 < starts.size()) ? starts[si + 1] : pr->n_words;
@@ -6029,7 +6092,21 @@ static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_s
         seg.text = std::move(text);
         seg.t0 = seg.words.front().t0;
         seg.t1 = seg.words.back().t1;
+        // Match shared CLI ownership: a word's final token can share the
+        // next word's first frame. Index ranges keep it with its own word;
+        // timestamp fallback is only for results without consistent groups.
+        const int64_t next_start = (w_end < pr->n_words) ? pr->words[w_end].t0 : INT64_MAX;
+        const int token_end = own_tokens ? token_ranges[w_end - 1].second : pr->n_tokens;
+        for (; ti < token_end && (own_tokens || pr->tokens[ti].t0 < next_start); ++ti) {
+            const auto& t = pr->tokens[ti];
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
+        }
         out.push_back(std::move(seg));
+    }
+    // Keep even tokens at INT64_MAX, matching the shared splitter's tail.
+    for (; ti < pr->n_tokens && !out.empty(); ++ti) {
+        const auto& t = pr->tokens[ti];
+        out.back().tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
     }
 }
 #endif
@@ -6282,6 +6359,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             }
             _fire_token_callbacks(s, toks);
             seg.words = emit_words_from_tokens(toks);
+            seg.tokens = std::move(toks);
             r->segments.push_back(std::move(seg));
         }
         // Record the acoustic language whisper auto-detected on this pass so
@@ -6355,6 +6433,8 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                     sw.p = w.p > 0.0f ? w.p : 1.0f;
                     seg.words.push_back(std::move(sw));
                 }
+                for (auto& t : ps.tokens)
+                    seg.tokens.push_back({std::move(t.text), t.t0, t.t1, t.p, {}});
                 r->segments.push_back(std::move(seg));
             }
             return r;
@@ -6378,24 +6458,19 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             constexpr int64_t kCoverSlopCs = 30;
 
             const auto slices = crispasr_energy_chunk_slices(audio, n, sr, cap_s, 2.0f);
-            std::vector<crispasr_session_seg::word> words;
-            auto run_window = [&](int w0, int w1, int64_t t0_cs, std::vector<crispasr_session_seg::word>& out) {
+            std::vector<parakeet_session_owned_word> words;
+            auto run_window = [&](int w0, int w1, int64_t t0_cs, std::vector<parakeet_session_owned_word>& out) {
                 parakeet_result* pr = parakeet_transcribe_ex(s->parakeet_ctx, audio + w0, w1 - w0, t0_cs);
                 if (!pr)
                     return;
-                for (int i = 0; i < pr->n_words; ++i) {
-                    crispasr_session_seg::word w;
-                    w.text = pr->words[i].text;
-                    w.t0 = pr->words[i].t0;
-                    w.t1 = pr->words[i].t1;
-                    w.p = pr->words[i].p > 0.0f ? pr->words[i].p : 1.0f;
-                    out.push_back(std::move(w));
-                }
+                auto window = parakeet_session_copy_words(pr);
+                for (auto& word : window)
+                    out.push_back(std::move(word));
                 parakeet_result_free(pr);
             };
             for (size_t si = 0; si < slices.size(); ++si) {
                 const auto& sl = slices[si];
-                std::vector<crispasr_session_seg::word> sw;
+                std::vector<parakeet_session_owned_word> sw;
                 run_window(sl.start, sl.end, sl.t0_cs, sw);
                 // Gap-fill rounds within this slice.
                 for (int round = 0; gap_fill && round < 2; ++round) {
@@ -6431,7 +6506,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                         const int w1 = std::min(n, (int)(win1_cs * sr / 100));
                         if (w1 - w0 < sr / 4)
                             continue;
-                        std::vector<crispasr_session_seg::word> fw;
+                        std::vector<parakeet_session_owned_word> fw;
                         run_window(w0, w1, win0_cs, fw);
                         for (auto& w : fw) {
                             const int64_t mid = (w.t0 + w.t1) / 2;
@@ -6489,7 +6564,12 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 seg.t0 = words.front().t0;
                 seg.t1 = words.back().t1;
             }
-            seg.words = std::move(words);
+            seg.words.reserve(words.size());
+            for (auto& word : words) {
+                for (auto& token : word.native_tokens)
+                    seg.tokens.push_back(std::move(token));
+                seg.words.push_back(std::move(word));
+            }
             return seg;
         };
 
@@ -6651,6 +6731,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 w.p = pr->words[i].p > 0.0f ? pr->words[i].p : 1.0f;
                 seg.words.push_back(std::move(w));
             }
+        }
+        for (int i = 0; i < pr->n_tokens; ++i) {
+            const auto& t = pr->tokens[i];
+            seg.tokens.push_back({t.text, t.t0, t.t1, t.p, {}});
         }
         r->segments.push_back(std::move(seg));
         parakeet_result_free(pr);
@@ -6815,6 +6899,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         canary_result_free(cr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -6857,7 +6942,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         filter_words_by_ngram_collapse(seg.words);
+        filter_tokens_by_ngram_collapse(seg.tokens);
         canary_qwen_result_free(cqr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -7208,7 +7295,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         filter_words_by_ngram_collapse(seg.words);
+        filter_tokens_by_ngram_collapse(seg.tokens);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -7243,7 +7332,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         filter_words_by_ngram_collapse(seg.words);
+        filter_tokens_by_ngram_collapse(seg.tokens);
         cohere_result_free(cr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -7463,7 +7554,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         filter_words_by_ngram_collapse(seg.words);
+        filter_tokens_by_ngram_collapse(seg.tokens);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -7583,6 +7676,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -7704,6 +7798,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 for (int idx : tok_of[u])
                     seg_toks.push_back(toks[(size_t)idx]);
                 seg.words = emit_words_from_tokens(seg_toks);
+                seg.tokens = std::move(seg_toks);
                 r->segments.push_back(std::move(seg));
             }
         }
@@ -7713,6 +7808,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             seg.t0 = 0;
             seg.t1 = dur_cs;
             seg.words = emit_words_from_tokens(toks);
+            seg.tokens = std::move(toks);
             r->segments.push_back(std::move(seg));
         }
         vibevoice_result_free(vr);
@@ -7763,6 +7859,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         canary_ctc_decode_result_free(dr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -7798,6 +7895,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         r->segments.push_back(std::move(seg));
         return r;
     };
@@ -7859,7 +7957,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
+        seg.tokens = std::move(toks);
         filter_words_by_ngram_collapse(seg.words);
+        filter_tokens_by_ngram_collapse(seg.tokens);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -8318,6 +8418,22 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             // Language hint not auto-injected — model auto-detects language.
             // Only inject when explicitly set by the caller (not LID-resolved).
             text = moss_diarize_transcribe(s->moss_diarize_ctx, pcm, n_samples);
+            if (text) {
+                const auto native = moss_diarize_parse_output(text);
+                if (!native.empty()) {
+                    for (const auto& ms : native) {
+                        crispasr_session_seg seg;
+                        seg.text = ms.text;
+                        seg.t0 = ms.t0_cs;
+                        seg.t1 = ms.t1_cs;
+                        if (ms.speaker_id > 0)
+                            seg.speaker = "(Speaker " + std::to_string(ms.speaker_id) + ") ";
+                        r->segments.push_back(std::move(seg));
+                    }
+                    free(text);
+                    return r;
+                }
+            }
             need_free = true;
         }
 #endif
@@ -8425,8 +8541,16 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr
         seg.t0 = crispasr_vad_remap_timestamp(stitched.mapping, seg.t0);
         seg.t1 = crispasr_vad_remap_timestamp(stitched.mapping, seg.t1);
         for (auto& w : seg.words) {
-            w.t0 = crispasr_vad_remap_timestamp(stitched.mapping, w.t0);
-            w.t1 = crispasr_vad_remap_timestamp(stitched.mapping, w.t1);
+            if (w.t0 >= 0)
+                w.t0 = crispasr_vad_remap_timestamp(stitched.mapping, w.t0);
+            if (w.t1 >= 0)
+                w.t1 = crispasr_vad_remap_timestamp(stitched.mapping, w.t1);
+        }
+        for (auto& t : seg.tokens) {
+            if (t.t0 >= 0)
+                t.t0 = crispasr_vad_remap_timestamp(stitched.mapping, t.t0);
+            if (t.t1 >= 0)
+                t.t1 = crispasr_vad_remap_timestamp(stitched.mapping, t.t1);
         }
     }
     // Timestamps are now on the real timeline, so the deferred merge can run
@@ -9121,6 +9245,41 @@ CA_EXPORT float crispasr_session_result_word_p(crispasr_session_result* r, int i
         return -1.0f;
     auto& ws = r->segments[i_seg].words;
     return (i_word >= 0 && i_word < (int)ws.size()) ? ws[i_word].p : -1.0f;
+}
+
+// Additive ABI: result storage stays opaque; token bytes belong to the result.
+CA_EXPORT int crispasr_session_result_n_tokens(crispasr_session_result* r, int i_seg) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return 0;
+    return (int)r->segments[i_seg].tokens.size();
+}
+CA_EXPORT const char* crispasr_session_result_token_text(crispasr_session_result* r, int i_seg, int i_token) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return "";
+    const auto& ts = r->segments[i_seg].tokens;
+    return (i_token >= 0 && i_token < (int)ts.size()) ? ts[i_token].text.c_str() : "";
+}
+CA_EXPORT int64_t crispasr_session_result_token_t0(crispasr_session_result* r, int i_seg, int i_token) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return -1;
+    const auto& ts = r->segments[i_seg].tokens;
+    return (i_token >= 0 && i_token < (int)ts.size()) ? ts[i_token].t0 : -1;
+}
+CA_EXPORT int64_t crispasr_session_result_token_t1(crispasr_session_result* r, int i_seg, int i_token) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return -1;
+    const auto& ts = r->segments[i_seg].tokens;
+    return (i_token >= 0 && i_token < (int)ts.size()) ? ts[i_token].t1 : -1;
+}
+CA_EXPORT float crispasr_session_result_token_p(crispasr_session_result* r, int i_seg, int i_token) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return -1.0f;
+    const auto& ts = r->segments[i_seg].tokens;
+    return (i_token >= 0 && i_token < (int)ts.size()) ? ts[i_token].p : -1.0f;
+}
+
+CA_EXPORT void crispasr_free_aligner_cache(void) {
+    crispasr_aligner_free_cache();
 }
 
 // Whisper's per-segment no-speech probability (the <|nospeech|> token
@@ -11781,6 +11940,26 @@ CA_EXPORT int crispasr_session_convert_sample_rate(crispasr_session* s) {
     return 0;
 }
 
+CA_EXPORT int crispasr_session_convert_inter_channels(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_inter_channels(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
+CA_EXPORT int crispasr_session_convert_upsample_product(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_upsample_product(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Chord recognition session API
 //
@@ -12846,12 +13025,21 @@ CA_EXPORT int crispasr_transcribe_parallel(struct whisper_context* ctx, struct w
     return rc;
 }
 
+CA_EXPORT int crispasr_transcribe_parallel_by_ref(struct whisper_context* ctx, const struct whisper_full_params* params,
+                                                  const float* samples, int n_samples, int n_processors) {
+    if (!ctx || !params || !samples || n_samples <= 0 || n_processors <= 0)
+        return -1;
+    return crispasr_transcribe_parallel(ctx, *params, samples, n_samples, n_processors);
+}
+
 // =========================================================================
 // Version reporting — identifies the C-ABI build to every consumer
 // (CLI, Dart, Python, Rust). Bump when breaking or extending the surface.
 // =========================================================================
 
 CA_EXPORT const char* crispasr_c_api_version(void) {
+    // 0.7.1 — Pointer-safe progress-tracking parallel Whisper transcription.
+    // Existing struct-by-value callers remain supported.
     // 0.7.0 — Adds exact canonical default-bundle enumeration for the
     // model registry (primary, companion, extras, and licence gate).
     // Pure addition; no symbol renames or signature changes.
@@ -12870,7 +13058,7 @@ CA_EXPORT const char* crispasr_c_api_version(void) {
     // `crispasr_detect_language_pcm` return-code contract.
     // 0.5.1 — Adds `crispasr_session_translate_text_free`.
     // Pure addition; no symbol renames or signature changes.
-    return "0.7.0";
+    return "0.7.1";
 }
 
 // Backwards-compatibility alias. The Dart smoke test and any 0.4.x-era

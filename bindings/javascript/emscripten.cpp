@@ -8,6 +8,7 @@
 //
 
 #include "crispasr.h"
+#include "crispasr_session.h"
 
 #include <emscripten.h>
 #include <emscripten/bind.h>
@@ -36,291 +37,11 @@ static std::atomic<bool> g_compute_thread_set{false};
 
 // The unified Session C-ABI is declared in crispasr.h (included above)
 // as `struct crispasr_session`. Legacy name alias for the Embind wrappers:
-extern "C" {
 typedef struct crispasr_session CrispasrSession;
-CrispasrSession* crispasr_session_open(const char* model_path, int n_threads);
-void crispasr_session_close(CrispasrSession* s);
-int crispasr_session_set_codec_path(CrispasrSession* s, const char* path);
-int crispasr_session_set_voice(CrispasrSession* s, const char* path, const char* ref_text_or_null);
-int crispasr_session_set_speaker_name(CrispasrSession* s, const char* name);
-int crispasr_session_n_speakers(CrispasrSession* s);
-const char* crispasr_session_get_speaker_name(CrispasrSession* s, int i);
-int crispasr_session_set_instruct(CrispasrSession* s, const char* instruct);
-// #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2).
-int crispasr_session_set_tts_phonemes(struct crispasr_session* s, const char* phonemes);
-void crispasr_session_set_tts_pad_silence_ms(struct crispasr_session* s, int ms);
-int crispasr_session_is_custom_voice(CrispasrSession* s);
-int crispasr_session_is_voice_design(CrispasrSession* s);
-float* crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
-// #321 parity: UNMARKED synthesis (hard-refused unless accept_marking_responsibility was called first),
-// the marking attestation gate, speech-to-speech, the input-rate probe, and two setters.
-float* crispasr_session_synthesize_raw(CrispasrSession* s, const char* text, int* out_n_samples);
-int crispasr_session_accept_marking_responsibility(CrispasrSession* s, const char* attestation);
-// Whose voice a PRESET voice is (EU AI Act Art. 50(4)); -2 on a bad value.
-int crispasr_session_set_speaker_identity(CrispasrSession* s, const char* identity);
-float* crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples, char** out_text,
-                                         int* out_n_samples);
-int crispasr_session_input_sample_rate(CrispasrSession* s);
-// #332: output-side counterparts (rate of synthesize/s2s PCM; mono channels).
-int crispasr_session_output_sample_rate(CrispasrSession* s);
-int crispasr_session_input_channels(CrispasrSession* s);
-int crispasr_session_output_channels(CrispasrSession* s);
-int crispasr_session_set_g2p_dict(CrispasrSession* s, const char* source);
-int crispasr_session_set_speaker_id(CrispasrSession* s, int id);
-void crispasr_pcm_free(float* pcm);
-unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t len, const char* format, const char* cert_path,
-                                  const char* key_path, size_t* out_len);
-void crispasr_c2pa_free(unsigned char* p);
-unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, int sample_rate, size_t* out_len);
-int crispasr_session_kokoro_clear_phoneme_cache(CrispasrSession* s);
-int crispasr_kokoro_resolve_model_for_lang_abi(const char* model_path, const char* lang, char* out_path,
-                                               int out_path_len);
-int crispasr_kokoro_resolve_fallback_voice_abi(const char* model_path, const char* lang, char* out_path,
-                                               int out_path_len, char* out_picked, int out_picked_len);
 
-// --- Full C-ABI parity declarations ---
-// Session extras
-int crispasr_session_available_backends(char* out_csv, int out_cap);
-int crispasr_session_detected_language(CrispasrSession* s, char* out_buf, int out_cap);
-// CTC vocabulary access (Omni CTC backend): n_vocab piece count, token_text
-// maps an id to its model-owned raw piece (do not free) or "" when out of
-// range / unsupported.
-int crispasr_session_n_vocab(CrispasrSession* s);
-const char* crispasr_session_token_text(CrispasrSession* s, int id);
-// Pitch (F0) estimation — CREPE. `pitch` runs the track and returns the
-// frame count; `pitch_frames` hands back a session-owned flat array of
-// 3 floats per frame {time_ms, f0_hz, voiced_prob}, frame-major.
-// Referencing these here is also what keeps the `crepe` objects from
-// being dead-stripped out of the wasm module at link time.
-int crispasr_session_pitch(CrispasrSession* s, const float* pcm_16k, int n_samples, float hop_ms);
-const float* crispasr_session_pitch_frames(CrispasrSession* s, int* out_n_frames);
-int crispasr_session_pitch_sample_rate(CrispasrSession* s);
-int crispasr_session_piano(CrispasrSession* s, const float* pcm_16k, int n_samples);
-const float* crispasr_session_piano_notes(CrispasrSession* s, int* out_n_notes);
-const int* crispasr_session_piano_note_programs(CrispasrSession* s, int* out_n_notes);
-int crispasr_session_piano_sample_rate(CrispasrSession* s);
 
-// Chord recognition — BTC. `chords` runs the timeline and returns the span
-// count; `chords_spans` hands back a session-owned flat array of 4 floats per
-// span ({startMs, endMs, label, confidence}). The label is an index; resolve
-// it with chords_span_name, since the names are strings.
-int crispasr_session_chords(CrispasrSession* s, const float* pcm, int n_samples, int sample_rate);
-const float* crispasr_session_chords_spans(CrispasrSession* s, int* out_n_spans);
-const char* crispasr_session_chords_span_name(CrispasrSession* s, int idx);
-int crispasr_session_chords_vocab_size(CrispasrSession* s);
-CrispasrSession* crispasr_session_open_explicit(const char* model_path, const char* backend_name, int n_threads);
-CrispasrSession* crispasr_session_open_with_params(const char* model_path, const char* backend_name,
-                                                   const void* params);
-const char* crispasr_session_backend(CrispasrSession* s);
-int crispasr_session_set_source_language(CrispasrSession* s, const char* lang);
-int crispasr_session_set_target_language(CrispasrSession* s, const char* lang);
-int crispasr_session_set_tts_reference_language(CrispasrSession* s, const char* lang);
-int crispasr_session_set_punctuation(CrispasrSession* s, int enable);
-int crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
-int crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
-int crispasr_session_set_sensitivity(CrispasrSession* s, const char* preset);
-int crispasr_session_set_translate(CrispasrSession* s, int enable);
-int crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
-int crispasr_session_set_tts_seed(CrispasrSession* s, unsigned long long seed);
-int crispasr_session_set_tts_steps(CrispasrSession* s, int steps);
-int crispasr_session_set_tts_num_candidates(CrispasrSession* s, int n);
-int crispasr_session_set_max_new_tokens(CrispasrSession* s, int n);
-int crispasr_session_set_frequency_penalty(CrispasrSession* s, float penalty);
-int crispasr_session_set_top_p(CrispasrSession* s, float top_p);
-int crispasr_session_set_top_k(CrispasrSession* s, int top_k);
-int crispasr_session_set_do_sample(CrispasrSession* s, int enable);
-int crispasr_session_set_min_p(CrispasrSession* s, float min_p);
-int crispasr_session_set_repetition_penalty(CrispasrSession* s, float r);
-int crispasr_session_set_cfg_weight(CrispasrSession* s, float cfg_weight);
-int crispasr_session_set_tts_noise_temp(CrispasrSession* s, float noise_temp);
-int crispasr_session_set_exaggeration(CrispasrSession* s, float exaggeration);
-int crispasr_session_set_max_speech_tokens(CrispasrSession* s, int n);
-int crispasr_session_set_min_speech_tokens(CrispasrSession* s, int n);
-int crispasr_session_set_length_scale(CrispasrSession* s, float scale);
-int crispasr_session_set_best_of(CrispasrSession* s, int n);
-int crispasr_session_set_beam_size(CrispasrSession* s, int n);
-int crispasr_session_set_return_logits(CrispasrSession* s, int enable);
-int crispasr_session_set_grammar_text(CrispasrSession* s, const char* gbnf_text, const char* root_rule, float penalty);
-int crispasr_session_set_fallback_thresholds(CrispasrSession* s, float entropy_thold, float logprob_thold,
-                                             float no_speech_thold, float temperature_inc);
-int crispasr_session_set_alt_n(CrispasrSession* s, int n);
-int crispasr_session_set_whisper_decode_extras(CrispasrSession* s, int suppress_nst, const char* suppress_regex,
-                                               int carry_initial_prompt);
-int crispasr_session_set_ask(CrispasrSession* s, const char* prompt);
-int crispasr_session_detect_language(CrispasrSession* s, const float* pcm, int n_samples, const char* lid_model_path,
-                                     int method, char* out_lang, int out_lang_cap, float* out_prob);
-
-// Session ASR transcription
-struct crispasr_session_result;
-struct crispasr_session_result* crispasr_session_transcribe(CrispasrSession* s, const float* pcm, int n_samples);
-struct crispasr_session_result* crispasr_session_transcribe_lang(CrispasrSession* s, const float* pcm, int n_samples,
-                                                                 const char* language);
-struct crispasr_session_result* crispasr_session_transcribe_chunked_lang(CrispasrSession* s, const float* pcm,
-                                                                         int n_samples, int chunk_seconds,
-                                                                         int overlap_seconds, const char* language);
-int crispasr_get_progress(void);
-struct crispasr_session_result* crispasr_session_transcribe_vad(CrispasrSession* s, const float* pcm, int n_samples,
-                                                                int sample_rate, const char* vad_model_path,
-                                                                void* opts);
-struct crispasr_session_result* crispasr_session_transcribe_vad_lang(CrispasrSession* s, const float* pcm,
-                                                                     int n_samples, int sample_rate,
-                                                                     const char* vad_model_path, void* opts,
-                                                                     const char* language);
-int crispasr_session_result_n_segments(struct crispasr_session_result* r);
-const char* crispasr_session_result_segment_text(struct crispasr_session_result* r, int i);
-long long crispasr_session_result_segment_t0(struct crispasr_session_result* r, int i);
-long long crispasr_session_result_segment_t1(struct crispasr_session_result* r, int i);
-int crispasr_session_result_n_words(struct crispasr_session_result* r, int i_seg);
-const char* crispasr_session_result_word_text(struct crispasr_session_result* r, int i_seg, int i_word);
-long long crispasr_session_result_word_t0(struct crispasr_session_result* r, int i_seg, int i_word);
-long long crispasr_session_result_word_t1(struct crispasr_session_result* r, int i_seg, int i_word);
-float crispasr_session_result_word_p(struct crispasr_session_result* r, int i_seg, int i_word);
-float crispasr_session_result_segment_no_speech_prob(struct crispasr_session_result* r, int i_seg);
-// #300: native per-segment speaker label ("(Speaker N) "), "" when the backend
-// does not diarize natively. Never NULL.
-const char* crispasr_session_result_segment_speaker(struct crispasr_session_result* r, int i);
-int crispasr_session_result_word_n_alts(struct crispasr_session_result* r, int i_seg, int i_word);
-const char* crispasr_session_result_word_alt_text(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
-float crispasr_session_result_word_alt_p(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
-int crispasr_session_result_n_logit_frames(struct crispasr_session_result* r);
-int crispasr_session_result_n_logit_vocab(struct crispasr_session_result* r);
-const float* crispasr_session_result_logits(struct crispasr_session_result* r);
-void crispasr_session_result_free(struct crispasr_session_result* r);
-char* crispasr_session_translate_text(CrispasrSession* s, const char* text, const char* src_lang, const char* tgt_lang,
-                                      int max_tokens);
-void crispasr_session_translate_text_free(char* text);
-
-// Streaming
-int crispasr_session_stream_kind(CrispasrSession* s);
-struct CrispasrStream;
-struct CrispasrStream* crispasr_session_stream_open(CrispasrSession* s, int n_threads, int step_ms, int length_ms,
-                                                    int keep_ms, const char* language, int translate);
-struct CrispasrStream* crispasr_stream_open(void* ctx, int n_threads, int step_ms, int length_ms, int keep_ms,
-                                            const char* language, int translate);
-int crispasr_stream_feed(struct CrispasrStream* s, const float* pcm, int n_samples);
-int crispasr_stream_get_text(struct CrispasrStream* s, char* out_text, int out_cap, double* out_t0_s, double* out_t1_s,
-                             long long* out_counter);
-int crispasr_stream_flush(struct CrispasrStream* s);
-void crispasr_stream_close(struct CrispasrStream* s);
-void crispasr_stream_set_live_decode(struct CrispasrStream* s, int enabled);
-
-// Punctuation
-void* crispasr_punc_init(const char* model_path);
-const char* crispasr_punc_process(void* ctx, const char* text);
-void crispasr_punc_free_text(const char* text);
-void crispasr_punc_free(void* ctx);
-
-// Alignment
-struct crispasr_align_result;
-struct crispasr_align_result* crispasr_align_words_abi(const char* aligner_model, const char* transcript,
-                                                       const float* samples, int n_samples, long long t_offset_cs,
-                                                       int n_threads);
-int crispasr_align_result_n_words(struct crispasr_align_result* r);
-const char* crispasr_align_result_word_text(struct crispasr_align_result* r, int i);
-long long crispasr_align_result_word_t0(struct crispasr_align_result* r, int i);
-long long crispasr_align_result_word_t1(struct crispasr_align_result* r, int i);
-void crispasr_align_result_free(struct crispasr_align_result* r);
-
-// VAD — declared in crispasr.h
-
-// LCS dedup
-int crispasr_lcs_dedup_prefix_count(const int* prev_tail_tokens, int n_prev, const int* curr_tokens, int n_curr,
-                                    int min_lcs_length);
-
-// params_set_* — declared in crispasr.h (use whisper_full_params*, not void*)
-
-// Token-level accessors
-long long crispasr_token_t0(void* ctx, int i_seg, int i_tok);
-long long crispasr_token_t1(void* ctx, int i_seg, int i_tok);
-float crispasr_token_p(void* ctx, int i_seg, int i_tok);
-int crispasr_token_n_alts(void* ctx, int i_seg, int i_tok);
-int crispasr_token_alt_id(void* ctx, int i_seg, int i_tok, int i_alt);
-float crispasr_token_alt_p(void* ctx, int i_seg, int i_tok, int i_alt);
-int crispasr_token_alt_text(void* ctx, int i_seg, int i_tok, int i_alt, char* out, int out_cap);
-
-// Language detection
-float crispasr_detect_language(void* ctx, const float* pcm, int n_samples, int n_threads, char* out_code, int out_cap);
-int crispasr_detect_language_pcm(const float* samples, int n_samples, int method, const char* model_path, int n_threads,
-                                 int use_gpu, int gpu_device, int flash_attn, char* out_lang, int out_lang_cap,
-                                 float* out_confidence);
-
-// Direct Parakeet API
-void* crispasr_parakeet_init(const char* model_path, int n_threads, int use_flash);
-void crispasr_parakeet_free(void* ctx);
-void* crispasr_parakeet_transcribe(void* ctx, const float* pcm, int n_samples, const char* language);
-const char* crispasr_parakeet_result_text(void* r);
-int crispasr_parakeet_result_n_words(void* r);
-const char* crispasr_parakeet_result_word_text(void* r, int i);
-long long crispasr_parakeet_result_word_t0(void* r, int i);
-long long crispasr_parakeet_result_word_t1(void* r, int i);
-int crispasr_parakeet_result_n_tokens(void* r);
-const char* crispasr_parakeet_result_token_text(void* r, int i);
-long long crispasr_parakeet_result_token_t0(void* r, int i);
-long long crispasr_parakeet_result_token_t1(void* r, int i);
-float crispasr_parakeet_result_token_p(void* r, int i);
-void crispasr_parakeet_result_free(void* r);
-
-// Backend detection
-int crispasr_detect_backend_from_gguf(const char* path, char* out_name, int out_cap);
-
-// RNNoise audio enhancement
-int crispasr_enhance_audio_rnnoise(const float* in_pcm, int n_samples, float* out_pcm, int out_cap);
-
-// Text-LID
-int crispasr_text_detect_language(const char* text, const char* model_path, int n_threads, char* out_label,
-                                  int out_label_cap, float* out_confidence);
-
-// TitaNet
-void* crispasr_titanet_init(const char* model_path, int n_threads);
-void crispasr_titanet_free(void* ctx);
-int crispasr_titanet_embed(void* ctx, const float* pcm_16k, int n_samples, float* out);
-float crispasr_titanet_cosine_sim(const float* a, const float* b, int dim);
-
-// Speaker database (closed-roster, consent-gated — issue #266)
-void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv, int consent_attested);
-void crispasr_speaker_db_free(void* db);
-int crispasr_speaker_db_count(const void* db);
-float crispasr_speaker_db_match(const void* db, const float* embedding, int dim, float threshold, char* out_name,
-                                int out_cap);
-int crispasr_speaker_db_enroll2(const char* dir_path, const char* name, const float* embedding, int dim,
-                                int consent_attested);
-
-// Pluggable speaker embedder + clustering + pyannote cache
-void* crispasr_speaker_embedder_make_abi(const char* model_spec, int n_threads, const char* cache_dir);
-void crispasr_speaker_embedder_free_abi(void* embedder);
-int crispasr_speaker_embedder_dim_abi(const void* embedder);
-int crispasr_speaker_embedder_embed_abi(void* embedder, const float* pcm_16k, int n_samples, float* out);
-const char* crispasr_speaker_embedder_name_abi(const void* embedder);
-int crispasr_speaker_cluster_abi(const float* embeddings, int n, int dim, float merge_threshold, int max_speakers,
-                                 int* labels_out);
-void* crispasr_pyannote_cache_compute_abi(const float* full_audio, int n_samples, const char* model_path,
-                                          int n_threads);
-void crispasr_pyannote_cache_free_abi(void* cache);
-int crispasr_pyannote_cache_apply_abi(const void* cache, long long slice_t0_cs, void* segs, int n_segs);
-
-// Kokoro lang helpers
-int crispasr_kokoro_lang_is_german_abi(const char* lang);
-int crispasr_kokoro_lang_has_native_voice_abi(const char* lang);
-
-// Registry + cache
-int crispasr_registry_lookup_abi(const char* backend, char* out_filename, int filename_cap, char* out_url, int url_cap,
-                                 char* out_size, int size_cap);
-int crispasr_registry_lookup_by_filename_abi(const char* filename, char* out_filename, int filename_cap, char* out_url,
-                                             int url_cap, char* out_size, int size_cap);
-int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
-int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int backend_cap,
-                                              char* out_license, int license_cap, int* out_requires_acceptance);
-int crispasr_registry_default_bundle_artifact_abi(const char* backend, int index, int* out_kind, char* out_filename,
-                                                  int filename_cap, char* out_url, int url_cap, char* out_size,
-                                                  int size_cap);
-int crispasr_cache_ensure_file_abi(const char* filename, const char* url, int quiet, const char* cache_dir_override,
-                                   char* out_buf, int out_cap);
-int crispasr_cache_dir_abi(const char* cache_dir_override, char* out_buf, int out_cap);
-
-// Diarization
-int crispasr_diarize_segments_abi(const float* left_pcm, const float* right_pcm, int n_samples, int is_stereo,
-                                  void* segs, int n_segs, const void* opts);
-}
+#include "session_results.h"
+#include "session_transcription.h"
 
 static CrispasrSession* g_tts_session = nullptr;
 // Backend-agnostic ASR session (parakeet/canary/whisper/…) for the asr* surface
@@ -328,6 +49,16 @@ static CrispasrSession* g_tts_session = nullptr;
 static CrispasrSession* g_asr_session = nullptr;
 
 struct whisper_context* g_context;
+#include "session_lifetime.h"
+#include "session_tasks.h"
+#include "session_utilities.h"
+#include "session_chat.h"
+#include "session_analysis.h"
+#include "session_speaker.h"
+#include "session_options.h"
+#include "session_registry.h"
+#include "session_diarization.h"
+#include "session_vad.h"
 
 #ifdef __EMSCRIPTEN_PTHREADS__
 // Present only in threaded builds. Under -sPROXY_TO_PTHREAD this runs on pthread-0
@@ -343,53 +74,37 @@ int main() {
 }
 #endif
 
-#ifdef __EMSCRIPTEN_PTHREADS__
-// JS values stay on their creating servicer thread. Only native inputs/results
-// cross the compute queue, leaving the servicer available for pthread startup.
-template <typename T>
-static void browser_dispatch(std::function<T()> work, std::function<emscripten::val(T&)> encode,
-                             emscripten::val callback) {
-    if (!g_compute_thread_set.load() || g_compute_thread == pthread_self()) {
-        emscripten::val error = emscripten::val::object();
-        error.set("error", std::string("Proxied compute thread is not ready"));
-        callback(error);
-        return;
-    }
-    auto* cb = new emscripten::val(callback);
-    const pthread_t servicer = pthread_self();
-    if (!g_proxy_queue.proxyAsync(g_compute_thread, [work, encode, cb, servicer]() {
-            auto* result = new T(work());
-            g_proxy_queue.proxyAsync(servicer, [result, encode, cb]() {
-                emscripten::val output = encode(*result);
-                delete result;
-                (*cb)(output);
-                delete cb;
-            });
-        })) {
-        emscripten::val error = emscripten::val::object();
-        error.set("error", std::string("Could not dispatch browser compute"));
-        (*cb)(error);
-        delete cb;
-    }
-}
-struct browser_asr_segment {
-    double t0, t1;
-    std::string text;
-};
-#endif
+#include "session_dispatch.h"
+#include "session_async_options.h"
+#include "session_async_audio.h"
+#include "session_streams.h"
 
 EMSCRIPTEN_BINDINGS(whisper) {
+    binding_register_session_tasks();
+    binding_register_utilities();
+    binding_register_chat();
+    binding_register_analysis();
+    binding_register_speaker();
+    binding_register_open_options();
+    binding_register_async_options();
+    binding_register_async_audio();
+    binding_register_registry();
+    binding_register_diarization();
+    binding_register_vad();
+    binding_register_streams();
+    binding_register_asr_callbacks();
 #ifdef __EMSCRIPTEN_PTHREADS__
     emscripten::function("browserComputeReady", emscripten::optional_override([]() {
+                             binding_check_callback();
                              return g_compute_thread_set.load() && g_compute_thread != pthread_self();
                          }));
     emscripten::function(
         "asrOpenAsync", emscripten::optional_override([](const std::string& path, const std::string& backend,
                                                          int threads, emscripten::val cb) {
+            binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    if (g_asr_session)
-                        crispasr_session_close(g_asr_session);
+                    binding_native_close_session(g_asr_session);
                     g_asr_session = backend.empty()
                                         ? crispasr_session_open(path.c_str(), threads)
                                         : crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
@@ -400,10 +115,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "ttsOpenExplicitAsync", emscripten::optional_override([](const std::string& path, const std::string& backend,
                                                                  int threads, emscripten::val cb) {
+            binding_check_reentry();
             browser_dispatch<bool>(
                 [path, backend, threads]() {
-                    if (g_tts_session)
-                        crispasr_session_close(g_tts_session);
+                    binding_native_close_session(g_tts_session);
                     g_tts_session = crispasr_session_open_explicit(path.c_str(), backend.c_str(), threads);
                     return g_tts_session != nullptr;
                 },
@@ -412,45 +127,26 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "asrTranscribeAsync",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang, emscripten::val cb) {
-            const int n = audio["length"].as<int>();
-            auto pcm = std::make_shared<std::vector<float>>(n);
-            emscripten::val heap = emscripten::val::module_property("HEAPU8");
-            emscripten::val view = emscripten::val::global("Float32Array")
-                                       .new_(heap["buffer"], reinterpret_cast<uintptr_t>(pcm->data()), n);
-            view.call<void>("set", audio);
-            browser_dispatch<std::vector<browser_asr_segment>>(
+            binding_check_reentry();
+            auto pcm = std::make_shared<std::vector<float>>(binding_pcm(audio));
+            browser_dispatch<std::vector<binding_segment>>(
                 [pcm, lang]() {
-                    std::vector<browser_asr_segment> segments;
+                    binding_require_no_stream(g_asr_session);
+                    std::vector<binding_segment> segments;
                     crispasr_session_result* result =
                         g_asr_session ? crispasr_session_transcribe_lang(g_asr_session, pcm->data(), (int)pcm->size(),
                                                                          lang.empty() ? nullptr : lang.c_str())
                                       : nullptr;
                     if (result) {
-                        for (int i = 0; i < crispasr_session_result_n_segments(result); ++i) {
-                            const char* text = crispasr_session_result_segment_text(result, i);
-                            segments.push_back({(double)crispasr_session_result_segment_t0(result, i),
-                                                (double)crispasr_session_result_segment_t1(result, i),
-                                                text ? text : ""});
-                        }
-                        crispasr_session_result_free(result);
+                        segments = binding_take_segments(result);
                     }
                     return segments;
                 },
-                [](std::vector<browser_asr_segment>& segments) {
-                    emscripten::val out = emscripten::val::array();
-                    for (const auto& segment : segments) {
-                        emscripten::val value = emscripten::val::object();
-                        value.set("t0", segment.t0);
-                        value.set("t1", segment.t1);
-                        value.set("text", segment.text);
-                        out.call<void>("push", value);
-                    }
-                    return out;
-                },
-                cb);
+                [](std::vector<binding_segment>& segments) { return binding_encode_segments(segments, 1.0); }, cb);
         }));
 #endif
     emscripten::function("init", emscripten::optional_override([](const std::string& path_model) {
+                             binding_check_reentry();
                              if (g_context == nullptr) {
                                  g_context = whisper_init_from_file_with_params(path_model.c_str(),
                                                                                 whisper_context_default_params());
@@ -465,6 +161,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                          }));
 
     emscripten::function("free", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              if (g_context) {
                                  whisper_free(g_context);
                                  g_context = nullptr;
@@ -474,6 +171,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "full_default",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang, bool translate) {
+            binding_check_reentry();
             if (g_context == nullptr) {
                 return -1;
             }
@@ -536,10 +234,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "asrOpen",
         emscripten::optional_override([](const std::string& model_path, const std::string& backend, int n_threads) {
-            if (g_asr_session) {
-                crispasr_session_close(g_asr_session);
-                g_asr_session = nullptr;
-            }
+            binding_check_reentry();
+            binding_native_close_session(g_asr_session);
             g_asr_session = backend.empty()
                                 ? crispasr_session_open(model_path.c_str(), n_threads)
                                 : crispasr_session_open_explicit(model_path.c_str(), backend.c_str(), n_threads);
@@ -547,34 +243,39 @@ EMSCRIPTEN_BINDINGS(whisper) {
         }));
 
     emscripten::function("asrClose", emscripten::optional_override([]() {
-                             if (g_asr_session) {
-                                 crispasr_session_close(g_asr_session);
-                                 g_asr_session = nullptr;
-                             }
+                             binding_check_reentry();
+                             binding_native_close_session(g_asr_session);
                          }));
 
     emscripten::function("asrSetSourceLanguage", emscripten::optional_override([](const std::string& lang) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_source_language(g_asr_session, lang.c_str())
                                                   : -1;
                          }));
     emscripten::function("asrSetTargetLanguage", emscripten::optional_override([](const std::string& lang) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_target_language(g_asr_session, lang.c_str())
                                                   : -1;
                          }));
     emscripten::function("asrSetTranslate", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_translate(g_asr_session, enable ? 1 : 0) : -1;
                          }));
     emscripten::function("asrSetPunctuation", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_punctuation(g_asr_session, enable ? 1 : 0)
                                                   : -1;
                          }));
     emscripten::function("asrSetPuncModel", emscripten::optional_override([](const std::string& m) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_punc_model(g_asr_session, m.c_str()) : -1;
                          }));
     emscripten::function("asrSetBeamSize", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_beam_size(g_asr_session, n) : -1;
                          }));
     emscripten::function("asrSetHotwords", emscripten::optional_override([](const std::string& w, double boost) {
+                             binding_check_reentry();
                              return g_asr_session
                                         ? crispasr_session_set_hotwords(g_asr_session, w.c_str(), (float)boost)
                                         : -1;
@@ -584,13 +285,16 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // preset (JS callers should treat that as an error, not a no-op) and -1
     // when no session is open.
     emscripten::function("asrSetSensitivity", emscripten::optional_override([](const std::string& preset) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_sensitivity(g_asr_session, preset.c_str())
                                                   : -1;
                          }));
     emscripten::function("asrSetAsk", emscripten::optional_override([](const std::string& prompt) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_ask(g_asr_session, prompt.c_str()) : -1;
                          }));
     emscripten::function("asrSetTemperature", emscripten::optional_override([](double temp, double seed) {
+                             binding_check_reentry();
                              return g_asr_session ? crispasr_session_set_temperature(g_asr_session, (float)temp,
                                                                                      (unsigned long long)seed)
                                                   : -1;
@@ -601,6 +305,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "asrTranscribe",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang) -> emscripten::val {
+            binding_check_reentry();
             emscripten::val out = emscripten::val::array();
             if (!g_asr_session)
                 return out;
@@ -611,20 +316,13 @@ EMSCRIPTEN_BINDINGS(whisper) {
             emscripten::val view = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcmf32.data()), n);
             view.call<void>("set", audio);
 
+            binding_check_reentry();
+            binding_require_no_stream(g_asr_session);
             crispasr_session_result* r = crispasr_session_transcribe_lang(g_asr_session, pcmf32.data(), n,
                                                                           lang.empty() ? nullptr : lang.c_str());
             if (!r)
                 return out;
-            const int ns = crispasr_session_result_n_segments(r);
-            for (int i = 0; i < ns; i++) {
-                emscripten::val seg = emscripten::val::object();
-                seg.set("t0", (double)crispasr_session_result_segment_t0(r, i));
-                seg.set("t1", (double)crispasr_session_result_segment_t1(r, i));
-                const char* text = crispasr_session_result_segment_text(r, i);
-                seg.set("text", std::string(text ? text : ""));
-                out.call<void>("push", seg);
-            }
-            crispasr_session_result_free(r);
+            out = binding_encode_segments(binding_take_segments(r), 1.0);
             return out;
         }));
 
@@ -636,6 +334,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
         "asrTranscribeChunked",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang, int chunkSeconds,
                                          int overlapSeconds) -> emscripten::val {
+            binding_check_reentry();
             emscripten::val out = emscripten::val::array();
             if (!g_asr_session)
                 return out;
@@ -646,26 +345,22 @@ EMSCRIPTEN_BINDINGS(whisper) {
             emscripten::val view = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcmf32.data()), n);
             view.call<void>("set", audio);
 
+            binding_check_reentry();
+            binding_require_no_stream(g_asr_session);
             crispasr_session_result* r = crispasr_session_transcribe_chunked_lang(
                 g_asr_session, pcmf32.data(), n, chunkSeconds, overlapSeconds, lang.empty() ? nullptr : lang.c_str());
             if (!r)
                 return out;
-            const int ns = crispasr_session_result_n_segments(r);
-            for (int i = 0; i < ns; i++) {
-                emscripten::val seg = emscripten::val::object();
-                seg.set("t0", (double)crispasr_session_result_segment_t0(r, i));
-                seg.set("t1", (double)crispasr_session_result_segment_t1(r, i));
-                const char* text = crispasr_session_result_segment_text(r, i);
-                seg.set("text", std::string(text ? text : ""));
-                out.call<void>("push", seg);
-            }
-            crispasr_session_result_free(r);
+            out = binding_encode_segments(binding_take_segments(r), 1.0);
             return out;
         }));
 
     // asrGetProgress() -> 0..100 (or -1 idle). Long-form progress poll, updated
     // in lockstep with asrTranscribeChunked windows (issue #208).
-    emscripten::function("asrGetProgress", emscripten::optional_override([]() { return crispasr_get_progress(); }));
+    emscripten::function("asrGetProgress", emscripten::optional_override([]() {
+                             binding_check_callback();
+                             return crispasr_get_progress();
+                         }));
 
     // -------------------------------------------------------------------
     // TTS surface (kokoro / vibevoice / qwen3-tts) + kokoro per-language
@@ -673,10 +368,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // -------------------------------------------------------------------
 
     emscripten::function("ttsOpen", emscripten::optional_override([](const std::string& model_path, int n_threads) {
-                             if (g_tts_session != nullptr) {
-                                 crispasr_session_close(g_tts_session);
-                                 g_tts_session = nullptr;
-                             }
+                             binding_check_reentry();
+                             binding_native_close_session(g_tts_session);
                              g_tts_session = crispasr_session_open(model_path.c_str(), n_threads <= 0 ? 1 : n_threads);
                              return g_tts_session != nullptr;
                          }));
@@ -686,10 +379,8 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "ttsOpenExplicit",
         emscripten::optional_override([](const std::string& model_path, const std::string& backend, int n_threads) {
-            if (g_tts_session != nullptr) {
-                crispasr_session_close(g_tts_session);
-                g_tts_session = nullptr;
-            }
+            binding_check_reentry();
+            binding_native_close_session(g_tts_session);
             const int nt = n_threads <= 0 ? 1 : n_threads;
             g_tts_session = backend.empty() ? crispasr_session_open(model_path.c_str(), nt)
                                             : crispasr_session_open_explicit(model_path.c_str(), backend.c_str(), nt);
@@ -697,23 +388,24 @@ EMSCRIPTEN_BINDINGS(whisper) {
         }));
 
     emscripten::function("ttsClose", emscripten::optional_override([]() {
-                             if (g_tts_session) {
-                                 crispasr_session_close(g_tts_session);
-                                 g_tts_session = nullptr;
-                             }
+                             binding_check_reentry();
+                             binding_native_close_session(g_tts_session);
                          }));
 
     emscripten::function("ttsSetCodecPath", emscripten::optional_override([](const std::string& path) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_codec_path(g_tts_session, path.c_str()) : -1;
                          }));
 
     // Drop the kokoro per-session phoneme cache. (PLAN #56 #5)
     emscripten::function("ttsClearPhonemeCache", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_kokoro_clear_phoneme_cache(g_tts_session) : -1;
                          }));
 
     emscripten::function("ttsSetVoice",
                          emscripten::optional_override([](const std::string& path, const std::string& ref_text) {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return -1;
                              const char* rt = ref_text.empty() ? nullptr : ref_text.c_str();
@@ -722,6 +414,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // Orpheus preset speakers — set by NAME, not by file path.
     emscripten::function("ttsSetSpeakerName", emscripten::optional_override([](const std::string& name) {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return -1;
                              return crispasr_session_set_speaker_name(g_tts_session, name.c_str());
@@ -730,6 +423,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // Returns the list of preset speaker names for the active backend
     // (orpheus today). Empty array if the backend has no preset speakers.
     emscripten::function("ttsSpeakers", emscripten::optional_override([]() -> emscripten::val {
+                             binding_check_reentry();
                              emscripten::val out = emscripten::val::array();
                              if (!g_tts_session)
                                  return out;
@@ -744,6 +438,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // qwen3-tts VoiceDesign — natural-language voice description.
     emscripten::function("ttsSetInstruct", emscripten::optional_override([](const std::string& instruct) {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return -1;
                              return crispasr_session_set_instruct(g_tts_session, instruct.c_str());
@@ -752,6 +447,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // #316: drive the acoustic model with phonemes, skipping the G2P.
     // kokoro and piper; -2 from any other backend.
     emscripten::function("ttsSetPhonemes", emscripten::optional_override([](const std::string& phonemes) {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return -1;
                              return crispasr_session_set_tts_phonemes(g_tts_session, phonemes.c_str());
@@ -759,6 +455,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // Pad N ms of silence at the beginning of TTS output. Useful to bypass VLC playback bugs.
     emscripten::function("ttsSetPadSilenceMs", emscripten::optional_override([](int ms) {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return;
                              crispasr_session_set_tts_pad_silence_ms(g_tts_session, ms);
@@ -767,15 +464,18 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // qwen3-tts variant detection (returns false also when the active
     // backend isn't qwen3-tts).
     emscripten::function("ttsIsCustomVoice", emscripten::optional_override([]() -> bool {
+                             binding_check_reentry();
                              return g_tts_session && crispasr_session_is_custom_voice(g_tts_session) != 0;
                          }));
 
     emscripten::function("ttsIsVoiceDesign", emscripten::optional_override([]() -> bool {
+                             binding_check_reentry();
                              return g_tts_session && crispasr_session_is_voice_design(g_tts_session) != 0;
                          }));
 
     // Returns a Float32Array of 24 kHz mono PCM. Empty array on failure.
     emscripten::function("ttsSynthesize", emscripten::optional_override([](const std::string& text) -> emscripten::val {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return emscripten::val::array();
                              int n = 0;
@@ -792,45 +492,6 @@ EMSCRIPTEN_BINDINGS(whisper) {
                              return out;
                          }));
 
-#ifdef __EMSCRIPTEN_PTHREADS__
-    // Multithreaded, deadlock-free synth for the browser. Delivers a Float32Array
-    // (24 kHz mono PCM, empty on failure) to `cb`. The servicer only enqueues work
-    // and returns immediately; the blocking compute happens on the proxied pthread.
-    emscripten::function(
-        "ttsSynthesizeAsync", emscripten::optional_override([](const std::string& text, emscripten::val cb) {
-            auto* text_copy = new std::string(text);
-            auto* cbp = new emscripten::val(cb);
-            if (!g_compute_thread_set.load() || g_compute_thread == pthread_self()) {
-                emscripten::val error = emscripten::val::object();
-                error.set("error", "Threaded browser compute is not ready; use PROXY_TO_PTHREAD");
-                (*cbp)(error);
-                delete text_copy;
-                delete cbp;
-                return;
-            }
-            pthread_t servicer = pthread_self();
-            // Enqueue the blocking synth onto the compute thread (pthread-0).
-            g_proxy_queue.proxyAsync(g_compute_thread, [text_copy, cbp, servicer]() {
-                int n = 0;
-                float* pcm =
-                    g_tts_session ? crispasr_session_synthesize(g_tts_session, text_copy->c_str(), &n) : nullptr;
-                delete text_copy;
-                // Hand the result (shared WASM heap) back to the servicer; only
-                // touch the JS callback `val` on the thread that created it.
-                g_proxy_queue.proxyAsync(servicer, [pcm, n, cbp]() {
-                    emscripten::val out = emscripten::val::array();
-                    if (pcm && n > 0) {
-                        out = emscripten::val::global("Float32Array").new_(n);
-                        out.call<void>("set", emscripten::val(emscripten::typed_memory_view(n, pcm)));
-                    }
-                    if (pcm)
-                        crispasr_pcm_free(pcm);
-                    (*cbp)(out);
-                    delete cbp;
-                });
-            });
-        }));
-#endif
 
     // Declare whose voice a PRESET voice is: "real_person" | "synthetic" |
     // "unknown". Cloning is not the only way to produce a deep fake — a preset
@@ -840,6 +501,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // fire for a non-cloned voice; it does NOT require a consent attestation.
     // Returns 0, -1 on no session, -2 on an unrecognised value.
     emscripten::function("ttsSetSpeakerIdentity", emscripten::optional_override([](const std::string& identity) {
+                             binding_check_reentry();
                              return g_tts_session
                                         ? crispasr_session_set_speaker_identity(g_tts_session, identity.c_str())
                                         : -1;
@@ -850,6 +512,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // `attestation` is recorded for audit. Returns 0 on success, -1 otherwise.
     emscripten::function(
         "ttsAcceptMarkingResponsibility", emscripten::optional_override([](const std::string& attestation) {
+            binding_check_reentry();
             return g_tts_session ? crispasr_session_accept_marking_responsibility(g_tts_session, attestation.c_str())
                                  : -1;
         }));
@@ -860,6 +523,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // for the default watermarked output.
     emscripten::function("ttsSynthesizeRaw",
                          emscripten::optional_override([](const std::string& text) -> emscripten::val {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return emscripten::val::array();
                              int n = 0;
@@ -885,6 +549,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // intermediate transcript is freed with crispasr_session_translate_text_free.
     emscripten::function(
         "ttsSpeechToSpeech", emscripten::optional_override([](const emscripten::val& audio) -> emscripten::val {
+            binding_check_reentry();
             emscripten::val result = emscripten::val::object();
             result.set("pcm", emscripten::val::array());
             result.set("transcript", std::string());
@@ -924,6 +589,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "kokoroResolveForLang",
         emscripten::optional_override([](const std::string& model_path, const std::string& lang) -> emscripten::val {
+            binding_check_reentry();
             char out_model[1024] = {0};
             char out_voice[1024] = {0};
             char out_picked[64] = {0};
@@ -955,138 +621,174 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // --- Session setters ---
     emscripten::function("sessionSetSourceLanguage", emscripten::optional_override([](const std::string& lang) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_source_language(g_tts_session, lang.c_str())
                                                   : -1;
                          }));
     emscripten::function("sessionSetTargetLanguage", emscripten::optional_override([](const std::string& lang) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_target_language(g_tts_session, lang.c_str())
                                                   : -1;
                          }));
     // #329: the language the cloning REFERENCE is spoken in (not the output
     // language) — cosyvoice3 drops the reference transcript when they differ.
     emscripten::function("sessionSetTtsReferenceLanguage", emscripten::optional_override([](const std::string& lang) {
+                             binding_check_reentry();
                              return g_tts_session
                                         ? crispasr_session_set_tts_reference_language(g_tts_session, lang.c_str())
                                         : -1;
                          }));
     emscripten::function("sessionSetPunctuation", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_punctuation(g_tts_session, enable ? 1 : 0)
                                                   : -1;
                          }));
     emscripten::function("sessionSetTranslate", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_translate(g_tts_session, enable ? 1 : 0) : -1;
                          }));
     emscripten::function(
         "sessionSetTemperature", emscripten::optional_override([](float temp, int seed) {
+            binding_check_reentry();
             return g_tts_session ? crispasr_session_set_temperature(g_tts_session, temp, (unsigned long long)seed) : -1;
         }));
     emscripten::function("sessionSetTtsSeed", emscripten::optional_override([](int seed) {
+                             binding_check_reentry();
                              return g_tts_session
                                         ? crispasr_session_set_tts_seed(g_tts_session, (unsigned long long)seed)
                                         : -1;
                          }));
     emscripten::function("sessionSetTtsSteps", emscripten::optional_override([](int steps) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_tts_steps(g_tts_session, steps) : -1;
                          }));
     emscripten::function("sessionSetTtsNumCandidates", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_tts_num_candidates(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetMaxNewTokens", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_max_new_tokens(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetFrequencyPenalty", emscripten::optional_override([](float p) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_frequency_penalty(g_tts_session, p) : -1;
                          }));
     emscripten::function("sessionSetTopP", emscripten::optional_override([](float p) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_top_p(g_tts_session, p) : -1;
                          }));
     emscripten::function("sessionSetTopK", emscripten::optional_override([](int k) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_top_k(g_tts_session, k) : -1;
                          }));
     emscripten::function("sessionSetDoSample", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_do_sample(g_tts_session, enable ? 1 : 0) : -1;
                          }));
     emscripten::function("sessionSetMinP", emscripten::optional_override([](float p) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_min_p(g_tts_session, p) : -1;
                          }));
     emscripten::function("sessionSetRepetitionPenalty", emscripten::optional_override([](float r) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_repetition_penalty(g_tts_session, r) : -1;
                          }));
     emscripten::function("sessionSetCfgWeight", emscripten::optional_override([](float w) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_cfg_weight(g_tts_session, w) : -1;
                          }));
     emscripten::function("sessionSetTtsNoiseTemp", emscripten::optional_override([](float t) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_tts_noise_temp(g_tts_session, t) : -1;
                          }));
     emscripten::function("sessionSetExaggeration", emscripten::optional_override([](float e) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_exaggeration(g_tts_session, e) : -1;
                          }));
     emscripten::function("sessionSetMaxSpeechTokens", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_max_speech_tokens(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetMinSpeechTokens", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_min_speech_tokens(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetLengthScale", emscripten::optional_override([](float s) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_length_scale(g_tts_session, s) : -1;
                          }));
     // #321 parity: G2P dict source — "olaph" (MIT), "open-dict" (CC-BY-SA), or a file path.
     emscripten::function("sessionSetG2pDict", emscripten::optional_override([](const std::string& source) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_g2p_dict(g_tts_session, source.c_str()) : -1;
                          }));
     // #321 parity: select a preset speaker by integer id (backends with an id-indexed roster).
     emscripten::function("sessionSetSpeakerId", emscripten::optional_override([](int id) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_speaker_id(g_tts_session, id) : -1;
                          }));
     // #321 parity: sample rate the backend expects for input PCM (16000 for
     // Whisper-family; feed it to S2S/transcribe input). 0 when no session is open.
     emscripten::function("sessionInputSampleRate", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_input_sample_rate(g_tts_session) : 0;
                          }));
     // #332: rate of the PCM ttsSynthesize/speech-to-speech produce (0 = the
     // backend has no audio output), plus the mono channel-count getters.
     emscripten::function("sessionOutputSampleRate", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_output_sample_rate(g_tts_session) : 0;
                          }));
     emscripten::function("sessionInputChannels", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_input_channels(g_tts_session) : 0;
                          }));
     emscripten::function("sessionOutputChannels", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_output_channels(g_tts_session) : 0;
                          }));
     emscripten::function("sessionSetBestOf", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_best_of(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetBeamSize", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_beam_size(g_tts_session, n) : -1;
                          }));
     emscripten::function("sessionSetReturnLogits", emscripten::optional_override([](bool enable) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_return_logits(g_tts_session, enable ? 1 : 0)
                                                   : -1;
                          }));
     emscripten::function(
         "sessionSetGrammarText",
         emscripten::optional_override([](const std::string& text, const std::string& root, float penalty) {
+            binding_check_reentry();
             return g_tts_session ? crispasr_session_set_grammar_text(g_tts_session, text.c_str(), root.c_str(), penalty)
                                  : -1;
         }));
     emscripten::function("sessionSetFallbackThresholds",
                          emscripten::optional_override([](float entropy, float logprob, float noSpeech, float tempInc) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_fallback_thresholds(g_tts_session, entropy,
                                                                                              logprob, noSpeech, tempInc)
                                                   : -1;
                          }));
     emscripten::function("sessionSetAltN", emscripten::optional_override([](int n) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_alt_n(g_tts_session, n) : -1;
                          }));
     emscripten::function(
         "sessionSetWhisperDecodeExtras",
         emscripten::optional_override([](bool suppressNst, const std::string& regex, bool carryPrompt) {
+            binding_check_reentry();
             return g_tts_session ? crispasr_session_set_whisper_decode_extras(g_tts_session, suppressNst ? 1 : 0,
                                                                               regex.c_str(), carryPrompt ? 1 : 0)
                                  : -1;
         }));
     emscripten::function("sessionSetAsk", emscripten::optional_override([](const std::string& prompt) {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_set_ask(g_tts_session, prompt.c_str()) : -1;
                          }));
 
@@ -1094,6 +796,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "sessionTranscribe",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang) -> emscripten::val {
+            binding_check_reentry();
             if (!g_tts_session)
                 return emscripten::val::array();
             const int n = audio["length"].as<int>();
@@ -1112,34 +815,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
             if (!res)
                 return emscripten::val::array();
 
-            int ns = crispasr_session_result_n_segments(res);
-            emscripten::val out = emscripten::val::array();
-            for (int i = 0; i < ns; i++) {
-                emscripten::val seg = emscripten::val::object();
-                const char* t = crispasr_session_result_segment_text(res, i);
-                seg.set("text", std::string(t ? t : ""));
-                seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
-                seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
-                seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
-                {
-                    const char* spk = crispasr_session_result_segment_speaker(res, i);
-                    seg.set("speaker", std::string(spk ? spk : ""));
-                }
-                int nw = crispasr_session_result_n_words(res, i);
-                emscripten::val words = emscripten::val::array();
-                for (int j = 0; j < nw; j++) {
-                    emscripten::val w = emscripten::val::object();
-                    const char* wt = crispasr_session_result_word_text(res, i, j);
-                    w.set("text", std::string(wt ? wt : ""));
-                    w.set("t0", crispasr_session_result_word_t0(res, i, j) / 100.0);
-                    w.set("t1", crispasr_session_result_word_t1(res, i, j) / 100.0);
-                    w.set("p", (double)crispasr_session_result_word_p(res, i, j));
-                    words.call<void>("push", w);
-                }
-                seg.set("words", words);
-                out.call<void>("push", seg);
-            }
-            crispasr_session_result_free(res);
+            auto out = binding_encode_segments(binding_take_segments(res), 100.0);
             return out;
         }));
 
@@ -1153,80 +829,11 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "sessionTranscribeWithLogits",
         emscripten::optional_override([](const emscripten::val& audio, const std::string& lang) -> emscripten::val {
+            binding_check_reentry();
             if (!g_tts_session)
                 return emscripten::val::null();
-            const int n = audio["length"].as<int>();
-            std::vector<float> pcm(n);
-            emscripten::val heap = emscripten::val::module_property("HEAPU8");
-            emscripten::val memory = heap["buffer"];
-            emscripten::val mv = audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcm.data()), n);
-            mv.call<void>("set", audio);
-
-            crispasr_session_set_return_logits(g_tts_session, 1);
-            crispasr_session_result* res;
-            if (!lang.empty()) {
-                res = crispasr_session_transcribe_lang(g_tts_session, pcm.data(), n, lang.c_str());
-            } else {
-                res = crispasr_session_transcribe(g_tts_session, pcm.data(), n);
-            }
-            if (!res) {
-                crispasr_session_set_return_logits(g_tts_session, 0);
-                return emscripten::val::null();
-            }
-
-            emscripten::val out = emscripten::val::object();
-            int ns = crispasr_session_result_n_segments(res);
-            emscripten::val segs = emscripten::val::array();
-            for (int i = 0; i < ns; i++) {
-                emscripten::val seg = emscripten::val::object();
-                const char* t = crispasr_session_result_segment_text(res, i);
-                seg.set("text", std::string(t ? t : ""));
-                seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
-                seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
-                seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
-                {
-                    const char* spk = crispasr_session_result_segment_speaker(res, i);
-                    seg.set("speaker", std::string(spk ? spk : ""));
-                }
-                int nw = crispasr_session_result_n_words(res, i);
-                emscripten::val words = emscripten::val::array();
-                for (int j = 0; j < nw; j++) {
-                    emscripten::val w = emscripten::val::object();
-                    const char* wt = crispasr_session_result_word_text(res, i, j);
-                    w.set("text", std::string(wt ? wt : ""));
-                    w.set("t0", crispasr_session_result_word_t0(res, i, j) / 100.0);
-                    w.set("t1", crispasr_session_result_word_t1(res, i, j) / 100.0);
-                    w.set("p", (double)crispasr_session_result_word_p(res, i, j));
-                    words.call<void>("push", w);
-                }
-                seg.set("words", words);
-                segs.call<void>("push", seg);
-            }
-            out.set("segments", segs);
-
-            // Copy the result-owned logit grid into a JS Float32Array before the
-            // result (and its buffer) is freed — same owned-then-freed idiom as
-            // ttsSynthesize.
-            int nf = crispasr_session_result_n_logit_frames(res);
-            int nv = crispasr_session_result_n_logit_vocab(res);
-            const float* lg = crispasr_session_result_logits(res);
-            if (nf > 0 && nv > 0 && lg) {
-                const int total = nf * nv;
-                emscripten::val data = emscripten::val::global("Float32Array").new_(total);
-                emscripten::val memoryView = emscripten::val(emscripten::typed_memory_view(total, lg));
-                data.call<void>("set", memoryView);
-                emscripten::val logits = emscripten::val::object();
-                logits.set("nFrames", nf);
-                logits.set("nVocab", nv);
-                logits.set("data", data);
-                out.set("logits", logits);
-            } else {
-                out.set("logits", emscripten::val::null());
-            }
-
-            crispasr_session_set_return_logits(g_tts_session, 0);
-            crispasr_session_result_free(res);
-            return out;
+            auto pcm = binding_pcm(audio);
+            return binding_encode_transcription(binding_transcribe_logits(g_tts_session, pcm, lang));
         }));
 
     // CTC vocabulary access (Omni CTC backend). Returns the vocab as a JS array
@@ -1235,6 +842,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // decode over sessionTranscribeWithLogits' grid. null when no session is
     // open or the backend exposes no CTC vocab.
     emscripten::function("sessionCtcVocab", emscripten::optional_override([]() -> emscripten::val {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return emscripten::val::null();
                              const int n = crispasr_session_n_vocab(g_tts_session);
@@ -1252,6 +860,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "sessionTranslateText", emscripten::optional_override([](const std::string& text, const std::string& src,
                                                                  const std::string& tgt, int maxTokens) -> std::string {
+            binding_check_reentry();
             if (!g_tts_session)
                 return "";
             char* res =
@@ -1276,6 +885,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // bindings — or [] on failure.
     emscripten::function(
         "sessionPitch", emscripten::optional_override([](const emscripten::val& audio, float hopMs) -> emscripten::val {
+            binding_check_reentry();
             emscripten::val out = emscripten::val::array();
             if (!g_tts_session)
                 return out;
@@ -1306,12 +916,14 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // Streaming mode of the active backend session (0 when none is loaded).
     emscripten::function("sessionStreamKind", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_stream_kind(g_tts_session) : 0;
                          }));
 
     // Native input rate the loaded pitch model expects (16000 for CREPE), or
     // 0 when the session has no pitch arm — doubles as a capability probe.
     emscripten::function("sessionPitchSampleRate", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_pitch_sample_rate(g_tts_session) : 0;
                          }));
 
@@ -1327,6 +939,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // program MT3 identified, or -1 when the model names no instrument.
     emscripten::function(
         "sessionPianoNotes", emscripten::optional_override([](const emscripten::val& audio) -> emscripten::val {
+            binding_check_reentry();
             emscripten::val out = emscripten::val::array();
             if (!g_tts_session)
                 return out;
@@ -1362,6 +975,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // Native input rate of the loaded note model, or 0 when the session has
     // no note arm — a capability probe, mirroring sessionPitchSampleRate.
     emscripten::function("sessionPianoSampleRate", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_piano_sample_rate(g_tts_session) : 0;
                          }));
 
@@ -1372,6 +986,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // registry will not download these without an explicit licence
     // acceptance. See docs/music-transcription/PLAN.md.
     emscripten::function("sessionChords", emscripten::optional_override([](emscripten::val audio, int sampleRate) {
+                             binding_check_reentry();
                              emscripten::val out = emscripten::val::array();
                              if (!g_tts_session)
                                  return out;
@@ -1406,11 +1021,13 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // 25 or 170, or 0 when the session has no chord arm — capability probe,
     // mirroring sessionPitchSampleRate.
     emscripten::function("sessionChordsVocabSize", emscripten::optional_override([]() {
+                             binding_check_reentry();
                              return g_tts_session ? crispasr_session_chords_vocab_size(g_tts_session) : 0;
                          }));
 
     // --- Available backends ---
     emscripten::function("availableBackends", emscripten::optional_override([]() -> std::string {
+                             binding_check_reentry();
                              char buf[1024] = {0};
                              crispasr_session_available_backends(buf, sizeof(buf));
                              return std::string(buf);
@@ -1418,6 +1035,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // --- Detected language (Whisper acoustic; "unknown" for other backends) ---
     emscripten::function("detectedLanguage", emscripten::optional_override([]() -> std::string {
+                             binding_check_reentry();
                              if (!g_tts_session)
                                  return std::string("unknown");
                              char buf[32] = {0};
@@ -1428,6 +1046,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // --- Detect backend from GGUF ---
     emscripten::function("detectBackendFromGguf",
                          emscripten::optional_override([](const std::string& path) -> std::string {
+                             binding_check_reentry();
                              char out[128] = {0};
                              int rc = crispasr_detect_backend_from_gguf(path.c_str(), out, sizeof(out));
                              // rc > 0 = detected (strlen of name); rc == 0 = valid GGUF, no backend
@@ -1439,6 +1058,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // --- LCS dedup ---
     emscripten::function("lcsDedup", emscripten::optional_override([](const emscripten::val& prev,
                                                                       const emscripten::val& curr, int minLen) -> int {
+                             binding_check_reentry();
                              int pn = prev["length"].as<int>();
                              int cn = curr["length"].as<int>();
                              std::vector<int> pvec(pn), cvec(cn);
@@ -1451,9 +1071,11 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // --- Kokoro lang helpers ---
     emscripten::function("kokoroLangIsGerman", emscripten::optional_override([](const std::string& lang) -> bool {
+                             binding_check_reentry();
                              return crispasr_kokoro_lang_is_german_abi(lang.c_str()) != 0;
                          }));
     emscripten::function("kokoroLangHasNativeVoice", emscripten::optional_override([](const std::string& lang) -> bool {
+                             binding_check_reentry();
                              return crispasr_kokoro_lang_has_native_voice_abi(lang.c_str()) != 0;
                          }));
 
@@ -1461,6 +1083,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function(
         "textDetectLanguage", emscripten::optional_override([](const std::string& text, const std::string& modelPath,
                                                                int nThreads) -> emscripten::val {
+            binding_check_reentry();
             char label[64] = {0};
             float conf = 0.0f;
             int rc = crispasr_text_detect_language(text.c_str(), modelPath.c_str(), nThreads, label, 64, &conf);
@@ -1473,6 +1096,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // --- Registry ---
     emscripten::function("registryListBackends", emscripten::optional_override([]() -> std::string {
+                             binding_check_reentry();
                              char buf[8192] = {0};
                              crispasr_registry_list_backends_abi(buf, sizeof(buf));
                              return std::string(buf);
@@ -1480,11 +1104,13 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     // --- Punctuation ---
     emscripten::function("puncInit", emscripten::optional_override([](const std::string& modelPath) -> int {
+                             binding_check_reentry();
                              void* h = crispasr_punc_init(modelPath.c_str());
                              return h ? (int)(uintptr_t)h : 0;
                          }));
     emscripten::function("puncProcess",
                          emscripten::optional_override([](int handle, const std::string& text) -> std::string {
+                             binding_check_reentry();
                              if (!handle)
                                  return text;
                              const char* r = crispasr_punc_process((void*)(uintptr_t)handle, text.c_str());
@@ -1495,6 +1121,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                              return out;
                          }));
     emscripten::function("puncFree", emscripten::optional_override([](int handle) {
+                             binding_check_reentry();
                              if (handle)
                                  crispasr_punc_free((void*)(uintptr_t)handle);
                          }));
@@ -1518,6 +1145,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // AI marker). Optionally feed the result to c2paSign() for a full manifest.
     emscripten::function(
         "pcmToWav", emscripten::optional_override([](const emscripten::val& pcm, int sampleRate) -> emscripten::val {
+            binding_check_reentry();
             std::vector<float> in = emscripten::vecFromJSArray<float>(pcm);
             size_t out_len = 0;
             unsigned char* out = crispasr_pcm_to_wav(in.data(), (int)in.size(), sampleRate, &out_len);
@@ -1531,6 +1159,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
 
     emscripten::function("c2paSign", emscripten::optional_override([](const emscripten::val& data,
                                                                       const std::string& format) -> emscripten::val {
+                             binding_check_reentry();
                              // Copy the JS Uint8Array into wasm memory (no reliance on HEAPU8 being
                              // exposed as a Module property, which varies by build config).
                              std::vector<unsigned char> in = emscripten::vecFromJSArray<unsigned char>(data);

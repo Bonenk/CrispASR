@@ -46,6 +46,9 @@ int rvc_svc_content_dim(const rvc_svc_context* ctx);
 int rvc_svc_n_speakers(const rvc_svc_context* ctx);
 // Output rate is a property of the checkpoint (32k/40k/48k), not a constant.
 int rvc_svc_sample_rate(const rvc_svc_context* ctx);
+// Dimensions needed to validate caller-owned deterministic replay noise.
+int rvc_svc_inter_channels(const rvc_svc_context* ctx);
+int rvc_svc_upsample_product(const rvc_svc_context* ctx);
 
 struct rvc_svc_result {
     float* pcm; // mono, rvc_svc_sample_rate()

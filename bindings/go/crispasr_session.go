@@ -10,173 +10,23 @@ package whisper
 // per-language model + voice resolver (PLAN #56 opt 2b).
 
 /*
-// LDFLAGS for libcrispasr + all conditionally-built sub-libs are set in
-// whisper.go (the canonical cgo block). Don't re-list here to avoid
-// `ld: warning: ignoring duplicate libraries: '-lcrispasr'`.
 #include <stdlib.h>
 #include <string.h>
-
-// Forward-declare the C ABI symbols. The full signatures live in
-// src/crispasr_c_api.cpp (Session) and src/kokoro.h
-// (kokoro_resolve_*_abi). They're exported by libcrispasr.dylib /
-// .so and linked in via cgo's -lcrispasr.
-
-typedef struct CrispasrSession CrispasrSession;
-
-CrispasrSession* crispasr_session_open(const char* model_path, int n_threads);
-void             crispasr_session_close(CrispasrSession* s);
-int              crispasr_session_set_codec_path(CrispasrSession* s, const char* path);
-int              crispasr_session_set_source_language(CrispasrSession* s, const char* lang);
-int              crispasr_session_set_target_language(CrispasrSession* s, const char* lang);
-int              crispasr_session_set_tts_reference_language(CrispasrSession* s, const char* lang);
-int              crispasr_session_set_punctuation(CrispasrSession* s, int enable);
-int              crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
-int              crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
-// Source separation (#359): stereo interleaved PCM in at the model's own rate.
-int              crispasr_session_separate(CrispasrSession* s, const float* pcm_stereo, int n_samples);
-int              crispasr_session_separate_n_stems(CrispasrSession* s);
-const char*      crispasr_session_separate_stem_name(CrispasrSession* s, int stem_idx);
-const float*     crispasr_session_separate_stem(CrispasrSession* s, int stem_idx, int* out_n_samples);
-int              crispasr_session_separate_sample_rate(CrispasrSession* s);
-int              crispasr_session_input_sample_rate(CrispasrSession* s);
-int              crispasr_session_output_sample_rate(CrispasrSession* s);
-int              crispasr_session_set_sensitivity(CrispasrSession* s, const char* preset);
-int              crispasr_session_set_translate(CrispasrSession* s, int enable);
-int              crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
-int              crispasr_session_set_tts_seed(CrispasrSession* s, unsigned long long seed);
-int              crispasr_session_set_max_new_tokens(CrispasrSession* s, int max_new_tokens);
-int              crispasr_session_set_frequency_penalty(CrispasrSession* s, float penalty);
-int              crispasr_session_set_tts_steps(CrispasrSession* s, int steps);
-int              crispasr_session_set_tts_num_candidates(CrispasrSession* s, int n);
-int              crispasr_session_set_top_p(CrispasrSession* s, float top_p);
-int              crispasr_session_set_top_k(CrispasrSession* s, int top_k);
-int              crispasr_session_set_do_sample(CrispasrSession* s, int enable);
-int              crispasr_session_set_min_p(CrispasrSession* s, float min_p);
-int              crispasr_session_set_repetition_penalty(CrispasrSession* s, float r);
-int              crispasr_session_set_cfg_weight(CrispasrSession* s, float cfg_weight);
-int              crispasr_session_set_tts_noise_temp(CrispasrSession* s, float noise_temp);
-int              crispasr_session_set_exaggeration(CrispasrSession* s, float exaggeration);
-int              crispasr_session_set_max_speech_tokens(CrispasrSession* s, int n);
-int              crispasr_session_set_min_speech_tokens(CrispasrSession* s, int n);
-int              crispasr_session_set_length_scale(CrispasrSession* s, float scale);
-int              crispasr_session_set_g2p_dict(CrispasrSession* s, const char* source);
-int              crispasr_session_set_best_of(CrispasrSession* s, int n);
-int              crispasr_session_set_beam_size(CrispasrSession* s, int n);
-int              crispasr_session_set_return_logits(CrispasrSession* s, int enable);
-int              crispasr_session_set_grammar_text(CrispasrSession* s, const char* gbnf_text,
-                                                   const char* root_rule, float penalty);
-int              crispasr_session_set_fallback_thresholds(CrispasrSession* s, float entropy_thold,
-                                                          float logprob_thold, float no_speech_thold,
-                                                          float temperature_inc);
-int              crispasr_session_set_alt_n(CrispasrSession* s, int n);
-int              crispasr_session_set_whisper_decode_extras(CrispasrSession* s, int suppress_nst,
-                                                            const char* suppress_regex,
-                                                            int carry_initial_prompt);
-int              crispasr_session_set_ask(CrispasrSession* s, const char* prompt);
-int              crispasr_session_detect_language(CrispasrSession* s, const float* pcm, int n_samples,
-                                                  const char* lid_model_path, int method,
-                                                  char* out_lang, int out_lang_cap, float* out_prob);
-int              crispasr_session_set_voice(CrispasrSession* s, const char* path, const char* ref_text_or_null);
-int              crispasr_session_set_speaker_name(CrispasrSession* s, const char* name);
-int              crispasr_session_set_speaker_id(CrispasrSession* s, int id);
-int              crispasr_session_n_speakers(CrispasrSession* s);
-const char*      crispasr_session_get_speaker_name(CrispasrSession* s, int i);
-int              crispasr_session_set_instruct(CrispasrSession* s, const char* instruct);
-int              crispasr_session_set_tts_phonemes(CrispasrSession* s, const char* phonemes);
-void             crispasr_session_set_tts_pad_silence_ms(CrispasrSession* s, int ms);
-int              crispasr_session_is_custom_voice(CrispasrSession* s);
-int              crispasr_session_is_voice_design(CrispasrSession* s);
-float*           crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
-float*           crispasr_session_synthesize_raw(CrispasrSession* s, const char* text, int* out_n_samples);
-int              crispasr_session_accept_marking_responsibility(CrispasrSession* s, const char* attestation);
-int              crispasr_session_set_speaker_identity(CrispasrSession* s, const char* identity);
-float*           crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples,
-                                                    char** out_text, int* out_n_samples);
-void             crispasr_session_translate_text_free(char* text);
-void             crispasr_pcm_free(float* pcm);
-int              crispasr_session_kokoro_clear_phoneme_cache(CrispasrSession* s);
-
-int crispasr_kokoro_resolve_model_for_lang_abi(const char* model_path, const char* lang,
-                                               char* out_path, int out_path_len);
-int crispasr_kokoro_resolve_fallback_voice_abi(const char* model_path, const char* lang,
-                                               char* out_path, int out_path_len,
-                                               char* out_picked, int out_picked_len);
-
-// --- ASR transcription (PLAN #59) ---
-typedef struct crispasr_session_result crispasr_session_result;
-crispasr_session_result* crispasr_session_transcribe(CrispasrSession* s, const float* pcm, int n_samples);
-crispasr_session_result* crispasr_session_transcribe_lang(CrispasrSession* s, const float* pcm, int n_samples,
-                                                          const char* language);
-crispasr_session_result* crispasr_session_transcribe_chunked_lang(CrispasrSession* s, const float* pcm, int n_samples,
-                                                                  int chunk_seconds, int overlap_seconds,
-                                                                  const char* language);
-crispasr_session_result* crispasr_session_transcribe_vad(CrispasrSession* s, const float* pcm, int n_samples,
-                                                         int sample_rate, const char* vad_model_path, void* opts);
-int          crispasr_get_progress(void);
-int          crispasr_session_result_n_segments(crispasr_session_result* r);
-const char*  crispasr_session_result_segment_text(crispasr_session_result* r, int i);
-long long    crispasr_session_result_segment_t0(crispasr_session_result* r, int i);
-long long    crispasr_session_result_segment_t1(crispasr_session_result* r, int i);
-int          crispasr_session_result_n_words(crispasr_session_result* r, int i_seg);
-const char*  crispasr_session_result_word_text(crispasr_session_result* r, int i_seg, int i_word);
-long long    crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
-long long    crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
-float        crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
-float        crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg);
-const char*  crispasr_session_result_segment_speaker(crispasr_session_result* r, int i);
-// Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for
-// backends that produce a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
-// canary-ctc). Frame-major: logits[t * n_logit_vocab + v]. Raw pre-softmax for
-// Omni & wav2vec2; log-probabilities for canary-ctc. _logits returns NULL when
-// none captured.
-int          crispasr_session_result_n_logit_frames(crispasr_session_result* r);
-int          crispasr_session_result_n_logit_vocab(crispasr_session_result* r);
-const float* crispasr_session_result_logits(crispasr_session_result* r);
-void         crispasr_session_result_free(crispasr_session_result* r);
-
-// --- Punctuation (PLAN #59) ---
-void*        crispasr_punc_init(const char* model_path);
-const char*  crispasr_punc_process(void* ctx, const char* text);
-void         crispasr_punc_free_text(const char* text);
-void         crispasr_punc_free(void* ctx);
-
-// --- Alignment (PLAN #59) ---
-typedef struct crispasr_align_result crispasr_align_result;
-crispasr_align_result* crispasr_align_words_abi(const char* aligner_model, const char* transcript,
-                                                 const float* samples, int n_samples, long long t_offset_cs,
-                                                 int n_threads);
-int          crispasr_align_result_n_words(crispasr_align_result* r);
-const char*  crispasr_align_result_word_text(crispasr_align_result* r, int i);
-long long    crispasr_align_result_word_t0(crispasr_align_result* r, int i);
-long long    crispasr_align_result_word_t1(crispasr_align_result* r, int i);
-int crispasr_align_result_n_characters(crispasr_align_result* r, int word);
-const char* crispasr_align_result_character_text(crispasr_align_result* r, int word, int i);
-long long crispasr_align_result_character_t0(crispasr_align_result* r, int word, int i);
-long long crispasr_align_result_character_t1(crispasr_align_result* r, int word, int i);
-void         crispasr_align_result_free(crispasr_align_result* r);
-
-// --- Watermark ---
-int   crispasr_watermark_load_model(const char* gguf_path);
-void  crispasr_watermark_embed(float* pcm, int n_samples, float alpha);
-float crispasr_watermark_detect(const float* pcm, int n_samples);
-
-// --- VAD (PLAN #59) ---
-int crispasr_vad_segments(const char* vad_model_path, const float* pcm, int n_samples,
-                          int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
-                          int n_threads, int use_gpu, float** out_spans);
-void crispasr_vad_free(float* spans);
-
-// --- Diarization (PLAN #59) ---
+#include <stdint.h>
+#include "crispasr.h"
+#include "crispasr_session.h"
+typedef struct crispasr_session CrispasrSession;
+typedef struct crispasr_stream CrispasrStream;
 struct crispasr_diarize_seg_abi {
-    long long t0_cs;
-    long long t1_cs;
+    int64_t t0_cs;
+    int64_t t1_cs;
     int       speaker;
     int       _pad;
 };
 struct crispasr_diarize_opts_abi {
     int         method;
     int         n_threads;
-    long long   slice_t0_cs;
+    int64_t   slice_t0_cs;
     const char* pyannote_model_path;
     // #324 foxnose (method 4). This layout is hand-maintained and MUST match
     // struct crispasr_diarize_opts_abi in src/crispasr_c_api.cpp exactly —
@@ -188,194 +38,46 @@ struct crispasr_diarize_opts_abi {
     int         num_speakers;
     int         _pad2;
 };
-int crispasr_diarize_segments_abi(const float* left_pcm, const float* right_pcm, int n_samples,
-                                  int is_stereo, struct crispasr_diarize_seg_abi* segs, int n_segs,
-                                  const struct crispasr_diarize_opts_abi* opts);
-// #395: a speaker turn the METHOD derived from the audio, independent of the
-// caller's segment grid. Same hand-maintained-layout warning as the opts
-// struct above: Go allocates these, so this must match
-// struct crispasr_diarize_turn_abi in src/crispasr_c_api.cpp exactly.
 struct crispasr_diarize_turn_abi {
-    long long t0_cs;
-    long long t1_cs;
+    int64_t t0_cs;
+    int64_t t1_cs;
     int       speaker;
     int       _pad;
 };
-int crispasr_diarize_segments_turns_abi(const float* left_pcm, const float* right_pcm, int n_samples,
-                                        int is_stereo, struct crispasr_diarize_seg_abi* segs, int n_segs,
-                                        const struct crispasr_diarize_opts_abi* opts,
-                                        struct crispasr_diarize_turn_abi* out_turns, int n_turns_cap,
-                                        int* out_n_turns);
+extern void goProgressCallback(int processed, int total, uintptr_t user);
+extern void goSegmentCallback(char* text, int64_t t0_cs, int64_t t1_cs, int segment_index, uintptr_t user);
+extern void goTokenCallback(char* token_text, int token_index, uintptr_t user);
+static void progressTrampoline(int processed, int total, void* user_data) {
+    goProgressCallback(processed, total, (uintptr_t)user_data);
+}
+static void segmentTrampoline(const char* text, int64_t t0_cs, int64_t t1_cs, int segment_index, void* user_data) {
+    goSegmentCallback((char*)text, t0_cs, t1_cs, segment_index, (uintptr_t)user_data);
+}
+static void tokenTrampoline(const char* token_text, int token_index, void* user_data) {
+    goTokenCallback((char*)token_text, token_index, (uintptr_t)user_data);
+}
+static void setProgressCallback(CrispasrSession* s, uintptr_t h) {
+    if (h == 0) {
+        crispasr_session_set_progress_callback(s, NULL, NULL);
+    } else {
+        crispasr_session_set_progress_callback(s, progressTrampoline, (void*)h);
+    }
+}
+static void setSegmentCallback(CrispasrSession* s, uintptr_t h) {
+    if (h == 0) {
+        crispasr_session_set_segment_callback(s, NULL, NULL);
+    } else {
+        crispasr_session_set_segment_callback(s, segmentTrampoline, (void*)h);
+    }
+}
+static void setTokenCallback(CrispasrSession* s, uintptr_t h) {
+    if (h == 0) {
+        crispasr_session_set_token_callback(s, NULL, NULL);
+    } else {
+        crispasr_session_set_token_callback(s, tokenTrampoline, (void*)h);
+    }
+}
 
-// --- Pluggable speaker embedder, clustering, pyannote cache (#107 P6) ---
-void*       crispasr_speaker_embedder_make_abi(const char* model_spec, int n_threads, const char* cache_dir);
-void        crispasr_speaker_embedder_free_abi(void* embedder);
-int         crispasr_speaker_embedder_dim_abi(const void* embedder);
-int         crispasr_speaker_embedder_embed_abi(void* embedder, const float* pcm_16k, int n_samples, float* out);
-const char* crispasr_speaker_embedder_name_abi(const void* embedder);
-int         crispasr_speaker_cluster_abi(const float* embeddings, int n, int dim,
-                                         float merge_threshold, int max_speakers, int* labels_out);
-void*       crispasr_pyannote_cache_compute_abi(const float* full_audio, int n_samples,
-                                                const char* model_path, int n_threads);
-void        crispasr_pyannote_cache_free_abi(void* cache);
-int         crispasr_pyannote_cache_apply_abi(const void* cache, long long slice_t0_cs,
-                                              struct crispasr_diarize_seg_abi* segs, int n_segs);
-
-// --- Standalone LID (PLAN #59) ---
-int crispasr_detect_language_pcm(const float* samples, int n_samples, int method,
-                                  const char* model_path, int n_threads, int use_gpu,
-                                  int gpu_device, int flash_attn,
-                                  char* out_lang, int out_lang_cap, float* out_prob);
-
-// --- Registry + cache (PLAN #59) ---
-int crispasr_registry_lookup_abi(const char* backend, char* out_filename, int filename_cap,
-                                 char* out_url, int url_cap, char* out_size, int size_cap);
-int crispasr_cache_ensure_file_abi(const char* filename, const char* url, int quiet,
-                                   const char* cache_dir_override, char* out_buf, int out_cap);
-int crispasr_cache_dir_abi(const char* cache_dir_override, char* out_buf, int out_cap);
-
-// --- Streaming (PLAN #62) ---
-typedef struct CrispasrStream CrispasrStream;
-int crispasr_session_stream_kind(CrispasrSession* s);
-CrispasrStream* crispasr_session_stream_open(CrispasrSession* s, int n_threads, int step_ms,
-                                             int length_ms, int keep_ms, const char* language, int translate);
-CrispasrStream* crispasr_stream_open(void* ctx, int n_threads, int step_ms,
-                                     int length_ms, int keep_ms, const char* language, int translate);
-int             crispasr_stream_feed(CrispasrStream* s, const float* pcm, int n_samples);
-int             crispasr_stream_get_text(CrispasrStream* s, char* out_text, int out_cap,
-                                         double* out_t0_s, double* out_t1_s, long long* out_counter);
-int             crispasr_stream_flush(CrispasrStream* s);
-void            crispasr_stream_close(CrispasrStream* s);
-void            crispasr_stream_set_live_decode(CrispasrStream* s, int enabled);
-
-// --- Text-LID ---
-int crispasr_text_detect_language(const char* text, const char* model_path, int n_threads,
-                                  char* out_label, int out_label_cap, float* out_confidence);
-
-// --- Backend detection ---
-int crispasr_detect_backend_from_gguf(const char* path, char* out_name, int out_cap);
-
-// --- RNNoise audio enhancement ---
-int crispasr_enhance_audio_rnnoise(const float* in_pcm, int n_samples, float* out_pcm, int out_cap);
-
-// --- params_set_* on whisper_full_params ---
-void crispasr_params_set_language(void* p, const char* lang);
-void crispasr_params_set_translate(void* p, int v);
-void crispasr_params_set_detect_language(void* p, int v);
-void crispasr_params_set_token_timestamps(void* p, int v);
-void crispasr_params_set_n_threads(void* p, int n);
-void crispasr_params_set_max_len(void* p, int n);
-void crispasr_params_set_best_of(void* p, int n);
-void crispasr_params_set_split_on_word(void* p, int v);
-void crispasr_params_set_no_context(void* p, int v);
-void crispasr_params_set_single_segment(void* p, int v);
-void crispasr_params_set_print_realtime(void* p, int v);
-void crispasr_params_set_print_progress(void* p, int v);
-void crispasr_params_set_print_timestamps(void* p, int v);
-void crispasr_params_set_print_special(void* p, int v);
-void crispasr_params_set_suppress_blank(void* p, int v);
-void crispasr_params_set_temperature(void* p, float t);
-void crispasr_params_set_max_tokens(void* p, int n);
-void crispasr_params_set_initial_prompt(void* p, const char* prompt);
-void crispasr_params_set_alt_n(void* p, int n);
-void crispasr_params_set_vad(void* p, int v);
-void crispasr_params_set_vad_model_path(void* p, const char* path);
-void crispasr_params_set_vad_threshold(void* p, float t);
-void crispasr_params_set_vad_min_speech_ms(void* p, int ms);
-void crispasr_params_set_vad_min_silence_ms(void* p, int ms);
-void crispasr_params_set_tdrz(void* p, int v);
-
-// --- Token-level accessors ---
-long long crispasr_token_t0(void* ctx, int i_seg, int i_tok);
-long long crispasr_token_t1(void* ctx, int i_seg, int i_tok);
-float     crispasr_token_p(void* ctx, int i_seg, int i_tok);
-int       crispasr_token_n_alts(void* ctx, int i_seg, int i_tok);
-int       crispasr_token_alt_id(void* ctx, int i_seg, int i_tok, int i_alt);
-float     crispasr_token_alt_p(void* ctx, int i_seg, int i_tok, int i_alt);
-int       crispasr_token_alt_text(void* ctx, int i_seg, int i_tok, int i_alt, char* out, int out_cap);
-
-// --- Language detection (whisper context) ---
-float crispasr_detect_language(void* ctx, const float* pcm, int n_samples,
-                               int n_threads, char* out_code, int out_cap);
-
-// --- VAD slices ---
-int crispasr_vad_slices(const char* vad_model_path, const float* pcm, int n_samples,
-                        int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
-                        int speech_pad_ms, float max_chunk_duration_s, int n_threads,
-                        float** out_spans);
-
-// --- LCS dedup ---
-int crispasr_lcs_dedup_prefix_count(const int* prev_tail_tokens, int n_prev,
-                                    const int* curr_tokens, int n_curr, int min_lcs_length);
-
-// --- Direct Parakeet API ---
-// Note: nemotron, lfm2-audio, and other recent backends are accessed
-// via the Session API (Open → Transcribe → Close). Standalone wrappers
-// below are for backwards compatibility with early parakeet integrations.
-void* crispasr_parakeet_init(const char* model_path, int n_threads, int use_flash);
-void  crispasr_parakeet_free(void* ctx);
-void* crispasr_parakeet_transcribe(void* ctx, const float* pcm, int n_samples, const char* language);
-const char* crispasr_parakeet_result_text(void* r);
-int         crispasr_parakeet_result_n_words(void* r);
-const char* crispasr_parakeet_result_word_text(void* r, int i);
-long long   crispasr_parakeet_result_word_t0(void* r, int i);
-long long   crispasr_parakeet_result_word_t1(void* r, int i);
-int         crispasr_parakeet_result_n_tokens(void* r);
-const char* crispasr_parakeet_result_token_text(void* r, int i);
-long long   crispasr_parakeet_result_token_t0(void* r, int i);
-long long   crispasr_parakeet_result_token_t1(void* r, int i);
-float       crispasr_parakeet_result_token_p(void* r, int i);
-void        crispasr_parakeet_result_free(void* r);
-
-// --- TitaNet ---
-void* crispasr_titanet_init(const char* model_path, int n_threads);
-void  crispasr_titanet_free(void* ctx);
-int   crispasr_titanet_embed(void* ctx, const float* pcm_16k, int n_samples, float* out);
-float crispasr_titanet_cosine_sim(const float* a, const float* b, int dim);
-
-// --- Speaker database (closed-roster, consent-gated — issue #266) ---
-void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv,
-                               int consent_attested);
-void  crispasr_speaker_db_free(void* db);
-int   crispasr_speaker_db_count(const void* db);
-float crispasr_speaker_db_match(const void* db, const float* embedding, int dim,
-                                float threshold, char* out_name, int out_cap);
-int   crispasr_speaker_db_enroll2(const char* dir_path, const char* name,
-                                  const float* embedding, int dim, int consent_attested);
-
-// --- Kokoro lang helpers ---
-int  crispasr_kokoro_lang_is_german_abi(const char* lang);
-int  crispasr_kokoro_lang_has_native_voice_abi(const char* lang);
-
-// --- Registry by filename ---
-int crispasr_registry_lookup_by_filename_abi(const char* filename, char* out_filename, int filename_cap,
-                                             char* out_url, int url_cap, char* out_size, int size_cap);
-int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
-int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int backend_cap,
-                                              char* out_license, int license_cap, int* out_requires_acceptance);
-int crispasr_registry_default_bundle_artifact_abi(const char* backend, int index, int* out_kind,
-                                                  char* out_filename, int filename_cap, char* out_url,
-                                                  int url_cap, char* out_size, int size_cap);
-
-// --- Session extras ---
-int crispasr_session_available_backends(char* out_csv, int out_cap);
-int crispasr_session_detected_language(CrispasrSession* s, char* out_buf, int out_cap);
-// CTC vocabulary access (Omni CTC backend): n_vocab piece count, token_text
-// maps an id to its raw piece (word-boundary marker intact) or "" when out of
-// range / unsupported. Pairs with the result logits accessor for detokenization.
-int          crispasr_session_n_vocab(CrispasrSession* s);
-const char*  crispasr_session_token_text(CrispasrSession* s, int id);
-CrispasrSession* crispasr_session_open_explicit(const char* model_path, const char* backend_name, int n_threads);
-CrispasrSession* crispasr_session_open_with_params(const char* model_path, const char* backend_name, const void* params);
-crispasr_session_result* crispasr_session_transcribe_vad_lang(CrispasrSession* s, const float* pcm, int n_samples,
-                                                              int sample_rate, const char* vad_model_path, void* opts,
-                                                              const char* language);
-char* crispasr_session_translate_text(CrispasrSession* s, const char* text, const char* src_lang,
-                                      const char* tgt_lang, int max_tokens);
-void  crispasr_session_translate_text_free(char* text);
-int   crispasr_session_result_word_n_alts(crispasr_session_result* r, int i_seg, int i_word);
-const char* crispasr_session_result_word_alt_text(crispasr_session_result* r, int i_seg, int i_word, int i_alt);
-float crispasr_session_result_word_alt_p(crispasr_session_result* r, int i_seg, int i_word, int i_alt);
 */
 import "C"
 
@@ -383,12 +85,36 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime/cgo"
+	"strings"
+	"sync/atomic"
 	"unsafe"
 )
 
 // CrispasrSession is a TTS/S2S-capable session (kokoro, vibevoice, qwen3-tts, moss-tts, orpheus, parler-tts, pocket-tts, tada, lfm2-audio, mini-omni2).
 type CrispasrSession struct {
-	handle *C.CrispasrSession
+	handle           *C.CrispasrSession
+	callbackActive   atomic.Bool
+	streams          map[*Stream]struct{}
+	progressCallback func(int, int)
+	progressHandle   cgo.Handle
+	segmentCallback  func(string, int64, int64, int)
+	segmentHandle    cgo.Handle
+	tokenCallback    func([]byte, int)
+	tokenHandle      cgo.Handle
+	callbackErr      error
+}
+
+// A session requires external synchronization across goroutines. Callback
+// re-entry is rejected before native can deadlock or close its live model.
+func (s *CrispasrSession) nativeHandle() *C.CrispasrSession {
+	if s == nil {
+		return nil
+	}
+	if s.callbackActive.Load() {
+		panic("do not re-enter a session from its callback")
+	}
+	return s.handle
 }
 
 // SessionOpen opens a backend session for the given model file.
@@ -407,8 +133,36 @@ func SessionOpen(modelPath string, nThreads int) (*CrispasrSession, error) {
 
 // Close releases the session handle.
 func (s *CrispasrSession) Close() {
+	if s != nil && s.callbackActive.Load() {
+		panic("do not close a session from its callback")
+	}
+	if s != nil {
+		for stream := range s.streams {
+			stream.Close()
+		}
+	}
 	if s != nil && s.handle != nil {
-		C.crispasr_session_close(s.handle)
+
+		C.setProgressCallback(s.handle, 0)
+		C.setSegmentCallback(s.handle, 0)
+		C.setTokenCallback(s.handle, 0)
+		if s.progressHandle != 0 {
+			s.progressHandle.Delete()
+			s.progressHandle = 0
+		}
+		if s.segmentHandle != 0 {
+			s.segmentHandle.Delete()
+			s.segmentHandle = 0
+		}
+		if s.tokenHandle != 0 {
+			s.tokenHandle.Delete()
+			s.tokenHandle = 0
+		}
+		s.progressCallback = nil
+		s.segmentCallback = nil
+		s.tokenCallback = nil
+		s.callbackErr = nil
+		C.crispasr_session_close(s.nativeHandle())
 		s.handle = nil
 	}
 }
@@ -417,7 +171,9 @@ func (s *CrispasrSession) Close() {
 // No-op for non-kokoro backends. Useful for long-running daemons that
 // resynthesize across many speakers and want bounded memory. (PLAN #56 #5)
 func (s *CrispasrSession) ClearPhonemeCache() error {
-	rc := C.crispasr_session_kokoro_clear_phoneme_cache(s.handle)
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_kokoro_clear_phoneme_cache(s.nativeHandle())
 	if rc != 0 {
 		return errors.New("crispasr_session_kokoro_clear_phoneme_cache failed")
 	}
@@ -431,9 +187,11 @@ func (s *CrispasrSession) ClearPhonemeCache() error {
 // SetSourceLanguage sets the sticky source-language hint (canary, cohere,
 // voxtral, whisper). Empty string clears. Per-call language args still win.
 func (s *CrispasrSession) SetSourceLanguage(lang string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))
-	rc := C.crispasr_session_set_source_language(s.handle, cl)
+	rc := C.crispasr_session_set_source_language(s.nativeHandle(), cl)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_source_language failed")
 	}
@@ -446,9 +204,11 @@ func (s *CrispasrSession) SetSourceLanguage(lang string) error {
 // segments. Open its tower GGUF with the matching decoder beside it; a sibling
 // Silero v6.2 companion enables the released full-file window recipe.
 func (s *CrispasrSession) SetTargetLanguage(lang string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))
-	rc := C.crispasr_session_set_target_language(s.handle, cl)
+	rc := C.crispasr_session_set_target_language(s.nativeHandle(), cl)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_target_language failed")
 	}
@@ -466,9 +226,11 @@ func (s *CrispasrSession) SetTargetLanguage(lang string) error {
 // transcript. When it declines, the requested target language has no effect —
 // set this to make it explicit. Empty string clears.
 func (s *CrispasrSession) SetTTSReferenceLanguage(lang string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))
-	rc := C.crispasr_session_set_tts_reference_language(s.handle, cl)
+	rc := C.crispasr_session_set_tts_reference_language(s.nativeHandle(), cl)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_tts_reference_language failed")
 	}
@@ -478,11 +240,13 @@ func (s *CrispasrSession) SetTTSReferenceLanguage(lang string) error {
 // SetPunctuation toggles punctuation + capitalisation in the output
 // (canary/cohere natively; LLM backends via post-process strip). Default true.
 func (s *CrispasrSession) SetPunctuation(enable bool) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	v := C.int(0)
 	if enable {
 		v = 1
 	}
-	rc := C.crispasr_session_set_punctuation(s.handle, v)
+	rc := C.crispasr_session_set_punctuation(s.nativeHandle(), v)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_punctuation failed")
 	}
@@ -495,9 +259,11 @@ func (s *CrispasrSession) SetPunctuation(enable bool) error {
 // backends that emit none (parakeet RNNT/CTC, etc.) — the same post-processor
 // the CLI --punc-model and the server apply.
 func (s *CrispasrSession) SetPuncModel(model string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cm := C.CString(model)
 	defer C.free(unsafe.Pointer(cm))
-	rc := C.crispasr_session_set_punc_model(s.handle, cm)
+	rc := C.crispasr_session_set_punc_model(s.nativeHandle(), cm)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_punc_model failed")
 	}
@@ -508,9 +274,11 @@ func (s *CrispasrSession) SetPuncModel(model string) error {
 // `boost` log-prob per token match (parakeet CTC/TDT trie, LLM backends prompt
 // injection). Empty string clears.
 func (s *CrispasrSession) SetHotwords(hotwords string, boost float32) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	ch := C.CString(hotwords)
 	defer C.free(unsafe.Pointer(ch))
-	rc := C.crispasr_session_set_hotwords(s.handle, ch, C.float(boost))
+	rc := C.crispasr_session_set_hotwords(s.nativeHandle(), ch, C.float(boost))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_hotwords failed")
 	}
@@ -527,9 +295,11 @@ func (s *CrispasrSession) SetHotwords(hotwords string, boost float32) error {
 // SetFallbackThresholds overrides this. An unrecognised name is rejected
 // rather than silently treated as "balanced".
 func (s *CrispasrSession) SetSensitivity(preset string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cp := C.CString(preset)
 	defer C.free(unsafe.Pointer(cp))
-	rc := C.crispasr_session_set_sensitivity(s.handle, cp)
+	rc := C.crispasr_session_set_sensitivity(s.nativeHandle(), cp)
 	if rc == -2 {
 		return errors.New("unknown sensitivity preset (expected: conservative, balanced, aggressive)")
 	}
@@ -542,11 +312,13 @@ func (s *CrispasrSession) SetSensitivity(preset string) error {
 // SetTranslate enables whisper sticky --translate. For canary/cohere/voxtral
 // the equivalent is SetTargetLanguage ≠ source.
 func (s *CrispasrSession) SetTranslate(enable bool) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	v := C.int(0)
 	if enable {
 		v = 1
 	}
-	rc := C.crispasr_session_set_translate(s.handle, v)
+	rc := C.crispasr_session_set_translate(s.nativeHandle(), v)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_translate failed")
 	}
@@ -557,7 +329,9 @@ func (s *CrispasrSession) SetTranslate(enable bool) error {
 // runtime control (canary, cohere, parakeet, moonshine). Other backends
 // silently no-op. seed is the RNG seed; pass 0 for time-based.
 func (s *CrispasrSession) SetTemperature(temperature float32, seed uint64) error {
-	rc := C.crispasr_session_set_temperature(s.handle, C.float(temperature), C.ulonglong(seed))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_temperature(s.nativeHandle(), C.float(temperature), C.uint64_t(seed))
 	// rc == -2 means no backend in this session honours it — soft no-op.
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_temperature failed")
@@ -569,7 +343,9 @@ func (s *CrispasrSession) SetTemperature(temperature float32, seed uint64) error
 // reseeding (chatterbox, vibevoice, qwen3-tts, orpheus). Other backends
 // silently no-op.
 func (s *CrispasrSession) SetTTSSeed(seed uint64) error {
-	rc := C.crispasr_session_set_tts_seed(s.handle, C.ulonglong(seed))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_tts_seed(s.nativeHandle(), C.uint64_t(seed))
 	// rc == -2 means no backend in this session honours it — soft no-op.
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_tts_seed failed")
@@ -580,7 +356,9 @@ func (s *CrispasrSession) SetTTSSeed(seed uint64) error {
 // SetMaxNewTokens sets a generated-token cap for autoregressive session
 // backends. Pass <= 0 to clear the override and use the backend default.
 func (s *CrispasrSession) SetMaxNewTokens(maxNewTokens int) error {
-	rc := C.crispasr_session_set_max_new_tokens(s.handle, C.int(maxNewTokens))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_max_new_tokens(s.nativeHandle(), C.int(maxNewTokens))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_max_new_tokens failed")
 	}
@@ -590,7 +368,9 @@ func (s *CrispasrSession) SetMaxNewTokens(maxNewTokens int) error {
 // SetFrequencyPenalty sets an opt-in repeated generated-token penalty for
 // autoregressive session backends. Pass <= 0 to disable it.
 func (s *CrispasrSession) SetFrequencyPenalty(penalty float32) error {
-	rc := C.crispasr_session_set_frequency_penalty(s.handle, C.float(penalty))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_frequency_penalty(s.nativeHandle(), C.float(penalty))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_frequency_penalty failed")
 	}
@@ -601,7 +381,9 @@ func (s *CrispasrSession) SetFrequencyPenalty(penalty float32) error {
 // step-based TTS backends (chatterbox, vibevoice, kugelaudio, tada, irodori, supertonic,
 // omnivoice). Higher = better fidelity, slower. Other backends silently no-op.
 func (s *CrispasrSession) SetTTSSteps(steps int) error {
-	rc := C.crispasr_session_set_tts_steps(s.handle, C.int(steps))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_tts_steps(s.nativeHandle(), C.int(steps))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_tts_steps failed")
 	}
@@ -612,7 +394,9 @@ func (s *CrispasrSession) SetTTSSteps(steps int) error {
 // ranked per token (TADA). Higher = more reliable multilingual timing at
 // higher cost. Other backends silently no-op.
 func (s *CrispasrSession) SetTTSNumCandidates(n int) error {
-	rc := C.crispasr_session_set_tts_num_candidates(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_tts_num_candidates(s.nativeHandle(), C.int(n))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_tts_num_candidates failed")
 	}
@@ -621,7 +405,9 @@ func (s *CrispasrSession) SetTTSNumCandidates(n int) error {
 
 // SetTopP sets the top-p nucleus-sampling threshold. Honoured by chatterbox.
 func (s *CrispasrSession) SetTopP(topP float32) error {
-	rc := C.crispasr_session_set_top_p(s.handle, C.float(topP))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_top_p(s.nativeHandle(), C.float(topP))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_top_p failed")
 	}
@@ -630,7 +416,9 @@ func (s *CrispasrSession) SetTopP(topP float32) error {
 
 // SetTopK sets the top-k sampling cutoff (0 = disabled). Honoured by TADA.
 func (s *CrispasrSession) SetTopK(topK int) error {
-	rc := C.crispasr_session_set_top_k(s.handle, C.int(topK))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_top_k(s.nativeHandle(), C.int(topK))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_top_k failed")
 	}
@@ -639,11 +427,13 @@ func (s *CrispasrSession) SetTopK(topK int) error {
 
 // SetDoSample enables/disables sampling (false = greedy). Honoured by TADA.
 func (s *CrispasrSession) SetDoSample(enable bool) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cEnable := C.int(0)
 	if enable {
 		cEnable = C.int(1)
 	}
-	rc := C.crispasr_session_set_do_sample(s.handle, cEnable)
+	rc := C.crispasr_session_set_do_sample(s.nativeHandle(), cEnable)
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_do_sample failed")
 	}
@@ -652,7 +442,9 @@ func (s *CrispasrSession) SetDoSample(enable bool) error {
 
 // SetMinP sets the min-p sampling threshold. Honoured by chatterbox.
 func (s *CrispasrSession) SetMinP(minP float32) error {
-	rc := C.crispasr_session_set_min_p(s.handle, C.float(minP))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_min_p(s.nativeHandle(), C.float(minP))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_min_p failed")
 	}
@@ -662,7 +454,9 @@ func (s *CrispasrSession) SetMinP(minP float32) error {
 // SetRepetitionPenalty sets the repetition penalty (1.0 = no penalty).
 // Honoured by chatterbox.
 func (s *CrispasrSession) SetRepetitionPenalty(r float32) error {
-	rc := C.crispasr_session_set_repetition_penalty(s.handle, C.float(r))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_repetition_penalty(s.nativeHandle(), C.float(r))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_repetition_penalty failed")
 	}
@@ -672,7 +466,9 @@ func (s *CrispasrSession) SetRepetitionPenalty(r float32) error {
 // SetCFGWeight sets the classifier-free-guidance weight (chatterbox).
 // 0 disables CFG; 0.5 is the upstream default.
 func (s *CrispasrSession) SetCFGWeight(cfgWeight float32) error {
-	rc := C.crispasr_session_set_cfg_weight(s.handle, C.float(cfgWeight))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_cfg_weight(s.nativeHandle(), C.float(cfgWeight))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_cfg_weight failed")
 	}
@@ -682,7 +478,9 @@ func (s *CrispasrSession) SetCFGWeight(cfgWeight float32) error {
 // SetTtsNoiseTemp sets the TADA flow-matching noise temperature
 // (Python noise_temp, default 0.9).
 func (s *CrispasrSession) SetTtsNoiseTemp(noiseTemp float32) error {
-	rc := C.crispasr_session_set_tts_noise_temp(s.handle, C.float(noiseTemp))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_tts_noise_temp(s.nativeHandle(), C.float(noiseTemp))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_tts_noise_temp failed")
 	}
@@ -692,7 +490,9 @@ func (s *CrispasrSession) SetTtsNoiseTemp(noiseTemp float32) error {
 // SetExaggeration sets the emotion-exaggeration scalar (chatterbox).
 // 0.5 is the upstream default.
 func (s *CrispasrSession) SetExaggeration(exaggeration float32) error {
-	rc := C.crispasr_session_set_exaggeration(s.handle, C.float(exaggeration))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_exaggeration(s.nativeHandle(), C.float(exaggeration))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_exaggeration failed")
 	}
@@ -702,7 +502,9 @@ func (s *CrispasrSession) SetExaggeration(exaggeration float32) error {
 // SetMaxSpeechTokens sets the upper bound on speech tokens generated per
 // synthesize call (chatterbox). Default ≈1000 tokens ≈ 20 s.
 func (s *CrispasrSession) SetMaxSpeechTokens(n int) error {
-	rc := C.crispasr_session_set_max_speech_tokens(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_max_speech_tokens(s.nativeHandle(), C.int(n))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_max_speech_tokens failed")
 	}
@@ -711,7 +513,9 @@ func (s *CrispasrSession) SetMaxSpeechTokens(n int) error {
 
 // SetMinSpeechTokens sets the floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s; other backends no-op (rc=-2).
 func (s *CrispasrSession) SetMinSpeechTokens(n int) error {
-	rc := C.crispasr_session_set_min_speech_tokens(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_min_speech_tokens(s.nativeHandle(), C.int(n))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_min_speech_tokens failed")
 	}
@@ -722,7 +526,9 @@ func (s *CrispasrSession) SetMinSpeechTokens(n int) error {
 // TTS backends with a duration model. Honoured by kokoro today; other backends
 // silently no-op. 1.0 = upstream default; >1.0 = slower; <1.0 = faster.
 func (s *CrispasrSession) SetLengthScale(scale float32) error {
-	rc := C.crispasr_session_set_length_scale(s.handle, C.float(scale))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_length_scale(s.nativeHandle(), C.float(scale))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_length_scale failed")
 	}
@@ -732,9 +538,11 @@ func (s *CrispasrSession) SetLengthScale(scale float32) error {
 // SetG2PDict selects the G2P pronunciation dictionary source for TTS backends:
 // "olaph" (MIT, default), "open-dict" (CC-BY-SA), or a file path.
 func (s *CrispasrSession) SetG2PDict(source string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cs := C.CString(source)
 	defer C.free(unsafe.Pointer(cs))
-	rc := C.crispasr_session_set_g2p_dict(s.handle, cs)
+	rc := C.crispasr_session_set_g2p_dict(s.nativeHandle(), cs)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_g2p_dict failed")
 	}
@@ -743,7 +551,9 @@ func (s *CrispasrSession) SetG2PDict(source string) error {
 
 // SetBestOf sets the best-of-N sampling count for ASR backends.
 func (s *CrispasrSession) SetBestOf(n int) error {
-	rc := C.crispasr_session_set_best_of(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_best_of(s.nativeHandle(), C.int(n))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_best_of failed")
 	}
@@ -752,7 +562,9 @@ func (s *CrispasrSession) SetBestOf(n int) error {
 
 // SetBeamSize sets the beam-search width for ASR backends that support it.
 func (s *CrispasrSession) SetBeamSize(n int) error {
-	rc := C.crispasr_session_set_beam_size(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_beam_size(s.nativeHandle(), C.int(n))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_beam_size failed")
 	}
@@ -766,11 +578,13 @@ func (s *CrispasrSession) SetBeamSize(n int) error {
 // consumer (e.g. forced alignment) needs the logits. Retrieve them with
 // TranscribeWithLogits.
 func (s *CrispasrSession) SetReturnLogits(on bool) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	enable := C.int(0)
 	if on {
 		enable = 1
 	}
-	rc := C.crispasr_session_set_return_logits(s.handle, enable)
+	rc := C.crispasr_session_set_return_logits(s.nativeHandle(), enable)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_return_logits failed")
 	}
@@ -781,6 +595,8 @@ func (s *CrispasrSession) SetReturnLogits(on bool) error {
 // Pass an empty gbnfText to clear the grammar. penalty is the grammar
 // penalty scalar (default 100.0).
 func (s *CrispasrSession) SetGrammarText(gbnfText, rootRule string, penalty float32) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	var cgbnf *C.char
 	if gbnfText != "" {
 		cgbnf = C.CString(gbnfText)
@@ -791,7 +607,7 @@ func (s *CrispasrSession) SetGrammarText(gbnfText, rootRule string, penalty floa
 		croot = C.CString(rootRule)
 		defer C.free(unsafe.Pointer(croot))
 	}
-	rc := C.crispasr_session_set_grammar_text(s.handle, cgbnf, croot, C.float(penalty))
+	rc := C.crispasr_session_set_grammar_text(s.nativeHandle(), cgbnf, croot, C.float(penalty))
 	if rc == -2 {
 		return errors.New("set_grammar_text: invalid GBNF or root rule not found")
 	}
@@ -804,7 +620,9 @@ func (s *CrispasrSession) SetGrammarText(gbnfText, rootRule string, penalty floa
 // SetFallbackThresholds sets whisper decoder fallback thresholds.
 // temperatureInc=0 disables fallback entirely (equivalent to --no-fallback).
 func (s *CrispasrSession) SetFallbackThresholds(entropyThold, logprobThold, noSpeechThold, temperatureInc float32) error {
-	rc := C.crispasr_session_set_fallback_thresholds(s.handle,
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_fallback_thresholds(s.nativeHandle(),
 		C.float(entropyThold), C.float(logprobThold),
 		C.float(noSpeechThold), C.float(temperatureInc))
 	if rc != 0 {
@@ -816,7 +634,9 @@ func (s *CrispasrSession) SetFallbackThresholds(entropyThold, logprobThold, noSp
 // SetAltN sets per-token top-N alternative-candidate capture for whisper
 // greedy decode. 0 disables it.
 func (s *CrispasrSession) SetAltN(n int) error {
-	rc := C.crispasr_session_set_alt_n(s.handle, C.int(n))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_alt_n(s.nativeHandle(), C.int(n))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_alt_n failed")
 	}
@@ -826,6 +646,8 @@ func (s *CrispasrSession) SetAltN(n int) error {
 // SetWhisperDecodeExtras sets whisper-only text-suppression and prompt-carry
 // extras. suppressRegex may be empty to clear any prior regex.
 func (s *CrispasrSession) SetWhisperDecodeExtras(suppressNST bool, suppressRegex string, carryInitialPrompt bool) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	var cregex *C.char
 	if suppressRegex != "" {
 		cregex = C.CString(suppressRegex)
@@ -842,7 +664,7 @@ func (s *CrispasrSession) SetWhisperDecodeExtras(suppressNST bool, suppressRegex
 	if carryInitialPrompt {
 		carry = 1
 	}
-	rc := C.crispasr_session_set_whisper_decode_extras(s.handle, C.int(snst), cregex, C.int(carry))
+	rc := C.crispasr_session_set_whisper_decode_extras(s.nativeHandle(), C.int(snst), cregex, C.int(carry))
 	if rc != 0 {
 		return errors.New("crispasr_session_set_whisper_decode_extras failed")
 	}
@@ -852,9 +674,11 @@ func (s *CrispasrSession) SetWhisperDecodeExtras(suppressNST bool, suppressRegex
 // SetAsk sets a free-form prompt / question passed to the backend on the next
 // transcribe or synthesize call (used by LLM-style backends).
 func (s *CrispasrSession) SetAsk(prompt string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cprompt := C.CString(prompt)
 	defer C.free(unsafe.Pointer(cprompt))
-	rc := C.crispasr_session_set_ask(s.handle, cprompt)
+	rc := C.crispasr_session_set_ask(s.nativeHandle(), cprompt)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_ask failed")
 	}
@@ -869,6 +693,27 @@ func (s *CrispasrSession) SetAsk(prompt string) error {
 // Feed PCM, pull text. Whisper-only at the C-ABI level today.
 type Stream struct {
 	handle *C.CrispasrStream
+	owner  *CrispasrSession
+}
+
+func (st *Stream) nativeHandle() *C.CrispasrStream {
+	if st.owner != nil {
+		st.owner.nativeHandle()
+	}
+	return st.handle
+}
+
+// SetLiveDecode enables partial decoding between commits on supported backends.
+func (st *Stream) SetLiveDecode(enabled bool) error {
+	if st == nil || st.handle == nil {
+		return errors.New("stream is closed")
+	}
+	value := C.int(0)
+	if enabled {
+		value = 1
+	}
+	C.crispasr_stream_set_live_decode(st.nativeHandle(), value)
+	return nil
 }
 
 // StreamingUpdate is one commit from a streaming session — the latest
@@ -884,7 +729,9 @@ type StreamingUpdate struct {
 // StreamKind returns 0 for unavailable streaming, 1 for rolling windows,
 // 2 for persistent model caches, or 3 for text-prefix streaming.
 func (s *CrispasrSession) StreamKind() int {
-	return int(C.crispasr_session_stream_kind(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	return int(C.crispasr_session_stream_kind(s.nativeHandle()))
 }
 
 // StreamOpen opens a rolling-window streaming decoder for this session.
@@ -892,26 +739,36 @@ func (s *CrispasrSession) StreamKind() int {
 // how often to commit a partial transcript; lengthMs (default 10000) is
 // the rolling window; keepMs (default 200) is the trailing audio carried.
 func (s *CrispasrSession) StreamOpen(stepMs, lengthMs, keepMs int, language string, translate bool) (*Stream, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	clang := C.CString(language)
 	defer C.free(unsafe.Pointer(clang))
 	tr := C.int(0)
 	if translate {
 		tr = 1
 	}
-	h := C.crispasr_session_stream_open(s.handle, C.int(4), C.int(stepMs), C.int(lengthMs), C.int(keepMs), clang, tr)
+	h := C.crispasr_session_stream_open(s.nativeHandle(), C.int(4), C.int(stepMs), C.int(lengthMs), C.int(keepMs), clang, tr)
 	if h == nil {
 		return nil, errors.New("crispasr_session_stream_open failed")
 	}
-	return &Stream{handle: h}, nil
+	stream := &Stream{handle: h, owner: s}
+	if s.streams == nil {
+		s.streams = make(map[*Stream]struct{})
+	}
+	s.streams[stream] = struct{}{}
+	return stream, nil
 }
 
 // Feed pushes 16 kHz mono float32 PCM. Returns 0 if still buffering, 1 if
 // a new partial transcript is ready (call GetText).
 func (st *Stream) Feed(pcm []float32) (int, error) {
+	if st == nil || st.handle == nil {
+		return 0, errors.New("stream is closed")
+	}
 	if len(pcm) == 0 {
 		return 0, nil
 	}
-	rc := C.crispasr_stream_feed(st.handle, (*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)))
+	rc := C.crispasr_stream_feed(st.nativeHandle(), (*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)))
 	if rc < 0 {
 		return 0, errors.New("crispasr_stream_feed failed")
 	}
@@ -920,10 +777,13 @@ func (st *Stream) Feed(pcm []float32) (int, error) {
 
 // GetText returns the latest committed transcript + absolute audio-time bounds.
 func (st *Stream) GetText() (StreamingUpdate, error) {
+	if st == nil || st.handle == nil {
+		return StreamingUpdate{}, errors.New("stream is closed")
+	}
 	var buf [8192]C.char
 	var t0, t1 C.double
-	var counter C.longlong
-	rc := C.crispasr_stream_get_text(st.handle, &buf[0], C.int(len(buf)), &t0, &t1, &counter)
+	var counter C.int64_t
+	rc := C.crispasr_stream_get_text(st.nativeHandle(), &buf[0], C.int(len(buf)), &t0, &t1, &counter)
 	if rc < 0 {
 		return StreamingUpdate{}, errors.New("crispasr_stream_get_text failed")
 	}
@@ -937,7 +797,10 @@ func (st *Stream) GetText() (StreamingUpdate, error) {
 
 // Flush finalises any remaining buffered audio.
 func (st *Stream) Flush() error {
-	if rc := C.crispasr_stream_flush(st.handle); rc < 0 {
+	if st == nil || st.handle == nil {
+		return errors.New("stream is closed")
+	}
+	if rc := C.crispasr_stream_flush(st.nativeHandle()); rc < 0 {
 		return errors.New("crispasr_stream_flush failed")
 	}
 	return nil
@@ -945,9 +808,18 @@ func (st *Stream) Flush() error {
 
 // Close releases the streaming handle.
 func (st *Stream) Close() {
+	if st == nil || st.handle == nil {
+		return
+	}
+	if st != nil && st.owner != nil {
+		st.owner.nativeHandle()
+	}
 	if st != nil && st.handle != nil {
-		C.crispasr_stream_close(st.handle)
+		C.crispasr_stream_close(st.nativeHandle())
 		st.handle = nil
+		if st.owner != nil {
+			delete(st.owner.streams, st)
+		}
 	}
 }
 
@@ -955,6 +827,8 @@ func (st *Stream) Close() {
 // method: 0=Whisper, 1=Silero (default), 2=Firered, 3=Ecapa.
 // Returns the ISO 639-1 code and the model's confidence in [0, 1].
 func (s *CrispasrSession) DetectLanguage(pcm []float32, lidModelPath string, method int) (string, float32, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	cpath := C.CString(lidModelPath)
 	defer C.free(unsafe.Pointer(cpath))
 	var outLang [16]C.char
@@ -963,7 +837,7 @@ func (s *CrispasrSession) DetectLanguage(pcm []float32, lidModelPath string, met
 	if len(pcm) > 0 {
 		pcmPtr = (*C.float)(unsafe.Pointer(&pcm[0]))
 	}
-	rc := C.crispasr_session_detect_language(s.handle, pcmPtr, C.int(len(pcm)), cpath, C.int(method),
+	rc := C.crispasr_session_detect_language(s.nativeHandle(), pcmPtr, C.int(len(pcm)), cpath, C.int(method),
 		&outLang[0], C.int(len(outLang)), &outProb)
 	if rc != 0 {
 		return "", 0, errors.New("crispasr_session_detect_language failed")
@@ -974,10 +848,168 @@ func (s *CrispasrSession) DetectLanguage(pcm []float32, lidModelPath string, met
 // SetCodecPath loads a separate codec GGUF.
 // Required for qwen3-tts (12 Hz tokenizer) and orpheus (SNAC codec);
 // no-op for other backends.
+func (s *CrispasrSession) takeCallbackError() error {
+	if s == nil {
+		return nil
+	}
+	if s.callbackErr != nil {
+		err := s.callbackErr
+		s.callbackErr = nil
+		return err
+	}
+	return nil
+}
+
+func (s *CrispasrSession) SetProgressCallback(cb func(int, int)) {
+	s.nativeHandle()
+	if s == nil || s.nativeHandle() == nil {
+		panic("session is closed")
+	}
+	if s.progressHandle != 0 {
+		C.setProgressCallback(s.handle, 0)
+		s.progressHandle.Delete()
+		s.progressHandle = 0
+		s.progressCallback = nil
+	}
+	if cb == nil {
+		return
+	}
+	s.progressCallback = cb
+	s.progressHandle = cgo.NewHandle(s)
+	C.setProgressCallback(s.handle, C.uintptr_t(s.progressHandle))
+}
+
+func (s *CrispasrSession) SetSegmentCallback(cb func(string, int64, int64, int)) {
+	s.nativeHandle()
+	if s == nil || s.nativeHandle() == nil {
+		panic("session is closed")
+	}
+	if s.segmentHandle != 0 {
+		C.setSegmentCallback(s.handle, 0)
+		s.segmentHandle.Delete()
+		s.segmentHandle = 0
+		s.segmentCallback = nil
+	}
+	if cb == nil {
+		return
+	}
+	s.segmentCallback = cb
+	s.segmentHandle = cgo.NewHandle(s)
+	C.setSegmentCallback(s.handle, C.uintptr_t(s.segmentHandle))
+}
+
+func (s *CrispasrSession) SetTokenCallback(cb func([]byte, int)) {
+	s.nativeHandle()
+	if s == nil || s.nativeHandle() == nil {
+		panic("session is closed")
+	}
+	if s.tokenHandle != 0 {
+		C.setTokenCallback(s.handle, 0)
+		s.tokenHandle.Delete()
+		s.tokenHandle = 0
+		s.tokenCallback = nil
+	}
+	if cb == nil {
+		return
+	}
+	s.tokenCallback = cb
+	s.tokenHandle = cgo.NewHandle(s)
+	C.setTokenCallback(s.handle, C.uintptr_t(s.tokenHandle))
+}
+
+//export goProgressCallback
+func goProgressCallback(processed C.int, total C.int, user C.uintptr_t) {
+	if user == 0 {
+		return
+	}
+	h := cgo.Handle(user)
+	s := h.Value().(*CrispasrSession)
+	if s.progressCallback == nil {
+		return
+	}
+	if s.callbackErr != nil {
+		return
+	}
+	func() {
+		defer func() {
+			s.callbackActive.Store(false)
+			if r := recover(); r != nil {
+				s.callbackErr = fmt.Errorf("progress callback panic: %v", r)
+			}
+		}()
+		s.callbackActive.Store(true)
+		s.progressCallback(int(processed), int(total))
+	}()
+}
+
+//export goSegmentCallback
+func goSegmentCallback(text *C.char, t0 C.long, t1 C.long, index C.int, user C.uintptr_t) {
+	if user == 0 {
+		return
+	}
+	h := cgo.Handle(user)
+	s := h.Value().(*CrispasrSession)
+	if s.segmentCallback == nil {
+		return
+	}
+	if s.callbackErr != nil {
+		return
+	}
+	func() {
+		defer func() {
+			s.callbackActive.Store(false)
+			if r := recover(); r != nil {
+				s.callbackErr = fmt.Errorf("segment callback panic: %v", r)
+			}
+		}()
+		s.callbackActive.Store(true)
+		var txt string
+		if text != nil {
+			txt = C.GoString(text)
+		}
+		s.segmentCallback(txt, int64(t0), int64(t1), int(index))
+	}()
+}
+
+//export goTokenCallback
+func goTokenCallback(tokenText *C.char, index C.int, user C.uintptr_t) {
+	if user == 0 {
+		return
+	}
+	h := cgo.Handle(user)
+	s := h.Value().(*CrispasrSession)
+	if s.tokenCallback == nil {
+		return
+	}
+	if s.callbackErr != nil {
+		return
+	}
+	func() {
+		defer func() {
+			s.callbackActive.Store(false)
+			if r := recover(); r != nil {
+				s.callbackErr = fmt.Errorf("token callback panic: %v", r)
+			}
+		}()
+		s.callbackActive.Store(true)
+		var tok []byte
+		if tokenText != nil {
+			l := C.strlen(tokenText)
+			tok = C.GoBytes(unsafe.Pointer(tokenText), C.int(l))
+			cp := make([]byte, len(tok))
+			copy(cp, tok)
+			tok = cp
+		}
+		s.tokenCallback(tok, int(index))
+	}()
+}
+
 func (s *CrispasrSession) SetCodecPath(path string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
-	rc := C.crispasr_session_set_codec_path(s.handle, cpath)
+	rc := C.crispasr_session_set_codec_path(s.nativeHandle(), cpath)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_codec_path failed")
 	}
@@ -991,6 +1023,8 @@ func (s *CrispasrSession) SetCodecPath(path string) error {
 // For MioTTS pass a preset embedding GGUF; save PCM at OutputSampleRate().
 // For orpheus voice selection is BY NAME — use SetSpeakerName instead.
 func (s *CrispasrSession) SetVoice(path, refText string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 	var rtPtr *C.char
@@ -999,7 +1033,7 @@ func (s *CrispasrSession) SetVoice(path, refText string) error {
 		defer C.free(unsafe.Pointer(crt))
 		rtPtr = crt
 	}
-	rc := C.crispasr_session_set_voice(s.handle, cpath, rtPtr)
+	rc := C.crispasr_session_set_voice(s.nativeHandle(), cpath, rtPtr)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_voice failed")
 	}
@@ -1011,9 +1045,11 @@ func (s *CrispasrSession) SetVoice(path, refText string) error {
 // e.g. "tara"/"leo" for the canopylabs English finetune; "Anton"/"Sophie"
 // for the Kartoffel_Orpheus DE finetunes. Use Speakers() to enumerate.
 func (s *CrispasrSession) SetSpeakerName(name string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cname := C.CString(name)
 	defer C.free(unsafe.Pointer(cname))
-	rc := C.crispasr_session_set_speaker_name(s.handle, cname)
+	rc := C.crispasr_session_set_speaker_name(s.nativeHandle(), cname)
 	switch rc {
 	case 0:
 		return nil
@@ -1031,7 +1067,9 @@ func (s *CrispasrSession) SetSpeakerName(name string) error {
 // range is [0, NSpeakers()-1]. Use SetSpeakerName for name-based
 // backends like orpheus.
 func (s *CrispasrSession) SetSpeakerID(id int) error {
-	rc := C.crispasr_session_set_speaker_id(s.handle, C.int(id))
+	s.nativeHandle()
+	s.nativeHandle()
+	rc := C.crispasr_session_set_speaker_id(s.nativeHandle(), C.int(id))
 	switch rc {
 	case 0:
 		return nil
@@ -1048,7 +1086,9 @@ func (s *CrispasrSession) SetSpeakerID(id int) error {
 // Works for both name-based (orpheus, qwen3-tts) and index-based
 // (melotts, piper, fastpitch) backends.
 func (s *CrispasrSession) NSpeakers() int {
-	return int(C.crispasr_session_n_speakers(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	return int(C.crispasr_session_n_speakers(s.nativeHandle()))
 }
 
 // SetInstruct sets the natural-language voice description for
@@ -1056,9 +1096,11 @@ func (s *CrispasrSession) NSpeakers() int {
 // Required before Synthesize when the loaded backend is VoiceDesign.
 // Detect via IsVoiceDesign().
 func (s *CrispasrSession) SetInstruct(instruct string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cins := C.CString(instruct)
 	defer C.free(unsafe.Pointer(cins))
-	rc := C.crispasr_session_set_instruct(s.handle, cins)
+	rc := C.crispasr_session_set_instruct(s.nativeHandle(), cins)
 	switch rc {
 	case 0:
 		return nil
@@ -1075,9 +1117,11 @@ func (s *CrispasrSession) SetInstruct(instruct string) error {
 // to tell a G2P bug from a model bug (#316). Empty clears.
 // Honoured by kokoro and piper; other backends return a soft no-op error.
 func (s *CrispasrSession) SetTTSPhonemes(phonemes string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	cps := C.CString(phonemes)
 	defer C.free(unsafe.Pointer(cps))
-	rc := C.crispasr_session_set_tts_phonemes(s.handle, cps)
+	rc := C.crispasr_session_set_tts_phonemes(s.nativeHandle(), cps)
 	switch rc {
 	case 0:
 		return nil
@@ -1092,28 +1136,36 @@ func (s *CrispasrSession) SetTTSPhonemes(phonemes string) error {
 // Useful to bypass VLC playback bugs where it drops the first ~1.5s of audio
 // while parsing a large C2PA chunk.
 func (s *CrispasrSession) SetTTSPadSilenceMs(ms int) {
-	C.crispasr_session_set_tts_pad_silence_ms(s.handle, C.int(ms))
+	s.nativeHandle()
+	s.nativeHandle()
+	C.crispasr_session_set_tts_pad_silence_ms(s.nativeHandle(), C.int(ms))
 }
 
 // IsCustomVoice reports whether the loaded model is a qwen3-tts
 // CustomVoice variant (use SetSpeakerName for it).
 func (s *CrispasrSession) IsCustomVoice() bool {
-	return C.crispasr_session_is_custom_voice(s.handle) != 0
+	s.nativeHandle()
+	s.nativeHandle()
+	return C.crispasr_session_is_custom_voice(s.nativeHandle()) != 0
 }
 
 // IsVoiceDesign reports whether the loaded model is a qwen3-tts
 // VoiceDesign variant (use SetInstruct for it).
 func (s *CrispasrSession) IsVoiceDesign() bool {
-	return C.crispasr_session_is_voice_design(s.handle) != 0
+	s.nativeHandle()
+	s.nativeHandle()
+	return C.crispasr_session_is_voice_design(s.nativeHandle()) != 0
 }
 
 // Speakers returns the list of preset speaker names for the active
 // backend. Empty if the backend has no preset-speaker contract.
 func (s *CrispasrSession) Speakers() []string {
-	n := int(C.crispasr_session_n_speakers(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	n := int(C.crispasr_session_n_speakers(s.nativeHandle()))
 	out := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		ptr := C.crispasr_session_get_speaker_name(s.handle, C.int(i))
+		ptr := C.crispasr_session_get_speaker_name(s.nativeHandle(), C.int(i))
 		if ptr != nil {
 			out = append(out, C.GoString(ptr))
 		}
@@ -1124,10 +1176,12 @@ func (s *CrispasrSession) Speakers() []string {
 // Synthesize converts `text` to mono PCM at OutputSampleRate(). Requires a TTS-capable
 // backend (kokoro / vibevoice / qwen3-tts / orpheus / tada).
 func (s *CrispasrSession) Synthesize(text string) ([]float32, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	ctext := C.CString(text)
 	defer C.free(unsafe.Pointer(ctext))
 	var n C.int
-	ptr := C.crispasr_session_synthesize(s.handle, ctext, &n)
+	ptr := C.crispasr_session_synthesize(s.nativeHandle(), ctext, &n)
 	if ptr == nil || n <= 0 {
 		return nil, errors.New("crispasr_session_synthesize: no audio produced")
 	}
@@ -1154,12 +1208,14 @@ func (s *CrispasrSession) Synthesize(text string) ([]float32, error) {
 // Returns an error on an unrecognised value rather than silently downgrading
 // it to "unknown".
 func (s *CrispasrSession) SetSpeakerIdentity(identity string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s == nil || s.handle == nil {
 		return errors.New("session is closed")
 	}
 	cid := C.CString(identity)
 	defer C.free(unsafe.Pointer(cid))
-	switch rc := C.crispasr_session_set_speaker_identity(s.handle, cid); rc {
+	switch rc := C.crispasr_session_set_speaker_identity(s.nativeHandle(), cid); rc {
 	case 0:
 		return nil
 	case -2:
@@ -1174,9 +1230,11 @@ func (s *CrispasrSession) SetSpeakerIdentity(identity string) error {
 // SynthesizeRaw will return UNMARKED audio; the default Synthesize (watermarked)
 // is unaffected. `attestation` is a human-readable affirmation recorded for audit.
 func (s *CrispasrSession) AcceptMarkingResponsibility(attestation string) error {
+	s.nativeHandle()
+	s.nativeHandle()
 	ca := C.CString(attestation)
 	defer C.free(unsafe.Pointer(ca))
-	if C.crispasr_session_accept_marking_responsibility(s.handle, ca) != 0 {
+	if C.crispasr_session_accept_marking_responsibility(s.nativeHandle(), ca) != 0 {
 		return errors.New("crispasr_session_accept_marking_responsibility failed")
 	}
 	return nil
@@ -1187,10 +1245,12 @@ func (s *CrispasrSession) AcceptMarkingResponsibility(attestation string) error 
 // themselves. It is hard-refused unless AcceptMarkingResponsibility was called
 // first. Most callers should use Synthesize, which watermarks by default.
 func (s *CrispasrSession) SynthesizeRaw(text string) ([]float32, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	ctext := C.CString(text)
 	defer C.free(unsafe.Pointer(ctext))
 	var n C.int
-	ptr := C.crispasr_session_synthesize_raw(s.handle, ctext, &n)
+	ptr := C.crispasr_session_synthesize_raw(s.nativeHandle(), ctext, &n)
 	if ptr == nil || n <= 0 {
 		return nil, errors.New("crispasr_session_synthesize_raw: no audio (attestation required? call AcceptMarkingResponsibility first)")
 	}
@@ -1211,13 +1271,14 @@ type SpeechToSpeechResult struct {
 // S2S capability (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). Input is
 // 16 kHz mono float32 PCM.
 func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResult, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if len(samples) == 0 {
 		return nil, errors.New("SpeechToSpeech: empty input")
 	}
 	var textOut *C.char
 	var nOut C.int
-	ptr := C.crispasr_session_speech_to_speech(
-		s.handle,
+	ptr := C.crispasr_session_speech_to_speech(s.nativeHandle(),
 		(*C.float)(unsafe.Pointer(&samples[0])),
 		C.int(len(samples)),
 		&textOut, &nOut)
@@ -1243,14 +1304,18 @@ func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResu
 // native rate, and it varies by backend — so "resample to the native rate"
 // was not actionable from Go, C# or Ruby until this was bound (#321).
 func (s *CrispasrSession) InputSampleRate() int {
-	return int(C.crispasr_session_input_sample_rate(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	return int(C.crispasr_session_input_sample_rate(s.nativeHandle()))
 }
 
 // OutputSampleRate is the rate (Hz) of PCM this backend returns — what
 // SpeechToSpeech and Synthesize hand back. 24 kHz for conversational S2S,
 // 48 kHz for Sidon and VoxCPM2 AudioVAE.
 func (s *CrispasrSession) OutputSampleRate() int {
-	return int(C.crispasr_session_output_sample_rate(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	return int(C.crispasr_session_output_sample_rate(s.nativeHandle()))
 }
 
 // Stem is one separated source from Separate: its name ("vocals", "drums", …)
@@ -1272,13 +1337,14 @@ type Stem struct {
 // separation models). Each stem comes back interleaved stereo. The C side owns
 // the stem buffers only until the next call, so they are copied out here.
 func (s *CrispasrSession) Separate(pcmStereo []float32) ([]Stem, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if len(pcmStereo) < 2 {
 		return nil, errors.New("Separate: needs interleaved stereo PCM")
 	}
 	// The C API counts PER-CHANNEL frames, not floats.
 	nFrames := len(pcmStereo) / 2
-	nStems := C.crispasr_session_separate(
-		s.handle,
+	nStems := C.crispasr_session_separate(s.nativeHandle(),
 		(*C.float)(unsafe.Pointer(&pcmStereo[0])),
 		C.int(nFrames))
 	if nStems <= 0 {
@@ -1286,12 +1352,12 @@ func (s *CrispasrSession) Separate(pcmStereo []float32) ([]Stem, error) {
 	}
 	stems := make([]Stem, 0, int(nStems))
 	for i := 0; i < int(nStems); i++ {
-		name := C.GoString(C.crispasr_session_separate_stem_name(s.handle, C.int(i)))
+		name := C.GoString(C.crispasr_session_separate_stem_name(s.nativeHandle(), C.int(i)))
 		if name == "" {
 			name = fmt.Sprintf("stem%d", i)
 		}
 		var nOut C.int
-		ptr := C.crispasr_session_separate_stem(s.handle, C.int(i), &nOut)
+		ptr := C.crispasr_session_separate_stem(s.nativeHandle(), C.int(i), &nOut)
 		if ptr == nil || nOut <= 0 {
 			return nil, fmt.Errorf("crispasr_session_separate: stem %d (%s) came back empty", i, name)
 		}
@@ -1307,7 +1373,9 @@ func (s *CrispasrSession) Separate(pcmStereo []float32) ([]Stem, error) {
 // SeparateSampleRate is the rate (Hz) of the stems from Separate, and the rate
 // its input must be at. 0 before a separation backend is loaded.
 func (s *CrispasrSession) SeparateSampleRate() int {
-	return int(C.crispasr_session_separate_sample_rate(s.handle))
+	s.nativeHandle()
+	s.nativeHandle()
+	return int(C.crispasr_session_separate_sample_rate(s.nativeHandle()))
 }
 
 // KokoroResolved is the result of KokoroResolveForLang. Mirrors the
@@ -1332,11 +1400,11 @@ type TranscribeResult struct {
 // TranscribeSegment is one segment from a transcription.
 type TranscribeSegment struct {
 	Text  string
-	T0    int64 // centiseconds
+	T0    int64 // centiseconds; -1 = unavailable (check HasTimestamps)
 	T1    int64
 	Words []TranscribeWord
 	// NoSpeechProb is Whisper's per-segment no-speech probability (the
-	// <|nospeech|> posterior) in [0, 1]. Whisper-only; other backends leave
+	// < |nospeech|> posterior) in [0, 1]. Whisper-only; other backends leave
 	// the -1.0 "no data" sentinel.
 	NoSpeechProb float32
 	// Speaker is a native per-segment speaker label from a backend that
@@ -1346,15 +1414,46 @@ type TranscribeSegment struct {
 	// array. The ordinals are CHUNK-LOCAL: "Speaker 1" in one transcribe call
 	// is not necessarily the same voice as "Speaker 1" in the next.
 	Speaker string
+	// Tokens are native token metadata (#549). Empty for backends/routes
+	// without token output. t0/t1 use centiseconds; negative means unavailable.
+	// Token text may contain a UTF-8 byte fragment: concatenate Raw bytes before
+	// decoding to reconstruct the transcript. Copied before native free.
+	Tokens []SessionToken
 }
+
+// HasTimestamps reports whether segment timing is available (-1 sentinel preserved).
+func (s TranscribeSegment) HasTimestamps() bool { return s.T0 >= 0 && s.T1 >= 0 && s.T1 >= s.T0 }
 
 // TranscribeWord is one word with timing and confidence.
 type TranscribeWord struct {
 	Text string
-	T0   int64 // centiseconds
+	T0   int64 // centiseconds; -1 = unavailable
 	T1   int64
-	P    float32 // confidence
+	P    float32 // confidence; -1 if unavailable
+	// Alternatives are word-level alternatives (when alt_n >0). Empty when unavailable.
+	Alternatives []WordAlternative
 }
+
+// HasTimestamps reports whether word timing is available.
+func (w TranscribeWord) HasTimestamps() bool { return w.T0 >= 0 && w.T1 >= 0 && w.T1 >= w.T0 }
+
+// WordAlternative is one alternative candidate for a word.
+type WordAlternative struct {
+	Text string
+	P    float32
+}
+
+// SessionToken is native token metadata with raw bytes preserved.
+type SessionToken struct {
+	Text string // display text decoded with replacement
+	Raw  []byte // lossless raw bytes (may be UTF-8 fragment)
+	T0   int64  // centiseconds; -1 = unavailable
+	T1   int64
+	P    float32 // confidence; -1 if unavailable
+}
+
+// HasTimestamps reports whether token timing is available.
+func (t SessionToken) HasTimestamps() bool { return t.T0 >= 0 && t.T1 >= 0 && t.T1 >= t.T0 }
 
 // CtcLogits holds the per-frame CTC logits captured from a CTC backend (Omni
 // CTC, wav2vec2/hubert/data2vec, or canary-ctc). Data is frame-major:
@@ -1370,12 +1469,16 @@ type CtcLogits struct {
 
 // Transcribe runs ASR on 16 kHz mono float32 PCM.
 func (s *CrispasrSession) Transcribe(pcm []float32) (*TranscribeResult, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	return s.TranscribeLang(pcm, "")
 }
 
 // TranscribeLang transcribes with an explicit language hint (e.g. "en", "de").
 // Pass empty string for auto-detect.
 func (s *CrispasrSession) TranscribeLang(pcm []float32, lang string) (*TranscribeResult, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s.handle == nil {
 		return nil, errors.New("session is closed")
 	}
@@ -1388,12 +1491,19 @@ func (s *CrispasrSession) TranscribeLang(pcm []float32, lang string) (*Transcrib
 		clang = C.CString(lang)
 		defer C.free(unsafe.Pointer(clang))
 	}
-	r := C.crispasr_session_transcribe_lang(s.handle, pcmPtr, C.int(len(pcm)), clang)
+	r := C.crispasr_session_transcribe_lang(s.nativeHandle(), pcmPtr, C.int(len(pcm)), clang)
+	if err := s.takeCallbackError(); err != nil {
+		if r != nil {
+			C.crispasr_session_result_free(r)
+		}
+		return nil, err
+	}
+
 	if r == nil {
 		return nil, errors.New("transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
 // TranscribeWithLogits transcribes 16 kHz mono float32 PCM and also returns the
@@ -1402,6 +1512,8 @@ func (s *CrispasrSession) TranscribeLang(pcm []float32, lang string) (*Transcrib
 // nil for backends that don't produce a dense CTC grid or when the transcript
 // is empty.
 func (s *CrispasrSession) TranscribeWithLogits(pcm []float32) (*TranscribeResult, *CtcLogits, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s.handle == nil {
 		return nil, nil, errors.New("session is closed")
 	}
@@ -1413,12 +1525,27 @@ func (s *CrispasrSession) TranscribeWithLogits(pcm []float32) (*TranscribeResult
 	}
 	defer s.SetReturnLogits(false)
 	pcmPtr := (*C.float)(unsafe.Pointer(&pcm[0]))
-	r := C.crispasr_session_transcribe(s.handle, pcmPtr, C.int(len(pcm)))
+	r := C.crispasr_session_transcribe(s.nativeHandle(), pcmPtr, C.int(len(pcm)))
+	if err := s.takeCallbackError(); err != nil {
+		if r != nil {
+			C.crispasr_session_result_free(r)
+		}
+		return nil, nil, err
+	}
+
 	if r == nil {
 		return nil, nil, errors.New("transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), extractLogits(r), nil
+	result, err := extractResult(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	logits, err := extractLogits(r)
+	if err != nil {
+		return nil, nil, err
+	}
+	return result, logits, nil
 }
 
 // TranscribeChunked runs chunked-encode ASR (issue #208): it forces the
@@ -1428,6 +1555,8 @@ func (s *CrispasrSession) TranscribeWithLogits(pcm []float32) (*TranscribeResult
 // per-model default window; overlapSeconds < 0 keeps the default overlap.
 // Poll GetProgress() (0..100) from another goroutine to render progress.
 func (s *CrispasrSession) TranscribeChunked(pcm []float32, chunkSeconds, overlapSeconds int, lang string) (*TranscribeResult, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s.handle == nil {
 		return nil, errors.New("session is closed")
 	}
@@ -1440,13 +1569,20 @@ func (s *CrispasrSession) TranscribeChunked(pcm []float32, chunkSeconds, overlap
 		clang = C.CString(lang)
 		defer C.free(unsafe.Pointer(clang))
 	}
-	r := C.crispasr_session_transcribe_chunked_lang(s.handle, pcmPtr, C.int(len(pcm)),
+	r := C.crispasr_session_transcribe_chunked_lang(s.nativeHandle(), pcmPtr, C.int(len(pcm)),
 		C.int(chunkSeconds), C.int(overlapSeconds), clang)
+	if err := s.takeCallbackError(); err != nil {
+		if r != nil {
+			C.crispasr_session_result_free(r)
+		}
+		return nil, err
+	}
+
 	if r == nil {
 		return nil, errors.New("chunked transcription failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
 // GetProgress polls long-form (chunked) transcription progress: 0..100, or -1
@@ -1459,6 +1595,8 @@ func GetProgress() int {
 // TranscribeVAD transcribes with VAD segmentation.
 // vadModelPath can be empty for auto-download of default Silero model.
 func (s *CrispasrSession) TranscribeVAD(pcm []float32, sampleRate int, vadModelPath string) (*TranscribeResult, error) {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s.handle == nil {
 		return nil, errors.New("session is closed")
 	}
@@ -1468,53 +1606,117 @@ func (s *CrispasrSession) TranscribeVAD(pcm []float32, sampleRate int, vadModelP
 	}
 	cvad := C.CString(vadModelPath)
 	defer C.free(unsafe.Pointer(cvad))
-	r := C.crispasr_session_transcribe_vad(s.handle, pcmPtr, C.int(len(pcm)), C.int(sampleRate), cvad, nil)
+	r := C.crispasr_session_transcribe_vad(s.nativeHandle(), pcmPtr, C.int(len(pcm)), C.int(sampleRate), cvad, nil)
+	if err := s.takeCallbackError(); err != nil {
+		if r != nil {
+			C.crispasr_session_result_free(r)
+		}
+		return nil, err
+	}
+
 	if r == nil {
 		return nil, errors.New("transcription with VAD failed")
 	}
 	defer C.crispasr_session_result_free(r)
-	return extractResult(r), nil
+	return extractResult(r)
 }
 
-func extractResult(r *C.crispasr_session_result) *TranscribeResult {
+func extractResult(r *C.crispasr_session_result) (*TranscribeResult, error) {
 	nSegs := int(C.crispasr_session_result_n_segments(r))
+	if nSegs < 0 {
+		return nil, errors.New("invalid native segment count")
+	}
 	result := &TranscribeResult{Segments: make([]TranscribeSegment, nSegs)}
 	for i := 0; i < nSegs; i++ {
 		seg := &result.Segments[i]
-		seg.Text = C.GoString(C.crispasr_session_result_segment_text(r, C.int(i)))
+		// Copy segment text (owned copy, not native pointer)
+		if txt := C.crispasr_session_result_segment_text(r, C.int(i)); txt != nil {
+			seg.Text = C.GoString(txt)
+		}
 		seg.T0 = int64(C.crispasr_session_result_segment_t0(r, C.int(i)))
 		seg.T1 = int64(C.crispasr_session_result_segment_t1(r, C.int(i)))
 		seg.NoSpeechProb = float32(C.crispasr_session_result_segment_no_speech_prob(r, C.int(i)))
-		seg.Speaker = C.GoString(C.crispasr_session_result_segment_speaker(r, C.int(i)))
+		if spk := C.crispasr_session_result_segment_speaker(r, C.int(i)); spk != nil {
+			seg.Speaker = C.GoString(spk)
+		}
 		nWords := int(C.crispasr_session_result_n_words(r, C.int(i)))
+		if nWords < 0 {
+			return nil, errors.New("invalid native word count")
+		}
 		seg.Words = make([]TranscribeWord, nWords)
 		for j := 0; j < nWords; j++ {
 			w := &seg.Words[j]
-			w.Text = C.GoString(C.crispasr_session_result_word_text(r, C.int(i), C.int(j)))
+			if wt := C.crispasr_session_result_word_text(r, C.int(i), C.int(j)); wt != nil {
+				w.Text = C.GoString(wt)
+			}
 			w.T0 = int64(C.crispasr_session_result_word_t0(r, C.int(i), C.int(j)))
 			w.T1 = int64(C.crispasr_session_result_word_t1(r, C.int(i), C.int(j)))
-			w.P = float32(C.crispasr_session_result_word_p(r, C.int(i), C.int(j)))
+			p := float32(C.crispasr_session_result_word_p(r, C.int(i), C.int(j)))
+			w.P = p
+			// Word alternatives (when alt_n>0) — copied before free, no fabrication
+			nAlts := int(C.crispasr_session_result_word_n_alts(r, C.int(i), C.int(j)))
+			if nAlts < 0 {
+				return nil, errors.New("invalid native alternative count")
+			}
+			if nAlts > 0 {
+				w.Alternatives = make([]WordAlternative, nAlts)
+				for k := 0; k < nAlts; k++ {
+					altTxt := C.crispasr_session_result_word_alt_text(r, C.int(i), C.int(j), C.int(k))
+					altP := float32(C.crispasr_session_result_word_alt_p(r, C.int(i), C.int(j), C.int(k)))
+					if altTxt != nil {
+						w.Alternatives[k].Text = C.GoString(altTxt)
+					}
+					w.Alternatives[k].P = altP
+				}
+			}
+		}
+		// Native tokens — raw bytes preserved, sentinel preserved, empty list when absent, copied before free
+		nTokens := int(C.crispasr_session_result_n_tokens(r, C.int(i)))
+		if nTokens < 0 {
+			return nil, errors.New("invalid native token count")
+		}
+		if nTokens > 0 {
+			seg.Tokens = make([]SessionToken, nTokens)
+			for j := 0; j < nTokens; j++ {
+				tt := C.crispasr_session_result_token_text(r, C.int(i), C.int(j))
+				if tt != nil {
+					// Preserve raw bytes (may be UTF-8 fragment split across tokens)
+					l := C.strlen(tt)
+					tRaw := C.GoBytes(unsafe.Pointer(tt), C.int(l))
+					seg.Tokens[j].Raw = tRaw
+					seg.Tokens[j].Text = C.GoString(tt)
+				}
+				seg.Tokens[j].T0 = int64(C.crispasr_session_result_token_t0(r, C.int(i), C.int(j)))
+				seg.Tokens[j].T1 = int64(C.crispasr_session_result_token_t1(r, C.int(i), C.int(j)))
+				seg.Tokens[j].P = float32(C.crispasr_session_result_token_p(r, C.int(i), C.int(j)))
+			}
 		}
 	}
-	return result
+	return result, nil
 }
 
 // extractLogits lifts out the CTC logits attached to a result (see
 // CtcLogits) into a Go-owned slice before the result is freed. The C buffer is
 // owned by the result, so the data is copied out here. Returns nil unless the
 // session opted in via SetReturnLogits and the backend produced a grid.
-func extractLogits(r *C.crispasr_session_result) *CtcLogits {
+func extractLogits(r *C.crispasr_session_result) (*CtcLogits, error) {
 	nFrames := int(C.crispasr_session_result_n_logit_frames(r))
 	nVocab := int(C.crispasr_session_result_n_logit_vocab(r))
 	ptr := C.crispasr_session_result_logits(r)
-	if nFrames <= 0 || nVocab <= 0 || ptr == nil {
-		return nil
+	if nFrames < 0 || nVocab < 0 {
+		return nil, errors.New("invalid native logit dimensions")
+	}
+	if nFrames == 0 || nVocab == 0 {
+		return nil, nil
+	}
+	if ptr == nil || nFrames > math.MaxInt/4/nVocab {
+		return nil, errors.New("invalid native logit buffer or size")
 	}
 	n := nFrames * nVocab
 	data := make([]float32, n)
 	src := unsafe.Slice((*float32)(unsafe.Pointer(ptr)), n)
 	copy(data, src)
-	return &CtcLogits{NVocab: nVocab, NFrames: nFrames, Data: data}
+	return &CtcLogits{NVocab: nVocab, NFrames: nFrames, Data: data}, nil
 }
 
 // CtcVocab returns the Omni CTC vocabulary as raw pieces indexed by token id
@@ -1523,16 +1725,18 @@ func extractLogits(r *C.crispasr_session_result) *CtcLogits {
 // CTC decode over the grid from TranscribeWithLogits. Returns nil for backends
 // that don't expose a CTC vocab.
 func (s *CrispasrSession) CtcVocab() []string {
+	s.nativeHandle()
+	s.nativeHandle()
 	if s.handle == nil {
 		return nil
 	}
-	n := int(C.crispasr_session_n_vocab(s.handle))
+	n := int(C.crispasr_session_n_vocab(s.nativeHandle()))
 	if n <= 0 {
 		return nil
 	}
 	vocab := make([]string, n)
 	for i := 0; i < n; i++ {
-		vocab[i] = C.GoString(C.crispasr_session_token_text(s.handle, C.int(i)))
+		vocab[i] = C.GoString(C.crispasr_session_token_text(s.nativeHandle(), C.int(i)))
 	}
 	return vocab
 }
@@ -1567,7 +1771,7 @@ func AlignWords(alignerModel, transcript string, pcm []float32, tOffsetCs int64,
 	if len(pcm) > 0 {
 		pcmPtr = (*C.float)(unsafe.Pointer(&pcm[0]))
 	}
-	r := C.crispasr_align_words_abi(cm, ct, pcmPtr, C.int(len(pcm)), C.longlong(tOffsetCs), C.int(nThreads))
+	r := C.crispasr_align_words_abi(cm, ct, pcmPtr, C.int(len(pcm)), C.int64_t(tOffsetCs), C.int(nThreads))
 	if r == nil {
 		return nil, errors.New("alignment failed")
 	}
@@ -1640,7 +1844,7 @@ func VADSegments(vadModelPath string, pcm []float32, sampleRate int, threshold f
 	}
 	var outSpans *C.float
 	n := C.crispasr_vad_segments(cm, pcmPtr, C.int(len(pcm)), C.int(sampleRate),
-		C.float(threshold), C.int(minSpeechMs), C.int(minSilenceMs), C.int(nThreads), 0, &outSpans)
+		C.float(threshold), C.int(minSpeechMs), C.int(minSilenceMs), C.int(nThreads), C.bool(false), &outSpans)
 	if n < 0 {
 		return nil, fmt.Errorf("VAD failed (rc=%d)", int(n))
 	}
@@ -1746,8 +1950,8 @@ func diarizeSegments(leftPCM, rightPCM []float32, isStereo bool, segs []DiarizeS
 	}
 	cSegs := make([]C.struct_crispasr_diarize_seg_abi, len(segs))
 	for i, s := range segs {
-		cSegs[i].t0_cs = C.longlong(s.T0)
-		cSegs[i].t1_cs = C.longlong(s.T1)
+		cSegs[i].t0_cs = C.int64_t(s.T0)
+		cSegs[i].t1_cs = C.int64_t(s.T1)
 		cSegs[i].speaker = C.int(s.Speaker)
 	}
 	var cPyannote *C.char
@@ -1974,11 +2178,11 @@ func (c *PyannoteCache) Apply(segs []DiarizeSeg, sliceT0Cs int64) error {
 	}
 	cSegs := make([]C.struct_crispasr_diarize_seg_abi, len(segs))
 	for i, s := range segs {
-		cSegs[i].t0_cs = C.longlong(s.T0)
-		cSegs[i].t1_cs = C.longlong(s.T1)
+		cSegs[i].t0_cs = C.int64_t(s.T0)
+		cSegs[i].t1_cs = C.int64_t(s.T1)
 		cSegs[i].speaker = C.int(s.Speaker)
 	}
-	rc := C.crispasr_pyannote_cache_apply_abi(c.handle, C.longlong(sliceT0Cs),
+	rc := C.crispasr_pyannote_cache_apply_abi(c.handle, C.int64_t(sliceT0Cs),
 		&cSegs[0], C.int(len(cSegs)))
 	if rc != 0 {
 		return fmt.Errorf("crispasr_pyannote_cache_apply_abi rc=%d", int(rc))
@@ -2020,6 +2224,12 @@ func PuncInit(modelPath string) (*PuncModel, error) {
 
 // Process restores punctuation + capitalization to the input text.
 func (p *PuncModel) Process(text string) (string, error) {
+	if p == nil || p.handle == nil {
+		return "", errors.New("punctuation model is closed")
+	}
+	if strings.IndexByte(text, 0) >= 0 {
+		return "", errors.New("text must not contain NUL")
+	}
 	ctext := C.CString(text)
 	defer C.free(unsafe.Pointer(ctext))
 	result := C.crispasr_punc_process(p.handle, ctext)
@@ -2256,8 +2466,9 @@ func AvailableBackends() []string {
 // transcribe as an ISO-639-1 code (e.g. "en"). Whisper-only; other backends
 // return the session's source-language hint, or "unknown".
 func (s *CrispasrSession) DetectedLanguage() string {
+	s.nativeHandle()
 	var buf [32]C.char
-	C.crispasr_session_detected_language(s.handle, &buf[0], 32)
+	C.crispasr_session_detected_language(s.nativeHandle(), &buf[0], 32)
 	return C.GoString(&buf[0])
 }
 
@@ -2279,13 +2490,14 @@ func splitCSV(s string) []string {
 // TranslateText translates text via the session's MT-capable backend.
 // Returns empty string if the backend doesn't support translation.
 func (s *CrispasrSession) TranslateText(text, srcLang, tgtLang string, maxTokens int) (string, error) {
+	s.nativeHandle()
 	ct := C.CString(text)
 	defer C.free(unsafe.Pointer(ct))
 	cs := C.CString(srcLang)
 	defer C.free(unsafe.Pointer(cs))
 	ctg := C.CString(tgtLang)
 	defer C.free(unsafe.Pointer(ctg))
-	res := C.crispasr_session_translate_text(s.handle, ct, cs, ctg, C.int(maxTokens))
+	res := C.crispasr_session_translate_text(s.nativeHandle(), ct, cs, ctg, C.int(maxTokens))
 	if res == nil {
 		return "", nil
 	}
@@ -2297,6 +2509,7 @@ func (s *CrispasrSession) TranslateText(text, srcLang, tgtLang string, maxTokens
 // TranscribeVadLang transcribes with VAD segmentation and a language hint.
 func (s *CrispasrSession) TranscribeVadLang(pcm []float32, sampleRate int,
 	vadModelPath string, language string) (*TranscribeResult, error) {
+	s.nativeHandle()
 	if len(pcm) == 0 {
 		return nil, nil
 	}
@@ -2304,14 +2517,20 @@ func (s *CrispasrSession) TranscribeVadLang(pcm []float32, sampleRate int,
 	defer C.free(unsafe.Pointer(cvad))
 	clang := C.CString(language)
 	defer C.free(unsafe.Pointer(clang))
-	res := C.crispasr_session_transcribe_vad_lang(s.handle,
+	res := C.crispasr_session_transcribe_vad_lang(s.nativeHandle(),
 		(*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)),
 		C.int(sampleRate), cvad, nil, clang)
+	if err := s.takeCallbackError(); err != nil {
+		if res != nil {
+			C.crispasr_session_result_free(res)
+		}
+		return nil, err
+	}
 	if res == nil {
 		return nil, fmt.Errorf("crispasr_session_transcribe_vad_lang failed")
 	}
 	defer C.crispasr_session_result_free(res)
-	return extractResult(res), nil
+	return extractResult(res)
 }
 
 // DetectBackendFromGGUF returns the backend name from GGUF metadata.
@@ -2387,14 +2606,14 @@ func ListKnownModels() []string {
 func KokoroLangIsGerman(lang string) bool {
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))
-	return C.crispasr_kokoro_lang_is_german_abi(cl) != 0
+	return bool(C.crispasr_kokoro_lang_is_german_abi(cl))
 }
 
 // KokoroLangHasNativeVoice returns true if the lang has a native Kokoro voice.
 func KokoroLangHasNativeVoice(lang string) bool {
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))
-	return C.crispasr_kokoro_lang_has_native_voice_abi(cl) != 0
+	return bool(C.crispasr_kokoro_lang_has_native_voice_abi(cl))
 }
 
 // VadSlices runs the unified VAD dispatcher returning speech spans in seconds.
@@ -2441,7 +2660,7 @@ func LcsDedup(prevTail, curr []int32, minLcsLength int) int {
 
 // ParakeetContext wraps a direct Parakeet ASR context.
 type ParakeetContext struct {
-	handle unsafe.Pointer
+	handle *C.parakeet_context
 }
 
 // ParakeetWord holds word-level timing from a Parakeet result.
@@ -2483,13 +2702,21 @@ func ParakeetInit(modelPath string, nThreads int, useFlash bool) (*ParakeetConte
 
 // Transcribe runs Parakeet ASR on mono 16 kHz float32 PCM.
 func (p *ParakeetContext) Transcribe(pcm []float32, language string) (*ParakeetResult, error) {
-	var clang *C.char
-	if language != "" {
-		clang = C.CString(language)
-		defer C.free(unsafe.Pointer(clang))
+	if language != "" && language != "en" {
+		return nil, errors.New("legacy Parakeet has no language parameter; use a unified Session for multilingual models")
 	}
-	res := C.crispasr_parakeet_transcribe(p.handle,
-		(*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)), clang)
+	return p.TranscribeAt(pcm, 0)
+}
+
+// TranscribeAt runs the legacy decoder with an absolute centisecond offset.
+func (p *ParakeetContext) TranscribeAt(pcm []float32, tOffsetCs int64) (*ParakeetResult, error) {
+	if p == nil || p.handle == nil {
+		return nil, errors.New("Parakeet context is closed")
+	}
+	if len(pcm) == 0 {
+		return nil, errors.New("nonempty PCM required")
+	}
+	res := C.crispasr_parakeet_transcribe(p.handle, (*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)), C.int64_t(tOffsetCs))
 	if res == nil {
 		return nil, fmt.Errorf("crispasr_parakeet_transcribe returned null")
 	}
@@ -2565,11 +2792,17 @@ func TitaNetInit(modelPath string, nThreads int) (*TitaNetContext, error) {
 
 // Embed extracts a 192-d speaker embedding from 16 kHz mono PCM.
 func (t *TitaNetContext) Embed(pcm16k []float32) ([]float32, error) {
+	if t == nil || t.handle == nil {
+		return nil, errors.New("TitaNet context is closed")
+	}
+	if len(pcm16k) == 0 {
+		return nil, errors.New("nonempty PCM required")
+	}
 	out := make([]float32, 192)
 	dim := C.crispasr_titanet_embed(t.handle,
 		(*C.float)(unsafe.Pointer(&pcm16k[0])), C.int(len(pcm16k)),
 		(*C.float)(unsafe.Pointer(&out[0])))
-	if dim <= 0 {
+	if dim != 192 {
 		return nil, fmt.Errorf("titanet_embed failed")
 	}
 	return out[:int(dim)], nil
@@ -2585,14 +2818,13 @@ func (t *TitaNetContext) Close() {
 
 // TitaNetCosineSim returns the cosine similarity between two embeddings.
 func TitaNetCosineSim(a, b []float32) float32 {
-	dim := len(a)
-	if len(b) < dim {
-		dim = len(b)
+	if len(a) != len(b) {
+		panic("TitaNet embeddings must have matching dimensions")
 	}
-	return float32(C.crispasr_titanet_cosine_sim(
-		(*C.float)(unsafe.Pointer(&a[0])),
-		(*C.float)(unsafe.Pointer(&b[0])),
-		C.int(dim)))
+	if len(a) == 0 {
+		return 0
+	}
+	return float32(C.crispasr_titanet_cosine_sim((*C.float)(unsafe.Pointer(&a[0])), (*C.float)(unsafe.Pointer(&b[0])), C.int(len(a))))
 }
 
 // ---------------------------------------------------------------------------
@@ -2613,7 +2845,7 @@ type SpeakerDB struct {
 // lawful basis + explicit consent from every enrolled person (GDPR
 // Art. 9); the call fails without it.
 func SpeakerDBOpen(dirPath, expectedNames string, consentAttested bool) (*SpeakerDB, error) {
-	if !consentAttested {
+	if !consentAttested || strings.TrimSpace(expectedNames) == "" {
 		return nil, fmt.Errorf("speaker db requires an explicit consent attestation (GDPR Art. 9)")
 	}
 	cd := C.CString(dirPath)
@@ -2629,17 +2861,23 @@ func SpeakerDBOpen(dirPath, expectedNames string, consentAttested bool) (*Speake
 
 // Count returns the number of enrolled speakers.
 func (db *SpeakerDB) Count() int {
+	if db == nil || db.handle == nil {
+		return 0
+	}
 	return int(C.crispasr_speaker_db_count(db.handle))
 }
 
 // Match returns (name, score) for the best match, or ("", score) if below threshold.
 func (db *SpeakerDB) Match(embedding []float32, threshold float32) (string, float32) {
+	if db == nil || db.handle == nil || len(embedding) == 0 || len(embedding) > math.MaxInt32 || math.IsNaN(float64(threshold)) || math.IsInf(float64(threshold), 0) {
+		return "", -1
+	}
 	var name [256]C.char
 	score := C.crispasr_speaker_db_match(db.handle,
 		(*C.float)(unsafe.Pointer(&embedding[0])), C.int(len(embedding)),
 		C.float(threshold), &name[0], 256)
 	n := ""
-	if float32(score) >= threshold {
+	if score >= 0 && float32(score) >= threshold {
 		n = C.GoString(&name[0])
 	}
 	return n, float32(score)
@@ -2649,6 +2887,12 @@ func (db *SpeakerDB) Match(embedding []float32, threshold float32) (string, floa
 // enrolled person's explicit consent (GDPR Art. 9); it is recorded in
 // the profile and enrollment refuses without it.
 func (db *SpeakerDB) Enroll(name string, embedding []float32, consentAttested bool) error {
+	if db == nil || db.handle == nil {
+		return errors.New("speaker db is closed")
+	}
+	if len(embedding) == 0 || len(embedding) > math.MaxInt32 {
+		return errors.New("expected a nonempty embedding with an int32 length")
+	}
 	if !consentAttested {
 		return fmt.Errorf("enrollment requires an explicit consent attestation (GDPR Art. 9)")
 	}
@@ -2712,4 +2956,18 @@ func WatermarkDetect(pcm []float32) float32 {
 		return 0
 	}
 	return float32(C.crispasr_watermark_detect((*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm))))
+}
+
+// DrainStreamedSegments copies and releases the globally selected session's
+// owned polling result. A nil result means no queued segments.
+func DrainStreamedSegments() (*TranscribeResult, error) {
+	result := C.crispasr_drain_streamed_segments()
+	if result == nil {
+		return nil, nil
+	}
+	defer C.crispasr_session_result_free(result)
+	if C.crispasr_session_result_n_segments(result) < 0 {
+		return nil, errors.New("invalid native segment count")
+	}
+	return extractResult(result)
 }

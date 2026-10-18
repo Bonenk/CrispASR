@@ -1,29 +1,10 @@
 #!/usr/bin/env python3
-"""Every chat C-ABI entry point must be bound by every chat binding.
+"""Check that every chat export is named by each chat wrapper.
 
-`include/crispasr_chat.h` is hand-mirrored into five languages. Nothing in CI
-compiles four of them: `bindings-go.yml` is the only binding workflow that
-touches the chat surface, and even it did not trigger on `crispasr_chat.h` or
-`src/chat.cpp` until this check landed beside it. `bindings/java` is built only
-by `build.yml`, whose PR filter is `ggml`/`.gitmodules`; there is no PR-time
-`cargo`, `dart test` or Java job at all. So a new entry point — or a renamed
-one — could land bound in one language and missing from the rest, and every
-required check would stay green.
-
-Compiling five toolchains in CI to catch that is the expensive answer. The
-cheap one is this: the risk is *drift*, and drift is visible in the text. This
-parses the header for its exported functions and asserts each one is named in
-each binding, the same way `tests/test-copies-in-sync.cpp` pins the duplicated
-module sources and `tools/check-backend-wiring.py` pins the backend surface.
-
-What it does NOT do: check signatures. A binding that declares
-`crispasr_chat_count_tokens` with the wrong argument types passes here. This
-catches the omission, not the mistranslation — per-language tests are what
-catch the second, and those are the suites that need a model.
-
-Usage:
-    python tools/check-chat-binding-coverage.py          # exit 1 on a gap
-    python tools/check-chat-binding-coverage.py --list   # print the symbols
+This is a source drift guard, not callable-API, signature, ownership or model
+acceptance. In particular, a bare declaration can satisfy this census. Run the
+language ABI contracts and full-library/platform/model gates separately.
+WASM chat is opt-in and currently restricted to single-thread modules.
 """
 
 from __future__ import annotations
@@ -40,6 +21,9 @@ HEADER = os.path.join(REPO, "include", "crispasr_chat.h")
 # split across files (Java: a JNA interface plus the session wrapper) may
 # satisfy a symbol from any of them.
 BINDINGS: dict[str, list[str]] = {
+    "ruby": ["bindings/ruby/ext/ruby_crispasr_aux.h"],
+    "wasm": ["bindings/javascript/session_chat.h"],
+    "csharp": ["bindings/csharp/CrispASR/ChatSession.cs"],
     "python": ["python/crispasr/_binding.py"],
     "go": ["bindings/go/chat.go"],
     "rust": ["crispasr-sys/src/lib.rs"],
@@ -102,12 +86,12 @@ def main() -> int:
             for s in missing:
                 print(f"UNBOUND  {lang}: {s}  (add it to {' or '.join(rel_paths)})", file=sys.stderr)
         else:
-            print(f"ok  {lang:6s} binds all {len(symbols)} entry points")
+            print(f"ok  {lang:6s} names all {len(symbols)} entry points")
 
     if gaps:
         print(f"\n{gaps} gap(s): a chat ABI entry point is not bound everywhere.", file=sys.stderr)
         return 1
-    print(f"\nRESULT: PASS — {len(symbols)} entry points bound by {len(BINDINGS)} bindings")
+    print(f"\nRESULT: PASS — {len(symbols)} entry points named by {len(BINDINGS)} wrappers (source census only)")
     return 0
 
 

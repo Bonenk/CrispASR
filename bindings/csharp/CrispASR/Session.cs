@@ -22,6 +22,7 @@ namespace CrispASR
     public sealed partial class Session : IDisposable
     {
         private IntPtr _handle;
+        private readonly System.Collections.Generic.HashSet<StreamDecoder> _streams = new();
 
         // The session C ABI reports every time in centiseconds; this binding
         // exposes seconds throughout (issue #291). ONE constant, used by every
@@ -45,6 +46,7 @@ namespace CrispASR
             {
                 if (_handle == IntPtr.Zero)
                     throw new ObjectDisposedException(nameof(Session));
+                if (_inCallback) throw new InvalidOperationException("Do not re-enter a session from its callback");
                 return _handle;
             }
         }
@@ -113,8 +115,10 @@ namespace CrispASR
 
         public void Dispose()
         {
+            if (_inCallback) throw new InvalidOperationException("Do not dispose a session from its callback");
             if (_handle != IntPtr.Zero)
             {
+                foreach (var stream in new System.Collections.Generic.List<StreamDecoder>(_streams)) stream.Dispose();
                 NativeMethods.crispasr_session_close(_handle);
                 _handle = IntPtr.Zero;
             }
@@ -576,7 +580,7 @@ namespace CrispASR
         {
             var r = NativeMethods.crispasr_session_transcribe_lang(Handle, pcm, pcm.Length, language);
             if (r == IntPtr.Zero) throw new InvalidOperationException("Transcription failed");
-            try { return ExtractSegments(r); }
+            try { return ExtractSegmentsWithCallbacks(r); }
             finally { NativeMethods.crispasr_session_result_free(r); }
         }
 
@@ -594,7 +598,7 @@ namespace CrispASR
             var r = NativeMethods.crispasr_session_transcribe_chunked_lang(
                 Handle, pcm, pcm.Length, chunkSeconds, overlapSeconds, language);
             if (r == IntPtr.Zero) throw new InvalidOperationException("Chunked transcription failed");
-            try { return ExtractSegments(r); }
+            try { return ExtractSegmentsWithCallbacks(r); }
             finally { NativeMethods.crispasr_session_result_free(r); }
         }
 
@@ -611,7 +615,7 @@ namespace CrispASR
             SetReturnLogits(true);
             var r = NativeMethods.crispasr_session_transcribe_lang(Handle, pcm, pcm.Length, language);
             if (r == IntPtr.Zero) { SetReturnLogits(false); throw new InvalidOperationException("Transcription failed"); }
-            try { return (ExtractSegments(r), ExtractLogits(r)); }
+            try { return (ExtractSegmentsWithCallbacks(r), ExtractLogits(r)); }
             finally { SetReturnLogits(false); NativeMethods.crispasr_session_result_free(r); }
         }
 
@@ -646,14 +650,30 @@ namespace CrispASR
             return vocab;
         }
 
-        /// <summary>Transcribe with VAD segmentation.</summary>
+        /// <summary>Transcribe with default VAD segmentation.</summary>
         public Segment[] TranscribeVad(float[] pcm, int sampleRate, string vadModelPath)
+            => TranscribeVad(pcm, sampleRate, vadModelPath, null, null);
+
+        /// <summary>Transcribe with VAD settings and an optional per-call language.</summary>
+        public Segment[] TranscribeVad(float[] pcm, int sampleRate, string vadModelPath,
+            string? language, VadOptions? options = null)
         {
-            var r = NativeMethods.crispasr_session_transcribe_vad(
-                Handle, pcm, pcm.Length, sampleRate, vadModelPath, IntPtr.Zero);
-            if (r == IntPtr.Zero) throw new InvalidOperationException("Transcription with VAD failed");
-            try { return ExtractSegments(r); }
-            finally { NativeMethods.crispasr_session_result_free(r); }
+            var handle = Handle;
+            ArgumentNullException.ThrowIfNull(pcm);
+            ArgumentNullException.ThrowIfNull(vadModelPath);
+            if (pcm.Length == 0) throw new ArgumentException("PCM must not be empty", nameof(pcm));
+            if (sampleRate <= 0) throw new ArgumentOutOfRangeException(nameof(sampleRate));
+            IntPtr opts = options?.Allocate() ?? IntPtr.Zero;
+            try
+            {
+                var r = language == null
+                    ? NativeMethods.crispasr_session_transcribe_vad(handle, pcm, pcm.Length, sampleRate, vadModelPath, opts)
+                    : NativeMethods.crispasr_session_transcribe_vad_lang(handle, pcm, pcm.Length, sampleRate, vadModelPath, opts, language);
+                if (r == IntPtr.Zero) throw new InvalidOperationException("Transcription with VAD failed");
+                try { return ExtractSegmentsWithCallbacks(r); }
+                finally { NativeMethods.crispasr_session_result_free(r); }
+            }
+            finally { if (opts != IntPtr.Zero) Marshal.FreeHGlobal(opts); }
         }
 
         private static Segment[] ExtractSegments(IntPtr r)
@@ -690,9 +710,29 @@ namespace CrispASR
                 }
                 float noSpeechProb = NativeMethods.crispasr_session_result_segment_no_speech_prob(r, i);
                 string speaker = NativeMethods.PtrToUtf8(NativeMethods.crispasr_session_result_segment_speaker(r, i)) ?? "";
-                segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker);
+                segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker, ExtractTokens(r, i));
             }
             return segs;
+        }
+
+        private static SessionToken[] ExtractTokens(IntPtr result, int segment)
+        {
+            try
+            {
+                int n = NativeMethods.crispasr_session_result_n_tokens(result, segment);
+                var tokens = new SessionToken[n];
+                for (int j = 0; j < n; j++)
+                {
+                    byte[] raw = NativeMethods.CopyUtf8Bytes(NativeMethods.crispasr_session_result_token_text(result, segment, j));
+                    long t0 = NativeMethods.crispasr_session_result_token_t0(result, segment, j);
+                    long t1 = NativeMethods.crispasr_session_result_token_t1(result, segment, j);
+                    bool timed = t0 >= 0 && t1 >= t0;
+                    tokens[j] = new SessionToken(raw, timed ? Seconds(t0) : -1, timed ? Seconds(t1) : -1,
+                                                 NativeMethods.crispasr_session_result_token_p(result, segment, j));
+                }
+                return tokens;
+            }
+            catch (EntryPointNotFoundException) { return Array.Empty<SessionToken>(); }
         }
 
         // ----------------------------------------------------------------
@@ -768,8 +808,13 @@ namespace CrispASR
                 Handle, nThreads, stepMs, lengthMs, keepMs, language ?? "", translate ? 1 : 0);
             if (p == IntPtr.Zero)
                 throw new InvalidOperationException("stream_open failed");
-            return new StreamDecoder(p);
+            var stream = new StreamDecoder(this, p);
+            _streams.Add(stream);
+            return stream;
         }
+
+        internal void CheckStreamOwner() { _ = Handle; }
+        internal void StreamClosed(StreamDecoder stream) => _streams.Remove(stream);
 
         // ----------------------------------------------------------------
         // Forced alignment (static)
@@ -925,6 +970,7 @@ namespace CrispASR
         public double T1 { get; }
         public float P { get; }
         public AltToken[] Alts { get; }
+        public bool HasTimestamps => T0 >= 0 && T1 >= T0;
 
         public Word(string text, double t0, double t1, float p, AltToken[]? alts = null)
         {
@@ -944,6 +990,19 @@ namespace CrispASR
         public AltToken(string text, float p) { Text = text; P = p; }
 
         public override string ToString() => FormattableString.Invariant($"{Text}({P * 100:F1}%)");
+    }
+
+    /// <summary>Owned native token bytes, seconds (-1 when unavailable) and probability.</summary>
+    public readonly struct SessionToken
+    {
+        public byte[] RawText { get; }
+        public string Text => Encoding.UTF8.GetString(RawText);
+        public double T0 { get; }
+        public double T1 { get; }
+        public float P { get; }
+        public bool HasTimestamps => T0 >= 0 && T1 >= T0;
+        public SessionToken(byte[] rawText, double t0, double t1, float p = -1)
+        { RawText = (byte[])rawText.Clone(); T0 = t0; T1 = t1; P = p; }
     }
 
     /// <summary>One segment from a transcription result.</summary>
@@ -966,11 +1025,14 @@ namespace CrispASR
         /// The ordinals are CHUNK-LOCAL: "Speaker 1" from one transcribe call is not
         /// necessarily the same voice as "Speaker 1" from the next.</summary>
         public string Speaker { get; }
+        public SessionToken[] Tokens { get; }
+        public bool HasTimestamps => T0 >= 0 && T1 >= T0;
 
         public Segment(string text, double t0, double t1, Word[] words, float noSpeechProb = -1.0f,
-                       string speaker = "")
+                       string speaker = "", SessionToken[]? tokens = null)
         {
             Text = text; T0 = t0; T1 = t1; Words = words; NoSpeechProb = noSpeechProb; Speaker = speaker ?? "";
+            Tokens = tokens ?? Array.Empty<SessionToken>();
         }
 
         public override string ToString() => FormattableString.Invariant($"[{T0:F2}-{T1:F2}] {Text}");
@@ -1073,12 +1135,17 @@ namespace CrispASR
     {
         private IntPtr _handle;
 
-        internal StreamDecoder(IntPtr handle) => _handle = handle;
+        private readonly Action _checkOwner;
+        private readonly Action<StreamDecoder> _onClosed;
+        internal StreamDecoder(Session owner, IntPtr handle) : this(owner.CheckStreamOwner, owner.StreamClosed, handle) { }
+        internal StreamDecoder(Action checkOwner, Action<StreamDecoder> onClosed, IntPtr handle) { _checkOwner = checkOwner; _onClosed = onClosed; _handle = handle; }
+        public void SetLiveDecode(bool enabled) => NativeMethods.crispasr_stream_set_live_decode(Handle, enabled ? 1 : 0);
 
         private IntPtr Handle
         {
             get
             {
+                _checkOwner();
                 if (_handle == IntPtr.Zero) throw new ObjectDisposedException(nameof(StreamDecoder));
                 return _handle;
             }
@@ -1118,7 +1185,9 @@ namespace CrispASR
         {
             if (_handle != IntPtr.Zero)
             {
+                _checkOwner();
                 NativeMethods.crispasr_stream_close(_handle);
+                _onClosed(this);
                 _handle = IntPtr.Zero;
             }
         }
@@ -1160,9 +1229,12 @@ namespace CrispASR
         /// <summary>Compute a 192-dim speaker embedding from 16 kHz mono PCM.</summary>
         public float[] Embed(float[] pcm16k)
         {
+            ArgumentNullException.ThrowIfNull(pcm16k);
+            if (_handle == IntPtr.Zero) throw new ObjectDisposedException(nameof(TitaNet));
+            if (pcm16k.Length == 0) throw new ArgumentException("Nonempty PCM required");
             var emb = new float[EmbeddingDim];
             int rc = NativeMethods.crispasr_titanet_embed(_handle, pcm16k, pcm16k.Length, emb);
-            if (rc != 0) throw new InvalidOperationException($"titanet_embed failed (rc={rc})");
+            if (rc != EmbeddingDim) throw new InvalidOperationException($"titanet_embed failed (rc={rc})");
             return emb;
         }
 
@@ -1209,20 +1281,27 @@ namespace CrispASR
         {
             if (!consentAttested)
                 throw new InvalidOperationException("SpeakerDb requires an explicit consent attestation (GDPR Art. 9)");
+            ArgumentNullException.ThrowIfNull(dirPath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(expectedNames);
             var p = NativeMethods.crispasr_speaker_db_open(dirPath, expectedNames, 1);
             if (p == IntPtr.Zero) throw new InvalidOperationException($"Failed to open speaker db from {dirPath}");
             return new SpeakerDb(p);
         }
 
-        public int Count => NativeMethods.crispasr_speaker_db_count(_handle);
+        private IntPtr Handle => _handle != IntPtr.Zero ? _handle : throw new ObjectDisposedException(nameof(SpeakerDb));
+        public int Count => NativeMethods.crispasr_speaker_db_count(Handle);
 
-        /// <summary>Match an embedding against the database. Returns (name, score) or (null, 0) if below threshold.</summary>
+        /// <summary>Match an embedding against the database. Returns (name, score), preserving a negative native score for no match.</summary>
         public (string? Name, float Score) Match(float[] embedding, float threshold = 0.5f)
         {
+            var handle = Handle;
+            ArgumentNullException.ThrowIfNull(embedding);
+            if (embedding.Length == 0) throw new ArgumentException("Embedding must not be empty", nameof(embedding));
+            if (!float.IsFinite(threshold)) throw new ArgumentOutOfRangeException(nameof(threshold));
             var outName = new byte[256];
             float score = NativeMethods.crispasr_speaker_db_match(
-                _handle, embedding, embedding.Length, threshold, outName, outName.Length);
-            if (score < threshold) return (null, score);
+                handle, embedding, embedding.Length, threshold, outName, outName.Length);
+            if (score < 0 || score < threshold) return (null, score);
             return (NativeMethods.NullTerminated(outName), score);
         }
 
@@ -1235,6 +1314,10 @@ namespace CrispASR
         {
             if (!consentAttested)
                 throw new InvalidOperationException("Enrollment requires an explicit consent attestation (GDPR Art. 9)");
+            ArgumentNullException.ThrowIfNull(dirPath);
+            ArgumentNullException.ThrowIfNull(name);
+            ArgumentNullException.ThrowIfNull(embedding);
+            if (embedding.Length == 0) throw new ArgumentException("Embedding must not be empty", nameof(embedding));
             int rc = NativeMethods.crispasr_speaker_db_enroll2(dirPath, name, embedding, embedding.Length, 1);
             if (rc != 0) throw new InvalidOperationException($"speaker_db_enroll failed (rc={rc})");
         }

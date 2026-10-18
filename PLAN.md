@@ -1,6 +1,357 @@
 # CrispASR — Pending work
 
-Updated 2026-10-17. This file contains current actions, dependencies and a
+## NOW — finish the callable wrapper inventory and remaining adapters
+
+Owner: maintainer coordinator. Active next: legacy callable-wrapper inventory
+and residual ownership/coercion audits after WASM event/stream checkpoints. Continue the cross-language wrapper
+task; the bounded external agent tasks have ended. Completed source repairs and measured
+probe counts are archived in HISTORY.md. Start with the incremental
+[callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
+The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
+Do not reimplement rows merely because an older note says they are missing.
+
+The shared census covers **297 unique `crispasr_*` exports** across the two
+shared headers, plus **14 separate chat exports**. It does not include every
+upstream `whisper_*` declaration. Source declarations/mentions are not proof
+of a public operation. Full parity and real-model acceptance remain open.
+
+Recommended implementation order and concrete acceptance:
+
+1. **Complete the callable ledger.** For each export, identify the actual
+   public method/result in Python, C#, Java, Go, Rust, Dart, Ruby and WASM.
+   Record bulk/superset equivalents, retired refusing stubs and deliberate
+   platform exclusions separately. TitaNet and roster DB now have reviewed
+   public paths in all eight; extend the ledger beyond those families.
+2. **Legacy Whisper controls.** First fix two verified high-level paths:
+   - Rust `crispasr-sys/src/lib.rs` declares pointer parameters for
+     `whisper_init_from_file_with_params` and `whisper_full`, while those native
+     symbols take structs by value. Route the legacy wrapper through the real
+     `*_by_ref` exports and add a literal-header ABI/operation regression; its
+     deprecation does not make the current signature mismatch acceptable.
+   - Java `WhisperCpp.initContextImpl` copies only `use_gpu` and `flash_attn`
+     into newly allocated native defaults, ignoring GPU-device/DTW settings.
+     Forward the remaining public options through pointer-safe native adapters,
+     free each default-params allocation, and make `freeContext` retire `ctx`
+     before native free (it currently leaves the pointer set). Probe repeated
+     close/reinitialization, initialization failure and actual DTW forwarding.
+   Then extend the cross-language inventory. C#/Python/Dart have pointer-safe parameter,
+   DTW and parallel probes; inspect Go's compiled parameter routes and finish
+   Java/Rust/Ruby/WASM callable gaps. Cover scalar setters, language detection,
+   native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
+   Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
+   implementation. Direct Parakeet uses an integer centisecond offset.
+   Go's legacy parameter-string ownership and five scalar decode controls now
+   have compiled operation probes; verify actual model behavior. Continue DTW,
+   remaining token introspection and legacy context/callback lifecycle auditing.
+   Review higher-level APIs as well as the low-level bindings.
+3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
+   opaque tickets, child-close ordering and raw text processor ownership now
+   have compiled regressions; see HISTORY.md. Audit microphone ring/close and
+   the old Whisper object/parameter/result path, including all allocation-returning
+   audio/container/scoring helpers on Ruby allocation exceptions. Microphone
+   ticket/pump ownership now has compiled native-thread regressions, including
+   callback-close and interrupted/error cleanup; verify actual device drivers
+   on supported platforms. Extend the
+   callable ledger rather than treating 155 guarded operations as API coverage.
+4. **WASM remaining adapters and dispatch.** Registry/cache and v2 load-options adapters now have compiled Node
+   probes; validate their full-module size and browser filesystem/download behavior.
+   Generic diarization/turns, language-aware VAD and owned logits results now
+   have compiled operation probes; include them in real-model/browser acceptance.
+   Finish remaining legacy controls. Retained ASR callback setters and session
+   stream adapters now have public paths; validate actual native backend behavior.
+   Generic speaker/clustering/pyannote adapters now have operation probes;
+   include them in full-module/native/model validation. Finish compute/servicer scheduling. Chat remains opt-in/single-thread until
+   work and callback delivery are safely proxied. Measure complete default
+   and opt-in module sizes and instantiate actual models in a browser.
+   Concrete remaining WASM acceptance:
+   - Validate retained ASR segment/token/progress events with actual models and
+     streams, including which backends emit each native hook. Copied-event transport,
+     raw token bytes, generations, replacement/close, bounded backlog and JS/native
+     allocation cleanup have component probes; they do not establish event support
+     on every backend. Keep registration idle and before retained stream creation.
+   - Validate retained stream adapters with actual models: feed/flush/text/live
+     decode, backend stream-kind semantics, finalization and browser responsiveness.
+     The compiled probes cover native transport and child-before-parent ownership,
+     including async replacement/close. Threaded callers must use async stream
+     methods and async parent replacement/close while a child exists. Check actual
+     backend cleanup and module instantiation in hosted full builds.
+   - Dispatch now has real pthread Node/browser operation probes, including
+     native/encoder/callback errors, overlap guards and progress responsiveness.
+     Extend acceptance to full models and module variants. Audit remaining ASR/
+     synchronous result encoders for intermediate emval/scratch leaks when JS
+     constructors/getters throw; JS throws do not unwind default C++ EH frames.
+     Extend borrow guards through argument coercion: a JS getter can submit
+     async work or close an owner after an operation's initial guard.
+   - Async v2 ASR/TTS load options now have literal-POD and worker-thread probes;
+     validate real backend/model replacement and memory limits.
+   - Token polling copies before JS constructors run; count/drain calls now
+     reject during active async compute. Retained ASR delivery uses a separate copied
+     queue that can drain during compute. Audit coercion/lifetime guards across
+     remaining adapters.
+5. **Residual public options and polling ownership.** Go/Rust now have load
+   options, standalone truecase/PCS and owned segment polling; Rust text scoring
+   and Go capability queries have compiled probes. Review remaining ledger
+   rows rather than treating the old missing-family list as current. Rust's raw
+   token polling is explicitly unsafe: a future safe adapter needs ownership
+   beyond the borrowed buffer selected globally by the C ABI. Do not permit
+   another thread to close/free it while copying.
+   Ruby and WASM now expose v2 session-open options; verify them with actual models.
+   Finish per-call VAD settings in languages beyond the C#/Java/Dart/Python
+   paths already implemented; probe actual option fields and language.
+6. **Platform and model acceptance.** Run full-library/compiler checks and
+   representative real tasks on pinned source/models/inputs, including TTS→ASR
+   roundtrips. Exercise 32-bit Java/Dart diarization marshaling on actual target
+   runtimes; the new pointer-aware layouts and 64-bit probes are not that proof.
+   Review real CI logs before acceptance. No release from fixture success or
+   queued jobs.
+
+The stream checkpoint `f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all
+six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625865),
+including Ruby's finalizer regression. Its
+[full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625808)
+was still pending at inspection. Retained ASR event changes require their own
+hosted results for the actual tip. Older source checkpoints establish only their
+recorded component contracts, not full current-wrapper/model acceptance.
+Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
+maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
+only in ignored maintainer notes.
+
+## Python shared-header expansion — hosted/model acceptance pending
+
+Owner: maintainer coordinator. Source inventory and operation contracts are in
+[Python API coverage](docs/python-api-coverage.md); completed implementation is
+archived in HISTORY.md. The census now reads both shared public headers: 297 unique functions
+(292 bound, three equivalent/compiled adapters, two retired native stubs).
+The eight additional audio/container/channel functions were implemented and
+probed; completed work is in HISTORY.md. Separate chat, other-language callable
+coverage and real-model acceptance remain independent gates.
+
+New operation/metadata probes pass with GCC and Clang. They exercise compiled C
+ABI transport, actual native metadata functions, allocated-buffer ownership,
+strided inputs, successful empty music results, replay-noise dimensions,
+callback exceptions/re-entry, options layout, and compiled legacy adapters.
+The combined local selection reports 63 passed, 92 subtests and 166 skips:
+164 export-resolution cases await an explicitly supplied current library, and
+two optional native-library checks await that build. GCC/Clang focused operation
+and metadata suites each report 39 passed, 64 subtests and one native-library
+skip. These skips are not hosted acceptance. The real-header helper also compiles locally. No full local library/model build
+was attempted. Hosted CI checks the newly built library's exports/getters and
+loads a helper compiled against that build. A fixture library is never the
+native model acceptance gate.
+
+Frozen implementation source `c12707299c5dcbca7bafe60a073688250238cdd9`
+is on immutable `diag/python-api-20261018`. Full CI
+[39120101432](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101432)
+and lint
+[39120101602](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101602)
+are dispatched and queued. Secret scan `39120093240` also targets that source.
+Verify terminal conclusions, source SHA and actual test/helper output before
+accepting the hosted gates. Later documentation commits on main do not alter
+this pinned implementation.
+
+Next acceptance work, in order:
+
+1. Audit the immutable source's full CI/lint pinned above,
+   especially the complete shared library, legacy helper link/load, the
+   164-symbol smoke subset and native exported metadata. Do not accept a stale
+   build discovered from another checkout. Local symbol-resolution checks skip
+   when no current native library was explicitly supplied.
+2. Exercise representative real models through Python: piano (including empty
+   notes and MT3 programs), chords, beats at native/mismatched rates, tab
+   emissions/mapping, conversion with pinned ContentVec/F0 and supplied replay
+   noise, text processors, and TTS reference/streaming/disclosure. Compare
+   structured outputs against the same native C ABI/CLI where that surface
+   exists; TTS still requires ASR roundtrips and conversion its pinned reference
+   recipe. Retain model/revision/source/input pins. Use hosted CPU/GPU capacity
+   for heavy work; no performance/accuracy claim from transport fixtures.
+3. Keep #549 real Japanese ASR multiwindow/gap-fill ownership acceptance open;
+   the separate #217 forced-alignment worker does not validate that route.
+4. Audit other language bindings independently, including the two new replay
+   dimension getters. Python's complete census does not establish Go/Rust/Dart/
+   Java/Ruby/C#/WASM parity. Do not ship a release from queued CI alone.
+
+## #217 — hosted character CTC synthetic benchmark accepted; full/model gates pending
+
+Owner: maintainer coordinator. Work is isolated on
+`perf/217-alignment-cleanroom`; no third-party source or fitted data is copied
+into this tree. The external review is pinned to Subtimer
+`4a894d0e166191d41ebc734b61d68f5c531fb55b`; project-wide licensing is absent
+from inspected metadata, while native/vendor notices have their own scope.
+Read [the full comparison and clean-room record](docs/alignment-cleanroom-2026-10-18.md).
+No matched Subtimer/current-CrispASR accuracy/runtime benchmark exists here.
+A research agent's unsupported DP-bottleneck and small-banding-quality-cost
+claims were rejected; do not promote them as measurements.
+
+A fresh implementation agent authored an independent opt-in character-CTC
+workspace candidate using only our source and sanitized requirements. The first
+T*S emission design was rejected on measured memory regression. Corrected
+source SHA256 `d089c141e03fa61970a5136d1c8f9b92a05e306ae36bab78d6b8b8597b68cfd5`
+uses unique-token emission columns, flat traceback storage and character-derived
+word bounds. Only `CRISPASR_CTC_ALIGN_OPT=1` enables it; default stays unchanged.
+Six acceptance tests pass: 240 randomized cases, 60 unique-optimum exhaustive
+path checks, ties/repeats/Unicode, invalid/nonfinite cases, and memory acceptance.
+Local synthetic measurements and their noisy timing ranges are retained in
+`docs/alignment-ctc-local-2026-10-18.json`; they do not measure encoder/model
+or Japanese Parakeet/Canary subword performance.
+
+Frozen character-performance source `567fc431e333d3cf1e2cb895f3d2895364e54328`
+is on `diag/217-ctc-workspace-20261018`. Heavy CPU `39112822169` passes
+all seven `alignment_ctc_bench.py --large` shapes on EPYC 7763/GCC13.3.
+Independent audit verifies terminal source/hash pins, artifact/log equality,
+all ratios/ranges and lower allocations/heap. Worker exact-output assertions
+pass; this aggregate receipt retains no raw per-call output/timing arrays.
+Gate-off/on median ratios are 1.124–1.215×; frozen-reference/on ratios are
+1.089–1.388×. Largest T4096/V16384/W256: gate-off339.608ms → on288.506ms,
+tracked heap275,986,668 → 7,556,460 bytes (36.52×). See
+`docs/alignment-ctc-hosted-2026-10-18.json`; this is synthetic DP, not encoder,
+model, RSS/VRAM or Japanese/subword acceptance. CI `39112823566`
+was also dispatched for that source and is retained while progressing.
+Queued lint `39112825190` was superseded/cancelled in favor of combined-source
+lint below. Audit terminal results and verify source pins before accepting any
+hosted result. It compiles only our model-free kernel
+and frozen own baseline; no external models/code are needed. Audit all receipt
+output parity, kernel-time distributions, actual allocation counts and tracked
+peak heap, source hashes, compiler/CPU/flags, and the independent test suite.
+Audit the retained character CI and later frozen integrated production
+CI/lint separately; this synthetic job is not full-library acceptance. Keep
+those branches immutable while documentation checkpoints advance. No default promotion until
+those gates and representative model alignment acceptance are satisfied.
+
+## #217 subword CTC failure contract — implemented; full CI pending
+
+The tiny production-tokenizer/DP test was first observed returning success with
+zero times for a two-label transcript and one frame. The independent CTC
+feasibility assertion failed before the fix. `canary_ctc_align_words` now rejects
+unreachable/nonfinite terminal states and invalid ABI/token-ID inputs. All four
+contract tests pass, including repeated-label minimum frames and known valid
+centisecond bounds. No encoder, tokenizer or valid-path DP arithmetic changes;
+this is a correctness fix, not a Japanese Parakeet speedup. CTest/ordinary CI
+run this suite. The independent character-kernel source remains unchanged.
+
+Frozen combined source `deaf9c010acce1410f470d6df421d0f77ff16be2` is on
+`diag/217-alignment-contract-20261018`: CI `39113844983` and lint
+`39113846749` are dispatched and queued. Audit this combined source separately
+from the immutable character-only performance source. Do not treat a synthetic token fixture as
+proof of long-form model accuracy. Character-path nonfinite-input policy still
+follows its frozen baseline; any future policy unification needs separate
+valid-output and error-contract acceptance, not a concealed speed change.
+
+## #217 subword workspace — implemented; hosted/model acceptance pending
+
+Independent own-code candidate uses `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1`, default
+off. It normalizes one vocabulary row at a time and flattens traceback while
+retaining the frozen `deaf9c010` tokenizer/DP return/text/timestamp behavior.
+Five tests pass under GCC and Clang (240 seeded random, 60 unique-optimum
+exhaustive tiny paths plus edge/memory cases); four contracts exercise both
+gates and six character tests remain green. CTest/CI run all suites. The local
+receipt and scope are in the [comparison](docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
+Frozen source `a1434c9b2d2484e7af572b577cb1f53127662775` is on
+`diag/217-subword-workspace-20261018`. Heavy CPU `39115492999` runs
+`tools/ci-heavy/alignment_subword_bench.py --large` (NumPy; timeout30), CI is
+`39115494689`, lint is `39115496152`; all three are queued at dispatch audit.
+Audit source and baseline hashes, exact return/text/bounds, successful complete alignments,
+allocation/heap reductions and timing distributions. Never promote from these
+synthetic results alone. Keep input/encoder memory and model quality separate.
+
+## #217 actual Japanese model profiling — worker implemented; hosted proof pending
+
+`tools/ci-heavy/alignment_model_profile.py` builds the real CPU library/CLI and
+pins the F16 Japanese CTC 1.1B model plus a 6.36-second FLEURS Japanese recording
+(CC BY 4.0; attribution/card retained). It queries the actual library's
+label/display splitters, retains native OFF/ON/OFF logits, times encoder versus
+postprocessor separately, replays those exact logits through the immutable own
+DP reference, and checks actual Python/exported C ABI and CLI output plus a
+12.34-second absolute offset. Cold/warm cache cases are distinguished. No
+boundary labels, long-file, Python-blueprint encoder, GPU/VRAM or Subtimer
+comparison is implied. The default-off optimization is not promoted.
+Six tiny rejection-contract tests pass and are wired into CTest/ordinary CI;
+model work is refused locally. Frozen source `08aea3537ad075ffa17e66a6f601c42519213aea` is on
+`diag/217-japanese-model-profile-20261018`; heavy CPU `39116431721` was
+dispatched with pinned packages and timeout120 and is queued at dispatch audit.
+See [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
+Do not report model evidence before independently auditing the terminal raw
+payload/source/ELF ledger, exact logits and native/reference/public/CLI outputs.
+Earlier frozen production CI/lint remain acceptance gates. No runtime source
+changed while adding this worker; production source remains unchanged from
+`a1434c9b2`. Actual ELF identity is recorded separately by the worker. If a model case fails, preserve the frozen receipt and repair in a
+new scope; do not widen nonempty/ordering/timestamp checks to obtain green.
+
+## #217 clean-room accuracy follow-ups — bounded next tasks
+
+After hosted acceptance of both exact-output CPU workspace experiments, profile
+`canary_ctc_align_words` on actual frozen model logits and split encoder versus
+postprocessor time on a matched Japanese clip. Synthetic timings alone do not
+characterize Parakeet. Preserve native centisecond-output/tokenizer parity and
+keep original behavior available for A/B. The unchanged per-word path scans
+remain a separate candidate only if profiling justifies them; do not conflate
+invalid-path semantic repair with a speed change.
+
+Long-form accuracy requires audio/text anchors before changing the current
+proportional Qwen chunk assignment or unbounded CTC encoder use. Build a small
+licensed Japanese boundary-labeled corpus with long pauses, music, repeated
+phrases and subtitle omissions. Acceptance: no dropped/reordered lines, correct
+absolute offsets, reported median/p95 boundary error and coverage, and bounded
+RAM/VRAM on a long clip. Evaluate optional VAD/vocal signals and independently
+trained boundary refinement against a raw-audio baseline. No external fitted
+parameters, exact feature recipes or source may be reused. The comparison and
+licensing/provenance constraints are in
+[the audit](docs/alignment-cleanroom-2026-10-18.md).
+
+## #549 — token ownership implemented; follow-up CI/audio validation pending
+
+Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
+(`39104662258`) and all 10 lint jobs (`39104663518`). Independent audit checked
+terminal metadata, exact source and the complete Linux unit log: 2,033 CTest
+unit cases pass; the exported-C-ABI/Python metadata suite passes all 11 tests,
+including all 30 legacy/shared splitter fixture/window combinations. Later main
+commits through the initial #217 claim alter documentation only relative to
+this validated source. Preserve this frozen proof; do not repeat it merely
+because documentation tips differ. The API fixes remain unreleased in v0.8.43.
+
+The remaining native packaging gaps are now implemented: legacy overlap
+splice/dedup and Japanese slice/gap-fill carry owned token blocks with retained
+words. Shared non-JA gap repair uses native grouping indices instead of inclusive
+timestamp matching, which duplicated both words' tokens when frames were tied.
+The grouping rules live in `src/core/parakeet_word_ranges.h` and are used by
+native word construction, so no word-string/timestamp reconstruction is needed.
+No public POD layout, decoder, window decision or Python constructor changed.
+
+Six new tests pass under GCC and Clang, after first reproducing empty tokens
+on JA/legacy routes and tied-frame duplicate tokens in shared repair. They
+exercise production grouping/window/repair functions, opaque getters and the
+Python result reader: equal frames, UTF-8 fragments, exact F32 probabilities,
+BOS/empty ownership, offset slices and token-less native words. Grouping also
+matches frozen own `08aea3537` word text/times/probabilities on 2,000 cases.
+The expanded metadata suite now has 12 tests, including a native-grouped
+continuation token sharing the next output segment's first frame. Both legacy
+and shared output splitters keep it with its own word, without changing word
+segments; all 18 metadata/window tests pass under GCC and Clang. CTest registers the new suite;
+ordinary CI runs it with `CRISPASR_LIB` against actual exported getters.
+`docs/contributing.md` now requires explicit result-field and multi-route wrapper
+parity and corrects the claim that Dart symbol checks auto-discover new APIs.
+
+Keep the issue open for full-library/platform follow-up and reporter validation.
+The first window-only source `aaa5f21a9` has CI39117671481/lint39117673618
+pending. Final integrated source `ebf69c43721e56a43b7c8f637873902098f523ba`
+is frozen on `diag/549-token-boundaries-20261018`, CI `39117921894` and lint
+`39117923785` (both queued at dispatch audit). Audit the actual exported-getter
+step for both metadata suites. Earlier green source `741141118` does not validate
+this follow-up. Then use a licensed Japanese ASR multi-window fixture: keep
+original native decodes/window choices fixed, require identical word/text/time
+outputs and exact retained token bytes/probabilities/offsets, without dropped
+units or duplicate seams. The CTC-aligner profile for #217 is a different model
+route and cannot stand in for this transcription validation. Generic CLI
+postprocessing (`examples/cli/crispasr_gap_fill.h`) retains timestamp-based token
+filtering for multiple model families; audit that separately before claiming
+full long-form CLI/session token identity, without applying Parakeet-specific
+grouping to unrelated tokenizers. Record token-less native routes explicitly.
+
+See [session metadata](docs/python-session-metadata.md) for `None` timing,
+byte-fragment handling, cache-release lifetime and older-library compatibility.
+The process-wide aligner cache wrapper is tested, but no real VRAM-counter
+measurement has been made. No release/tag is implied by the CI acceptance.
+
+Updated 2026-10-18. This file contains current actions, dependencies and a
 legacy audit inventory. Completed work and experiment receipts live in
 [HISTORY.md](HISTORY.md#plan-reconciliation-archive--2026-10-15).
 The archived snapshot preserves detailed older requirements without treating
@@ -39,16 +390,16 @@ not establish native speech acceptance.
 See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
 entry points, bounded next action, acceptance gates and external dependencies.
 No task remains assigned to a departed agent. Inspect existing Echo runs first;
-then reproduce new Nemotron streaming issue547 on reporter/current source with
-exact offered fixtures and fresh/reused session controls. Actual MiMo71-row
+then audit the current-main #547 fix and its validation before repeating
+streaming diagnosis. Actual MiMo71-row
 Q/K/V capture follows. Research and hardware waits are explicitly separate.
 
-Issue547 was read in full on2026-10-17 (no comments then). Exact WAV/PCM fixtures
-are not attached. The adapter already resets and the encoder clears backend
-cache on its first call; the reported stale-cache explanation is unproven.
-Acceptance requires nonempty correct finals for consecutive standalone-recognized
-turns, partials and reset/counter/cache evidence, then C-ABI/session and Windows
-CPU checks. Do not patch teardown or suppress empty events speculatively.
+Issue #547 now has the streaming utterance-open throttle fix on main in
+`dd14099c3`, including literal boundary tests and the dedicated
+`tools/ci-heavy/issue547_nemotron_multiturn.py` validation worker. Do not repeat
+the old stale-cache hypothesis or reimplement that fix. Audit the worker's
+existing runs/results and fresh/reused-session/multi-turn acceptance before
+claiming full hardware validation; this #549 task did not execute that worker.
 
 ## Ordered roadmap
 

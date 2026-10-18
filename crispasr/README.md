@@ -50,3 +50,14 @@ See the [main repo](https://github.com/CrispStrobe/CrispASR) for full documentat
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+`Session::open_with_options` accepts `SessionOptions` with native defaults.
+`TruecaseModel` and `PCSModel` own their contexts; mutable `process` returns
+`Result<String, String>` and Drop releases the model. `Session::score_texts`
+returns copied candidate scores and token counts. `drain_streamed_segments`
+returns copied metadata; progress/count/reset helpers are also available.
+Raw token polling is unsafe because native storage is borrowed and selected
+globally: callers must serialize drain/inference/close until copying finishes.
+
+Word `confidence` preserves native -1 when unavailable. VAD and owned polling
+share the ordinary result reader, including count checks and RAII cleanup.

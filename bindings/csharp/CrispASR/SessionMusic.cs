@@ -269,6 +269,25 @@ namespace CrispASR
         public int ConvertSpeakerCount => NativeMethods.crispasr_session_convert_n_speakers(Handle);
         /// <summary>Native output rate of the RVC model (32k/40k/48k — not a constant).</summary>
         public int ConvertSampleRate => NativeMethods.crispasr_session_convert_sample_rate(Handle);
+        /// <summary>Latent channels used by replay noise [channels, frames].</summary>
+        public int ConvertInterChannels => NativeMethods.crispasr_session_convert_inter_channels(Handle);
+        /// <summary>Samples per frame used by replay sine noise [frames, samples].</summary>
+        public int ConvertUpsampleProduct => NativeMethods.crispasr_session_convert_upsample_product(Handle);
+
+        private static void ValidateReplayNoise(float[]? noise, int frames, Func<int> dimension, string name)
+        {
+            if (noise == null) return; // retain compatibility with older libraries for random draws
+            int width;
+            try { width = dimension(); }
+            catch (EntryPointNotFoundException e)
+            {
+                throw new NotSupportedException("Replay noise validation requires a newer native library", e);
+            }
+            if (width <= 0) throw new InvalidOperationException("native replay-noise dimension is unavailable");
+            int required = checked(frames * width);
+            if (noise.Length != required)
+                throw new ArgumentException($"{name} length {noise.Length} must equal {required}", name);
+        }
 
         /// <summary>
         /// RVC voice conversion. <paramref name="content"/> is a frame-major content
@@ -283,6 +302,8 @@ namespace CrispASR
         public float[] Convert(float[] content, float[] f0Hz, int speakerId = 0,
                                float[]? noiseZp = null, float[]? noiseSine = null)
         {
+            ArgumentNullException.ThrowIfNull(content);
+            ArgumentNullException.ThrowIfNull(f0Hz);
             int dim = ConvertContentDim;
             if (dim <= 0) throw new InvalidOperationException("loaded model has no voice-conversion arm");
             int nFrames = content.Length / dim;
@@ -290,6 +311,10 @@ namespace CrispASR
                 throw new ArgumentException($"content length {content.Length} is not a multiple of content_dim {dim}", nameof(content));
             if (f0Hz.Length != nFrames)
                 throw new ArgumentException($"f0Hz length {f0Hz.Length} must equal frame count {nFrames}", nameof(f0Hz));
+            if (speakerId < 0 || speakerId >= ConvertSpeakerCount)
+                throw new ArgumentOutOfRangeException(nameof(speakerId));
+            ValidateReplayNoise(noiseZp, nFrames, () => ConvertInterChannels, nameof(noiseZp));
+            ValidateReplayNoise(noiseSine, nFrames, () => ConvertUpsampleProduct, nameof(noiseSine));
             int n = NativeMethods.crispasr_session_convert(Handle, content, nFrames, f0Hz, speakerId, noiseZp, noiseSine);
             if (n < 0) throw new InvalidOperationException($"convert failed (rc={n})");
             IntPtr p = NativeMethods.crispasr_session_convert_audio(Handle, out int nSamples);

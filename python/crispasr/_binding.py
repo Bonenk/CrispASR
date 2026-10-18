@@ -19,6 +19,8 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 
+from ._session_extra import SessionExtras, mono as _mono_pcm, session_operation as _session_operation
+
 
 def _resample_pcm_numpy(pcm: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
     """Older-library fallback matching core/audio_resample.cpp, without SciPy.
@@ -104,6 +106,7 @@ class Segment:
     start: float  # seconds
     end: float    # seconds
     no_speech_prob: float = 0.0
+    tokens: List["SessionToken"] = field(default_factory=list)
 
 
 def _find_lib():
@@ -222,7 +225,12 @@ class CrispASR:
     """
 
     def __init__(self, model_path: str, lib_path: Optional[str] = None,
-                 helpers_lib_path: Optional[str] = None):
+                 helpers_lib_path: Optional[str] = None, *,
+                 dtw: bool = False, dtw_aheads_preset: int = 1, dtw_n_top: int = 1):
+        self._ctx = None
+        if dtw and (dtw_aheads_preset not in (1, *range(3, 15)) or
+                    (dtw_aheads_preset == 1 and dtw_n_top < 1)):
+            raise ValueError("DTW needs N_TOP_MOST (1) with positive n_top, or a model preset (3..14)")
         resolved_lib_path = lib_path or _find_lib()
         self._lib = ctypes.CDLL(resolved_lib_path)
         self._setup_signatures()
@@ -243,23 +251,32 @@ class CrispASR:
                 self._helpers = ctypes.CDLL(hp)
                 break
 
-        if self._helpers:
-            # Use pointer-based wrappers (avoids by-value struct issues)
-            self._helpers.whisper_init_from_file_ptr.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
-            self._helpers.whisper_init_from_file_ptr.restype = ctypes.c_void_p
-            self._helpers.whisper_full_ptr.argtypes = [
-                ctypes.c_void_p, ctypes.c_void_p,
-                ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-            ]
-            self._helpers.whisper_full_ptr.restype = ctypes.c_int
-
+        native_pointer_init = getattr(self._lib, "whisper_init_from_file_with_params_by_ref", None)
+        if native_pointer_init is not None or self._helpers:
+            init = native_pointer_init or self._helpers.whisper_init_from_file_ptr
+            init.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
+            init.restype = ctypes.c_void_p
+            if self._helpers:
+                self._helpers.whisper_full_ptr.argtypes = [
+                    ctypes.c_void_p, ctypes.c_void_p,
+                    ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+                ]
+                self._helpers.whisper_full_ptr.restype = ctypes.c_int
             cparams = self._lib.whisper_context_default_params_by_ref()
-            self._ctx = self._helpers.whisper_init_from_file_ptr(
-                model_path.encode("utf-8"), cparams
-            )
-            self._lib.whisper_free_context_params(cparams)
+            if not cparams:
+                raise RuntimeError("Whisper context parameter allocation failed")
+            try:
+                if dtw:
+                    from ._session_extra import function
+                    function(self._lib, "crispasr_ctx_params_set_dtw",
+                             [ctypes.c_void_p, ctypes.c_bool, ctypes.c_int, ctypes.c_int], None)(
+                                 cparams, True, dtw_aheads_preset, dtw_n_top)
+                self._ctx = init(model_path.encode("utf-8"), cparams)
+            finally:
+                self._lib.whisper_free_context_params(cparams)
         else:
-            # Fallback: use deprecated simple init (no params)
+            if dtw:
+                raise RuntimeError("DTW configuration requires native pointer wrappers or libcrispasr_helpers")
             self._lib.whisper_init_from_file.argtypes = [ctypes.c_char_p]
             self._lib.whisper_init_from_file.restype = ctypes.c_void_p
             self._ctx = self._lib.whisper_init_from_file(model_path.encode("utf-8"))
@@ -287,13 +304,6 @@ class CrispASR:
 
         lib.whisper_free_params.argtypes = [ctypes.c_void_p]
         lib.whisper_free_params.restype = None
-
-        # whisper_full (takes params by value — needs helpers lib for pointer variant)
-        lib.whisper_full.argtypes = [
-            ctypes.c_void_p, ctypes.c_void_p,
-            ctypes.POINTER(ctypes.c_float), ctypes.c_int,
-        ]
-        lib.whisper_full.restype = ctypes.c_int
 
         # Results (ctx-based variants)
         lib.whisper_full_n_segments.argtypes = [ctypes.c_void_p]
@@ -425,6 +435,8 @@ class CrispASR:
         vad_min_speech_ms: int = 250,
         vad_min_silence_ms: int = 100,
         tdrz: bool = False,
+        n_processors: int = 1,
+        decode_options: Optional[dict] = None,
     ) -> List[Segment]:
         """Transcribe raw PCM audio data.
 
@@ -443,36 +455,79 @@ class CrispASR:
         Returns:
             List of Segment objects.
         """
+        if not self._ctx:
+            raise RuntimeError("model is closed")
         pcm = _prepare_asr_pcm(self._lib, pcm, sample_rate)
         samples_ptr = pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
 
+        if n_processors < 1:
+            raise ValueError("n_processors must be positive")
         # Get default params
         params_ptr = self._lib.whisper_full_default_params_by_ref(strategy)
+        if not params_ptr:
+            raise RuntimeError("Whisper decode parameter allocation failed")
 
-        # 0.4.2: VAD + tdrz. Setters are optional — older dylibs don't
-        # have them, the lookup-time hasattr() guard skipped the argtypes
-        # declaration so these calls no-op silently.
-        if vad and hasattr(self._lib, "crispasr_params_set_vad"):
-            self._lib.crispasr_params_set_vad(params_ptr, 1)
-            if hasattr(self._lib, "crispasr_params_set_vad_threshold"):
-                self._lib.crispasr_params_set_vad_threshold(params_ptr, vad_threshold)
-            if hasattr(self._lib, "crispasr_params_set_vad_min_speech_ms"):
-                self._lib.crispasr_params_set_vad_min_speech_ms(params_ptr, vad_min_speech_ms)
-            if hasattr(self._lib, "crispasr_params_set_vad_min_silence_ms"):
-                self._lib.crispasr_params_set_vad_min_silence_ms(params_ptr, vad_min_silence_ms)
-            if vad_model_path and hasattr(self._lib, "crispasr_params_set_vad_model_path"):
-                self._lib.crispasr_params_set_vad_model_path(
-                    params_ptr, vad_model_path.encode("utf-8")
-                )
-        if tdrz and hasattr(self._lib, "crispasr_params_set_tdrz"):
-            self._lib.crispasr_params_set_tdrz(params_ptr, 1)
+        # Native parameter setters may retain string pointers until decode returns.
+        try:
+            # 0.4.2: VAD + tdrz. Setters are optional — older dylibs don't
+            # have them, the lookup-time hasattr() guard skipped the argtypes
+            # declaration so these calls no-op silently.
+            if vad and hasattr(self._lib, "crispasr_params_set_vad"):
+                self._lib.crispasr_params_set_vad(params_ptr, 1)
+                if hasattr(self._lib, "crispasr_params_set_vad_threshold"):
+                    self._lib.crispasr_params_set_vad_threshold(params_ptr, vad_threshold)
+                if hasattr(self._lib, "crispasr_params_set_vad_min_speech_ms"):
+                    self._lib.crispasr_params_set_vad_min_speech_ms(params_ptr, vad_min_speech_ms)
+                if hasattr(self._lib, "crispasr_params_set_vad_min_silence_ms"):
+                    self._lib.crispasr_params_set_vad_min_silence_ms(params_ptr, vad_min_silence_ms)
+                if vad_model_path and hasattr(self._lib, "crispasr_params_set_vad_model_path"):
+                    vad_path_bytes = vad_model_path.encode("utf-8")
+                    self._lib.crispasr_params_set_vad_model_path(params_ptr, vad_path_bytes)
+            if tdrz and hasattr(self._lib, "crispasr_params_set_tdrz"):
+                self._lib.crispasr_params_set_tdrz(params_ptr, 1)
 
-        # Run inference
-        if self._helpers:
-            ret = self._helpers.whisper_full_ptr(self._ctx, params_ptr, samples_ptr, len(pcm))
-        else:
-            ret = self._lib.whisper_full(self._ctx, params_ptr, samples_ptr, len(pcm))
-        self._lib.whisper_free_params(params_ptr)
+            full_pointer = getattr(self._lib, "whisper_full_by_ref", None)
+            parallel_pointer = getattr(self._lib, "crispasr_transcribe_parallel_by_ref", None)
+            if not self._helpers and (full_pointer is None or (n_processors > 1 and parallel_pointer is None)):
+                raise RuntimeError("legacy Whisper inference requires native pointer wrappers or libcrispasr_helpers")
+            if n_processors < 1:
+                raise ValueError("n_processors must be positive")
+            # Keep strings alive until inference returns: native setters retain
+            # initial_prompt/language pointers rather than copying their bytes.
+            option_bytes = []
+            for name, value in (decode_options or {}).items():
+                allowed = {
+                    "translate", "detect_language", "token_timestamps", "n_threads", "max_len",
+                    "best_of", "split_on_word", "no_context", "single_segment", "print_realtime",
+                    "print_progress", "print_timestamps", "print_special", "suppress_blank",
+                    "temperature", "max_tokens", "initial_prompt", "alt_n",
+                }
+                if name not in allowed:
+                    raise ValueError(f"unknown legacy decode option {name!r}")
+                fn = getattr(self._lib, "crispasr_params_set_" + name, None)
+                if fn is None:
+                    raise RuntimeError(f"decode option {name!r} unavailable in loaded library")
+                if name == "initial_prompt":
+                    value = value.encode("utf-8")
+                    option_bytes.append(value)
+                fn(params_ptr, value)
+            if hasattr(self._lib, "crispasr_params_set_language"):
+                language_bytes = language.encode("utf-8")
+                self._lib.crispasr_params_set_language(params_ptr, language_bytes)
+            if n_processors == 1:
+                fn = full_pointer or self._helpers.whisper_full_ptr
+                fn.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+                fn.restype = ctypes.c_int
+                ret = fn(self._ctx, params_ptr, samples_ptr, len(pcm))
+            else:
+                from ._session_extra import function
+                fn = function(self._lib if parallel_pointer is not None else self._helpers,
+                              "crispasr_transcribe_parallel_by_ref" if parallel_pointer is not None else "crispasr_transcribe_parallel_ptr",
+                              [ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
+                               ctypes.c_int, ctypes.c_int], ctypes.c_int)
+                ret = fn(self._ctx, params_ptr, samples_ptr, len(pcm), n_processors)
+        finally:
+            self._lib.whisper_free_params(params_ptr)
 
         if ret != 0:
             raise RuntimeError(f"Transcription failed (error code {ret})")
@@ -486,9 +541,72 @@ class CrispASR:
             t0 = self._lib.whisper_full_get_segment_t0(self._ctx, i) / 100.0
             t1 = self._lib.whisper_full_get_segment_t1(self._ctx, i) / 100.0
             nsp = float(self._lib.whisper_full_get_segment_no_speech_prob(self._ctx, i))
-            segments.append(Segment(text=text, start=t0, end=t1, no_speech_prob=nsp))
+            segments.append(Segment(text=text, start=t0, end=t1, no_speech_prob=nsp, tokens=self.tokens(i)))
 
         return segments
+
+    def tokens(self, segment: int) -> List["SessionToken"]:
+        """Copy legacy Whisper tokens, probabilities, alternatives and DTW times.
+
+        Enable token timestamps/alternatives with transcribe_pcm decode_options;
+        DTW also requires context configuration at model creation.
+        """
+        from ._session_extra import function
+        if not self._ctx:
+            raise RuntimeError("model is closed")
+        segment = operator.index(segment)
+        if not 0 <= segment < self._lib.whisper_full_n_segments(self._ctx):
+            raise IndexError("segment index out of range")
+        lib = self._lib
+        if not all(hasattr(lib, name) for name in ("whisper_full_n_tokens", "whisper_full_get_token_text")):
+            return []
+        n = function(lib, "whisper_full_n_tokens", [ctypes.c_void_p, ctypes.c_int], ctypes.c_int)(self._ctx, segment)
+        text = function(lib, "whisper_full_get_token_text", [ctypes.c_void_p, ctypes.c_int, ctypes.c_int], ctypes.c_char_p)
+        out = []
+        for j in range(n):
+            raw = text(self._ctx, segment, j) or b""
+            t0 = lib.crispasr_token_t0(self._ctx, segment, j) if hasattr(lib, "crispasr_token_t0") else -1
+            t1 = lib.crispasr_token_t1(self._ctx, segment, j) if hasattr(lib, "crispasr_token_t1") else -1
+            prob = lib.crispasr_token_p(self._ctx, segment, j) if hasattr(lib, "crispasr_token_p") else -1.0
+            alternatives = []
+            if all(hasattr(lib, name) for name in ("crispasr_token_n_alts", "crispasr_token_alt_id",
+                                                  "crispasr_token_alt_p", "crispasr_token_alt_text")):
+                for k in range(lib.crispasr_token_n_alts(self._ctx, segment, j)):
+                    size = 256
+                    while True:
+                        buf = ctypes.create_string_buffer(size)
+                        rc = lib.crispasr_token_alt_text(self._ctx, segment, j, k, buf, size)
+                        if rc >= 0:
+                            break
+                        if rc != -1 or size >= 1048576:
+                            raise RuntimeError(f"token alternative read failed (rc={rc})")
+                        size *= 2
+                    alternatives.append(TokenAlternative(buf.value.decode("utf-8", errors="replace"),
+                                                        lib.crispasr_token_alt_p(self._ctx, segment, j, k),
+                                                        lib.crispasr_token_alt_id(self._ctx, segment, j, k)))
+            valid = t0 >= 0 and t1 >= t0
+            out.append(SessionToken(raw.decode("utf-8", errors="replace"),
+                                    t0 / 100.0 if valid else None, t1 / 100.0 if valid else None,
+                                    prob, raw, alternatives,
+                                    self.token_dtw_time(segment, j) if hasattr(lib, "crispasr_token_dtw_t") else None))
+        return out
+
+    def token_dtw_time(self, segment: int, token: int) -> Optional[float]:
+        """DTW token time in seconds, or None when native timing is absent."""
+        from ._session_extra import function
+        if not self._ctx:
+            raise RuntimeError("model is closed")
+        segment, token = operator.index(segment), operator.index(token)
+        if not 0 <= segment < self._lib.whisper_full_n_segments(self._ctx):
+            raise IndexError("segment index out of range")
+        n_tokens = function(self._lib, "whisper_full_n_tokens",
+                            [ctypes.c_void_p, ctypes.c_int], ctypes.c_int)(self._ctx, segment)
+        if not 0 <= token < n_tokens:
+            raise IndexError("token index out of range")
+        value = function(self._lib, "crispasr_token_dtw_t",
+                         [ctypes.c_void_p, ctypes.c_int, ctypes.c_int], ctypes.c_int64)(
+                             self._ctx, segment, token)
+        return None if value < 0 else value / 100.0
 
     @property
     def detected_language(self) -> str:
@@ -541,11 +659,46 @@ class CrispASR:
 
 @dataclass
 class SessionWord:
-    """Word-level timing from a session transcribe (backends that produce it)."""
+    """Session word. Missing native timing is ``None``; use forced alignment."""
     text: str
-    start: float  # seconds
-    end: float    # seconds
+    start: Optional[float]  # seconds; None when unavailable
+    end: Optional[float]
     confidence: float = 1.0  # softmax probability in [0, 1]; 1.0 if backend doesn't emit one
+    alternatives: List[Tuple[str, float]] = field(default_factory=list)
+
+    @property
+    def has_timestamps(self) -> bool:
+        return self.start is not None and self.end is not None
+
+
+@dataclass
+class TokenAlternative:
+    """Legacy token candidate with its original vocabulary ID."""
+    text: str
+    probability: float
+    token_id: int
+
+
+@dataclass
+class SessionToken:
+    """Native token metadata; times in seconds or ``None``, confidence -1 if absent.
+
+    A byte-level BPE token can split a UTF-8 character. ``text`` is a display
+    string decoded with replacement; join ``raw_text`` bytes before decoding
+    when reconstructing the original token stream losslessly.
+    """
+    text: str
+    start: Optional[float]
+    end: Optional[float]
+    confidence: float = -1.0
+    raw_text: bytes = b""
+
+    alternatives: List[TokenAlternative] = field(default_factory=list)
+    dtw_time: Optional[float] = None
+
+    @property
+    def has_timestamps(self) -> bool:
+        return self.start is not None and self.end is not None
 
 
 @dataclass
@@ -567,6 +720,8 @@ class SessionSegment:
     # in one transcribe call is not necessarily the same voice as "Speaker 1" in
     # the next — use the diarize_* helpers for cross-recording clustering.
     speaker: str = ""
+    # Empty on older libraries or backends/routes that do not expose tokens.
+    tokens: List[SessionToken] = field(default_factory=list)
 
 
 # =========================================================================
@@ -986,6 +1141,24 @@ def cache_dir(*, override: Optional[str] = None, lib_path: Optional[str] = None)
     return buf.value.decode("utf-8") if rc == 0 else None
 
 
+def _free_aligner_cache(lib) -> None:
+    if not hasattr(lib, "crispasr_free_aligner_cache"):
+        raise RuntimeError("Aligner cache release is unavailable in this library; rebuild CrispASR.")
+    lib.crispasr_free_aligner_cache.argtypes = []
+    lib.crispasr_free_aligner_cache.restype = None
+    lib.crispasr_free_aligner_cache()
+
+
+def free_aligner_cache(*, lib_path: Optional[str] = None) -> None:
+    """Release the loaded library's process-wide forced-aligner cache.
+
+    Safe to repeat. Waits for active alignment; the next alignment reloads its
+    model. Pass the same ``lib_path`` used for alignment if selecting a custom
+    library. Raises RuntimeError on libraries without this additive C API.
+    """
+    _free_aligner_cache(ctypes.CDLL(lib_path or _find_lib()))
+
+
 def align_words(
     aligner_model: str,
     transcript: str,
@@ -1047,7 +1220,7 @@ def align_words(
             fn = getattr(lib, "crispasr_align_result_" + name)
             fn.restype, fn.argtypes = result_type, args
 
-    pcm_np = np.asarray(pcm, dtype=np.float32)
+    pcm_np = _mono_pcm(pcm)
     res = lib.crispasr_align_words_abi(
         aligner_model.encode("utf-8"),
         transcript.encode("utf-8"),
@@ -1425,7 +1598,16 @@ def _diarize_segments_impl(
     return rc == 0, turns
 
 
-class Session:
+
+
+class _SessionOpenParams(ctypes.Structure):
+    _fields_ = [("abi_version", ctypes.c_int), ("n_threads", ctypes.c_int),
+                ("use_gpu", ctypes.c_int), ("verbosity", ctypes.c_int),
+                ("flash_attn", ctypes.c_int), ("n_gpu_layers", ctypes.c_int),
+                ("reserved", ctypes.c_int * 6)]
+
+
+class Session(SessionExtras):
     """Backend-agnostic transcription session over any CrispASR-supported GGUF.
 
     The backend is auto-detected from the file's `general.architecture`
@@ -1454,13 +1636,23 @@ class Session:
     _PROGRESS_CB_TYPE = ctypes.CFUNCTYPE(None, ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
 
     def __init__(self, model_path: str, lib_path: Optional[str] = None,
-                 n_threads: int = 4, backend: Optional[str] = None):
+                 n_threads: int = 4, backend: Optional[str] = None, *,
+                 use_gpu: Optional[bool] = None, verbosity: int = 0,
+                 flash_attn: Optional[bool] = None, n_gpu_layers: Optional[int] = None):
         self._lib = ctypes.CDLL(lib_path or _find_lib())
         self._progress_cb_holder = None
         self._setup_session_signatures()
 
         path_bytes = model_path.encode("utf-8")
-        if backend:
+        if use_gpu is not None or verbosity != 0 or flash_attn is not None or n_gpu_layers is not None:
+            if not hasattr(self._lib, "crispasr_session_open_with_params"):
+                raise RuntimeError("session open options require a newer libcrispasr")
+            opts = _SessionOpenParams(2, n_threads, 1 if use_gpu is None else int(bool(use_gpu)), int(verbosity),
+                                      1 if flash_attn is None else int(bool(flash_attn)),
+                                      -1 if n_gpu_layers is None else int(n_gpu_layers))
+            self._handle = self._lib.crispasr_session_open_with_params(
+                path_bytes, backend.encode("utf-8") if backend else None, ctypes.byref(opts))
+        elif backend:
             self._handle = self._lib.crispasr_session_open_explicit(
                 path_bytes, backend.encode("utf-8"), n_threads
             )
@@ -1631,6 +1823,15 @@ class Session:
         if hasattr(lib, "crispasr_session_result_segment_no_speech_prob"):
             lib.crispasr_session_result_segment_no_speech_prob.argtypes = [ctypes.c_void_p, ctypes.c_int]
             lib.crispasr_session_result_segment_no_speech_prob.restype = ctypes.c_float
+        if all(hasattr(lib, "crispasr_session_result_" + name) for name in
+               ("n_tokens", "token_text", "token_t0", "token_t1", "token_p")):
+            lib.crispasr_session_result_n_tokens.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            lib.crispasr_session_result_n_tokens.restype = ctypes.c_int
+            for name, restype in (("text", ctypes.c_char_p), ("t0", ctypes.c_int64),
+                                  ("t1", ctypes.c_int64), ("p", ctypes.c_float)):
+                fn = getattr(lib, "crispasr_session_result_token_" + name)
+                fn.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+                fn.restype = restype
         # 0.5.13: per-word top-N alternative candidates.
         if hasattr(lib, "crispasr_session_result_word_n_alts"):
             lib.crispasr_session_result_word_n_alts.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
@@ -1638,6 +1839,9 @@ class Session:
         if hasattr(lib, "crispasr_session_result_word_alt_p"):
             lib.crispasr_session_result_word_alt_p.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
             lib.crispasr_session_result_word_alt_p.restype = ctypes.c_float
+        if hasattr(lib, "crispasr_session_result_word_alt_text"):
+            lib.crispasr_session_result_word_alt_text.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+            lib.crispasr_session_result_word_alt_text.restype = ctypes.c_char_p
         # 2026-07-07: per-frame CTC logits for backends with a dense CTC grid
         # (Omni CTC, wav2vec2/hubert/data2vec, canary-ctc), opted in via
         # crispasr_session_set_return_logits. Frame-major (raw pre-softmax for
@@ -1689,6 +1893,65 @@ class Session:
         self._lib.crispasr_session_detected_language(self._handle, buf, len(buf))
         return buf.value.decode("utf-8") or "unknown"
 
+    def free_aligner_cache(self) -> None:
+        """Release the process-wide aligner cache in this session's library.
+
+        This does not close the session; the next alignment reloads its model.
+        """
+        _free_aligner_cache(self._lib)
+
+    def _read_result(self, res) -> List[SessionSegment]:
+        """Copy native metadata before freeing the opaque result handle."""
+        self.raise_callback_error()
+        lib = self._lib
+        out = []
+        has_tokens = all(hasattr(lib, "crispasr_session_result_" + name) for name in
+                         ("n_tokens", "token_text", "token_t0", "token_t1", "token_p"))
+
+        def times(t0, t1):
+            if t0 < 0 or t1 < t0:
+                return None, None
+            return t0 / 100.0, t1 / 100.0
+
+        for i in range(lib.crispasr_session_result_n_segments(res)):
+            raw = lib.crispasr_session_result_segment_text(res, i)
+            words = []
+            for j in range(lib.crispasr_session_result_n_words(res, i)):
+                wt = lib.crispasr_session_result_word_text(res, i, j)
+                start, end = times(lib.crispasr_session_result_word_t0(res, i, j),
+                                   lib.crispasr_session_result_word_t1(res, i, j))
+                p = (lib.crispasr_session_result_word_p(res, i, j)
+                     if hasattr(lib, "crispasr_session_result_word_p") else 1.0)
+                alternatives = []
+                if all(hasattr(lib, name) for name in (
+                        "crispasr_session_result_word_n_alts", "crispasr_session_result_word_alt_text",
+                        "crispasr_session_result_word_alt_p")):
+                    for k in range(lib.crispasr_session_result_word_n_alts(res, i, j)):
+                        alt = lib.crispasr_session_result_word_alt_text(res, i, j, k)
+                        alternatives.append(((alt or b"").decode("utf-8"),
+                                             lib.crispasr_session_result_word_alt_p(res, i, j, k)))
+                words.append(SessionWord(wt.decode("utf-8") if wt else "", start, end,
+                                         1.0 if p < 0 else p, alternatives))
+            tokens = []
+            if has_tokens:
+                for j in range(lib.crispasr_session_result_n_tokens(res, i)):
+                    tt = lib.crispasr_session_result_token_text(res, i, j) or b""
+                    start, end = times(lib.crispasr_session_result_token_t0(res, i, j),
+                                       lib.crispasr_session_result_token_t1(res, i, j))
+                    tokens.append(SessionToken(tt.decode("utf-8", errors="replace"), start, end,
+                                               lib.crispasr_session_result_token_p(res, i, j), tt))
+            spk = (lib.crispasr_session_result_segment_speaker(res, i)
+                   if hasattr(lib, "crispasr_session_result_segment_speaker") else None)
+            nsp = (lib.crispasr_session_result_segment_no_speech_prob(res, i)
+                   if hasattr(lib, "crispasr_session_result_segment_no_speech_prob") else -1.0)
+            out.append(SessionSegment(
+                text=raw.decode("utf-8").strip() if raw else "",
+                start=lib.crispasr_session_result_segment_t0(res, i) / 100.0,
+                end=lib.crispasr_session_result_segment_t1(res, i) / 100.0,
+                words=words, no_speech_prob=nsp, speaker=spk.decode("utf-8") if spk else "",
+                tokens=tokens))
+        return out
+
     def transcribe(
         self, pcm: np.ndarray, sample_rate: int = 16000,
         *,
@@ -1710,38 +1973,12 @@ class Session:
         else:
             res = self._lib.crispasr_session_transcribe(self._handle, samples_ptr, len(pcm))
         if not res:
+            self.raise_callback_error()
             self.set_return_logits(False)
             raise RuntimeError(f"crispasr_session_transcribe failed for backend {self.backend!r}")
 
         try:
-            n_seg = self._lib.crispasr_session_result_n_segments(res)
-            out: List[SessionSegment] = []
-            for i in range(n_seg):
-                t = self._lib.crispasr_session_result_segment_text(res, i)
-                text = t.decode("utf-8") if t else ""
-                t0 = self._lib.crispasr_session_result_segment_t0(res, i) / 100.0
-                t1 = self._lib.crispasr_session_result_segment_t1(res, i) / 100.0
-                wn = self._lib.crispasr_session_result_n_words(res, i)
-                has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
-                nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
-                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
-                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
-                spk = spk_b.decode("utf-8") if spk_b else ""
-                words: List[SessionWord] = []
-                has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
-                for j in range(wn):
-                    wt = self._lib.crispasr_session_result_word_text(res, i, j)
-                    raw_p = self._lib.crispasr_session_result_word_p(res, i, j) if has_word_p else 1.0
-                    words.append(SessionWord(
-                        text=wt.decode("utf-8") if wt else "",
-                        start=self._lib.crispasr_session_result_word_t0(res, i, j) / 100.0,
-                        end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
-                        # -1.0 from C means "no per-word p for this backend";
-                        # surface 1.0 so callers can render uniformly.
-                        confidence=1.0 if raw_p < 0 else raw_p,
-                    ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
-            return out
+            return self._read_result(res)
         finally:
             self._lib.crispasr_session_result_free(res)
 
@@ -1774,11 +2011,15 @@ class Session:
         registered = False
         if progress is not None and hasattr(self._lib, "crispasr_session_set_progress_callback"):
             def _trampoline(processed, total, _ud):
+                if getattr(self, "_extra_callback_error", None) is not None:
+                    return
+                self._inside_callback = True
                 try:
                     progress(processed, total)
-                except Exception as e:  # never let a Python exception cross the FFI boundary
-                    import sys
-                    sys.stderr.write(f"crispasr progress callback raised: {e}\n")
+                except BaseException as exc:
+                    self._extra_callback_error = exc
+                finally:
+                    self._inside_callback = False
             self._progress_cb_holder = Session._PROGRESS_CB_TYPE(_trampoline)
             self._lib.crispasr_session_set_progress_callback(self._handle, self._progress_cb_holder, None)
             registered = True
@@ -1788,38 +2029,16 @@ class Session:
                 self._handle, samples_ptr, len(pcm), int(chunk_seconds), int(overlap_seconds), lang_c)
         finally:
             if registered:
-                self._lib.crispasr_session_set_progress_callback(self._handle, None, None)
+                previous = getattr(self, "_extra_callback_holders", {}).get("progress")
+                self._lib.crispasr_session_set_progress_callback(
+                    self._handle, previous if previous is not None else Session._PROGRESS_CB_TYPE(), None)
                 self._progress_cb_holder = None
         if not res:
+            self.raise_callback_error()
             raise RuntimeError(f"crispasr_session_transcribe_chunked failed for backend {self.backend!r}")
 
         try:
-            n_seg = self._lib.crispasr_session_result_n_segments(res)
-            out: List[SessionSegment] = []
-            has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
-            for i in range(n_seg):
-                t = self._lib.crispasr_session_result_segment_text(res, i)
-                text = t.decode("utf-8") if t else ""
-                t0 = self._lib.crispasr_session_result_segment_t0(res, i) / 100.0
-                t1 = self._lib.crispasr_session_result_segment_t1(res, i) / 100.0
-                wn = self._lib.crispasr_session_result_n_words(res, i)
-                has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
-                nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
-                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
-                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
-                spk = spk_b.decode("utf-8") if spk_b else ""
-                words: List[SessionWord] = []
-                for j in range(wn):
-                    wt = self._lib.crispasr_session_result_word_text(res, i, j)
-                    raw_p = self._lib.crispasr_session_result_word_p(res, i, j) if has_word_p else 1.0
-                    words.append(SessionWord(
-                        text=wt.decode("utf-8") if wt else "",
-                        start=self._lib.crispasr_session_result_word_t0(res, i, j) / 100.0,
-                        end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
-                        confidence=1.0 if raw_p < 0 else raw_p,
-                    ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
-            return out
+            return self._read_result(res)
         finally:
             self.set_return_logits(False)
             self._lib.crispasr_session_result_free(res)
@@ -1912,39 +2131,13 @@ class Session:
                 ctypes.byref(opts),
             )
         if not res:
+            self.raise_callback_error()
             raise RuntimeError(
                 f"crispasr_session_transcribe_vad failed for backend {self.backend!r}"
             )
 
         try:
-            n_seg = self._lib.crispasr_session_result_n_segments(res)
-            out: List[SessionSegment] = []
-            for i in range(n_seg):
-                t = self._lib.crispasr_session_result_segment_text(res, i)
-                text = t.decode("utf-8") if t else ""
-                t0 = self._lib.crispasr_session_result_segment_t0(res, i) / 100.0
-                t1 = self._lib.crispasr_session_result_segment_t1(res, i) / 100.0
-                wn = self._lib.crispasr_session_result_n_words(res, i)
-                has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
-                nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
-                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
-                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
-                spk = spk_b.decode("utf-8") if spk_b else ""
-                words: List[SessionWord] = []
-                has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
-                for j in range(wn):
-                    wt = self._lib.crispasr_session_result_word_text(res, i, j)
-                    raw_p = self._lib.crispasr_session_result_word_p(res, i, j) if has_word_p else 1.0
-                    words.append(SessionWord(
-                        text=wt.decode("utf-8") if wt else "",
-                        start=self._lib.crispasr_session_result_word_t0(res, i, j) / 100.0,
-                        end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
-                        # -1.0 from C means "no per-word p for this backend";
-                        # surface 1.0 so callers can render uniformly.
-                        confidence=1.0 if raw_p < 0 else raw_p,
-                    ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
-            return out
+            return self._read_result(res)
         finally:
             self._lib.crispasr_session_result_free(res)
 
@@ -1982,33 +2175,11 @@ class Session:
         else:
             res = self._lib.crispasr_session_transcribe(self._handle, samples_ptr, len(pcm))
         if not res:
+            self.raise_callback_error()
             raise RuntimeError(f"crispasr_session_transcribe failed for backend {self.backend!r}")
 
         try:
-            n_seg = self._lib.crispasr_session_result_n_segments(res)
-            has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
-            for i in range(n_seg):
-                t = self._lib.crispasr_session_result_segment_text(res, i)
-                text = t.decode("utf-8") if t else ""
-                t0 = self._lib.crispasr_session_result_segment_t0(res, i) / 100.0
-                t1 = self._lib.crispasr_session_result_segment_t1(res, i) / 100.0
-                wn = self._lib.crispasr_session_result_n_words(res, i)
-                has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
-                nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
-                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
-                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
-                spk = spk_b.decode("utf-8") if spk_b else ""
-                words: List[SessionWord] = []
-                for j in range(wn):
-                    wt = self._lib.crispasr_session_result_word_text(res, i, j)
-                    raw_p = self._lib.crispasr_session_result_word_p(res, i, j) if has_word_p else 1.0
-                    words.append(SessionWord(
-                        text=wt.decode("utf-8") if wt else "",
-                        start=self._lib.crispasr_session_result_word_t0(res, i, j) / 100.0,
-                        end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
-                        confidence=1.0 if raw_p < 0 else raw_p,
-                    ))
-                segs.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
+            segs = self._read_result(res)
 
             # Lift out the CTC logits (if any) before the handle is freed.
             n_frames = self._lib.crispasr_session_result_n_logit_frames(res)
@@ -2828,19 +2999,19 @@ class Session:
         func = getattr(self._lib, fn)
         func.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p,
                          ctypes.c_char_p, ctypes.c_int]
-        func.restype = ctypes.c_char_p
+        func.restype = ctypes.c_void_p
+        free_fn = self._lib.crispasr_session_translate_text_free
+        free_fn.argtypes = [ctypes.c_void_p]
+        free_fn.restype = None
         result = func(self._handle, text.encode("utf-8"),
                       src_lang.encode("utf-8"), tgt_lang.encode("utf-8"),
                       int(max_tokens))
         if not result:
             raise RuntimeError("translate_text returned null — check model and language pair")
-        out = result.decode("utf-8")
-        # Free the malloc'd string
-        free_fn = "crispasr_session_translate_text_free"
-        if hasattr(self._lib, free_fn):
-            getattr(self._lib, free_fn).argtypes = [ctypes.c_char_p]
-            getattr(self._lib, free_fn)(result)
-        return out
+        try:
+            return ctypes.string_at(result).decode("utf-8")
+        finally:
+            free_fn(result)
 
     # ------------------------------------------------------------------
     # Streaming API (PLAN #62a — Python wrapper for crispasr_stream_*).
@@ -2897,7 +3068,14 @@ class Session:
             self._lib.crispasr_stream_set_live_decode.argtypes = [ctypes.c_void_p, ctypes.c_int]
             self._lib.crispasr_stream_set_live_decode.restype = None
             self._lib.crispasr_stream_set_live_decode(h, 1)
-        return Session._Stream(self._lib, h)
+        stream = Session._Stream(self._lib, h)
+        stream._owner = self
+        import weakref
+        streams = getattr(self, "_streams", None)
+        if streams is None:
+            self._streams = streams = weakref.WeakSet()
+        streams.add(stream)
+        return stream
 
     class _Stream:
         """Rolling-window streaming decoder handle returned by
@@ -2913,7 +3091,9 @@ class Session:
             1 if a new partial transcript is ready (call :meth:`get_text`).
             Raises on error."""
             import numpy as np
-            arr = np.ascontiguousarray(pcm, dtype=np.float32)
+            if self._closed:
+                raise RuntimeError("stream is closed")
+            arr = _mono_pcm(pcm)
             self._lib.crispasr_stream_feed.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
             self._lib.crispasr_stream_feed.restype = ctypes.c_int
             rc = self._lib.crispasr_stream_feed(
@@ -2927,6 +3107,8 @@ class Session:
             """Return latest committed transcript as
             ``{"text": str, "t0": float, "t1": float, "counter": int}``.
             ``counter`` increments per commit; same value means no new text."""
+            if self._closed:
+                raise RuntimeError("stream is closed")
             self._lib.crispasr_stream_get_text.argtypes = [
                 ctypes.c_void_p, ctypes.c_char_p, ctypes.c_int,
                 ctypes.POINTER(ctypes.c_double), ctypes.POINTER(ctypes.c_double),
@@ -2946,6 +3128,8 @@ class Session:
 
         def flush(self) -> None:
             """Finalise any remaining buffered audio."""
+            if self._closed:
+                raise RuntimeError("stream is closed")
             self._lib.crispasr_stream_flush.argtypes = [ctypes.c_void_p]
             self._lib.crispasr_stream_flush.restype = ctypes.c_int
             rc = self._lib.crispasr_stream_flush(self._handle)
@@ -2959,6 +3143,8 @@ class Session:
             self._lib.crispasr_stream_close.restype = None
             self._lib.crispasr_stream_close(self._handle)
             self._closed = True
+            self._handle = None
+            self._owner = None
 
         def __enter__(self):
             return self
@@ -3053,9 +3239,10 @@ class Session:
         self._lib.crispasr_pcm_free.restype = None
         n = ctypes.c_int(0)
         ptr = self._lib.crispasr_session_synthesize(self._handle, text.encode("utf-8"), ctypes.byref(n))
-        if not ptr or n.value <= 0:
-            raise RuntimeError(f"synthesize returned no audio for backend {self.backend!r}")
         try:
+            if not ptr or n.value <= 0:
+                detail = self.last_synth_error() if hasattr(self._lib, "crispasr_session_last_synth_error") else ""
+                raise RuntimeError(detail or f"synthesize returned no audio for backend {self.backend!r}")
             arr = np.ctypeslib.as_array(ptr, shape=(n.value,)).copy()
         finally:
             self._lib.crispasr_pcm_free(ptr)
@@ -3072,7 +3259,9 @@ class Session:
             ctypes.c_void_p, ctypes.c_char_p,
         ]
         self._lib.crispasr_session_accept_marking_responsibility.restype = ctypes.c_int
-        self._lib.crispasr_session_accept_marking_responsibility(self._handle, attestation.encode("utf-8"))
+        rc = self._lib.crispasr_session_accept_marking_responsibility(self._handle, attestation.encode("utf-8"))
+        if rc != 0:
+            raise RuntimeError(f"accept_marking_responsibility failed (rc={rc})")
 
     def set_speaker_identity(self, identity: str) -> None:
         """Declare whose voice a PRESET voice is: "real_person", "synthetic" or
@@ -3116,12 +3305,9 @@ class Session:
         self._lib.crispasr_pcm_free.restype = None
         n = ctypes.c_int(0)
         ptr = self._lib.crispasr_session_synthesize_raw(self._handle, text.encode("utf-8"), ctypes.byref(n))
-        if not ptr or n.value <= 0:
-            raise RuntimeError(
-                "synthesize_raw returned no audio (attestation required? "
-                "call accept_marking_responsibility() first)"
-            )
         try:
+            if not ptr or n.value <= 0:
+                raise RuntimeError("synthesize_raw returned no audio; check marking attestation and last_synth_error()")
             arr = np.ctypeslib.as_array(ptr, shape=(n.value,)).copy()
         finally:
             self._lib.crispasr_pcm_free(ptr)
@@ -3153,8 +3339,13 @@ class Session:
         lib.crispasr_session_separate_sample_rate.argtypes = [ctypes.c_void_p]
         lib.crispasr_session_separate_sample_rate.restype = ctypes.c_int
 
-        data = pcm_stereo.astype(np.float32)
-        n_samples = len(data) // 2  # stereo interleaved
+        data = np.asarray(pcm_stereo, dtype=np.float32)
+        if data.ndim == 2 and data.shape[1] == 2:
+            data = data.reshape(-1)
+        elif data.ndim != 1 or data.size % 2:
+            raise ValueError("expected interleaved stereo or an (n_frames, 2) array")
+        data = np.ascontiguousarray(data)
+        n_samples = data.size // 2
         n_stems = lib.crispasr_session_separate(
             self._handle, data.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), n_samples,
         )
@@ -3192,7 +3383,7 @@ class Session:
         lib.crispasr_session_pitch_frames.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
         lib.crispasr_session_pitch_frames.restype = ctypes.POINTER(ctypes.c_float)
 
-        data = pcm_mono.astype(np.float32)
+        data = _mono_pcm(pcm_mono)
         n = lib.crispasr_session_pitch(
             self._handle, data.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(data), float(hop_ms),
         )
@@ -3217,9 +3408,14 @@ class Session:
         intermediate ASR text (may be
         empty if the backend doesn't produce one).
 
+        ``language`` updates the sticky source-language hint (consumed by
+        LFM2-Audio; other backends may ignore it).
+
         Raises :class:`RuntimeError` if the C ABI lacks the symbol or
         if the backend doesn't support S2S.
         """
+        if language is not None:
+            self.set_source_language(language)
         if not hasattr(self._lib, "crispasr_session_speech_to_speech"):
             raise RuntimeError("S2S API not present in this libcrispasr build")
         self._lib.crispasr_session_speech_to_speech.argtypes = [
@@ -3232,25 +3428,26 @@ class Session:
         self._lib.crispasr_pcm_free.argtypes = [ctypes.POINTER(ctypes.c_float)]
         self._lib.crispasr_pcm_free.restype = None
         import numpy as np
-        in_arr = np.ascontiguousarray(input_pcm, dtype=np.float32)
+        in_arr = _mono_pcm(input_pcm)
         in_ptr = in_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
         text_out = ctypes.c_char_p(None)
         n_out = ctypes.c_int(0)
         ptr = self._lib.crispasr_session_speech_to_speech(
             self._handle, in_ptr, len(in_arr),
             ctypes.byref(text_out), ctypes.byref(n_out))
-        if not ptr or n_out.value <= 0:
-            raise RuntimeError(f"speech_to_speech returned no audio for backend {self.backend!r}")
         try:
+            if not ptr or n_out.value <= 0:
+                raise RuntimeError(f"speech_to_speech returned no audio for backend {self.backend!r}")
             arr = np.ctypeslib.as_array(ptr, shape=(n_out.value,)).copy()
+            transcript = text_out.value.decode("utf-8") if text_out.value else ""
+            return arr, transcript
         finally:
-            self._lib.crispasr_pcm_free(ptr)
-        transcript = text_out.value.decode("utf-8") if text_out.value else ""
-        if text_out.value and hasattr(self._lib, "crispasr_session_translate_text_free"):
-            self._lib.crispasr_session_translate_text_free.argtypes = [ctypes.c_char_p]
-            self._lib.crispasr_session_translate_text_free.restype = None
-            self._lib.crispasr_session_translate_text_free(text_out)
-        return arr, transcript
+            if ptr:
+                self._lib.crispasr_pcm_free(ptr)
+            if text_out and hasattr(self._lib, "crispasr_session_translate_text_free"):
+                free = self._lib.crispasr_session_translate_text_free
+                free.argtypes, free.restype = [ctypes.c_void_p], None
+                free(ctypes.cast(text_out, ctypes.c_void_p))
 
     def input_sample_rate(self) -> int:
         """Sample rate this backend expects for input PCM, in Hz.
@@ -3280,7 +3477,11 @@ class Session:
         return int(self._lib.crispasr_session_output_sample_rate(self._handle))
 
     def close(self) -> None:
+        if getattr(self, "_inside_callback", False):
+            raise RuntimeError("do not close a session from its callback")
         if getattr(self, "_handle", None):
+            for stream in list(getattr(self, "_streams", ())):
+                stream.close()
             self._lib.crispasr_session_close(self._handle)
             self._handle = None
 
@@ -3297,6 +3498,13 @@ class Session:
 # =========================================================================
 # FireRedPunc — punctuation restoration post-processor
 # =========================================================================
+
+# Static discovery remains usable without a model; all instance operations
+# require a live session and cannot re-enter it from native callbacks.
+for _method_name, _method in list(vars(Session).items()):
+    if not _method_name.startswith("_") and _method_name not in ("close", "free_aligner_cache") and callable(_method) and not isinstance(_method, staticmethod):
+        setattr(Session, _method_name, _session_operation(_method))
+
 
 class PuncModel:
     """BERT-based punctuation restoration (FireRedPunc).
@@ -3340,21 +3548,23 @@ class PuncModel:
         lib.crispasr_punc_init.argtypes = [ctypes.c_char_p]
         lib.crispasr_punc_init.restype = ctypes.c_void_p
         lib.crispasr_punc_process.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
-        lib.crispasr_punc_process.restype = ctypes.c_char_p
-        lib.crispasr_punc_free_text.argtypes = [ctypes.c_char_p]
+        lib.crispasr_punc_process.restype = ctypes.c_void_p
+        lib.crispasr_punc_free_text.argtypes = [ctypes.c_void_p]
         lib.crispasr_punc_free_text.restype = None
         lib.crispasr_punc_free.argtypes = [ctypes.c_void_p]
         lib.crispasr_punc_free.restype = None
 
     def process(self, text: str) -> str:
         """Add punctuation to unpunctuated text."""
-        result = self._lib.crispasr_punc_process(
-            self._handle, text.encode("utf-8"))
+        if not self._handle:
+            raise RuntimeError("punctuation model is closed")
+        result = self._lib.crispasr_punc_process(self._handle, text.encode("utf-8"))
         if not result:
             return text
-        out = result.decode("utf-8")
-        self._lib.crispasr_punc_free_text(result)
-        return out
+        try:
+            return ctypes.string_at(result).decode("utf-8")
+        finally:
+            self._lib.crispasr_punc_free_text(result)
 
     def close(self) -> None:
         if getattr(self, "_handle", None):
@@ -3400,7 +3610,9 @@ class TitaNet:
     def embed(self, pcm_16k):
         """Extract 192-d speaker embedding from 16 kHz mono float32 PCM."""
         import numpy as np
+        if not self._ctx: raise RuntimeError("TitaNet context is closed")
         pcm = np.ascontiguousarray(pcm_16k, dtype=np.float32)
+        if pcm.ndim!=1 or not pcm.size: raise ValueError("nonempty mono PCM required")
         out = np.zeros(192, dtype=np.float32)
         dim = self._lib.crispasr_titanet_embed(
             self._ctx,
@@ -3408,7 +3620,7 @@ class TitaNet:
             len(pcm),
             out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         )
-        if dim <= 0:
+        if dim != 192:
             raise RuntimeError("TitaNet embedding extraction failed")
         return out[:dim]
 
@@ -3419,7 +3631,7 @@ class TitaNet:
         return float(np.dot(a, b))
 
     def close(self):
-        if self._ctx:
+        if getattr(self, "_ctx", None):
             self._lib.crispasr_titanet_free(self._ctx)
             self._ctx = None
 
@@ -3475,8 +3687,11 @@ class SpeakerDB:
                 "identification (GDPR Art. 9); affirm a lawful basis + explicit consent "
                 "from every enrolled person"
             )
-        if expected_names:
-            self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
+        if not expected_names or not expected_names.strip():
+            raise ValueError("SpeakerDB requires an explicit participant roster")
+        self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
+        if not self._db:
+            raise RuntimeError("speaker_db_open failed")
         self._dir = dir_path
 
     @property
@@ -3484,25 +3699,29 @@ class SpeakerDB:
         return self._lib.crispasr_speaker_db_count(self._db) if self._db else 0
 
     def match(self, embedding, threshold=0.7):
-        """Match embedding against DB. Returns (name, score) or (None, score)."""
+        """Return (name, score); a negative native score always means no match."""
+        if not self._db:
+            raise RuntimeError("SpeakerDB is closed")
         import numpy as np
         emb = np.ascontiguousarray(embedding, dtype=np.float32)
+        if emb.ndim != 1 or not emb.size or not np.isfinite(threshold):
+            raise ValueError("Expected a nonempty embedding and finite threshold")
         name_buf = ctypes.create_string_buffer(256)
         score = self._lib.crispasr_speaker_db_match(
             self._db, emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             len(emb), threshold, name_buf, 256,
         )
-        name = name_buf.value.decode() if score >= threshold else None
+        name = name_buf.value.decode() if score >= 0 and score >= threshold else None
         return name, float(score)
 
     def enroll(self, name, embedding):
-        """Enroll a speaker with the given name and embedding.
-
-        The consent attestation given at construction is recorded in the
-        v2 .spkr profile (audit trail).
-        """
+        """Enroll on disk with the attestation from construction; reopen to refresh the roster."""
+        if not self._db:
+            raise RuntimeError("SpeakerDB is closed")
         import numpy as np
         emb = np.ascontiguousarray(embedding, dtype=np.float32)
+        if emb.ndim != 1 or not emb.size:
+            raise ValueError("Expected a nonempty embedding")
         rc = self._lib.crispasr_speaker_db_enroll2(
             self._dir.encode(), name.encode(),
             emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(emb), 1,
@@ -3593,7 +3812,7 @@ class SpeakerEmbedder:
         return out if ok else None
 
     def close(self):
-        if self._ctx:
+        if getattr(self, "_ctx", None):
             self._lib.crispasr_speaker_embedder_free_abi(self._ctx)
             self._ctx = None
 
@@ -3703,7 +3922,7 @@ class PyannoteCache:
             s.speaker = int(seg_array[i].speaker)
 
     def close(self):
-        if self._ctx:
+        if getattr(self, "_ctx", None):
             self._lib.crispasr_pyannote_cache_free_abi(self._ctx)
             self._ctx = None
 
@@ -3920,19 +4139,24 @@ class Parakeet:
         if not self._handle:
             raise RuntimeError(f"Failed to load Parakeet model: {model_path}")
 
-    def transcribe(self, pcm: "np.ndarray", language: Optional[str] = None):
+    def transcribe(self, pcm: "np.ndarray", language: Optional[str] = None, *, t_offset_cs: int = 0):
         """Transcribe mono 16 kHz float32 PCM. Returns a dict with text,
         words [(text, t0_cs, t1_cs)], and tokens [(text, t0_cs, t1_cs, p)]."""
+        if not self._handle: raise RuntimeError("Parakeet context is closed")
+        if language not in (None,"","en"):
+            raise ValueError("legacy Parakeet has no language parameter; use Session for language hints")
+        t_offset_cs = operator.index(t_offset_cs)
+        if not -(1<<63) <= t_offset_cs < (1<<63): raise OverflowError("offset exceeds int64")
         pcm_arr = np.ascontiguousarray(pcm, dtype=np.float32)
+        if pcm_arr.ndim != 1 or not pcm_arr.size: raise ValueError("nonempty mono PCM required")
         lib = self._lib
         fn = lib.crispasr_parakeet_transcribe
         fn.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float),
-                       ctypes.c_int, ctypes.c_char_p]
+                       ctypes.c_int, ctypes.c_int64]
         fn.restype = ctypes.c_void_p
-        lang = language.encode("utf-8") if language else None
         res = fn(self._handle,
                  pcm_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-                 int(pcm_arr.size), lang)
+                 int(pcm_arr.size), t_offset_cs)
         if not res:
             raise RuntimeError("crispasr_parakeet_transcribe returned null")
         try:
@@ -3940,7 +4164,7 @@ class Parakeet:
             lib.crispasr_parakeet_result_text.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_text.restype = ctypes.c_char_p
             raw = lib.crispasr_parakeet_result_text(res)
-            text = raw.decode("utf-8") if raw else ""
+            text = raw.decode("utf-8", errors="replace") if raw else ""
             # Words
             lib.crispasr_parakeet_result_n_words.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_n_words.restype = ctypes.c_int
@@ -3972,22 +4196,24 @@ class Parakeet:
             lib.crispasr_parakeet_result_token_p.restype = ctypes.c_float
             nt = lib.crispasr_parakeet_result_n_tokens(res)
             tokens = []
+            token_bytes = []
             for i in range(nt):
                 tt = lib.crispasr_parakeet_result_token_text(res, i)
+                token_bytes.append(tt or b"")
                 tokens.append((
-                    tt.decode("utf-8") if tt else "",
+                    tt.decode("utf-8", errors="replace") if tt else "",
                     lib.crispasr_parakeet_result_token_t0(res, i),
                     lib.crispasr_parakeet_result_token_t1(res, i),
                     float(lib.crispasr_parakeet_result_token_p(res, i)),
                 ))
-            return {"text": text, "words": words, "tokens": tokens}
+            return {"text": text, "words": words, "tokens": tokens, "token_bytes": token_bytes}
         finally:
             lib.crispasr_parakeet_result_free.argtypes = [ctypes.c_void_p]
             lib.crispasr_parakeet_result_free.restype = None
             lib.crispasr_parakeet_result_free(res)
 
     def close(self):
-        if self._handle:
+        if getattr(self, "_handle", None):
             self._lib.crispasr_parakeet_free.argtypes = [ctypes.c_void_p]
             self._lib.crispasr_parakeet_free.restype = None
             self._lib.crispasr_parakeet_free(self._handle)

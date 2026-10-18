@@ -133,6 +133,13 @@ int rvc_svc_sample_rate(const rvc_svc_context* ctx) {
     return ctx ? ctx->hp.sample_rate : 0;
 }
 
+int rvc_svc_inter_channels(const rvc_svc_context* ctx) {
+    return ctx ? ctx->hp.inter : 0;
+}
+int rvc_svc_upsample_product(const rvc_svc_context* ctx) {
+    return ctx ? ctx->hp.upp() : 0;
+}
+
 rvc_svc_context* rvc_svc_init_from_file(const char* model_path, rvc_svc_params params) {
     gguf_context* meta = core_gguf::open_metadata(model_path);
     if (!meta) {

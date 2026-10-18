@@ -88,12 +88,14 @@ on:
       # chat ABI binding coverage — the guarded files, so the check runs on the
       # commits that can break it rather than incidentally on an unrelated .cpp.
       - 'include/crispasr_chat.h'
-      - 'python/crispasr/_binding.py'
+      - 'python/crispasr/**.py'
+      - 'tools/check-python-api-coverage.py'
       - 'bindings/go/chat.go'
       - 'crispasr-sys/src/lib.rs'
       - 'flutter/crispasr/lib/src/chat.dart'
       - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
       - 'tools/check-chat-binding-coverage.py'
+      - 'bindings/csharp/CrispASR/ChatSession.cs'
       - 'tools/check-doc-anchors.py'
       - 'tools/check-cuda-split-packaging.py'
       - 'tools/check-cpu-backend-include.py'
@@ -124,12 +126,14 @@ on:
       # commit that only DELETES a symbol from one binding touches no .h at
       # all — and that is precisely the drift this guards. A guard that cannot
       # run on the commits it exists to guard is not a guard.
-      - 'python/crispasr/_binding.py'
+      - 'python/crispasr/**.py'
+      - 'tools/check-python-api-coverage.py'
       - 'bindings/go/chat.go'
       - 'crispasr-sys/src/lib.rs'
       - 'flutter/crispasr/lib/src/chat.dart'
       - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
       - 'tools/check-chat-binding-coverage.py'
+      - 'bindings/csharp/CrispASR/ChatSession.cs'
       - 'tools/check-doc-anchors.py'
       - 'tools/check-cuda-split-packaging.py'
       - 'tools/check-cpu-backend-include.py'
@@ -390,7 +394,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Every chat entry point is bound in all five bindings
-        run: python tools/check-chat-binding-coverage.py
+        run: |
+          python tools/check-chat-binding-coverage.py
+          python tools/check-python-api-coverage.py
 
   # The wiring audit checks a registry ROW EXISTS; nothing checked the URL
   # resolves. A registry entry naming a HuggingFace repo that had never been

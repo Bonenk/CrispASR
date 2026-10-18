@@ -160,3 +160,47 @@ Optional extras, each gating its own tests: `CRISPASR_MODEL_WHISPER`,
 `CRISPASR_VAD_MODEL`, `CRISPASR_MODEL_TABCNN`, `CRISPASR_MODEL_TTS`. A variable
 that is set but points at a missing file always fails — that is a
 misconfiguration, not a skip.
+
+## Additional native operations
+
+`ModelRegistry` exposes registry entries, exact default bundles and cache
+operations. An unknown lookup/bundle returns null; native download errors
+propagate. `SpeakerEmbedder`, `PyannoteCache` and `Diarization.Assign` expose
+speaker extraction, clustering and segment/turn labeling. All C# times are
+seconds. `SessionOptions` configures v2 session creation; `Session.VadSlices`
+and `Session.DetectTextLanguage` provide the corresponding auxiliary tasks.
+
+For Whisper-specific legacy controls, `WhisperContext` uses opaque native
+parameters and pointer adapters:
+
+```csharp
+using var whisper = WhisperContext.Open("ggml-base.bin", dtw: true);
+var segments = whisper.Transcribe(pcm, new WhisperDecodeOptions {
+    Language = "de", InitialPrompt = "Grüße", TokenTimestamps = true,
+    Processors = 2
+});
+```
+
+Tokens include owned raw UTF-8 pieces, alternatives and DTW times. Concatenate
+raw pieces before decoding; a missing time is -1. Library versions without the
+new parallel pointer export cannot provide `Processors > 1`. Do one operation
+at a time per context. Dispose streams before their owner, or dispose the owner
+to close all of its child streams.
+
+`ParakeetContext` also exposes the direct legacy decoder, copying words and raw
+tokens before freeing the native result. `Transcribe(pcm, offsetSeconds: 1.23)`
+converts the offset to native centiseconds. It has no language parameter; use
+`Session` when selecting language hints.
+
+`TitaNet.Embed` returns an owned 192-float vector. Native success reports the
+number of floats written, not a zero status. The binding rejects other counts
+and calls after disposal. Similarity helpers expect embeddings already
+normalized to unit L2 length by TitaNet.
+
+`TranscribeVad(pcm, sampleRate, model, language, new VadOptions { ... })`
+accepts per-call language and all six native VAD controls. Threshold defaults
+to 0.5; speech/silence/padding durations are milliseconds; chunk length is
+seconds. The original three-argument overload retains native defaults.
+`SpeakerDb.Match` preserves a negative native score as no match, and DB
+operations reject disposed handles. `SpeakerDb.Enroll` writes to disk;
+reopen an existing DB to refresh the retained roster.

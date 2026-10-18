@@ -1,0 +1,157 @@
+{
+  "schema": 1,
+  "scope": "subword CTC tokenizer/DP only; no encoder/model/audio",
+  "source_commit": "95fa9cbb29fb58091850cc6f8f131dc4cdaa7d04",
+  "source_file_dirty": true,
+  "source_sha256": "75aaa65cb016fc93246eedd3a603c1ba9637aa23b01508017075b2b66054158c",
+  "baseline_commit": "deaf9c010acce1410f470d6df421d0f77ff16be2",
+  "baseline_source_sha256": "48e9400358ff09c4394677b8208d979212923beb47ba0d2122515312d494bd36",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+  "flags": [
+    "-std=c++17",
+    "-O3",
+    "-DNDEBUG",
+    "-fno-fast-math"
+  ],
+  "cpu": "Intel Xeon Processor (Skylake, IBRS, no TSX)",
+  "architecture": "x86_64",
+  "platform": "Linux",
+  "gate": "CRISPASR_SUBWORD_CTC_ALIGN_OPT",
+  "repeats": 9,
+  "warmup_calls_per_arm": 1,
+  "cases": [
+    {
+      "T": 256,
+      "V": 16,
+      "words": 20,
+      "labels": 40,
+      "unique_labels_including_blank": 3,
+      "output_parity": "exact return code, word bytes and centisecond stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 0.452713,
+          "min_ms": 0.130548,
+          "max_ms": 0.594364,
+          "peak_heap_bytes": 45676,
+          "allocations": 311
+        },
+        "gate_off": {
+          "median_ms": 0.527765,
+          "min_ms": 0.164403,
+          "max_ms": 0.735364,
+          "peak_heap_bytes": 45676,
+          "allocations": 311
+        },
+        "gate_on": {
+          "median_ms": 0.492337,
+          "min_ms": 0.149709,
+          "max_ms": 0.64856,
+          "peak_heap_bytes": 23212,
+          "allocations": 54
+        }
+      },
+      "speedup_vs_gate_off": 1.0719588412002348,
+      "heap_reduction_vs_gate_off": 1.967775288643805
+    },
+    {
+      "T": 256,
+      "V": 64,
+      "words": 20,
+      "labels": 40,
+      "unique_labels_including_blank": 3,
+      "output_parity": "exact return code, word bytes and centisecond stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 0.498595,
+          "min_ms": 0.32654,
+          "max_ms": 1.143081,
+          "peak_heap_bytes": 94828,
+          "allocations": 311
+        },
+        "gate_off": {
+          "median_ms": 0.60336,
+          "min_ms": 0.330931,
+          "max_ms": 0.844176,
+          "peak_heap_bytes": 94828,
+          "allocations": 311
+        },
+        "gate_on": {
+          "median_ms": 0.525538,
+          "min_ms": 0.310572,
+          "max_ms": 0.745133,
+          "peak_heap_bytes": 23404,
+          "allocations": 54
+        }
+      },
+      "speedup_vs_gate_off": 1.1480806335602756,
+      "heap_reduction_vs_gate_off": 4.051786019483849
+    },
+    {
+      "T": 256,
+      "V": 1024,
+      "words": 20,
+      "labels": 40,
+      "unique_labels_including_blank": 3,
+      "output_parity": "exact return code, word bytes and centisecond stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 3.191267,
+          "min_ms": 2.854388,
+          "max_ms": 13.633771,
+          "peak_heap_bytes": 1077868,
+          "allocations": 311
+        },
+        "gate_off": {
+          "median_ms": 3.486896,
+          "min_ms": 2.810241,
+          "max_ms": 6.179761,
+          "peak_heap_bytes": 1077868,
+          "allocations": 311
+        },
+        "gate_on": {
+          "median_ms": 2.04694,
+          "min_ms": 1.848846,
+          "max_ms": 4.890997,
+          "peak_heap_bytes": 27244,
+          "allocations": 54
+        }
+      },
+      "speedup_vs_gate_off": 1.7034676150742083,
+      "heap_reduction_vs_gate_off": 39.56350022023198
+    },
+    {
+      "T": 256,
+      "V": 4096,
+      "words": 20,
+      "labels": 40,
+      "unique_labels_including_blank": 3,
+      "output_parity": "exact return code, word bytes and centisecond stamps",
+      "arms": {
+        "frozen_reference": {
+          "median_ms": 19.135292,
+          "min_ms": 13.57316,
+          "max_ms": 22.244669,
+          "peak_heap_bytes": 4223596,
+          "allocations": 311
+        },
+        "gate_off": {
+          "median_ms": 19.243675,
+          "min_ms": 12.374963,
+          "max_ms": 22.855174,
+          "peak_heap_bytes": 4223596,
+          "allocations": 311
+        },
+        "gate_on": {
+          "median_ms": 11.0235,
+          "min_ms": 8.881806,
+          "max_ms": 17.548898,
+          "peak_heap_bytes": 39532,
+          "allocations": 54
+        }
+      },
+      "speedup_vs_gate_off": 1.7456955594865513,
+      "heap_reduction_vs_gate_off": 106.83992714762724
+    }
+  ],
+  "memory_scope": "peak live C++ allocations inside kernel; excludes input/model/IPC/setup"
+}

@@ -155,3 +155,32 @@ Getting help:
 ## License
 
 The license for the Go bindings is the same as the license for the rest of the crispasr project, which is the MIT License. See the `LICENSE` file for more details.
+
+`SessionOpenWithOptions(path, backend, options)` accepts `SessionOptions`;
+start from `DefaultSessionOptions()` for native GPU/flash defaults. Use
+`BackendCapabilities` / `ListBackendCapabilities` for verbs. `TruecaseInit`
+and `PCSInit` return owned processors with `Process` and idempotent `Close`.
+`DrainStreamedSegments` returns owned metadata or nil when empty. Serialize
+all global polling with inference/close of the most recently streaming session.
+
+Word probability `P` preserves native -1 when unavailable; it is not replaced
+with a fabricated 1.0. Invalid native counts/dimensions return errors.
+
+
+## Legacy Whisper parameter ownership
+
+`Params` remains copyable: `copy := params` preserves independent scalar and
+prompt/VAD-path values. `SetInitialPrompt` and `SetVADModelPath` retain Go
+strings. Sequential and parallel inference create temporary C strings and free
+them on return, including native failure. No parameter `Close` is required.
+NUL-containing strings return an error at inference; nil contexts, empty PCM
+and invalid parallel processor counts are rejected before native calls.
+Serialize operations on a native context and do not mutate one `Params` value
+concurrently; independent value copies may be configured separately.
+
+Both low-level `Params` and the higher-level `Context` expose `SetBestOf`,
+`SetDetectLanguage`, `SetSuppressBlank`, `SetTdrz`, and `SetAltN`. Candidate
+counts clamp to 0–32; nonpositive best-of values leave the setting unchanged.
+Custom implementations/mocks of the higher-level `Context` interface need
+these five new methods. `Params` is a Go options type, not a native ABI struct;
+pass it through the binding methods.

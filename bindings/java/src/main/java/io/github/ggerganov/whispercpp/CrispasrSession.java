@@ -30,9 +30,9 @@ import com.sun.jna.ptr.PointerByReference;
  * }
  * }</pre>
  */
-public final class CrispasrSession implements AutoCloseable {
+public final class CrispasrSession extends CrispasrSessionTasks implements AutoCloseable {
 
-    private static java.util.Map<String, Object> nativeOptions() {
+    static java.util.Map<String, Object> nativeOptions() {
         DefaultTypeMapper mapper = new DefaultTypeMapper();
         // JNA 5.13 applies OPTION_STRING_ENCODING to returned strings, but
         // scalar String arguments still use the global jna.encoding default.
@@ -59,6 +59,11 @@ public final class CrispasrSession implements AutoCloseable {
         Lib INSTANCE = Native.load("crispasr", Lib.class, nativeOptions());
 
         Pointer crispasr_session_open(String modelPath, int nThreads);
+        int crispasr_session_result_n_tokens(Pointer r, int segment);
+        Pointer crispasr_session_result_token_text(Pointer r, int segment, int token);
+        long crispasr_session_result_token_t0(Pointer r, int segment, int token);
+        long crispasr_session_result_token_t1(Pointer r, int segment, int token);
+        float crispasr_session_result_token_p(Pointer r, int segment, int token);
         void    crispasr_session_close(Pointer session);
         int     crispasr_session_set_codec_path(Pointer session, String path);
         int     crispasr_session_set_voice(Pointer session, String path, String refTextOrNull);
@@ -197,8 +202,8 @@ public final class CrispasrSession implements AutoCloseable {
 
         // --- Punctuation (PLAN #59) ---
         Pointer crispasr_punc_init(String modelPath);
-        String  crispasr_punc_process(Pointer ctx, String text);
-        void    crispasr_punc_free_text(String text);
+        Pointer crispasr_punc_process(Pointer ctx, String text);
+        void    crispasr_punc_free_text(Pointer text);
         void    crispasr_punc_free(Pointer ctx);
 
         // --- Registry + cache (PLAN #59) ---
@@ -289,14 +294,14 @@ public final class CrispasrSession implements AutoCloseable {
         // Direct Parakeet API
         Pointer crispasr_parakeet_init(String modelPath, int nThreads, int useFlash);
         void    crispasr_parakeet_free(Pointer ctx);
-        Pointer crispasr_parakeet_transcribe(Pointer ctx, float[] pcm, int nSamples, String language);
+        Pointer crispasr_parakeet_transcribe(Pointer ctx, float[] pcm, int nSamples, long offsetCs);
         String  crispasr_parakeet_result_text(Pointer r);
         int     crispasr_parakeet_result_n_words(Pointer r);
         String  crispasr_parakeet_result_word_text(Pointer r, int i);
         long    crispasr_parakeet_result_word_t0(Pointer r, int i);
         long    crispasr_parakeet_result_word_t1(Pointer r, int i);
         int     crispasr_parakeet_result_n_tokens(Pointer r);
-        String  crispasr_parakeet_result_token_text(Pointer r, int i);
+        Pointer crispasr_parakeet_result_token_text(Pointer r, int i);
         long    crispasr_parakeet_result_token_t0(Pointer r, int i);
         long    crispasr_parakeet_result_token_t1(Pointer r, int i);
         float   crispasr_parakeet_result_token_p(Pointer r, int i);
@@ -335,8 +340,6 @@ public final class CrispasrSession implements AutoCloseable {
                                                   Pointer segs, int nSegs);
 
         // Kokoro lang helpers
-        boolean crispasr_kokoro_lang_is_german_abi(String lang);
-        boolean crispasr_kokoro_lang_has_native_voice_abi(String lang);
 
         // Backend detection
         int crispasr_detect_backend_from_gguf(String path, byte[] outName, int outCap);
@@ -401,6 +404,14 @@ public final class CrispasrSession implements AutoCloseable {
     }
 
     private Pointer handle;
+    private final java.util.Set<Stream> streams = new java.util.HashSet<>();
+    @Override protected Pointer nativeHandle() {
+        if(handle==null)throw new IllegalStateException("session is closed");
+        if(inCallback)throw new IllegalStateException("do not re-enter session from callback");
+        return handle;
+    }
+    @Override protected Segment[] readNativeResult(Pointer result) {return extractSegments(result);}
+
 
     private CrispasrSession(Pointer handle) {
         this.handle = handle;
@@ -420,13 +431,17 @@ public final class CrispasrSession implements AutoCloseable {
         return new CrispasrSession(p);
     }
 
+    static CrispasrSession wrap(Pointer handle) {
+        return new CrispasrSession(handle);
+    }
+
     /**
      * Drop the kokoro per-session phoneme cache. No-op for non-kokoro
      * backends. Useful for long-running daemons that resynthesize across
      * many speakers and want bounded memory. (PLAN #56 #5)
      */
     public void clearPhonemeCache() {
-        int rc = Lib.INSTANCE.crispasr_session_kokoro_clear_phoneme_cache(handle);
+        int rc = Lib.INSTANCE.crispasr_session_kokoro_clear_phoneme_cache(nativeHandle());
         if (rc != 0) throw new IllegalStateException("clear_phoneme_cache failed (rc=" + rc + ")");
     }
 
@@ -434,13 +449,13 @@ public final class CrispasrSession implements AutoCloseable {
 
     /** Sticky source-language hint (canary/cohere/voxtral/whisper). Empty clears. */
     public void setSourceLanguage(String lang) {
-        int rc = Lib.INSTANCE.crispasr_session_set_source_language(handle, lang == null ? "" : lang);
+        int rc = Lib.INSTANCE.crispasr_session_set_source_language(nativeHandle(), lang == null ? "" : lang);
         if (rc != 0) throw new IllegalStateException("set_source_language failed (rc=" + rc + ")");
     }
 
     /** Sticky target-language. ≠ source on canary/cohere ⇒ translation. */
     public void setTargetLanguage(String lang) {
-        int rc = Lib.INSTANCE.crispasr_session_set_target_language(handle, lang == null ? "" : lang);
+        int rc = Lib.INSTANCE.crispasr_session_set_target_language(nativeHandle(), lang == null ? "" : lang);
         if (rc != 0) throw new IllegalStateException("set_target_language failed (rc=" + rc + ")");
     }
 
@@ -452,133 +467,133 @@ public final class CrispasrSession implements AutoCloseable {
      * inference declines rather than guesses on a short transcript.
      */
     public void setTtsReferenceLanguage(String lang) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_reference_language(handle, lang == null ? "" : lang);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_reference_language(nativeHandle(), lang == null ? "" : lang);
         if (rc != 0) throw new IllegalStateException("set_tts_reference_language failed (rc=" + rc + ")");
     }
 
     /** Toggle punctuation + capitalisation. Default true. */
     public void setPunctuation(boolean enable) {
-        int rc = Lib.INSTANCE.crispasr_session_set_punctuation(handle, enable ? 1 : 0);
+        int rc = Lib.INSTANCE.crispasr_session_set_punctuation(nativeHandle(), enable ? 1 : 0);
         if (rc != 0) throw new IllegalStateException("set_punctuation failed (rc=" + rc + ")");
     }
 
     /** Whisper sticky --translate. */
     public void setTranslate(boolean enable) {
-        int rc = Lib.INSTANCE.crispasr_session_set_translate(handle, enable ? 1 : 0);
+        int rc = Lib.INSTANCE.crispasr_session_set_translate(nativeHandle(), enable ? 1 : 0);
         if (rc != 0) throw new IllegalStateException("set_translate failed (rc=" + rc + ")");
     }
 
     /** Decoder temperature on backends with runtime control (canary/cohere/parakeet/moonshine). */
     public void setTemperature(float temperature, long seed) {
-        int rc = Lib.INSTANCE.crispasr_session_set_temperature(handle, temperature, seed);
+        int rc = Lib.INSTANCE.crispasr_session_set_temperature(nativeHandle(), temperature, seed);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_temperature failed (rc=" + rc + ")");
     }
 
     /** Reseed TTS backends that support runtime seed control (soft no-op otherwise). */
     public void setTtsSeed(long seed) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_seed(handle, seed);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_seed(nativeHandle(), seed);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_tts_seed failed (rc=" + rc + ")");
     }
 
     /** Generated-token cap for autoregressive session backends. Pass <= 0 to clear. */
     public void setMaxNewTokens(int maxNewTokens) {
-        int rc = Lib.INSTANCE.crispasr_session_set_max_new_tokens(handle, maxNewTokens);
+        int rc = Lib.INSTANCE.crispasr_session_set_max_new_tokens(nativeHandle(), maxNewTokens);
         if (rc != 0) throw new IllegalStateException("set_max_new_tokens failed (rc=" + rc + ")");
     }
 
     /** Opt-in repeated generated-token penalty for autoregressive session backends. Pass <= 0 to disable. */
     public void setFrequencyPenalty(float penalty) {
-        int rc = Lib.INSTANCE.crispasr_session_set_frequency_penalty(handle, penalty);
+        int rc = Lib.INSTANCE.crispasr_session_set_frequency_penalty(nativeHandle(), penalty);
         if (rc != 0) throw new IllegalStateException("set_frequency_penalty failed (rc=" + rc + ")");
     }
 
     /** Diffusion / CFM step count for diffusion-based TTS backends (chatterbox). Soft no-op otherwise. */
     public void setTtsSteps(int steps) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_steps(handle, steps);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_steps(nativeHandle(), steps);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_tts_steps failed (rc=" + rc + ")");
     }
 
     /** Flow-matching timing candidates ranked per token (TADA). Soft no-op on other backends. */
     public void setTtsNumCandidates(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_num_candidates(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_num_candidates(nativeHandle(), n);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_tts_num_candidates failed (rc=" + rc + ")");
     }
 
     /** Top-p nucleus-sampling threshold. Honoured by chatterbox; other backends no-op. */
     public void setTopP(float topP) {
-        int rc = Lib.INSTANCE.crispasr_session_set_top_p(handle, topP);
+        int rc = Lib.INSTANCE.crispasr_session_set_top_p(nativeHandle(), topP);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_top_p failed (rc=" + rc + ")");
     }
 
     /** Top-k sampling cutoff (0 = disabled). Honoured by TADA; other backends no-op. */
     public void setTopK(int topK) {
-        int rc = Lib.INSTANCE.crispasr_session_set_top_k(handle, topK);
+        int rc = Lib.INSTANCE.crispasr_session_set_top_k(nativeHandle(), topK);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_top_k failed (rc=" + rc + ")");
     }
 
     /** Enable/disable sampling (false = greedy). Honoured by TADA; other backends no-op. */
     public void setDoSample(boolean enable) {
-        int rc = Lib.INSTANCE.crispasr_session_set_do_sample(handle, enable ? 1 : 0);
+        int rc = Lib.INSTANCE.crispasr_session_set_do_sample(nativeHandle(), enable ? 1 : 0);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_do_sample failed (rc=" + rc + ")");
     }
 
     /** Min-p sampling threshold. Honoured by chatterbox; other backends no-op. */
     public void setMinP(float minP) {
-        int rc = Lib.INSTANCE.crispasr_session_set_min_p(handle, minP);
+        int rc = Lib.INSTANCE.crispasr_session_set_min_p(nativeHandle(), minP);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_min_p failed (rc=" + rc + ")");
     }
 
     /** Repetition penalty (1.0 = no penalty). Honoured by chatterbox. */
     public void setRepetitionPenalty(float r) {
-        int rc = Lib.INSTANCE.crispasr_session_set_repetition_penalty(handle, r);
+        int rc = Lib.INSTANCE.crispasr_session_set_repetition_penalty(nativeHandle(), r);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_repetition_penalty failed (rc=" + rc + ")");
     }
 
     /** Classifier-free-guidance weight (chatterbox). 0 disables CFG; 0.5 is the upstream default. */
     public void setCfgWeight(float cfgWeight) {
-        int rc = Lib.INSTANCE.crispasr_session_set_cfg_weight(handle, cfgWeight);
+        int rc = Lib.INSTANCE.crispasr_session_set_cfg_weight(nativeHandle(), cfgWeight);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_cfg_weight failed (rc=" + rc + ")");
     }
 
     /** TADA flow-matching noise temperature (Python noise_temp, default 0.9). */
     public void setTtsNoiseTemp(float noiseTemp) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_noise_temp(handle, noiseTemp);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_noise_temp(nativeHandle(), noiseTemp);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_tts_noise_temp failed (rc=" + rc + ")");
     }
 
     /** Emotion-exaggeration scalar (chatterbox). 0.5 is the upstream default. */
     public void setExaggeration(float exaggeration) {
-        int rc = Lib.INSTANCE.crispasr_session_set_exaggeration(handle, exaggeration);
+        int rc = Lib.INSTANCE.crispasr_session_set_exaggeration(nativeHandle(), exaggeration);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_exaggeration failed (rc=" + rc + ")");
     }
 
     /** Upper bound on speech tokens per synthesize call (chatterbox). Default 1000 ≈ 20 s. */
     public void setMaxSpeechTokens(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_max_speech_tokens(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_max_speech_tokens(nativeHandle(), n);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_max_speech_tokens failed (rc=" + rc + ")");
     }
 
     /** Floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s. Other backends no-op (rc=-2). */
     public void setMinSpeechTokens(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_min_speech_tokens(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_min_speech_tokens(nativeHandle(), n);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_min_speech_tokens failed (rc=" + rc + ")");
     }
 
     /** Per-phoneme length-scale / speaking-rate scalar. Honoured by kokoro today; other backends no-op. */
     public void setLengthScale(float scale) {
-        int rc = Lib.INSTANCE.crispasr_session_set_length_scale(handle, scale);
+        int rc = Lib.INSTANCE.crispasr_session_set_length_scale(nativeHandle(), scale);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_length_scale failed (rc=" + rc + ")");
     }
 
     /** Best-of-N sampling count for ASR backends. */
     public void setBestOf(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_best_of(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_best_of(nativeHandle(), n);
         if (rc != 0) throw new IllegalStateException("set_best_of failed (rc=" + rc + ")");
     }
 
     /** Beam-search width for ASR backends that support it. */
     public void setBeamSize(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_beam_size(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_beam_size(nativeHandle(), n);
         if (rc != 0) throw new IllegalStateException("set_beam_size failed (rc=" + rc + ")");
     }
 
@@ -590,40 +605,40 @@ public final class CrispasrSession implements AutoCloseable {
      * normal path pays no {@code [vocab × frames]} copy.
      */
     public void setReturnLogits(boolean enable) {
-        int rc = Lib.INSTANCE.crispasr_session_set_return_logits(handle, enable ? 1 : 0);
+        int rc = Lib.INSTANCE.crispasr_session_set_return_logits(nativeHandle(), enable ? 1 : 0);
         if (rc != 0) throw new IllegalStateException("set_return_logits failed (rc=" + rc + ")");
     }
 
     /** Set a GBNF grammar for constrained whisper decoding. Pass null or "" to clear. */
     public void setGrammarText(String gbnfText, String rootRule, float penalty) {
-        int rc = Lib.INSTANCE.crispasr_session_set_grammar_text(handle, gbnfText, rootRule, penalty);
+        int rc = Lib.INSTANCE.crispasr_session_set_grammar_text(nativeHandle(), gbnfText, rootRule, penalty);
         if (rc == -2) throw new IllegalArgumentException("set_grammar_text: invalid GBNF or root rule not found");
         if (rc != 0) throw new IllegalStateException("set_grammar_text failed (rc=" + rc + ")");
     }
 
     /** Set whisper decoder fallback thresholds. temperatureInc=0 disables fallback. */
     public void setFallbackThresholds(float entropyThold, float logprobThold, float noSpeechThold, float temperatureInc) {
-        int rc = Lib.INSTANCE.crispasr_session_set_fallback_thresholds(handle,
+        int rc = Lib.INSTANCE.crispasr_session_set_fallback_thresholds(nativeHandle(),
                 entropyThold, logprobThold, noSpeechThold, temperatureInc);
         if (rc != 0) throw new IllegalStateException("set_fallback_thresholds failed (rc=" + rc + ")");
     }
 
     /** Per-token top-N alternative-candidate capture for whisper greedy decode. 0 = off. */
     public void setAltN(int n) {
-        int rc = Lib.INSTANCE.crispasr_session_set_alt_n(handle, n);
+        int rc = Lib.INSTANCE.crispasr_session_set_alt_n(nativeHandle(), n);
         if (rc != 0) throw new IllegalStateException("set_alt_n failed (rc=" + rc + ")");
     }
 
     /** Whisper-only text-suppression and prompt-carry extras. suppressRegex may be null or "". */
     public void setWhisperDecodeExtras(boolean suppressNst, String suppressRegex, boolean carryInitialPrompt) {
-        int rc = Lib.INSTANCE.crispasr_session_set_whisper_decode_extras(handle,
+        int rc = Lib.INSTANCE.crispasr_session_set_whisper_decode_extras(nativeHandle(),
                 suppressNst ? 1 : 0, suppressRegex != null ? suppressRegex : "", carryInitialPrompt ? 1 : 0);
         if (rc != 0) throw new IllegalStateException("set_whisper_decode_extras failed (rc=" + rc + ")");
     }
 
     /** Free-form prompt passed to the backend on the next transcribe/synthesize call. */
     public void setAsk(String prompt) {
-        int rc = Lib.INSTANCE.crispasr_session_set_ask(handle, prompt);
+        int rc = Lib.INSTANCE.crispasr_session_set_ask(nativeHandle(), prompt);
         if (rc != 0) throw new IllegalStateException("set_ask failed (rc=" + rc + ")");
     }
 
@@ -635,7 +650,7 @@ public final class CrispasrSession implements AutoCloseable {
         byte[] outLang = new byte[16];
         float[] prob = new float[]{ 0.0f };
         int rc = Lib.INSTANCE.crispasr_session_detect_language(
-                handle, pcm, pcm.length, lidModelPath, method, outLang, outLang.length, prob);
+                nativeHandle(), pcm, pcm.length, lidModelPath, method, outLang, outLang.length, prob);
         if (rc != 0) throw new IllegalStateException("detect_language failed (rc=" + rc + ")");
         if (outConfidence != null && outConfidence.length >= 1) outConfidence[0] = prob[0];
         int n = 0;
@@ -643,17 +658,37 @@ public final class CrispasrSession implements AutoCloseable {
         return new String(outLang, 0, n, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    // PLAN #59: translateText, enhanceAudioRnnoise, textDetectLanguage,
-    // detectBackendFromGguf — deferred to a separate PR after JNA ABI
-    // testing. The JNA interface eagerly resolves all declared symbols,
-    // and type mismatches cause "Invalid memory access" at load time.
+    /** Translate text using a translation-capable session, copying and freeing native UTF-8. */
+    public String translateText(String text, String sourceLanguage, String targetLanguage, int maxTokens) {
+        Pointer session = nativeHandle();
+        java.util.Objects.requireNonNull(text, "text");
+        java.util.Objects.requireNonNull(sourceLanguage, "sourceLanguage");
+        java.util.Objects.requireNonNull(targetLanguage, "targetLanguage");
+        Pointer out = Lib.INSTANCE.crispasr_session_translate_text(session, text, sourceLanguage, targetLanguage, maxTokens);
+        if (out == null) throw new IllegalStateException("translate_text failed");
+        try { return out.getString(0, "UTF-8"); }
+        finally { Lib.INSTANCE.crispasr_session_translate_text_free(out); }
+    }
+    public String translateText(String text, String sourceLanguage, String targetLanguage) {
+        return translateText(text, sourceLanguage, targetLanguage, 256);
+    }
+
+    /** RNNoise denoising of 48 kHz mono PCM. Throws if RNNoise is unavailable in the native build. */
+    public static float[] enhanceAudioRnnoise(float[] pcm) {
+        java.util.Objects.requireNonNull(pcm, "pcm");
+        if (pcm.length == 0) return new float[0];
+        float[] out = new float[pcm.length];
+        int rc = Lib.INSTANCE.crispasr_enhance_audio_rnnoise(pcm, pcm.length, out, out.length);
+        if (rc != 0) throw new IllegalStateException("enhance_audio_rnnoise failed (rc=" + rc + ")");
+        return out;
+    }
 
     /**
      * Load a separate codec GGUF. Required for qwen3-tts (12 Hz tokenizer)
      * and orpheus (SNAC codec); no-op for other backends.
      */
     public void setCodecPath(String path) {
-        int rc = Lib.INSTANCE.crispasr_session_set_codec_path(handle, path);
+        int rc = Lib.INSTANCE.crispasr_session_set_codec_path(nativeHandle(), path);
         if (rc != 0) throw new IllegalStateException("set_codec_path failed (rc=" + rc + ")");
     }
 
@@ -666,7 +701,7 @@ public final class CrispasrSession implements AutoCloseable {
      * {@link #setSpeakerName(String)} instead.
      */
     public void setVoice(String path, String refText) {
-        int rc = Lib.INSTANCE.crispasr_session_set_voice(handle, path, refText);
+        int rc = Lib.INSTANCE.crispasr_session_set_voice(nativeHandle(), path, refText);
         if (rc != 0) throw new IllegalStateException("set_voice failed (rc=" + rc + ")");
     }
 
@@ -680,7 +715,7 @@ public final class CrispasrSession implements AutoCloseable {
      * @throws IllegalStateException if the active backend has no preset-speaker contract
      */
     public void setSpeakerName(String name) {
-        int rc = Lib.INSTANCE.crispasr_session_set_speaker_name(handle, name);
+        int rc = Lib.INSTANCE.crispasr_session_set_speaker_name(nativeHandle(), name);
         if (rc == -2) throw new IllegalArgumentException("unknown speaker: " + name + "; call speakers() to enumerate");
         if (rc == -3) throw new IllegalStateException("backend has no preset speakers; use setVoice() instead");
         if (rc != 0) throw new IllegalStateException("set_speaker_name failed (rc=" + rc + ")");
@@ -688,7 +723,7 @@ public final class CrispasrSession implements AutoCloseable {
 
     /** Select a multi-speaker backend's speaker by index. */
     public void setSpeakerId(int id) {
-        int rc = Lib.INSTANCE.crispasr_session_set_speaker_id(handle, id);
+        int rc = Lib.INSTANCE.crispasr_session_set_speaker_id(nativeHandle(), id);
         if (rc != 0 && rc != -2) throw new IllegalStateException("set_speaker_id failed (rc=" + rc + ")");
     }
 
@@ -699,13 +734,13 @@ public final class CrispasrSession implements AutoCloseable {
      * punctuation on backends that emit none (parakeet RNNT/CTC, …).
      */
     public void setPuncModel(String puncModel) {
-        int rc = Lib.INSTANCE.crispasr_session_set_punc_model(handle, puncModel);
+        int rc = Lib.INSTANCE.crispasr_session_set_punc_model(nativeHandle(), puncModel);
         if (rc != 0) throw new IllegalStateException("set_punc_model failed (rc=" + rc + ")");
     }
 
     /** Comma-separated hotwords for contextual biasing, boosted by {@code boost} per token match. */
     public void setHotwords(String hotwords, float boost) {
-        int rc = Lib.INSTANCE.crispasr_session_set_hotwords(handle, hotwords, boost);
+        int rc = Lib.INSTANCE.crispasr_session_set_hotwords(nativeHandle(), hotwords, boost);
         if (rc != 0) throw new IllegalStateException("set_hotwords failed (rc=" + rc + ")");
     }
 
@@ -723,7 +758,7 @@ public final class CrispasrSession implements AutoCloseable {
      *     never silently treated as {@code "balanced"}.
      */
     public void setSensitivity(String preset) {
-        int rc = Lib.INSTANCE.crispasr_session_set_sensitivity(handle, preset);
+        int rc = Lib.INSTANCE.crispasr_session_set_sensitivity(nativeHandle(), preset);
         if (rc == -2) {
             throw new IllegalArgumentException(
                 "unknown sensitivity preset '" + preset + "' (expected: conservative, balanced, aggressive)");
@@ -733,7 +768,7 @@ public final class CrispasrSession implements AutoCloseable {
 
     /** Select the G2P pronunciation dictionary for TTS ({@code olaph}/{@code open-dict}/path). */
     public void setG2pDict(String source) {
-        int rc = Lib.INSTANCE.crispasr_session_set_g2p_dict(handle, source);
+        int rc = Lib.INSTANCE.crispasr_session_set_g2p_dict(nativeHandle(), source);
         if (rc != 0) throw new IllegalStateException("set_g2p_dict failed (rc=" + rc + ")");
     }
 
@@ -742,10 +777,10 @@ public final class CrispasrSession implements AutoCloseable {
      * Empty if the backend has no preset-speaker contract.
      */
     public String[] speakers() {
-        int n = Lib.INSTANCE.crispasr_session_n_speakers(handle);
+        int n = Lib.INSTANCE.crispasr_session_n_speakers(nativeHandle());
         String[] out = new String[n];
         for (int i = 0; i < n; i++) {
-            String s = Lib.INSTANCE.crispasr_session_get_speaker_name(handle, i);
+            String s = Lib.INSTANCE.crispasr_session_get_speaker_name(nativeHandle(), i);
             out[i] = (s == null) ? "" : s;
         }
         return out;
@@ -760,7 +795,7 @@ public final class CrispasrSession implements AutoCloseable {
      * @throws IllegalStateException if the active backend isn't a VoiceDesign variant
      */
     public void setInstruct(String instruct) {
-        int rc = Lib.INSTANCE.crispasr_session_set_instruct(handle, instruct);
+        int rc = Lib.INSTANCE.crispasr_session_set_instruct(nativeHandle(), instruct);
         if (rc == -3) throw new IllegalStateException(
                 "backend is not a VoiceDesign variant; setInstruct only applies to qwen3-tts VoiceDesign models");
         if (rc != 0) throw new IllegalStateException("set_instruct failed (rc=" + rc + ")");
@@ -768,14 +803,14 @@ public final class CrispasrSession implements AutoCloseable {
 
     /** #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2 otherwise). */
     public void setTtsPhonemes(String phonemes) {
-        int rc = Lib.INSTANCE.crispasr_session_set_tts_phonemes(handle, phonemes == null ? "" : phonemes);
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_phonemes(nativeHandle(), phonemes == null ? "" : phonemes);
         if (rc == -2) throw new RuntimeException("backend has no phonemes-in entry point (kokoro and piper do)");
         if (rc != 0) throw new RuntimeException("set_tts_phonemes failed (rc=" + rc + ")");
     }
 
     /** Pad N ms of silence at the beginning of TTS output. Useful to bypass VLC playback bugs where it drops the first ~1.5s of audio while parsing a large C2PA chunk. */
     public void setTtsPadSilenceMs(int ms) {
-        Lib.INSTANCE.crispasr_session_set_tts_pad_silence_ms(handle, ms);
+        Lib.INSTANCE.crispasr_session_set_tts_pad_silence_ms(nativeHandle(), ms);
     }
 
     /**
@@ -783,7 +818,7 @@ public final class CrispasrSession implements AutoCloseable {
      * (use {@link #setSpeakerName(String)} for it).
      */
     public boolean isCustomVoice() {
-        return Lib.INSTANCE.crispasr_session_is_custom_voice(handle) != 0;
+        return Lib.INSTANCE.crispasr_session_is_custom_voice(nativeHandle()) != 0;
     }
 
     /**
@@ -791,7 +826,7 @@ public final class CrispasrSession implements AutoCloseable {
      * (use {@link #setInstruct(String)} for it).
      */
     public boolean isVoiceDesign() {
-        return Lib.INSTANCE.crispasr_session_is_voice_design(handle) != 0;
+        return Lib.INSTANCE.crispasr_session_is_voice_design(nativeHandle()) != 0;
     }
 
     /**
@@ -800,7 +835,7 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public float[] synthesize(String text) {
         IntByReference n = new IntByReference(0);
-        Pointer pcm = Lib.INSTANCE.crispasr_session_synthesize(handle, text, n);
+        Pointer pcm = Lib.INSTANCE.crispasr_session_synthesize(nativeHandle(), text, n);
         if (pcm == null || n.getValue() <= 0) {
             throw new IllegalStateException("synthesize returned no audio");
         }
@@ -820,7 +855,7 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public float[] synthesizeRaw(String text) {
         IntByReference n = new IntByReference(0);
-        Pointer pcm = Lib.INSTANCE.crispasr_session_synthesize_raw(handle, text, n);
+        Pointer pcm = Lib.INSTANCE.crispasr_session_synthesize_raw(nativeHandle(), text, n);
         if (pcm == null || n.getValue() <= 0) {
             throw new IllegalStateException("synthesizeRaw returned no audio "
                     + "(did you call acceptMarkingResponsibility()?)");
@@ -839,7 +874,7 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public void acceptMarkingResponsibility(String attestation) {
         int rc = Lib.INSTANCE.crispasr_session_accept_marking_responsibility(
-                handle, attestation == null ? "" : attestation);
+                nativeHandle(), attestation == null ? "" : attestation);
         if (rc != 0) {
             throw new IllegalStateException(
                     "accept_marking_responsibility failed (rc=" + rc + ")");
@@ -866,7 +901,7 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public void setSpeakerIdentity(String identity) {
         int rc = Lib.INSTANCE.crispasr_session_set_speaker_identity(
-                handle, identity == null ? "" : identity);
+                nativeHandle(), identity == null ? "" : identity);
         if (rc == -2) {
             throw new IllegalArgumentException(
                     "unrecognised speaker_identity '" + identity
@@ -935,7 +970,7 @@ public final class CrispasrSession implements AutoCloseable {
         IntByReference n = new IntByReference(0);
         PointerByReference outText = new PointerByReference();
         Pointer pcm = Lib.INSTANCE.crispasr_session_speech_to_speech(
-                handle, inSamples, inSamples.length, outText, n);
+                nativeHandle(), inSamples, inSamples.length, outText, n);
         if (pcm == null || n.getValue() <= 0) {
             throw new IllegalStateException(
                     "speechToSpeech returned no audio (backend may not support S2S)");
@@ -958,7 +993,7 @@ public final class CrispasrSession implements AutoCloseable {
      * Whisper-family backends). Returns 0 on error.
      */
     public int inputSampleRate() {
-        return Lib.INSTANCE.crispasr_session_input_sample_rate(handle);
+        return Lib.INSTANCE.crispasr_session_input_sample_rate(nativeHandle());
     }
 
     /**
@@ -966,7 +1001,7 @@ public final class CrispasrSession implements AutoCloseable {
      * backend. Returns 0 when the backend has no audio output (ASR-only). (#332)
      */
     public int outputSampleRate() {
-        return Lib.INSTANCE.crispasr_session_output_sample_rate(handle);
+        return Lib.INSTANCE.crispasr_session_output_sample_rate(nativeHandle());
     }
 
     /**
@@ -975,7 +1010,7 @@ public final class CrispasrSession implements AutoCloseable {
      * surface. (#332)
      */
     public int inputChannels() {
-        return Lib.INSTANCE.crispasr_session_input_channels(handle);
+        return Lib.INSTANCE.crispasr_session_input_channels(nativeHandle());
     }
 
     /**
@@ -983,13 +1018,13 @@ public final class CrispasrSession implements AutoCloseable {
      * the backend has no audio output. (#332)
      */
     public int outputChannels() {
-        return Lib.INSTANCE.crispasr_session_output_channels(handle);
+        return Lib.INSTANCE.crispasr_session_output_channels(nativeHandle());
     }
 
     /** Streaming mode: 0 unavailable, 1 rolling windows, 2 persistent
      * model caches, 3 text-prefix streaming. */
     public int streamKind() {
-        return Lib.INSTANCE.crispasr_session_stream_kind(handle);
+        return Lib.INSTANCE.crispasr_session_stream_kind(nativeHandle());
     }
 
     /**
@@ -1006,12 +1041,14 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public Stream streamOpen(int stepMs, int lengthMs, int keepMs, String language, boolean translate) {
         Pointer p = Lib.INSTANCE.crispasr_session_stream_open(
-                handle, 4, stepMs, lengthMs, keepMs, language == null ? "" : language, translate ? 1 : 0);
+                nativeHandle(), 4, stepMs, lengthMs, keepMs, language == null ? "" : language, translate ? 1 : 0);
         if (p == null) {
             throw new IllegalStateException(
                     "crispasr_session_stream_open failed");
         }
-        return new Stream(p);
+        Stream stream = new Stream(this,p);
+        streams.add(stream);
+        return stream;
     }
 
     /**
@@ -1041,8 +1078,17 @@ public final class CrispasrSession implements AutoCloseable {
     public static final class Stream implements AutoCloseable {
         private Pointer handle;
 
-        Stream(Pointer handle) {
-            this.handle = handle;
+        private final CrispasrSession owner;
+        Stream(CrispasrSession owner, Pointer handle) {
+            this.owner=owner;this.handle = handle;
+        }
+        private void checkOpen() {
+            owner.nativeHandle();
+            if(handle==null)throw new IllegalStateException("stream is closed");
+        }
+        /** Enable partial decodes between commits on supported backends. */
+        public void setLiveDecode(boolean enabled) {
+            checkOpen();Lib.INSTANCE.crispasr_stream_set_live_decode(handle,enabled?1:0);
         }
 
         /**
@@ -1053,7 +1099,7 @@ public final class CrispasrSession implements AutoCloseable {
          * @throws IllegalStateException on decode failure (negative rc from C-ABI)
          */
         public int feed(float[] pcm) {
-            if (handle == null) throw new IllegalStateException("stream is closed");
+            checkOpen();
             if (pcm == null || pcm.length == 0) return 0;
             int rc = Lib.INSTANCE.crispasr_stream_feed(handle, pcm, pcm.length);
             if (rc < 0) throw new IllegalStateException("crispasr_stream_feed failed (rc=" + rc + ")");
@@ -1062,7 +1108,7 @@ public final class CrispasrSession implements AutoCloseable {
 
         /** Latest committed transcript + absolute audio-time bounds. */
         public StreamingUpdate getText() {
-            if (handle == null) throw new IllegalStateException("stream is closed");
+            checkOpen();
             byte[] buf = new byte[8192];
             DoubleByReference t0 = new DoubleByReference(0.0);
             DoubleByReference t1 = new DoubleByReference(0.0);
@@ -1077,7 +1123,7 @@ public final class CrispasrSession implements AutoCloseable {
 
         /** Force a decode on whatever is buffered. Useful when the audio has ended. */
         public void flush() {
-            if (handle == null) throw new IllegalStateException("stream is closed");
+            checkOpen();
             int rc = Lib.INSTANCE.crispasr_stream_flush(handle);
             if (rc < 0) throw new IllegalStateException("crispasr_stream_flush failed (rc=" + rc + ")");
         }
@@ -1085,7 +1131,9 @@ public final class CrispasrSession implements AutoCloseable {
         @Override
         public void close() {
             if (handle != null) {
+                owner.nativeHandle();
                 Lib.INSTANCE.crispasr_stream_close(handle);
+                owner.streams.remove(this);
                 handle = null;
             }
         }
@@ -1093,8 +1141,10 @@ public final class CrispasrSession implements AutoCloseable {
 
     @Override
     public void close() {
+        if(inCallback)throw new IllegalStateException("do not close session from callback");
         if (handle != null) {
-            Lib.INSTANCE.crispasr_session_close(handle);
+            for(Stream stream : new java.util.ArrayList<>(streams))stream.close();
+            Lib.INSTANCE.crispasr_session_close(nativeHandle());
             handle = null;
         }
     }
@@ -1109,9 +1159,30 @@ public final class CrispasrSession implements AutoCloseable {
         public final String text;
         public final long t0, t1; // centiseconds
         public final float p;     // confidence
-        Word(String text, long t0, long t1, float p) {
-            this.text = text; this.t0 = t0; this.t1 = t1; this.p = p;
+        public final AltToken[] alts;
+        Word(String text, long t0, long t1, float p) { this(text,t0,t1,p,new AltToken[0]); }
+        Word(String text, long t0, long t1, float p, AltToken[] alts) {
+            this.text = text; this.t0 = t0; this.t1 = t1; this.p = p; this.alts=alts;
         }
+        public boolean hasTimestamps() { return t0>=0 && t1>=t0; }
+    }
+
+    public static final class AltToken {
+        public final String text;
+        public final float p;
+        public AltToken(String text,float p) { this.text=text; this.p=p; }
+    }
+    /** Owned native bytes; concatenate rawText before decoding split UTF-8 tokens. Times are centiseconds. */
+    public static final class SessionToken {
+        public final byte[] rawText;
+        public final String text;
+        public final long t0,t1;
+        public final float p;
+        SessionToken(byte[] raw,long t0,long t1,float p) {
+            this.rawText=raw.clone();this.text=new String(raw,java.nio.charset.StandardCharsets.UTF_8);
+            this.t0=t0;this.t1=t1;this.p=p;
+        }
+        public boolean hasTimestamps() { return t0>=0 && t1>=t0; }
     }
 
     /** One segment from a transcription result. */
@@ -1128,10 +1199,15 @@ public final class CrispasrSession implements AutoCloseable {
          *  The ordinals are CHUNK-LOCAL: {@code Speaker 1} from one transcribe call is
          *  not necessarily the same voice as {@code Speaker 1} from the next. */
         public final String speaker;
+        public final SessionToken[] tokens;
         Segment(String text, long t0, long t1, Word[] words, float noSpeechProb, String speaker) {
-            this.text = text; this.t0 = t0; this.t1 = t1; this.words = words; this.noSpeechProb = noSpeechProb;
-            this.speaker = speaker == null ? "" : speaker;
+            this(text,t0,t1,words,noSpeechProb,speaker,new SessionToken[0]);
         }
+        Segment(String text, long t0, long t1, Word[] words, float noSpeechProb, String speaker,SessionToken[] tokens) {
+            this.text = text; this.t0 = t0; this.t1 = t1; this.words = words; this.noSpeechProb = noSpeechProb;
+            this.speaker = speaker == null ? "" : speaker;this.tokens=tokens;
+        }
+        public boolean hasTimestamps() { return t0>=0 && t1>=t0; }
     }
 
     /**
@@ -1175,7 +1251,7 @@ public final class CrispasrSession implements AutoCloseable {
 
     /** Transcribe with explicit language hint. */
     public Segment[] transcribeLang(float[] pcm, String lang) {
-        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_lang(handle, pcm, pcm.length, lang);
+        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_lang(nativeHandle(), pcm, pcm.length, lang);
         if (r == null) throw new RuntimeException("transcription failed");
         try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
     }
@@ -1190,7 +1266,7 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public TranscriptionWithLogits transcribeWithLogits(float[] pcm, String lang) {
         setReturnLogits(true);
-        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_lang(handle, pcm, pcm.length, lang);
+        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_lang(nativeHandle(), pcm, pcm.length, lang);
         if (r == null) {
             setReturnLogits(false);
             throw new RuntimeException("transcription failed");
@@ -1213,7 +1289,7 @@ public final class CrispasrSession implements AutoCloseable {
      * progress bar.
      */
     public Segment[] transcribeChunked(float[] pcm, int chunkSeconds, int overlapSeconds, String lang) {
-        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_chunked_lang(handle, pcm, pcm.length,
+        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_chunked_lang(nativeHandle(), pcm, pcm.length,
                 chunkSeconds, overlapSeconds, lang);
         if (r == null) throw new RuntimeException("chunked transcription failed");
         try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
@@ -1227,15 +1303,50 @@ public final class CrispasrSession implements AutoCloseable {
         return Lib.INSTANCE.crispasr_get_progress();
     }
 
-    /** Transcribe with VAD segmentation. */
-    public Segment[] transcribeVad(float[] pcm, int sampleRate, String vadModelPath) {
-        Pointer r = Lib.INSTANCE.crispasr_session_transcribe_vad(
-                handle, pcm, pcm.length, sampleRate, vadModelPath, null);
-        if (r == null) throw new RuntimeException("transcription with VAD failed");
-        try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
+    /** Settings for shared VAD transcription. Durations are milliseconds. */
+    public static final class VadOptions {
+        public float threshold = 0.5f;
+        public int minSpeechDurationMs = 250, minSilenceDurationMs = 100, speechPadMs = 30;
+        /** Maximum chunk length in seconds; zero disables splitting. */
+        public int chunkSeconds = 30, nThreads = 4;
+
+        private Memory nativeMemory() {
+            if (!Float.isFinite(threshold) || threshold < 0 || threshold > 1
+                    || minSpeechDurationMs < 0 || minSilenceDurationMs < 0 || speechPadMs < 0
+                    || chunkSeconds < 0 || nThreads < 1)
+                throw new IllegalArgumentException("Invalid VAD threshold, durations or thread count");
+            Memory p = new Memory(24);
+            p.setFloat(0, threshold); p.setInt(4, minSpeechDurationMs);
+            p.setInt(8, minSilenceDurationMs); p.setInt(12, speechPadMs);
+            p.setInt(16, chunkSeconds); p.setInt(20, nThreads);
+            return p;
+        }
     }
 
-    private static Segment[] extractSegments(Pointer r) {
+    /** Transcribe with default VAD segmentation. */
+    public Segment[] transcribeVad(float[] pcm, int sampleRate, String vadModelPath) {
+        return transcribeVad(pcm, sampleRate, vadModelPath, null, null);
+    }
+
+    /** Transcribe with a per-call language and optional VAD settings. */
+    public Segment[] transcribeVad(float[] pcm, int sampleRate, String vadModelPath,
+            String language, VadOptions options) {
+        Pointer session = nativeHandle();
+        java.util.Objects.requireNonNull(pcm, "pcm");
+        java.util.Objects.requireNonNull(vadModelPath, "vadModelPath");
+        if (pcm.length == 0 || sampleRate <= 0)
+            throw new IllegalArgumentException("PCM must be nonempty and sample rate positive");
+        try (Memory opts = options == null ? null : options.nativeMemory()) {
+            Pointer r = language == null
+                    ? Lib.INSTANCE.crispasr_session_transcribe_vad(session, pcm, pcm.length, sampleRate, vadModelPath, opts)
+                    : Lib.INSTANCE.crispasr_session_transcribe_vad_lang(session, pcm, pcm.length, sampleRate, vadModelPath, opts, language);
+            if (r == null) throw new IllegalStateException("transcription with VAD failed");
+            try { return extractSegments(r); } finally { Lib.INSTANCE.crispasr_session_result_free(r); }
+        }
+    }
+
+    private Segment[] extractSegments(Pointer r) {
+        throwCallbackError();
         int nSegs = Lib.INSTANCE.crispasr_session_result_n_segments(r);
         Segment[] segs = new Segment[nSegs];
         for (int i = 0; i < nSegs; i++) {
@@ -1245,17 +1356,45 @@ public final class CrispasrSession implements AutoCloseable {
             int nWords = Lib.INSTANCE.crispasr_session_result_n_words(r, i);
             Word[] words = new Word[nWords];
             for (int j = 0; j < nWords; j++) {
+                AltToken[] alternatives;
+                try {
+                    int na=Lib.INSTANCE.crispasr_session_result_word_n_alts(r,i,j);
+                    alternatives=new AltToken[na];
+                    for(int k=0;k<na;k++)alternatives[k]=new AltToken(
+                        Lib.INSTANCE.crispasr_session_result_word_alt_text(r,i,j,k),
+                        Lib.INSTANCE.crispasr_session_result_word_alt_p(r,i,j,k));
+                } catch(UnsatisfiedLinkError absent) { alternatives=new AltToken[0]; }
                 words[j] = new Word(
                     Lib.INSTANCE.crispasr_session_result_word_text(r, i, j),
                     Lib.INSTANCE.crispasr_session_result_word_t0(r, i, j),
                     Lib.INSTANCE.crispasr_session_result_word_t1(r, i, j),
-                    Lib.INSTANCE.crispasr_session_result_word_p(r, i, j));
+                    Lib.INSTANCE.crispasr_session_result_word_p(r, i, j),alternatives);
             }
             float noSpeechProb = Lib.INSTANCE.crispasr_session_result_segment_no_speech_prob(r, i);
             String speaker = Lib.INSTANCE.crispasr_session_result_segment_speaker(r, i);
-            segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker);
+            segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker,extractTokens(r,i));
         }
         return segs;
+    }
+
+    static byte[] copyUtf8Bytes(Pointer ptr) {
+        if(ptr==null)return new byte[0];
+        long n=ptr.indexOf(0,(byte)0);
+        return ptr.getByteArray(0,Math.toIntExact(n));
+    }
+    private static SessionToken[] extractTokens(Pointer result,int segment) {
+        try {
+            int n=Lib.INSTANCE.crispasr_session_result_n_tokens(result,segment);
+            SessionToken[] out=new SessionToken[n];
+            for(int j=0;j<n;j++) {
+                long t0=Lib.INSTANCE.crispasr_session_result_token_t0(result,segment,j);
+                long t1=Lib.INSTANCE.crispasr_session_result_token_t1(result,segment,j);
+                boolean timed=t0>=0 && t1>=t0;
+                out[j]=new SessionToken(copyUtf8Bytes(Lib.INSTANCE.crispasr_session_result_token_text(result,segment,j)),
+                    timed?t0:-1,timed?t1:-1,Lib.INSTANCE.crispasr_session_result_token_p(result,segment,j));
+            }
+            return out;
+        } catch(UnsatisfiedLinkError absent) { return new SessionToken[0]; }
     }
 
     /**
@@ -1266,7 +1405,7 @@ public final class CrispasrSession implements AutoCloseable {
     public String detectedLanguage() {
         if (handle == null) throw new IllegalStateException("session is closed");
         byte[] buf = new byte[32];
-        Lib.INSTANCE.crispasr_session_detected_language(handle, buf, buf.length);
+        Lib.INSTANCE.crispasr_session_detected_language(nativeHandle(), buf, buf.length);
         return nullTerminated(buf);
     }
 
@@ -1290,11 +1429,11 @@ public final class CrispasrSession implements AutoCloseable {
      * backends that don't expose a CTC vocab.
      */
     public String[] ctcVocab() {
-        int n = Lib.INSTANCE.crispasr_session_n_vocab(handle);
+        int n = Lib.INSTANCE.crispasr_session_n_vocab(nativeHandle());
         if (n <= 0) return null;
         String[] vocab = new String[n];
         for (int i = 0; i < n; i++) {
-            String p = Lib.INSTANCE.crispasr_session_token_text(handle, i);
+            String p = Lib.INSTANCE.crispasr_session_token_text(nativeHandle(), i);
             vocab[i] = p != null ? p : "";
         }
         return vocab;
