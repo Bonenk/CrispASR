@@ -479,7 +479,7 @@ hashes use native centiseconds and return copied `{t0:, t1:, speaker:}` records.
 ## Session ownership and load options
 
 Handles returned by the Session/Stream/Chat, direct Parakeet/TitaNet, speaker
-DB and text processor APIs are opaque integer tickets. Pass them back through
+DB, microphone and text processor APIs are opaque integer tickets. Pass them back through
 the Ruby APIs; they are not native memory addresses. Closed tickets stay closed
 when a native allocator reuses an address. Close is idempotent and a session
 closes its child `Whisper::CrispASR::Session::Stream` handles first.
@@ -493,3 +493,21 @@ are preserved.
 accepts `n_threads`, `use_gpu`, `verbosity`, `flash_attn`, and `n_gpu_layers` as
 symbol or string hash keys. Boolean controls require true/false; defaults match
 the native v2 loader. Release the returned handle with `Session.close`.
+
+
+## Microphone lifetime
+
+`Whisper::CrispASR::Mic.open(sample_rate, channels) { |pcm| ... }` returns an
+opaque ticket. `start(ticket)` begins capture; `stop(ticket)` stops it and
+reports native driver errors. `close(ticket)` retires the ticket and releases
+the device. Stop/close are idempotent after close; starting a closed or foreign
+ticket raises. The native callback copies PCM into a bounded queue, then a Ruby
+pump invokes the block with an owned float array. When the queue fills, the
+oldest chunk is dropped.
+
+Closing from the block is supported and does not join the current thread.
+Other callers wait for pump cleanup. Native producer threads stop before queue
+storage is released. Callback exceptions retain the existing policy of being
+swallowed so capture can continue; handle application errors inside the block
+when they need reporting. Killing/interruption of the pump also releases its
+native device. Close each microphone explicitly when finished.

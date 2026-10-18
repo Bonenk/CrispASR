@@ -37,10 +37,9 @@ Recommended implementation order and concrete acceptance:
    have compiled regressions; see HISTORY.md. Audit microphone ring/close and
    the old Whisper object/parameter/result path, including all allocation-returning
    audio/container/scoring helpers on Ruby allocation exceptions. Microphone
-   handles still cast caller integers directly to freed native storage; replace
-   them with tracked ownership and cover repeated/foreign close, callback-close
-   self-join, interruption, allocation failures and producer/pump synchronization.
-   Extend the
+   ticket/pump ownership now has compiled native-thread regressions, including
+   callback-close and interrupted/error cleanup; verify actual device drivers
+   on supported platforms. Extend the
    callable ledger rather than treating 155 guarded operations as API coverage.
 4. **WASM remaining adapters and dispatch.** Registry/cache and v2 load-options adapters now have compiled Node
    probes; validate their full-module size and browser filesystem/download behavior.

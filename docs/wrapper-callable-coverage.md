@@ -171,3 +171,15 @@ WASM's `sessionTranscribeWithLogits` uses a shared native-to-owned transcription
 helper. The operation probe checks negative segment/word/alternative/token
 counts, negative/overflowing logit dimensions, missing buffers, copied grids,
 native-result freeing and logit-flag reset on C++ and JS encoding errors.
+
+
+## Ruby microphone ownership (separate microphone header)
+
+`Whisper::CrispASR::Mic.open/start/stop/close/default_device_name` wrap the five
+microphone exports declared in `src/crispasr_mic.h`, outside the shared 311-export
+census. Handles are opaque tickets. The compiled native-thread fixture checks
+PCM copies, callback-close, repeated/concurrent close, foreign/retired tickets,
+start/stop/open failures, queue overflow, GC, callback exceptions, pump kill and
+an injected copy exception after dequeue. A test-only atomic allocation counter
+checks queued/pending chunks return to zero. This does not prove audio-device
+access on a target platform.

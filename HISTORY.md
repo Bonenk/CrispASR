@@ -1,3 +1,25 @@
+## Ruby microphone tickets and pump cleanup — 2026-10-18
+
+Microphone handles now use the shared opaque-ticket namespace, with private
+native storage. Close retires the ticket before releasing the GVL for a join,
+so repeated/concurrent close cannot dereference freed records. Closing from
+the callback skips self-join; a regression reproduced the former `ThreadError`.
+The pump's ensure owns final release, including native close, queued PCM,
+dequeued pending PCM, Ruby GC roots and synchronization primitives.
+
+Queue state is mutex-protected, and native producer threads stop before their
+userdata/queue storage is freed. Argument conversion precedes allocation;
+open/start/stop failures preserve cleanup. Callback exceptions keep the existing
+swallow-and-continue policy and clear errinfo. Pump interruption also retires
+the ticket and native device.
+
+Validation: **340 Ruby assertions** pass. A real pthread producer supplies PCM
+in the model/device-free fixture. Cases cover callback-close, concurrent/repeated
+close, stale/foreign tickets, native errors, queue overflow, GC compaction,
+callback exceptions, pump kill and an injected copy failure after dequeue. A
+test-only atomic chunk counter returns to zero after normal and error cleanup.
+Real audio-device drivers and remaining legacy/resource paths stay in PLAN.md.
+
 ## WASM diarization, VAD and owned transcription results — 2026-10-18
 
 Generic diarization now exposes segment labeling and derived speaker turns,

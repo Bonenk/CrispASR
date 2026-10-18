@@ -1474,6 +1474,19 @@ static VALUE rb_chat_ai_disclosure(VALUE self) {
 
 /* Test-only direct callback routing probes. */
 #ifdef CRISPASR_WRAPPER_PROBE
+extern void probe_mic_mode(int);
+extern int probe_mic_live(void);
+extern int probe_mic_closes(void);
+static VALUE rb_test_mic_mode(VALUE self, VALUE mode) {
+    probe_mic_mode(NUM2INT(mode));
+    return Qnil;
+}
+static VALUE rb_test_mic_live(VALUE self) {
+    return INT2NUM(probe_mic_live());
+}
+static VALUE rb_test_mic_closes(VALUE self) {
+    return INT2NUM(probe_mic_closes());
+}
 extern void probe_text_mode(int);
 extern int probe_text_live(void);
 extern int probe_text_contexts(void);
@@ -1678,6 +1691,9 @@ static void rb_aux_init(void) {
     rb_define_singleton_method(mSession, "tab_n_frames", rb_context_guard_rb_aux_tab_n_frames, 1);
     rb_define_singleton_method(mSession, "transcribe_vad", rb_context_guard_rb_aux_transcribe_vad, 3);
 #ifdef CRISPASR_WRAPPER_PROBE
+    rb_define_singleton_method(mCrispASR, "test_mic_mode", rb_test_mic_mode, 1);
+    rb_define_singleton_method(mCrispASR, "test_mic_live", rb_test_mic_live, 0);
+    rb_define_singleton_method(mCrispASR, "test_mic_closes", rb_test_mic_closes, 0);
     rb_define_singleton_method(mCrispASR, "test_audio_mode", rb_test_audio_mode, 1);
     rb_define_singleton_method(mCrispASR, "test_audio_live", rb_test_audio_live, 0);
     rb_define_singleton_method(mCrispASR, "test_text_mode", rb_test_text_mode, 1);

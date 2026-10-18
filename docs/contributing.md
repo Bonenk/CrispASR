@@ -643,6 +643,11 @@ For manually mirrored option structs, derive pointer fields from the target
 ABI rather than hard-coding 64-bit offsets. Validate returned counts against
 allocated capacity, and reject short stereo channels before the native call.
 
+Ruby microphone queues require a native producer thread in their operation
+probe. Verify callback-close avoids self-join, retire the ticket before a join
+releases the GVL, synchronize queue state under the mutex, and free both queued
+and dequeued PCM on pump interruption or Ruby allocation/copy errors.
+
 Ruby callbacks must use stable native buffers when calling code that can run
 `GC.compact`. A rooted Ruby String does not guarantee a stable data pointer.
 The chat adapter uses Ruby-owned data payloads for messages/strings/stop arrays,

@@ -418,4 +418,63 @@ reject(RuntimeError){streams.flush(stream)};reject(RuntimeError){streams.set_liv
 reject(RuntimeError){s.stream_kind(owner)}
 reject(RuntimeError){s.transcribe(owner,[1,3,5])};reject(RuntimeError){streams.open(owner,100,300,10,nil,false)}
 s.close(h)
+require 'timeout'
+mic=c::Mic
+received=Queue.new
+mh=mic.open(16000,1) do |pcm|
+  error=nil
+  begin
+    mic.close(mh)
+  rescue => e
+    error=e.class.to_s
+  end
+  received << [pcm,error]
+end
+mic.start(mh)
+value=Timeout.timeout(5){received.pop}
+eq(value,[[0.0,0.5,-0.25],nil])
+eq(c.test_mic_live,0)
+mic.close(mh);mic.stop(mh);reject(RuntimeError){mic.start(mh)}
+eq(mic.default_device_name,'Probe microphone')
+reject(RuntimeError){mic.start(999999999)};eq(mic.close(999999999),nil)
+reject(TypeError){mic.start('invalid')}
+reject(ArgumentError){mic.open(16000,1)}
+reject(ArgumentError){mic.open(0,1){}}
+reject(ArgumentError){mic.open(16000,3){}}
+bad_rate=Object.new;def bad_rate.to_int; raise ArgumentError,'coercion';end
+reject(ArgumentError){mic.open(bad_rate,1){}};eq(c.test_mic_live,0)
+c.test_mic_mode(1);reject(RuntimeError){mic.open(16000,1){}};eq(c.test_mic_live,0);c.test_mic_mode(0)
+# Native start/stop failures leave a closeable owner.
+mh=mic.open(16000,1){}
+c.test_mic_mode(2);reject(RuntimeError){mic.start(mh)};eq(c.test_mic_live,1)
+c.test_mic_mode(3);reject(RuntimeError){mic.stop(mh)};c.test_mic_mode(0)
+closed_before=c.test_mic_closes
+[Thread.new{mic.close(mh)},Thread.new{mic.close(mh)}].each(&:join)
+eq(c.test_mic_closes,closed_before+1);eq(c.test_mic_live,0)
+# Ring overflow drops the oldest chunks. Callback exceptions/GC do not kill delivery.
+c.test_mic_mode(4);finished=Queue.new;seen=[]
+mh=mic.open(16000,1) do |pcm|
+  seen << pcm.first
+  if seen.length==1
+    GC.start;GC.compact if GC.respond_to?(:compact)
+    raise 'expected callback error'
+  end
+  finished << true if seen.length==31
+end
+mic.start(mh);Timeout.timeout(5){finished.pop};mic.stop(mh);mic.close(mh)
+eq(seen,(39..69).map(&:to_f));eq(c.test_mic_live,0);eq(mic.test_live_chunks,0);c.test_mic_mode(0)
+# Killing an idle pump still closes the native microphone and retires its ticket.
+threads=Queue.new
+mh=mic.open(16000,1){|pcm|threads << Thread.current};mic.start(mh)
+pump=Timeout.timeout(5){threads.pop};pump.kill;pump.join
+eq(c.test_mic_live,0);reject(RuntimeError){mic.start(mh)};mic.close(mh)
+# New owners cannot revive old tickets, even if native malloc reuses an address.
+old=mh;mh=mic.open(16000,1){};eq(mh==old,false);reject(RuntimeError){mic.start(old)}
+mic.close(old);eq(c.test_mic_live,1);mic.close(mh);eq(c.test_mic_live,0)
+# A copy/allocation exception after native dequeue must free the pending chunk.
+c.test_mic_mode(5);calls=0
+mh=mic.open(16000,1){calls+=1};pump=mic.test_pump(mh);pump.report_on_exception=false
+mic.start(mh);reject(NoMemoryError){pump.join}
+eq(calls,0);eq(c.test_mic_live,0);eq(mic.test_live_chunks,0)
+reject(RuntimeError){mic.start(mh)};mic.close(mh);c.test_mic_mode(0)
 puts "PASS Ruby ABI: #{$count} assertions"
