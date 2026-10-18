@@ -1,5 +1,19 @@
 # CrispASR — Pending work
 
+## CLAIMED — #549 legacy Parakeet segmented-token parity (2026-10-18)
+
+Owner: maintainer agent; branch `fix/549-python-metadata-parity`, isolated
+worktree `${CRISPASR_WORKTREES}/crispasr-issue549-20261018`.
+Scope: retain native token arrays in the legacy explicit-output splitter,
+matching the existing shared CLI splitter exactly, including no-word results,
+word-boundary splits, timestamp ties and trailing tokens. Preserve decoded
+text/words/probabilities and all inference/path-selection behavior. Acceptance:
+compile both production splitters against the same tiny native results and
+compare output segment/token fields; exercise the real C getters/Python reader.
+The separate Japanese gap-fill ownership work remains explicitly pending.
+Integration CI `39104177158` has started Linux/macOS jobs; lint `39104177171`
+is still queued. Audit those exact-source results independently.
+
 ## Issue #549 — implementation complete; full-library CI pending (2026-10-18)
 
 Owner: next maintainer for terminal CI audit. Implementation: `5e7694516`,
