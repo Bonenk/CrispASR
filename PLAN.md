@@ -1,20 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-10-18 — #217 actual Japanese alignment profiling worker
-
-Owner: maintainer coordinator; branch `perf/217-alignment-cleanroom`.
-Prepare hosted-only CPU validation of the pinned F16 Japanese 1.1B CTC model
-and a pinned FLEURS `ja_jp` test recording (CC BY 4.0 attribution retained).
-Retain actual native logits/vocabulary/PCM and compare baseline/opt-in/OFF
-outputs, including the immutable own DP reference on those exact logits.
-Measure model load, encoder and postprocessor independently; compare exported
-C ABI/Python and CLI word output and absolute offsets. No model/runtime math
-change, no default promotion and no historical/third-party speed ranking.
-Worker may be queued while earlier CI runs wait, but acceptance still depends
-on their exact-source results. Tiny local worker-contract checks only; all
-model downloads/builds/inference run on GH. FLEURS lacks word boundaries, so
-this is parity/profiling evidence, not a boundary-accuracy benchmark.
-
 ## #217 — comparison complete; opt-in character CTC candidate validated locally
 
 Owner: maintainer coordinator. Work is isolated on
@@ -88,6 +73,27 @@ Frozen source `a1434c9b2d2484e7af572b577cb1f53127662775` is on
 Audit source and baseline hashes, exact return/text/bounds, successful complete alignments,
 allocation/heap reductions and timing distributions. Never promote from these
 synthetic results alone. Keep input/encoder memory and model quality separate.
+
+## #217 actual Japanese model profiling — worker implemented; hosted proof pending
+
+`tools/ci-heavy/alignment_model_profile.py` builds the real CPU library/CLI and
+pins the F16 Japanese CTC 1.1B model plus a 6.36-second FLEURS Japanese recording
+(CC BY 4.0; attribution/card retained). It queries the actual library's
+label/display splitters, retains native OFF/ON/OFF logits, times encoder versus
+postprocessor separately, replays those exact logits through the immutable own
+DP reference, and checks actual Python/exported C ABI and CLI output plus a
+12.34-second absolute offset. Cold/warm cache cases are distinguished. No
+boundary labels, long-file, Python-blueprint encoder, GPU/VRAM or Subtimer
+comparison is implied. The default-off optimization is not promoted.
+Six tiny rejection-contract tests pass and are wired into CTest/ordinary CI;
+model work is refused locally. Dispatch on a frozen source branch with pinned
+packages and timeout120 per [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
+Do not report model evidence before independently auditing the terminal raw
+payload/source/ELF ledger, exact logits and native/reference/public/CLI outputs.
+Earlier frozen production CI/lint remain acceptance gates. No runtime source
+changed while adding this worker; production source remains unchanged from
+`a1434c9b2`. Actual ELF identity is recorded separately by the worker. If a model case fails, preserve the frozen receipt and repair in a
+new scope; do not widen nonempty/ordering/timestamp checks to obtain green.
 
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 

@@ -1,3 +1,15 @@
+## #217 actual-model alignment profiling worker — 2026-10-18
+
+Prepared a hosted-only native CPU worker for pinned Japanese CTC 1.1B F16 and
+a pinned, attributed CC BY 4.0 FLEURS recording. It separates load/encoder/DP
+scopes, retains actual OFF/ON/OFF logits and exact own-reference replay, and
+checks the shipped Python/exported C ABI, offsets and real CLI against native
+word times. Six model-free rejection-contract tests pass, including duplicate
+sentence IDs, physical hashes, close-but-different tensors, dropped/invalid
+words and non-centisecond drift; CTest and CI include them. No production
+source/default change. Model execution/acceptance remains pending in PLAN.md;
+see [method and limitations](tools/ci-heavy/alignment-model-profile/README.md).
+
 ## #217 independent subword workspace experiment — 2026-10-18
 
 Implemented default-off `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` from our own source:

@@ -211,6 +211,9 @@ jobs:
       - name: Subword CTC feasibility and ABI failure contracts
         run: python3 tests/test_canary_align_contract.py -v
 
+      - name: Alignment model-profile evidence rejection contracts
+        run: python3 tests/test_alignment_model_profile.py -v
+
       - name: Subword CTC streaming workspace and independent path oracle
         run: python3 tests/test_subword_align_compact.py -v
 

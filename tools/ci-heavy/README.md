@@ -200,3 +200,11 @@ return/text/centisecond acceptance. Run with `-f pip="numpy"`, timeout30 and an
 immutable source branch. It measures kernel time and live C++ allocations,
 not encoder, model quality, RSS or VRAM. Tiny local runs require `--output`;
 large shapes require hosted Actions. See the [alignment audit](../../docs/alignment-cleanroom-2026-10-18.md#independent-subword-workspace-experiment).
+
+`alignment_model_profile.py` builds the actual native CPU library/CLI for the
+pinned Japanese CTC 1.1B F16 model and a pinned CC BY 4.0 FLEURS recording.
+It retains actual OFF/ON/OFF logits, exact own-reference DP replay and shipped
+Python/exported-C-ABI/CLI parity, with separate load/encoder/DP timing scopes.
+Run only on hosted Linux with the immutable pins/packages and timeout120 in
+[the method](alignment-model-profile/README.md). This is not a word-boundary,
+long-form, GPU/VRAM, original-Python or Subtimer comparison/default acceptance.
