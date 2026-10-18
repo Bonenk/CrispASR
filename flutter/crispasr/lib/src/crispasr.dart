@@ -506,8 +506,9 @@ bool diarizeSegments({
           continue;
         }
         if (rc == 0) {
-          if (count.value < 0 || count.value > cap)
+          if (count.value < 0 || count.value > cap) {
             throw StateError('Invalid native diarization turn count');
+          }
           for (var i = 0; i < count.value; i++) {
             outTurns.add(DiarizeTurn(
                 t0: turns[i].t0 / 100.0,
@@ -2187,13 +2188,16 @@ class CrispASR {
   /// Native DTW timestamp in seconds, or -1 when unavailable.
   double tokenDtwTime(int segment, int token) {
     _checkDisposed();
-    if (segment < 0 || segment >= _nSegments(_ctx))
+    if (segment < 0 || segment >= _nSegments(_ctx)) {
       throw RangeError('Segment index out of range');
+    }
     final nTokens = _fullNTokens;
-    if (nTokens == null)
+    if (nTokens == null) {
       throw UnsupportedError('Native token counts unavailable');
-    if (token < 0 || token >= nTokens(_ctx, segment))
+    }
+    if (token < 0 || token >= nTokens(_ctx, segment)) {
       throw RangeError('Token index out of range');
+    }
     if (!_lib.providesSymbol('crispasr_token_dtw_t')) return -1;
     final fn = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32, Int32),
         int Function(Pointer<Void>, int, int)>('crispasr_token_dtw_t');
@@ -6558,8 +6562,9 @@ class CrispasrTitaNet {
       final output = malloc<Float>(192);
       try {
         final dim = fn(_handle, pcmPtr, pcm16k.length, output);
-        if (dim != 192)
+        if (dim != 192) {
           throw StateError('TitaNet must return 192 floats (got $dim)');
+        }
         return Float32List.fromList(output.asTypedList(192));
       } finally {
         malloc.free(output);
@@ -6571,8 +6576,9 @@ class CrispasrTitaNet {
 
   /// Dot product for embeddings normalized to unit L2 length by TitaNet.
   static double cosineSim(DynamicLibrary lib, Float32List a, Float32List b) {
-    if (a.length != b.length)
+    if (a.length != b.length) {
       throw ArgumentError('Embedding dimensions must match');
+    }
     if (a.isEmpty) return 0;
     final fn = lib.lookupFunction<
         Float Function(Pointer<Float>, Pointer<Float>, Int32),
@@ -6616,10 +6622,12 @@ class CrispasrSpeakerDB {
   CrispasrSpeakerDB(DynamicLibrary lib, this.dirPath,
       {required String expectedNames, required bool consentAttested})
       : _lib = lib {
-    if (!consentAttested)
+    if (!consentAttested) {
       throw StateError('Speaker DB requires an explicit consent attestation');
-    if (expectedNames.trim().isEmpty)
+    }
+    if (expectedNames.trim().isEmpty) {
       throw ArgumentError('Participant roster required');
+    }
     final arena = Arena();
     try {
       final fn = _lib.lookupFunction<
@@ -6646,8 +6654,9 @@ class CrispasrSpeakerDB {
   /// A negative native score always means no match.
   (String?, double) match(Float32List embedding, {double threshold = 0.7}) {
     _checkOpen();
-    if (embedding.isEmpty || !threshold.isFinite)
+    if (embedding.isEmpty || !threshold.isFinite) {
       throw ArgumentError('Nonempty embedding and finite threshold required');
+    }
     final arena = Arena();
     try {
       final pcm = arena<Float>(embedding.length)
