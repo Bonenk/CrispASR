@@ -18,12 +18,22 @@ two optional native-library checks await that build. GCC/Clang focused operation
 and metadata suites each report 39 passed, 64 subtests and one native-library
 skip. These skips are not hosted acceptance. The real-header helper also compiles locally. No full local library/model build
 was attempted. Hosted CI checks the newly built library's exports/getters and
-loads a helper compiled against that build; record its exact source/run below
-once dispatched. A fixture library is never the native model acceptance gate.
+loads a helper compiled against that build. A fixture library is never the
+native model acceptance gate.
+
+Frozen implementation source `c12707299c5dcbca7bafe60a073688250238cdd9`
+is on immutable `diag/python-api-20261018`. Full CI
+[39120101432](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101432)
+and lint
+[39120101602](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101602)
+are dispatched and queued. Secret scan `39120093240` also targets that source.
+Verify terminal conclusions, source SHA and actual test/helper output before
+accepting the hosted gates. Later documentation commits on main do not alter
+this pinned implementation.
 
 Next acceptance work, in order:
 
-1. Audit the immutable source's full CI/lint (source/run pins to follow),
+1. Audit the immutable source's full CI/lint pinned above,
    especially the complete shared library, legacy helper link/load, the
    164-symbol smoke subset and native exported metadata. Do not accept a stale
    build discovered from another checkout. Local symbol-resolution checks skip
