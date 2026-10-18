@@ -102,6 +102,31 @@ Existing `TranscribeOptions` and `Segment` struct literals remain unchanged.
 Snapshot readers limit segments to one million tokens, alternatives to 32 per
 token and text to 1 MiB per token/candidate, rejecting invalid counts or buffers.
 
+`WhisperDecodeControls` adds per-call language/prompt strings, boolean flags,
+threads, greedy best-of, temperature, length/token limits and alternatives without
+changing `TranscribeOptions`. Construct it with `Default::default()` and assign
+fields; it is non-exhaustive so future controls can be added compatibly:
+
+```rust
+let mut controls = crispasr::WhisperDecodeControls::default();
+controls.language = Some("de".into());
+controls.initial_prompt = Some("Grüße".into());
+controls.n_threads = Some(4);
+controls.token_timestamps = Some(true);
+controls.alt_n = Some(5);
+// With an already loaded legacy model and mono 16 kHz PCM:
+// model.transcribe_pcm_with_controls(&pcm, &options, &controls)?;
+// model.transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)?;
+```
+
+`None` preserves native defaults; `Some(false)` explicitly clears a flag.
+Threads/best-of must be positive, limits nonnegative and temperature finite and
+nonnegative. Language must be nonempty; language/prompt strings must be NUL-free
+and remain owned until native inference and parameter cleanup finish. Empty
+prompts are valid. Alternative counts retain the native 0–32 clamp; native beam
+and chunk-merge behavior still applies. All controls share existing VAD/tinydiarize
+validation, native failure cleanup and owned segment handling on both routes.
+
 Prefer `Session` for backend dispatch and native exception handling. Repairing
 the legacy pointer ABI does not make the deprecated direct Whisper API safe
 against C++ exceptions. Model/platform acceptance remains separate from the

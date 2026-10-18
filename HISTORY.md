@@ -1,3 +1,39 @@
+## Compatible Rust Whisper scalar controls — 2026-10-18
+
+`WhisperDecodeControls` exposes language/prompt strings, eleven flags, threads,
+greedy best-of, temperature, length/token limits and alternatives. Sequential
+`transcribe_pcm_with_controls` and progress-tracked
+`transcribe_pcm_parallel_with_controls` share validation, owned string lifetime,
+VAD/tinydiarize handling, copied segments and matching native parameter cleanup.
+The controls type is non-exhaustive and created with Default; existing
+`TranscribeOptions`, result shapes and older entry points remain compatible.
+The earlier sequential alternative-capture method delegates to these controls.
+
+Unset fields preserve native defaults; explicit false/zero fields apply where
+valid. Positive threads/best-of, nonnegative limits, finite/nonnegative
+temperature, nonempty language and NUL-free strings are validated before native
+full-parameter allocation. Empty prompts are allowed. Owned language/prompt C
+strings outlive native inference and parameter destruction; alternatives retain
+the native 0–32 clamp. Native greedy/beam and parallel chunk semantics still apply.
+
+The Go/Rust fixture now compiles the actual runtime's **25 C++ scalar setters**
+instead of handwritten C mirrors. The 19 new control routes plus six existing
+VAD/tinydiarize routes cover that exported helper family, without claiming every
+raw full-params field or callback API. Field oracles check every control against
+distinct defaults on sequential/parallel and greedy/beam routes, explicit clears,
+UTF-8 strings, defaults, native/allocation errors, empty output and cleanup.
+Rejected controls make no native parameter requests. Heap churn catches premature
+string release: deliberately dropping the prepared owner before inference
+reproduced a native language mismatch; restoring the lifetime passes.
+
+Validation: **39 Go tests with the race detector, 34 Rust tests and five
+doctests pass**, including source-family completeness checks alongside the
+compiled operation probes. Formatting, documentation anchors and workflow shell
+checks pass. Review of the native parallel loop also found separate timestamp
+merge/worker-error/VAD concerns; those are precisely scoped in PLAN.md for
+model-free runtime regressions and later actual-model acceptance. Controls
+transport probes do not establish that runtime merge behavior or full parity.
+
 ## Repair stale CPU CI assertions — 2026-10-18
 
 The six hosted binding contract jobs passed on `9bbbd8228`, as did the separate

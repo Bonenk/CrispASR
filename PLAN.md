@@ -2,11 +2,13 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active now: compatible Rust Whisper scalar
-controls and parallel alternative capture; track the full CI rerun after the
-stale API-version/Ruby-registration assertions were repaired. Completed repairs and measured probe counts are archived in
-HISTORY.md. Continue the cross-language wrapper task; the bounded external
-agent tasks have ended. Start with the incremental
+Owner: maintainer coordinator. Active next: native parallel timestamp/worker
+validation, then remaining parameter/lifecycle and cross-language audits.
+The Rust scalar-helper family now has compatible public controls and parallel
+forwarding; completed repairs and measured probes are archived in HISTORY.md.
+Track the full CI rerun after repairing the stale API-version/Ruby assertions.
+Continue the cross-language wrapper task; the bounded external agent tasks have
+ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
 The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
 Do not reimplement rows merely because an older note says they are missing.
@@ -63,21 +65,36 @@ Recommended implementation order and concrete acceptance:
    callbacks, with a hosted race-detector gate. Same-context inference/close/
    re-entry still requires caller serialization; audit/enforce that lifecycle
    in low-level and high-level APIs, including foreign callback threads.
-   Rust scalar decode
-   controls still need a compatible public options surface, including parallel
-   alternative capture and language/prompt/thread/temperature controls; avoid
-   breaking downstream `TranscribeOptions` struct literals. Sequential Rust
-   alternative capture now has an additive per-call method and compiled probes.
-   Reuse existing validation/owned string lifetime and matching parameter cleanup
-   when extending controls to either decode route.
-   Start in `crispasr/src/lib.rs::transcribe_pcm_impl` and the owned reader in
-   `crispasr/src/whisper_tokens.rs`. Inventory `crispasr_params_set_*` exports
-   against the actual public methods, including language/initial-prompt strings,
-   translate/detection, token timestamps, threads, best-of, temperature and
-   length/token limits. Cover invalid strings/scalars and allocation/native
-   failure with matching frees on sequential and parallel routes. Go's owned
+   Rust's 25 scalar-helper routes now have compiled controls/old-options probes;
+   validate language/prompt/thread/temperature and alternative behavior with
+   actual models, including native parallel chunk merging. Audit raw full-params
+   fields and legacy callback routes outside that helper family separately.
+   Reuse the owned controls in `crispasr/src/whisper_controls.rs`, common decode
+   path `crispasr/src/lib.rs::transcribe_pcm_impl` and the owned token reader in
+   `crispasr/src/whisper_tokens.rs`; do not reimplement completed setters. Go's owned
    reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
    is in `bindings/go/pkg/whisper/token_snapshots.go`.
+
+### Next runtime check: legacy parallel merge, errors and VAD
+
+Inspect `src/crispasr.cpp::whisper_full_parallel` with a model-free fixture that
+compiles the actual function against tiny fake worker states and PCM, then run
+actual-model acceptance through hosted CPU/GPU jobs. The source currently:
+
+- shifts merged segment times but does not shift their token t0/t1/DTW fields;
+  verify absolute token times for later chunks and preserve unavailable -1;
+- computes offset/sample-to-centisecond products with int intermediates;
+  test multi-minute offsets/long clips and use bounded 64-bit arithmetic;
+- joins workers but ignores their return codes; test worker failure, state
+  allocation failure and partial-result cleanup rather than returning success;
+- preprocesses VAD before dispatch while preserving the VAD flag for worker
+  calls; audit double filtering, timeline mapping and stale results on silence.
+
+Keep alternative arrays associated with their moved token/segment data. Use
+synthetic worker failures and nonzero chunk offsets to isolate glue correctness
+before downloading models. Wrapper transport probes do not prove this runtime
+merge behavior. Add these checks to hosted CI and keep actual model acceptance
+separate from the model-free regression suite.
 
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now

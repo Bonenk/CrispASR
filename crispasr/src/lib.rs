@@ -18,6 +18,9 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod whisper_controls;
+pub use whisper_controls::WhisperDecodeControls;
+
 mod whisper_tokens;
 pub use whisper_tokens::{WhisperToken, WhisperTokenAlternative};
 
@@ -197,7 +200,38 @@ impl CrispASR {
         opts: &TranscribeOptions,
         alt_n: i32,
     ) -> Result<Vec<Segment>, String> {
-        self.transcribe_pcm_impl(pcm, opts, None, Some(alt_n))
+        let mut controls = WhisperDecodeControls::default();
+        controls.alt_n = Some(alt_n);
+        self.transcribe_pcm_impl(pcm, opts, None, Some(&controls))
+    }
+
+    /// Decode with optional language/prompt, scalar flags and token controls.
+    /// Owned strings remain alive until inference and parameter cleanup finish.
+    /// `None` fields preserve native defaults; invalid controls fail before
+    /// native full-parameter allocation.
+    pub fn transcribe_pcm_with_controls(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        controls: &WhisperDecodeControls,
+    ) -> Result<Vec<Segment>, String> {
+        self.transcribe_pcm_impl(pcm, opts, None, Some(controls))
+    }
+
+    /// Progress-tracked parallel decode with the same controls, validation and
+    /// owned string lifetimes as sequential decoding. Processors must be positive.
+    /// Greedy alternative capture follows native chunk/merge behavior.
+    pub fn transcribe_pcm_parallel_with_controls(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        controls: &WhisperDecodeControls,
+        processors: i32,
+    ) -> Result<Vec<Segment>, String> {
+        if processors <= 0 {
+            return Err("parallel decoding requires positive processors".into());
+        }
+        self.transcribe_pcm_impl(pcm, opts, Some(processors), Some(controls))
     }
 
     fn transcribe_pcm_impl(
@@ -205,7 +239,7 @@ impl CrispASR {
         pcm: &[f32],
         opts: &TranscribeOptions,
         processors: Option<i32>,
-        alt_n: Option<i32>,
+        controls: Option<&WhisperDecodeControls>,
     ) -> Result<Vec<Segment>, String> {
         if pcm.is_empty() || pcm.len() > i32::MAX as usize {
             return Err("nonempty PCM with an int32 sample count required".into());
@@ -218,6 +252,7 @@ impl CrispASR {
         {
             return Err("unsupported sampling strategy".into());
         }
+        let prepared_controls = controls.map(WhisperDecodeControls::prepare).transpose()?;
         let vad_path = if opts.vad {
             if opts
                 .vad_threshold
@@ -240,8 +275,8 @@ impl CrispASR {
             return Err("could not allocate transcription parameters".into());
         }
         unsafe {
-            if let Some(n) = alt_n {
-                crispasr_sys::crispasr_params_set_alt_n(params, n);
+            if let Some(prepared) = &prepared_controls {
+                prepared.apply(params);
             }
             if opts.vad {
                 crispasr_sys::crispasr_params_set_vad(params, 1);

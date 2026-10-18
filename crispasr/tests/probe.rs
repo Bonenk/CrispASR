@@ -1197,3 +1197,176 @@ fn probe_legacy_rust_owned_token_snapshots_and_alternative_capture() {
     );
     unsafe { probe_legacy_tokens_reset() };
 }
+
+fn configured_legacy_controls(enabled: bool) -> crispasr::WhisperDecodeControls {
+    let mut controls = crispasr::WhisperDecodeControls::default();
+    controls.translate = Some(enabled);
+    controls.detect_language = Some(enabled);
+    controls.token_timestamps = Some(enabled);
+    controls.split_on_word = Some(enabled);
+    controls.no_context = Some(enabled);
+    controls.single_segment = Some(enabled);
+    controls.print_realtime = Some(enabled);
+    controls.print_progress = Some(enabled);
+    controls.print_timestamps = Some(enabled);
+    controls.print_special = Some(enabled);
+    controls.suppress_blank = Some(enabled);
+
+    controls.language = Some(if enabled { "ja" } else { "auto" }.into());
+    controls.initial_prompt = Some(if enabled { "Grüße 日" } else { "" }.into());
+    controls.n_threads = Some(if enabled { 3 } else { 1 });
+    controls.max_len = Some(if enabled { 77 } else { 0 });
+    controls.best_of = Some(if enabled { 7 } else { 1 });
+    controls.max_tokens = Some(if enabled { 23 } else { 0 });
+    controls.temperature = Some(if enabled { 0.625 } else { 0. });
+    controls.alt_n = Some(if enabled { 100 } else { -10 });
+    controls
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_decode_controls_sequential_parallel_and_defaults() {
+    extern "C" {
+        fn probe_legacy_controls_expect(mode: c_int);
+        fn probe_legacy_rust_alt_n() -> c_int;
+        fn probe_parallel_by_ref_calls() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let pcm = [1., 3., 5.];
+    let mut options = crispasr::TranscribeOptions {
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    for (expect, controls) in [
+        (1, configured_legacy_controls(true)),
+        (2, configured_legacy_controls(false)),
+        (3, crispasr::WhisperDecodeControls::default()),
+    ] {
+        unsafe { probe_legacy_controls_expect(expect) };
+        for strategy in [0, 1] {
+            options.strategy = Some(strategy);
+            let segments = model
+                .transcribe_pcm_with_controls(&pcm, &options, &controls)
+                .unwrap();
+            assert_eq!(segments[0].text, "日");
+            assert_eq!(segments[0].start, 1.);
+            assert_eq!(unsafe { probe_live_get() }, 0);
+            let calls = unsafe { probe_parallel_by_ref_calls() };
+            let segments = model
+                .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+                .unwrap();
+            assert_eq!(segments[0].text, "日");
+            assert_eq!(unsafe { probe_parallel_by_ref_calls() }, calls + 1);
+            assert_eq!(
+                unsafe { probe_legacy_rust_alt_n() },
+                if expect == 1 {
+                    32
+                } else if expect == 2 {
+                    0
+                } else {
+                    7
+                }
+            );
+            assert_eq!(unsafe { probe_live_get() }, 0);
+        }
+    }
+    // Existing routes keep unset native defaults too.
+    assert!(model.transcribe_pcm_with_options(&pcm, &options).is_ok());
+    assert!(model.transcribe_pcm_parallel(&pcm, &options, 2).is_ok());
+    unsafe { probe_legacy_controls_expect(1) };
+    let controls = configured_legacy_controls(true);
+    for parallel in [false, true] {
+        for mode in [2, 11, 12] {
+            unsafe { probe_mode_set(mode) };
+            let result = if parallel {
+                model.transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+            } else {
+                model.transcribe_pcm_with_controls(&pcm, &options, &controls)
+            };
+            assert!(result.is_err(), "parallel={parallel} mode={mode}");
+            assert_eq!(unsafe { probe_live_get() }, 0);
+        }
+        unsafe { probe_mode_set(1) };
+        let empty = if parallel {
+            model.transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+        } else {
+            model.transcribe_pcm_with_controls(&pcm, &options, &controls)
+        };
+        assert!(empty.unwrap().is_empty());
+    }
+    unsafe {
+        probe_mode_set(0);
+        probe_legacy_controls_expect(0)
+    };
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_decode_controls_reject_invalid_before_parameter_allocation() {
+    extern "C" {
+        fn probe_legacy_param_requests() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let options = crispasr::TranscribeOptions::default();
+    let pcm = [1., 3., 5.];
+    let mut invalid = Vec::new();
+    for value in ["", "bad\0language"] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.language = Some(value.into());
+        invalid.push(c);
+    }
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.initial_prompt = Some("bad\0prompt".into());
+    invalid.push(c);
+    for value in [0, -1] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.n_threads = Some(value);
+        invalid.push(c);
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.best_of = Some(value);
+        invalid.push(c);
+    }
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.max_len = Some(-1);
+    invalid.push(c);
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.max_tokens = Some(-1);
+    invalid.push(c);
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.temperature = Some(value);
+        invalid.push(c);
+    }
+    let requests = unsafe { probe_legacy_param_requests() };
+    let calls = unsafe { probe_calls_get() };
+    for controls in invalid {
+        assert!(model
+            .transcribe_pcm_with_controls(&pcm, &options, &controls)
+            .is_err());
+        assert!(model
+            .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+            .is_err());
+    }
+    let controls = configured_legacy_controls(true);
+    assert!(model
+        .transcribe_pcm_with_controls(&[], &options, &controls)
+        .is_err());
+    assert!(model
+        .transcribe_pcm_parallel_with_controls(&[], &options, &controls, 2)
+        .is_err());
+    for processors in [0, -1] {
+        assert!(model
+            .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, processors)
+            .is_err());
+    }
+    assert_eq!(unsafe { probe_legacy_param_requests() }, requests);
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+}

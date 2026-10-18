@@ -333,8 +333,9 @@ also provides replacement-decoded display text; Go strings keep the same bytes
 as `Raw`. No borrowed native string or result pointer escapes. Snapshots remain
 valid after native buffers are mutated and the model is closed. Existing Go
 `Context` implementations/`Token` literals and Rust `TranscribeOptions`/`Segment`
-literals keep their shapes. Rust alternative capture is sequential; parallel
-capture and the remaining scalar control surface are still scoped in PLAN.md.
+literals keep their shapes. Rust's original alternative-capture convenience
+method remains sequential; the controls API below also forwards capture during
+parallel decode. Native worker/merge and model acceptance remain in PLAN.md.
 
 Probes exercise long alternative buffer retries, token/alternative count limits,
 negative/oversized lengths, missing terminators, inconsistent embedded NULs,
@@ -343,3 +344,33 @@ reconstruction. The limits are one million tokens per segment, 32 alternatives
 and 1 MiB text per token/candidate. These compiled public-header fixtures do not
 establish real model accuracy/candidate quality or concurrent close safety;
 serialize access/inference/close on the same legacy context.
+
+
+## Rust legacy Whisper scalar controls
+
+`WhisperDecodeControls`, `transcribe_pcm_with_controls` and
+`transcribe_pcm_parallel_with_controls` expose all **19 non-VAD scalar setter
+routes**, including language/prompt strings, eleven flags, threads, maximum
+length/tokens, best-of, temperature and alternative count. The existing
+`TranscribeOptions` supplies the six VAD/tinydiarize setter routes, covering the
+current **25 `crispasr_params_set_*` exports**. This does not cover every field
+of the upstream raw `whisper_full_params` struct or the separate callback APIs.
+
+`None` leaves native defaults intact; explicit false/zero values apply where
+valid. Positive threads/best-of, nonnegative limits, finite/nonnegative temperature,
+nonempty language and NUL-free strings are checked before native parameter
+allocation. Owned prompt/language C strings outlive inference and parameter free.
+Alternative counts use native clamping. Existing options and result shapes remain
+unchanged; the new controls type is non-exhaustive and constructed with Default.
+
+The Go/Rust contract compiles the actual runtime's 25 C++ setters against the
+public headers, replacing mirrored C setter bodies. Field oracles check every
+control on sequential/parallel and greedy/beam routes, explicit clears, unset
+native defaults, VAD plus tinydiarize, UTF-8 strings, native failures and cleanup.
+The oracle also churns heap blocks before reading borrowed string fields; an
+injected early owner drop reproduced a mismatch and the restored lifetime passes.
+`probe_legacy_rust_decode_controls_reject_invalid_before_parameter_allocation`
+also checks that rejected inputs never request native parameters. A source-family
+tripwire flags new setters without public Rust routes; that check supplements
+operation probes and does not establish behavioral coverage by itself. Actual
+model behavior, worker errors and parallel timestamp merging remain in PLAN.md.

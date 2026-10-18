@@ -17,6 +17,7 @@
 #include <unistd.h>
 #endif
 
+static int legacy_controls_expected, legacy_param_requests;
 static int probe_mode = 0; // 0=normal, 1=empty, 2=error
 static int probe_live = 0;
 static int probe_calls = 0;
@@ -80,6 +81,8 @@ int probe_result_frees_get(void) {
 }
 void probe_reset(void) {
     probe_mode = 0;
+    legacy_controls_expected = 0;
+    legacy_param_requests = 0;
     probe_calls = 0;
     probe_result_frees = 0;
 }
@@ -1070,6 +1073,85 @@ int probe_legacy_rust_alt_n(void) {
     return legacy_rust_alt_n;
 }
 
+void probe_legacy_controls_expect(int mode) {
+    legacy_controls_expected = mode;
+}
+int probe_legacy_param_requests(void) {
+    return legacy_param_requests;
+}
+static void seed_legacy_controls(struct whisper_full_params* p) {
+    if (!legacy_controls_expected)
+        return;
+    p->translate = legacy_controls_expected != 1;
+    p->detect_language = legacy_controls_expected != 1;
+    p->token_timestamps = legacy_controls_expected != 1;
+    p->split_on_word = legacy_controls_expected != 1;
+    p->no_context = legacy_controls_expected != 1;
+    p->single_segment = legacy_controls_expected != 1;
+    p->print_realtime = legacy_controls_expected != 1;
+    p->print_progress = legacy_controls_expected != 1;
+    p->print_timestamps = legacy_controls_expected != 1;
+    p->print_special = legacy_controls_expected != 1;
+    p->suppress_blank = legacy_controls_expected != 1;
+
+    p->n_threads = 4;
+    p->max_len = 99;
+    p->greedy.best_of = 5;
+    p->max_tokens = 17;
+    p->temperature = .125f;
+    p->alt_n = 7;
+    p->initial_prompt = "native default";
+}
+static int check_legacy_controls(const struct whisper_full_params* p) {
+    if (!legacy_controls_expected)
+        return 1;
+    int mode = legacy_controls_expected;
+    int okay = 1;
+    char* churn[8];
+    for (int i = 0; i < 8; ++i) {
+        churn[i] = malloc(16);
+        if (churn[i]) {
+            memset(churn[i], 'X', 15);
+            churn[i][15] = 0;
+        }
+    }
+#define CONTROL_CHECK(expr)                                                                                            \
+    do {                                                                                                               \
+        if (!(expr)) {                                                                                                 \
+            fprintf(stderr, "control mismatch: %s\n", #expr);                                                          \
+            okay = 0;                                                                                                  \
+            goto done;                                                                                                 \
+        }                                                                                                              \
+    } while (0)
+    CONTROL_CHECK(p->translate == (mode != 2));
+    CONTROL_CHECK(p->detect_language == (mode != 2));
+    CONTROL_CHECK(p->token_timestamps == (mode != 2));
+    CONTROL_CHECK(p->split_on_word == (mode != 2));
+    CONTROL_CHECK(p->no_context == (mode != 2));
+    CONTROL_CHECK(p->single_segment == (mode != 2));
+    CONTROL_CHECK(p->print_realtime == (mode != 2));
+    CONTROL_CHECK(p->print_progress == (mode != 2));
+    CONTROL_CHECK(p->print_timestamps == (mode != 2));
+    CONTROL_CHECK(p->print_special == (mode != 2));
+    CONTROL_CHECK(p->suppress_blank == (mode != 2));
+
+    CONTROL_CHECK(p->n_threads == (mode == 1 ? 3 : mode == 2 ? 1 : 4));
+    CONTROL_CHECK(p->max_len == (mode == 1 ? 77 : mode == 2 ? 0 : 99));
+    CONTROL_CHECK(p->greedy.best_of == (mode == 1 ? 7 : mode == 2 ? 1 : 5));
+    CONTROL_CHECK(p->max_tokens == (mode == 1 ? 23 : mode == 2 ? 0 : 17));
+    CONTROL_CHECK(p->alt_n == (mode == 1 ? 32 : mode == 2 ? 0 : 7));
+    CONTROL_CHECK(p->temperature == (mode == 1 ? .625f : mode == 2 ? 0.f : .125f));
+    CONTROL_CHECK(p->language && strcmp(p->language, mode == 1 ? "ja" : mode == 2 ? "auto" : "de") == 0);
+    CONTROL_CHECK(p->initial_prompt && strcmp(p->initial_prompt, mode == 1   ? "Grüße 日"
+                                                                 : mode == 2 ? ""
+                                                                             : "native default") == 0);
+#undef CONTROL_CHECK
+done:
+    for (int i = 0; i < 8; ++i)
+        free(churn[i]);
+    return okay;
+}
+
 // Literal public-header legacy Rust transport; by-value entry remains a trap.
 static int rust_legacy_contexts;
 static struct whisper_context_params last_legacy_context_params;
@@ -1123,6 +1205,7 @@ int whisper_full(struct whisper_context* ctx, struct whisper_full_params p, cons
     return probe_legacy_full(ctx, p, s, n);
 }
 struct whisper_full_params* whisper_full_default_params_by_ref(enum whisper_sampling_strategy s) {
+    ++legacy_param_requests;
     if (probe_mode == 11)
         return NULL;
     struct whisper_full_params* p = tracked_alloc(sizeof(*p));
@@ -1130,6 +1213,7 @@ struct whisper_full_params* whisper_full_default_params_by_ref(enum whisper_samp
         memset(p, 0, sizeof(*p));
         p->strategy = s;
         p->language = "de";
+        seed_legacy_controls(p);
     }
     return p;
 }
@@ -1144,6 +1228,8 @@ int whisper_full_by_ref(whisper_context* ctx, struct whisper_full_params* p, con
         (!p->tdrz_enable || !p->vad_model_path || strcmp(p->vad_model_path, "vad") || p->vad_params.threshold != .7f ||
          p->vad_params.min_speech_duration_ms != 300 || p->vad_params.min_silence_duration_ms != 200))
         return -7;
+    if (!check_legacy_controls(p))
+        return -10;
     return probe_mode == 2 ? -1 : 0;
 }
 static int parallel_by_ref_calls;
@@ -1402,10 +1488,7 @@ void crispasr_ctx_params_set_dtw(struct whisper_context_params* p, bool e, int a
 int64_t crispasr_token_dtw_t(struct whisper_context* ctx, int s, int t) {
     return whisper_full_get_token_data(ctx, s, t).t_dtw;
 }
-void crispasr_params_set_alt_n(struct whisper_full_params* p, int n) {
-    if (p)
-        p->alt_n = n < 0 ? 0 : n > 32 ? 32 : n;
-}
+
 int crispasr_token_n_alts(struct whisper_context* ctx, int s, int t) {
     if (ctx != rust_legacy_context() || s != 0 || t < 0 || t >= 2)
         STUB_ABORT();
@@ -1474,78 +1557,8 @@ int crispasr_stream_open_dummy(void) {
     STUB_ABORT();
     return 0;
 }
-void crispasr_params_set_language(struct whisper_full_params* p, const char* l) {
-    STUB_ABORT();
-}
-void crispasr_params_set_translate(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_detect_language(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_token_timestamps(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_n_threads(struct whisper_full_params* p, int n) {
-    STUB_ABORT();
-}
-void crispasr_params_set_max_len(struct whisper_full_params* p, int n) {
-    STUB_ABORT();
-}
-void crispasr_params_set_best_of(struct whisper_full_params* p, int n) {
-    STUB_ABORT();
-}
-void crispasr_params_set_split_on_word(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_no_context(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_single_segment(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_print_realtime(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_print_progress(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_print_timestamps(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_print_special(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_suppress_blank(struct whisper_full_params* p, int v) {
-    STUB_ABORT();
-}
-void crispasr_params_set_temperature(struct whisper_full_params* p, float t) {
-    STUB_ABORT();
-}
-void crispasr_params_set_max_tokens(struct whisper_full_params* p, int n) {
-    STUB_ABORT();
-}
-void crispasr_params_set_initial_prompt(struct whisper_full_params* p, const char* pr) {
-    STUB_ABORT();
-}
-void crispasr_params_set_vad(struct whisper_full_params* p, int v) {
-    p->vad = v != 0;
-}
-void crispasr_params_set_vad_model_path(struct whisper_full_params* p, const char* pr) {
-    p->vad_model_path = pr;
-}
-void crispasr_params_set_vad_threshold(struct whisper_full_params* p, float t) {
-    p->vad_params.threshold = t;
-}
-void crispasr_params_set_vad_min_speech_ms(struct whisper_full_params* p, int ms) {
-    p->vad_params.min_speech_duration_ms = ms;
-}
-void crispasr_params_set_vad_min_silence_ms(struct whisper_full_params* p, int ms) {
-    p->vad_params.min_silence_duration_ms = ms;
-}
-void crispasr_params_set_tdrz(struct whisper_full_params* p, int v) {
-    p->tdrz_enable = v != 0;
-}
+
+
 struct whisper_context* whisper_init_from_file_with_params_by_ref(const char* p, struct whisper_context_params* pr) {
     ++probe_calls;
     if (!p || !pr || !pr->use_gpu || strcmp(p, "fail") == 0 || probe_mode == 19)

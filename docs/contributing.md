@@ -758,6 +758,17 @@ also have a high-level optional capability: keep existing public interfaces and
 result struct literals compatible when adding detailed results. Rust's per-call
 alternative capture reuses `TranscribeOptions` instead of adding required fields.
 
+The Rust `WhisperDecodeControls` companion carries the remaining scalar options
+without breaking old options literals. Prepare/validate language and prompt
+C strings before native parameter allocation, and keep their owner alive until
+inference and parameter destruction finish. Test unset versus explicit false
+and zero against distinct native defaults, on both sequential and parallel
+routes. The Go/Rust fixture compiles all `crispasr_params_set_*` definitions from
+the actual C++ runtime; do not replace those with handwritten setter bodies.
+Its source-family inventory is only a completeness tripwire, alongside compiled
+field/lifetime/cleanup operation probes. Raw full-params fields and callback
+controls outside that helper family still require their own audit.
+
 
 Java native defaults must be copied into Java-owned parameter storage, then
 freed with the matching native destructor; never `Native.free()` a C++-allocated
