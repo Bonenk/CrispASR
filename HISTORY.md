@@ -1,3 +1,17 @@
+## 2026-10-19 — OpenVoice CUDA package build completed; work handed off
+
+[Run39266520251](https://github.com/CrispStrobe/CrispASR/actions/runs/39266520251)
+passes on0b4213c39d9ae335df32fb8d09f80febd2f2d8ae after the root-CMake,
+link-only CUDA stub alias and Python3.10 streaming-hash repairs. Build and
+runtime dependency checks pass; Actions artifact12193662775 is698,965,729
+bytes, ZIP SHA256 bce0538953a84094fc86c63729c37e2bc8dc41e27d25337a27f5de793bbc5030.
+Independent delivery audit and actual GPU/pretrained/quality acceptance remain
+open. No tag/release or model promotion was made. PLAN.md and
+[the handoff](docs/maintenance-handoff.md) scope the remaining work; operational
+paths/account recovery are in ignored maintainer notes. All five privacy checks
+passed before the implementation pushes. Two worker contracts, embedded-phase
+compilation and streaming hash verification pass locally.
+
 ## 2026-10-19 — OpenVoice checkpoint-free encoder arithmetic proof
 
 The original pinned ReferenceEncoder class and unchanged native CPU encoder

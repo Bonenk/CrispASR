@@ -7,6 +7,56 @@ in gitignored CLAUDE.md. Public receipts use `${CRISPASR_STORAGE}` and
 Historical artifact hashes describe original retained bytes; sanitizing a location
 in a tracked receipt does not change an immutable public artifact's hash.
 
+## Fresh-agent starting point — final OpenVoice handoff
+
+Implementation is pushed through0b4213c39; this handoff changes documentation
+only. The original maintainer checkout must not be reset or cleaned: use a
+separate worktree. Read local ignored CLAUDE.md for private artifact locations,
+known kernel slugs/account and recovery details; none belong in public commits.
+No worker remains actively owned by the departing agent.
+
+1. **Inspect existing jobs first.** OpenVoice bake v2 and alignment CUDA memory
+   v2 both last reported QUEUED. The corrected conditioning submission was
+   rejected by the two-session GPU cap and created no run. Preserve the needed
+   alignment job. Stop obsolete OpenVoice v2 through the UI or an exact session
+   ID supplied by the maintainer; kernel IDs are not cancellable session IDs.
+   Save terminal logs/output before replacing it. Account-wide enumeration was
+   incomplete due to API errors; these are confirmed statuses for our two jobs,
+   not a claim that no other account work exists. Recheck live state.
+2. **Audit the successful build.** CUDA run39266520251/source0b4213c39 passed;
+   PLAN.md records artifact ID, size, digest and retention. Download to external
+   storage, inspect its source/ggml/CUDA provenance, hashes and driver-free
+   dependency closure. It is build proof, not inference proof. The conditioning
+   worker separately uses its pinned, previously audited alignment runtime;
+   do not substitute this newer bundle without an explicit new scope.
+3. **Run conditioning once a slot is free.** Entry point:
+   tools/kaggle/openvoice-conditioning/; its bootstrap pins shared worker
+   5f9ad8b36 and native source6be9fda36. Use kpush.py per the external guide,
+   inspect the response rather than exit status alone, and retain actual device
+   and original/module/model/input identities. No full SDK build on Kaggle.
+4. **Audit before accepting.** Require all27/28 stages and both magnitudes and
+   cosine/error gates, pristine original-hook neutrality, shared-noise replay,
+   equal-weight clip means, uninstrumented native C API/cache behavior and CUDA
+   scheduler splits. Then require WER<=0.2 on baseline/original/clone and
+   independent speaker-similarity improvement>0.01. Failure means preserve and
+   diagnose the earliest divergent operator; do not relax gates. Converted
+   weights and original references checkpoint before native testing; staging
+   weights are unvalidated. Publish portable audited receipts without secrets.
+5. **Resume the remaining roadmap.** Complete issue550's existing45-minute
+   short/long/short CUDA run, then remaining wrapper model/platform/lifecycle
+   scope, PR521's failed original/native clone gates, accepted-scope release,
+   and bounded Echo/MiMo/Dia research. Existing detailed rows below and PLAN.md
+   give entry points/gates. Drama3 remains deferred for licensing.
+
+What is already done: original OpenVoice module dumping, strict diff wiring,
+source-speaker dispatch, clip/noise APIs, nine-stage synthetic encoder proof,
+and generic speaker operation review in all eight wrappers. Do not redo those
+because an older dated note says pending. Actual pretrained embedding quality,
+CUDA conversion and speech quality are not accepted. Full shared Session/CLI
+model execution, automatic VAD, raw mixed-rate preprocessing, natural references,
+languages/devices and quant variants are separate follow-ups after the bounded
+matrix passes. No release/tag was cut.
+
 Whisper CPU model run39211685024 (sourceafeffa1a5) is complete and independently
 audited:12 native/six Python cases pass exact raw timestamp bounds. Current
 CPU alignment39212307554 (source62e598ca0) is now independently audited too.
@@ -43,7 +93,8 @@ release tag was cut during this handoff.
 
 The #549 metadata source `741141118` passes all 13 CI and 10 lint jobs; long-JA
 and legacy overlap token ownership are now implemented with six local GCC/Clang
-fixture tests; this follow-up still needs full-library CI and Japanese audio proof. #217's independently authored
+fixture tests; the bounded Japanese CPU model/audio proof is independently audited; further
+long-form/device scope remains in PLAN.md. #217's independently authored
 character-CTC workspace is opt-in (`CRISPASR_CTC_ALIGN_OPT=1`, default off).
 A separate subword workspace now has its own default-off gate
 `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` and five GCC/Clang acceptance tests; the
@@ -72,8 +123,9 @@ release blocker.
    34 sources, four actual decodes, callback/concurrent guards, cancellation
    recovery and owned snapshots pass. See go-model-lifecycle-audit-2026-10-19.json.
    Go/Rust generic speaker paths also pass51 Go race/35 Rust/five doctests.
-   Continue existing Python/C#/Java/Dart generic primitive methods and the
-   callable ledger. Raw Go handles, other languages, real VAD/DTW model modes
+   Python/C#/Java/Dart generic primitive operation review is now complete too;
+   continue the remaining callable ledger and model/platform/lifecycle scope.
+   Raw Go handles, other languages, real VAD/DTW model modes
    and additional devices remain separate scope; do not repeat accepted JFK.
 4. Inspect PR521 headab6c92cae and its fresh checks. Current main is merged
    without rewriting contributor history; the helper conflict, stale ggml pin

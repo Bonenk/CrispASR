@@ -2,6 +2,13 @@
 
 **Release candidate notes; v0.8.44 has not been tagged or published.**
 
+Handoff2026-10-19: OpenVoice CUDA packaging39266520251 passes on0b4213c39;
+actual pretrained embedding/conversion, GPU inference and speech quality remain
+pending. Synthetic encoder proof and wrapper operation contracts have their
+stated bounded acceptance only. Follow [PLAN.md](PLAN.md) and
+[the maintainer handoff](docs/maintenance-handoff.md) before freezing release
+scope. No model/default or release promotion follows from this build.
+
 Changes since v0.8.43 include merged PRs #541, #542, #531, #543 and #544,
 plus the validated backend-operator wrapper. The Breeze integration preserves
 contributor history from #529 and #536; the session integration preserves #530.

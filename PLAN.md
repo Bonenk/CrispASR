@@ -2,7 +2,7 @@
 
 ## NOW — OpenVoice2 actual-model and CUDA acceptance
 
-Owner: maintainer coordinator (active, 2026-10-19). Implementation, exact source
+Owner: unassigned; ready for a fresh agent (handoff 2026-10-19). Implementation, exact source
 speaker dispatch, clip means/noise replay and the nine-stage synthetic CPU
 encoder proof are archived in HISTORY.md. Method and scopes:
 [OpenVoice baking](docs/openvoice2-baking.md). The synthetic F32 arithmetic
@@ -10,13 +10,14 @@ receipt does not establish pretrained embedding/conversion or GPU quality.
 
 External state and next actions:
 
-1. Full-CMake39255636270 failed configuration. Repaired39258859196/source6be9fda36
-   compiled model/driver objects but failed executable linking because the CUDA
-   toolkit stub lacked its libcuda.so.1 SONAME alias. The worker now creates a
-   link-only alias outside the bundle. Run39264728906 then compiled, linked
-   and passed dependency closure, but packaging failed on Python3.10 lacking
-   hashlib.file_digest. Streaming SHA256 is repaired; dispatch/audit packaging.
-   Never ship a driver/stub or call a green build model acceptance.
+1. CUDA packaging [run39266520251](https://github.com/CrispStrobe/CrispASR/actions/runs/39266520251)
+   succeeded on source0b4213c39d9ae335df32fb8d09f80febd2f2d8ae.
+   Artifact12193662775 is698,965,729 bytes (Actions ZIP digest
+   bce0538953a84094fc86c63729c37e2bc8dc41e27d25337a27f5de793bbc5030).
+   Next: download to external storage, independently inspect provenance/member
+   hashes and dependency closure; retain or mirror before its14-day expiry.
+   Logs are retained locally. This is compile/link/package proof only, not
+   actual GPU/model acceptance. Earlier failed build attempts are in HISTORY.md.
 2. Kaggle `openvoice-bake` version2 is queued on old native source71e329ccf.
    Version1 terminal logs/output are retained after its pre-inference loader
    failure. Version2 preserves host loader paths but lacks the later dynamic
@@ -24,13 +25,15 @@ External state and next actions:
    Retain logs/output before superseding it. Do not guess session IDs, launch
    hardware-fishing retries or exceed the two-session GPU cap.
 3. Prepared `tools/kaggle/openvoice-conditioning/` pins a shared worker and
-   native source6be9fda36, including DL repair and early producer checkpoints.
+   native source6be9fda36. Bootstrap commit0b4213c39 pins shared worker5f9ad8b36
+   by SHA256, including DL repair and early producer checkpoints.
    Its submission was rejected by the two-session batch-GPU cap: both the old
    OpenVoice and needed alignment jobs are queued. Cancellation needs an exact
    session ID, which the public API cannot resolve from a kernel slug; the
    maintainer has been asked to stop the obsolete run or supply its session ID.
-   Submit only after a slot is confirmed free. The
-   prebuilt base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
+   Submit once with tools/kaggle/kpush.py after a slot is confirmed free;
+   check the actual response (CLI exit0 can still report rejection). The prebuilt
+   base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
    the small model/driver delta with that macro, discover modules from the
    bundle directory and isolate Torch with host loader paths/different cwd.
 4. Independently audit27/28 required stages, original pristine/captured replay,
@@ -75,7 +78,8 @@ Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
 Named credential fallback is repaired and version2 uses an immutable public HF
 mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
 verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2
-is prepared for one fresh run after quota/concurrency checks. Keep actual
+was submitted and is QUEUED at the handoff; inspect this existing run, do not
+submit a duplicate. Keep actual
 GPU/cache/long-file acceptance open; delivery is not inference proof.
 
 Kernel acceptance, per the maintainer's external Kaggle guide:
@@ -179,7 +183,9 @@ Recommended implementation order and concrete acceptance:
    remaining token introspection and legacy context/callback lifecycle auditing.
    Review higher-level APIs as well as the low-level bindings. Go's
    higher-level `ProcessParallel` optional capability now reaches the native
-   pointer/progress adapter, with compiled operation tests. Actual Go model/device acceptance remains open; the built-in high-level
+   pointer/progress adapter, with compiled operation tests. The bounded Go CPU
+   model acceptance is complete (see its audit above); other modes/devices remain
+   open. The built-in high-level
    Model's ownership/close guards now have compiled race/pthread probes.
    Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
    high-level model constructor now have operation probes. The shared helper
@@ -602,9 +608,10 @@ claiming full hardware validation; this #549 task did not execute that worker.
    then run the pinned 45-minute short/long/short Kaggle matrix above. Publish
    evidence before closing the issue; a portable build alone is not GPU proof.
 2. **Close wrapper acceptance and implementation gaps.** Audit green Arabic
-   CTC/Java39214206020 and binding contracts39215435420. Validate high-level
-   Go lifetime/re-entry on a real small model, then assess an owned low-level
-   Go adapter and remaining language lifecycle/callable-ledger gaps. Validate
+   CTC/Java39214206020 and binding contracts39215435420; bounded Go CPU model
+   lifetime/re-entry is also audited. Generic speaker operations in all eight
+   wrappers are reviewed. Continue owned low-level adapters, other model modes,
+   language lifecycle/platform checks and the remaining callable ledger. Validate
    Japanese multi-window ASR for549 separately from CTC forced alignment.
 3. **Finish PR521.** Rebase on current main, inspect the complete runtime diff,
    repair genuine CI failures and preserve contributor history. Merge only
