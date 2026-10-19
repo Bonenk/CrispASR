@@ -755,3 +755,8 @@ results and NUL-truncated speaker/cache paths. Seven Python cases, strict Dart
 analyzer/all40 FFI tests,53 C# auxiliary and137 Java auxiliary assertions pass.
 These are compiled wrapper contracts, not real speaker-model quality or
 universal concurrent-handle acceptance. No release tag is implied by this draft.
+
+The checkpoint-free original/native CPU encoder probe now passes all nine
+boundaries (cosine>=0.9999999999998275, norm ratios within3.02e-8). Its historical
+axis-swap control fails. This synthetic arithmetic evidence is separate from
+pretrained/GGUF/STFT/CUDA/voice-quality acceptance, which remains pending.

@@ -22,8 +22,8 @@ External state and next actions:
    Retain logs/output before superseding it. Do not guess session IDs, launch
    hardware-fishing retries or exceed the two-session GPU cap.
 3. Prepared `tools/kaggle/openvoice-conditioning/` pins a shared worker and
-   native source6be9fda36. Refresh its immutable worker hash after the DL repair,
-   then submit it when the earlier job is terminal or safely stopped. The
+   native source6be9fda36. Its shared-worker pin is refreshed to c5aa111bd
+   including the DL repair. Submit it when the earlier job is terminal or safely stopped. The
    prebuilt base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
    the small model/driver delta with that macro, discover modules from the
    bundle directory and isolate Torch with host loader paths/different cwd.

@@ -6,8 +6,8 @@ from pathlib import Path
 import runpy
 import urllib.request
 
-WORKER_SOURCE = "faa6cfa4fbf0e1b24d39a82b500cd8825f193af2"
-WORKER_SHA256 = "61e4cf492d2d355779cb3fa53e15c9de9d03b61912552959430906312e118a84"
+WORKER_SOURCE = "c5aa111bdb992feb2108cd1e04785755b31a9686"
+WORKER_SHA256 = "7ada52c1138c2da5f5f663b5cd364dada565204ab131ff32ef4e16c95f593b3a"
 path = Path('/kaggle/temp/openvoice-conditioning-worker.py')
 path.parent.mkdir(parents=True, exist_ok=True)
 url = ('https://raw.githubusercontent.com/CrispStrobe/CrispASR/' + WORKER_SOURCE +
