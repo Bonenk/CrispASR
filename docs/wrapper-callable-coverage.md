@@ -384,6 +384,14 @@ states and real threads. Fifteen UBSan cases cover chunk token/DTW shifts,
 unavailable sentinels, alternative association, wide/fractional boundary math,
 worker/main errors, worker exceptions, null state allocation, silence cleanup,
 parent VAD mapping retention and sequential/tiny-input routing. It is a runtime
-glue gate, separate from the language transport fixtures. Original-time VAD token
-mapping, context reuse, duration/callback semantics and actual-model/device
-acceptance remain in PLAN.md.
+glue gate, separate from the language transport fixtures. Duration/callback
+semantics and actual-model/device acceptance remain in PLAN.md.
+
+`tests/test_whisper_vad_timeline.py` adds nine UBSan cases using the literal VAD
+stitcher/interpolator, token getters, scalar adapters, sequential/parallel routes
+and real state-decoder entry before a controlled inference body. Token/DTW
+getters map available times to original audio on a returned copy and preserve
+negative sentinels; repeated reads do not change stored tokens. Plain decode
+clears old VAD maps, and failed VAD clears old results. Controlled speech
+intervals verify actual stitching and 1/2/3-worker getter consistency, not actual
+VAD/model alignment quality or device execution. Those remain in PLAN.md.

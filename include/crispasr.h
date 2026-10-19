@@ -833,7 +833,10 @@ CRISPASR_API whisper_token whisper_full_get_token_id_from_state(struct whisper_s
                                                                 int i_token);
 
 // Get token data for the specified token in the specified segment
-// This contains probabilities, timestamps, etc.
+// This contains probabilities, timestamps, etc. Times are in centiseconds.
+// With VAD, available t0/t1/t_dtw values are mapped to the original audio
+// timeline, like segment getters. Negative unavailable values are preserved.
+// Mapping applies only to the returned copy; repeated reads do not alter state.
 CRISPASR_API whisper_token_data whisper_full_get_token_data(struct whisper_context* ctx, int i_segment, int i_token);
 CRISPASR_API whisper_token_data whisper_full_get_token_data_from_state(struct whisper_state* state, int i_segment,
                                                                        int i_token);

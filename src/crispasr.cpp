@@ -7787,14 +7787,19 @@ static void whisper_sequence_score(const struct whisper_full_params& params, whi
     }
 }
 
-static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state, struct whisper_full_params params,
+static void whisper_reset_vad_mapping(struct whisper_state* state) {
+    state->vad_mapping_table.clear();
+    state->vad_segments.clear();
+    state->has_vad_segments = false;
+}
+
+static bool whisper_vad(struct whisper_context* /*ctx*/, struct whisper_state* state, struct whisper_full_params params,
                         const float* samples, int n_samples, std::vector<float>& filtered_samples) {
     CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
     int filtered_n_samples = 0;
 
-    // Clear any existing mapping table
-    state->vad_mapping_table.clear();
-    state->has_vad_segments = false;
+    // Each prepass owns the mapping for this state's current audio only.
+    whisper_reset_vad_mapping(state);
 
     if (state->vad_context == nullptr) {
         struct whisper_vad_context_params vad_ctx_params = whisper_vad_default_context_params();
@@ -7818,8 +7823,8 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
 
     if (vad_segments->data.size() > 0) {
         state->has_vad_segments = true;
-        ctx->state->vad_segments.clear();
-        ctx->state->vad_segments.reserve(vad_segments->data.size());
+        state->vad_segments.clear();
+        state->vad_segments.reserve(vad_segments->data.size());
 
         // Initialize the time mapping table
         state->vad_mapping_table.clear();
@@ -7896,7 +7901,7 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
                     "%s: vad_segment_info: orig_start: %.2f, orig_end: %.2f, vad_start: %.2f, vad_end: %.2f\n",
                     __func__, segment.orig_start / 100.0, segment.orig_end / 100.0, segment.vad_start / 100.0,
                     segment.vad_end / 100.0);
-                ctx->state->vad_segments.push_back(segment);
+                state->vad_segments.push_back(segment);
 
                 // Copy this speech segment
                 memcpy(filtered_samples.data() + offset, samples + segment_start_samples,
@@ -7952,6 +7957,11 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
 
 int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* state, struct whisper_full_params params,
                             const float* samples, int n_samples) {
+    // A state reused without VAD must not apply its previous audio's time map.
+    // VAD wrappers set params.vad and prepare the current map before this call.
+    if (!params.vad) {
+        whisper_reset_vad_mapping(state);
+    }
     // Reset all schedulers so a second whisper_full() call on the same
     // context doesn't hit GGML_ASSERT(!sched->is_alloc) if a previous
     // call left a scheduler in the allocated state (e.g. early return,
@@ -9101,9 +9111,12 @@ int whisper_full(struct whisper_context* ctx, struct whisper_full_params params,
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
         if (!whisper_vad(ctx, ctx->state, params, samples, n_samples, vad_samples)) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD\n", __func__);
+            whisper_reset_vad_mapping(ctx->state);
+            ctx->state->result_all.clear();
             return -1;
         }
         if (vad_samples.empty()) {
+            whisper_reset_vad_mapping(ctx->state);
             ctx->state->result_all.clear();
             return 0;
         }
@@ -9120,6 +9133,7 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         return -1;
     }
     if (n_samples == 0) {
+        whisper_reset_vad_mapping(ctx->state);
         ctx->state->result_all.clear();
         return 0;
     }
@@ -9132,10 +9146,12 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
         if (!whisper_vad(ctx, ctx->state, params, samples, n_samples, vad_samples)) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD\n", __func__);
+            whisper_reset_vad_mapping(ctx->state);
             ctx->state->result_all.clear();
             return -1;
         }
         if (vad_samples.empty()) {
+            whisper_reset_vad_mapping(ctx->state);
             ctx->state->result_all.clear();
             return 0;
         }
@@ -9430,11 +9446,26 @@ whisper_token whisper_full_get_token_id(struct whisper_context* ctx, int i_segme
 
 struct whisper_token_data whisper_full_get_token_data_from_state(struct whisper_state* state, int i_segment,
                                                                  int i_token) {
-    return state->result_all[i_segment].tokens[i_token];
+    // Return original-audio times just like the segment getters. Keep stored
+    // tokens in processed time so repeated reads and parallel merge cannot
+    // apply the mapping twice; negative values remain unavailable sentinels.
+    auto token = state->result_all[i_segment].tokens[i_token];
+    if (state->has_vad_segments && !state->vad_mapping_table.empty()) {
+        if (token.t0 >= 0) {
+            token.t0 = map_processed_to_original_time(token.t0, state->vad_mapping_table);
+        }
+        if (token.t1 >= 0) {
+            token.t1 = map_processed_to_original_time(token.t1, state->vad_mapping_table);
+        }
+        if (token.t_dtw >= 0) {
+            token.t_dtw = map_processed_to_original_time(token.t_dtw, state->vad_mapping_table);
+        }
+    }
+    return token;
 }
 
 struct whisper_token_data whisper_full_get_token_data(struct whisper_context* ctx, int i_segment, int i_token) {
-    return ctx->state->result_all[i_segment].tokens[i_token];
+    return whisper_full_get_token_data_from_state(ctx->state, i_segment, i_token);
 }
 
 float whisper_full_get_token_p_from_state(struct whisper_state* state, int i_segment, int i_token) {

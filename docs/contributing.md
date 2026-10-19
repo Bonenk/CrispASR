@@ -746,6 +746,15 @@ proves glue behavior; hosted actual-model tests must separately check VAD
 original-time mapping, bounded duration and callback/device behavior. Do not
 infer original-time VAD token parity from a successful chunk merge.
 
+`python3 tests/test_whisper_vad_timeline.py -v` also compiles the literal VAD
+stitcher/interpolator, token getters and scalar adapters. Available token/DTW
+times must use original-audio time consistently with segments. Map returned
+copies, preserve unavailable negatives, and test repeated reads to reject double
+mapping. Reset stale VAD bookkeeping when a state is reused without VAD or a
+prepass fails; retain its cached VAD context. The fixture executes the real
+state-decoder entry but replaces scheduler/inference work and detector output;
+it establishes timeline glue, not real detector/model alignment quality.
+
 DTW must be configured before context creation. Native defaults enable flash
 attention, and the loader disables DTW if both remain enabled. The shared
 `crispasr_ctx_params_set_dtw` helper therefore disables flash attention when

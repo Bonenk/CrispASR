@@ -4,12 +4,14 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
 
+// PRODUCTION_VAD_TYPES
 // PRODUCTION_SEGMENT
 struct whisper_state {
     std::vector<whisper_segment> result_all;
@@ -17,11 +19,15 @@ struct whisper_state {
     int64_t t_mel_us = 0, t_sample_us = 0, t_encode_us = 0, t_decode_us = 0, t_batchd_us = 0, t_prompt_us = 0;
     int n_sample = 0, n_encode = 0, n_decode = 0, n_batchd = 0, n_prompt = 0;
     bool has_vad_segments = false;
-    std::vector<int> vad_mapping_table;
+    whisper_vad_context* vad_context = nullptr;
+    // PRODUCTION_VAD_SEGMENT_INFO
+    std::vector<vad_segment_info> vad_segments;
+    std::vector<vad_time_mapping> vad_mapping_table;
 };
 struct whisper_context {
     whisper_state* state;
 };
+// PRODUCTION_RESET_MAPPING
 static int allocated = 0, freed = 0, fail_allocation = -1, failed_worker = -1, throws_worker = -1;
 static int vad_calls = 0, sequential_calls = 0, fail_sequential = 0;
 static bool vad_silence = false, vad_failure = false, allocation_throws = false;
@@ -64,7 +70,7 @@ static bool whisper_vad(whisper_context*, whisper_state* state, whisper_full_par
         return false;
     }
     state->has_vad_segments = true;
-    state->vad_mapping_table = {0, 100, 200, 400};
+    state->vad_mapping_table = {{0, 100}, {200, 400}};
     if (!vad_silence) {
         out.assign(samples, samples + count);
     }
@@ -72,6 +78,7 @@ static bool whisper_vad(whisper_context*, whisper_state* state, whisper_full_par
 }
 int whisper_full_with_state(whisper_context* ctx, whisper_state* state, whisper_full_params params, const float*,
                             int n) {
+    // PRODUCTION_DECODE_ENTRY
     require(state != nullptr, "decode received null worker state");
     require(n > 0, "decode received empty chunk");
     state->result_all.clear();
@@ -208,7 +215,8 @@ int main(int argc, char** argv) {
     }
     if (test == "vad") {
         require(vad_calls == 1, "VAD applied more than once");
-        require(state.has_vad_segments && state.vad_mapping_table == std::vector<int>({0, 100, 200, 400}),
+        require(state.has_vad_segments && state.vad_mapping_table.size() == 2 &&
+                    state.vad_mapping_table[0].original_time == 100 && state.vad_mapping_table[1].original_time == 400,
                 "parent VAD mapping lost");
     }
     require(state.result_all.size() == size_t(processors), "missing merged segments");

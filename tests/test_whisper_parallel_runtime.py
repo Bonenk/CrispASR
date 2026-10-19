@@ -21,7 +21,10 @@ class WhisperParallelRuntime(unittest.TestCase):
         path = Path(cls.tmp.name)
         source = (ROOT / 'src/crispasr.cpp').read_text()
         fixture = (ROOT / 'tests/fixtures/whisper-parallel-runtime.cpp').read_text()
+        fixture = fixture.replace('// PRODUCTION_VAD_TYPES', definition(source, 'struct vad_time_mapping {') + ';')
+        fixture = fixture.replace('// PRODUCTION_VAD_SEGMENT_INFO', definition(source, 'struct vad_segment_info {') + ';')
         fixture = fixture.replace('// PRODUCTION_SEGMENT', definition(source, 'struct whisper_segment {') + ';')
+        fixture = fixture.replace('// PRODUCTION_RESET_MAPPING', definition(source, 'static void whisper_reset_vad_mapping('))
         fixture = fixture.replace('// PRODUCTION_PARALLEL', definition(source, 'int whisper_full_parallel('))
         (path / 'probe.cpp').write_text(fixture)
         cls.binary = path / 'parallel-runtime-probe'

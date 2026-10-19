@@ -1,3 +1,32 @@
+## Whisper VAD token timeline and reusable state — 2026-10-19
+
+Token-data getters now map available t0/t1/DTW times back to original audio
+using the same VAD interpolation as segment getters. They transform only the
+returned copy, preserving stored filtered-time values for subsequent reads and
+parallel merging. Context getters delegate to state getters, so the scalar
+C ABI adapters and bindings inherit the same timeline. Negative unavailable
+sentinels and non-timing token metadata are preserved.
+
+Plain decoding clears a previous VAD map in the real state-decoder entry,
+covering sequential, parallel and direct-state routes. Empty parallel input
+also clears mapping, and failed sequential VAD no longer exposes an earlier
+transcript. New VAD prepasses clear old segment bookkeeping; speech segments
+belong to the supplied state rather than an unrelated context default state.
+Silence/failure resets mapping consistently without discarding the cached VAD
+model context.
+
+The new `tests/test_whisper_vad_timeline.py` compiles the literal native VAD
+stitcher, interpolation/getters, sequential/parallel dispatch and scalar C ABI
+adapters. It also compiles the real state-decoder entry before replacing the
+scheduler/inference body. Controlled detector intervals exercise real speech
+copying and compressed-silence placement, original-time interpolation, repeated
+reads, unavailable/partially available endpoints, VAD/plain state reuse, detector/
+loader failure and 1/2/3-worker merge. Seven of the original eight cases failed
+before repair; all **nine final cases pass under UBSan**, as do the **15 existing
+parallel runtime cases**. Full-source syntax, formatting and documentation checks
+pass. The suite is wired into CTest and hosted CI. Actual detector/model quality,
+overlap/clipping boundary acceptance and GPU behavior remain separate PLAN tasks.
+
 ## Legacy parallel runtime timestamps and worker failures — 2026-10-19
 
 `whisper_full_parallel` now shifts available token t0/t1/DTW timestamps together

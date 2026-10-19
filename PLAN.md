@@ -2,8 +2,8 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Next: native parallel actual-model/timeline
-validation, then remaining parameter/lifecycle and cross-language audits.
+Owner: maintainer coordinator. Next: hosted model acceptance and bounded
+parallel duration/callback semantics, then remaining lifecycle/cross-language audits.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
 All 2,033 native unit tests passed; rerun hosted CI after the Parakeet
@@ -89,13 +89,13 @@ Assert per-run timestamp bounds/order and candidate ownership, with unavailable
 
 Still audit these distinct semantics before claiming complete timeline parity:
 
-- VAD segment getters map the parent's filtered timeline to the original audio,
-  but token/DTW getters currently return stored filtered-time values. Capture
-  both and establish one documented cross-wrapper original-time contract;
-  exercise discontinuous speech regions and unavailable timestamps.
-- Reuse a context with VAD enabled, then disabled: inspect/reset stale mapping
-  state consistently in sequential and parallel routes. Verify silence and
-  failed VAD cannot expose a prior transcript.
+- Available token/DTW getter values now use the same original-time map as
+  segment getters, with copy-only mapping and sentinel preservation. Plain
+  sequential/parallel/direct-state decoding clears a previous VAD map; failed
+  VAD clears results. Nine literal native timeline/stitching cases cover these
+  repairs. Validate actual VAD detections, overlap/clipping boundaries and
+  VAD-on -> plain -> VAD-on model reuse through each public wrapper; do not
+  assume the controlled detector fixture establishes real alignment quality.
 - Inspect `duration_ms` globally versus per worker. Test an offset plus a bounded
   requested interval before changing how audio is split.
 - The first chunk may have delivered callbacks before another worker fails;
@@ -105,8 +105,10 @@ Still audit these distinct semantics before claiming complete timeline parity:
 
 Source audit found no double filtering: `whisper_full_with_state` does not call
 VAD. Preserve the single prepass and parent mapping rather than disabling a flag
-based on the earlier hypothesis. The tiny worker fixture checks mapping retention,
-not actual VAD interpolation or model quality. Use Kaggle for genuine GPU behavior
+based on the earlier hypothesis. The parallel worker fixture checks mapping retention;
+`tests/test_whisper_vad_timeline.py` additionally executes the real stitcher,
+interpolation, token getters and scalar adapters with controlled detections.
+The decoder body remains controlled, so model quality is still unmeasured. Use Kaggle for genuine GPU behavior
 when needed, after hosted CPU correctness; do not wait on hours of idle CI.
 
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,

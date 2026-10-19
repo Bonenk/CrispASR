@@ -221,7 +221,9 @@ jobs:
         run: python3 tests/test_align_compact.py -v
 
       - name: Legacy parallel runtime timestamps, errors and VAD (model-free UBSan)
-        run: python3 tests/test_whisper_parallel_runtime.py -v
+        run: |
+          python3 tests/test_whisper_parallel_runtime.py -v
+          python3 tests/test_whisper_vad_timeline.py -v
 
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v

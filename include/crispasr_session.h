@@ -174,6 +174,8 @@ CRISPASR_SESSION_API int crispasr_transcribe_parallel_by_ref(whisper_context* ct
 // Enabling DTW disables incompatible flash attention; disabling DTW keeps its current setting.
 CRISPASR_SESSION_API void crispasr_ctx_params_set_dtw(whisper_context_params* p, bool enable, int aheads_preset,
                                                       int n_top);
+// Token times are centiseconds on the original audio timeline when VAD is used;
+// unavailable negative values are preserved, including DTW timestamps.
 CRISPASR_SESSION_API int64_t crispasr_token_t0(whisper_context* ctx, int i_seg, int i_tok);
 CRISPASR_SESSION_API int64_t crispasr_token_t1(whisper_context* ctx, int i_seg, int i_tok);
 CRISPASR_SESSION_API float crispasr_token_p(whisper_context* ctx, int i_seg, int i_tok);
