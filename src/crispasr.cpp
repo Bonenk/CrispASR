@@ -8904,6 +8904,30 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
             // [EXPERIMENTAL] Token-level timestamps with DTW
             const auto n_segments_before = state->result_all.size();
 
+            // Predicted timestamps can extend into the padded encoder window.
+            // Publish only times within the audio supplied to this window, even
+            // when token energy expansion, wrapping or DTW adjusts them later.
+            const int64_t window_end = std::min<int64_t>(seek_end, int64_t(seek) + CRISPASR_CHUNK_SIZE * 100);
+            const auto bound_time = [&](int64_t t) { return std::max<int64_t>(seek, std::min(t, window_end)); };
+            const auto bound_segments = [&](size_t first) {
+                for (size_t i = first; i < result_all.size(); ++i) {
+                    auto& segment = result_all[i];
+                    segment.t0 = bound_time(segment.t0);
+                    segment.t1 = std::max(segment.t0, bound_time(segment.t1));
+                    for (auto& token : segment.tokens) {
+                        const auto bound_token_time = [&](int64_t t) {
+                            return t < 0 ? t : std::max(segment.t0, std::min(t, segment.t1));
+                        };
+                        token.t0 = bound_token_time(token.t0);
+                        token.t1 = bound_token_time(token.t1);
+                        token.t_dtw = bound_token_time(token.t_dtw);
+                        if (token.t0 >= 0 && token.t1 >= 0) {
+                            token.t1 = std::max(token.t0, token.t1);
+                        }
+                    }
+                }
+            };
+
             const bool is_no_speech = (state->no_speech_prob > params.no_speech_thold &&
                                        best_decoder.sequence.avg_logprobs < params.logprob_thold);
 
@@ -8952,8 +8976,8 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                         const auto t1 = seek + 2 * (tokens_cur[i].tid - whisper_token_beg(ctx));
 
                         if (!text.empty()) {
-                            const auto tt0 = t0;
-                            const auto tt1 = t1;
+                            const auto tt0 = bound_time(t0);
+                            const auto tt1 = std::max(tt0, bound_time(t1));
 
                             if (params.print_realtime) {
                                 if (params.print_timestamps) {
@@ -8985,6 +9009,7 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                                     n_new = whisper_wrap_segment(*ctx, *state, params.max_len, params.split_on_word);
                                 }
                             }
+                            bound_segments(result_all.size() - n_new);
                             if (params.new_segment_callback && !ctx->params.dtw_token_timestamps) {
                                 params.new_segment_callback(ctx, state, n_new, params.new_segment_callback_user_data);
                             }
@@ -9025,8 +9050,8 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                 if (!text.empty()) {
                     const auto t1 = seek + seek_delta;
 
-                    const auto tt0 = t0;
-                    const auto tt1 = t1;
+                    const auto tt0 = bound_time(t0);
+                    const auto tt1 = std::max(tt0, bound_time(t1));
 
                     if (params.print_realtime) {
                         if (params.print_timestamps) {
@@ -9056,6 +9081,7 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                             n_new = whisper_wrap_segment(*ctx, *state, params.max_len, params.split_on_word);
                         }
                     }
+                    bound_segments(result_all.size() - n_new);
                     if (params.new_segment_callback && !ctx->params.dtw_token_timestamps) {
                         params.new_segment_callback(ctx, state, n_new, params.new_segment_callback_user_data);
                     }
@@ -9070,10 +9096,9 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                     const int n_frames = std::min(std::min(CRISPASR_CHUNK_SIZE * 100, seek_delta), seek_end - seek);
                     whisper_exp_compute_token_level_timestamps_dtw(ctx, state, params, result_all.size() - n_segments,
                                                                    n_segments, seek, n_frames, 7, params.n_threads);
+                    bound_segments(n_segments_before);
                     if (params.new_segment_callback) {
-                        for (int seg = (int)result_all.size() - n_segments; seg < n_segments; seg++) {
-                            params.new_segment_callback(ctx, state, seg, params.new_segment_callback_user_data);
-                        }
+                        params.new_segment_callback(ctx, state, n_segments, params.new_segment_callback_user_data);
                     }
                 }
             }

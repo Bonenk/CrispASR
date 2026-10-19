@@ -666,3 +666,12 @@ speech across all arms. These results correct the earlier cross-device causal
 interpretation; they do not change defaults or establish broader native/Q4
 acceptance. Complete evidence and limitations are archived in HISTORY.md and
 docs/dia-sampler-device-results-2026-10-17.json.
+
+### Whisper callback timeline repair (2026-10-19)
+
+Segment and available token/DTW times are bounded to the supplied decoder
+window before callbacks, including wrapped output. DTW callbacks report the
+new-segment count correctly after earlier windows. Six literal native emission
+regressions pass, alongside35 parallel/VAD cases. Hosted actual-model rerun is
+still required; the preceding run passed bounded sequential and exposed the
+parallel timestamp overrun. No model-quality or GPU acceptance is claimed.

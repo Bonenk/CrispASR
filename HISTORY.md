@@ -1,3 +1,21 @@
+## Bound Whisper emission before callbacks — 2026-10-19
+
+Hosted run39208655226 confirms bounded sequential decoding now passes, then
+fails two-processor decoding: a predicted segment ends at1238 centiseconds for
+1100 centiseconds of audio. Retained library/probe/audio and native/probe source
+hashes were independently checked against the dispatched commit. This failed
+run is diagnostic evidence, not acceptance of the full model matrix.
+
+Native emission now bounds segment timestamps to the actual decoder window and
+bounds available token/DTW times after energy expansion, wrapping and DTW,
+before delivering callbacks. Unavailable negative sentinels, text and alternative
+candidates are preserved. DTW callbacks now report the number of new segments
+once per window; the former index/count loop could omit later-window callbacks.
+Six literal-emission cases fail before repair and pass afterward under UBSan,
+including callback-visible values, nonzero offsets, wrapped output and a later
+DTW window. The existing22 parallel and13 VAD/entry cases also pass. The hosted
+model sanity margin is unchanged; a fresh actual-model matrix remains required.
+
 ## Hosted bounded-sequential failure and wrapper follow-up — 2026-10-19
 
 Hosted CPU run39206481422 built the actual library and loaded revision-pinned

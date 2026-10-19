@@ -2,8 +2,11 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Next: review the rerun of real-model bounded
-sequential/parallel pointer and Python acceptance, then callback/lifecycle audits.
+Owner: maintainer coordinator (active). Next: repair callback-visible emission
+bounds exposed by hosted run39208655226, rerun the actual-model matrix, then
+fix issue550 bounded CTC encoder memory. After that audit completed Japanese
+alignment/Echo artifacts, finish wrapper lifecycle/callable gaps, review the
+updated PR521 and release accepted changes after validation.
 Go high-level parallel access and Python CI expectation repairs are complete;
 see HISTORY.md. Do not infer model acceptance from the local glue regressions.
 The Rust scalar-helper family now has compatible public controls and parallel
@@ -93,7 +96,10 @@ The first model attempt, [run39206481422](https://github.com/CrispStrobe/CrispAS
 passed build/load/full sequential, then failed the first bounded sequential
 segment-time check. PCM bounding is now fixed in the actual state-decoder entry;
 13 state/VAD and 22 parallel regression cases pass. The probe preserves failing
-segment rows before checking. Rerun and inspect the new artifact; never accept
+segment rows before checking. The rerun39208655226 passes bounded sequential
+then fails parallel2 on a prediction beyond the supplied PCM. Emission bounds
+and later-window DTW callbacks are now repaired, with six red-before/green-after
+literal-emission cases. Rerun and inspect the new artifact; never accept
 the failed receipt or relax the one-second sanity margin to make it green.
 Run `tools/ci-heavy/whisper_wrapper_validate.py` through `heavy-cpu.yml` with
 `pip=numpy` and a 60-minute timeout; inspect `receipt.json`, native/Python raw
@@ -660,7 +666,13 @@ Passing current source CI does not prove new v0.8.44 assets have been built.
 Unrelated future research need not be advertised as accepted to release proven
 improvements. Existing failed gates must stay explicit.
 
-## Research backlog — Drama3 (issue545)
+## Deferred outside active/release scope — Drama3 (issues545/546)
+
+Maintainer decision (2026-10-19): exclude this backend from the active roadmap
+and next release because its custom licence is unsuitable for the intended
+scope. Do not start conversion, download weights or claim support. Reconsider
+only after an explicit scope/licence decision; the technical notes below are
+retained for handoff, not an active task.
 
 Issue546 requests the same backend, explicitly including GGUF conversion and
 zero-shot voice cloning; track those requirements together with545. Cloning
