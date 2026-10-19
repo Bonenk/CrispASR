@@ -29,8 +29,13 @@ partitions approximately ten-second clips and averages clip embeddings. Our
 current raw-reference API computes one embedding over the provided PCM. A
 clean, single-utterance raw reference matches upstream `extract_se([clip])`,
 not the entire automatic VAD frontend. Do not call this VAD parity, multilingual
-text-cleaner parity, or exact librosa resampling parity. Segmented/averaged
-reference acceptance remains a separate explicit task.
+text-cleaner parity, or exact librosa resampling parity. The explicit `openvoice2_extract_speaker_embedding_segments` API now averages
+caller-selected ordered speech clips with equal weights, and
+`openvoice2_set_target_embedding` copies that prepared identity into conversion.
+Automatic VAD selection remains a separate policy; never describe supplied
+spans as an automatic upstream frontend. Unequal-length tiny-clip probes guard
+equal weighting, invalid spans and unchanged outputs after failure. Actual
+multi-clip model acceptance remains pending.
 
 The upstream demo selects the saved source embedding by actual MeloTTS speaker
 key. Both native CLI and shared session now resolve that key from model
@@ -59,11 +64,16 @@ hook snapshots. Reference GGUFs contain the exact native-rate source/reference
 PCM used by the model, so the C++ comparison isolates model math from resampler
 implementations. The recipe and source identity are required archive metadata.
 Keep deterministic tau=0 acceptance separate from upstream tau=0.3 stochastic
-quality. The header now documents the actual long-standing native default0.
+quality. The dumper can now record the actual original posterior noise at0.3;
+`openvoice2_set_posterior_noise` owns it and the driver requires its28th stage.
+A shared seed alone is insufficient across different random samplers. The
+original waveform must also be byte-identical after removing capture hooks and
+replaying the same seed. These newer paths are not covered by the earlier
+source71e329ccf Kaggle run. The header now documents the actual long-standing native default0.
 Original watermarking is disabled for model-boundary parity; converted output
 also exposes our existing peak normalization as a separate stage.
 
-Twenty-seven stages are required, without optional skips: both PCM inputs and
+Twenty-seven deterministic stages (28 with posterior-noise replay) are required, without optional skips: both PCM inputs and
 spectrograms, reference normalization, six reference convolutions, GRU,
 projected target/source embeddings, posterior pre/WaveNet/stats/latent,
 forward/reverse flow latents, vocoder pre/four MRF stages, raw decoder waveform
@@ -104,7 +114,7 @@ failed originals as controls; do not relax thresholds after seeing a result.
 This is a synthetic closed-loop voice test, not general human-speaker accuracy.
 
 Remaining acceptance scope: raw mixed-rate preprocessing vs original librosa;
-Silero-selected clip averaging; tau0.3 and shared-noise replay; quant variants
+automatic Silero selection and actual supplied-clip averaging; actual tau0.3 shared-noise replay; quant variants
 with sensitive tensors retained; full shared Session/CLI model execution;
 additional languages, natural references and supported device families.
 Public reference archives belong in `cstr/crispasr-regression-fixtures`, with

@@ -1,3 +1,18 @@
+## 2026-10-19 — OpenVoice explicit clip means and posterior-noise replay
+
+Added native equal-weight clip embedding extraction, owned target-identity
+conditioning and owned original posterior-noise replay. Invalid replacements
+leave prior conditioning intact; invalid/overlapping spans and failed extraction
+leave caller output unchanged. Unequal clip lengths guard averaging semantics.
+The Python original-module dumper supports tau0.3 by capturing the actual
+standard-normal input, then removes hooks and requires byte-identical pristine
+replay. Strict diff requires28 stages for this recipe; tau0 remains27.
+
+Tiny conditioning and strict-driver contracts pass, including missing shared
+noise rejection. Numerical, multi-clip and free-running quality acceptance is
+still pending; Kaggle v2 remains frozen on the preceding deterministic runtime
+source71e329ccf. Do not claim this new scope from its eventual result.
+
 ## 2026-10-19 — OpenVoice deterministic reference wiring and source identity
 
 Checkpoint71e329ccf adds original-module reference hooks, strict unified diff

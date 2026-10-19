@@ -25,11 +25,12 @@ class OpenVoiceBakeContracts(unittest.TestCase):
 static std::string fault;
 static float samples[4]={1,2,3,4};
 static int alive=0;
-struct openvoice2_context {openvoice2_stage_callback callback=nullptr;void* user=nullptr;};
+struct openvoice2_context {openvoice2_stage_callback callback=nullptr;void* user=nullptr;bool noisy=false;};
 extern "C" openvoice2_context_params openvoice2_context_default_params(){return {2,0,false,0};}
-extern "C" openvoice2_context* openvoice2_init_from_file(const char*,openvoice2_context_params){++alive;return new openvoice2_context;}
+extern "C" openvoice2_context* openvoice2_init_from_file(const char*,openvoice2_context_params p){++alive;auto* c=new openvoice2_context;c->noisy=p.tau>0;return c;}
 extern "C" void openvoice2_free(openvoice2_context* c){if(c){--alive;delete c;}}
 extern "C" bool openvoice2_set_source_speaker(openvoice2_context*,const char* name){return std::strcmp(name,"en-us")==0;}
+extern "C" bool openvoice2_set_posterior_noise(openvoice2_context*,const float*,int){return true;}
 extern "C" void openvoice2_set_stage_callback(openvoice2_context* c,openvoice2_stage_callback f,void* u){c->callback=f;c->user=u;}
 extern "C" bool openvoice2_convert(openvoice2_context* c,const float*,int,int,const float*,int,int,float** p,int* n){
  const char* names[]={"src_pcm","ref_pcm","src_spec","ref_spec","ref_enc_layernorm",
@@ -46,6 +47,7 @@ extern "C" bool openvoice2_convert(openvoice2_context* c,const float*,int,int,co
   }
   c->callback(name,data,fault=="shape"?3:4,c->user);
  }
+ if(c->noisy)c->callback("enc_q_noise",samples,4,c->user);
  *n=4;*p=static_cast<float*>(malloc(4*sizeof(float)));return fault!="conversion";
 }
 namespace crispasr_diff {
@@ -53,11 +55,12 @@ Ref::~Ref(){}
 std::pair<const float*,size_t> Ref::get_f32(const std::string& key) const {
  if(fault=="missing_reference" && key=="target_se")return {nullptr,0};
  if(fault=="input" && key=="raw_audio")return {nullptr,0};
+ if(fault=="missing_noise" && key=="enc_q_noise")return {nullptr,0};
  return {samples,4};
 }
 std::string Ref::meta(const std::string& key) const {
  if(key=="ov2_sample_rate")return fault=="rate"?"16000":"22050";
- if(key=="ov2_tau")return fault=="tau"?"0.3":"0";
+ if(key=="ov2_tau")return fault=="tau"?"0.7":(fault=="noisy" || fault=="missing_noise"?"0.3":"0");
  if(key=="ov2_source_speaker")return fault=="speaker"?"missing":"en-us";
  return "";
 }
@@ -67,7 +70,7 @@ int main(int argc,char** argv){
  crispasr_diff::Ref ref;
  int rc=crispasr_openvoice_diff("model.gguf",ref,false);
  assert(alive==0);
- if(fault.empty())assert(rc==0);else assert(rc!=0);
+ if(fault.empty() || fault=="noisy")assert(rc==0);else assert(rc!=0);
 }
 '''
         (path / 'probe.cpp').write_text(source)
@@ -81,7 +84,7 @@ int main(int argc,char** argv){
 
     def test_gate_accepts_complete_stages_and_rejects_faults(self):
         for fault in ['', 'scale', 'nan', 'permutation', 'shape', 'missing_native',
-                      'missing_reference', 'input', 'rate', 'tau', 'speaker', 'conversion']:
+                      'missing_reference', 'input', 'rate', 'tau', 'speaker', 'conversion', 'noisy', 'missing_noise']:
             with self.subTest(fault=fault):
                 subprocess.run([str(self.binary), fault], check=True, stdout=subprocess.DEVNULL)
 

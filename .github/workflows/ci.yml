@@ -201,6 +201,7 @@ jobs:
           python3 tests/test_tts_session_contracts.py -v
           python3 tests/test_openvoice_bake_contracts.py -v
           python3 tests/test_openvoice_worker_contracts.py -v
+          python3 tests/test_openvoice_conditioning_contracts.py -v
 
       - name: Supertonic speaker API null and bounds contracts
         run: python3 tests/test_supertonic_speaker_contracts.py -v

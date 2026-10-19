@@ -97,8 +97,16 @@ def dump(model_dir, audio, stages, **kwargs):
     speaker = os.environ.get('CRISPASR_OV2_SOURCE_SPEAKER', 'en-default')
     speaker_path = root / 'base_speakers/ses' / (speaker + '.pth')
     tau = float(os.environ.get('CRISPASR_OV2_TAU', '0'))
-    if tau != 0:
-        raise ValueError('Exact reference replay currently requires tau=0; noisy quality is a separate gate')
+    if tau not in (0, .3):
+        raise ValueError('Reference recipe supports diagnostic tau=0 or upstream tau=0.3')
+    # Capture the actual standard-normal input without changing the sampler.
+    # A separate C++ RNG cannot be compared by setting the same integer seed.
+    original_randn_like = torch.randn_like
+    posterior_noise = []
+    def capture_noise(*args, **kwargs):
+        noise = original_randn_like(*args, **kwargs)
+        posterior_noise.append(noise.detach().clone())
+        return noise
     try:
         with torch.inference_mode():
             ref_spec = spec(reference)
@@ -109,7 +117,24 @@ def dump(model_dir, audio, stages, **kwargs):
             src_se = torch.load(speaker_path, map_location=device, weights_only=True).reshape(1, -1, 1)
             save('src_se', src_se)
             lengths = torch.tensor([src_spec.shape[-1]], dtype=torch.long, device=device)
-            converted = model.voice_conversion(src_spec, lengths, src_se, target, tau=0)[0][0, 0]
+            torch.manual_seed(42)
+            torch.randn_like = capture_noise
+            try:
+                converted = model.voice_conversion(src_spec, lengths, src_se, target, tau=tau)[0][0, 0]
+            finally:
+                torch.randn_like = original_randn_like
+            if len(posterior_noise) != 1:
+                raise RuntimeError('Unexpected posterior sampling count')
+            if tau:
+                save('enc_q_noise', posterior_noise[0], True)
+            # Remove only our diagnostic hooks, then repeat the untouched
+            # inference with the same random seed and actual model inputs.
+            for handle in handles:
+                handle.remove()
+            torch.manual_seed(42)
+            pristine = model.voice_conversion(src_spec, lengths, src_se, target, tau=tau)[0][0, 0]
+            if not torch.equal(converted, pristine):
+                raise RuntimeError('Capture instrumentation changed original output')
             output = converted.detach().float().cpu().numpy().copy()
             peak = np.max(np.abs(output))
             if peak > .01:
@@ -122,8 +147,9 @@ def dump(model_dir, audio, stages, **kwargs):
     if missing:
         raise RuntimeError('Original blueprint did not execute stages: ' + str(sorted(missing)))
     # Keep metadata portable. Inputs and boundaries are self-contained in GGUF.
-    captures.update(ov2_source_speaker=speaker, ov2_sample_rate=str(sr), ov2_tau='0',
-                    ov2_recipe='native-rate raw reference; no VAD; watermark disabled; diagnostic tau=0',
+    captures.update(ov2_source_speaker=speaker, ov2_sample_rate=str(sr), ov2_tau=str(tau),
+                    ov2_capture_neutral='byte-identical pristine replay',
+                    ov2_recipe=f'native-rate raw reference; no VAD; watermark disabled; tau={tau}; shared posterior noise',
                     ov2_checkpoint_sha256=hashlib.file_digest(
                         (root / 'converter/checkpoint.pth').open('rb'), 'sha256').hexdigest())
     return captures

@@ -2024,6 +2024,10 @@ int main(int argc, char** argv) {
                 ref_backend.c_str(), backend_name.c_str());
     }
 
+    if (backend_name == "openvoice2") {
+        return crispasr_openvoice_diff(model_path, ref, std::getenv("CRISPASR_DIFF_USE_GPU") != nullptr);
+    }
+
     // Load audio (any common format, via read_audio_data).
     std::vector<float> samples;
     std::vector<std::vector<float>> stereo;
@@ -8832,8 +8836,6 @@ int main(int argc, char** argv) {
         }
 
         moss_transcribe_free(ctx);
-    } else if (backend_name == "openvoice2") {
-        return crispasr_openvoice_diff(model_path, ref, std::getenv("CRISPASR_DIFF_USE_GPU") != nullptr);
     } else if (backend_name == "melotts") {
         // MeloTTS (VITS2): text-driven TTS. The reference archive
         // contains intermediate activations (enc_output, enc_mean,

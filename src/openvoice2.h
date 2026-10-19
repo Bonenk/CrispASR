@@ -58,6 +58,21 @@ void openvoice2_free(struct openvoice2_context* ctx);
 // NULL clears selection and extracts identity from the actual source PCM.
 bool openvoice2_set_source_speaker(struct openvoice2_context* ctx, const char* name);
 
+// Average independently encoded, ordered non-overlapping speech clips.
+// Starts/ends are sample indices in ref_pcm (end exclusive); no VAD is run.
+// This matches upstream extract_se(list_of_clips), including equal clip weights.
+bool openvoice2_extract_speaker_embedding_segments(struct openvoice2_context* ctx, const float* ref_pcm, int n_ref,
+                                                   int ref_sr, const int* starts, const int* ends, int n_segments,
+                                                   float* out_embedding);
+
+// Optional caller-prepared target identity (256 finite floats); NULL clears it.
+// Copied on success; an invalid request leaves the prior override unchanged.
+bool openvoice2_set_target_embedding(struct openvoice2_context* ctx, const float* embedding);
+
+// Diagnostic teacher forcing: owned standard-normal posterior noise in (T,C)
+// order. NULL/0 clears it. A conversion rejects a mismatched frame count.
+bool openvoice2_set_posterior_noise(struct openvoice2_context* ctx, const float* noise, int n);
+
 // Synchronous diagnostic snapshots, valid only during callback; no re-entry.
 typedef void (*openvoice2_stage_callback)(const char*, const float*, size_t, void*);
 void openvoice2_set_stage_callback(struct openvoice2_context* ctx, openvoice2_stage_callback callback, void* user);

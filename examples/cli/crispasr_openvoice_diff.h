@@ -14,20 +14,30 @@ inline int crispasr_openvoice_diff(const std::string& model, crispasr_diff::Ref&
     const auto source = ref.get_f32("raw_audio");
     const auto reference = ref.get_f32("reference_audio");
     const std::string rate_text = ref.meta("ov2_sample_rate");
+    const std::string tau_text = ref.meta("ov2_tau");
+    const bool noisy = tau_text == "0.3";
     if (!source.first || !reference.first || !source.second || !reference.second || source.second > INT32_MAX ||
-        reference.second > INT32_MAX || rate_text != "22050" || ref.meta("ov2_tau") != "0") {
+        reference.second > INT32_MAX || rate_text != "22050" || (tau_text != "0" && tau_text != "0.0" && !noisy)) {
         fprintf(stderr, "openvoice2: missing or invalid native-rate replay inputs/recipe\n");
         return 4;
     }
     auto params = openvoice2_context_default_params();
     params.use_gpu = gpu;
-    params.tau = 0;
+    params.tau = noisy ? .3f : 0;
     params.verbosity = 1;
     std::unique_ptr<openvoice2_context, decltype(&openvoice2_free)> ctx(
         openvoice2_init_from_file(model.c_str(), params), openvoice2_free);
     if (!ctx || !openvoice2_set_source_speaker(ctx.get(), ref.meta("ov2_source_speaker").c_str())) {
         fprintf(stderr, "openvoice2: missing model or exact source-speaker identity\n");
         return 4;
+    }
+    if (noisy) {
+        const auto noise = ref.get_f32("enc_q_noise");
+        if (!noise.first || !noise.second || noise.second > INT32_MAX ||
+            !openvoice2_set_posterior_noise(ctx.get(), noise.first, (int)noise.second)) {
+            fprintf(stderr, "openvoice2: missing or invalid original posterior noise\n");
+            return 4;
+        }
     }
     using Captures = std::map<std::string, std::vector<float>>;
     Captures captures;
@@ -44,13 +54,15 @@ inline int crispasr_openvoice_diff(const std::string& model, crispasr_diff::Ref&
     free(output);
     if (!ok || n <= 0)
         return 4;
-    const char* stages[] = {"src_pcm",           "ref_pcm",       "src_spec",         "ref_spec",
-                            "ref_enc_layernorm", "ref_enc_conv0", "ref_enc_conv1",    "ref_enc_conv2",
-                            "ref_enc_conv3",     "ref_enc_conv4", "ref_enc_conv5",    "ref_enc_gru_out",
-                            "target_se",         "src_se",        "enc_q_pre",        "enc_q_wn_out",
-                            "enc_q_stats",       "enc_q_z",       "z_after_flow_fwd", "z_after_flow_rev",
-                            "dec_conv_pre",      "dec_stage0",    "dec_stage1",       "dec_stage2",
-                            "dec_stage3",        "dec_output",    "output_pcm"};
+    std::vector<const char*> stages = {"src_pcm",           "ref_pcm",       "src_spec",         "ref_spec",
+                                       "ref_enc_layernorm", "ref_enc_conv0", "ref_enc_conv1",    "ref_enc_conv2",
+                                       "ref_enc_conv3",     "ref_enc_conv4", "ref_enc_conv5",    "ref_enc_gru_out",
+                                       "target_se",         "src_se",        "enc_q_pre",        "enc_q_wn_out",
+                                       "enc_q_stats",       "enc_q_z",       "z_after_flow_fwd", "z_after_flow_rev",
+                                       "dec_conv_pre",      "dec_stage0",    "dec_stage1",       "dec_stage2",
+                                       "dec_stage3",        "dec_output",    "output_pcm"};
+    if (noisy)
+        stages.push_back("enc_q_noise");
     int failed = 0;
     for (const char* name : stages) {
         auto found = captures.find(name);
@@ -82,7 +94,6 @@ inline int crispasr_openvoice_diff(const std::string& model, crispasr_diff::Ref&
                max_error);
         failed += !pass;
     }
-    printf("openvoice2: %zu required stages, %d failures (no optional skips)\n", sizeof(stages) / sizeof(stages[0]),
-           failed);
+    printf("openvoice2: %zu required stages, %d failures (no optional skips)\n", stages.size(), failed);
     return failed ? 1 : 0;
 }

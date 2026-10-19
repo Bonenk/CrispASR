@@ -228,6 +228,8 @@ struct openvoice2_context {
     std::mt19937 rng;
     std::string dump_dir;
     std::string source_speaker;
+    std::vector<float> target_override;
+    std::vector<float> posterior_noise;
     openvoice2_stage_callback stage_callback = nullptr;
     void* stage_user = nullptr;
     uint64_t model_identity = 0;
@@ -982,11 +984,13 @@ static void enc_q_forward(openvoice2_context* ctx, const std::vector<float>& spe
         for (int c = 0; c < inter; c++) {
             float mean = stats[t * proj_out + c];
             float logvar = stats[t * proj_out + inter + c];
-            float noise = dist(ctx->rng);
+            float noise = ctx->posterior_noise.empty() ? dist(ctx->rng) : ctx->posterior_noise[t * inter + c];
             z_out[t * inter + c] = mean + expf(logvar) * noise * ctx->tau;
         }
     }
     dump_stage(ctx, "enc_q_z", z_out.data(), z_out.size());
+    if (!ctx->posterior_noise.empty())
+        dump_stage(ctx, "enc_q_noise", ctx->posterior_noise.data(), ctx->posterior_noise.size());
 }
 
 // ── WaveNet-based coupling flow ──────────────────────────────────────
@@ -1329,6 +1333,8 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     if (ctx->verbosity >= 1)
         fprintf(stderr, "openvoice2: STFT — src T=%d (%d bins)\n", T_src, hp.spec_channels);
 
+    if (!ctx->posterior_noise.empty() && ctx->posterior_noise.size() != (size_t)T_src * hp.inter_channels)
+        return false;
     dump_stage(ctx, "src_spec", src_spec.data(), src_spec.size());
 
     // 2. Extract target speaker embedding from reference (content-addressed
@@ -1336,7 +1342,10 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     std::vector<float> target_se;
     {
         openvoice2_bench_stage _bs("ref_enc");
-        if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se)) {
+        if (!ctx->target_override.empty()) {
+            target_se = ctx->target_override;
+            dump_stage(ctx, "target_se", target_se.data(), target_se.size());
+        } else if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se)) {
             fprintf(stderr, "openvoice2: ref_enc failed\n");
             return false;
         }
@@ -1399,7 +1408,7 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
             return false;
         // The extractor emits target stages too; emit the reference again last
         // so diagnostic consumers do not confuse source and target identity.
-        if (ctx->stage_callback || !ctx->dump_dir.empty())
+        if (ctx->target_override.empty() && (ctx->stage_callback || !ctx->dump_dir.empty()))
             if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se))
                 return false;
     }
@@ -1537,4 +1546,61 @@ extern "C" void openvoice2_set_stage_callback(openvoice2_context* ctx, openvoice
         ctx->stage_callback = callback;
         ctx->stage_user = user;
     }
+}
+
+extern "C" bool openvoice2_set_target_embedding(openvoice2_context* ctx, const float* embedding) {
+    if (!ctx || ctx->hp.gin_channels != 256)
+        return false;
+    if (!embedding) {
+        ctx->target_override.clear();
+        return true;
+    }
+    for (int i = 0; i < ctx->hp.gin_channels; ++i)
+        if (!std::isfinite(embedding[i]))
+            return false;
+    ctx->target_override.assign(embedding, embedding + ctx->hp.gin_channels);
+    return true;
+}
+
+extern "C" bool openvoice2_set_posterior_noise(openvoice2_context* ctx, const float* noise, int n) {
+    if (!ctx || ctx->hp.inter_channels <= 0 || n < 0 || (!noise && n != 0) ||
+        (noise && (n == 0 || n % ctx->hp.inter_channels != 0)))
+        return false;
+    for (int i = 0; i < n; ++i)
+        if (!std::isfinite(noise[i]))
+            return false;
+    if (!noise)
+        ctx->posterior_noise.clear();
+    else
+        ctx->posterior_noise.assign(noise, noise + n);
+    return true;
+}
+
+extern "C" bool openvoice2_extract_speaker_embedding_segments(openvoice2_context* ctx, const float* ref_pcm, int n_ref,
+                                                              int ref_sr, const int* starts, const int* ends,
+                                                              int n_segments, float* out_embedding) {
+    if (!ctx || !ref_pcm || !starts || !ends || !out_embedding || n_ref <= 0 || ref_sr <= 0 || n_segments <= 0 ||
+        n_segments > n_ref)
+        return false;
+    for (int i = 0; i < n_segments; ++i)
+        if (starts[i] < 0 || ends[i] <= starts[i] || ends[i] > n_ref || (i && starts[i] < ends[i - 1]))
+            return false;
+    std::vector<float> average(256, 0.0f), embedding(256);
+    for (int i = 0; i < n_segments; ++i) {
+        if (!openvoice2_extract_speaker_embedding(ctx, ref_pcm + starts[i], ends[i] - starts[i], ref_sr,
+                                                  embedding.data()))
+            return false;
+        for (int j = 0; j < 256; ++j) {
+            if (!std::isfinite(embedding[j]))
+                return false;
+            average[j] += embedding[j];
+        }
+    }
+    for (float& value : average) {
+        value /= n_segments;
+        if (!std::isfinite(value))
+            return false;
+    }
+    memcpy(out_embedding, average.data(), 256 * sizeof(float));
+    return true;
 }
