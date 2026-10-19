@@ -218,6 +218,16 @@ constructor and close. Those are operation probes, not model-dependent tests.
 `TestProbeLegacyCallbacksAcrossContexts` exercises eight contexts through native
 callbacks, including registration changes within delivery. The strict hosted
 Go/Rust contract enables Go's race detector. Custom heads and remaining legacy context/resource controls are still pending.
+The higher-level `ProcessParallel(ctx, pcm, processors, encoder, segment, progress)`
+helper and optional `ParallelProcessor` capability now expose the native parallel
+pointer/progress route without changing the existing Context interface. One
+processor shares the ordinary Process path; per-call single-segment policy does
+not mutate future options. `parallel_probe_test.go` exercises dispatch counters,
+callbacks/token metadata, iteration reset, failure/abort/recovery, invalid counts,
+empty PCM and nil/closed/unsupported contexts. The strict Go/Rust race-enabled
+contract runs these operation probes in addition to package compilation.
+Same-model lifecycle and real-model/device acceptance remain separate.
+
 The owned-token and compatible higher-level DTW paths are described below.
 
 
@@ -391,7 +401,7 @@ acceptance remain in PLAN.md. The hosted-only
 `tools/ci-heavy/whisper_wrapper_validate.py` prepares actual tiny.en pointer/Python
 metadata acceptance; its artifacts must be reviewed before claiming completion.
 
-`tests/test_whisper_vad_timeline.py` adds nine UBSan cases using the literal VAD
+`tests/test_whisper_vad_timeline.py` supplies thirteen UBSan cases using the literal VAD
 stitcher/interpolator, token getters, scalar adapters, sequential/parallel routes
 and real state-decoder entry before a controlled inference body. Token/DTW
 getters map available times to original audio on a returned copy and preserve

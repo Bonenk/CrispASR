@@ -44,7 +44,7 @@ class HelperDiscoveryTests(unittest.TestCase):
                 helper = root / "custom-helper"
                 helper.touch()
                 kwargs["helpers_lib_path"] = str(helper)
-            elif mode in ("build", "legacy"):
+            elif mode in ("build", "legacy", "native"):
                 adjacent.unlink()
                 if mode == "build":
                     (root / "build").mkdir()
@@ -54,6 +54,13 @@ class HelperDiscoveryTests(unittest.TestCase):
                     helper = None
 
             native, helpers = Mock(), Mock()
+            # Mock invents optional attributes unless explicitly removed. Model
+            # actual symbol availability rather than accidentally enabling every API.
+            pointer_native = mode in ("native", "native_with_helper")
+            if pointer_native:
+                native.whisper_init_from_file_with_params_by_ref.return_value = 13
+            else:
+                del native.whisper_init_from_file_with_params_by_ref
             native.whisper_context_default_params_by_ref.return_value = 17
             native.whisper_init_from_file.return_value = 12
             helpers.whisper_init_from_file_ptr.return_value = 11
@@ -72,24 +79,29 @@ class HelperDiscoveryTests(unittest.TestCase):
                     patch.object(binding, "_register_dll_dir"), \
                     patch.object(binding.ctypes, "CDLL", side_effect=load):
                 model = binding.CrispASR("model.gguf", **kwargs)
-                if helper is not None:
-                    self.assertEqual(loaded, [str(library), str(helper)])
+                self.assertEqual(loaded, [str(library)] + ([str(helper)] if helper is not None else []))
+                self.assertIs(model._helpers, helpers if helper is not None else None)
+                if pointer_native:
+                    native.whisper_init_from_file_with_params_by_ref.assert_called_once_with(b"model.gguf", 17)
+                    native.whisper_free_context_params.assert_called_once_with(17)
+                    helpers.whisper_init_from_file_ptr.assert_not_called()
+                    native.whisper_init_from_file.assert_not_called()
+                    expected_context = 13
+                elif helper is not None:
                     helpers.whisper_init_from_file_ptr.assert_called_once_with(b"model.gguf", 17)
                     native.whisper_free_context_params.assert_called_once_with(17)
                     native.whisper_init_from_file.assert_not_called()
-                    self.assertIs(model._helpers, helpers)
                     expected_context = 11
                 else:
-                    self.assertEqual(loaded, [str(library)])
                     native.whisper_init_from_file.assert_called_once_with(b"model.gguf")
-                    self.assertIsNone(model._helpers)
+                    native.whisper_context_default_params_by_ref.assert_not_called()
                     expected_context = 12
                 model.close()
                 native.whisper_free.assert_called_once_with(expected_context)
 
     def test_constructor_routes(self):
         for system in ("Linux", "Darwin", "Windows"):
-            for mode in ("automatic", "explicit", "environment", "helper_override", "build", "legacy"):
+            for mode in ("automatic", "explicit", "environment", "helper_override", "build", "legacy", "native", "native_with_helper"):
                 with self.subTest(system=system, mode=mode):
                     self.check_constructor(system, mode)
 

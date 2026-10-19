@@ -2,8 +2,10 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Next: review hosted Whisper pointer/Python
-model acceptance, then callbacks and remaining lifecycle/cross-language audits.
+Owner: maintainer coordinator. Next: review the rerun of real-model bounded
+sequential/parallel pointer and Python acceptance, then callback/lifecycle audits.
+Go high-level parallel access and Python CI expectation repairs are complete;
+see HISTORY.md. Do not infer model acceptance from the local glue regressions.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
 All 2,033 native unit tests passed; rerun hosted CI after the Parakeet
@@ -46,7 +48,10 @@ Recommended implementation order and concrete acceptance:
    with optional per-call progress callbacks. Verify actual model behavior and
    progress frequency. Continue DTW,
    remaining token introspection and legacy context/callback lifecycle auditing.
-   Review higher-level APIs as well as the low-level bindings.
+   Review higher-level APIs as well as the low-level bindings. Go's
+   higher-level `ProcessParallel` optional capability now reaches the native
+   pointer/progress adapter, with compiled operation tests. Model acceptance,
+   same-model lifecycle serialization and callback-close safety remain open.
    Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
    high-level model constructor now have operation probes. The shared helper
    disables incompatible flash attention. Owned Rust/Go token snapshots now expose
@@ -84,12 +89,18 @@ repairs are archived in HISTORY.md. Keep this gate in CTest and hosted CI.
 Next, use a hosted CPU build and a small existing Whisper fixture (no local
 model downloads/native builds) to call the exported pointer ABI with 1/2/3
 processors, nonzero offsets, token timestamps, DTW and alternative capture.
+The first model attempt, [run39206481422](https://github.com/CrispStrobe/CrispASR/actions/runs/39206481422),
+passed build/load/full sequential, then failed the first bounded sequential
+segment-time check. PCM bounding is now fixed in the actual state-decoder entry;
+13 state/VAD and 22 parallel regression cases pass. The probe preserves failing
+segment rows before checking. Rerun and inspect the new artifact; never accept
+the failed receipt or relax the one-second sanity margin to make it green.
 Run `tools/ci-heavy/whisper_wrapper_validate.py` through `heavy-cpu.yml` with
 `pip=numpy` and a 60-minute timeout; inspect `receipt.json`, native/Python raw
 metadata and failure logs from the exact dispatched commit before marking model
 acceptance done. It uses a resolved immutable public model revision and records
 SHA256 identities. It does not exercise an actual VAD model. The model sanity
-gate allows a one-second timestamp margin; the 22-case runtime gate requires
+gate allows a one-second timestamp margin; the state/parallel runtime gates require
 exact input geometry. Extend acceptance to actual VAD and supported native
 platforms separately.
 Assert per-run timestamp bounds/order and candidate ownership, with unavailable
@@ -102,7 +113,9 @@ Still audit these distinct semantics before claiming complete timeline parity:
   sequential/parallel/direct-state decoding clears a previous VAD map; failed
   VAD clears results. Nine literal native timeline/stitching cases cover these
   repairs. Validate actual VAD detections, overlap/clipping boundaries and
-  VAD-on -> plain -> VAD-on model reuse through each public wrapper; do not
+  VAD-on -> plain -> VAD-on model reuse through each public wrapper. Also test
+  bounded offsets with Tiron's fixed 75-centisecond onset pad before claiming
+  those model-specific window semantics; do not
   assume the controlled detector fixture establishes real alignment quality.
 - Global parallel duration now clips PCM once before splitting, with exact
   sample geometry and forwarding checked by seven additional regressions.

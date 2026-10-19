@@ -1,3 +1,42 @@
+## Hosted bounded-sequential failure and wrapper follow-up — 2026-10-19
+
+Hosted CPU run39206481422 built the actual library and loaded revision-pinned
+public tiny.en weights. The full sequential case completed, then the bounded
+sequential case failed its segment-time check before reaching parallel/DTW or
+Python cases. The artifact's library/probe/source/audio SHA256 identities were
+independently verified. The failed matrix is not model acceptance.
+
+The state decoder still computed features from PCM after the requested endpoint;
+its seek limit alone did not hide that later speech. Sequential/direct-state
+entry now clips PCM before feature extraction and caps seek end at available mel
+frames. Invalid offsets/durations are rejected, while zero-PCM precomputed-mel
+entry remains supported. Two literal-entry regressions reproduced the PCM leak;
+the **13 state/VAD cases plus 22 parallel cases pass under UBSan**. The hosted
+probe now writes segment values before asserting, preserving the failing row.
+Actual model rerun remains required; no threshold was relaxed.
+
+The high-level Go package now exposes `ProcessParallel` through optional
+`ParallelProcessor`, preserving the existing Context interface. Its common
+sequential/parallel path forwards progress to the native pointer adapter and
+resets the segment cursor after success. Callback-only single-segment options
+are local to each call. Compiled probes cover dispatch counts, encoder/segment/
+progress callbacks, copied token metadata, alternating modes, native failure,
+encoder abort, recovery, cleanup and nil/closed/unsupported/invalid input.
+The native fixture now exercises Go callback trampolines on the pointer route
+and provides the token probability getter used by high-level segment conversion.
+**41 Go cases pass with the race detector, 34 Rust cases and five doctests pass.**
+Same-model inference/close/re-entry still requires caller serialization.
+
+CPU CI's 2,033 native unit cases and compiled Python metadata checks passed.
+The later Python test group exposed stale expectations: GGUF detection returns
+canonical `vibevoice-tts`, and unrestricted Mock objects invented the newly
+preferred native pointer initializer. The backend assertion now matches the
+shared architecture table. Constructor tests explicitly model missing symbols
+and cover native-pointer preference with/without helpers, legacy helpers and
+legacy fallback across Linux/macOS/Windows (24 routes). Focused Python tests
+pass (12 cases plus 24 subtests; the actual-library backend assertion remains a
+hosted gate). Full-source syntax, format and documentation checks pass.
+
 ## Parallel decoding bounds duration once before splitting — 2026-10-19
 
 With multiple processors, `whisper_full_parallel` now caps PCM at the requested

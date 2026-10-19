@@ -20,6 +20,46 @@ int main(int argc, char** argv) {
                 "VAD modified the unrelated context default state");
         return 0;
     }
+    if (test == "bounded-state" || test == "bounded-sequential") {
+        params.offset_ms = 1000;
+        params.duration_ms = 2000;
+        tracked_pcm = pcm.data();
+        int rc = test == "bounded-state" ? whisper_full_with_state(&ctx, &state, params, pcm.data(), int(pcm.size()))
+                                         : whisper_full(&ctx, params, pcm.data(), int(pcm.size()));
+        require(rc == 0, "bounded decode failed");
+        require(decode_calls[0].count == 3 * CRISPASR_SAMPLE_RATE,
+                "sequential feature extraction can see audio after requested endpoint");
+        require(decode_calls[0].offset_ms == 1000 && decode_calls[0].duration_ms == 2000,
+                "sequential decoder lost requested seek interval");
+        return 0;
+    }
+    if (test == "precomputed-mel") {
+        allow_precomputed_mel = true;
+        params.offset_ms = 1000;
+        params.duration_ms = 2000;
+        require(whisper_full_with_state(&ctx, &state, params, nullptr, 0) == 0 && completed == 1,
+                "PCM bounding broke precomputed mel decoding");
+        require(whisper_full(&ctx, params, nullptr, 0) == 0 && completed == 2,
+                "sequential wrapper rejected precomputed mel entry");
+        params.vad = true;
+        require(whisper_full(nullptr, params, pcm.data(), int(pcm.size())) < 0, "null context reached VAD prepass");
+        require(whisper_full_with_state(&ctx, nullptr, params, pcm.data(), int(pcm.size())) < 0,
+                "null direct state accepted");
+        params.duration_ms = -1;
+        require(whisper_full(&ctx, params, pcm.data(), int(pcm.size())) < 0 && vad_calls == 0,
+                "invalid duration reached VAD prepass");
+        return 0;
+    }
+    if (test == "seek-range") {
+        params.offset_ms = 1000;
+        params.duration_ms = 2000;
+        require(native_seek_range(params, 120) == std::pair<int, int>{100, 120}, "duration extends past available mel");
+        params.duration_ms = 2147483647;
+        require(native_seek_range(params, 300) == std::pair<int, int>{100, 300}, "large duration extends past mel");
+        params.duration_ms = 0;
+        require(native_seek_range(params, 800) == std::pair<int, int>{100, 800}, "unbounded seek changed");
+        return 0;
+    }
     auto stitch = [&]() {
         std::vector<float> filtered;
         require(whisper_vad(&ctx, &state, params, pcm.data(), int(pcm.size()), filtered), "VAD stitch failed");

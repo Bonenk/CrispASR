@@ -1230,7 +1230,13 @@ int whisper_full_by_ref(whisper_context* ctx, struct whisper_full_params* p, con
         return -7;
     if (!check_legacy_controls(p))
         return -10;
-    return probe_mode == 2 ? -1 : 0;
+    if (probe_mode == 2)
+        return -1;
+    // Go's real default-params adapter installs native callback trampolines;
+    // exercise those here too when reached through the pointer parallel route.
+    if (p->encoder_begin_callback)
+        return probe_legacy_full(ctx, *p, samples, n);
+    return 0;
 }
 static int parallel_by_ref_calls;
 int probe_parallel_by_ref_calls(void) {
@@ -1906,8 +1912,7 @@ whisper_token_data whisper_full_get_token_data_from_state(struct whisper_state* 
     return _s;
 }
 float whisper_full_get_token_p(struct whisper_context* ctx, int i_segment, int i_token) {
-    STUB_ABORT();
-    return 0;
+    return whisper_full_get_token_data(ctx, i_segment, i_token).p;
 }
 float whisper_full_get_token_p_from_state(struct whisper_state* state, int i_segment, int i_token) {
     STUB_ABORT();

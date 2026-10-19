@@ -64,6 +64,9 @@ def main():
             raise RuntimeError('Expected one actual Linux shared library')
         library = libraries[0].resolve()
         receipt['library_sha256'] = sha(library)
+        receipt['native_source_sha256'] = {name: sha(ROOT / name) for name in (
+            'src/crispasr.cpp', 'src/crispasr_c_api.cpp', 'include/crispasr.h', 'include/crispasr_session.h')}
+
         receipt['native_dependencies'] = {str(p.relative_to(scratch / 'build')): sha(p)
                                           for p in (scratch / 'build').rglob('*.so') if p.is_file()}
         native_out = out / 'native'

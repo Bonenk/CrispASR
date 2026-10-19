@@ -67,6 +67,13 @@ void whisper_vad_free_segments(whisper_vad_segments* segments) { delete segments
         fixture += '\n#define CA_EXPORT extern "C"\n'
         for name in ('crispasr_token_t0', 'crispasr_token_t1', 'crispasr_token_dtw_t'):
             fixture += '\n' + extract_function(api, name)
+        # Compile the real decoder seek arithmetic separately from GGML work.
+        start = source.index('    const int seek_start = params.offset_ms / 10;')
+        end = source.index('    // if length of spectrogram', start)
+        fixture += '\nstatic int fixture_mel_length;\nint whisper_n_len_from_state(whisper_state*) { return fixture_mel_length; }\n'
+        fixture += 'static std::pair<int, int> native_seek_range(whisper_full_params params, int length) {\n'
+        fixture += 'fixture_mel_length = length; whisper_state* state = nullptr;\n' + source[start:end]
+        fixture += 'return {seek_start, seek_end}; }\n'
         fixture += (ROOT / 'tests/fixtures/whisper-vad-timeline-main.cpp').read_text()
         (path / 'probe.cpp').write_text(fixture)
         cls.binary = path / 'vad-timeline-probe'
@@ -106,6 +113,18 @@ void whisper_vad_free_segments(whisper_vad_segments* segments) { delete segments
 
     def test_vad_stitching_belongs_to_the_requested_state(self):
         self.check_case('state-owner')
+
+    def test_sequential_decode_bounds_pcm_before_feature_extraction(self):
+        self.check_case('bounded-sequential')
+
+    def test_direct_state_decode_bounds_pcm_before_feature_extraction(self):
+        self.check_case('bounded-state')
+
+    def test_precomputed_mel_route_still_reaches_decoder(self):
+        self.check_case('precomputed-mel')
+
+    def test_seek_duration_never_extends_past_available_mel(self):
+        self.check_case('seek-range')
 
     def test_empty_parallel_input_clears_previous_mapping(self):
         self.check_case('empty')

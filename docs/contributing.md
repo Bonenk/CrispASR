@@ -746,6 +746,20 @@ proves glue behavior; hosted actual-model tests must separately check VAD
 original-time mapping, bounded duration and callback/device behavior. Do not
 infer original-time VAD token parity from a successful chunk merge.
 
+The high-level Go `ProcessParallel` helper uses optional `ParallelProcessor`;
+keep existing Context implementations compatible. Exercise the public high-level
+method, native pointer-route count, progress/encoder/segment callbacks and cursor
+reset, not just low-level declarations or package compilation. Callback-specific
+options must stay local to the decode call. Same-model lifecycle serialization
+is still required; the optional parallel API does not make concurrent close safe.
+
+For sequential/direct-state decode, cap PCM before mel extraction as well as
+bounding seek end at available mel frames. A duration check in the decode loop
+alone leaves later speech visible to the encoder. Preserve the zero-PCM route
+used with precomputed mel. The literal entry/seek tests exercise both contracts;
+real-model timestamp failures must be diagnosed from retained rows, not hidden
+by loosening the model smoke threshold.
+
 For bounded parallel decoding, clip one global offset/duration interval before
 splitting, clear the now-consumed per-worker duration, and cover exact contiguous
 sample coverage including remainder, fractional offsets, overflow-sized limits

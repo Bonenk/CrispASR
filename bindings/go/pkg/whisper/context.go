@@ -229,57 +229,47 @@ func (context *context) WhisperLangAutoDetect(offset_ms int, n_threads int) ([]f
 	return langProbs, nil
 }
 
-// Process new sample data and return any errors
+// Process new sample data and return any errors.
 func (context *context) Process(
 	data []float32,
 	callEncoderBegin EncoderBeginCallback,
 	callNewSegment SegmentCallback,
 	callProgress ProgressCallback,
 ) error {
-	if context.model.ctx == nil {
+	return context.process(data, 1, callEncoderBegin, callNewSegment, callProgress)
+}
+
+func (context *context) process(data []float32, processors int, callEncoderBegin EncoderBeginCallback,
+	callNewSegment SegmentCallback, callProgress ProgressCallback) error {
+	if context == nil || context.model == nil || context.model.ctx == nil {
 		return ErrInternalAppError
 	}
-	// If the callback is defined then we force on single_segment mode
+	// Callback-driven segment policy belongs to this call, not later decodes.
+	params := context.params
 	if callNewSegment != nil {
-		context.params.SetSingleSegment(true)
+		params.SetSingleSegment(true)
 	}
-
-	// We don't do parallel processing at the moment
-	processors := 0
-	if processors > 1 {
-		if err := context.model.ctx.Whisper_full_parallel(context.params, data, processors, callEncoderBegin,
-			func(new int) {
-				if callNewSegment != nil {
-					num_segments := context.model.ctx.Whisper_full_n_segments()
-					s0 := num_segments - new
-					for i := s0; i < num_segments; i++ {
-						callNewSegment(toSegment(context.model.ctx, i))
-					}
-				}
-			}); err != nil {
-			return err
+	var segmentCallback func(int)
+	if callNewSegment != nil {
+		segmentCallback = func(new int) {
+			count := context.model.ctx.Whisper_full_n_segments()
+			for i := count - new; i < count; i++ {
+				callNewSegment(toSegment(context.model.ctx, i))
+			}
 		}
-	} else if err := context.model.ctx.Whisper_full(context.params, data, callEncoderBegin,
-		func(new int) {
-			if callNewSegment != nil {
-				num_segments := context.model.ctx.Whisper_full_n_segments()
-				s0 := num_segments - new
-				for i := s0; i < num_segments; i++ {
-					callNewSegment(toSegment(context.model.ctx, i))
-				}
-			}
-		}, func(progress int) {
-			if callProgress != nil {
-				callProgress(progress)
-			}
-		}); err != nil {
+	}
+	var err error
+	if processors > 1 {
+		err = context.model.ctx.Whisper_full_parallel_with_progress(params, data, processors,
+			callEncoderBegin, segmentCallback, callProgress)
+	} else {
+		err = context.model.ctx.Whisper_full(params, data, callEncoderBegin, segmentCallback, callProgress)
+	}
+	if err != nil {
 		return err
 	}
-
-	// Reset n so that more Segments can be available within NextSegment call
+	// Make all newly decoded segments available to NextSegment.
 	context.n = 0
-
-	// Return success
 	return nil
 }
 

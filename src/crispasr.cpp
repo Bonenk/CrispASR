@@ -7957,10 +7957,28 @@ static bool whisper_vad(struct whisper_context* /*ctx*/, struct whisper_state* s
 
 int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* state, struct whisper_full_params params,
                             const float* samples, int n_samples) {
+    if (!ctx || !state || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
     // A state reused without VAD must not apply its previous audio's time map.
     // VAD wrappers set params.vad and prepare the current map before this call.
     if (!params.vad) {
         whisper_reset_vad_mapping(state);
+    }
+    // Bound PCM before feature extraction, including sequential/direct-state
+    // decode. A seek limit alone still exposes later speech to the encoder.
+    // Zero PCM remains valid for callers decoding a precomputed mel buffer.
+    if (n_samples > 0) {
+        const int64_t offset_samples = int64_t(CRISPASR_SAMPLE_RATE) * params.offset_ms / 1000;
+        if (offset_samples >= n_samples) {
+            state->result_all.clear();
+            return 0;
+        }
+        if (params.duration_ms > 0) {
+            const int64_t end_samples = offset_samples + int64_t(CRISPASR_SAMPLE_RATE) * params.duration_ms / 1000;
+            n_samples = int(std::min<int64_t>(n_samples, end_samples));
+        }
     }
     // Reset all schedulers so a second whisper_full() call on the same
     // context doesn't hit GGML_ASSERT(!sched->is_alloc) if a previous
@@ -8027,8 +8045,9 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
     }
 
     const int seek_start = params.offset_ms / 10;
-    const int seek_end =
-        params.duration_ms == 0 ? whisper_n_len_from_state(state) : seek_start + params.duration_ms / 10;
+    const int seek_end = params.duration_ms == 0
+                             ? whisper_n_len_from_state(state)
+                             : std::min(whisper_n_len_from_state(state), seek_start + params.duration_ms / 10);
 
     // if length of spectrogram is less than 100ms (10 frames), then return
     // basically don't process anything that is less than 100ms
@@ -9106,6 +9125,10 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
 }
 
 int whisper_full(struct whisper_context* ctx, struct whisper_full_params params, const float* samples, int n_samples) {
+    if (!ctx || !ctx->state || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
     std::vector<float> vad_samples;
     if (params.vad) {
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);

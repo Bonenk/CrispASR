@@ -39,6 +39,7 @@ struct decode_call {
     int count = 0, offset_ms = 0, duration_ms = 0;
 };
 static const float* tracked_pcm = nullptr;
+static bool allow_precomputed_mel = false;
 static std::array<decode_call, 4> decode_calls;
 
 static void log_message(const char*, ...) {}
@@ -85,13 +86,13 @@ static bool whisper_vad(whisper_context*, whisper_state* state, whisper_full_par
     return true;
 }
 int whisper_full_with_state(whisper_context* ctx, whisper_state* state, whisper_full_params params,
-                            const float* samples, int n) {
+                            const float* samples, int n_samples) {
     // PRODUCTION_DECODE_ENTRY
     require(state != nullptr, "decode received null worker state");
-    require(n > 0, "decode received empty chunk");
+    require(n_samples > 0 || allow_precomputed_mel, "decode received empty chunk");
     if (tracked_pcm) {
         require(state->id >= 0 && state->id < int(decode_calls.size()), "unexpected worker ID");
-        decode_calls[state->id] = {samples, n, params.offset_ms, params.duration_ms};
+        decode_calls[state->id] = {samples, n_samples, params.offset_ms, params.duration_ms};
     }
     state->result_all.clear();
     const int64_t offset = params.offset_ms / 10;

@@ -69,9 +69,9 @@ int main(int argc, char** argv) {
                     const auto finish = whisper_full_get_segment_t1(ctx.get(), i);
                     // Exact interval geometry is gated separately by the tiny
                     // runtime suite. Model timestamps have a one-second margin.
-                    check(start >= 0 && finish >= start && finish <= end + 100, "segment outside model time margin");
                     out << "segment\t" << i << '\t' << start << '\t' << finish << '\t'
                         << hex(whisper_full_get_segment_text(ctx.get(), i)) << '\n';
+                    check(start >= 0 && finish >= start && finish <= end + 100, "segment outside model time margin");
                     const int tokens = whisper_full_n_tokens(ctx.get(), i);
                     check(tokens >= 0 && tokens < 100000, "invalid token count");
                     for (int j = 0; j < tokens; ++j) {

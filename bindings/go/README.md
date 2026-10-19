@@ -219,3 +219,20 @@ counts clamp to 0–32; nonpositive best-of values leave the setting unchanged.
 Custom implementations/mocks of the higher-level `Context` interface need
 these five new methods. `Params` is a Go options type, not a native ABI struct;
 pass it through the binding methods.
+
+
+The higher-level package also supports parallel processing without extending
+its existing `Context` interface:
+
+```go
+err := whisper.ProcessParallel(context, samples, 2, nil, onSegment, onProgress)
+```
+
+This uses optional `ParallelProcessor`; custom contexts lacking that capability
+return an error. One processor selects ordinary sequential decoding. Counts
+must be positive int32 values; empty PCM, nil/closed contexts and native failures
+return errors. Progress frequency and transcript boundaries depend on the native
+decoder. Callback-specific single-segment mode applies only to that call, and
+successful calls reset `NextSegment` iteration. Serialize operations sharing a
+model; callbacks must not re-enter inference or close the model. Operation/race
+probes establish transport, callbacks and cleanup, not model quality or speed.
