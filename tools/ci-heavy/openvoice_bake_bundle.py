@@ -30,6 +30,13 @@ def run(command, label):
 def main():
     OUT.mkdir(exist_ok=True)
     PROJECT.mkdir(exist_ok=True)
+    # CUDA's linker stub has SONAME libcuda.so.1 but ships as libcuda.so.
+    # This alias is link-only, outside the runtime bundle; never package it.
+    links = PROJECT / 'link-only'
+    links.mkdir(exist_ok=True)
+    alias = links / 'libcuda.so.1'
+    if not alias.exists():
+        alias.symlink_to(next(CUDA.rglob('stubs/libcuda.so')))
     (PROJECT / 'targets.cmake').write_text('''if(TARGET openvoice-bake)
   return()
 endif()
@@ -45,7 +52,7 @@ target_include_directories(openvoice-probe PRIVATE "${CRISPASR_SOURCE}/src")
 ''')
     run(['cmake', '-S', ROOT, '-B', BUILD, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
          f'-DCRISPASR_SOURCE={ROOT}', f'-DCMAKE_PROJECT_crispasr_INCLUDE={PROJECT / "targets.cmake"}',
-         f'-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,{CUDA / "lib64/stubs"}', '-DBUILD_SHARED_LIBS=ON', '-DGGML_CUDA=ON',
+         f'-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,{links}', '-DBUILD_SHARED_LIBS=ON', '-DGGML_CUDA=ON',
          '-DCMAKE_CUDA_ARCHITECTURES=60;75', '-DGGML_NATIVE=OFF', '-DCRISPASR_BUILD_TESTS=OFF',
          '-DCRISPASR_BUILD_EXAMPLES=OFF', '-DCRISPASR_BUILD_SERVER=OFF',
          '-DCRISPASR_OPUS_FETCH=ON', '-DCMAKE_C_COMPILER_LAUNCHER=ccache',

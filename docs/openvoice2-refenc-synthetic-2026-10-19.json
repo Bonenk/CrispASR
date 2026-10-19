@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "kind": "synthetic ReferenceEncoder CPU arithmetic; not pretrained acceptance",
+  "seed": 20261019,
+  "torch": "2.11.0+cu130",
+  "input_shape": [
+    1,
+    129,
+    513
+  ],
+  "gru_steps": 3,
+  "pretrained": false,
+  "gpu_executed": false,
+  "native_source_sha256": "59059a1e2bcca925605d55d1593cc3f0f822def454b314a8c120e54e54516674",
+  "original_source_sha256": "54f9e8284a0e9a89c75cb3163d2694cf34d90a5d05cfbcbf12ccd4f0b1ba2dc8",
+  "cases": {
+    "native": {
+      "ref_enc_layernorm": {
+        "elements": 66177,
+        "cosine": 0.99999999999985,
+        "norm_mine": 257.2479388427846,
+        "norm_ref": 257.2479395238867,
+        "norm_ratio": 0.9999999973523516,
+        "relative_l2": 5.507258349442271e-07,
+        "max_abs": 1.9073486328125e-06,
+        "passed": true
+      },
+      "ref_enc_conv0": {
+        "elements": 534560,
+        "cosine": 0.99999999999987,
+        "norm_mine": 289.515033925551,
+        "norm_ref": 289.515031952379,
+        "norm_ratio": 1.0000000068154389,
+        "relative_l2": 5.095561942965023e-07,
+        "max_abs": 1.8030405044555664e-06,
+        "passed": true
+      },
+      "ref_enc_conv1": {
+        "elements": 136224,
+        "cosine": 0.9999999999998289,
+        "norm_mine": 51.68088498101311,
+        "norm_ref": 51.68088443299702,
+        "norm_ratio": 1.0000000106038451,
+        "relative_l2": 5.86828062804381e-07,
+        "max_abs": 6.854534149169922e-07,
+        "passed": true
+      },
+      "ref_enc_conv2": {
+        "elements": 70720,
+        "cosine": 0.9999999999998427,
+        "norm_mine": 16.372057295773086,
+        "norm_ref": 16.372056982671854,
+        "norm_ratio": 1.000000019124123,
+        "relative_l2": 5.629744855062743e-07,
+        "max_abs": 2.3096799850463867e-07,
+        "passed": true
+      },
+      "ref_enc_conv3": {
+        "elements": 19008,
+        "cosine": 0.9999999999998275,
+        "norm_mine": 4.0787809901023255,
+        "norm_ref": 4.078780955781102,
+        "norm_ratio": 1.0000000084145786,
+        "relative_l2": 5.877956127140594e-07,
+        "max_abs": 1.043081283569336e-07,
+        "passed": true
+      },
+      "ref_enc_conv4": {
+        "elements": 10880,
+        "cosine": 0.9999999999998614,
+        "norm_mine": 1.9353883152910665,
+        "norm_ref": 1.935388301975526,
+        "norm_ratio": 1.0000000068800357,
+        "relative_l2": 5.270622735132851e-07,
+        "max_abs": 9.313225746154785e-08,
+        "passed": true
+      },
+      "ref_enc_conv5": {
+        "elements": 3456,
+        "cosine": 0.9999999999998361,
+        "norm_mine": 0.6203650376857346,
+        "norm_ref": 0.6203650242451777,
+        "norm_ratio": 1.000000021665562,
+        "relative_l2": 5.733213141896349e-07,
+        "max_abs": 4.0978193283081055e-08,
+        "passed": true
+      },
+      "ref_enc_gru_out": {
+        "elements": 128,
+        "cosine": 0.9999999999999328,
+        "norm_mine": 0.6233424438301014,
+        "norm_ref": 0.6233424626525059,
+        "norm_ratio": 0.9999999698040714,
+        "relative_l2": 3.681582131694297e-07,
+        "max_abs": 8.195638656616211e-08,
+        "passed": true
+      },
+      "target_se": {
+        "elements": 256,
+        "cosine": 0.9999999999999383,
+        "norm_mine": 0.8923605420085275,
+        "norm_ref": 0.8923605387751821,
+        "norm_ratio": 1.0000000036233623,
+        "relative_l2": 3.516337517766239e-07,
+        "max_abs": 8.940696716308594e-08,
+        "passed": true
+      }
+    },
+    "swapped_axes": {
+      "ref_enc_layernorm": {
+        "elements": 66177,
+        "cosine": 0.99999999999985,
+        "norm_mine": 257.2479388427846,
+        "norm_ref": 257.2479395238867,
+        "norm_ratio": 0.9999999973523516,
+        "relative_l2": 5.507258349442271e-07,
+        "max_abs": 1.9073486328125e-06,
+        "passed": true
+      },
+      "ref_enc_conv0": {
+        "elements": 534560,
+        "cosine": 0.4050038269375587,
+        "norm_mine": 289.69273146102717,
+        "norm_ref": 289.515031952379,
+        "norm_ratio": 1.0006137833585007,
+        "relative_l2": 1.0912026027982569,
+        "max_abs": 2.961014986038208,
+        "passed": false
+      },
+      "ref_enc_conv1": {
+        "elements": 136224,
+        "cosine": 0.5068057084019681,
+        "norm_mine": 52.035962794278575,
+        "norm_ref": 51.68088443299702,
+        "norm_ratio": 1.0068705937442286,
+        "relative_l2": 0.9966006539650416,
+        "max_abs": 1.0199815034866333,
+        "passed": false
+      },
+      "ref_enc_conv2": {
+        "elements": 70720,
+        "cosine": 0.6601753403026429,
+        "norm_mine": 16.524666338184787,
+        "norm_ref": 16.372056982671854,
+        "norm_ratio": 1.009321330586282,
+        "relative_l2": 0.8282942970873544,
+        "max_abs": 0.31215301528573036,
+        "passed": false
+      },
+      "ref_enc_conv3": {
+        "elements": 19008,
+        "cosine": 0.7666639196124856,
+        "norm_mine": 4.091803336058685,
+        "norm_ref": 4.078780955781102,
+        "norm_ratio": 1.003192713808062,
+        "relative_l2": 0.6842311779274853,
+        "max_abs": 0.11158831045031548,
+        "passed": false
+      },
+      "ref_enc_conv4": {
+        "elements": 10880,
+        "cosine": 0.903039995965321,
+        "norm_mine": 1.9215157050345542,
+        "norm_ref": 1.935388301975526,
+        "norm_ratio": 0.9928321376507176,
+        "relative_l2": 0.43884096708876624,
+        "max_abs": 0.04558158293366432,
+        "passed": false
+      },
+      "ref_enc_conv5": {
+        "elements": 3456,
+        "cosine": 0.9413443375129765,
+        "norm_mine": 0.6244509872181307,
+        "norm_ref": 0.6203650242451777,
+        "norm_ratio": 1.006586385133373,
+        "relative_l2": 0.34369661477814695,
+        "max_abs": 0.02230774750933051,
+        "passed": false
+      },
+      "ref_enc_gru_out": {
+        "elements": 128,
+        "cosine": 0.9231365223757327,
+        "norm_mine": 0.697545230519707,
+        "norm_ref": 0.6233424626525059,
+        "norm_ratio": 1.1190401301259767,
+        "relative_l2": 0.431505717906032,
+        "max_abs": 0.0638340637087822,
+        "passed": false
+      },
+      "target_se": {
+        "elements": 256,
+        "cosine": 0.9714315457606353,
+        "norm_mine": 0.9515259131819132,
+        "norm_ref": 0.8923605387751821,
+        "norm_ratio": 1.066302096334223,
+        "relative_l2": 0.2555800721246446,
+        "max_abs": 0.04098077863454819,
+        "passed": false
+      }
+    }
+  },
+  "passed": true,
+  "native_source_commit": "6be9fda3629d9314da97101b8574fb25db06150f",
+  "original_source_commit": "74a1d147b17a8c3092dd5430504bd83ef6c7eb23",
+  "scope": "Synthetic F32 ReferenceEncoder CPU arithmetic, unmodified original class and native body; no GGUF loader, STFT, trained weights, GPU, conversion waveform or speech quality",
+  "native_body_sha256": "3884039c8f665cf18d13cec5da423ec0be6b470e70daf37a0d5f39a9f106d3c4",
+  "weights_sha256": "6027ddfd44ea699eb3aa2dafcd1deda1c7da7b573de97b48f6776bf774f2674b",
+  "input_sha256": "f6e13b99b8f8b835c21e94b7dca624db17372311db8e4f1cd985d4d69ada9a0d",
+  "compiler": "c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+}

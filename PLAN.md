@@ -1,36 +1,44 @@
 # CrispASR — Pending work
 
-## NOW — OpenVoice2 reproducible baking and cloning acceptance
+## NOW — OpenVoice2 actual-model and CUDA acceptance
 
-Owner: maintainer coordinator (active, 2026-10-19). Wiring/source identity
-checkpoint71e329ccf is on main. Full-CMake CUDA bundle39255636270 failed configuration before compilation;
-the repaired root-project build39258859196/source6be9fda36 is queued;
-Kaggle v1 stopped before inference after replacing the host loader path;
-terminal logs/output are retained. Version2 is submitted and queued; it
-validates frozen native source71e329ccf. New clip-mean/target-override and
-tau0.3 shared-noise APIs have local contract checks; a later model run must
-validate those separately. A conditioning worker is prepared with source6be9fda36,
-three cases including original tau0.3 noise replay, unequal clip means and
-independent quality gates (`tools/kaggle/openvoice-conditioning/`, pinned shared
-worker/source hashes). It is not submitted; do not submit it over the live v2 run. Version2 preserves host paths and isolates Torch
-subprocesses from bundled CUDA12.4; local loader/embedded-phase checks pass.
-Kaggle can use the exact-ggml audited base runtime with a bounded model-file
-delta compile, avoiding a full native build. Method and scoped open gates:
-[OpenVoice baking](docs/openvoice2-baking.md). Audit found native
-inference avoids whisper-timestamped/Unidecode, but historical parity is not
-a pinned current acceptance receipt. Complete unified Python blueprint hooks
-and strict crispasr-diff dispatch; dump resampled PCM, STFT, all reference
-encoder boundaries, projected embeddings, posterior/flow and decoder stages.
-Reconcile actual MeloTTS source-speaker selection and reference speech
-segmentation/averaging without copying copyleft helpers. Preserve deterministic
-tau=0 diagnostics separately from default recipe quality. Publish immutable
-licensed inputs/reference GGUFs, model/source/checksum pins and norms/errors.
-Use Kaggle for GPU execution; hosted build delivery remains separate. Require
-ASR content roundtrips plus independent cloned-vs-baseline speaker similarity,
-CLI/C ABI coverage and cache/reuse checks before claiming accepted cloning.
-Scope F32-sensitive/F16 and supported quantization explicitly; do not silently
-relax gates or claim full GPU execution for CPU reference-encoder stages.
+Owner: maintainer coordinator (active, 2026-10-19). Implementation, exact source
+speaker dispatch, clip means/noise replay and the nine-stage synthetic CPU
+encoder proof are archived in HISTORY.md. Method and scopes:
+[OpenVoice baking](docs/openvoice2-baking.md). The synthetic F32 arithmetic
+receipt does not establish pretrained embedding/conversion or GPU quality.
 
+External state and next actions:
+
+1. Full-CMake39255636270 failed configuration. Repaired39258859196/source6be9fda36
+   compiled model/driver objects but failed executable linking because the CUDA
+   toolkit stub lacked its libcuda.so.1 SONAME alias. The worker now creates a
+   link-only alias outside the bundle. Dispatch/audit the repaired build; never
+   ship a driver or stub and never call a green build model acceptance.
+2. Kaggle `openvoice-bake` version2 is queued on old native source71e329ccf.
+   Version1 terminal logs/output are retained after its pre-inference loader
+   failure. Version2 preserves host loader paths but lacks the later dynamic
+   backend ABI flags/discovery repair; it cannot qualify current conditioning.
+   Retain logs/output before superseding it. Do not guess session IDs, launch
+   hardware-fishing retries or exceed the two-session GPU cap.
+3. Prepared `tools/kaggle/openvoice-conditioning/` pins a shared worker and
+   native source6be9fda36. Refresh its immutable worker hash after the DL repair,
+   then submit it when the earlier job is terminal or safely stopped. The
+   prebuilt base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
+   the small model/driver delta with that macro, discover modules from the
+   bundle directory and isolate Torch with host loader paths/different cwd.
+4. Independently audit27/28 required stages, original pristine/captured replay,
+   exact PCM and actual posterior noise, both norms/errors, clip means and
+   mean-conditioned waveforms, uninstrumented C API/cache reuse and actual
+   CUDA scheduler splits. Retain original/model/GGUF/input/library/source hashes.
+   Publish vetted immutable reference artifacts. Keep F32-sensitive and any
+   quant variants explicitly identified; no silent threshold relaxation.
+5. Require baseline/original/clone ASR WER<=0.2 and independent speaker cosine
+   improvement>0.01 in the bounded synthetic matrix. Then extend only new
+   scope: full shared Session/CLI actual-model paths, raw mixed-rate processing,
+   automatic Silero selection, natural references/languages, free-running noise
+   and additional devices/quantization. GPU vocoder remains gated by
+   CRISPASR_OV2_GPU=1; reference encoder/flows remain CPU. No release claim yet.
 
 ## Character-alignment acceptance qualification
 

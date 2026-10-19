@@ -56,6 +56,7 @@ def host_environment():
 def run(command, name, **kwargs):
     if str(command[0])==sys.executable:
         kwargs.setdefault('env',host_environment())
+        kwargs.setdefault('cwd',WORK)
     print(name, flush=True)
     harness=sys.modules.get('kaggle_harness')
     if harness:
@@ -131,13 +132,16 @@ def main():
         run([sys.executable,'-m','pip','install','-q','faster-whisper'],'asr-dependencies')
         # Use the prebuilt CUDA ggml. These are ordinary model C++ files only;
         # link our own definitions locally to avoid old SDK symbol interposition.
-        common=['c++','-std=c++17','-O2','-fPIC','-fopenmp','-I'+str(ROOT/'src'),'-I'+str(ROOT/'ggml/include'),
+        # The audited base uses dynamic backend modules. Match that ABI and
+        # let registry discovery find CPU/CUDA next to the current directory.
+        os.chdir(BUNDLE)
+        common=['c++','-std=c++17','-O2','-fPIC','-fopenmp','-DGGML_BACKEND_DL','-I'+str(ROOT/'src'),'-I'+str(ROOT/'ggml/include'),
                 '-I'+str(ROOT/'examples/cli'),'-L'+str(BUNDLE),'-Wl,-rpath,'+str(BUNDLE)]
         run(common+[ROOT/'src/openvoice2.cpp',ROOT/'src/melotts.cpp','-shared','-Wl,-Bsymbolic-functions',
-                    '-lcrispasr','-lggml','-lggml-cpu','-lggml-base','-ldl','-pthread','-o',WORK/'libopenvoice-probe.so'],'compile-model-delta')
+                    '-lcrispasr','-lggml','-lggml-base','-ldl','-pthread','-o',WORK/'libopenvoice-probe.so'],'compile-model-delta')
         run(common+[ROOT/'tools/ci-heavy/openvoice-bake/main.cpp',ROOT/'examples/cli/crispasr_diff.cpp',
                     '-L'+str(WORK),'-Wl,-rpath,'+str(WORK),'-lopenvoice-probe','-lcrispasr',
-                    '-lggml','-lggml-cpu','-lggml-base','-ldl','-pthread','-o',WORK/'openvoice-bake'],'compile-diff-driver')
+                    '-lggml','-lggml-base','-ldl','-pthread','-o',WORK/'openvoice-bake'],'compile-diff-driver')
         RECEIPT['native_delta']={name:sha(WORK/name) for name in ['libopenvoice-probe.so','openvoice-bake']}
         import numpy as np
         import soundfile as sf

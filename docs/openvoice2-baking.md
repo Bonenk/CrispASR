@@ -102,12 +102,19 @@ ggml, CUDA kernels or the full SDK. Record both base and delta identities.
 The separate full-CMake check39255636270 failed during configuration because
 the parent wrapper project changed CMAKE_SOURCE_DIR used by existing C2PA/llama
 paths. The worker now configures the repository root and injects only its
-target declarations; repaired run39258859196/source6be9fda36 is queued. This build check is not a prerequisite for this bounded model experiment and is not model acceptance.
+target declarations. Run39258859196/source6be9fda36 compiled both models and
+the driver, then failed executable linking because the toolkit lacked the
+libcuda.so.1 alias. The link-only alias repair stays outside the runtime bundle.
+This build check is not model acceptance.
 
 The kernel preserves the host NVIDIA loader paths and runs Torch phases in
 separate processes from the packaged native CUDA stack. Version1 failed at
 post-reexec nvidia-smi before inference; version2 repairs this preflight.
-The submitted v2 kernel records two text cases, original/native stage comparison,
+Submitted v2 is still queued and lacks the later GGML_BACKEND_DL compile and
+module-discovery repair required by the audited base; it must be superseded
+after retaining logs. The prepared worker matches this ABI, searches modules
+from the native bundle cwd, and uses a different cwd/host loader environment
+for Torch subprocesses. The intended matrix records original/native stage comparison,
 uninstrumented public model C API waveform/embedding parity and deterministic
 cache reuse, with CPU Torch fallback on sm60 while the native vocoder genuinely
 uses CUDA. It then checks independent ASR WER<=0.2 for baseline/original/clone
@@ -128,3 +135,23 @@ additional languages, natural references and supported device families.
 Public reference archives belong in `cstr/crispasr-regression-fixtures`, with
 immutable revisions, source/model/file hashes and licenses. Keep private
 operational paths and account details in ignored maintainer notes.
+
+## Checkpoint-free numerical encoder probe
+
+[The synthetic receipt](openvoice2-refenc-synthetic-2026-10-19.json) compares
+the unmodified original ReferenceEncoder class to the literal native CPU encoder
+body, using deterministic F32 tensors and synthetic coefficients. Input129x513
+exercises all six convolutions and three GRU steps. All nine boundaries pass:
+minimum cosine0.9999999999998275; maximum norm-ratio deviation3.02e-8; maximum
+relative L2 error5.88e-7. Restoring the historical H/W-axis swap yields first
+convolution cosine0.405004 and final embedding cosine0.971432, with final norm
+ratio1.0663; the probe rejects it.
+
+```sh
+python tools/validation/openvoice_refenc_toy.py --upstream "$OPENVOICE_SOURCE"   --out "$ARTIFACTS/toy-refenc"
+```
+
+No pretrained checkpoint, GGUF decoding, STFT, full SDK, CUDA or waveform is
+involved in this small arithmetic check. Coefficients are read as F32 vectors.
+It establishes the encoder's CPU math/layout and a rejecting structural control;
+it does not replace the pending actual-model/GPU/quality matrix.

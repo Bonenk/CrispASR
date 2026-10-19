@@ -1,3 +1,17 @@
+## 2026-10-19 — OpenVoice checkpoint-free encoder arithmetic proof
+
+The original pinned ReferenceEncoder class and unchanged native CPU encoder
+body agree across layer norm, six convolutions, three-step GRU and projection:
+all nine cosines>=0.9999999999998275, maximum relative L2 error5.88e-7, norm
+ratios within3.02e-8 of1. Deterministic synthetic F32 tensors/coefficient buffers
+use no pretrained checkpoint or full SDK build. Restoring the historical axis
+swap drops the first convolution to0.405004 and final embedding to0.971432;
+the control is rejected. Receipt: docs/openvoice2-refenc-synthetic-2026-10-19.json.
+
+This checks CPU encoder arithmetic/layout, not GGUF/dequantization, STFT,
+trained embeddings, CUDA, conversion waveform or speaker/intelligibility quality.
+Those actual-model/hardware gates remain in PLAN.md.
+
 ## 2026-10-19 — Python/Dart and C#/Java generic speaker contracts
 
 Python now rejects malformed success codes/counts/labels, invalid mono/shape
