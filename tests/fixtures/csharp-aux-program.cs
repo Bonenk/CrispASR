@@ -15,8 +15,15 @@ class SessionAuxProbe {
         var pcm=new float[]{1,3,5};var spans=Session.VadSlices("vad",pcm);Eq(spans[0].T0,1.25);Eq(spans[0].T1,2.5);
         probe_aux_mode(1);Eq(Session.VadSlices("vad",pcm).Length,0);probe_aux_mode(2);Reject<InvalidOperationException>(()=>Session.VadSlices("vad",pcm));Eq(probe_aux_live(),0);probe_aux_mode(0);
         Eq(Session.DetectTextLanguage("test","model").Code,"de");Eq(Session.DetectTextLanguage("test","model").Probability,.875f);probe_aux_mode(2);Reject<InvalidOperationException>(()=>Session.DetectTextLanguage("test","model"));probe_aux_mode(0);
-        using(var embedder=new SpeakerEmbedder("probe")){Eq(embedder.Dimension,3);Eq(embedder.Name,"embed-probe");Eq(embedder.Embed(pcm)[2],.75f);probe_aux_mode(2);Reject<InvalidOperationException>(()=>embedder.Embed(pcm));probe_aux_mode(0);}
+        using(var embedder=new SpeakerEmbedder("probe")){Eq(embedder.Dimension,3);Eq(embedder.Name,"embed-probe");Eq(embedder.Embed(pcm)[2],.75f);probe_aux_mode(2);Reject<InvalidOperationException>(()=>embedder.Embed(pcm));probe_aux_mode(0);foreach(int invalid in new[]{15,16,17}){probe_aux_mode(invalid);Reject<InvalidOperationException>(()=>embedder.Embed(pcm));}probe_aux_mode(0);}
         Eq(SpeakerEmbedder.Cluster(new float[]{1,0,0,0,1,0},3).ClusterCount,2);Reject<ArgumentException>(()=>SpeakerEmbedder.Cluster(new float[5],3));
+        foreach(int invalid in new[]{11,12,13}) {probe_aux_mode(invalid);Reject<InvalidOperationException>(()=>SpeakerEmbedder.Cluster(new float[]{1,0,0,0,1,0},3));}
+        probe_aux_mode(14);var unassigned=SpeakerEmbedder.Cluster(new float[]{1,0,0,0,1,0},3);Eq(unassigned.ClusterCount,0);Eq(unassigned.Labels[1],-1);probe_aux_mode(0);
+        Reject<ArgumentException>(()=>SpeakerEmbedder.Cluster(new float[]{1,0,0,0,1,0},3,float.NaN));
+        Reject<ArgumentException>(()=>new SpeakerEmbedder("probe\0bad"));
+        Reject<ArgumentException>(()=>new SpeakerEmbedder("probe",cacheDirectory:"cache\0bad"));
+        Reject<ArgumentException>(()=>new PyannoteCache(pcm,"model\0bad"));
+        Reject<ArgumentException>(()=>new PyannoteCache(Array.Empty<float>(),"model"));
         var segments=new[]{new DiarizationSegment(1,2)};var options=new DiarizationOptions{Method=4,Threads=7,SliceOffsetSeconds=1.25,Model="model",Embedder="embed",MinSpeakers=1,MaxSpeakers=3,NumSpeakers=2};
         var diarized=Diarization.Assign(pcm,segments,options);Eq(diarized.Segments[0].Speaker,1);Eq(diarized.Turns[0].Start,1.25);Eq(diarized.Turns[0].End,2.5);Eq(segments[0].Speaker,-1);
         Eq(Diarization.Assign(pcm,segments,options,includeTurns:false).Turns.Length,0);Reject<ArgumentException>(()=>Diarization.Assign(pcm,segments,options,new float[1]));

@@ -1,3 +1,21 @@
+## 2026-10-19 — Python/Dart and C#/Java generic speaker contracts
+
+Python now rejects malformed success codes/counts/labels, invalid mono/shape
+inputs, NUL/overflowing options and use after close, including array coercion
+that closes the handle. Dart uses temporary allocator arenas, exact1-success,
+checked matrix dimensions, native count/label checks and cache packing/lifetime
+guards. New Python/Dart probes failed before repair; seven Python cases and
+strict Dart analyzer/all40 actual FFI tests pass.
+
+C#/Java auxiliary probes reproduced accepted oversized cluster counts and NUL
+paths before repair. Both now validate returned count/labels, preserve native
+zero/all-unassigned semantics and reject truncated speaker/cache paths. C# also
+rejects nonfinite clustering thresholds and empty cache PCM. Final expanded
+auxiliary probes cover exact1-success versus2/-1 and invalid dimensions as well.
+C# auxiliary53 assertions and Java auxiliary137 assertions pass.
+The callable ledger maps all eight generic-speaker adapters. These are compiled
+operation/ownership checks, not actual speaker-model or concurrent-handle proof.
+
 ## 2026-10-19 — OpenVoice explicit clip means and posterior-noise replay
 
 Added native equal-weight clip embedding extraction, owned target-identity

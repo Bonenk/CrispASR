@@ -100,17 +100,15 @@ owned adapter before promising concurrent safety. High-level Contexts share the
 latest native result state. All six earlier binding contracts39215435420 pass;
 current-tip CI remains a separate integration gate.
 
-## Generic speaker primitives — remaining languages/model scope
+## Generic speaker primitives — remaining model/platform scope
 
-Go/Rust callable embed/name/dim/cluster/cache ownership is now covered by the
-shared compiled oracle; repairs and51 race-enabled Go/35 Rust/five doctest
-results are archived in HISTORY.md. Do not reimplement these methods.
-Next review the existing Python/C#/Java/Dart methods and operation probes,
-including exact1-success embedding, cluster shape/count/label validation,
-coercion/string cleanup and closed resource handling. Python/Dart currently
-accept any nonzero embedding result and need a bounded shared-oracle probe.
-Recheck code before editing. Generic Go handles remain caller-serialized;
-owned concurrent adapters and real-model/device acceptance are separate scope.
+Python/Dart and C#/Java operation review is now complete alongside Go/Rust and
+Ruby/WASM; repairs and their scoped local probes are archived in HISTORY.md and
+mapped in docs/wrapper-callable-coverage.md. Do not reimplement these methods.
+Remaining: real speaker-model/device quality, additional target platforms,
+owned concurrent adapters and callback/concurrent-close behavior. Generic
+handles remain caller-serialized; static/callable closure is not model or
+universal concurrency acceptance. Broader API inventory remains below.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
