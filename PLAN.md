@@ -2,7 +2,7 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active: native parallel timestamp/worker
+Owner: maintainer coordinator. Next: native parallel actual-model/timeline
 validation, then remaining parameter/lifecycle and cross-language audits.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
@@ -76,26 +76,38 @@ Recommended implementation order and concrete acceptance:
    reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
    is in `bindings/go/pkg/whisper/token_snapshots.go`.
 
-### Next runtime check: legacy parallel merge, errors and VAD
+### Native parallel follow-up: actual-model acceptance and timeline audit
 
-Inspect `src/crispasr.cpp::whisper_full_parallel` with a model-free fixture that
-compiles the actual function against tiny fake worker states and PCM, then run
-actual-model acceptance through hosted CPU/GPU jobs. The source currently:
+The literal parallel loop now has a model-free UBSan regression suite in
+`tests/test_whisper_parallel_runtime.py`; completed timestamp/error/silence
+repairs are archived in HISTORY.md. Keep this gate in CTest and hosted CI.
+Next, use a hosted CPU build and a small existing Whisper fixture (no local
+model downloads/native builds) to call the exported pointer ABI with 1/2/3
+processors, nonzero offsets, token timestamps, DTW and alternative capture.
+Assert per-run timestamp bounds/order and candidate ownership, with unavailable
+-1 preserved. Do not require identical text between different chunkings.
 
-- shifts merged segment times but does not shift their token t0/t1/DTW fields;
-  verify absolute token times for later chunks and preserve unavailable -1;
-- computes offset/sample-to-centisecond products with int intermediates;
-  test multi-minute offsets/long clips and use bounded 64-bit arithmetic;
-- joins workers but ignores their return codes; test worker failure, state
-  allocation failure and partial-result cleanup rather than returning success;
-- preprocesses VAD before dispatch while preserving the VAD flag for worker
-  calls; audit double filtering, timeline mapping and stale results on silence.
+Still audit these distinct semantics before claiming complete timeline parity:
 
-Keep alternative arrays associated with their moved token/segment data. Use
-synthetic worker failures and nonzero chunk offsets to isolate glue correctness
-before downloading models. Wrapper transport probes do not prove this runtime
-merge behavior. Add these checks to hosted CI and keep actual model acceptance
-separate from the model-free regression suite.
+- VAD segment getters map the parent's filtered timeline to the original audio,
+  but token/DTW getters currently return stored filtered-time values. Capture
+  both and establish one documented cross-wrapper original-time contract;
+  exercise discontinuous speech regions and unavailable timestamps.
+- Reuse a context with VAD enabled, then disabled: inspect/reset stale mapping
+  state consistently in sequential and parallel routes. Verify silence and
+  failed VAD cannot expose a prior transcript.
+- Inspect `duration_ms` globally versus per worker. Test an offset plus a bounded
+  requested interval before changing how audio is split.
+- The first chunk may have delivered callbacks before another worker fails;
+  failure clears the stored result but cannot retract callbacks. Exercise
+  foreign-thread encoder/abort callbacks and actual context/device allocation
+  failures. Same-context concurrent decode/close is unsupported.
+
+Source audit found no double filtering: `whisper_full_with_state` does not call
+VAD. Preserve the single prepass and parent mapping rather than disabling a flag
+based on the earlier hypothesis. The tiny worker fixture checks mapping retention,
+not actual VAD interpolation or model quality. Use Kaggle for genuine GPU behavior
+when needed, after hosted CPU correctness; do not wait on hours of idle CI.
 
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now

@@ -33,6 +33,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <memory>
 #include <random>
 #include <regex>
 #include <set>
@@ -9114,6 +9115,14 @@ int whisper_full(struct whisper_context* ctx, struct whisper_full_params params,
 
 int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params params, const float* samples,
                           int n_samples, int n_processors) {
+    if (!ctx || !ctx->state || n_processors < 1 || n_samples < 0 || params.offset_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
+    if (n_samples == 0) {
+        ctx->state->result_all.clear();
+        return 0;
+    }
     if (n_processors == 1) {
         return whisper_full(ctx, params, samples, n_samples);
     }
@@ -9123,65 +9132,88 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
         if (!whisper_vad(ctx, ctx->state, params, samples, n_samples, vad_samples)) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD\n", __func__);
+            ctx->state->result_all.clear();
             return -1;
         }
         if (vad_samples.empty()) {
+            ctx->state->result_all.clear();
             return 0;
         }
         samples = vad_samples.data();
         n_samples = vad_samples.size();
     }
-    int ret = 0;
-
-    // prepare separate states for each thread
-    std::vector<whisper_state*> states;
-
-    const int offset_samples = (CRISPASR_SAMPLE_RATE * params.offset_ms) / 1000;
+    // Validate in sample units before narrowing. Even a 134-second offset
+    // overflows the old sample_rate * offset_ms int intermediate.
+    const int64_t offset_samples_wide = int64_t(CRISPASR_SAMPLE_RATE) * params.offset_ms / 1000;
+    if (offset_samples_wide >= n_samples) {
+        ctx->state->result_all.clear();
+        return 0;
+    }
+    const int offset_samples = int(offset_samples_wide);
     const int n_samples_per_processor = (n_samples - offset_samples) / n_processors;
+    if (n_samples_per_processor == 0) {
+        // Avoid empty workers. VAD has already run, so use the state decoder.
+        return whisper_full_with_state(ctx, ctx->state, params, samples, n_samples);
+    }
 
-    // the calling thread will process the first chunk
-    // while the other threads will process the remaining chunks
-
-    std::vector<std::thread> workers(n_processors - 1);
-    for (int i = 0; i < n_processors - 1; ++i) {
-        // create a new state for each thread
-        states.push_back(whisper_init_state(ctx));
-
-        const int start_samples = offset_samples + (i + 1) * n_samples_per_processor;
-        const int n_samples_cur = (i == n_processors - 2) ? n_samples - start_samples : n_samples_per_processor;
-
+    int ret = 0;
+    using state_owner = std::unique_ptr<whisper_state, decltype(&whisper_free_state)>;
+    std::vector<state_owner> states;
+    std::vector<std::thread> workers;
+    std::vector<int> worker_status;
+    try {
+        worker_status.resize(n_processors - 1, 0);
+        states.reserve(n_processors - 1);
+        workers.reserve(n_processors - 1);
+        // Allocate every state before launching threads, so a null state never
+        // reaches a decoder and earlier states are freed on allocation failure.
+        for (int i = 0; i < n_processors - 1; ++i) {
+            states.emplace_back(whisper_init_state(ctx), whisper_free_state);
+            if (!states.back()) {
+                ctx->state->result_all.clear();
+                return -1;
+            }
+        }
+        for (int i = 0; i < n_processors - 1; ++i) {
+            const int start_samples = offset_samples + (i + 1) * n_samples_per_processor;
+            const int n_samples_cur = (i == n_processors - 2) ? n_samples - start_samples : n_samples_per_processor;
+            auto params_cur = params;
+            params_cur.offset_ms = 0;
+            params_cur.print_progress = false;
+            params_cur.print_realtime = false;
+            params_cur.new_segment_callback = nullptr;
+            params_cur.new_segment_callback_user_data = nullptr;
+            params_cur.progress_callback = nullptr;
+            params_cur.progress_callback_user_data = nullptr;
+            workers.emplace_back([&, i, params_cur, start_samples, n_samples_cur]() {
+                try {
+                    worker_status[i] = whisper_full_with_state(ctx, states[i].get(), params_cur,
+                                                               samples + start_samples, n_samples_cur);
+                } catch (...) {
+                    // Exceptions must not escape a std::thread entry point.
+                    worker_status[i] = -1;
+                }
+            });
+        }
         auto params_cur = params;
-
-        params_cur.offset_ms = 0;
-        params_cur.print_progress = false;
         params_cur.print_realtime = false;
-
-        params_cur.new_segment_callback = nullptr;
-        params_cur.new_segment_callback_user_data = nullptr;
-
-        params_cur.progress_callback = nullptr;
-        params_cur.progress_callback_user_data = nullptr;
-
-        workers[i] = std::thread(whisper_full_with_state, ctx, states[i], std::move(params_cur),
-                                 samples + start_samples, n_samples_cur);
+        ret = whisper_full_with_state(ctx, ctx->state, params_cur, samples, offset_samples + n_samples_per_processor);
+    } catch (...) {
+        // Includes thread creation failure: join every thread already started.
+        ret = -1;
     }
-
-    {
-        auto params_cur = params;
-
-        // We need to disable the print real-time for this one as well, otherwise it will show only for the first chunk.
-        params_cur.print_realtime = false;
-
-        // Run the first transformation using default state but only for the first chunk.
-        ret = whisper_full_with_state(ctx, ctx->state, std::move(params_cur), samples,
-                                      offset_samples + n_samples_per_processor);
+    for (auto& worker : workers) {
+        worker.join();
     }
-
-    for (int i = 0; i < n_processors - 1; ++i) {
-        workers[i].join();
+    for (int status : worker_status) {
+        if (ret == 0 && status != 0) {
+            ret = status;
+        }
     }
-
-    const int64_t offset_t = (int64_t)params.offset_ms / 10.0;
+    if (ret != 0) {
+        ctx->state->result_all.clear();
+        return ret;
+    }
 
     // combine results into result_state->result_all from all other states
     for (int i = 0; i < n_processors - 1; ++i) {
@@ -9189,8 +9221,20 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
 
         for (auto& result : results_i) {
             // correct the segment timestamp taking into account the offset
-            result.t0 += 100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t;
-            result.t1 += 100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t;
+            const int64_t shift = 100LL * (offset_samples + (i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE;
+            result.t0 += shift;
+            result.t1 += shift;
+            for (auto& token : result.tokens) {
+                if (token.t0 >= 0) {
+                    token.t0 += shift;
+                }
+                if (token.t1 >= 0) {
+                    token.t1 += shift;
+                }
+                if (token.t_dtw >= 0) {
+                    token.t_dtw += shift;
+                }
+            }
 
             // make sure that segments are not overlapping
             if (!ctx->state->result_all.empty()) {
@@ -9218,8 +9262,6 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         ctx->state->n_decode += states[i]->n_decode;
         ctx->state->n_batchd += states[i]->n_batchd;
         ctx->state->n_prompt += states[i]->n_prompt;
-
-        whisper_free_state(states[i]);
     }
 
     // average the timings
@@ -9234,7 +9276,7 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
     for (int i = 0; i < n_processors - 1; ++i) {
         CRISPASR_LOG_WARN(
             "%s: split %d - %s\n", __func__, (i + 1),
-            to_timestamp(100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t).c_str());
+            to_timestamp(100LL * (offset_samples + (i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE).c_str());
     }
     CRISPASR_LOG_WARN("%s: the transcription quality may be degraded near these boundaries\n", __func__);
 

@@ -783,6 +783,12 @@ CRISPASR_API int whisper_full_with_state(struct whisper_context* ctx, struct whi
 // Not thread safe if executed in parallel on the same context.
 // It seems this approach can offer some speedup in some cases.
 // However, the transcription accuracy can be worse at the beginning and end of each chunk.
+// Available token/DTW times receive the same chunk offset as segment times;
+// negative unavailable-time sentinels and token alternatives are preserved.
+// Worker errors are propagated after all started workers are joined. Failed
+// parallel decoding discards partial results; callbacks already delivered by
+// the first chunk cannot be retracted. Invalid inputs and null worker-state
+// allocations return -1.
 CRISPASR_API int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params params,
                                        const float* samples, int n_samples, int n_processors);
 

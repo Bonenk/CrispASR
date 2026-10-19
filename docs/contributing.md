@@ -736,6 +736,16 @@ negative/nonfinite probabilities, empty codes and malformed UTF-8; zero
 probability is a valid result. Model progress frequency and detection accuracy
 require separate model acceptance.
 
+`python3 tests/test_whisper_parallel_runtime.py -v` compiles the actual parallel
+runtime loop against tiny states and real threads under UBSan. Keep split/merge
+sample arithmetic wide, shift available token/DTW timestamps alongside segments,
+preserve unavailable sentinels and alternative ownership, and propagate worker
+errors only after joining started threads. Check null state allocation, worker
+exceptions, VAD silence, fractional offsets and long-clip geometry. This fixture
+proves glue behavior; hosted actual-model tests must separately check VAD
+original-time mapping, bounded duration and callback/device behavior. Do not
+infer original-time VAD token parity from a successful chunk merge.
+
 DTW must be configured before context creation. Native defaults enable flash
 attention, and the loader disables DTW if both remain enabled. The shared
 `crispasr_ctx_params_set_dtw` helper therefore disables flash attention when

@@ -374,3 +374,16 @@ also checks that rejected inputs never request native parameters. A source-famil
 tripwire flags new setters without public Rust routes; that check supplements
 operation probes and does not establish behavioral coverage by itself. Actual
 model behavior, worker errors and parallel timestamp merging remain in PLAN.md.
+
+
+## Native legacy parallel runtime regression scope
+
+`tests/test_whisper_parallel_runtime.py` compiles the literal runtime loop and
+segment layout against real public parameter/token headers, controlled worker
+states and real threads. Fifteen UBSan cases cover chunk token/DTW shifts,
+unavailable sentinels, alternative association, wide/fractional boundary math,
+worker/main errors, worker exceptions, null state allocation, silence cleanup,
+parent VAD mapping retention and sequential/tiny-input routing. It is a runtime
+glue gate, separate from the language transport fixtures. Original-time VAD token
+mapping, context reuse, duration/callback semantics and actual-model/device
+acceptance remain in PLAN.md.

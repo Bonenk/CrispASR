@@ -1,3 +1,33 @@
+## Legacy parallel runtime timestamps and worker failures — 2026-10-19
+
+`whisper_full_parallel` now shifts available token t0/t1/DTW timestamps together
+with merged segments, preserves negative unavailable sentinels and moves token
+alternatives with their segment. Offset-to-sample and sample-to-centisecond
+arithmetic uses 64-bit intermediates; split/merge times come from the actual
+sample boundary, avoiding a further centisecond rounding loss at fractional
+offsets. Invalid processor/sample/offset inputs are rejected, past-end offsets
+and empty PCM clear results, and oversized processor requests fall back to a
+single state decoder when chunks would be empty.
+
+Worker statuses are collected after every started thread joins. Main/worker
+errors discard partial transcripts; native worker exceptions become failure
+rather than escaping the thread entry point. Worker states use owned cleanup,
+null allocations are rejected before threads launch, and launch failures join
+already-started threads. Previously delivered first-chunk callbacks cannot be
+retracted. VAD silence/failure clears prior results. Audit disproved the earlier
+double-VAD hypothesis: the worker decoder does not invoke VAD; the prepass and
+parent mapping remain intact.
+
+The new model-free probe compiles the literal production parallel function,
+actual private segment layout and public parameter/token headers against tiny
+controlled states and real std::threads. Before repair, ten of eleven initial
+cases failed (including UBSan overflow and an escaping-thread exception); an
+additional fractional-offset case independently failed until boundary rounding
+was repaired. All **15 cases now pass under UBSan**. The suite is registered in
+CTest and hosted CPU CI. It proves merge/error glue, not model accuracy, actual
+VAD interpolation, GPU execution or original-time VAD token parity. Those and
+context reuse/duration/callback acceptance are scoped in PLAN.md.
+
 ## Parakeet metadata CI fixture pointer signatures — 2026-10-19
 
 All 2,033 native unit tests pass after the earlier assertion repairs. The next
