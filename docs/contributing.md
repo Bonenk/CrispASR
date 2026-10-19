@@ -798,6 +798,16 @@ a blocked concurrent decode, all result readers and a real pthread callback.
 The raw low-level Go Context still requires caller serialization; do not describe
 this as universal wrapper lifecycle safety.
 
+Generic speaker wrappers must exercise real public methods, not just declared
+symbols. Reuse `tests/fixtures/wrapper-speaker-primitives.c` with POD layouts
+extracted from the runtime. Native embedding success is exactly1; pyannote apply
+success is0; clustering returns a count and labels, including0/all-unassigned.
+Check int32 conversions and matrix bounds before allocation/native access;
+never multiply unvalidated caller dimensions. Probe malformed success codes,
+counts/labels, NUL strings, repeated close/drop and native failures. Go/Rust and
+Ruby/WASM share this oracle. Go generic handles still need caller serialization;
+the high-level Whisper borrow guard does not protect unrelated model handles.
+
 Legacy token adapters must copy both chosen-token and candidate text before
 native buffers can be reused or the model closed. Preserve raw UTF-8 fragments
 and native timing/probability sentinels. Validate segment/token indices and

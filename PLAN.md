@@ -63,11 +63,24 @@ and tools/ci-heavy/go-model-lifecycle/. Hosted run39222679421 on frozen35df8d6d4
 failed before model execution: the generated Go link requires Opus/Ogg and
 crispasr_opusfile, which the worker omitted. The worker now explicitly enables
 CRISPASR_OPUS_FETCH like existing Go CI, retains native evidence before Go
-linking, and checkpoints each completed model case. A corrected hosted run is
-required; this failure is not a decoder/lifetime result. Inspect retained raw outputs before accepting model scope. Raw low-level
+linking, and checkpoints each completed model case. Corrected run39228691810 is in progress on frozen5aba585ce, branch
+diag/go-model-lifecycle-v2-20261019. The first failure is not a decoder/lifetime
+result; audit the rerun's raw outputs before accepting model behavior. Inspect retained raw outputs before accepting model scope. Raw low-level
 Go pointers still require caller serialization; assess an owned low-level
 adapter before promising their concurrent lifetime safety. Native result states
 remain shared across high-level Contexts. Other-language lifecycle remains open.
+
+## Generic speaker primitives — remaining languages/model scope
+
+Go/Rust callable embed/name/dim/cluster/cache ownership is now covered by the
+shared compiled oracle; repairs and51 race-enabled Go/35 Rust/five doctest
+results are archived in HISTORY.md. Do not reimplement these methods.
+Next review the existing Python/C#/Java/Dart methods and operation probes,
+including exact1-success embedding, cluster shape/count/label validation,
+coercion/string cleanup and closed resource handling. Python/Dart currently
+accept any nonzero embedding result and need a bounded shared-oracle probe.
+Recheck code before editing. Generic Go handles remain caller-serialized;
+owned concurrent adapters and real-model/device acceptance are separate scope.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 

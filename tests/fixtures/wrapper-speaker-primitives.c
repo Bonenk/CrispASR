@@ -37,15 +37,15 @@ int32_t crispasr_speaker_embedder_embed_abi(void* handle, const float* pcm, int3
     out[0] = .25f;
     out[1] = .5f;
     out[2] = .75f;
-    return speaker_mode == 4 ? 2 : 1;
+    return speaker_mode == 4 ? 2 : speaker_mode == 8 ? -1 : 1;
 }
 int32_t crispasr_speaker_cluster_abi(const float* emb, int32_t n, int32_t dim, float threshold, int32_t max,
                                      int32_t* labels) {
     if (!emb || n != 2 || dim != 3 || threshold != .6f || max != 3 || emb[0] != 1 || emb[5] != 6 || speaker_mode == 2)
         return -1;
-    labels[0] = 0;
-    labels[1] = 1;
-    return speaker_mode == 6 ? 3 : 2;
+    labels[0] = speaker_mode == 9 ? -1 : speaker_mode == 7 ? 2 : 0;
+    labels[1] = speaker_mode == 9 ? -1 : 1;
+    return speaker_mode == 9 ? 0 : speaker_mode == 6 ? 3 : 2;
 }
 void* crispasr_pyannote_cache_compute_abi(const float* pcm, int32_t n, const char* model, int32_t threads) {
     if (speaker_mode == 1 || !pcm || n != 3 || pcm[0] != 1 || pcm[2] != 5 || !model || strcmp(model, "seg") ||

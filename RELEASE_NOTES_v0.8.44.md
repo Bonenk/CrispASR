@@ -724,3 +724,13 @@ inputs and the distinction between independent and hosted-worker evidence.
 The CUDA alignment bundle is independently hash-audited; a2703-second Kaggle
 cache/memory test is dispatched. The real-model Go lifecycle check is separately
 dispatched on GitHub Actions. Neither pending run is release acceptance yet.
+
+### Go/Rust generic speaker input and result contracts
+
+Generic speaker methods now reject invalid native embedding success codes and
+inconsistent cluster counts/labels. Go clustering validates dimensions before
+multiplication, preventing an oversized-input indexing panic. Int32 sample/count
+bounds and Go NUL strings are checked before native entry. Shared compiled
+operation tests cover embedder, clustering, cache and cleanup; native unassigned
+results are preserved. These changes do not add concurrent generic-handle safety
+or establish speaker-model quality.

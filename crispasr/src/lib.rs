@@ -3970,7 +3970,7 @@ impl SpeakerEmbedder {
     /// short for its mel pipeline).
     pub fn embed(&self, pcm_16k: &[f32]) -> Option<Vec<f32>> {
         let dim = self.dim();
-        if dim <= 0 || pcm_16k.is_empty() {
+        if dim <= 0 || pcm_16k.is_empty() || pcm_16k.len() > i32::MAX as usize {
             return None;
         }
         let mut out = vec![0.0f32; dim as usize];
@@ -3982,7 +3982,7 @@ impl SpeakerEmbedder {
                 out.as_mut_ptr(),
             )
         };
-        if ok != 0 {
+        if ok == 1 {
             Some(out)
         } else {
             None
@@ -4007,7 +4007,8 @@ unsafe impl Send for SpeakerEmbedder {}
 /// `embeddings` is a flat row-major `n * dim` buffer (e.g. four 192-d
 /// vectors -> 768 floats). Stops at `merge_threshold` similarity or
 /// when the count reaches `max_speakers`. Returns one cluster ID per
-/// input in `[0, k)` assigned in first-appearance order.
+/// input in `[0, k)` assigned in first-appearance order, or `-1` for a native
+/// zero-count/unassigned result.
 pub fn agglomerative_cluster(
     embeddings: &[f32],
     n: i32,
@@ -4015,7 +4016,14 @@ pub fn agglomerative_cluster(
     merge_threshold: f32,
     max_speakers: i32,
 ) -> Result<Vec<i32>, String> {
-    if n <= 0 || dim <= 0 || embeddings.len() < (n as usize) * (dim as usize) {
+    let required = (n as usize).checked_mul(dim as usize);
+    if n <= 0
+        || dim <= 0
+        || !merge_threshold.is_finite()
+        || required.map_or(true, |count| {
+            count > i32::MAX as usize || count > embeddings.len()
+        })
+    {
         return Err("invalid arguments to agglomerative_cluster".to_string());
     }
     let mut out = vec![0i32; n as usize];
@@ -4029,8 +4037,17 @@ pub fn agglomerative_cluster(
             out.as_mut_ptr(),
         )
     };
-    if k < 0 {
+    if k < 0 || k > n {
         return Err("crispasr_speaker_cluster_abi returned -1".to_string());
+    }
+    if out.iter().any(|&label| {
+        if k == 0 {
+            label != -1
+        } else {
+            label < 0 || label >= k
+        }
+    }) {
+        return Err("invalid native speaker cluster label".to_string());
     }
     Ok(out)
 }
@@ -4048,7 +4065,7 @@ pub struct PyannoteCache {
 impl PyannoteCache {
     /// Run pyannote-seg once over `pcm_16k` and cache the posteriors.
     pub fn compute(pcm_16k: &[f32], model_path: &str, n_threads: i32) -> Result<Self, String> {
-        if pcm_16k.is_empty() {
+        if pcm_16k.is_empty() || pcm_16k.len() > i32::MAX as usize {
             return Err("empty audio".to_string());
         }
         let model_c = std::ffi::CString::new(model_path).map_err(|e| e.to_string())?;
@@ -4075,6 +4092,8 @@ impl PyannoteCache {
         if segs.is_empty() {
             return Ok(());
         }
+        let segment_count =
+            i32::try_from(segs.len()).map_err(|_| "pyannote segment count exceeds int32")?;
         let mut abi_segs: Vec<crispasr_sys::CrispasrDiarizeSegAbi> = segs
             .iter()
             .map(|s| crispasr_sys::CrispasrDiarizeSegAbi {
@@ -4089,7 +4108,7 @@ impl PyannoteCache {
                 self.raw,
                 (slice_t0 * 100.0).round() as i64,
                 abi_segs.as_mut_ptr(),
-                abi_segs.len() as i32,
+                segment_count,
             )
         };
         if rc != 0 {

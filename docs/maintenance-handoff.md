@@ -73,7 +73,10 @@ release blocker.
    abort/recovery and parallel ownership acceptance. Run39222679421 on frozen
    35df8d6d4 failed before inference because Opus/Ogg/opusfile were omitted
    from the worker build. Explicit OPUS_FETCH and early artifact checkpoints
-   repair the preflight; audit the corrected run rather than accepting the old one. Raw
+   repair the preflight. Rerun39228691810 on frozen5aba585ce is in progress;
+   audit it rather than accepting the old run. Go/Rust generic speaker paths
+   now have shared-oracle operation proof (51 Go race/35 Rust/five doctests);
+   next audit existing Python/C#/Java/Dart generic methods per PLAN.md. Raw
    low-level pointers and other-language lifecycle remain separate. Validate
    actual Go/model behavior and continue the callable ledger from PLAN.md.
 4. Inspect PR521 headab6c92cae and its fresh checks. Current main is merged

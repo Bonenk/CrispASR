@@ -1,3 +1,22 @@
+## Go/Rust generic speaker operation gaps repaired — 2026-10-19
+
+New actual-method/shared-header probes reproduced a Go cluster-size overflow
+followed by an empty-buffer indexing panic, and acceptance of malformed native
+embedding success code2 in both Go and Rust. The adapters now require exactly1,
+validate int32 sample/count conversions and matrix sizes before allocation or
+native access, and reject inconsistent native cluster counts/labels. Go also
+rejects truncated NUL strings in generic embedder/cache construction. Native
+zero-count/all-unassigned output is preserved rather than rejected.
+
+The former abort-only C fixture entries now reuse the Ruby/WASM generic speaker
+oracle with literal runtime diarization PODs. Public embed/name/dim, clustering,
+cache apply, native failures, owned values and close/drop are exercised. Final
+strict isolated run passes51 race-enabled Go cases,35 Rust cases and five
+doctests. Both observed failing runs are retained privately; no local full
+runtime/model build or inference was used. The callable ledger and contributing
+method are updated. Generic Go handles remain caller-serialized; no real speaker
+quality, GPU or universal concurrent-lifetime acceptance is claimed.
+
 ## Go model-worker link preflight repair — 2026-10-19
 
 Run39222679421/source35df8d6d4 built the real native library but failed the

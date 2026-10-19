@@ -2044,7 +2044,8 @@ func diarizeSegments(leftPCM, rightPCM []float32, isStereo bool, segs []DiarizeS
 //	"indextts" / "indextts-bigvgan" / "ecapa"     -> IndexTTS-BigVGAN ECAPA-TDNN (512-d)
 //	any .gguf path                                -> TitaNet (or IndexTTS if "indextts" in name)
 //
-// Always call Close() — the C-side context owns model weights.
+// Always call Close() — the C-side context owns model weights. Serialize all
+// operations and Close on an instance; this raw adapter has no lifecycle lock.
 type SpeakerEmbedder struct {
 	handle unsafe.Pointer
 }
@@ -2053,6 +2054,9 @@ type SpeakerEmbedder struct {
 // cacheDir overrides the auto-download cache root (empty for the
 // CrispASR default of ~/.cache/crispasr/).
 func NewSpeakerEmbedder(modelSpec string, nThreads int, cacheDir string) (*SpeakerEmbedder, error) {
+	if strings.IndexByte(modelSpec, 0) >= 0 || strings.IndexByte(cacheDir, 0) >= 0 || nThreads < math.MinInt32 || nThreads > math.MaxInt32 {
+		return nil, fmt.Errorf("speaker embedder requires NUL-free strings and int32 threads")
+	}
 	cSpec := C.CString(modelSpec)
 	defer C.free(unsafe.Pointer(cSpec))
 	cCache := C.CString(cacheDir)
@@ -2087,7 +2091,7 @@ func (e *SpeakerEmbedder) Name() string {
 // Embed extracts one embedding from mono 16 kHz float32 PCM. Returns
 // nil when the underlying model rejected the input (e.g. too short).
 func (e *SpeakerEmbedder) Embed(pcm16k []float32) []float32 {
-	if e == nil || e.handle == nil || len(pcm16k) == 0 {
+	if e == nil || e.handle == nil || len(pcm16k) == 0 || len(pcm16k) > math.MaxInt32 {
 		return nil
 	}
 	d := e.Dim()
@@ -2101,7 +2105,7 @@ func (e *SpeakerEmbedder) Embed(pcm16k []float32) []float32 {
 		C.int(len(pcm16k)),
 		(*C.float)(unsafe.Pointer(&out[0])),
 	)
-	if ok == 0 {
+	if ok != 1 {
 		return nil
 	}
 	return out
@@ -2122,10 +2126,11 @@ func (e *SpeakerEmbedder) Close() {
 // maxSpeakers is a hard cap.
 //
 // Returns one cluster ID per input in [0, k) assigned in
-// first-appearance order.
+// first-appearance order, or -1 for a native zero-count/unassigned result.
 func AgglomerativeCluster(embeddings []float32, n, dim int,
 	mergeThreshold float32, maxSpeakers int) ([]int32, error) {
-	if n <= 0 || dim <= 0 || len(embeddings) < n*dim {
+	if n <= 0 || n > math.MaxInt32 || dim <= 0 || dim > math.MaxInt32 || n > math.MaxInt32/dim || n > len(embeddings)/dim ||
+		maxSpeakers < math.MinInt32 || maxSpeakers > math.MaxInt32 || math.IsNaN(float64(mergeThreshold)) || math.IsInf(float64(mergeThreshold), 0) {
 		return nil, fmt.Errorf("invalid arguments to AgglomerativeCluster")
 	}
 	out := make([]int32, n)
@@ -2134,15 +2139,21 @@ func AgglomerativeCluster(embeddings []float32, n, dim int,
 		C.int(n), C.int(dim), C.float(mergeThreshold), C.int(maxSpeakers),
 		(*C.int)(unsafe.Pointer(&out[0])),
 	)
-	if rc < 0 {
+	if rc < 0 || int(rc) > n {
 		return nil, fmt.Errorf("crispasr_speaker_cluster_abi failed")
+	}
+	for _, label := range out {
+		if (rc == 0 && label != -1) || (rc > 0 && (label < 0 || label >= int32(rc))) {
+			return nil, fmt.Errorf("invalid native speaker cluster label")
+		}
 	}
 	return out, nil
 }
 
 // PyannoteCache holds pyannote-seg posteriors over a full audio buffer.
 // Compute once at the start of a pipeline, then call Apply for each
-// set of segment ranges. Gives cross-slice speaker-ID consistency.
+// set of segment ranges. Gives cross-slice speaker-ID consistency. Serialize
+// Apply and Close on an instance; the handle has no lifecycle lock.
 type PyannoteCache struct {
 	handle unsafe.Pointer
 }
@@ -2150,8 +2161,8 @@ type PyannoteCache struct {
 // NewPyannoteCache pre-computes pyannote-seg posteriors over pcm16k.
 // modelPath must point at a pyannote-seg .gguf.
 func NewPyannoteCache(pcm16k []float32, modelPath string, nThreads int) (*PyannoteCache, error) {
-	if len(pcm16k) == 0 {
-		return nil, fmt.Errorf("empty audio")
+	if len(pcm16k) == 0 || len(pcm16k) > math.MaxInt32 || strings.IndexByte(modelPath, 0) >= 0 || nThreads < math.MinInt32 || nThreads > math.MaxInt32 {
+		return nil, fmt.Errorf("pyannote cache requires PCM/int32 counts and a NUL-free model path")
 	}
 	cPath := C.CString(modelPath)
 	defer C.free(unsafe.Pointer(cPath))
@@ -2175,6 +2186,9 @@ func (c *PyannoteCache) Apply(segs []DiarizeSeg, sliceT0Cs int64) error {
 	}
 	if len(segs) == 0 {
 		return nil
+	}
+	if len(segs) > math.MaxInt32 {
+		return fmt.Errorf("pyannote segment count exceeds int32")
 	}
 	cSegs := make([]C.struct_crispasr_diarize_seg_abi, len(segs))
 	for i, s := range segs {

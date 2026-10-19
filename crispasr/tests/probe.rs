@@ -1370,3 +1370,68 @@ fn probe_legacy_rust_decode_controls_reject_invalid_before_parameter_allocation(
     assert_eq!(unsafe { probe_calls_get() }, calls);
     assert_eq!(unsafe { probe_live_get() }, 0);
 }
+
+extern "C" {
+    fn probe_speaker_mode(mode: c_int);
+    fn probe_speaker_live() -> c_int;
+}
+#[test]
+fn probe_generic_speaker_returns_clusters_and_cache() {
+    unsafe {
+        probe_speaker_mode(0);
+    }
+    {
+        let e = crispasr::SpeakerEmbedder::new("embed", 2, Some("cache")).unwrap();
+        assert_eq!(e.dim(), 3);
+        assert_eq!(e.name(), "generic");
+        assert_eq!(e.embed(&[1., 3., 5.]).unwrap(), vec![0.25, 0.5, 0.75]);
+        for mode in [4, 8] {
+            unsafe {
+                probe_speaker_mode(mode);
+            }
+            assert!(
+                e.embed(&[1., 3., 5.]).is_none(),
+                "accepted invalid native success code"
+            );
+        }
+        unsafe {
+            probe_speaker_mode(0);
+        }
+    }
+    for mode in [0, 2, 6, 7, 9] {
+        unsafe {
+            probe_speaker_mode(mode);
+        }
+        let result = crispasr::agglomerative_cluster(&[1., 2., 3., 4., 5., 6.], 2, 3, 0.6, 3);
+        if mode == 0 {
+            assert_eq!(result.unwrap(), vec![0, 1]);
+        } else if mode == 9 {
+            assert_eq!(result.unwrap(), vec![-1, -1]);
+        } else {
+            assert!(result.is_err(), "invalid cluster count accepted");
+        }
+    }
+    unsafe {
+        probe_speaker_mode(0);
+    }
+    {
+        let cache = crispasr::PyannoteCache::compute(&[1., 3., 5.], "seg", 2).unwrap();
+        let mut segments = vec![
+            crispasr::DiarizeSegment::new(1.25, 1.75),
+            crispasr::DiarizeSegment::new(2., 2.5),
+        ];
+        cache.apply(&mut segments, 1.25).unwrap();
+        assert_eq!(segments[0].speaker, 2);
+        assert_eq!(segments[1].speaker, 1);
+        for mode in [2, 5] {
+            unsafe {
+                probe_speaker_mode(mode);
+            }
+            assert!(cache.apply(&mut segments, 1.25).is_err());
+        }
+        unsafe {
+            probe_speaker_mode(0);
+        }
+    }
+    assert_eq!(unsafe { probe_speaker_live() }, 0);
+}
