@@ -2,7 +2,11 @@
 
 ## NOW — OpenVoice2 reproducible baking and cloning acceptance
 
-Owner: maintainer coordinator (active, 2026-10-19). Audit found native
+Owner: maintainer coordinator (active, 2026-10-19). Wiring/source identity
+checkpoint71e329ccf is on main. Full-CMake CUDA bundle39255636270 is queued;
+Kaggle can use the exact-ggml audited base runtime with a bounded model-file
+delta compile, avoiding a full native build. Method and scoped open gates:
+[OpenVoice baking](docs/openvoice2-baking.md). Audit found native
 inference avoids whisper-timestamped/Unidecode, but historical parity is not
 a pinned current acceptance receipt. Complete unified Python blueprint hooks
 and strict crispasr-diff dispatch; dump resampled PCM, STFT, all reference

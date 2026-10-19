@@ -1318,3 +1318,10 @@ all three: it loads the upstream model, monkey-patches
 `perframe_<stage>_f<NNN>.bin` files (matching the C++ runtime's
 `VIBEVOICE_TTS_DUMP_PERFRAME=1` output) and a `noise.bin` for the
 C++ side to replay.
+
+For voice converters, capture the projected speaker embedding as well as the
+encoder hidden state. Pin the base TTS speaker identity, reference segmentation
+and resampling recipe, sampling temperature/noise, raw waveform and any final
+normalization separately. Require intelligibility and independent cloned versus
+baseline speaker similarity alongside stage norms/errors. The current concrete
+method and remaining scope are in [OpenVoice2 baking](openvoice2-baking.md).

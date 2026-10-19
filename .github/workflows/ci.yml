@@ -197,7 +197,9 @@ jobs:
         run: python3 tests/test_omnivoice_alloc.py -v
 
       - name: TTS session failure, ownership and conversion contracts
-        run: python3 tests/test_tts_session_contracts.py -v
+        run: |
+          python3 tests/test_tts_session_contracts.py -v
+          python3 tests/test_openvoice_bake_contracts.py -v
 
       - name: Supertonic speaker API null and bounds contracts
         run: python3 tests/test_supertonic_speaker_contracts.py -v

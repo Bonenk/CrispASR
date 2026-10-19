@@ -2367,3 +2367,7 @@ and changed-feedback/scaled-output negatives pass. The remaining hidden
 variation is inside the decoder blocks or their attention inputs; these
 isolated controls do not accept native speech, Q4 or speed.
 [Norm/input audit](dia-norm-embedding-isolation-2026-10-13.json).
+
+OpenVoice2 cloning reference/quality scope and reproducible per-stage validation
+are documented in [OpenVoice2 baking](openvoice2-baking.md). Native conversion
+uses a raw reference clip; automatic upstream VAD/clip averaging is not implied.

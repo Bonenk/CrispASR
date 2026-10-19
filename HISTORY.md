@@ -1,3 +1,20 @@
+## 2026-10-19 — OpenVoice deterministic reference wiring and source identity
+
+Checkpoint71e329ccf adds original-module reference hooks, strict unified diff
+registration and27 required runtime snapshots with cosine/magnitude/error
+checks. The CLI and C ABI now use the selected MeloTTS speaker's metadata key;
+unknown identities fall back to actual source-audio embedding extraction.
+Reference cache keys include encoder coefficients and diagnostics bypass cache
+hits. Corrected documentation of native tau0; opt-in CUDA vocoder backend now
+honors the caller under CRISPASR_OV2_GPU=1. GPU/quality acceptance remains open.
+
+The actual session-dispatch probe was observed failing on prior source because
+source identity was never selected, and passes after repair (four test cases).
+The strict-driver contract accepts all stages and rejects eleven injected
+missing/shape/scale/nonfinite/recipe/identity/conversion failures, with resource
+cleanup. Tiny compilation/syntax checks pass; these establish glue/gate behavior,
+not numerical model parity. See docs/openvoice2-baking.md and PLAN.md.
+
 ## Kaggle credential preflight repaired; immutable CUDA delivery — 2026-10-19
 
 Alignment CUDA worker v1 reached terminal ERROR before any inference: a missing
