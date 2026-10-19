@@ -76,3 +76,17 @@ Tiny local worker contracts (no models/build of the library):
 ```sh
 python3 tests/test_alignment_model_profile.py -v
 ```
+
+## Long-window follow-up (issue550)
+
+Add `--long-windows` to the worker arguments to repeat the licensed speech seven
+times (44.52 seconds) with the complete repeated transcript. The actual CLI runs
+full input (`--chunk-seconds 0`), 30-second cores, 10-second cores, then 30-second
+cores again. Require complete ordered positive word spans within the existing one-encoder-frame
+endpoint tolerance and exact
+30-second repeatability. Python/exported C ABI default windowing must match the
+30-second CLI words with a12.34-second absolute offset. Retain raw WAV/text,
+per-call JSON/logs and measured full-versus-window boundary differences. Different
+encoder context/normalization means full and windowed logits/timings need not be
+identical. No manual word-boundary or GPU/VRAM acceptance follows. Short-fixture
+OFF/ON/OFF and immutable-own-reference gates still apply first.

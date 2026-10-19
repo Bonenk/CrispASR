@@ -2963,7 +2963,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         // Run alignment.
         auto aligned = crispasr_align_words(am, transcript, samples.data(), (int)samples.size(), /*t_offset_cs=*/0,
-                                            params.n_threads);
+                                            params.n_threads, nullptr, params.chunk_seconds);
         if (aligned.empty()) {
             fprintf(stderr, "crispasr[align-only]: alignment failed or produced no words.\n");
             return 10;

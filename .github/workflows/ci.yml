@@ -196,6 +196,9 @@ jobs:
       - name: Omnivoice output allocation guards (literal bodies)
         run: python3 tests/test_omnivoice_alloc.py -v
 
+      - name: Signed128 portability formatter UBSan regression
+        run: python3 tests/test_tts_voice_int128.py -v
+
       - name: TTS session failure, ownership and conversion contracts
         run: python3 tests/test_tts_session_contracts.py -v
 
@@ -219,6 +222,13 @@ jobs:
 
       - name: CTC compact workspace, frozen parity and exhaustive path oracle
         run: python3 tests/test_align_compact.py -v
+
+      - name: Legacy parallel runtime timestamps, errors and VAD (model-free UBSan)
+        run: |
+          python3 tests/test_whisper_parallel_runtime.py -v
+          python3 tests/test_whisper_vad_timeline.py -v
+          python3 tests/test_whisper_emission_bounds.py -v
+          python3 tests/test_ctc_windows.py -v
 
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v

@@ -33,6 +33,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <memory>
 #include <random>
 #include <regex>
 #include <set>
@@ -7786,14 +7787,19 @@ static void whisper_sequence_score(const struct whisper_full_params& params, whi
     }
 }
 
-static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state, struct whisper_full_params params,
+static void whisper_reset_vad_mapping(struct whisper_state* state) {
+    state->vad_mapping_table.clear();
+    state->vad_segments.clear();
+    state->has_vad_segments = false;
+}
+
+static bool whisper_vad(struct whisper_context* /*ctx*/, struct whisper_state* state, struct whisper_full_params params,
                         const float* samples, int n_samples, std::vector<float>& filtered_samples) {
     CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
     int filtered_n_samples = 0;
 
-    // Clear any existing mapping table
-    state->vad_mapping_table.clear();
-    state->has_vad_segments = false;
+    // Each prepass owns the mapping for this state's current audio only.
+    whisper_reset_vad_mapping(state);
 
     if (state->vad_context == nullptr) {
         struct whisper_vad_context_params vad_ctx_params = whisper_vad_default_context_params();
@@ -7817,8 +7823,8 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
 
     if (vad_segments->data.size() > 0) {
         state->has_vad_segments = true;
-        ctx->state->vad_segments.clear();
-        ctx->state->vad_segments.reserve(vad_segments->data.size());
+        state->vad_segments.clear();
+        state->vad_segments.reserve(vad_segments->data.size());
 
         // Initialize the time mapping table
         state->vad_mapping_table.clear();
@@ -7895,7 +7901,7 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
                     "%s: vad_segment_info: orig_start: %.2f, orig_end: %.2f, vad_start: %.2f, vad_end: %.2f\n",
                     __func__, segment.orig_start / 100.0, segment.orig_end / 100.0, segment.vad_start / 100.0,
                     segment.vad_end / 100.0);
-                ctx->state->vad_segments.push_back(segment);
+                state->vad_segments.push_back(segment);
 
                 // Copy this speech segment
                 memcpy(filtered_samples.data() + offset, samples + segment_start_samples,
@@ -7951,6 +7957,29 @@ static bool whisper_vad(struct whisper_context* ctx, struct whisper_state* state
 
 int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* state, struct whisper_full_params params,
                             const float* samples, int n_samples) {
+    if (!ctx || !state || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
+    // A state reused without VAD must not apply its previous audio's time map.
+    // VAD wrappers set params.vad and prepare the current map before this call.
+    if (!params.vad) {
+        whisper_reset_vad_mapping(state);
+    }
+    // Bound PCM before feature extraction, including sequential/direct-state
+    // decode. A seek limit alone still exposes later speech to the encoder.
+    // Zero PCM remains valid for callers decoding a precomputed mel buffer.
+    if (n_samples > 0) {
+        const int64_t offset_samples = int64_t(CRISPASR_SAMPLE_RATE) * params.offset_ms / 1000;
+        if (offset_samples >= n_samples) {
+            state->result_all.clear();
+            return 0;
+        }
+        if (params.duration_ms > 0) {
+            const int64_t end_samples = offset_samples + int64_t(CRISPASR_SAMPLE_RATE) * params.duration_ms / 1000;
+            n_samples = int(std::min<int64_t>(n_samples, end_samples));
+        }
+    }
     // Reset all schedulers so a second whisper_full() call on the same
     // context doesn't hit GGML_ASSERT(!sched->is_alloc) if a previous
     // call left a scheduler in the allocated state (e.g. early return,
@@ -8016,8 +8045,9 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
     }
 
     const int seek_start = params.offset_ms / 10;
-    const int seek_end =
-        params.duration_ms == 0 ? whisper_n_len_from_state(state) : seek_start + params.duration_ms / 10;
+    const int seek_end = params.duration_ms == 0
+                             ? whisper_n_len_from_state(state)
+                             : std::min(whisper_n_len_from_state(state), seek_start + params.duration_ms / 10);
 
     // if length of spectrogram is less than 100ms (10 frames), then return
     // basically don't process anything that is less than 100ms
@@ -8874,6 +8904,30 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
             // [EXPERIMENTAL] Token-level timestamps with DTW
             const auto n_segments_before = state->result_all.size();
 
+            // Predicted timestamps can extend into the padded encoder window.
+            // Publish only times within the audio supplied to this window, even
+            // when token energy expansion, wrapping or DTW adjusts them later.
+            const int64_t window_end = std::min<int64_t>(seek_end, int64_t(seek) + CRISPASR_CHUNK_SIZE * 100);
+            const auto bound_time = [&](int64_t t) { return std::max<int64_t>(seek, std::min(t, window_end)); };
+            const auto bound_segments = [&](size_t first) {
+                for (size_t i = first; i < result_all.size(); ++i) {
+                    auto& segment = result_all[i];
+                    segment.t0 = bound_time(segment.t0);
+                    segment.t1 = std::max(segment.t0, bound_time(segment.t1));
+                    for (auto& token : segment.tokens) {
+                        const auto bound_token_time = [&](int64_t t) {
+                            return t < 0 ? t : std::max(segment.t0, std::min(t, segment.t1));
+                        };
+                        token.t0 = bound_token_time(token.t0);
+                        token.t1 = bound_token_time(token.t1);
+                        token.t_dtw = bound_token_time(token.t_dtw);
+                        if (token.t0 >= 0 && token.t1 >= 0) {
+                            token.t1 = std::max(token.t0, token.t1);
+                        }
+                    }
+                }
+            };
+
             const bool is_no_speech = (state->no_speech_prob > params.no_speech_thold &&
                                        best_decoder.sequence.avg_logprobs < params.logprob_thold);
 
@@ -8922,8 +8976,8 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                         const auto t1 = seek + 2 * (tokens_cur[i].tid - whisper_token_beg(ctx));
 
                         if (!text.empty()) {
-                            const auto tt0 = t0;
-                            const auto tt1 = t1;
+                            const auto tt0 = bound_time(t0);
+                            const auto tt1 = std::max(tt0, bound_time(t1));
 
                             if (params.print_realtime) {
                                 if (params.print_timestamps) {
@@ -8955,6 +9009,7 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                                     n_new = whisper_wrap_segment(*ctx, *state, params.max_len, params.split_on_word);
                                 }
                             }
+                            bound_segments(result_all.size() - n_new);
                             if (params.new_segment_callback && !ctx->params.dtw_token_timestamps) {
                                 params.new_segment_callback(ctx, state, n_new, params.new_segment_callback_user_data);
                             }
@@ -8995,8 +9050,8 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                 if (!text.empty()) {
                     const auto t1 = seek + seek_delta;
 
-                    const auto tt0 = t0;
-                    const auto tt1 = t1;
+                    const auto tt0 = bound_time(t0);
+                    const auto tt1 = std::max(tt0, bound_time(t1));
 
                     if (params.print_realtime) {
                         if (params.print_timestamps) {
@@ -9026,6 +9081,7 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                             n_new = whisper_wrap_segment(*ctx, *state, params.max_len, params.split_on_word);
                         }
                     }
+                    bound_segments(result_all.size() - n_new);
                     if (params.new_segment_callback && !ctx->params.dtw_token_timestamps) {
                         params.new_segment_callback(ctx, state, n_new, params.new_segment_callback_user_data);
                     }
@@ -9040,10 +9096,9 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
                     const int n_frames = std::min(std::min(CRISPASR_CHUNK_SIZE * 100, seek_delta), seek_end - seek);
                     whisper_exp_compute_token_level_timestamps_dtw(ctx, state, params, result_all.size() - n_segments,
                                                                    n_segments, seek, n_frames, 7, params.n_threads);
+                    bound_segments(n_segments_before);
                     if (params.new_segment_callback) {
-                        for (int seg = (int)result_all.size() - n_segments; seg < n_segments; seg++) {
-                            params.new_segment_callback(ctx, state, seg, params.new_segment_callback_user_data);
-                        }
+                        params.new_segment_callback(ctx, state, n_segments, params.new_segment_callback_user_data);
                     }
                 }
             }
@@ -9095,14 +9150,21 @@ int whisper_full_with_state(struct whisper_context* ctx, struct whisper_state* s
 }
 
 int whisper_full(struct whisper_context* ctx, struct whisper_full_params params, const float* samples, int n_samples) {
+    if (!ctx || !ctx->state || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
     std::vector<float> vad_samples;
     if (params.vad) {
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
         if (!whisper_vad(ctx, ctx->state, params, samples, n_samples, vad_samples)) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD\n", __func__);
+            whisper_reset_vad_mapping(ctx->state);
+            ctx->state->result_all.clear();
             return -1;
         }
         if (vad_samples.empty()) {
+            whisper_reset_vad_mapping(ctx->state);
             ctx->state->result_all.clear();
             return 0;
         }
@@ -9114,6 +9176,15 @@ int whisper_full(struct whisper_context* ctx, struct whisper_full_params params,
 
 int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params params, const float* samples,
                           int n_samples, int n_processors) {
+    if (!ctx || !ctx->state || n_processors < 1 || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
+        (n_samples > 0 && !samples)) {
+        return -1;
+    }
+    if (n_samples == 0) {
+        whisper_reset_vad_mapping(ctx->state);
+        ctx->state->result_all.clear();
+        return 0;
+    }
     if (n_processors == 1) {
         return whisper_full(ctx, params, samples, n_samples);
     }
@@ -9123,65 +9194,98 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         CRISPASR_LOG_INFO("%s: VAD is enabled, processing speech segments only\n", __func__);
         if (!whisper_vad(ctx, ctx->state, params, samples, n_samples, vad_samples)) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD\n", __func__);
+            whisper_reset_vad_mapping(ctx->state);
+            ctx->state->result_all.clear();
             return -1;
         }
         if (vad_samples.empty()) {
+            whisper_reset_vad_mapping(ctx->state);
+            ctx->state->result_all.clear();
             return 0;
         }
         samples = vad_samples.data();
         n_samples = vad_samples.size();
     }
-    int ret = 0;
-
-    // prepare separate states for each thread
-    std::vector<whisper_state*> states;
-
-    const int offset_samples = (CRISPASR_SAMPLE_RATE * params.offset_ms) / 1000;
+    // Validate in sample units before narrowing. Even a 134-second offset
+    // overflows the old sample_rate * offset_ms int intermediate.
+    const int64_t offset_samples_wide = int64_t(CRISPASR_SAMPLE_RATE) * params.offset_ms / 1000;
+    if (offset_samples_wide >= n_samples) {
+        ctx->state->result_all.clear();
+        return 0;
+    }
+    // duration_ms limits the entire requested interval, not each worker.
+    // Bound PCM before splitting so encoders cannot see the unrequested tail.
+    // Offsets/duration retain the existing post-VAD (processed-audio) units.
+    if (params.duration_ms > 0) {
+        const int64_t end_samples = offset_samples_wide + int64_t(CRISPASR_SAMPLE_RATE) * params.duration_ms / 1000;
+        n_samples = int(std::min<int64_t>(n_samples, end_samples));
+        params.duration_ms = 0; // The PCM bound now owns the global limit.
+    }
+    const int offset_samples = int(offset_samples_wide);
     const int n_samples_per_processor = (n_samples - offset_samples) / n_processors;
+    if (n_samples_per_processor == 0) {
+        // Avoid empty workers. VAD has already run, so use the state decoder.
+        return whisper_full_with_state(ctx, ctx->state, params, samples, n_samples);
+    }
 
-    // the calling thread will process the first chunk
-    // while the other threads will process the remaining chunks
-
-    std::vector<std::thread> workers(n_processors - 1);
-    for (int i = 0; i < n_processors - 1; ++i) {
-        // create a new state for each thread
-        states.push_back(whisper_init_state(ctx));
-
-        const int start_samples = offset_samples + (i + 1) * n_samples_per_processor;
-        const int n_samples_cur = (i == n_processors - 2) ? n_samples - start_samples : n_samples_per_processor;
-
+    int ret = 0;
+    using state_owner = std::unique_ptr<whisper_state, decltype(&whisper_free_state)>;
+    std::vector<state_owner> states;
+    std::vector<std::thread> workers;
+    std::vector<int> worker_status;
+    try {
+        worker_status.resize(n_processors - 1, 0);
+        states.reserve(n_processors - 1);
+        workers.reserve(n_processors - 1);
+        // Allocate every state before launching threads, so a null state never
+        // reaches a decoder and earlier states are freed on allocation failure.
+        for (int i = 0; i < n_processors - 1; ++i) {
+            states.emplace_back(whisper_init_state(ctx), whisper_free_state);
+            if (!states.back()) {
+                ctx->state->result_all.clear();
+                return -1;
+            }
+        }
+        for (int i = 0; i < n_processors - 1; ++i) {
+            const int start_samples = offset_samples + (i + 1) * n_samples_per_processor;
+            const int n_samples_cur = (i == n_processors - 2) ? n_samples - start_samples : n_samples_per_processor;
+            auto params_cur = params;
+            params_cur.offset_ms = 0;
+            params_cur.print_progress = false;
+            params_cur.print_realtime = false;
+            params_cur.new_segment_callback = nullptr;
+            params_cur.new_segment_callback_user_data = nullptr;
+            params_cur.progress_callback = nullptr;
+            params_cur.progress_callback_user_data = nullptr;
+            workers.emplace_back([&, i, params_cur, start_samples, n_samples_cur]() {
+                try {
+                    worker_status[i] = whisper_full_with_state(ctx, states[i].get(), params_cur,
+                                                               samples + start_samples, n_samples_cur);
+                } catch (...) {
+                    // Exceptions must not escape a std::thread entry point.
+                    worker_status[i] = -1;
+                }
+            });
+        }
         auto params_cur = params;
-
-        params_cur.offset_ms = 0;
-        params_cur.print_progress = false;
         params_cur.print_realtime = false;
-
-        params_cur.new_segment_callback = nullptr;
-        params_cur.new_segment_callback_user_data = nullptr;
-
-        params_cur.progress_callback = nullptr;
-        params_cur.progress_callback_user_data = nullptr;
-
-        workers[i] = std::thread(whisper_full_with_state, ctx, states[i], std::move(params_cur),
-                                 samples + start_samples, n_samples_cur);
+        ret = whisper_full_with_state(ctx, ctx->state, params_cur, samples, offset_samples + n_samples_per_processor);
+    } catch (...) {
+        // Includes thread creation failure: join every thread already started.
+        ret = -1;
     }
-
-    {
-        auto params_cur = params;
-
-        // We need to disable the print real-time for this one as well, otherwise it will show only for the first chunk.
-        params_cur.print_realtime = false;
-
-        // Run the first transformation using default state but only for the first chunk.
-        ret = whisper_full_with_state(ctx, ctx->state, std::move(params_cur), samples,
-                                      offset_samples + n_samples_per_processor);
+    for (auto& worker : workers) {
+        worker.join();
     }
-
-    for (int i = 0; i < n_processors - 1; ++i) {
-        workers[i].join();
+    for (int status : worker_status) {
+        if (ret == 0 && status != 0) {
+            ret = status;
+        }
     }
-
-    const int64_t offset_t = (int64_t)params.offset_ms / 10.0;
+    if (ret != 0) {
+        ctx->state->result_all.clear();
+        return ret;
+    }
 
     // combine results into result_state->result_all from all other states
     for (int i = 0; i < n_processors - 1; ++i) {
@@ -9189,8 +9293,20 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
 
         for (auto& result : results_i) {
             // correct the segment timestamp taking into account the offset
-            result.t0 += 100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t;
-            result.t1 += 100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t;
+            const int64_t shift = 100LL * (offset_samples + (i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE;
+            result.t0 += shift;
+            result.t1 += shift;
+            for (auto& token : result.tokens) {
+                if (token.t0 >= 0) {
+                    token.t0 += shift;
+                }
+                if (token.t1 >= 0) {
+                    token.t1 += shift;
+                }
+                if (token.t_dtw >= 0) {
+                    token.t_dtw += shift;
+                }
+            }
 
             // make sure that segments are not overlapping
             if (!ctx->state->result_all.empty()) {
@@ -9218,8 +9334,6 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
         ctx->state->n_decode += states[i]->n_decode;
         ctx->state->n_batchd += states[i]->n_batchd;
         ctx->state->n_prompt += states[i]->n_prompt;
-
-        whisper_free_state(states[i]);
     }
 
     // average the timings
@@ -9234,7 +9348,7 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
     for (int i = 0; i < n_processors - 1; ++i) {
         CRISPASR_LOG_WARN(
             "%s: split %d - %s\n", __func__, (i + 1),
-            to_timestamp(100 * ((i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE + offset_t).c_str());
+            to_timestamp(100LL * (offset_samples + (i + 1) * n_samples_per_processor) / CRISPASR_SAMPLE_RATE).c_str());
     }
     CRISPASR_LOG_WARN("%s: the transcription quality may be degraded near these boundaries\n", __func__);
 
@@ -9388,11 +9502,26 @@ whisper_token whisper_full_get_token_id(struct whisper_context* ctx, int i_segme
 
 struct whisper_token_data whisper_full_get_token_data_from_state(struct whisper_state* state, int i_segment,
                                                                  int i_token) {
-    return state->result_all[i_segment].tokens[i_token];
+    // Return original-audio times just like the segment getters. Keep stored
+    // tokens in processed time so repeated reads and parallel merge cannot
+    // apply the mapping twice; negative values remain unavailable sentinels.
+    auto token = state->result_all[i_segment].tokens[i_token];
+    if (state->has_vad_segments && !state->vad_mapping_table.empty()) {
+        if (token.t0 >= 0) {
+            token.t0 = map_processed_to_original_time(token.t0, state->vad_mapping_table);
+        }
+        if (token.t1 >= 0) {
+            token.t1 = map_processed_to_original_time(token.t1, state->vad_mapping_table);
+        }
+        if (token.t_dtw >= 0) {
+            token.t_dtw = map_processed_to_original_time(token.t_dtw, state->vad_mapping_table);
+        }
+    }
+    return token;
 }
 
 struct whisper_token_data whisper_full_get_token_data(struct whisper_context* ctx, int i_segment, int i_token) {
-    return ctx->state->result_all[i_segment].tokens[i_token];
+    return whisper_full_get_token_data_from_state(ctx->state, i_segment, i_token);
 }
 
 float whisper_full_get_token_p_from_state(struct whisper_state* state, int i_segment, int i_token) {

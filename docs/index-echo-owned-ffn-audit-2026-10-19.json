@@ -1,0 +1,52 @@
+{
+  "run": 39008086579,
+  "source": "c2deea373f9bd27f526f873bc01cb97068e1bff7",
+  "status": "raw payload/source/observer and 512 metric audit passed",
+  "payloads_verified": 1153,
+  "source_files_verified": 13,
+  "shared_tensor_triples_verified": 72,
+  "same_input_metric_rows_verified": 512,
+  "summary": {
+    "mlp_in": {
+      "min_cosine": 0.9999999999999998,
+      "max_relative_l2": 0.0
+    },
+    "gate_out": {
+      "min_cosine": 0.9979504490604794,
+      "max_relative_l2": 0.06399789266783945
+    },
+    "up_out": {
+      "min_cosine": 0.9969927943637992,
+      "max_relative_l2": 0.07751214166101897
+    },
+    "down_in": {
+      "min_cosine": 0.9956375402281887,
+      "max_relative_l2": 0.09330696512325769
+    },
+    "down_out": {
+      "min_cosine": 0.9936457231955403,
+      "max_relative_l2": 0.1126166809947548
+    },
+    "mlp_out": {
+      "min_cosine": 0.9936457231955403,
+      "max_relative_l2": 0.1126166809947548
+    },
+    "down_on_native_down_in": {
+      "min_cosine": 0.996803286634986,
+      "max_relative_l2": 0.08001168725135202
+    },
+    "activation_on_native_gate_up": {
+      "min_cosine": 0.9999999999999979,
+      "max_relative_l2": 7.210393795049222e-08
+    }
+  },
+  "receipt_sha256": "732057caeafb8bcfc4a2eda24b73a405c8e5b7e8deb32865b10144e280b7701b",
+  "limits": [
+    "same native inputs and Q4 coefficients; no independent whole-model trajectory",
+    "coefficient source weights absent from artifact; their receipt hashes not re-downloaded",
+    "no speech, Q4, GPU acceptance or default promotion"
+  ],
+  "library_sha256": "2b0cf2e2f4368708b30e574573b89361dbf36696f10b7a896a552d156c50d733",
+  "artifact_recovery": "Actions omitted one hidden workflow snapshot; recovered from anonymous immutable public checkpoint with exact receipt size/SHA and frozen-source match",
+  "hidden_snapshot_public_url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/26e8cd5860445d20e76e2455245efb823d190f0f/index-echo-9b/owned-ffn-20261017/v2/method/.github/workflows/heavy-cpu.yml"
+}

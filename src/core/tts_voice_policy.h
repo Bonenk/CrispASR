@@ -28,7 +28,10 @@
 // integer overload. Provide the missing overload; guarded so MSVC (which
 // has no __int128) is unaffected.
 inline std::ostream& operator<<(std::ostream& os, __int128 value) {
-    __int128 mag = value < 0 ? -value : value;
+    // Convert before negation: signed minimum has no positive signed value.
+    unsigned __int128 mag = static_cast<unsigned __int128>(value);
+    if (value < 0)
+        mag = 0 - mag;
     char buffer[64];
     char* d = buffer + sizeof(buffer);
     do {

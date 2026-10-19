@@ -1,0 +1,28 @@
+{
+  "run": 39211685024,
+  "source": "afeffa1a50cad6870daff1cb190b4e1c7a67b428",
+  "status": "CPU pointer/Python matrix and raw identity/bounds audit passed",
+  "native_runs": 12,
+  "python_runs": 6,
+  "native_token_rows": 258,
+  "native_alternative_rows": 516,
+  "native_available_dtw_rows": 103,
+  "python_tokens": 162,
+  "python_alternatives": 324,
+  "python_available_dtw": 68,
+  "library_sha256": "03f354645faacf1070ce7826469199ffa7b3c0be178a6eb1dcb7ff6247ca42e7",
+  "receipt_sha256": "1ba099875ecb6731d7bb4dec20664abece7acbe61baa10a944d64c87523b85db",
+  "native_raw_sha256": "3f79e2f397ebe39e4b58a1a84af038f50cf15fc347667278ada1095281c5c88c",
+  "python_raw_sha256": "9a49bb844ad2d52d2984c8a463af79334679a3628ef33a6af27f91ba5cbe138c",
+  "model_revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+  "model_sha256_reported_by_hosted_worker": "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f",
+  "audio_sha256": "59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e",
+  "identical_inputs_and_probe_to_failed_run": 39208655226,
+  "native_bound_check": "all available raw timestamps within exact segment and selected input bounds; no margin required in this audit",
+  "limitations": [
+    "CPU tiny.en/JFK greedy metadata smoke; no original-reference, WER, speed, GPU or actual VAD-model proof",
+    "Python retention after reuse/close asserted by verified worker; saved snapshots are owned-value evidence",
+    "model weight bytes are retained on hosted scratch, not downloaded again for audit",
+    "same-context lifecycle concurrency and other wrapper model/platform acceptance remain open"
+  ]
+}

@@ -1,12 +1,82 @@
 # CrispASR — Pending work
 
+## Character-alignment acceptance qualification
+
+Arabic CTC/Java39214206020 is complete and its retained output is independently
+audited; see HISTORY.md and docs/arabic-characters-java-audit-2026-10-19.json.
+Do not rerun the repaired Java preflight or accepted output matrix without a
+new scope. Separate future oracle/DP replay needs retained vocabulary/binaries;
+this older worker did not preserve those, or a separate raw Python output.
+
+## Active — issue550 real CUDA long-input memory/reuse
+
+Owner: maintainer coordinator. CPU acceptance is complete and independently
+audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
+implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
+
+Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
+completed successfully on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+Claimed by the maintainer coordinator: actual GPU execution and output audit.
+The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
+archive/provenance and27 member hashes. Worker and method:
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.1).
+Source/model/fixture pins are frozen; GPU acceptance is still pending.
+Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
+this task's acceptance concerns CTC alignment memory. Inspect build provenance,
+source/library/archive hashes and dependency closure before GPU execution.
+
+Kaggle worker version1 was pushed once and is queued at this checkpoint.
+Do not repush while it is live; retain terminal logs before any repair push.
+
+Kernel acceptance, per the maintainer's external Kaggle guide:
+
+1. Use that prebuilt runtime; clone the exact source for harness/binding code,
+   with no heavy Kaggle build. Record actual CUDA device/capability. The package
+   targets60/75; no Torch is needed for this F16 CTC memory test. Check account
+   quota/concurrency first; do not retry sessions to select hardware.
+2. Reuse the pinned licensed Japanese FLEURS fixture, model and transcript from
+   CPU run39212307554. Verify model/audio/runtime bytes. Compare44.52 seconds,
+   approximately45 minutes (425 repeats gives2703 seconds), then44.52 seconds
+   again through one cached public C ABI/Python model. Long input exercises
+   first32s, interior34s and final partial encoder shapes and scheduler reuse.
+   Also compare a CLI call against default public output with absolute offsets.
+3. Require complete ordered word ownership, positive in-range spans with the
+   existing one-frame tolerance, correct text/offsets, CUDA execution evidence,
+   successful long input and repeatability after the shape/cache changes.
+   Retain source/runtime/model/input identities, raw word results, logs and
+   sampled device memory/utilization with idle baseline. A sampled memory peak
+   is not an exact allocator peak. Preserve CPU/full-window boundary differences;
+   do not invent acoustic accuracy or byte-exact CPU/GPU parity.
+4. Keep public proof separate from weights and credentials; publish only vetted
+   portable evidence. Host logits/DP memory still scales with duration. VAD is
+   unused in align-only. A green build, device enumeration, weights on GPU or
+   the44-second CPU result alone cannot close the45-minute CUDA report.
+
+## Go lifecycle follow-up after the high-level repair
+
+The built-in high-level Model now enforces nonblocking ownership across native
+operations/close and separately synchronizes options. Completed implementation,
+47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
+All six hosted binding contracts39215435420 pass. Claimed: actual small-model
+Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
+and tools/ci-heavy/go-model-lifecycle/. The worker/probe are prepared; hosted
+compile and execution remain pending. Raw low-level
+Go pointers still require caller serialization; assess an owned low-level
+adapter before promising their concurrent lifetime safety. Native result states
+remain shared across high-level Contexts. Other-language lifecycle remains open.
+
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: native parallel timestamp/worker
-validation, then remaining parameter/lifecycle and cross-language audits.
+Owner: maintainer coordinator (active). Whisper CPU pointer/Python model proof
+and Japanese/Echo artifact audits are now complete; see HISTORY.md and receipts.
+Next complete issue550 actual CUDA memory/reuse; its CPU matrix is audited.
+Continue wrapper lifecycle/callable gaps, updated PR521 and release acceptance.
+Go high-level parallel access and Python CI expectation repairs are complete;
+see HISTORY.md. Do not infer model acceptance from the local glue regressions.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
-Track the full CI rerun after repairing the stale API-version/Ruby assertions.
+All 2,033 native unit tests passed; rerun hosted CI after the Parakeet
+metadata fixture optional-signature repair (see HISTORY.md).
 Continue the cross-language wrapper task; the bounded external agent tasks have
 ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
@@ -45,7 +115,10 @@ Recommended implementation order and concrete acceptance:
    with optional per-call progress callbacks. Verify actual model behavior and
    progress frequency. Continue DTW,
    remaining token introspection and legacy context/callback lifecycle auditing.
-   Review higher-level APIs as well as the low-level bindings.
+   Review higher-level APIs as well as the low-level bindings. Go's
+   higher-level `ProcessParallel` optional capability now reaches the native
+   pointer/progress adapter, with compiled operation tests. Actual Go model/device acceptance remains open; the built-in high-level
+   Model's ownership/close guards now have compiled race/pthread probes.
    Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
    high-level model constructor now have operation probes. The shared helper
    disables incompatible flash attention. Owned Rust/Go token snapshots now expose
@@ -62,9 +135,10 @@ Recommended implementation order and concrete acceptance:
    probes, including invalid indices/counts, null/empty native output and cleanup.
    Native declarations alone do not satisfy these rows. Go callback registries
    now synchronize concurrent contexts without holding locks through user
-   callbacks, with a hosted race-detector gate. Same-context inference/close/
-   re-entry still requires caller serialization; audit/enforce that lifecycle
-   in low-level and high-level APIs, including foreign callback threads.
+   callbacks, with a hosted race-detector gate. The built-in high-level Model
+   now rejects overlapping native operations/close, including foreign callback
+   threads. Raw low-level pointers still require caller serialization; audit an
+   owned adapter and the remaining other-language lifecycle separately.
    Rust's 25 scalar-helper routes now have compiled controls/old-options probes;
    validate language/prompt/thread/temperature and alternative behavior with
    actual models, including native parallel chunk merging. Audit raw full-params
@@ -75,26 +149,46 @@ Recommended implementation order and concrete acceptance:
    reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
    is in `bindings/go/pkg/whisper/token_snapshots.go`.
 
-### Next runtime check: legacy parallel merge, errors and VAD
+### Native parallel follow-up: remaining timeline/model-platform scope
 
-Inspect `src/crispasr.cpp::whisper_full_parallel` with a model-free fixture that
-compiles the actual function against tiny fake worker states and PCM, then run
-actual-model acceptance through hosted CPU/GPU jobs. The source currently:
+CPU actual-model metadata acceptance is complete: run39211685024 passes all12
+native and six Python cases, independently audited against exact source/library/
+probe/audio identities and raw timestamps. See
+[the receipt](docs/whisper-wrapper-model-audit-2026-10-19.json) and HISTORY.md.
+The tiny suites (22 parallel,13 VAD/entry, six emission) remain CTest/CI gates.
+Do not rerun the same tiny.en/JFK matrix merely because an old note says failed.
+Extend coverage to beam candidates, partial UTF-8, actual VAD-model detections,
+foreign callback threads, GPU/supported platforms and model-specific behavior.
+The scoped CPU proof is not original-reference/WER/speed or whole-wrapper parity.
 
-- shifts merged segment times but does not shift their token t0/t1/DTW fields;
-  verify absolute token times for later chunks and preserve unavailable -1;
-- computes offset/sample-to-centisecond products with int intermediates;
-  test multi-minute offsets/long clips and use bounded 64-bit arithmetic;
-- joins workers but ignores their return codes; test worker failure, state
-  allocation failure and partial-result cleanup rather than returning success;
-- preprocesses VAD before dispatch while preserving the VAD flag for worker
-  calls; audit double filtering, timeline mapping and stale results on silence.
+Still audit these distinct semantics before claiming complete timeline parity:
 
-Keep alternative arrays associated with their moved token/segment data. Use
-synthetic worker failures and nonzero chunk offsets to isolate glue correctness
-before downloading models. Wrapper transport probes do not prove this runtime
-merge behavior. Add these checks to hosted CI and keep actual model acceptance
-separate from the model-free regression suite.
+- Available token/DTW getter values now use the same original-time map as
+  segment getters, with copy-only mapping and sentinel preservation. Plain
+  sequential/parallel/direct-state decoding clears a previous VAD map; failed
+  VAD clears results. Nine literal native timeline/stitching cases cover these
+  repairs. Validate actual VAD detections, overlap/clipping boundaries and
+  VAD-on -> plain -> VAD-on model reuse through each public wrapper. Also test
+  bounded offsets with Tiron's fixed 75-centisecond onset pad before claiming
+  those model-specific window semantics; do not
+  assume the controlled detector fixture establishes real alignment quality.
+- Global parallel duration now clips PCM once before splitting, with exact
+  sample geometry and forwarding checked by seven additional regressions.
+  VAD offsets/duration still select in processed-audio units after the prepass;
+  establish whether a future original-time selection API is needed without
+  silently changing that existing contract.
+- The first chunk may have delivered callbacks before another worker fails;
+  failure clears the stored result but cannot retract callbacks. Exercise
+  foreign-thread encoder/abort callbacks and actual context/device allocation
+  failures. Same-context concurrent decode/close is unsupported.
+
+Source audit found no double filtering: `whisper_full_with_state` does not call
+VAD. Preserve the single prepass and parent mapping rather than disabling a flag
+based on the earlier hypothesis. The parallel worker fixture checks mapping retention;
+`tests/test_whisper_vad_timeline.py` additionally executes the real stitcher,
+interpolation, token getters and scalar adapters with controlled detections.
+The decoder body remains controlled, so model quality is still unmeasured. Use Kaggle for genuine GPU behavior
+when needed, after hosted CPU correctness; do not wait on hours of idle CI.
 
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now
@@ -304,41 +398,28 @@ Audit source and baseline hashes, exact return/text/bounds, successful complete 
 allocation/heap reductions and timing distributions. Never promote from these
 synthetic results alone. Keep input/encoder memory and model quality separate.
 
-## #217 actual Japanese model profiling — worker implemented; hosted proof pending
+## #217 Japanese alignment — CPU proof audited; long-form/hardware pending
 
-`tools/ci-heavy/alignment_model_profile.py` builds the real CPU library/CLI and
-pins the F16 Japanese CTC 1.1B model plus a 6.36-second FLEURS Japanese recording
-(CC BY 4.0; attribution/card retained). It queries the actual library's
-label/display splitters, retains native OFF/ON/OFF logits, times encoder versus
-postprocessor separately, replays those exact logits through the immutable own
-DP reference, and checks actual Python/exported C ABI and CLI output plus a
-12.34-second absolute offset. Cold/warm cache cases are distinguished. No
-boundary labels, long-file, Python-blueprint encoder, GPU/VRAM or Subtimer
-comparison is implied. The default-off optimization is not promoted.
-Six tiny rejection-contract tests pass and are wired into CTest/ordinary CI;
-model work is refused locally. Frozen source `08aea3537ad075ffa17e66a6f601c42519213aea` is on
-`diag/217-japanese-model-profile-20261018`; heavy CPU `39116431721` was
-dispatched with pinned packages and timeout120 and is queued at dispatch audit.
-See [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
-Do not report model evidence before independently auditing the terminal raw
-payload/source/ELF ledger, exact logits and native/reference/public/CLI outputs.
-Earlier frozen production CI/lint remain acceptance gates. No runtime source
-changed while adding this worker; production source remains unchanged from
-`a1434c9b2`. Actual ELF identity is recorded separately by the worker. If a model case fails, preserve the frozen receipt and repair in a
-new scope; do not widen nonempty/ordering/timestamp checks to obtain green.
+Completed CPU evidence is archived in HISTORY.md and the
+[verified audit](docs/alignment-japanese-audit-2026-10-19.json). Keep both workspace
+gates default-off. The measured DP saving is0.055ms beside4591ms encoder time;
+do not prioritize another DP micro-optimization as an end-to-end speed fix.
+Next: inspect issue550 long-window worker
+[run39212307554](https://github.com/CrispStrobe/CrispASR/actions/runs/39212307554)
+at source62e598ca0, then long-input CUDA memory, seams and labeled boundaries.
+Short-clip parity does not establish long-form acoustic accuracy, Japanese ASR
+multiwindow ownership (#549), original encoder parity or Subtimer superiority.
 
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 
-After hosted acceptance of both exact-output CPU workspace experiments, profile
-`canary_ctc_align_words` on actual frozen model logits and split encoder versus
-postprocessor time on a matched Japanese clip. Synthetic timings alone do not
-characterize Parakeet. Preserve native centisecond-output/tokenizer parity and
+The actual Japanese model profile is audited (see HISTORY.md). Preserve the
+measured encoder/postprocessor split when choosing another optimization. Preserve native centisecond-output/tokenizer parity and
 keep original behavior available for A/B. The unchanged per-word path scans
 remain a separate candidate only if profiling justifies them; do not conflate
 invalid-path semantic repair with a speed change.
 
 Long-form accuracy requires audio/text anchors before changing the current
-proportional Qwen chunk assignment or unbounded CTC encoder use. Build a small
+proportional Qwen chunk assignment or extending the new bounded CTC encoder windows. Build a small
 licensed Japanese boundary-labeled corpus with long pauses, music, repeated
 phrases and subtitle omissions. Acceptance: no dropped/reordered lines, correct
 absolute offsets, reported median/p95 boundary error and coverage, and bounded
@@ -452,24 +533,37 @@ the old stale-cache hypothesis or reimplement that fix. Audit the worker's
 existing runs/results and fresh/reused-session/multi-turn acceptance before
 claiming full hardware validation; this #549 task did not execute that worker.
 
-## Ordered roadmap
+## Ordered roadmap — maintainer-approved execution order (2026-10-19)
 
-The immediate handoff priorities above supersede this longer-term research order.
+1. **Close issue550 GPU acceptance.** Audit successful CUDA bundle39215806310,
+   then run the pinned 45-minute short/long/short Kaggle matrix above. Publish
+   evidence before closing the issue; a portable build alone is not GPU proof.
+2. **Close wrapper acceptance and implementation gaps.** Audit green Arabic
+   CTC/Java39214206020 and binding contracts39215435420. Validate high-level
+   Go lifetime/re-entry on a real small model, then assess an owned low-level
+   Go adapter and remaining language lifecycle/callable-ledger gaps. Validate
+   Japanese multi-window ASR for549 separately from CTC forced alignment.
+3. **Finish PR521.** Rebase on current main, inspect the complete runtime diff,
+   repair genuine CI failures and preserve contributor history. Merge only
+   accepted scope; keep original/native clone failures and quality gates intact.
+4. **Release accepted work.** Require exact-tip CI/lint and package/wheel
+   relocation/load checks, reconcile comprehensive notes, then use
+   scripts/bump-version.sh, publish and inspect assets. Do not hold accepted
+   release scope indefinitely for unrelated research; do not advertise failed
+   or hardware-unvalidated model paths.
+5. **Resume bounded numerical work.** Echo: one identical-input projection
+   precision counterfactual. MiMo: actual failing71-row Q/K/V, masks, scores,
+   probabilities and pre-output capture. Dia remains experimental until real
+   speech acceptance; do not repeat completed sweeps without a new hypothesis.
+6. **Maintain the handoff continuously.** Archive completed work in HISTORY.md;
+   give every PLAN.md item an entry point, exact next action and acceptance gate.
+   Separate reporter/hardware/gated-asset waits; keep machine details ignored.
+   Drama3 stays deferred outside active/release scope.
 
-1. **Dia correctness:** validate current-main speech, reconcile reference/diff
-   wiring, then broaden prompts/seeds before GPU/Q4 and profiling.
-2. **CANN hardware preparation:** compose fallback/ACL controls and execute on
-   physical Ascend when available; do useful CPU/SDK preparation meanwhile.
-3. **Remaining PR decisions:** salvage independently accepted #492/#521 pieces
-   with contributor history intact; retain failed quality/performance gates.
-4. **Quantization:** bounded Echo Q4 and Nemotron precision experiments.
-5. **Documentation:** keep this plan current and archive terminal work promptly.
-6. **Release:** freeze accepted scope and run immutable package/wheel validation
-   before scripts/bump-version.sh, tag and publication.
-
-Hardware waits do not justify repeating accepted diagnostics or waiting hours
-without independent useful work. GH handles heavy CPU/builds; Kaggle handles
-actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
+General CI39216228487 on65b851a91 is queued at this checkpoint; green component
+workflows do not replace exact-tip general CI. Hardware waits do not justify
+repeating accepted diagnostics. GH handles heavy CPU/builds; Kaggle handles
+actual supported GPU tests per the external guide. Neither supplies Ascend.
 
 ## Dia correctness — current dependencies
 
@@ -531,6 +625,13 @@ commands: [CANN TODO](docs/cann-todo.md) and
 
 ## Remaining PRs — scoped salvage and acceptance
 
+PR521 review branch now incorporates current main without rewriting contributor
+history. Python helper conflict is resolved with main's tested matrix; ggml
+retains main's newer CANN fixes. The signed128-minimum formatter overflow is
+fixed after an observed UBSan failure, with a permanent CI regression. Inspect
+fresh branch checks; unchanged original/native clone speech failures still
+prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
+
 - **PR492 / MiMo:** author KokerZhou closed the PR unmerged on2026-10-15;
   it is no longer an open merge candidate. Independent opt-in mel/cached-decode pieces are merged.
   Dynamic Q8 activation amplification is measured; the existing F32 cache-read
@@ -553,11 +654,16 @@ commands: [CANN TODO](docs/cann-todo.md) and
   array-audited and permanently republished with a verified anonymous download.
   See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
   work is runtime/input/precision/quality diagnosis, not another proof search.
-- **Issue518 / draft PR521 / OmniVoice:** audio/text utilities match upstream;
+- **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
   The standalone utilities are integrated with complete original/native array
-  replay and hosted checks; see HISTORY.md. The full runtime PR remains a draft.
-  Do not call the onset repaired or relax the clone gate. Preserve controls and
+  replay and hosted checks; see HISTORY.md. The PR is now ready-for-review, headc1e7b73a8 (2026-10-19).
+  Its body/discussion/review comments were re-read. The Linux failure is the
+  stale vibevoice architecture expectation already fixed on main; CLANG64 lacks
+  `<cstdlib>` in the deprecated executable (now fixed on main);
+  CUDA11.8 setup hit Chocolatey504 before compilation. Rebase and inspect new CI.
+  Full diff/runtime review, original utility proof and unchanged cloning-quality
+  gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.
 - **Breeze:** accepted guided/voice/server fixes are merged. Investigate canonical
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
@@ -572,16 +678,18 @@ commands: [CANN TODO](docs/cann-todo.md) and
   global0.999 summary floor at block0; guarded at11/12/15 and middle at12/12/15
   for JFK/JFK-tail/ZH. These differ from native per-stage quantized gates: JFK's
   literal FAIL remains teacherforced_logits (.967303/.983031/.979347).
-  Block4 middle cosine0.999908 passes0.999. No FFN projection is identified by
-  those cumulative block outputs; old block logs omit norms. Next capture actual
-  paired FFN gate/up/product/down on owned identical inputs with both norms and
-  relative error. Single-file safetensors permits lazy per-tensor loading; use a
-  bounded actual original MLP module rather than requiring a full9B resident
-  model merely to attribute one FFN. The retained630KB proof contains logs and
-  metadata, zero GGUF files or FFN tensors. See
-  docs/index-echo-q4-first-failures-2026-10-17.json. Then test targeted precision changes against complete EN/ZH stages, magnitudes,
-  cache behavior, decoded/subtitle output and TTS-ASR. Do not repeat rejected
-  recipes unchanged. Evidence: docs/index-echo-q4-imatrix-validation-2026-10-09.json.
+  Block4 middle cosine0.999908 passes0.999. Completed owned-input attribution is
+  audited; see HISTORY.md and [the receipt](docs/index-echo-owned-ffn-audit-2026-10-19.json).
+  Next evaluate one bounded projection intervention on identical saved inputs
+  before a full decoder: isolate down-projection layer25 (worst owned-down-input
+  error,8.00% on Mandarin), then inspect gate/up error if MLP output remains
+  outside the existing gate. Cumulative first crossings are not causal layers.
+  Audit previous guarded Q8-down/F16 recipes before choosing another override;
+  avoid repeating an already rejected recipe. Use a fresh public prefix and
+  retain original/converted/physical-type/input pins and exact byte-size cost.
+  Only after component improvement run complete EN/ZH stages/magnitudes, cache,
+  CLI/subtitles/session and TTS-ASR plus actual GPU validation. No accepted Q4
+  recipe or runtime arithmetic repair follows from attribution.
 - **Echo performance:** scheduler opt-in has narrow T4 evidence; new CPU/Metal/
   CUDA A/B must establish output and timing before any default change.
 - **Nemotron:** accepted experimental hybrid T4 controls are not compact-Q4
@@ -621,7 +729,13 @@ Passing current source CI does not prove new v0.8.44 assets have been built.
 Unrelated future research need not be advertised as accepted to release proven
 improvements. Existing failed gates must stay explicit.
 
-## Research backlog — Drama3 (issue545)
+## Deferred outside active/release scope — Drama3 (issues545/546)
+
+Maintainer decision (2026-10-19): exclude this backend from the active roadmap
+and next release because its custom licence is unsuitable for the intended
+scope. Do not start conversion, download weights or claim support. Reconsider
+only after an explicit scope/licence decision; the technical notes below are
+retained for handoff, not an active task.
 
 Issue546 requests the same backend, explicitly including GGUF conversion and
 zero-shot voice cloning; track those requirements together with545. Cloning
@@ -795,24 +909,11 @@ are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
 
-## In flight — Echo9B owned-input FFN worker
+## Echo9B owned-input FFN follow-up
 
-The corrected worker is integrated on main. Frozen dispatched sourcec2deea37
-remains unchanged on diag/echo-9b-owned-ffn-repair-20261017. A new maintainer
-should inspect the existing run, retrieve and independently audit results; avoid
-duplicate dispatches. Exact commands, local collectors and recovery locations
-are in ignored CLAUDE.md; public source/run IDs and acceptance are below.
-
-Frozen repairc2deea373f9bd27f526f873bc01cb97068e1bff7 is pushed. Local actual
-released5.6.0/Torch2.6CPU controls pass6/6, including missing-block/stale-FFN
-negatives, and all four secret checks pass unskipped. Heavy CPU39008086579
-and lint39008088033 are dispatched to fresh immutable v2 fixture prefix.
-All runtime files and physical model pins are unchanged from failedv1.
-Independent failed-v1 audit verifies36payloads,37anonymous public files and14
-source snapshots; GH upload omitted the hidden workflow method snapshot, which
-was recovered and hash/source-verified from the public checkpoint. No9B FFN
-arrays exist in that failed proof. Both failed auditor assumption and correction
-remain retained. See docs/index-echo-owned-ffn-failed-2026-10-17.json and the
-updated preparation receipt. Await actual native OFF/ON/OFF and source-layer
-results before diagnosing projections, changing precision or promoting Q4.
-MiMo actual Q/K/V capture remains the next independent implementation task.
+The completed v2 worker/source/payload/tensor/metric audit is archived in
+HISTORY.md. Do not dispatch it again to recreate accepted attribution. Next
+precision task and all quality gates are in the quantization section above.
+Keep all seven rejected recipes rejected and production defaults unchanged.
+Component proof does not reproduce a whole original model trajectory or
+validate speech, Q4 quality, GPU portability or speed.

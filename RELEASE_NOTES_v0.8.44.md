@@ -666,3 +666,45 @@ speech across all arms. These results correct the earlier cross-device causal
 interpretation; they do not change defaults or establish broader native/Q4
 acceptance. Complete evidence and limitations are archived in HISTORY.md and
 docs/dia-sampler-device-results-2026-10-17.json.
+
+### Whisper callback timeline repair (2026-10-19)
+
+Segment and available token/DTW times are bounded to the supplied decoder
+window before callbacks, including wrapped output. DTW callbacks report the
+new-segment count correctly after earlier windows. Six literal native emission
+regressions pass, alongside35 parallel/VAD cases. Hosted run39211685024 now passes12 native and six Python cases; an independent
+raw/hash audit confirms exact input/segment bounds, DTW and owned alternatives.
+No model-quality, GPU or concurrent-lifecycle acceptance is claimed.
+
+### Long-input CTC alignment (implementation; validation pending)
+
+Canary/FastConformer forced alignment uses30-second encoder cores with two-second
+context while retaining one global transcript alignment. CLI align-only honors
+`--chunk-seconds`; bindings receive the safe default. Short-input inference is
+unchanged; zero explicitly disables windows. Nine tiny runtime tests pass.
+The independently audited CPU seam run now passes all147 units in44.52 seconds,
+repeatability and CLI/Python/C ABI offset parity. Mean/max boundary differences
+versus full native context are9.25/400ms; no labeled accuracy claim follows.
+Long-file CUDA memory/reuse remains pending. Host logits/DP memory scales with
+duration, and align-only does not apply VAD.
+
+### Audited alignment and quantization diagnostics
+
+Actual Japanese CTC CPU profiling now has independently verified native logits,
+reference/DP, CLI and Python/C ABI output. The DP heap reduction is substantial;
+its measured0.055ms saving is negligible beside4.59s encoder inference on this
+clip. Echo9B's32-layer same-input FFN attribution is also independently audited.
+These diagnostics do not establish long-form boundary accuracy, an accepted Q4
+recipe or GPU performance. Drama3 is excluded from this release's active scope.
+
+### Go high-level model lifetime
+
+Overlapping native operations and close now return `ErrModelBusy`, including
+re-entry from native callbacks. Native-query methods without error returns panic
+on busy/closed access; owned option setters safely update the next decode's
+snapshot. Concurrent/repeated close frees once, and returned segments/tokens
+remain owned. Contexts still share the model's latest native results. Raw
+low-level Context pointers still require caller serialization. Language lookup
+also frees its C string and lists the final supported language. Validation:
+47 Go race cases,34 Rust cases and five doctests; actual Go/model/platform checks
+remain pending.

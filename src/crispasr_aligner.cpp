@@ -9,6 +9,7 @@
 #include "align.h"
 #include "canary_ctc.h"
 #include "core/align_labels.h"
+#include "core/ctc_windows.h"
 #include "core/align_sentinel.h" // §W3 collapse detection
 #include "core/uroman.h"
 #include "gguf.h"
@@ -22,6 +23,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <memory>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -685,13 +688,13 @@ static void align_sentinel_check(std::vector<CrispasrAlignedWord>& words, int n_
 static std::vector<CrispasrAlignedWord> align_words_impl(const std::string& aligner_model,
                                                          const std::string& transcript, const float* samples,
                                                          int n_samples, int64_t t_offset_cs, int n_threads,
-                                                         bool* out_load_failed);
+                                                         bool* out_load_failed, int chunk_seconds);
 
 std::vector<CrispasrAlignedWord> crispasr_align_words(const std::string& aligner_model, const std::string& transcript,
                                                       const float* samples, int n_samples, int64_t t_offset_cs,
-                                                      int n_threads, bool* out_load_failed) {
-    std::vector<CrispasrAlignedWord> out =
-        align_words_impl(aligner_model, transcript, samples, n_samples, t_offset_cs, n_threads, out_load_failed);
+                                                      int n_threads, bool* out_load_failed, int chunk_seconds) {
+    std::vector<CrispasrAlignedWord> out = align_words_impl(aligner_model, transcript, samples, n_samples, t_offset_cs,
+                                                            n_threads, out_load_failed, chunk_seconds);
     align_sentinel_check(out, n_samples, t_offset_cs);
     return out;
 }
@@ -699,11 +702,11 @@ std::vector<CrispasrAlignedWord> crispasr_align_words(const std::string& aligner
 static std::vector<CrispasrAlignedWord> align_words_impl(const std::string& aligner_model,
                                                          const std::string& transcript, const float* samples,
                                                          int n_samples, int64_t t_offset_cs, int n_threads,
-                                                         bool* out_load_failed) {
+                                                         bool* out_load_failed, int chunk_seconds) {
     std::vector<CrispasrAlignedWord> out;
     if (out_load_failed)
         *out_load_failed = false;
-    if (aligner_model.empty() || transcript.empty() || !samples || n_samples <= 0)
+    if (aligner_model.empty() || transcript.empty() || !samples || n_samples <= 0 || chunk_seconds < 0)
         return out;
 
     const bool is_qwen3_fa = path_contains_ci(aligner_model, "forced-aligner") ||
@@ -795,14 +798,42 @@ static std::vector<CrispasrAlignedWord> align_words_impl(const std::string& alig
 
     float* ctc_logits = nullptr;
     int T_ctc = 0, V_ctc = 0;
-    int rc = canary_ctc_compute_logits(actx, samples, n_samples, &ctc_logits, &T_ctc, &V_ctc);
+    std::vector<float> window_logits;
+    int rc = 0;
+    const int frame_cs = canary_ctc_frame_dur_cs(actx);
+    const int64_t core_frames = frame_cs > 0 ? int64_t(chunk_seconds) * 100 / frame_cs : 0;
+    const bool windowed = chunk_seconds > 0 && int64_t(n_samples) > int64_t(chunk_seconds) * 16000;
+    if (windowed) {
+        if (frame_cs <= 0 || frame_cs > 1000 || core_frames <= 0 || core_frames > std::numeric_limits<int>::max())
+            return out;
+        fprintf(stderr, "crispasr[aligner]: bounded CTC encoder: %ds cores + 2s context; global transcript alignment\n",
+                chunk_seconds);
+        rc = core_ctc_windows::compute(
+            samples, n_samples, frame_cs * 160, int(core_frames), std::max(1, 200 / frame_cs),
+            [&](const float* pcm, int count, std::vector<float>& rows, int& t, int& v) {
+                float* raw = nullptr;
+                const int status = canary_ctc_compute_logits(actx, pcm, count, &raw, &t, &v);
+                std::unique_ptr<float, decltype(&free)> owned(raw, &free);
+                if (status != 0)
+                    return status;
+                if (!raw || t <= 0 || v <= 0 || size_t(t) > rows.max_size() / size_t(v))
+                    return -1;
+                rows.assign(raw, raw + size_t(t) * size_t(v));
+                return 0;
+            },
+            window_logits, T_ctc, V_ctc);
+        ctc_logits = window_logits.data();
+    } else {
+        rc = canary_ctc_compute_logits(actx, samples, n_samples, &ctc_logits, &T_ctc, &V_ctc);
+    }
+    // Windowed logits are vector-owned; the unchanged short path is malloc-owned.
+    std::unique_ptr<float, decltype(&free)> owned_logits(windowed ? nullptr : ctc_logits, &free);
     if (rc != 0) {
         fprintf(stderr, "crispasr[aligner]: compute_logits failed (rc=%d)\n", rc);
         return out;
     }
 
     if (label_words.empty()) {
-        free(ctc_logits);
         return out;
     }
 
@@ -813,7 +844,6 @@ static std::vector<CrispasrAlignedWord> align_words_impl(const std::string& alig
 
     rc = canary_ctc_align_words(actx, ctc_logits, T_ctc, V_ctc, word_ptrs.data(), (int)label_words.size(),
                                 aligned.data());
-    free(ctc_logits);
     // Do NOT free actx — it's cached (§176e).
 
     if (rc != 0) {

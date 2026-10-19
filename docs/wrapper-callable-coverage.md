@@ -218,6 +218,17 @@ constructor and close. Those are operation probes, not model-dependent tests.
 `TestProbeLegacyCallbacksAcrossContexts` exercises eight contexts through native
 callbacks, including registration changes within delivery. The strict hosted
 Go/Rust contract enables Go's race detector. Custom heads and remaining legacy context/resource controls are still pending.
+The higher-level `ProcessParallel(ctx, pcm, processors, encoder, segment, progress)`
+helper and optional `ParallelProcessor` capability now expose the native parallel
+pointer/progress route without changing the existing Context interface. One
+processor shares the ordinary Process path; per-call single-segment policy does
+not mutate future options. `parallel_probe_test.go` exercises dispatch counters,
+callbacks/token metadata, iteration reset, failure/abort/recovery, invalid counts,
+empty PCM and nil/closed/unsupported contexts. The strict Go/Rust race-enabled
+contract runs these operation probes in addition to package compilation.
+The built-in high-level Model now has the lifecycle guard/probes described
+below; raw low-level ownership and actual Go-model/device acceptance remain open.
+
 The owned-token and compatible higher-level DTW paths are described below.
 
 
@@ -342,8 +353,9 @@ negative/oversized lengths, missing terminators, inconsistent embedded NULs,
 null/empty native text, invalid indices, unavailable sentinels and partial UTF-8
 reconstruction. The limits are one million tokens per segment, 32 alternatives
 and 1 MiB text per token/candidate. These compiled public-header fixtures do not
-establish real model accuracy/candidate quality or concurrent close safety;
-serialize access/inference/close on the same legacy context.
+establish real model accuracy/candidate quality. Raw low-level Go/Rust legacy
+contexts retain their lifetime contracts; the built-in high-level Go Model now
+guards copying/close as described below.
 
 
 ## Rust legacy Whisper scalar controls
@@ -374,3 +386,41 @@ also checks that rejected inputs never request native parameters. A source-famil
 tripwire flags new setters without public Rust routes; that check supplements
 operation probes and does not establish behavioral coverage by itself. Actual
 model behavior, worker errors and parallel timestamp merging remain in PLAN.md.
+
+
+## Native legacy parallel runtime regression scope
+
+`tests/test_whisper_parallel_runtime.py` compiles the literal runtime loop and
+segment layout against real public parameter/token headers, controlled worker
+states and real threads. Twenty-two UBSan cases cover chunk token/DTW shifts,
+unavailable sentinels, alternative association, wide/fractional boundary math,
+worker/main errors, worker exceptions, null state allocation, silence cleanup,
+parent VAD mapping retention and sequential/tiny-input routing. It is a runtime
+glue gate, separate from the language transport fixtures. Seven of these cases
+add exact bounded-interval coverage, fractional/clipped/large durations and
+negative/tiny-limit routing. Callback semantics and actual-model/device
+acceptance remain in PLAN.md. The hosted-only
+`tools/ci-heavy/whisper_wrapper_validate.py` prepares actual tiny.en pointer/Python
+metadata acceptance; its artifacts must be reviewed before claiming completion.
+
+`tests/test_whisper_vad_timeline.py` supplies thirteen UBSan cases using the literal VAD
+stitcher/interpolator, token getters, scalar adapters, sequential/parallel routes
+and real state-decoder entry before a controlled inference body. Token/DTW
+getters map available times to original audio on a returned copy and preserve
+negative sentinels; repeated reads do not change stored tokens. Plain decode
+clears old VAD maps, and failed VAD clears old results. Controlled speech
+intervals verify actual stitching and 1/2/3-worker getter consistency, not actual
+VAD/model alignment quality or device execution. Those remain in PLAN.md.
+
+### High-level Go legacy lifecycle (2026-10-19)
+
+The built-in `pkg/whisper` Model owns a nonblocking native borrow shared across
+its Contexts: decode, close, result/token copy, native setters/queries and context
+construction are mutually exclusive. Error-returning methods return
+`ErrModelBusy`; native queries without error returns panic on busy/closed access.
+Go-owned parameter setters and decode snapshots use a separate mutex, so callback
+updates can affect the next call. `String` handles busy/closed models safely.
+Compiled public-method probes cover callback close, same/shared-context overlap,
+result/cursor reads, recovery/abort, native pthread re-entry, parameter races and
+owned result retention after close. Low-level raw Go Context pointers, independent
+native result states and other-language lifecycle remain separate tasks.

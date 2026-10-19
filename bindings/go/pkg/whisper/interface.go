@@ -21,7 +21,10 @@ type ProgressCallback func(int)
 type EncoderBeginCallback func() bool
 
 // Model is the interface to a whisper model. Create a new model with the
-// function whisper.New(string)
+// function whisper.New(string). Native operations share one nonblocking borrow
+// per Model. Error-returning methods report ErrModelBusy during another call;
+// native-query methods without error returns panic with that sentinel. Do not
+// invoke those native queries from callbacks. Close never waits for a callback.
 type Model interface {
 	io.Closer
 
@@ -35,7 +38,12 @@ type Model interface {
 	Languages() []string
 }
 
-// Context is the speech recognition context.
+// Context is the speech recognition context. Contexts from one Model share its
+// native decoder/results. Read results before the next decode; returned Segment
+// and token snapshots are owned copies. Go-owned option setters are synchronized
+// and affect the next decode snapshot; SetLanguage additionally borrows native
+// state and can return ErrModelBusy. Native-query methods without error returns
+// panic on busy/closed access; use error-returning operations for lifecycle checks.
 type Context interface {
 	SetLanguage(string) error // Set the language to use for speech recognition, use "auto" for auto detect language.
 	SetTranslate(bool)        // Set translate flag

@@ -1,3 +1,354 @@
+## PR521 integration preparation — 2026-10-19
+
+Updated the review branch with current main while preserving contributor and
+merge history. Resolved the Python helper conflict with main's tested native
+pointer/fallback matrix; retained main's newer ggml pin, preserving both CANN
+fixes. No full-runtime merge or speech/default promotion is implied.
+
+The branch's portability formatter negated signed128 minimum in signed
+arithmetic. A literal-header UBSan probe reproduced the overflow before the
+fix. Unsigned magnitude conversion now passes0,1,-1 and both signed extrema;
+the regression is wired into ordinary CI. The actual native output-function
+allocator/OOM extraction and Python helper routing checks also pass.
+Original/native clone speech still fails the unchanged gate. Integration stays
+in review pending fresh CI and a separately accepted full-runtime scope.
+
+## Arabic character/Java retained-output audit accepted — 2026-10-19
+
+Hosted run39214206020/sourcea9ee23d5f passes. Independent artifact inspection
+confirms15 ordered words and85 positive in-word character spans, CLI word versus
+segment JSON equality, equality to the retained post-logit reference,407x51
+finite logits, and100 exact Java UTF-8/centisecond rows with a325cs offset.
+Three host JNA encoding controls pass. The public audit records every retained
+artifact hash: docs/arabic-characters-java-audit-2026-10-19.json.
+
+This is a single Arabic Q4 CPU output acceptance, not labeled boundary accuracy,
+new encoder/original-stage, GPU or WER parity. Model identity and Python/C ABI
+execution are hosted-worker evidence: this older worker retained no vocabulary,
+native binaries or separate raw Python result archive, so independent DP replay
+is not claimed. All six binding ABI contract jobs39215435420 also pass.
+
+## 2026-10-19 — hosted CUDA build and wrapper workflows completed
+
+CUDA bundle39215806310 completed on191815511 (sm60/sm75); this proves the
+portable build, not GPU alignment. Independent archive/provenance and27-member
+hash audit is retained in docs/alignment-cuda-bundle-audit-2026-10-19.json.
+The new tools/kaggle/alignment-cuda-memory worker passes syntax/metadata and
+exact retained147-unit/repeated-transcript preparation checks; actual GPU
+execution remains in PLAN.md. Arabic CTC/Java39214206020 and binding
+contracts39215435420 are green. Their remaining artifact/model acceptance and
+the approved execution order are tracked in PLAN.md. No release was tagged.
+
+## Bounded CTC CPU model/seam acceptance audited — 2026-10-19
+
+Run39212307554/source62e598ca0 completes the actual Japanese CTC CPU worker,
+including44.52 seconds of repeated licensed FLEURS speech. Independent audit
+verifies all75 artifact hashes,18 source snapshots and library/CLI identities,
+finite byte-exact short-input OFF/ON/OFF logits,22 native/five public/three CLI
+short cases, the exact repeated PCM/transcript, four long CLI calls and the long
+public result. All147 units have ordered positive spans within the existing
+one-frame endpoint allowance. CLI cores0/30/10/30 finish; both30-second results
+match exactly, and default Python/C ABI matches with a12.34-second offset.
+[Audit receipt](docs/alignment-windows-cpu-audit-2026-10-19.json).
+
+Versus full native context,30-second windowing has mean0.92517-centisecond and
+maximum40-centisecond boundary differences (9.25/400ms). These are differences,
+not manually labeled accuracy. The repeated fixture is not a45-minute GPU or
+real conversational recording. No CUDA peak-memory, original encoder, WER,
+Subtimer or new release acceptance follows. The separate same-run short DP
+medians are1.430403ms off and1.5135695ms on; no robust DP speedup is established.
+
+Actual CUDA preparation completed: frozen191815511 on
+`diag/550-cuda-memory-20261019`, build39215806310, reusing the existing portable
+CLI/shared-ABI CUDA package workflow. No model/GPU execution is claimed from
+that successful build. Concrete long-input/cache/device-memory acceptance is scoped
+in PLAN.md; the issue remains open and has a progress/evidence comment.
+
+## High-level Go legacy lifecycle and language repairs — 2026-10-19
+
+The high-level Model now owns a nonblocking native borrow shared by its Contexts.
+Decode/close, context construction, native setters/queries and result/token
+copying cannot overlap. Error-returning operations return ErrModelBusy; native
+queries without error returns panic on busy/closed access instead of calling
+through invalid handles. String safely reports busy/closed state. Rejected
+close leaves inference/model usable; subsequent and repeated close free once.
+Contexts still share native decoder/results; this is not independent state per
+Context. Low-level raw pointers retain their caller-serialization contract.
+
+All Go-owned parameter setters/readers and per-call snapshots now use a separate
+mutex. Callback option updates affect the next decode without mutating the
+active copy. SetLanguage additionally borrows native state. Owned Segment/token
+copies remain valid after close. The low-level language lookup releases its
+temporary C string; Languages now includes the final supported native ID
+(Cantonese on the real table). The model test's expected inventory includes it.
+
+The callback-close regression fails before repair (close succeeds and invalidates
+the context) and passes afterward. A separate public-method probe observes the
+omitted-last-language failure before its repair. Ten high-level cases now cover
+blocked shared-context calls, all native readers, callbacks from an actual
+pthread, error/abort/recovery, concurrent option writes/reads/snapshots,16 racing
+closers and ownership after close. All **47 Go cases pass with the race detector,
+34 Rust cases and five doctests pass** against the strict isolated public-header
+fixture;25 literal native scalar setters are compiled. Initial test assumptions
+about fixture controls/default language were corrected separately from runtime
+fixes. Go formatting, generated cgo flags and documentation checks pass. Hosted
+and actual-Go-model acceptance remain separate; no new speed/quality claim.
+
+## Character alignment Java build preflight repaired — 2026-10-19
+
+Hosted character-alignment run39212277740 failed before model download/build:
+its standalone javac invocation could not resolve CrispasrSessionTasks and its
+utility parent after the session API expansion. The worker now supplies the
+binding source root, letting javac resolve the actual dependency graph. Runtime
+callback guards are unchanged.
+
+A new strict Java contract executes the exact worker javac argument expression
+from an unrelated temporary working directory. It reproduces the missing-parent
+failure before the fix and passes afterward, then calls the real UTF-8 native
+guard under US-ASCII, ISO-8859-1 and UTF-8 host defaults. All four strict Java
+contracts pass (126 auxiliary,92 modern,6 older-ABI and44 legacy assertions under
+each of two encodings, plus the new worker/UTF-8 preflight). Hosted Arabic Q4
+character/model acceptance must rerun on the repaired source.
+
+## Whisper actual-model CPU acceptance audited — 2026-10-19
+
+Run39211685024/sourceafeffa1a5 passes12 native pointer cases (DTW off/on ×
+1/2/3 processors × full/bounded input) and six Python metadata cases. Actual
+library/dependency, native/probe source, compiled probe and audio identities are
+independently verified. Model revision/hash, audio and probe source match the
+preceding failed run. The audit checks all258 native token rows,516 alternative
+rows,103 available DTW rows and Python162 tokens/324 alternatives/68 DTW values.
+Every available raw timestamp is inside its exact segment and selected input
+bounds; this independent check needs no timestamp margin. The verified worker
+also asserts scalar/struct equality, progress retirement and Python owned result
+retention through reuse/close. [Audit receipt](docs/whisper-wrapper-model-audit-2026-10-19.json).
+
+This closes CPU tiny.en/JFK greedy pointer/Python metadata acceptance. It does
+not establish original-reference, WER, speed, actual VAD-model, GPU/other-wrapper
+or same-context concurrent lifecycle safety. Model weights were hash-checked by
+the hosted worker and were not downloaded again locally. Keep future coverage
+and release/platform gates separate from this completed matrix.
+
+## Japanese alignment and Echo FFN independent audits — 2026-10-19
+
+Japanese CPU run39116431721/source08aea3537 passes independent verification of
+all60 retained artifacts,16 frozen source snapshots, library/CLI identities,
+byte-exact finite80×4001 OFF/ON/OFF logits,22 native calls, five Python/C ABI
+calls and three CLI calls. The actual saved logits/vocabulary were independently
+replayed through the immutable own reference and current literal DP: identical
+word text/times, tracked heap1,290,804→24,568 bytes and137→56 allocations.
+These are postprocessor counters, not encoder/process RSS. On this6.36-second
+FLEURS recording the encoder median is4591.176ms; DP off/on medians are
+1.511408/1.4569045ms (1.0374×, about0.055ms saved). No long-form, manually
+labeled boundary, original encoder, GPU or Subtimer comparison is established.
+The unchanged endpoint gate allows one encoder frame beyond PCM. Both workspace
+gates remain default-off. [Verified receipt](docs/alignment-japanese-audit-2026-10-19.json).
+
+Echo CPU run39008086579/sourcec2deea373 now has independently verified hashes for
+all1,153 payloads and13 source snapshots, library identity, released original
+MLP class provenance,72 byte-exact shared OFF/ON/OFF tensor triples and all512
+same-input metric rows across32 layers and JFK/Mandarin. One hidden workflow
+snapshot omitted by Actions was recovered from the immutable anonymous public
+checkpoint and verified against the receipt/source. Actual coefficient weights
+were not downloaded again; their receipt hashes remain provenance, not a new
+independent weight-byte check. [Verified receipt](docs/index-echo-owned-ffn-audit-2026-10-19.json).
+
+On those identical captured inputs, activation-product maximum relative L2 is
+7.21e-8; gate/up errors reach6.40%/7.75%, isolated down projection8.00%, and
+complete MLP output11.26%. These are quantized component comparisons, not proof
+of a runtime activation bug or a whole-model trajectory. Layer25 Mandarin has
+the largest isolated down error. All seven failed recipes remain rejected;
+no speech/Q4/GPU/performance acceptance or production default changes follow.
+Do not repeat the completed attribution merely because older plans say queued.
+
+## PR521 CI failure triage — 2026-10-19
+
+The current PR is open and ready-for-review atc1e7b73a8. Its Linux failure is the
+stale vibevoice architecture expectation already repaired on main. Windows
+CLANG64 fails because the deprecated launcher uses EXIT_FAILURE without its
+own standard-library include; `<cstdlib>` is now included explicitly, with
+GCC/Clang syntax checks. CUDA11.8 fails before compilation when Chocolatey's
+unzip feed returns HTTP504. Rebase/review and new CI remain necessary. Original
+and native fixed cloning controls still fail the unchanged2/9 WER gate; no
+cloning-quality repair or merge is claimed.
+
+## Issue550 bounded CTC encoder implementation — 2026-10-19
+
+The shared Canary/FastConformer alignment path now uses overlapping frame-grid
+encoder windows for long audio:30-second cores with two-second context. Every
+global frame belongs to exactly one window; logits feed one global transcript
+DP, without proportional word assignment. CLI align-only forwards its existing
+`--chunk-seconds`; C ABI/bindings inherit the default. Zero explicitly disables
+windowing. Short-input inference stays on its original path. Window failures
+return no partial alignment; malloc/vector logits have distinct RAII ownership.
+
+Nine tiny UBSan tests cover actual shared inference dispatch, exact global row
+ownership, context/tails/endpoints, malformed vocabulary, failure cleanup and
+short/disabled routes. The hosted Japanese worker now has optional44.52-second
+repeated-speech CLI/default-public-ABI/seam validation. Actual-model and CUDA
+long-file peak-memory acceptance remain pending; issue550 is not closed. Host
+logits/DP memory still grows with duration; VAD remains unused in align-only.
+
+## Bound Whisper emission before callbacks — 2026-10-19
+
+Hosted run39208655226 confirms bounded sequential decoding now passes, then
+fails two-processor decoding: a predicted segment ends at1238 centiseconds for
+1100 centiseconds of audio. Retained library/probe/audio and native/probe source
+hashes were independently checked against the dispatched commit. This failed
+run is diagnostic evidence, not acceptance of the full model matrix.
+
+Native emission now bounds segment timestamps to the actual decoder window and
+bounds available token/DTW times after energy expansion, wrapping and DTW,
+before delivering callbacks. Unavailable negative sentinels, text and alternative
+candidates are preserved. DTW callbacks now report the number of new segments
+once per window; the former index/count loop could omit later-window callbacks.
+Six literal-emission cases fail before repair and pass afterward under UBSan,
+including callback-visible values, nonzero offsets, wrapped output and a later
+DTW window. The existing22 parallel and13 VAD/entry cases also pass. The hosted
+model sanity margin is unchanged; a fresh actual-model matrix remains required.
+
+## Hosted bounded-sequential failure and wrapper follow-up — 2026-10-19
+
+Hosted CPU run39206481422 built the actual library and loaded revision-pinned
+public tiny.en weights. The full sequential case completed, then the bounded
+sequential case failed its segment-time check before reaching parallel/DTW or
+Python cases. The artifact's library/probe/source/audio SHA256 identities were
+independently verified. The failed matrix is not model acceptance.
+
+The state decoder still computed features from PCM after the requested endpoint;
+its seek limit alone did not hide that later speech. Sequential/direct-state
+entry now clips PCM before feature extraction and caps seek end at available mel
+frames. Invalid offsets/durations are rejected, while zero-PCM precomputed-mel
+entry remains supported. Two literal-entry regressions reproduced the PCM leak;
+the **13 state/VAD cases plus 22 parallel cases pass under UBSan**. The hosted
+probe now writes segment values before asserting, preserving the failing row.
+Actual model rerun remains required; no threshold was relaxed.
+
+The high-level Go package now exposes `ProcessParallel` through optional
+`ParallelProcessor`, preserving the existing Context interface. Its common
+sequential/parallel path forwards progress to the native pointer adapter and
+resets the segment cursor after success. Callback-only single-segment options
+are local to each call. Compiled probes cover dispatch counts, encoder/segment/
+progress callbacks, copied token metadata, alternating modes, native failure,
+encoder abort, recovery, cleanup and nil/closed/unsupported/invalid input.
+The native fixture now exercises Go callback trampolines on the pointer route
+and provides the token probability getter used by high-level segment conversion.
+**41 Go cases pass with the race detector, 34 Rust cases and five doctests pass.**
+Same-model inference/close/re-entry still requires caller serialization.
+
+CPU CI's 2,033 native unit cases and compiled Python metadata checks passed.
+The later Python test group exposed stale expectations: GGUF detection returns
+canonical `vibevoice-tts`, and unrestricted Mock objects invented the newly
+preferred native pointer initializer. The backend assertion now matches the
+shared architecture table. Constructor tests explicitly model missing symbols
+and cover native-pointer preference with/without helpers, legacy helpers and
+legacy fallback across Linux/macOS/Windows (24 routes). Focused Python tests
+pass (12 cases plus 24 subtests; the actual-library backend assertion remains a
+hosted gate). Full-source syntax, format and documentation checks pass.
+
+## Parallel decoding bounds duration once before splitting — 2026-10-19
+
+With multiple processors, `whisper_full_parallel` now caps PCM at the requested
+offset plus duration before dividing work. Previously it split the remaining
+recording and passed the full requested duration to every worker, so workers
+could skip requested spans and decode unrelated later audio. The bounded PCM
+owns the interval limit; per-worker duration is zero. End-point arithmetic is
+64-bit and clips to available samples, preserving the final chunk remainder,
+nonzero/fractional offsets and the short-interval fallback. Negative duration
+is rejected before dispatch, including the one-processor route. Zero duration
+remains unbounded; VAD interval units remain processed-audio time.
+
+Seven new literal-runtime cases fail before repair and pass afterward. The
+independent call recorder checks exact contiguous PCM coverage and rejects
+out-of-interval tails and repeated duration forwarding. The suite now passes
+**22 parallel cases plus nine VAD timeline cases under UBSan**. Full runtime and
+hosted model probe syntax checks pass. These establish dispatch geometry, not
+transcript equality across chunkings or original-model numerical parity.
+
+`tools/ci-heavy/whisper_wrapper_validate.py` prepares hosted CPU acceptance using
+a revision-resolved public tiny.en GGML model and the repository JFK WAV. It
+builds the actual shared library and runs a compiled pointer-ABI matrix (12
+runs: DTW off/on, 1/2/3 processors, full/bounded intervals), then six Python
+wrapper runs with owned metadata retained across reuse/close. It retains binary/
+model/audio identities, actual native binaries, raw metadata and failure logs.
+Timestamp sanity uses a documented one-second model margin; the tiny runtime
+suite separately gates exact sample geometry. Model execution is pending until
+the hosted artifact is reviewed; no model, WER, speed, VAD-detector or GPU parity
+is claimed from preparing this worker.
+
+## Whisper VAD token timeline and reusable state — 2026-10-19
+
+Token-data getters now map available t0/t1/DTW times back to original audio
+using the same VAD interpolation as segment getters. They transform only the
+returned copy, preserving stored filtered-time values for subsequent reads and
+parallel merging. Context getters delegate to state getters, so the scalar
+C ABI adapters and bindings inherit the same timeline. Negative unavailable
+sentinels and non-timing token metadata are preserved.
+
+Plain decoding clears a previous VAD map in the real state-decoder entry,
+covering sequential, parallel and direct-state routes. Empty parallel input
+also clears mapping, and failed sequential VAD no longer exposes an earlier
+transcript. New VAD prepasses clear old segment bookkeeping; speech segments
+belong to the supplied state rather than an unrelated context default state.
+Silence/failure resets mapping consistently without discarding the cached VAD
+model context.
+
+The new `tests/test_whisper_vad_timeline.py` compiles the literal native VAD
+stitcher, interpolation/getters, sequential/parallel dispatch and scalar C ABI
+adapters. It also compiles the real state-decoder entry before replacing the
+scheduler/inference body. Controlled detector intervals exercise real speech
+copying and compressed-silence placement, original-time interpolation, repeated
+reads, unavailable/partially available endpoints, VAD/plain state reuse, detector/
+loader failure and 1/2/3-worker merge. Seven of the original eight cases failed
+before repair; all **nine final cases pass under UBSan**, as do the **15 existing
+parallel runtime cases**. Full-source syntax, formatting and documentation checks
+pass. The suite is wired into CTest and hosted CI. Actual detector/model quality,
+overlap/clipping boundary acceptance and GPU behavior remain separate PLAN tasks.
+
+## Legacy parallel runtime timestamps and worker failures — 2026-10-19
+
+`whisper_full_parallel` now shifts available token t0/t1/DTW timestamps together
+with merged segments, preserves negative unavailable sentinels and moves token
+alternatives with their segment. Offset-to-sample and sample-to-centisecond
+arithmetic uses 64-bit intermediates; split/merge times come from the actual
+sample boundary, avoiding a further centisecond rounding loss at fractional
+offsets. Invalid processor/sample/offset inputs are rejected, past-end offsets
+and empty PCM clear results, and oversized processor requests fall back to a
+single state decoder when chunks would be empty.
+
+Worker statuses are collected after every started thread joins. Main/worker
+errors discard partial transcripts; native worker exceptions become failure
+rather than escaping the thread entry point. Worker states use owned cleanup,
+null allocations are rejected before threads launch, and launch failures join
+already-started threads. Previously delivered first-chunk callbacks cannot be
+retracted. VAD silence/failure clears prior results. Audit disproved the earlier
+double-VAD hypothesis: the worker decoder does not invoke VAD; the prepass and
+parent mapping remain intact.
+
+The new model-free probe compiles the literal production parallel function,
+actual private segment layout and public parameter/token headers against tiny
+controlled states and real std::threads. Before repair, ten of eleven initial
+cases failed (including UBSan overflow and an escaping-thread exception); an
+additional fractional-offset case independently failed until boundary rounding
+was repaired. All **15 cases now pass under UBSan**. The suite is registered in
+CTest and hosted CPU CI. It proves merge/error glue, not model accuracy, actual
+VAD interpolation, GPU execution or original-time VAD token parity. Those and
+context reuse/duration/callback acceptance are scoped in PLAN.md.
+
+## Parakeet metadata CI fixture pointer signatures — 2026-10-19
+
+All 2,033 native unit tests pass after the earlier assertion repairs. The next
+hosted metadata step exposed missing ctypes signatures for optional word
+alternative getters in `test_parakeet_window_metadata.py`: `_read_result`
+discovers them in the full library, but the untyped call truncates its opaque
+result pointer. This is a test harness error, not a measured decoder failure.
+
+The tiny fixture now exports the same three literal production alternative
+getters and declares their pointer/index/return types. Before the signature
+repair this reproduces exit 139 without models or a full native build; after it,
+all six grouping/window/repair tests pass. Hosted validation against the complete
+library remains required and stays enabled.
+
 ## Compatible Rust Whisper scalar controls — 2026-10-18
 
 `WhisperDecodeControls` exposes language/prompt strings, eleven flags, threads,

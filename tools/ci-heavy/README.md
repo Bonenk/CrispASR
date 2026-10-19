@@ -23,6 +23,15 @@ pristine/OFF/ON/OFF instrumentation controls. Complete raw evidence is retained;
 bounded replay is separate from free-running speech acceptance. See the
 [reference wiring method](dia-reference-wire/README.md).
 
+`whisper_wrapper_validate.py` builds the real CPU library, resolves a public
+Whisper tiny.en GGML revision, and runs twelve compiled pointer-ABI and six
+Python wrapper checks for parallel/DTW/tokens/alternatives/ownership. Exact
+bounded interval geometry uses the separate tiny runtime regressions; model
+timestamp sanity allows a one-second margin. Binaries, input identities, raw
+metadata and phase logs survive failure. This is metadata integration evidence,
+not original-model, WER, speed, VAD-detector or GPU parity. Run with
+`-f script=tools/ci-heavy/whisper_wrapper_validate.py -f pip=numpy -f timeout_minutes=60`.
+
 ## Running a job
 
 ```bash

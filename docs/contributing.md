@@ -736,6 +736,49 @@ negative/nonfinite probabilities, empty codes and malformed UTF-8; zero
 probability is a valid result. Model progress frequency and detection accuracy
 require separate model acceptance.
 
+`python3 tests/test_whisper_parallel_runtime.py -v` compiles the actual parallel
+runtime loop against tiny states and real threads under UBSan. Keep split/merge
+sample arithmetic wide, shift available token/DTW timestamps alongside segments,
+preserve unavailable sentinels and alternative ownership, and propagate worker
+errors only after joining started threads. Check null state allocation, worker
+exceptions, VAD silence, fractional offsets and long-clip geometry. This fixture
+proves glue behavior; hosted actual-model tests must separately check VAD
+original-time mapping, bounded duration and callback/device behavior. Do not
+infer original-time VAD token parity from a successful chunk merge.
+
+The high-level Go `ProcessParallel` helper uses optional `ParallelProcessor`;
+keep existing Context implementations compatible. Exercise the public high-level
+method, native pointer-route count, progress/encoder/segment callbacks and cursor
+reset, not just low-level declarations or package compilation. Callback-specific
+options must stay local to the decode call. Same-model lifecycle serialization
+is still required; the optional parallel API does not make concurrent close safe.
+
+For sequential/direct-state decode, cap PCM before mel extraction as well as
+bounding seek end at available mel frames. A duration check in the decode loop
+alone leaves later speech visible to the encoder. Preserve the zero-PCM route
+used with precomputed mel. The literal entry/seek tests exercise both contracts;
+real-model timestamp failures must be diagnosed from retained rows, not hidden
+by loosening the model smoke threshold.
+
+For bounded parallel decoding, clip one global offset/duration interval before
+splitting, clear the now-consumed per-worker duration, and cover exact contiguous
+sample coverage including remainder, fractional offsets, overflow-sized limits
+and tiny-interval fallback. VAD selection currently uses processed-audio units.
+`tools/ci-heavy/whisper_wrapper_validate.py` is a hosted-only actual-library/model
+pointer/Python smoke worker (`heavy-cpu.yml`, `pip=numpy`). Review its artifacts;
+preparing or dispatching it does not establish model acceptance. Exact geometry
+belongs to the tiny regressions; its real-model timestamp sanity has a one-second
+margin and establishes no transcript/numerical/GPU parity.
+
+`python3 tests/test_whisper_vad_timeline.py -v` also compiles the literal VAD
+stitcher/interpolator, token getters and scalar adapters. Available token/DTW
+times must use original-audio time consistently with segments. Map returned
+copies, preserve unavailable negatives, and test repeated reads to reject double
+mapping. Reset stale VAD bookkeeping when a state is reused without VAD or a
+prepass fails; retain its cached VAD context. The fixture executes the real
+state-decoder entry but replaces scheduler/inference work and detector output;
+it establishes timeline glue, not real detector/model alignment quality.
+
 DTW must be configured before context creation. Native defaults enable flash
 attention, and the loader disables DTW if both remain enabled. The shared
 `crispasr_ctx_params_set_dtw` helper therefore disables flash attention when
@@ -746,7 +789,14 @@ preset mappings, top-layer validation, context cleanup and indexed DTW output.
 The high-level Go DTW constructor now has an operation test in addition to
 package compilation. Go's hosted wrapper contract enables the race detector;
 callback registry locks must be released before invoking user callbacks. Registry
-locking alone does not serialize same-context inference and close.
+locking alone does not serialize same-context inference and close. The built-in
+high-level Go Model now uses a shared nonblocking borrow across decode, close,
+readers, native setters and Context construction. Error-returning methods reject
+with `ErrModelBusy`; native queries lacking an error return panic on busy/closed
+access. Option setters/copy have a separate mutex. Probe callback close/re-entry,
+a blocked concurrent decode, all result readers and a real pthread callback.
+The raw low-level Go Context still requires caller serialization; do not describe
+this as universal wrapper lifecycle safety.
 
 Legacy token adapters must copy both chosen-token and candidate text before
 native buffers can be reused or the model closed. Preserve raw UTF-8 fragments
@@ -796,6 +846,31 @@ Callback exceptions are captured on the JS side and returned after native
 frames finish. Full native/browser/model and opt-in bundle-size gates are
 required separately from the tiny Embind probe. Threaded browser chat remains
 pending a servicer/compute dispatch implementation.
+
+### Alignment memory and callback timelines
+
+The shared Canary/FastConformer aligner bounds long-input encoder inference with
+30-second cores and two-second context, stitches logits on the encoder frame
+grid, and aligns the complete transcript once. CLI align-only forwards
+`--chunk-seconds` (zero explicitly disables windows); C ABI and bindings inherit
+the default. VAD is unused in align-only. This bounds encoder activations, not
+host logits or traceback memory. Qwen3-FA and wav2vec2 have separate paths; do not
+infer their long-input behavior from this implementation.
+
+Run `python3 tests/test_ctc_windows.py -v` for tiny actual shared-dispatch/frame
+ownership checks. Hosted `alignment_model_profile.py --long-windows` additionally
+compares full versus windowed native alignment, repeated 44.52-second speech,
+10/30-second seams, exact repeatability and CLI/Python/C ABI offset parity. This
+is not manually labeled boundary accuracy or a CUDA peak-memory result. Keep
+issue550 open until long-input hardware validation is recorded.
+
+Whisper emission changes must also run
+`python3 tests/test_whisper_emission_bounds.py -v`. Its literal production block
+checks segment/token/DTW bounds before callbacks, wrapped output, negative
+sentinels and later-window DTW new-segment counts. Model-free callback tests do
+not replace hosted actual-model validation. The scoped CPU pointer/Python
+[model audit](whisper-wrapper-model-audit-2026-10-19.json) passes12 native/six
+Python cases; extend its stated limits rather than treating it as full parity.
 
 ## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
 

@@ -203,8 +203,26 @@ literals are unchanged; unsupported providers and closed models return errors.
 
 Callback registry access is synchronized across contexts. The registry lock is
 released before invoking a callback, allowing registration changes during
-callback delivery. Continue to serialize inference/close/re-entry on the same
-native context; registry synchronization does not enforce that ownership rule.
+callback delivery. Low-level raw native contexts still require caller
+serialization of inference/close/re-entry; registry synchronization alone does
+not enforce their ownership.
+
+The higher-level `pkg/whisper` Model now enforces a nonblocking native borrow
+shared by all its Contexts. `Close`, decode, result/token copying, language
+selection and new-context creation return `ErrModelBusy` if another operation
+owns the model, including calls from callbacks and foreign threads. Methods
+without error returns (native token/language queries and timing controls) panic
+with that sentinel on busy access and `ErrInternalAppError` after close. Handle
+lifecycle through the error-returning operations; do not call native queries
+from callbacks. `String` remains safe and reports a busy model. Close is
+idempotent after inference ends; a rejected close leaves the model usable.
+
+Go-owned option setters use a separate mutex and can update the next decode's
+snapshot while inference runs; `SetLanguage` requires the native borrow. Contexts
+share the latest native result set: read it before another decode, or retain the
+owned Segment/token snapshots. This does not provide independent decoder states
+for multiple Contexts. Low-level `Whisper_lang_id` now releases its temporary
+C string, and high-level `Languages` includes the final supported language ID.
 
 `Whisper_full_parallel` uses the native pointer-parameter parallel wrapper,
 including CrispASR's global progress lifecycle. The additive
@@ -219,3 +237,21 @@ counts clamp to 0–32; nonpositive best-of values leave the setting unchanged.
 Custom implementations/mocks of the higher-level `Context` interface need
 these five new methods. `Params` is a Go options type, not a native ABI struct;
 pass it through the binding methods.
+
+
+The higher-level package also supports parallel processing without extending
+its existing `Context` interface:
+
+```go
+err := whisper.ProcessParallel(context, samples, 2, nil, onSegment, onProgress)
+```
+
+This uses optional `ParallelProcessor`; custom contexts lacking that capability
+return an error. One processor selects ordinary sequential decoding. Counts
+must be positive int32 values; empty PCM, nil/closed contexts and native failures
+return errors. Progress frequency and transcript boundaries depend on the native
+decoder. Callback-specific single-segment mode applies only to that call, and
+successful calls reset `NextSegment` iteration. The built-in Model rejects
+overlapping native calls and callback close/re-entry with `ErrModelBusy`;
+custom Context implementations define their own ownership policy. Operation/race
+probes establish transport, callbacks and cleanup, not model quality or speed.

@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "run": 39214206020,
+  "source": "a9ee23d5f25b815c871d37aeadf6d90bde60a7a1",
+  "status": "retained Arabic CLI/reference and Java UTF-8/time/offset outputs independently audited",
+  "words": 15,
+  "characters": 85,
+  "logits_shape": [
+    407,
+    51
+  ],
+  "duration_seconds": 8.16,
+  "java_offset_cs": 325,
+  "model_sha256_reported_by_hosted_worker": "d1b186a975a1e3506ff61ca90c301caeadfc78c1f483f4b3cd2d899409ce1be7",
+  "artifacts": {
+    "summary.md": {
+      "bytes": 139,
+      "sha256": "a84780554d093cff37f94a1abb46297580c0a62c270f122c9abc4ebdbcd95288"
+    },
+    "existing-align-units.log": {
+      "bytes": 485,
+      "sha256": "dca4444065c6049aa1ef152578730d93e83de0f6963692bfd3faf72ad36005c2"
+    },
+    "segments.json": {
+      "bytes": 4375,
+      "sha256": "d47971c26041156f67a9f4bab23a60d56be1e05b7986de9df82772eb960d2ac8"
+    },
+    "arabic.wav": {
+      "bytes": 261164,
+      "sha256": "9cf74b20120bc58d2474e875fcd55dcf2abda9bc8715d91fbdd6fbd90582e158"
+    },
+    "java-utf8-ISO-8859-1.log": {
+      "bytes": 29,
+      "sha256": "30a17ff2c94a61ded17cf52218766d5f062cf740ec9f3cc5b17e07c56cad1dfb"
+    },
+    "java-utf8-UTF-8.log": {
+      "bytes": 29,
+      "sha256": "30a17ff2c94a61ded17cf52218766d5f062cf740ec9f3cc5b17e07c56cad1dfb"
+    },
+    "transcript.txt": {
+      "bytes": 185,
+      "sha256": "5c2b3091b9bc42ce7a1d1c60b9c6aa39190c3278acb31a7f7d3f9c19c9db30c1"
+    },
+    "java-guard-build.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "acceptance.json": {
+      "bytes": 1419,
+      "sha256": "0eabae9922c8aa5c613b035e8b25d0c9806e9cee23946e62eb7d78c2c15bdc74"
+    },
+    "java-utf8-US-ASCII.log": {
+      "bytes": 29,
+      "sha256": "30a17ff2c94a61ded17cf52218766d5f062cf740ec9f3cc5b17e07c56cad1dfb"
+    },
+    "words.json": {
+      "bytes": 4164,
+      "sha256": "1e4bd3e9a0aa3129e75c6cdcb5297c8ea1c18cc495d928f32ba1918f72bd4a40"
+    },
+    "build.log": {
+      "bytes": 434643,
+      "sha256": "786078e0f7052b68922ce59364371fda4e83743606e195e00c299eeb62a8a7c9"
+    },
+    "configure.log": {
+      "bytes": 3077,
+      "sha256": "aa0fa4ca49425e98df253cec63dec1c8b4e723d286a1022ea812e57da497bbc0"
+    },
+    "java-alignment.log": {
+      "bytes": 120,
+      "sha256": "6d1de6492ff6c054d584a2fcfaf95344ca66b261aff6e64826fdea84a871f7b4"
+    },
+    "java-spans.tsv": {
+      "bytes": 1707,
+      "sha256": "1304bcbb76a730d3f01357878515e821a166a0362aa172d1e8d94f5c185e0bb8"
+    },
+    "java-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "cli-words.log": {
+      "bytes": 509,
+      "sha256": "57d5b0b83fe5c2c4ab73cde78ed84ee62e630a0ba1e83e702712a8133f0cffe1"
+    },
+    "independent-reference.json": {
+      "bytes": 6203,
+      "sha256": "ad6e74f0ddd7edc9fbe20eea8ad59a16070301c04803d365dcbc4d00659503cb"
+    },
+    "cli-segments.log": {
+      "bytes": 526,
+      "sha256": "b8eb18fa05e52d2d16436bbfa421c2db57b27afa49f2d321d6c413c0523e5c7e"
+    },
+    "known-paths.log": {
+      "bytes": 44,
+      "sha256": "ebf7aea1b3049053b8508c815bae9ad71184be63d535f33da3db0d39dedf56cc"
+    },
+    "logits.npy": {
+      "bytes": 83156,
+      "sha256": "c52f1bd952cd25cd3f6f8475d8b88d158caca84dc67dac8fde625d376f4d2580"
+    }
+  },
+  "limitations": [
+    "single Arabic Q4 CPU recording; no acoustic boundary ground truth, original encoder numerical parity, GPU or WER claim",
+    "Python/C ABI model execution and model identity are hosted-worker evidence; no separate raw Python result archive",
+    "vocabulary/native binaries were not retained by this older worker, so independent post-logit DP replay is not claimed"
+  ]
+}

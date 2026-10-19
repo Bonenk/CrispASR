@@ -1,3 +1,30 @@
+## Actual Japanese CTC CPU profile — 2026-10-19
+
+Frozen source08aea3537, run39116431721, F16 Japanese CTC1.1B and one6.36-second
+licensed FLEURS clip, four CPU threads, CUDA/Metal/Vulkan/BLAS disabled.
+
+| Scope | Median | Comparison |
+| --- | ---: | --- |
+| Warm encoder/frontend/readback |4591.176ms| OFF/ON/OFF exact logits |
+| Native DP gate off |1.511408ms|10 measured calls|
+| Native DP gate on |1.4569045ms|10 measured calls;1.0374× off/on ratio|
+
+The0.055ms DP saving is negligible beside the encoder on this fixture. Literal
+same-logit replay reduces tracked DP heap1,290,804→24,568 bytes and allocations
+137→56, with exact frozen-reference/native/public/CLI word times. Counters are
+not whole-process or GPU memory. Independently verified arrays/calls/sources and
+limits are in [the audit](docs/alignment-japanese-audit-2026-10-19.json).
+No labeled-boundary accuracy, long-form, original encoder parity, GPU or matched
+Subtimer performance claim follows. The workspace gates remain default-off.
+
+A separate hosted run39212307554 gives short-input DP medians1.430403ms off
+and1.5135695ms on (gate on is slower in that run). Do not infer a robust DP
+speedup or compare encoder medians across these separate runs as a runtime
+improvement. Its44.52-second window/full/public seam controls pass; maximum
+boundary difference versus full context is400ms, without boundary ground truth.
+See [the independently audited receipt](docs/alignment-windows-cpu-audit-2026-10-19.json).
+Actual long-input CUDA memory/reuse is still pending.
+
 ## Hosted character CTC workspace — 2026-10-18
 
 Heavy CPU39112822169 passes seven synthetic shapes on EPYC7763/GCC13.3.

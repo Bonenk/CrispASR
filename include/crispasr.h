@@ -783,6 +783,16 @@ CRISPASR_API int whisper_full_with_state(struct whisper_context* ctx, struct whi
 // Not thread safe if executed in parallel on the same context.
 // It seems this approach can offer some speedup in some cases.
 // However, the transcription accuracy can be worse at the beginning and end of each chunk.
+// For multiple processors, duration_ms bounds one interval before splitting;
+// each worker decodes its slice without reapplying the global duration. Zero
+// duration uses the remaining audio. With VAD, interval selection retains its
+// existing processed-audio units. Negative offset/duration is invalid.
+// Available token/DTW times receive the same chunk offset as segment times;
+// negative unavailable-time sentinels and token alternatives are preserved.
+// Worker errors are propagated after all started workers are joined. Failed
+// parallel decoding discards partial results; callbacks already delivered by
+// the first chunk cannot be retracted. Invalid inputs and null worker-state
+// allocations return -1.
 CRISPASR_API int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params params,
                                        const float* samples, int n_samples, int n_processors);
 
@@ -827,7 +837,10 @@ CRISPASR_API whisper_token whisper_full_get_token_id_from_state(struct whisper_s
                                                                 int i_token);
 
 // Get token data for the specified token in the specified segment
-// This contains probabilities, timestamps, etc.
+// This contains probabilities, timestamps, etc. Times are in centiseconds.
+// With VAD, available t0/t1/t_dtw values are mapped to the original audio
+// timeline, like segment getters. Negative unavailable values are preserved.
+// Mapping applies only to the returned copy; repeated reads do not alter state.
 CRISPASR_API whisper_token_data whisper_full_get_token_data(struct whisper_context* ctx, int i_segment, int i_token);
 CRISPASR_API whisper_token_data whisper_full_get_token_data_from_state(struct whisper_state* state, int i_segment,
                                                                        int i_token);
