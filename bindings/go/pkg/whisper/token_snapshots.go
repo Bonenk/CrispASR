@@ -22,8 +22,10 @@ func TokenSnapshots(ctx Context, segment int) ([]native.WhisperTokenSnapshot, er
 }
 
 func (ctx *context) TokenSnapshots(segment int) ([]native.WhisperTokenSnapshot, error) {
-	if ctx == nil || ctx.model == nil || ctx.model.ctx == nil {
-		return nil, ErrInternalAppError
+	nativeContext, release, err := ctx.borrow()
+	if err != nil {
+		return nil, err
 	}
-	return ctx.model.ctx.Whisper_token_snapshots(segment)
+	defer release()
+	return nativeContext.Whisper_token_snapshots(segment)
 }

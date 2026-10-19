@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync"
 
 	// Bindings
 	whisper "github.com/CrispStrobe/CrispASR/bindings/go"
@@ -13,6 +14,7 @@ import (
 // TYPES
 
 type model struct {
+	mu   sync.Mutex
 	path string
 	ctx  *whisper.Context
 }
@@ -52,14 +54,17 @@ func NewWithDTW(path string, preset whisper.AlignmentHeadsPreset, nTop int) (Mod
 }
 
 func (model *model) Close() error {
+	if model == nil {
+		return nil
+	}
+	if !model.mu.TryLock() {
+		return ErrModelBusy
+	}
+	defer model.mu.Unlock()
 	if model.ctx != nil {
 		model.ctx.Whisper_free()
+		model.ctx = nil
 	}
-
-	// Release resources
-	model.ctx = nil
-
-	// Return success
 	return nil
 }
 
@@ -67,6 +72,13 @@ func (model *model) Close() error {
 // STRINGIFY
 
 func (model *model) String() string {
+	if model == nil {
+		return "<whisper.model nil>"
+	}
+	if !model.mu.TryLock() {
+		return "<whisper.model busy>"
+	}
+	defer model.mu.Unlock()
 	str := "<whisper.model"
 	if model.ctx != nil {
 		str += fmt.Sprintf(" model=%q", model.path)
@@ -79,15 +91,19 @@ func (model *model) String() string {
 
 // Return true if model is multilingual (language and translation options are supported)
 func (model *model) IsMultilingual() bool {
-	return model.ctx.Whisper_is_multilingual() != 0
+	ctx, release := model.mustBorrow()
+	defer release()
+	return ctx.Whisper_is_multilingual() != 0
 }
 
 // Return all recognized languages. Initially it is set to auto-detect
 func (model *model) Languages() []string {
-	result := make([]string, 0, whisper.Whisper_lang_max_id())
-	for i := 0; i < whisper.Whisper_lang_max_id(); i++ {
+	ctx, release := model.mustBorrow()
+	defer release()
+	result := make([]string, 0, whisper.Whisper_lang_max_id()+1)
+	for i := 0; i <= whisper.Whisper_lang_max_id(); i++ {
 		str := whisper.Whisper_lang_str(i)
-		if model.ctx.Whisper_lang_id(str) >= 0 {
+		if ctx.Whisper_lang_id(str) >= 0 {
 			result = append(result, str)
 		}
 	}
@@ -95,12 +111,14 @@ func (model *model) Languages() []string {
 }
 
 func (model *model) NewContext() (Context, error) {
-	if model.ctx == nil {
-		return nil, ErrInternalAppError
+	ctx, release, err := model.borrow()
+	if err != nil {
+		return nil, err
 	}
+	defer release()
 
 	// Create new context
-	params := model.ctx.Whisper_full_default_params(whisper.SAMPLING_GREEDY)
+	params := ctx.Whisper_full_default_params(whisper.SAMPLING_GREEDY)
 	params.SetTranslate(false)
 	params.SetPrintSpecial(false)
 	params.SetPrintProgress(false)

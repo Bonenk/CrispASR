@@ -87,7 +87,7 @@ func TestLanguages(t *testing.T) {
 		"mn", "bs", "kk", "sq", "sw", "gl", "mr", "pa", "si", "km", "sn",
 		"yo", "so", "af", "oc", "ka", "be", "tg", "sd", "gu", "am", "yi",
 		"lo", "uz", "fo", "ht", "ps", "tk", "nn", "mt", "sa", "lb", "my",
-		"bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su",
+		"bo", "tl", "mg", "as", "tt", "haw", "ln", "ha", "ba", "jw", "su", "yue",
 	}
 
 	actualLanguages := model.Languages()

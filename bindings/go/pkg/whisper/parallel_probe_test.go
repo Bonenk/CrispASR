@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -155,5 +156,44 @@ func TestProbeHighLevelParallelRejectsUnsupportedAndInvalidInput(t *testing.T) {
 	}
 	if probeParallelNativeCalls() != calls {
 		t.Fatal("rejected input reached native decoder")
+	}
+}
+
+func TestProbeHighLevelCallbackCloseIsRejected(t *testing.T) {
+	probeParallelReset()
+	path := filepath.Join(t.TempDir(), "model")
+	if err := os.WriteFile(path, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	ctx, err := m.NewContext()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx.SetThreads(3)
+	ctx.SetBestOf(7)
+	ctx.SetDetectLanguage(true)
+	ctx.SetSuppressBlank(false)
+	ctx.SetTdrz(true)
+	ctx.SetAltN(32)
+	ctx.SetInitialPrompt("")
+	ctx.SetVADModelPath("")
+	called := false
+	err = ctx.Process([]float32{1, 3, 5}, func() bool {
+		called = true
+		if closeErr := m.Close(); closeErr == nil || !strings.Contains(closeErr.Error(), "busy") {
+			t.Errorf("callback close must reject live inference, got %v", closeErr)
+		}
+		return false
+	}, nil, nil)
+	if !called || err == nil {
+		t.Fatal("encoder abort not observed")
+	}
+	if err := ctx.Process([]float32{1, 3, 5}, nil, nil, nil); err != nil {
+		t.Fatal("context not usable after callback rejection:", err)
 	}
 }

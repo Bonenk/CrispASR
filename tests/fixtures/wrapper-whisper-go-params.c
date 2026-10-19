@@ -1,6 +1,22 @@
 // Included by the Go/Rust probe; real public-header struct transport.
 static char legacy_prompt[256], legacy_model[256];
 #include <stdatomic.h>
+#include <pthread.h>
+static int legacy_foreign_callback;
+void probe_legacy_foreign_callback(int enabled) {
+    legacy_foreign_callback = enabled;
+}
+struct probe_encoder_call {
+    struct whisper_context* context;
+    struct whisper_full_params* params;
+    bool accepted;
+};
+static void* probe_encoder_foreign(void* data) {
+    struct probe_encoder_call* call = data;
+    call->accepted =
+        call->params->encoder_begin_callback(call->context, NULL, call->params->encoder_begin_callback_user_data);
+    return NULL;
+}
 static int legacy_mode;
 static _Atomic int legacy_calls;
 void probe_legacy_expect(const char* prompt, const char* model) {
@@ -21,8 +37,20 @@ static int probe_legacy_full(struct whisper_context* ctx, struct whisper_full_pa
         return -9;
     if (legacy_mode == 1)
         return -1;
-    if (p.encoder_begin_callback && !p.encoder_begin_callback(ctx, NULL, p.encoder_begin_callback_user_data))
-        return -2;
+    if (p.encoder_begin_callback) {
+        if (legacy_foreign_callback) {
+            struct probe_encoder_call call = {ctx, &p, false};
+            pthread_t thread;
+            if (pthread_create(&thread, NULL, probe_encoder_foreign, &call) != 0)
+                return -3;
+            if (pthread_join(thread, NULL) != 0)
+                abort();
+            if (!call.accepted)
+                return -2;
+        } else if (!p.encoder_begin_callback(ctx, NULL, p.encoder_begin_callback_user_data)) {
+            return -2;
+        }
+    }
     if (p.new_segment_callback)
         p.new_segment_callback(ctx, NULL, 1, p.new_segment_callback_user_data);
     if (p.progress_callback)

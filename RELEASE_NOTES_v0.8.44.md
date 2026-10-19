@@ -693,3 +693,15 @@ its measured0.055ms saving is negligible beside4.59s encoder inference on this
 clip. Echo9B's32-layer same-input FFN attribution is also independently audited.
 These diagnostics do not establish long-form boundary accuracy, an accepted Q4
 recipe or GPU performance. Drama3 is excluded from this release's active scope.
+
+### Go high-level model lifetime
+
+Overlapping native operations and close now return `ErrModelBusy`, including
+re-entry from native callbacks. Native-query methods without error returns panic
+on busy/closed access; owned option setters safely update the next decode's
+snapshot. Concurrent/repeated close frees once, and returned segments/tokens
+remain owned. Contexts still share the model's latest native results. Raw
+low-level Context pointers still require caller serialization. Language lookup
+also frees its C string and lists the final supported language. Validation:
+47 Go race cases,34 Rust cases and five doctests; actual Go/model/platform checks
+remain pending.

@@ -54,9 +54,10 @@ accuracy/runtime benchmark. No external code or fitted asset is ported/vendored.
    speech, full/10s/30s encoder seams and default C ABI/Python offset parity.
    Follow with actual long-input CUDA memory/reuse; host DP/logits remain linear
    in recording length. VAD is unused in align-only.
-3. Finish wrapper lifecycle/callable ledger gates from PLAN.md. Same-context
-   inference/close/re-entry still requires caller serialization; do not infer
-   concurrent safety from synchronized callback maps.
+3. Inspect the new high-level Go lifecycle contracts:47 Go race cases pass,
+   including actual pthread callbacks and concurrent close/option updates. Raw
+   low-level pointers and other-language lifecycle remain separate. Validate
+   actual Go/model behavior and continue the callable ledger from PLAN.md.
 4. Rebase/review PR521 after main's Python expectation/deprecated-launcher fixes.
    CUDA11.8's old failure is a Chocolatey504 setup failure. Preserve unchanged
    original/native clone failures and contributor history when deciding scope.

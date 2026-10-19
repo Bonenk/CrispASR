@@ -5,6 +5,7 @@ import (
 	"io"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	// Bindings
@@ -15,9 +16,10 @@ import (
 // TYPES
 
 type context struct {
-	n      int
-	model  *model
-	params whisper.Params
+	paramsMu sync.Mutex
+	n        int
+	model    *model
+	params   whisper.Params
 }
 
 // Make sure context adheres to the interface
@@ -38,24 +40,48 @@ func newContext(model *model, params whisper.Params) (Context, error) {
 ///////////////////////////////////////////////////////////////////////////////
 // PUBLIC METHODS
 
-func (context *context) SetBestOf(n int)          { context.params.SetBestOf(n) }
-func (context *context) SetDetectLanguage(v bool) { context.params.SetDetectLanguage(v) }
-func (context *context) SetSuppressBlank(v bool)  { context.params.SetSuppressBlank(v) }
-func (context *context) SetTdrz(v bool)           { context.params.SetTdrz(v) }
-func (context *context) SetAltN(n int)            { context.params.SetAltN(n) }
+func (context *context) SetBestOf(n int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	context.params.SetBestOf(n)
+}
+func (context *context) SetDetectLanguage(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	context.params.SetDetectLanguage(v)
+}
+func (context *context) SetSuppressBlank(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	context.params.SetSuppressBlank(v)
+}
+func (context *context) SetTdrz(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	context.params.SetTdrz(v)
+}
+func (context *context) SetAltN(n int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	context.params.SetAltN(n)
+}
 
 // Set the language to use for speech recognition.
 func (context *context) SetLanguage(lang string) error {
-	if context.model.ctx == nil {
-		return ErrInternalAppError
+	ctx, release, err := context.borrow()
+	if err != nil {
+		return err
 	}
-	if !context.model.IsMultilingual() {
+	defer release()
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
+	if ctx.Whisper_is_multilingual() == 0 {
 		return ErrModelNotMultilingual
 	}
 
 	if lang == "auto" {
 		context.params.SetLanguage(-1)
-	} else if id := context.model.ctx.Whisper_lang_id(lang); id < 0 {
+	} else if id := ctx.Whisper_lang_id(lang); id < 0 {
 		return ErrUnsupportedLanguage
 	} else if err := context.params.SetLanguage(id); err != nil {
 		return err
@@ -70,6 +96,8 @@ func (context *context) IsMultilingual() bool {
 
 // Get language
 func (context *context) Language() string {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	id := context.params.Language()
 	if id == -1 {
 		return "auto"
@@ -78,139 +106,197 @@ func (context *context) Language() string {
 }
 
 func (context *context) DetectedLanguage() string {
-	return whisper.Whisper_lang_str(context.model.ctx.Whisper_full_lang_id())
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Whisper_lang_str(ctx.Whisper_full_lang_id())
 }
 
 // Set translate flag
 func (context *context) SetTranslate(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTranslate(v)
 }
 
 // Voice Activity Detection (VAD)
 func (context *context) SetVAD(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVAD(v)
 }
 
 func (context *context) SetVADModelPath(path string) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADModelPath(path)
 }
 
 func (context *context) SetVADThreshold(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADThreshold(t)
 }
 
 func (context *context) SetVADMinSpeechMs(ms int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADMinSpeechMs(ms)
 }
 
 func (context *context) SetVADMinSilenceMs(ms int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADMinSilenceMs(ms)
 }
 
 func (context *context) SetVADMaxSpeechSec(s float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADMaxSpeechSec(s)
 }
 
 func (context *context) SetVADSpeechPadMs(ms int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADSpeechPadMs(ms)
 }
 
 func (context *context) SetVADSamplesOverlap(sec float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetVADSamplesOverlap(sec)
 }
 
 func (context *context) SetSplitOnWord(v bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetSplitOnWord(v)
 }
 
 // Set number of threads to use
 func (context *context) SetThreads(v uint) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetThreads(int(v))
 }
 
 // Set time offset
 func (context *context) SetOffset(v time.Duration) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetOffset(int(v.Milliseconds()))
 }
 
 // Set duration of audio to process
 func (context *context) SetDuration(v time.Duration) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetDuration(int(v.Milliseconds()))
 }
 
 // Set timestamp token probability threshold (~0.01)
 func (context *context) SetTokenThreshold(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTokenThreshold(t)
 }
 
 // Set timestamp token sum probability threshold (~0.01)
 func (context *context) SetTokenSumThreshold(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTokenSumThreshold(t)
 }
 
 // Set max segment length in characters
 func (context *context) SetMaxSegmentLength(n uint) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetMaxSegmentLength(int(n))
 }
 
 // Set token timestamps flag
 func (context *context) SetTokenTimestamps(b bool) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTokenTimestamps(b)
 }
 
 // Set max tokens per segment (0 = no limit)
 func (context *context) SetMaxTokensPerSegment(n uint) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetMaxTokensPerSegment(int(n))
 }
 
 // Set audio encoder context
 func (context *context) SetAudioCtx(n uint) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetAudioCtx(int(n))
 }
 
 // Set maximum number of text context tokens to store
 func (context *context) SetMaxContext(n int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetMaxContext(n)
 }
 
 // Set Beam Size
 func (context *context) SetBeamSize(n int) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetBeamSize(n)
 }
 
 // Set Entropy threshold
 func (context *context) SetEntropyThold(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetEntropyThold(t)
 }
 
 // Set Temperature
 func (context *context) SetTemperature(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTemperature(t)
 }
 
 // Set the fallback temperature incrementation
 // Pass -1.0 to disable this feature
 func (context *context) SetTemperatureFallback(t float32) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetTemperatureFallback(t)
 }
 
 // Set initial prompt
 func (context *context) SetInitialPrompt(prompt string) {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	context.params.SetInitialPrompt(prompt)
 }
 
 // ResetTimings resets the mode timings. Should be called before processing
 func (context *context) ResetTimings() {
-	context.model.ctx.Whisper_reset_timings()
+	ctx, release := context.mustBorrow()
+	defer release()
+	ctx.Whisper_reset_timings()
 }
 
 // PrintTimings prints the model timings to stdout.
 func (context *context) PrintTimings() {
-	context.model.ctx.Whisper_print_timings()
+	ctx, release := context.mustBorrow()
+	defer release()
+	ctx.Whisper_print_timings()
 }
 
 // SystemInfo returns the system information
 func (context *context) SystemInfo() string {
+	context.paramsMu.Lock()
+	defer context.paramsMu.Unlock()
 	return fmt.Sprintf("system_info: n_threads = %d / %d | %s\n",
 		context.params.Threads(),
 		runtime.NumCPU(),
@@ -222,7 +308,12 @@ func (context *context) SystemInfo() string {
 // Make sure to call whisper_pcm_to_mel() or whisper_set_mel() first.
 // Returns the probabilities of all languages.
 func (context *context) WhisperLangAutoDetect(offset_ms int, n_threads int) ([]float32, error) {
-	langProbs, err := context.model.ctx.Whisper_lang_auto_detect(offset_ms, n_threads)
+	ctx, release, err := context.borrow()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	langProbs, err := ctx.Whisper_lang_auto_detect(offset_ms, n_threads)
 	if err != nil {
 		return nil, err
 	}
@@ -241,29 +332,32 @@ func (context *context) Process(
 
 func (context *context) process(data []float32, processors int, callEncoderBegin EncoderBeginCallback,
 	callNewSegment SegmentCallback, callProgress ProgressCallback) error {
-	if context == nil || context.model == nil || context.model.ctx == nil {
-		return ErrInternalAppError
+	ctx, release, err := context.borrow()
+	if err != nil {
+		return err
 	}
+	defer release()
 	// Callback-driven segment policy belongs to this call, not later decodes.
+	context.paramsMu.Lock()
 	params := context.params
+	context.paramsMu.Unlock()
 	if callNewSegment != nil {
 		params.SetSingleSegment(true)
 	}
 	var segmentCallback func(int)
 	if callNewSegment != nil {
 		segmentCallback = func(new int) {
-			count := context.model.ctx.Whisper_full_n_segments()
+			count := ctx.Whisper_full_n_segments()
 			for i := count - new; i < count; i++ {
-				callNewSegment(toSegment(context.model.ctx, i))
+				callNewSegment(toSegment(ctx, i))
 			}
 		}
 	}
-	var err error
 	if processors > 1 {
-		err = context.model.ctx.Whisper_full_parallel_with_progress(params, data, processors,
+		err = ctx.Whisper_full_parallel_with_progress(params, data, processors,
 			callEncoderBegin, segmentCallback, callProgress)
 	} else {
-		err = context.model.ctx.Whisper_full(params, data, callEncoderBegin, segmentCallback, callProgress)
+		err = ctx.Whisper_full(params, data, callEncoderBegin, segmentCallback, callProgress)
 	}
 	if err != nil {
 		return err
@@ -275,15 +369,17 @@ func (context *context) process(data []float32, processors int, callEncoderBegin
 
 // Return the next segment of tokens
 func (context *context) NextSegment() (Segment, error) {
-	if context.model.ctx == nil {
-		return Segment{}, ErrInternalAppError
+	ctx, release, err := context.borrow()
+	if err != nil {
+		return Segment{}, err
 	}
-	if context.n >= context.model.ctx.Whisper_full_n_segments() {
+	defer release()
+	if context.n >= ctx.Whisper_full_n_segments() {
 		return Segment{}, io.EOF
 	}
 
 	// Populate result
-	result := toSegment(context.model.ctx, context.n)
+	result := toSegment(ctx, context.n)
 
 	// Increment the cursor
 	context.n++
@@ -294,58 +390,62 @@ func (context *context) NextSegment() (Segment, error) {
 
 // Test for text tokens
 func (context *context) IsText(t Token) bool {
-	switch {
-	case context.IsBEG(t):
-		return false
-	case context.IsSOT(t):
-		return false
-	case whisper.Token(t.Id) >= context.model.ctx.Whisper_token_eot():
-		return false
-	case context.IsPREV(t):
-		return false
-	case context.IsSOLM(t):
-		return false
-	case context.IsNOT(t):
-		return false
-	default:
-		return true
-	}
+	ctx, release := context.mustBorrow()
+	defer release()
+	id := whisper.Token(t.Id)
+	return id != ctx.Whisper_token_beg() && id != ctx.Whisper_token_sot() &&
+		id < ctx.Whisper_token_eot() && id != ctx.Whisper_token_prev() &&
+		id != ctx.Whisper_token_solm() && id != ctx.Whisper_token_not()
 }
 
 // Test for "begin" token
 func (context *context) IsBEG(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_beg()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_beg()
 }
 
 // Test for "start of transcription" token
 func (context *context) IsSOT(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_sot()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_sot()
 }
 
 // Test for "end of transcription" token
 func (context *context) IsEOT(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_eot()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_eot()
 }
 
 // Test for "start of prev" token
 func (context *context) IsPREV(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_prev()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_prev()
 }
 
 // Test for "start of lm" token
 func (context *context) IsSOLM(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_solm()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_solm()
 }
 
 // Test for "No timestamps" token
 func (context *context) IsNOT(t Token) bool {
-	return whisper.Token(t.Id) == context.model.ctx.Whisper_token_not()
+	ctx, release := context.mustBorrow()
+	defer release()
+	return whisper.Token(t.Id) == ctx.Whisper_token_not()
 }
 
 // Test for token associated with a specific language
 func (context *context) IsLANG(t Token, lang string) bool {
-	if id := context.model.ctx.Whisper_lang_id(lang); id >= 0 {
-		return whisper.Token(t.Id) == context.model.ctx.Whisper_token_lang(id)
+	ctx, release := context.mustBorrow()
+	defer release()
+	if id := ctx.Whisper_lang_id(lang); id >= 0 {
+		return whisper.Token(t.Id) == ctx.Whisper_token_lang(id)
 	} else {
 		return false
 	}

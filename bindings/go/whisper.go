@@ -264,7 +264,9 @@ func (ctx *Context) Whisper_tokenize(text string, tokens []Token) (int, error) {
 //	"de" -> 2
 //	"german" -> 2
 func (ctx *Context) Whisper_lang_id(lang string) int {
-	return int(C.whisper_lang_id(C.CString(lang)))
+	value := C.CString(lang)
+	defer C.free(unsafe.Pointer(value))
+	return int(C.whisper_lang_id(value))
 }
 
 // Largest language id (i.e. number of available languages - 1)

@@ -1,3 +1,33 @@
+## High-level Go legacy lifecycle and language repairs — 2026-10-19
+
+The high-level Model now owns a nonblocking native borrow shared by its Contexts.
+Decode/close, context construction, native setters/queries and result/token
+copying cannot overlap. Error-returning operations return ErrModelBusy; native
+queries without error returns panic on busy/closed access instead of calling
+through invalid handles. String safely reports busy/closed state. Rejected
+close leaves inference/model usable; subsequent and repeated close free once.
+Contexts still share native decoder/results; this is not independent state per
+Context. Low-level raw pointers retain their caller-serialization contract.
+
+All Go-owned parameter setters/readers and per-call snapshots now use a separate
+mutex. Callback option updates affect the next decode without mutating the
+active copy. SetLanguage additionally borrows native state. Owned Segment/token
+copies remain valid after close. The low-level language lookup releases its
+temporary C string; Languages now includes the final supported native ID
+(Cantonese on the real table). The model test's expected inventory includes it.
+
+The callback-close regression fails before repair (close succeeds and invalidates
+the context) and passes afterward. A separate public-method probe observes the
+omitted-last-language failure before its repair. Ten high-level cases now cover
+blocked shared-context calls, all native readers, callbacks from an actual
+pthread, error/abort/recovery, concurrent option writes/reads/snapshots,16 racing
+closers and ownership after close. All **47 Go cases pass with the race detector,
+34 Rust cases and five doctests pass** against the strict isolated public-header
+fixture;25 literal native scalar setters are compiled. Initial test assumptions
+about fixture controls/default language were corrected separately from runtime
+fixes. Go formatting, generated cgo flags and documentation checks pass. Hosted
+and actual-Go-model acceptance remain separate; no new speed/quality claim.
+
 ## Character alignment Java build preflight repaired — 2026-10-19
 
 Hosted character-alignment run39212277740 failed before model download/build:

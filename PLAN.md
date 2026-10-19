@@ -23,18 +23,16 @@ peak-memory/reuse. Host logits/DP memory still grows with duration; this is not
 an unlimited-length or constant-host-memory claim. Do not close550 before real
 long-input GPU validation. No foreign alignment implementation is used.
 
-## Active — high-level Go legacy model lifecycle
+## Go lifecycle follow-up after the high-level repair
 
-Owner: maintainer coordinator. Enforce one native operation/close at a time per
-shared high-level Model, including its multiple Contexts. Use a nonblocking
-borrow so callback re-entry/close returns a busy error rather than self-deadlock.
-Guard option mutation/copy separately so callback setters affect later calls.
-Guard result/cursor/token readers through the native copy, including concurrent
-close; retain owned callback results. Operations without error returns must
-reject busy/closed access explicitly. Preserve public interfaces and legacy
-pointer ABI. Add race-enabled real public-method probes for callback close,
-re-entry, blocked concurrent decode, option updates, recovery and repeated close.
-Low-level raw Go pointers and other-language lifecycle remain separate scope.
+The built-in high-level Model now enforces nonblocking ownership across native
+operations/close and separately synchronizes options. Completed implementation,
+47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
+Next inspect current hosted binding contracts and validate the high-level Go
+callback-close/re-entry guard with an actual small Whisper model. Raw low-level
+Go pointers still require caller serialization; assess an owned low-level
+adapter before promising their concurrent lifetime safety. Native result states
+remain shared across high-level Contexts. Other-language lifecycle remains open.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
@@ -88,8 +86,8 @@ Recommended implementation order and concrete acceptance:
    remaining token introspection and legacy context/callback lifecycle auditing.
    Review higher-level APIs as well as the low-level bindings. Go's
    higher-level `ProcessParallel` optional capability now reaches the native
-   pointer/progress adapter, with compiled operation tests. Model acceptance,
-   same-model lifecycle serialization and callback-close safety remain open.
+   pointer/progress adapter, with compiled operation tests. Actual Go model/device acceptance remains open; the built-in high-level
+   Model's ownership/close guards now have compiled race/pthread probes.
    Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
    high-level model constructor now have operation probes. The shared helper
    disables incompatible flash attention. Owned Rust/Go token snapshots now expose
@@ -106,9 +104,10 @@ Recommended implementation order and concrete acceptance:
    probes, including invalid indices/counts, null/empty native output and cleanup.
    Native declarations alone do not satisfy these rows. Go callback registries
    now synchronize concurrent contexts without holding locks through user
-   callbacks, with a hosted race-detector gate. Same-context inference/close/
-   re-entry still requires caller serialization; audit/enforce that lifecycle
-   in low-level and high-level APIs, including foreign callback threads.
+   callbacks, with a hosted race-detector gate. The built-in high-level Model
+   now rejects overlapping native operations/close, including foreign callback
+   threads. Raw low-level pointers still require caller serialization; audit an
+   owned adapter and the remaining other-language lifecycle separately.
    Rust's 25 scalar-helper routes now have compiled controls/old-options probes;
    validate language/prompt/thread/temperature and alternative behavior with
    actual models, including native parallel chunk merging. Audit raw full-params

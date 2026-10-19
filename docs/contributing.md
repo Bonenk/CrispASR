@@ -789,7 +789,14 @@ preset mappings, top-layer validation, context cleanup and indexed DTW output.
 The high-level Go DTW constructor now has an operation test in addition to
 package compilation. Go's hosted wrapper contract enables the race detector;
 callback registry locks must be released before invoking user callbacks. Registry
-locking alone does not serialize same-context inference and close.
+locking alone does not serialize same-context inference and close. The built-in
+high-level Go Model now uses a shared nonblocking borrow across decode, close,
+readers, native setters and Context construction. Error-returning methods reject
+with `ErrModelBusy`; native queries lacking an error return panic on busy/closed
+access. Option setters/copy have a separate mutex. Probe callback close/re-entry,
+a blocked concurrent decode, all result readers and a real pthread callback.
+The raw low-level Go Context still requires caller serialization; do not describe
+this as universal wrapper lifecycle safety.
 
 Legacy token adapters must copy both chosen-token and candidate text before
 native buffers can be reused or the model closed. Preserve raw UTF-8 fragments

@@ -1279,22 +1279,24 @@ float whisper_full_get_segment_no_speech_prob(struct whisper_context* ctx, int i
     return .125f;
 }
 int whisper_full_lang_id(struct whisper_context* ctx) {
-    STUB_ABORT();
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
     return 0;
 }
 const char* whisper_lang_str(int id) {
-    return "en";
+    return id == 0 ? "en" : id == 1 ? "de" : NULL;
 }
 int whisper_lang_id(const char* lang) {
-    STUB_ABORT();
-    return 0;
+    return lang && strcmp(lang, "en") == 0 ? 0 : lang && strcmp(lang, "de") == 0 ? 1 : -1;
 }
 int whisper_lang_max_id(void) {
-    STUB_ABORT();
-    return 0;
+    return 1;
 }
 int whisper_lang_auto_detect(struct whisper_context* ctx, int off, int nt, float* probs) {
-    STUB_ABORT();
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0 || off < 0 || nt <= 0 || !probs)
+        STUB_ABORT();
+    probs[0] = .75f;
+    probs[1] = .25f;
     return 0;
 }
 int whisper_n_len(struct whisper_context* ctx) {
@@ -1314,40 +1316,48 @@ int whisper_n_audio_ctx(struct whisper_context* ctx) {
     return 0;
 }
 int whisper_is_multilingual(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 1;
 }
 const char* whisper_token_to_str(struct whisper_context* ctx, int tok) {
     STUB_ABORT();
     return "";
 }
 int whisper_token_eot(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 100;
 }
 int whisper_token_sot(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 101;
 }
 int whisper_token_prev(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 102;
 }
 int whisper_token_solm(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 103;
 }
 int whisper_token_not(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 104;
 }
 int whisper_token_beg(struct whisper_context* ctx) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
+    return 105;
 }
 int whisper_token_lang(struct whisper_context* ctx, int id) {
-    STUB_ABORT();
-    return 0;
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0 || id < 0 || id > 1)
+        STUB_ABORT();
+    return 200 + id;
 }
 int whisper_token_translate(struct whisper_context* ctx) {
     STUB_ABORT();
@@ -1358,14 +1368,15 @@ int whisper_token_transcribe(struct whisper_context* ctx) {
     return 0;
 }
 void whisper_print_timings(struct whisper_context* ctx) {
-    STUB_ABORT();
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
 }
 void whisper_reset_timings(struct whisper_context* ctx) {
-    STUB_ABORT();
+    if (ctx != rust_legacy_context() || rust_legacy_contexts <= 0)
+        STUB_ABORT();
 }
 const char* whisper_print_system_info(void) {
-    STUB_ABORT();
-    return "";
+    return "probe CPU";
 }
 void whisper_log_set(ggml_log_callback a, void* b) {
     STUB_ABORT();

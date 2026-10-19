@@ -10,8 +10,9 @@ type ParallelProcessor interface {
 
 // ProcessParallel splits mono PCM into the requested number of native chunks.
 // One processor uses ordinary sequential decoding. Chunk boundaries can change
-// the transcript; progress frequency depends on the native decoder. Callers must
-// serialize model operations and must not close/re-enter it from callbacks.
+// the transcript; progress frequency depends on the native decoder. The built-in
+// high-level model rejects concurrent/reentrant native operations and callback
+// close with ErrModelBusy. Third-party implementations define their own policy.
 // Contexts without this capability return an error.
 func ProcessParallel(ctx Context, data []float32, processors int, encoder EncoderBeginCallback,
 	segment SegmentCallback, progress ProgressCallback) error {
