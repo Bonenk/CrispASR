@@ -19,14 +19,18 @@ completed successfully on frozen source191815511, branchdiag/550-cuda-memory-202
 Claimed by the maintainer coordinator: actual GPU execution and output audit.
 The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
 archive/provenance and27 member hashes. Worker and method:
-`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.1).
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.2).
 Source/model/fixture pins are frozen; GPU acceptance is still pending.
 Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
 this task's acceptance concerns CTC alignment memory. Inspect build provenance,
 source/library/archive hashes and dependency closure before GPU execution.
 
-Kaggle worker version1 was pushed once and is queued at this checkpoint.
-Do not repush while it is live; retain terminal logs before any repair push.
+Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
+Named credential fallback is repaired and version2 uses an immutable public HF
+mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
+verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2
+is prepared for one fresh run after quota/concurrency checks. Keep actual
+GPU/cache/long-file acceptance open; delivery is not inference proof.
 
 Kernel acceptance, per the maintainer's external Kaggle guide:
 

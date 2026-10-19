@@ -1,3 +1,22 @@
+## Kaggle credential preflight repaired; immutable CUDA delivery — 2026-10-19
+
+Alignment CUDA worker v1 reached terminal ERROR before any inference: a missing
+GH credential silently fell back to an HF token and Actions returned401. Both
+missing-named-token and wrong-earlier-dataset cases fail before the resolver
+repair. Named credentials now resolve only their requested filename; default
+HF lookup retains its historical aliases. All17 hermetic resolver controls pass,
+including downloader absence and rejected-token refusal. Canonical/bundled
+harness copies remain synchronized. Production token validation is unchanged;
+mount/precedence tests no longer send synthetic credentials to live services.
+
+Version2 uses an immutable anonymous HF mirror of the previously audited CUDA
+archive and five licensed pinned fixture inputs. Full anonymous downloads verify
+489,213,512 runtime bytes and269,096 fixture bytes; revision/hashes are retained
+in docs/alignment-cuda-mirror-2026-10-19.json. Native/model pins are unchanged.
+The worker frees the cached context after short/long/short acceptance before
+loading a fresh CLI model. No GPU or long-file acceptance follows from delivery;
+the remaining hardware test is in PLAN.md. Terminal v1 logs are retained privately.
+
 ## Real-model high-level Go lifecycle accepted — 2026-10-19
 
 Run39228691810/source5aba585ce passes after the Opus build preflight repair.

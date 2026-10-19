@@ -583,7 +583,7 @@ def _kaggle_input_root() -> Path:
 
 
 def kaggle_token_from_dataset(filename: str = "hf_token.txt") -> str | None:
-    """Read an HF token from a private Kaggle Dataset mounted via
+    """Read a named credential from a private Kaggle Dataset mounted via
     kernel-metadata.json `dataset_sources` (e.g. ${KAGGLE_ACCOUNT}/crispasr-hf-token
     → /kaggle/input/crispasr-hf-token/hf_token.txt). Bypasses the flaky
     Secrets API; datasets are filesystem-mounted before the script runs.
@@ -632,14 +632,18 @@ def kaggle_token_from_dataset(filename: str = "hf_token.txt") -> str | None:
                             s for s in sorted(owner.iterdir()) if s.is_dir())
             else:
                 classic_dirs.append(sub)  # classic <root>/<slug>
+    # HF aliases apply only to the default HF request. A named credential
+    # must never silently resolve to a different service's token.
+    filenames = (filename, "token", "access_token") if filename == "hf_token.txt" else (filename,)
     for d in classic_dirs + nested_dirs:
-        for fn in (filename, "hf_token.txt", "token", "access_token"):
+        for fn in filenames:
             p = d / fn
             if p not in candidates:
                 candidates.append(p)
     # Also try the flat file variants
-    candidates.append(root / "crispasr-hf-token" / "token")
-    candidates.append(root / "crispasr-hf-token" / "access_token")
+    if filename == "hf_token.txt":
+        candidates.append(root / "crispasr-hf-token" / "token")
+        candidates.append(root / "crispasr-hf-token" / "access_token")
 
     # Debug: list what we're scanning
     for p in candidates:
