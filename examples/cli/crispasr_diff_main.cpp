@@ -35,6 +35,7 @@
 
 #include "crispasr_diff.h"
 #include "crispasr_dia_diff.h"
+#include "crispasr_openvoice_diff.h"
 #include "core/backend_validation.h"
 #include "gguf.h"
 
@@ -2021,6 +2022,10 @@ int main(int argc, char** argv) {
                 "crispasr-diff: warning: reference archive was dumped for backend '%s' "
                 "but you asked for '%s'\n",
                 ref_backend.c_str(), backend_name.c_str());
+    }
+
+    if (backend_name == "openvoice2") {
+        return crispasr_openvoice_diff(model_path, ref, std::getenv("CRISPASR_DIFF_USE_GPU") != nullptr);
     }
 
     // Load audio (any common format, via read_audio_data).

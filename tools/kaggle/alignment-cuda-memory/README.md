@@ -6,11 +6,15 @@ loads Torch. Before pushing, check account quota and concurrent sessions. Push
 with `tools/kaggle/kpush.py`; account and credentials must remain external.
 
 The script pins source191815511, the CUDA12.4.1 sm60/sm75 bundle from
-run39215806310, and the accepted CPU fixture archive from39212307554. Both
-Actions ZIPs, the native archive, every packaged runtime member, model and
-fixture inputs are verified. The attached credential dataset needs Actions
-artifact read access and the ordinary HF token. Expired artifacts require a
-reviewed replacement and new pins; never silently fetch the latest build.
+run39215806310, and the accepted CPU fixture archive from39212307554. The native archive, every packaged runtime member, model and fixture inputs
+are verified. Version2 downloads an anonymously verified immutable public HF
+mirror of the audited archive and five licensed fixture files; no Actions
+credential is needed. The ordinary HF token supports progress uploads. Mirror
+revision and full-byte verification are in
+[the delivery receipt](../../../docs/alignment-cuda-mirror-2026-10-19.json).
+Never silently fetch the latest build or change runtime/model pins. Version1
+failed before inference when a missing GH token resolved to an HF fallback;
+its terminal logs were retained before preparing version2.
 
 The public Python/C ABI cache is reused across44.52s,2703s and44.52s of exactly
 repeated licensed Japanese FLEURS speech. The last short call must reproduce the

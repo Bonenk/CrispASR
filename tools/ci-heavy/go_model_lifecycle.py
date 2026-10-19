@@ -55,17 +55,19 @@ def main():
              '-DBUILD_SHARED_LIBS=ON', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
              '-DGGML_NATIVE=OFF', '-DGGML_CUDA=OFF', '-DGGML_METAL=OFF',
              '-DGGML_VULKAN=OFF', '-DGGML_BLAS=OFF', '-DCRISPASR_BUILD_SERVER=OFF',
-             '-DCRISPASR_BUILD_TESTS=OFF'], 'configure')
+             '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_OPUS_FETCH=ON'], 'configure')
         run(['cmake', '--build', build, '--target', 'crispasr-lib', '-j2'], 'build')
-        model = scratch / 'ggml-tiny.en.bin'
-        url = f'https://huggingface.co/ggerganov/whisper.cpp/resolve/{MODEL_REV}/ggml-tiny.en.bin'
-        with urllib.request.urlopen(url, timeout=180) as source, model.open('wb') as target:
-            shutil.copyfileobj(source, target)
-        if sha(model) != MODEL_SHA:
-            raise ValueError('Pinned model checksum mismatch')
         libraries = list(build.rglob('libcrispasr.so'))
         if len(libraries) != 1:
             raise ValueError('Expected one real native library')
+        native = out / 'native'
+        native.mkdir(exist_ok=True)
+        for dependency in build.rglob('*.so*'):
+            if dependency.is_file():
+                shutil.copy2(dependency, native / dependency.name)
+        shutil.copy2(build / 'compile_commands.json', out / 'compile_commands.json')
+        receipt.update(library_sha256=sha(libraries[0]), probe_sha256=sha(ROOT / 'tools/ci-heavy/go-model-lifecycle/main.go'))
+        save()
         directories = sorted({p.parent for pattern in ('*.a', '*.so*') for p in build.rglob(pattern) if p.is_file()})
         env = dict(os.environ)
         env['CGO_ENABLED'] = '1'
@@ -77,16 +79,18 @@ def main():
         # Compile the actual public packages and their ordinary generated linker
         # directives; no substitute headers, stub libraries or altered bindings.
         run(['go', 'build', '-race', '-o', binary, source], 'go-build', env=env, cwd=ROOT / 'bindings/go')
+        shutil.copy2(binary, native / binary.name)
+        model = scratch / 'ggml-tiny.en.bin'
+        url = f'https://huggingface.co/ggerganov/whisper.cpp/resolve/{MODEL_REV}/ggml-tiny.en.bin'
+        with urllib.request.urlopen(url, timeout=180) as response, model.open('wb') as target:
+            shutil.copyfileobj(response, target)
+        if sha(model) != MODEL_SHA:
+            raise ValueError('Pinned model checksum mismatch')
+        receipt.update(model_sha256=MODEL_SHA, audio_sha256=AUDIO_SHA, binary_sha256=sha(binary))
+        save()
         run([binary, model, audio, out / 'go-results.json'], 'go-model-acceptance', env=env, timeout=1800)
         if 'GO_REAL_MODEL_LIFECYCLE_PASS' not in (out / 'go-model-acceptance.log').read_text():
             raise ValueError('Probe did not complete')
-        native = out / 'native'
-        native.mkdir(exist_ok=True)
-        for dependency in build.rglob('*.so*'):
-            if dependency.is_file():
-                shutil.copy2(dependency, native / dependency.name)
-        shutil.copy2(binary, native / binary.name)
-        shutil.copy2(build / 'compile_commands.json', out / 'compile_commands.json')
         receipt.update(model_sha256=MODEL_SHA, audio_sha256=AUDIO_SHA,
                        library_sha256=sha(libraries[0]), binary_sha256=sha(binary), probe_sha256=sha(source),
                        source_sha256={str(p.relative_to(ROOT)): sha(p) for p in

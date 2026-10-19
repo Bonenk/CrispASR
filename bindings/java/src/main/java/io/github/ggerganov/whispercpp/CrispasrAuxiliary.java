@@ -298,6 +298,8 @@ public final class CrispasrAuxiliary {
 
     public SpeakerEmbedder(String modelSpec, int nThreads, String cacheDir) {
       Objects.requireNonNull(modelSpec, "modelSpec");
+      if (modelSpec.indexOf(0) >= 0 || (cacheDir != null && cacheDir.indexOf(0) >= 0))
+        throw new IllegalArgumentException("Speaker paths must not contain NUL");
       if (modelSpec.isEmpty())
         throw new IllegalArgumentException("modelSpec empty");
       if (nThreads <= 0)
@@ -379,8 +381,12 @@ public final class CrispasrAuxiliary {
     int[] labels = new int[n];
     int rc = CrispasrSession.Lib.INSTANCE.crispasr_speaker_cluster_abi(
         embeddings, n, dim, mergeThreshold, maxSpeakers, labels);
-    if (rc < 0)
-      throw new IllegalStateException("crispasr_speaker_cluster_abi failed (rc=" + rc + ")");
+    if (rc < 0 || rc > n)
+      throw new IllegalStateException("Invalid speaker cluster count: " + rc);
+    for (int label : labels) {
+      if (rc == 0 ? label != -1 : label < 0 || label >= rc)
+        throw new IllegalStateException("Invalid speaker cluster label: " + label);
+    }
     return new ClusterResult(labels, rc);
   }
 
@@ -394,6 +400,8 @@ public final class CrispasrAuxiliary {
     public PyannoteCache(float[] fullAudio, String modelPath, int nThreads) {
       Objects.requireNonNull(fullAudio, "fullAudio");
       Objects.requireNonNull(modelPath, "modelPath");
+      if (modelPath.indexOf(0) >= 0)
+        throw new IllegalArgumentException("Model path must not contain NUL");
       if (fullAudio.length == 0)
         throw new IllegalArgumentException("fullAudio empty");
       if (nThreads <= 0)

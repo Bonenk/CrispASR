@@ -10,13 +10,14 @@ in a tracked receipt does not change an immutable public artifact's hash.
 Whisper CPU model run39211685024 (sourceafeffa1a5) is complete and independently
 audited:12 native/six Python cases pass exact raw timestamp bounds. Current
 CPU alignment39212307554 (source62e598ca0) is now independently audited too.
-Current priority is actual long-input CUDA memory/reuse, hosted/high-level Go
-model acceptance, remaining callable/lifecycle gaps, PR521 and release validation.
+Current priority is actual long-input CUDA memory/reuse. High-level Go model
+acceptance is complete within its audited CPU scope; remaining callable/lifecycle
+gaps, PR521 and release validation follow.
 CUDA build39215806310 succeeded on frozen191815511. Arabic CTC/Java39214206020
 and all six binding contracts39215435420 also succeeded. The retained Arabic
 15-word/85-character/100-Java-row outputs are independently audited; see
-arabic-characters-java-audit-2026-10-19.json for scope and missing replay inputs. General CI39216228487 on65b851a91
-is queued at this checkpoint. PLAN.md scopes the
+arabic-characters-java-audit-2026-10-19.json for scope and missing replay inputs.
+Inspect exact current-main CI; earlier documentation-tip runs may be cancelled. PLAN.md scopes the
 Kaggle memory/cache follow-up in tools/kaggle/alignment-cuda-memory/;
 the archive and27 member hashes are independently audited. No GPU acceptance
 is claimed until the run and retained outputs pass audit. Drama3 is
@@ -67,15 +68,18 @@ release blocker.
    Inspect CUDA bundle39215806310, then run approximately45 minutes plus warm
    short/long/short cache changes on real CUDA. PLAN.md gives the exact gates.
    Host DP/logits remain linear; VAD is unused in align-only. Keep550 open.
-3. Inspect the new high-level Go lifecycle contracts:47 Go race cases pass,
-   including actual pthread callbacks and concurrent close/option updates. New
-   hosted-only tools/ci-heavy/go_model_lifecycle.py prepares real-model callback,
-   abort/recovery and parallel ownership acceptance; execution is pending. Raw
-   low-level pointers and other-language lifecycle remain separate. Validate
-   actual Go/model behavior and continue the callable ledger from PLAN.md.
-4. Rebase/review PR521 after main's Python expectation/deprecated-launcher fixes.
-   CUDA11.8's old failure is a Chocolatey504 setup failure. Preserve unchanged
-   original/native clone failures and contributor history when deciding scope.
+3. Preserve the real Go model audit39228691810/source5aba585ce:26 artifacts,
+   34 sources, four actual decodes, callback/concurrent guards, cancellation
+   recovery and owned snapshots pass. See go-model-lifecycle-audit-2026-10-19.json.
+   Go/Rust generic speaker paths also pass51 Go race/35 Rust/five doctests.
+   Continue existing Python/C#/Java/Dart generic primitive methods and the
+   callable ledger. Raw Go handles, other languages, real VAD/DTW model modes
+   and additional devices remain separate scope; do not repeat accepted JFK.
+4. Inspect PR521 headab6c92cae and its fresh checks. Current main is merged
+   without rewriting contributor history; the helper conflict, stale ggml pin
+   and signed128-minimum overflow are repaired. Literal UBSan, allocator/OOM
+   and helper tests pass. Original/native clone gates remain failed; no full
+   runtime/default merge is authorized by component-only proof.
 5. Freeze accepted release scope, inspect exact package/wheel CI, then finalize
    notes/tag/publication. No release from queued jobs or fixture-only claims.
 
@@ -134,8 +138,9 @@ portability rewrite during a numerical diagnosis.
 ## Handoff checks
 
 Use `gh issue list`, `gh pr list` and `gh run list --branch main` to refresh state.
-The sole open PR at handoff is draft521 at381f3a3a; issues456,461,483,485,518,532,
-545,546,547 remain open. Read whole discussions before acting on new updates.
+The sole open PR at this checkpoint is ready-for-review521 atab6c92cae;
+issues456,461,483,485,518,532,545,546,549 and550 remain open. Refresh live
+state before acting; historical issue numbers above may already be closed. Read whole discussions before acting on new updates.
 Run the secret/privacy suite with the maintainer account environment supplied
 privately so the account guard is not skipped. Check document anchors, generated
 LEARNINGS index, workflow shell and version consistency after documentation edits.

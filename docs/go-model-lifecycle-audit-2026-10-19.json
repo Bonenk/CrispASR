@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "run": 39228691810,
+  "source": "5aba585ce5ab7b5a7df390ef3b868a2c5e12c12a",
+  "status": "independent retained artifact/source/output audit passed",
+  "verified_artifacts": 26,
+  "verified_sources": 34,
+  "cases": 4,
+  "callback_checks": [
+    0,
+    4,
+    0,
+    8
+  ],
+  "segment_counts": [
+    2,
+    2,
+    2,
+    2
+  ],
+  "token_rows": 105,
+  "first_segment_owned_snapshots": 58,
+  "alternatives": 116,
+  "fixture_duration_cs": 1100,
+  "race_instrumented_go_binary": true,
+  "sequential_callback_and_recovery_results": "exact",
+  "library_sha256": "da929b5c3c61a0d966cc08142824492130c0d7c6813cf7017be38d30ad74f909",
+  "binary_sha256": "ade18e381176a79682b4aac375afae6ab0ace14eb4a160d306cf2b61c17fecae",
+  "receipt_sha256": "ff9598160b0cb2feb88a986a959b4b340d93991def27e0afbc490e57c86c5c74",
+  "raw_results_sha256": "088e811134e4b4546348bf251b8badf1718d6cff9effbfa821ddffa042c2a928",
+  "model_revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+  "model_sha256_reported_by_hosted_worker": "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f",
+  "limitations": [
+    "CPU tiny.en/JFK greedy high-level Go lifecycle only; no original-reference, WER, speed, GPU or real VAD-model acceptance",
+    "native C++ is not instrumented by the Go race detector",
+    "generic speaker handles and raw low-level Go Context still require caller serialization",
+    "no DTW model mode; unavailable DTW sentinels are preserved",
+    "model weights were hash-checked on hosted scratch and not downloaded again for this audit"
+  ]
+}

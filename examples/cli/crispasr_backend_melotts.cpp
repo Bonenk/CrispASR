@@ -225,6 +225,8 @@ public:
             float* cloned_pcm = nullptr;
             int n_cloned = 0;
 
+            if (!openvoice2_set_source_speaker(ov2_ctx_, melotts_source_speaker(ctx_)))
+                openvoice2_set_source_speaker(ov2_ctx_, nullptr);
             if (openvoice2_convert(ov2_ctx_, out.data(), (int)out.size(), src_sr, ref_pcm_.data(), (int)ref_pcm_.size(),
                                    ref_sr_, &cloned_pcm, &n_cloned)) {
                 out.assign(cloned_pcm, cloned_pcm + n_cloned);

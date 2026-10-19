@@ -25,6 +25,10 @@ class GoRustWrapperContract(unittest.TestCase):
             runtime=(ROOT/'src/crispasr_c_api.cpp').read_text()
             start=runtime.index('struct crispasr_open_params_v1 {')
             (tmp/'runtime-open-layout.h').write_text(runtime[start:runtime.index('};',start)+2])
+            layouts=[]
+            for name in ['crispasr_diarize_seg_abi','crispasr_diarize_turn_abi','crispasr_diarize_opts_abi']:
+                start=runtime.index('struct '+name+' {');end=runtime.index('};',start)+2;layouts.append(runtime[start:end])
+            (tmp/'runtime-abi-layout.h').write_text('\n'.join(layouts))
             obj=tmp/'probe.o'
             subprocess.run(['cc','-std=c11','-Werror','-fPIC','-I'+str(tmp),'-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
                 '-c',str(ROOT/'tests/fixtures/go-rust-wrapper-abi.c'),'-o',str(obj)],check=True)

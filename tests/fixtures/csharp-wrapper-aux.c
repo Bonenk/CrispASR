@@ -26,7 +26,7 @@ void crispasr_speaker_embedder_free_abi(void* p) {
     }
 }
 int32_t crispasr_speaker_embedder_dim_abi(const void* p) {
-    return 3;
+    return mode == 17 ? 0 : 3;
 }
 const char* crispasr_speaker_embedder_name_abi(const void* p) {
     return "embed-probe";
@@ -34,6 +34,10 @@ const char* crispasr_speaker_embedder_name_abi(const void* p) {
 int32_t crispasr_speaker_embedder_embed_abi(void* p, const float* pcm, int n, float* out) {
     if (mode == 2)
         return 0;
+    if (mode == 15)
+        return 2;
+    if (mode == 16)
+        return -1;
     out[0] = .25f;
     out[1] = .5f;
     out[2] = .75f;
@@ -42,8 +46,14 @@ int32_t crispasr_speaker_embedder_embed_abi(void* p, const float* pcm, int n, fl
 int32_t crispasr_speaker_cluster_abi(const float* embeddings, int n, int dim, float threshold, int max, int* labels) {
     if (dim != 3 || n != 2)
         return -1;
-    labels[0] = 0;
-    labels[1] = 1;
+    labels[0] = mode == 14 ? -1 : 0;
+    labels[1] = mode == 14 ? -1 : (mode == 12 ? 2 : 1);
+    if (mode == 11)
+        return 3;
+    if (mode == 13)
+        return -1;
+    if (mode == 14)
+        return 0;
     return 2;
 }
 void* crispasr_pyannote_cache_compute_abi(const float* pcm, int n, const char* model, int threads) {

@@ -43,6 +43,7 @@
 #include <string>
 #include <vector>
 #include "core/ggml_cpu_backend.h"
+#include "core/gpu_backend_pref.h"
 
 // ===========================================================================
 // Bench instrumentation — `OPENVOICE2_BENCH=1` for per-stage timings.
@@ -226,11 +227,19 @@ struct openvoice2_context {
     float tau;
     std::mt19937 rng;
     std::string dump_dir;
+    std::string source_speaker;
+    std::vector<float> target_override;
+    std::vector<float> posterior_noise;
+    openvoice2_stage_callback stage_callback = nullptr;
+    void* stage_user = nullptr;
+    uint64_t model_identity = 0;
 };
 
 // ── Diff dump helpers ────────────────────────────────────────────────
 
 static void dump_stage(const openvoice2_context* ctx, const char* label, const float* data, size_t n) {
+    if (ctx->stage_callback)
+        ctx->stage_callback(label, data, n, ctx->stage_user);
     if (ctx->dump_dir.empty())
         return;
     std::string path = ctx->dump_dir + "/" + label + ".bin";
@@ -280,6 +289,8 @@ extern "C" struct openvoice2_context_params openvoice2_context_default_params(vo
 
 extern "C" struct openvoice2_context* openvoice2_init_from_file(const char* path,
                                                                 struct openvoice2_context_params params) {
+    if (!path || !*path || params.n_threads <= 0 || !std::isfinite(params.tau) || params.tau < 0)
+        return nullptr;
     auto* ctx = new openvoice2_context();
     ctx->verbosity = params.verbosity;
     ctx->tau = params.tau;
@@ -373,11 +384,25 @@ extern "C" struct openvoice2_context* openvoice2_init_from_file(const char* path
 
     // Pass 2: load weights via core_gguf
     ctx->backend_cpu = core_cpu_backend::init();
-    ctx->backend = ctx->backend_cpu;
+    if (!ctx->backend_cpu) {
+        delete ctx;
+        return nullptr;
+    }
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, params.n_threads);
+    const char* gpu_gate = crispasr_env::get("CRISPASR_OV2_GPU");
+    ctx->backend =
+        params.use_gpu && gpu_gate && std::strcmp(gpu_gate, "1") == 0 ? crispasr_init_gpu_backend() : ctx->backend_cpu;
+    if (!ctx->backend)
+        ctx->backend = ctx->backend_cpu;
+    if (ctx->verbosity)
+        fprintf(stderr, "openvoice2: vocoder backend %s (reference encoder and flows run on CPU)\n",
+                ggml_backend_name(ctx->backend));
 
     core_gguf::WeightLoad wl;
     if (!core_gguf::load_weights(path, ctx->backend, "openvoice2", wl)) {
         fprintf(stderr, "openvoice2: failed to load weights\n");
+        if (ctx->backend != ctx->backend_cpu)
+            ggml_backend_free(ctx->backend);
         ggml_backend_free(ctx->backend_cpu);
         delete ctx;
         return nullptr;
@@ -385,6 +410,14 @@ extern "C" struct openvoice2_context* openvoice2_init_from_file(const char* path
     ctx->w_ctx = wl.ctx;
     ctx->w_buf = wl.buf;
     auto& tensors = wl.tensors;
+    for (const auto& item : tensors) {
+        if (item.first.rfind("ref_enc.", 0) != 0)
+            continue;
+        std::vector<float> values;
+        read_f32(item.second, values);
+        ctx->model_identity = (ctx->model_identity * 1099511628211ULL) ^
+                              crispasr_ref_cache::fnv1a(values.data(), values.size() * sizeof(float));
+    }
 
     // Base speaker embeddings
     for (auto& [name, tensor] : tensors) {
@@ -879,6 +912,7 @@ static bool ref_enc_forward(openvoice2_context* ctx, const std::vector<float>& s
         out_emb[o] = sum;
     }
 
+    dump_stage(ctx, "target_se", out_emb.data(), out_emb.size());
     return true;
 }
 
@@ -908,6 +942,8 @@ static void enc_q_forward(openvoice2_context* ctx, const std::vector<float>& spe
         }
     }
 
+    dump_stage(ctx, "enc_q_pre", h.data(), h.size());
+
     // Compute speaker conditioning for WaveNet
     std::vector<float> g_cond;
     if (hp.zero_g) {
@@ -920,6 +956,8 @@ static void enc_q_forward(openvoice2_context* ctx, const std::vector<float>& spe
     // WaveNet
     std::vector<float> wn_out;
     wavenet_forward(eq.wn, hp.n_wn_layers_enc_q, hidden, T, h, g_cond, wn_out);
+
+    dump_stage(ctx, "enc_q_wn_out", wn_out.data(), wn_out.size());
 
     // Proj: (hidden, T) → (2*inter, T), k=1
     std::vector<float> w_proj, b_proj;
@@ -937,6 +975,8 @@ static void enc_q_forward(openvoice2_context* ctx, const std::vector<float>& spe
         }
     }
 
+    dump_stage(ctx, "enc_q_stats", stats.data(), stats.size());
+
     // Split into mean + logvar, sample z = mean + exp(logvar) * noise * tau
     z_out.resize(inter * T);
     std::normal_distribution<float> dist(0.0f, 1.0f);
@@ -944,10 +984,13 @@ static void enc_q_forward(openvoice2_context* ctx, const std::vector<float>& spe
         for (int c = 0; c < inter; c++) {
             float mean = stats[t * proj_out + c];
             float logvar = stats[t * proj_out + inter + c];
-            float noise = dist(ctx->rng);
+            float noise = ctx->posterior_noise.empty() ? dist(ctx->rng) : ctx->posterior_noise[t * inter + c];
             z_out[t * inter + c] = mean + expf(logvar) * noise * ctx->tau;
         }
     }
+    dump_stage(ctx, "enc_q_z", z_out.data(), z_out.size());
+    if (!ctx->posterior_noise.empty())
+        dump_stage(ctx, "enc_q_noise", ctx->posterior_noise.data(), ctx->posterior_noise.size());
 }
 
 // ── WaveNet-based coupling flow ──────────────────────────────────────
@@ -1091,8 +1134,18 @@ static bool hifigan_decode_cpu(openvoice2_context* ctx, const std::vector<float>
         ggml_set_input(g_input);
     }
 
+    std::vector<std::pair<std::string, ggml_tensor*>> snapshots;
+    auto snapshot = [&](const std::string& name, ggml_tensor* tensor) {
+        if (ctx->stage_callback || !ctx->dump_dir.empty()) {
+            ggml_set_output(tensor);
+            snapshots.emplace_back(name, tensor);
+        }
+    };
+
     // conv_pre: (inter_channels, T) → (upsample_initial_ch=512, T)
     ggml_tensor* x = conv1d_cf(gc, x_input, dec.conv_pre_w, dec.conv_pre_b, 1, 3, 1);
+
+    snapshot("dec_conv_pre", x);
 
     // Speaker conditioning: x += cond(g)
     if (g_input && dec.cond_w) {
@@ -1146,6 +1199,7 @@ static bool hifigan_decode_cpu(openvoice2_context* ctx, const std::vector<float>
         }
 
         x = ggml_scale(gc, sum_rb, 1.0f / (float)n_rk);
+        snapshot("dec_stage" + std::to_string(us), x);
         rb_idx += n_rk;
     }
 
@@ -1171,6 +1225,11 @@ static bool hifigan_decode_cpu(openvoice2_context* ctx, const std::vector<float>
 
     ggml_backend_sched_graph_compute(ctx->sched, gf);
 
+    for (const auto& item : snapshots) {
+        std::vector<float> data((size_t)ggml_nelements(item.second));
+        ggml_backend_tensor_get(item.second, data.data(), 0, data.size() * sizeof(float));
+        dump_stage(ctx, item.first.c_str(), data.data(), data.size());
+    }
     int T_audio = (int)ggml_nelements(x);
     pcm_out.resize(T_audio);
     ggml_backend_tensor_get(x, pcm_out.data(), 0, T_audio * sizeof(float));
@@ -1200,8 +1259,9 @@ static bool hifigan_decode_cpu(openvoice2_context* ctx, const std::vector<float>
 static bool openvoice2_target_se(openvoice2_context* ctx, const float* ref_pcm, int n_ref, int ref_sr,
                                  std::vector<float>& out_se) {
     const uint64_t key = crispasr_ref_cache::fnv1a(ref_pcm, (size_t)n_ref * sizeof(float)) ^
-                         crispasr_ref_cache::fnv1a(&ref_sr, sizeof(ref_sr));
-    {
+                         crispasr_ref_cache::fnv1a(&ref_sr, sizeof(ref_sr)) ^ ctx->model_identity;
+    const bool diagnostics = ctx->stage_callback || !ctx->dump_dir.empty();
+    if (!diagnostics) {
         std::vector<uint32_t> shape;
         std::vector<float> se;
         if (crispasr_ref_cache::get_floats("openvoice2-se", &key, sizeof(key), shape, se) && shape.size() == 1 &&
@@ -1215,13 +1275,15 @@ static bool openvoice2_target_se(openvoice2_context* ctx, const float* ref_pcm, 
 
     std::vector<float> ref_22k;
     resample_linear(ref_pcm, n_ref, ref_sr, ctx->hp.sample_rate, ref_22k);
+    dump_stage(ctx, "ref_pcm", ref_22k.data(), ref_22k.size());
     int T_ref = 0;
     std::vector<float> ref_spec;
     stft_magnitude(ref_22k.data(), (int)ref_22k.size(), ctx->hp.filter_length, ctx->hp.hop_length, ctx->hp.win_length,
                    ref_spec, T_ref);
+    dump_stage(ctx, "ref_spec", ref_spec.data(), ref_spec.size());
     if (!ref_enc_forward(ctx, ref_spec, T_ref, out_se))
         return false;
-    if (out_se.size() == 256)
+    if (!diagnostics && out_se.size() == 256)
         crispasr_ref_cache::put_floats("openvoice2-se", &key, sizeof(key), {256u}, out_se.data(), out_se.size());
     return true;
 }
@@ -1234,7 +1296,11 @@ extern "C" int openvoice2_sample_rate(const struct openvoice2_context* ctx) {
 
 extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* src_pcm, int n_src, int src_sr,
                                    const float* ref_pcm, int n_ref, int ref_sr, float** out_pcm, int* n_out) {
-    if (!ctx || !src_pcm || !ref_pcm || !out_pcm || !n_out)
+    if (out_pcm)
+        *out_pcm = nullptr;
+    if (n_out)
+        *n_out = 0;
+    if (!ctx || !src_pcm || !ref_pcm || !out_pcm || !n_out || n_src <= 0 || n_ref <= 0 || src_sr <= 0 || ref_sr <= 0)
         return false;
 
     const auto& hp = ctx->hp;
@@ -1253,6 +1319,8 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     if (ctx->verbosity >= 1)
         fprintf(stderr, "openvoice2: src %d→%d samples\n", n_src, (int)src_22k.size());
 
+    dump_stage(ctx, "src_pcm", src_22k.data(), src_22k.size());
+
     // 1. STFT of source
     int T_src;
     std::vector<float> src_spec;
@@ -1265,12 +1333,19 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     if (ctx->verbosity >= 1)
         fprintf(stderr, "openvoice2: STFT — src T=%d (%d bins)\n", T_src, hp.spec_channels);
 
+    if (!ctx->posterior_noise.empty() && ctx->posterior_noise.size() != (size_t)T_src * hp.inter_channels)
+        return false;
+    dump_stage(ctx, "src_spec", src_spec.data(), src_spec.size());
+
     // 2. Extract target speaker embedding from reference (content-addressed
     //    cache: resample + STFT + ref_enc skipped entirely on a cache hit).
     std::vector<float> target_se;
     {
         openvoice2_bench_stage _bs("ref_enc");
-        if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se)) {
+        if (!ctx->target_override.empty()) {
+            target_se = ctx->target_override;
+            dump_stage(ctx, "target_se", target_se.data(), target_se.size());
+        } else if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se)) {
             fprintf(stderr, "openvoice2: ref_enc failed\n");
             return false;
         }
@@ -1317,24 +1392,27 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     // 4. Source speaker embedding — use pre-saved base speaker if available
     //    (upstream OpenVoice2 uses base_speakers/ses/en-default.pth, not ref_enc).
     std::vector<float> src_se;
-    if (!ctx->w.base_speakers.empty()) {
-        // Default to first base speaker (en-au alphabetically, or en-default if present)
-        const ov2_base_speaker* best = &ctx->w.base_speakers[0];
+    if (!ctx->source_speaker.empty()) {
         for (const auto& bs : ctx->w.base_speakers) {
-            if (bs.name == "en-default") {
-                best = &bs;
+            if (bs.name == ctx->source_speaker) {
+                read_f32(bs.embedding, src_se);
                 break;
             }
         }
-        read_f32(best->embedding, src_se);
-        if (ctx->verbosity >= 1)
-            fprintf(stderr, "openvoice2: using base speaker '%s' as source SE\n", best->name.c_str());
+        if (src_se.size() != (size_t)hp.gin_channels)
+            return false;
     } else {
-        // Fallback: extract from source audio (less accurate for synthetic input)
-        ref_enc_forward(ctx, src_spec, T_src, src_se);
-        if (ctx->verbosity >= 1)
-            fprintf(stderr, "openvoice2: extracted source SE from audio (no base speakers in GGUF)\n");
+        // Arbitrary input has no known base-speaker identity. Extract it from
+        // the actual source instead of silently choosing another speaker.
+        if (!ref_enc_forward(ctx, src_spec, T_src, src_se))
+            return false;
+        // The extractor emits target stages too; emit the reference again last
+        // so diagnostic consumers do not confuse source and target identity.
+        if (ctx->target_override.empty() && (ctx->stage_callback || !ctx->dump_dir.empty()))
+            if (!openvoice2_target_se(ctx, ref_pcm, n_ref, ref_sr, target_se))
+                return false;
     }
+    dump_stage(ctx, "src_se", src_se.data(), src_se.size());
 
     // 5. Flow forward: z → z_p (normalize with source voice)
     {
@@ -1342,6 +1420,7 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
         flow_wavenet(ctx, z, T_src, src_se, /*reverse=*/false);
     }
 
+    dump_stage(ctx, "z_after_flow_fwd", z.data(), z.size());
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "openvoice2: flow forward (source → prior)\n");
         vec_stats("z_after_flow_fwd", z);
@@ -1353,6 +1432,7 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
         flow_wavenet(ctx, z, T_src, target_se, /*reverse=*/true);
     }
 
+    dump_stage(ctx, "z_after_flow_rev", z.data(), z.size());
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "openvoice2: flow reverse (prior → target)\n");
         vec_stats("z_after_flow_rev", z);
@@ -1367,6 +1447,8 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
             return false;
         }
     }
+
+    dump_stage(ctx, "dec_output", pcm.data(), pcm.size());
 
     // Peak-normalize output to fill ±0.95 range.
     // The voice converter produces weak output (±0.3) on synthetic MeloTTS input;
@@ -1390,8 +1472,13 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
         }
     }
 
+    dump_stage(ctx, "output_pcm", pcm.data(), pcm.size());
     *n_out = (int)pcm.size();
     *out_pcm = (float*)malloc(pcm.size() * sizeof(float));
+    if (!*out_pcm) {
+        *n_out = 0;
+        return false;
+    }
     memcpy(*out_pcm, pcm.data(), pcm.size() * sizeof(float));
 
     if (ctx->verbosity >= 1)
@@ -1403,7 +1490,7 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
 
 extern "C" bool openvoice2_extract_speaker_embedding(struct openvoice2_context* ctx, const float* ref_pcm, int n_ref,
                                                      int ref_sr, float* out_embedding) {
-    if (!ctx || !ref_pcm || !out_embedding)
+    if (!ctx || !ref_pcm || !out_embedding || n_ref <= 0 || ref_sr <= 0)
         return false;
 
     std::vector<float> emb;
@@ -1427,6 +1514,8 @@ extern "C" void openvoice2_free(struct openvoice2_context* ctx) {
         core_gguf::release_weight_buffer(ctx->w_buf);
     if (ctx->w_ctx)
         ggml_free(ctx->w_ctx);
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
+        ggml_backend_free(ctx->backend);
     if (ctx->backend_cpu)
         ggml_backend_free(ctx->backend_cpu);
     delete ctx;
@@ -1435,4 +1524,83 @@ extern "C" void openvoice2_free(struct openvoice2_context* ctx) {
 extern "C" void openvoice2_set_dump_dir(struct openvoice2_context* ctx, const char* dir) {
     if (ctx)
         ctx->dump_dir = dir ? dir : "";
+}
+
+extern "C" bool openvoice2_set_source_speaker(openvoice2_context* ctx, const char* name) {
+    if (!ctx)
+        return false;
+    if (!name || !*name) {
+        ctx->source_speaker.clear();
+        return true;
+    }
+    for (const auto& speaker : ctx->w.base_speakers) {
+        if (speaker.name == name) {
+            ctx->source_speaker = name;
+            return true;
+        }
+    }
+    return false;
+}
+extern "C" void openvoice2_set_stage_callback(openvoice2_context* ctx, openvoice2_stage_callback callback, void* user) {
+    if (ctx) {
+        ctx->stage_callback = callback;
+        ctx->stage_user = user;
+    }
+}
+
+extern "C" bool openvoice2_set_target_embedding(openvoice2_context* ctx, const float* embedding) {
+    if (!ctx || ctx->hp.gin_channels != 256)
+        return false;
+    if (!embedding) {
+        ctx->target_override.clear();
+        return true;
+    }
+    for (int i = 0; i < ctx->hp.gin_channels; ++i)
+        if (!std::isfinite(embedding[i]))
+            return false;
+    ctx->target_override.assign(embedding, embedding + ctx->hp.gin_channels);
+    return true;
+}
+
+extern "C" bool openvoice2_set_posterior_noise(openvoice2_context* ctx, const float* noise, int n) {
+    if (!ctx || ctx->hp.inter_channels <= 0 || n < 0 || (!noise && n != 0) ||
+        (noise && (n == 0 || n % ctx->hp.inter_channels != 0)))
+        return false;
+    for (int i = 0; i < n; ++i)
+        if (!std::isfinite(noise[i]))
+            return false;
+    if (!noise)
+        ctx->posterior_noise.clear();
+    else
+        ctx->posterior_noise.assign(noise, noise + n);
+    return true;
+}
+
+extern "C" bool openvoice2_extract_speaker_embedding_segments(openvoice2_context* ctx, const float* ref_pcm, int n_ref,
+                                                              int ref_sr, const int* starts, const int* ends,
+                                                              int n_segments, float* out_embedding) {
+    if (!ctx || !ref_pcm || !starts || !ends || !out_embedding || n_ref <= 0 || ref_sr <= 0 || n_segments <= 0 ||
+        n_segments > n_ref)
+        return false;
+    for (int i = 0; i < n_segments; ++i)
+        if (starts[i] < 0 || ends[i] <= starts[i] || ends[i] > n_ref || (i && starts[i] < ends[i - 1]))
+            return false;
+    std::vector<float> average(256, 0.0f), embedding(256);
+    for (int i = 0; i < n_segments; ++i) {
+        if (!openvoice2_extract_speaker_embedding(ctx, ref_pcm + starts[i], ends[i] - starts[i], ref_sr,
+                                                  embedding.data()))
+            return false;
+        for (int j = 0; j < 256; ++j) {
+            if (!std::isfinite(embedding[j]))
+                return false;
+            average[j] += embedding[j];
+        }
+    }
+    for (float& value : average) {
+        value /= n_segments;
+        if (!std::isfinite(value))
+            return false;
+    }
+    memcpy(out_embedding, average.data(), 256 * sizeof(float));
+    return true;
 }

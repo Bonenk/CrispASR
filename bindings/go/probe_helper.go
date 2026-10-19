@@ -10,6 +10,8 @@ package whisper
 #include "crispasr_chat.h"
 typedef struct crispasr_session CrispasrSession;
 void probe_mode_set(int m);
+void probe_speaker_mode(int);
+int probe_speaker_live(void);
 void probe_streamed_ready(int ready);
 void probe_legacy_expect(const char*, const char*);
 void probe_legacy_mode(int);
@@ -102,3 +104,6 @@ func probeLegacyContextFlash() bool { return C.probe_legacy_context_flash() != 0
 func probeLegacyTokensReset()      { C.probe_legacy_tokens_reset() }
 func probeLegacyTokensMutate()     { C.probe_legacy_tokens_mutate() }
 func probeLegacyAltTextCalls() int { return int(C.probe_legacy_alt_text_calls()) }
+
+func probeSpeakerMode(mode int) { C.probe_speaker_mode(C.int(mode)) }
+func probeSpeakerLive() int     { return int(C.probe_speaker_live()) }

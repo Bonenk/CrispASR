@@ -63,14 +63,19 @@ namespace CrispASR
     {
         private IntPtr handle;
         private IntPtr Handle => handle == IntPtr.Zero ? throw new ObjectDisposedException(nameof(SpeakerEmbedder)) : handle;
-        public SpeakerEmbedder(string model, int threads = 4, string? cacheDirectory = null) { ArgumentNullException.ThrowIfNull(model); handle = NativeMethods.crispasr_speaker_embedder_make_abi(model, threads, cacheDirectory); if (handle == IntPtr.Zero) throw new InvalidOperationException("Speaker embedder failed to open"); }
+        public SpeakerEmbedder(string model, int threads = 4, string? cacheDirectory = null) { ArgumentNullException.ThrowIfNull(model); if (model.Contains('\0') || (cacheDirectory?.Contains('\0') ?? false)) throw new ArgumentException("Speaker paths must not contain NUL"); handle = NativeMethods.crispasr_speaker_embedder_make_abi(model, threads, cacheDirectory); if (handle == IntPtr.Zero) throw new InvalidOperationException("Speaker embedder failed to open"); }
         public int Dimension => NativeMethods.crispasr_speaker_embedder_dim_abi(Handle);
         public string Name => NativeMethods.PtrToUtf8(NativeMethods.crispasr_speaker_embedder_name_abi(Handle)) ?? "";
         public float[] Embed(float[] pcm16k) { ArgumentNullException.ThrowIfNull(pcm16k); int dim = Dimension; if (dim <= 0) throw new InvalidOperationException("Invalid embedding dimension"); var output = new float[dim]; if (NativeMethods.crispasr_speaker_embedder_embed_abi(Handle, pcm16k, pcm16k.Length, output) != 1) throw new InvalidOperationException("Speaker embedding failed"); return output; }
         public static (int[] Labels, int ClusterCount) Cluster(float[] embeddings, int dimension, float mergeThreshold = .65f, int maxSpeakers = 8)
         {
             ArgumentNullException.ThrowIfNull(embeddings); if (dimension <= 0 || embeddings.Length == 0 || embeddings.Length % dimension != 0) throw new ArgumentException("Expected a nonempty frame-major embedding matrix");
-            int n = embeddings.Length / dimension; var labels = new int[n]; int count = NativeMethods.crispasr_speaker_cluster_abi(embeddings, n, dimension, mergeThreshold, maxSpeakers, labels); if (count < 0) throw new InvalidOperationException("Speaker clustering failed"); return (labels, count);
+            if (!float.IsFinite(mergeThreshold) || maxSpeakers <= 0) throw new ArgumentException("Invalid speaker clustering options");
+            int n = embeddings.Length / dimension; var labels = new int[n];
+            int count = NativeMethods.crispasr_speaker_cluster_abi(embeddings, n, dimension, mergeThreshold, maxSpeakers, labels);
+            if (count < 0 || count > n) throw new InvalidOperationException("Invalid speaker clustering count");
+            foreach (int label in labels) if (count == 0 ? label != -1 : label < 0 || label >= count) throw new InvalidOperationException("Invalid speaker clustering labels");
+            return (labels, count);
         }
         public void Dispose() { if (handle != IntPtr.Zero) { NativeMethods.crispasr_speaker_embedder_free_abi(handle); handle = IntPtr.Zero; } }
     }
@@ -127,7 +132,7 @@ namespace CrispASR
     public sealed class PyannoteCache : IDisposable
     {
         private IntPtr handle;
-        public PyannoteCache(float[] audio16k, string model, int threads = 4) { ArgumentNullException.ThrowIfNull(audio16k); ArgumentNullException.ThrowIfNull(model); handle = NativeMethods.crispasr_pyannote_cache_compute_abi(audio16k, audio16k.Length, model, threads); if (handle == IntPtr.Zero) throw new InvalidOperationException("Pyannote cache compute failed"); }
+        public PyannoteCache(float[] audio16k, string model, int threads = 4) { ArgumentNullException.ThrowIfNull(audio16k); ArgumentNullException.ThrowIfNull(model); if (audio16k.Length == 0 || model.Contains('\0')) throw new ArgumentException("Nonempty PCM and NUL-free model path required"); handle = NativeMethods.crispasr_pyannote_cache_compute_abi(audio16k, audio16k.Length, model, threads); if (handle == IntPtr.Zero) throw new InvalidOperationException("Pyannote cache compute failed"); }
         public DiarizationSegment[] Apply(IReadOnlyList<DiarizationSegment> segments, double sliceOffsetSeconds = 0) { if (handle == IntPtr.Zero) throw new ObjectDisposedException(nameof(PyannoteCache)); if (!double.IsFinite(sliceOffsetSeconds)) throw new ArgumentException("Invalid offset"); var data = DiarizationSegment.ToNative(segments); int rc = NativeMethods.crispasr_pyannote_cache_apply_abi(handle, checked((long)Math.Round(sliceOffsetSeconds * 100)), data, data.Length); if (rc != 0) throw new InvalidOperationException($"Pyannote cache apply failed (rc={rc})"); return DiarizationSegment.FromNative(data); }
         public void Dispose() { if (handle != IntPtr.Zero) { NativeMethods.crispasr_pyannote_cache_free_abi(handle); handle = IntPtr.Zero; } }
     }

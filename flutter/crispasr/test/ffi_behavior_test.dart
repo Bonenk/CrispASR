@@ -185,6 +185,104 @@ void main() {
       if (dir.existsSync()) dir.deleteSync(recursive: true);
     }
   });
+  test('generic speaker exact success and resource lifetime', () {
+    final lib = _openProbe();
+    final mode = lib.lookupFunction<Void Function(Int32), void Function(int)>(
+        'probe_speaker_mode');
+    final live = lib
+        .lookupFunction<Int32 Function(), int Function()>('probe_speaker_live');
+    mode(0);
+    final embedder =
+        CrispasrSpeakerEmbedder(lib, 'embed', nThreads: 2, cacheDir: 'cache');
+    try {
+      expect(embedder.dim, 3);
+      expect(embedder.name, 'generic');
+      final owned = embedder.embed(_pcm123());
+      expect(owned, [.25, .5, .75]);
+      for (final invalid in [2, 3, 4, 8]) {
+        mode(invalid);
+        expect(embedder.embed(_pcm123()), isNull);
+      }
+      mode(0);
+      embedder.close();
+      embedder.close();
+      expect(owned, [.25, .5, .75]);
+      expect(() => embedder.dim, throwsStateError);
+      expect(() => embedder.name, throwsStateError);
+      expect(() => embedder.embed(_pcm123()), throwsStateError);
+    } finally {
+      embedder.close();
+      mode(0);
+    }
+    expect(live(), 0);
+    expect(
+        () => CrispasrSpeakerEmbedder(lib, 'embed\u0000bad',
+            nThreads: 2, cacheDir: 'cache'),
+        throwsArgumentError);
+    expect(
+        () => CrispasrSpeakerEmbedder(lib, 'embed',
+            nThreads: 0x100000002, cacheDir: 'cache'),
+        throwsArgumentError);
+    expect(live(), 0);
+  });
+  test('generic cluster count labels input bounds and unassigned', () {
+    final lib = _openProbe();
+    final mode = lib.lookupFunction<Void Function(Int32), void Function(int)>(
+        'probe_speaker_mode');
+    final input = Float32List.fromList([1, 2, 3, 4, 5, 6]);
+    List<int> run() => crispasrAgglomerativeCluster(lib, input,
+        n: 2, dim: 3, mergeThreshold: .6, maxSpeakers: 3);
+    mode(0);
+    expect(run(), [0, 1]);
+    for (final invalid in [2, 6, 7]) {
+      mode(invalid);
+      expect(run, throwsException);
+    }
+    mode(9);
+    expect(run(), [-1, -1]);
+    mode(0);
+    expect(() => crispasrAgglomerativeCluster(lib, input, n: 2, dim: 1 << 62),
+        throwsArgumentError);
+    expect(
+        () => crispasrAgglomerativeCluster(lib, input,
+            n: 2, dim: 3, mergeThreshold: double.nan),
+        throwsArgumentError);
+    expect(
+        () => crispasrAgglomerativeCluster(lib, input,
+            n: 2, dim: 3, maxSpeakers: 0x100000003),
+        throwsArgumentError);
+  });
+  test('generic pyannote cache transport failures and closed guards', () {
+    final lib = _openProbe();
+    final mode = lib.lookupFunction<Void Function(Int32), void Function(int)>(
+        'probe_speaker_mode');
+    final live = lib
+        .lookupFunction<Int32 Function(), int Function()>('probe_speaker_live');
+    mode(0);
+    final cache = CrispasrPyannoteCache(lib, _pcm123(), 'seg', nThreads: 2);
+    final segs = [
+      DiarizeSegment(t0: 1.25, t1: 1.75, speaker: -1),
+      DiarizeSegment(t0: 2, t1: 2.5, speaker: -1)
+    ];
+    try {
+      cache.apply(segs, sliceT0: 1.25);
+      expect(segs.map((s) => s.speaker), [2, 1]);
+      for (final invalid in [2, 5]) {
+        mode(invalid);
+        expect(() => cache.apply(segs, sliceT0: 1.25), throwsException);
+        expect(segs.map((s) => s.speaker), [2, 1]);
+      }
+      mode(0);
+      expect(() => cache.apply(segs, sliceT0: double.nan), throwsArgumentError);
+      cache.close();
+      cache.close();
+      expect(() => cache.apply(segs, sliceT0: 1.25), throwsStateError);
+    } finally {
+      cache.close();
+      mode(0);
+    }
+    expect(live(), 0);
+  });
   test('speaker database roster, negative scores, enrollment and closed guards',
       () {
     final lib = _openProbe();

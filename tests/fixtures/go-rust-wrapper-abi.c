@@ -1649,43 +1649,7 @@ int32_t crispasr_speaker_db_enroll(const char* dir_path, const char* name, const
     STUB_ABORT();
     return 0;
 }
-void* crispasr_speaker_embedder_make_abi(const char* model_spec, int32_t n_threads, const char* cache_dir) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_speaker_embedder_free_abi(void* embedder) {
-    STUB_ABORT();
-}
-int32_t crispasr_speaker_embedder_dim_abi(const void* embedder) {
-    STUB_ABORT();
-    return 0;
-}
-int32_t crispasr_speaker_embedder_embed_abi(void* embedder, const float* pcm_16k, int32_t n_samples, float* out) {
-    STUB_ABORT();
-    return 0;
-}
-const char* crispasr_speaker_embedder_name_abi(const void* embedder) {
-    STUB_ABORT();
-    return 0;
-}
-int32_t crispasr_speaker_cluster_abi(const float* embeddings, int32_t n, int32_t dim, float merge_threshold,
-                                     int32_t max_speakers, int32_t* labels_out) {
-    STUB_ABORT();
-    return 0;
-}
-void* crispasr_pyannote_cache_compute_abi(const float* full_audio, int32_t n_samples, const char* model_path,
-                                          int32_t n_threads) {
-    STUB_ABORT();
-    return 0;
-}
-void crispasr_pyannote_cache_free_abi(void* cache) {
-    STUB_ABORT();
-}
-int32_t crispasr_pyannote_cache_apply_abi(const void* cache, int64_t slice_t0_cs, crispasr_diarize_seg_abi* segs,
-                                          int32_t n_segs) {
-    STUB_ABORT();
-    return 0;
-}
+#include "wrapper-speaker-primitives.c"
 const char* whisper_version(void) {
     STUB_ABORT();
     return 0;

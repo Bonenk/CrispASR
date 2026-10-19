@@ -18,17 +18,16 @@ import threading
 import time
 import traceback
 import urllib.request
-import zipfile
 
-VERSION = '2026-10-19.alignment-cuda-memory.1'
+VERSION = '2026-10-19.alignment-cuda-memory.2'
 SOURCE = '191815511b85a526aace111b1bda2e28ecb7faad'
 REPO_URL = 'https://github.com/CrispStrobe/CrispASR.git'
-API = 'https://api.github.com/repos/CrispStrobe/CrispASR'
-BUNDLE_ARTIFACT = 12171451583
-BUNDLE_ZIP_SHA = '1001303284f6c8b9019687783e6c78b7e8e74c892d6ebe006e7d391930f4d26e'
+MIRROR_REV = '425c555beb63de4665cba604c47ea38232f5d080'
+MIRROR_ROOT = 'https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/'
+BUNDLE_PATH = 'alignment-long-cuda-20261019/v2/runtime.tar.gz'
 BUNDLE_SHA = '63474b5f034ebac850b7b87ef76eecec12d009092d4c72370aeeb6be341365c5'
-FIXTURE_ARTIFACT = 12168884256
-FIXTURE_ZIP_SHA = 'd11a80685acb0dff5815fba165f78688a418e9e8b9b47eea6fec77c779d21b6a'
+FIXTURE_PATH = 'alignment-long-cuda-20261019/v2/fixture.tar.gz'
+FIXTURE_SHA = 'c46cdb1044d6837714ab7572a2edc319fc15ccf3e3645fb8991b93503995c4c8'
 OUT = Path('/kaggle/working')
 SCRATCH = Path('/kaggle/temp/alignment-cuda-memory')
 ROOT = SCRATCH / 'sdk'
@@ -44,14 +43,13 @@ def checked(command, **kwargs):
     return subprocess.check_output(list(map(str, command)), text=True, **kwargs)
 
 
-def download_artifact(artifact, expected_sha, target, token):
-    request = urllib.request.Request(f'{API}/actions/artifacts/{artifact}/zip',
-                                    headers={'Authorization': 'Bearer ' + token,
-                                             'Accept': 'application/vnd.github+json'})
-    with urllib.request.urlopen(request, timeout=180) as response, target.open('wb') as output:
+def download_public(name, expected_sha, target):
+    # Anonymous reads cannot accidentally send another service's credentials.
+    url = f'{MIRROR_ROOT}{MIRROR_REV}/{name}'
+    with urllib.request.urlopen(url, timeout=180) as response, target.open('wb') as output:
         shutil.copyfileobj(response, output, 4 * 1024 * 1024)
     if sha(target) != expected_sha:
-        raise ValueError('Immutable Actions artifact ZIP checksum mismatch')
+        raise ValueError('Immutable public mirror checksum mismatch')
 
 
 def save_json(path, data):
@@ -80,36 +78,15 @@ def bootstrap():
     kh.provenance(VERSION, ROOT)
     os.environ['HF_TOKEN'] = kh.resolve_hf_token(require=True)
     if not BUNDLE.exists():
-        token = kh.kaggle_token_from_dataset('gh_token.txt')
-        if not token:
-            raise RuntimeError('The attached credential dataset must provide artifact read access')
-        package_zip = SCRATCH / 'bundle.zip'
-        download_artifact(BUNDLE_ARTIFACT, BUNDLE_ZIP_SHA, package_zip, token)
-        with zipfile.ZipFile(package_zip) as archive:
-            names = [n for n in archive.namelist() if n.endswith('breeze-cuda-speech-validation.tar.gz')]
-            if len(names) != 1:
-                raise ValueError('Missing or ambiguous runtime archive')
-            package = SCRATCH / 'runtime.tar.gz'
-            with archive.open(names[0]) as source, package.open('wb') as target:
-                shutil.copyfileobj(source, target)
-        if sha(package) != BUNDLE_SHA:
-            raise ValueError('Runtime archive checksum mismatch')
+        package = SCRATCH / 'runtime.tar.gz'
+        download_public(BUNDLE_PATH, BUNDLE_SHA, package)
         with tarfile.open(package) as archive:
             archive.extractall(SCRATCH, filter='data')
-        fixture_zip = SCRATCH / 'fixture.zip'
-        download_artifact(FIXTURE_ARTIFACT, FIXTURE_ZIP_SHA, fixture_zip, token)
-        # Only the licensed inputs/ledger are needed, never the CPU binaries.
-        wanted = {'pcm.npy', 'units.json', 'transcript.txt', 'ATTRIBUTION.md', 'receipt.json'}
-        fixture = SCRATCH / 'fixture'
-        fixture.mkdir(exist_ok=True)
-        with zipfile.ZipFile(fixture_zip) as archive:
-            for name in wanted:
-                candidates = [n for n in archive.namelist() if n == name or n.endswith('/' + name)]
-                if len(candidates) != 1:
-                    raise ValueError('Missing or ambiguous fixture member: ' + name)
-                (fixture / name).write_bytes(archive.read(candidates[0]))
-        package_zip.unlink()
-        fixture_zip.unlink()
+        fixture_package = SCRATCH / 'fixture.tar.gz'
+        download_public(FIXTURE_PATH, FIXTURE_SHA, fixture_package)
+        with tarfile.open(fixture_package) as archive:
+            archive.extractall(SCRATCH, filter='data')
+        fixture_package.unlink()
         package.unlink()
     provenance = json.loads((BUNDLE / 'provenance.json').read_text())
     if provenance['source'] != SOURCE or not provenance['build_complete'] or provenance['gpu_executed']:
@@ -159,7 +136,8 @@ def main():
         raise ValueError('Model checksum mismatch')
     library = str(BUNDLE / 'libcrispasr.so')
     receipt = dict(schema=1, source=SOURCE, version=VERSION, entry_sha256=sha(Path(__file__)),
-                   hardware=hardware, bundle_sha256=BUNDLE_SHA, model=model_pin,
+                   hardware=hardware, bundle_sha256=BUNDLE_SHA, mirror_revision=MIRROR_REV,
+                   fixture_archive_sha256=FIXTURE_SHA, model=model_pin,
                    fixture_pins=cpu['pins'], complete=False, gpu_executed=False, cases=[],
                    limitations=['repeated speech, not natural conversational 45-minute audio',
                                 'no boundary ground truth or CPU/GPU byte-exact claim',
@@ -223,6 +201,9 @@ def main():
         shifted = [dict(w, t0=w['t0'] - 1234, t1=w['t1'] - 1234) for w in results[2]]
         if results[0] != shifted:
             raise ValueError('Short result changed after long-input cache/scheduler reuse')
+        # Reuse acceptance is already complete; release its GPU arenas before
+        # an independent CLI process loads another copy of the model.
+        free_aligner_cache(lib_path=library)
         # Fresh CLI must match cached public ABI on the same 44.52s samples.
         phase[0] = 'cli'
         import soundfile as sf

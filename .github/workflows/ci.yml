@@ -200,7 +200,11 @@ jobs:
         run: python3 tests/test_tts_voice_int128.py -v
 
       - name: TTS session failure, ownership and conversion contracts
-        run: python3 tests/test_tts_session_contracts.py -v
+        run: |
+          python3 tests/test_tts_session_contracts.py -v
+          python3 tests/test_openvoice_bake_contracts.py -v
+          python3 tests/test_openvoice_worker_contracts.py -v
+          python3 tests/test_openvoice_conditioning_contracts.py -v
 
       - name: Supertonic speaker API null and bounds contracts
         run: python3 tests/test_supertonic_speaker_contracts.py -v
@@ -240,6 +244,7 @@ jobs:
           CRISPASR_LIB="$PWD/$library" python3 tests/test_session_metadata.py -v
           CRISPASR_LIB="$PWD/$library" python3 tests/test_parakeet_window_metadata.py -v
           CRISPASR_LIB="$PWD/$library" python3 tests/test_python_wrapper_operations.py -v
+          python3 tests/test_python_speaker_primitives.py -v
           python3 tests/test_python_audio_utilities.py -v
           python3 tools/check-python-api-coverage.py --library "$PWD/$library"
           python3 tests/test_python_legacy_pointer.py -v

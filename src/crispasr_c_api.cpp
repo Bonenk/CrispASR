@@ -10891,6 +10891,9 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
             int in_sr = crispasr_session_input_sample_rate(s);
 
             float* out_pcm = nullptr;
+            const char* source_speaker = melotts_source_speaker(s->melotts_ctx);
+            if (!openvoice2_set_source_speaker(s->ov2_ctx, source_speaker))
+                openvoice2_set_source_speaker(s->ov2_ctx, nullptr);
             bool converted = openvoice2_convert(s->ov2_ctx, src, n, sr, s->ov2_ref_pcm.data(),
                                                 (int)s->ov2_ref_pcm.size(), in_sr, &out_pcm, &n);
 

@@ -1,0 +1,157 @@
+# OpenVoice2 reference and cloning validation
+
+Status (2026-10-19): strict reference/runtime wiring is implemented. Fresh
+model, CUDA and speech-quality acceptance is pending execution and independent
+audit; the June cosine measurements in HISTORY.md are historical evidence.
+
+## Recipe and license boundary
+
+OpenVoice V2 separates a base TTS from tone-color conversion. The native
+MeloTTS path uses its own English dictionary/neural G2P; conversion uses raw
+reference PCM, native STFT, six Conv2d layers, GRU, a 256-dimensional speaker
+projection, posterior encoder, source/target-conditioned flow and vocoder.
+Neither inference path imports whisper-timestamped or Unidecode. The OpenVoice
+converter reads checkpoints directly; the reference imports original
+`openvoice.models` and `openvoice.mel_processing`, not `se_extractor` or the
+text/watermark frontend. This is not an exhaustive dependency-license audit of
+an arbitrary Python environment installed by a user.
+
+Upstream source pin: `74a1d147b17a8c3092dd5430504bd83ef6c7eb23`.
+[OpenVoice code](https://github.com/myshell-ai/OpenVoice/blob/74a1d147b17a8c3092dd5430504bd83ef6c7eb23/LICENSE)
+and [official V2 weights](https://huggingface.co/myshell-ai/OpenVoiceV2) declare
+MIT; retain notices. [MeloTTS](https://github.com/myshell-ai/MeloTTS/blob/main/LICENSE)
+is MIT too. Their complete Python install has separate copyleft dependencies:
+pinned whisper-timestamped1.14.2 advertises GPLv3 (current upstream is AGPLv3),
+and Unidecode1.3.7 is GPLv2-or-later. Those helpers are not vendored here.
+
+Upstream `se_extractor.get_se(vad=True)` runs Silero VAD, concatenates speech,
+partitions approximately ten-second clips and averages clip embeddings. Our
+current raw-reference API computes one embedding over the provided PCM. A
+clean, single-utterance raw reference matches upstream `extract_se([clip])`,
+not the entire automatic VAD frontend. Do not call this VAD parity, multilingual
+text-cleaner parity, or exact librosa resampling parity. The explicit `openvoice2_extract_speaker_embedding_segments` API now averages
+caller-selected ordered speech clips with equal weights, and
+`openvoice2_set_target_embedding` copies that prepared identity into conversion.
+Automatic VAD selection remains a separate policy; never describe supplied
+spans as an automatic upstream frontend. Unequal-length tiny-clip probes guard
+equal weighting, invalid spans and unchanged outputs after failure. Actual
+multi-clip model acceptance remains pending.
+
+The upstream demo selects the saved source embedding by actual MeloTTS speaker
+key. Both native CLI and shared session now resolve that key from model
+metadata on each synthesis call. Missing keys use embedding extraction from
+actual source PCM, never an unrelated first/default saved speaker.
+
+## Reproduce a deterministic bake
+
+Use the pinned upstream checkout and original checkpoint root containing
+`converter/config.json`, `converter/checkpoint.pth` and `base_speakers/ses/`.
+Choose licensed source/reference WAVs; record their hashes and attribution.
+
+```sh
+export CRISPASR_OV2_UPSTREAM="$OPENVOICE_SOURCE"
+export CRISPASR_OV2_REFERENCE_WAV="$REFERENCE_WAV"
+export CRISPASR_OV2_SOURCE_SPEAKER=en-us
+export CRISPASR_OV2_DEVICE=cpu
+export CRISPASR_OV2_TAU=0
+python tools/dump_reference.py --backend openvoice2 --model-dir "$CHECKPOINT_ROOT" \
+  --audio "$SOURCE_WAV" --output "$ARTIFACTS/ref.gguf"
+build/bin/crispasr-diff openvoice2 "$MODEL_GGUF" "$ARTIFACTS/ref.gguf" "$SOURCE_WAV"
+```
+
+The Python forward calls the original model's `voice_conversion`, with owned
+hook snapshots. Reference GGUFs contain the exact native-rate source/reference
+PCM used by the model, so the C++ comparison isolates model math from resampler
+implementations. The recipe and source identity are required archive metadata.
+Keep deterministic tau=0 acceptance separate from upstream tau=0.3 stochastic
+quality. The dumper can now record the actual original posterior noise at0.3;
+`openvoice2_set_posterior_noise` owns it and the driver requires its28th stage.
+A shared seed alone is insufficient across different random samplers. The
+original waveform must also be byte-identical after removing capture hooks and
+replaying the same seed. These newer paths are not covered by the earlier
+source71e329ccf Kaggle run. The header now documents the actual long-standing native default0.
+Original watermarking is disabled for model-boundary parity; converted output
+also exposes our existing peak normalization as a separate stage.
+
+Twenty-seven deterministic stages (28 with posterior-noise replay) are required, without optional skips: both PCM inputs and
+spectrograms, reference normalization, six reference convolutions, GRU,
+projected target/source embeddings, posterior pre/WaveNet/stats/latent,
+forward/reverse flow latents, vocoder pre/four MRF stages, raw decoder waveform
+and final normalized PCM. The driver prints cosine, both norms, norm ratio,
+relative L2 and maximum absolute error. Gate: cosine>=0.99, norm ratio within2%,
+relative L2<=0.15; the two PCM inputs must be exact. These are aggregate stage
+metrics, not per-row minimum cosine. Missing/wrong-size/nonfinite stages fail.
+
+Diagnostic captures bypass the reference cache so stages cannot disappear on
+a hit. Ordinary cache identities now include reference-encoder coefficients,
+preventing embeddings from another precision/checkpoint being reused. Snapshot
+callbacks are synchronous and must not re-enter or free the context.
+
+## GPU and quality acceptance
+
+GPU execution is opt-in via `CRISPASR_OV2_GPU=1` and the caller's `use_gpu=true`.
+For the diff command also set `CRISPASR_DIFF_USE_GPU=1`. Reference encoder and
+flows remain CPU; only the vocoder graph can execute on CUDA. A device listed
+by the runtime or weights in GPU memory alone does not establish execution.
+Do not flip the gate without recorded numerical and decoded-output proof.
+
+`tools/kaggle/openvoice-bake/` uses the independently audited CUDA12.4 sm60/sm75
+runtime from source191815511 and its exact ggml revision. It compiles only the
+changed model files and strict driver against those prebuilt libraries, not
+ggml, CUDA kernels or the full SDK. Record both base and delta identities.
+The separate full-CMake check39255636270 failed during configuration because
+the parent wrapper project changed CMAKE_SOURCE_DIR used by existing C2PA/llama
+paths. The worker now configures the repository root and injects only its
+target declarations. Run39258859196/source6be9fda36 compiled both models and
+the driver, then failed executable linking because the toolkit lacked the
+libcuda.so.1 alias. The link-only alias repair stays outside the runtime bundle.
+This build check is not model acceptance.
+
+The kernel preserves the host NVIDIA loader paths and runs Torch phases in
+separate processes from the packaged native CUDA stack. Version1 failed at
+post-reexec nvidia-smi before inference; version2 repairs this preflight.
+Submitted v2 is still queued and lacks the later GGML_BACKEND_DL compile and
+module-discovery repair required by the audited base; it must be superseded
+after retaining logs. The prepared worker matches this ABI, searches modules
+from the native bundle cwd, and uses a different cwd/host loader environment
+for Torch subprocesses. The intended matrix records original/native stage comparison,
+uninstrumented public model C API waveform/embedding parity and deterministic
+cache reuse, with CPU Torch fallback on sm60 while the native vocoder genuinely
+uses CUDA. It then checks independent ASR WER<=0.2 for baseline/original/clone
+and independent Resemblyzer similarity improvement>0.01 over baseline. Preserve
+failed originals as controls; do not relax thresholds after seeing a result.
+This is a synthetic closed-loop voice test, not general human-speaker accuracy.
+The prepared conditioning mode (`CRISPASR_OV2_CONDITIONING=1`) freezes newer
+source6be9fda36, adds a third tau0.3 replay and unequal-length original/native
+clip means plus mean-conditioned waveform comparison. Its entry version and
+source are distinct from submitted v2; it has not been run. Its standalone
+immutable bootstrap is `tools/kaggle/openvoice-conditioning/`. Converted GGUFs and
+producer versions are retained in newer receipts; v2 lacks those extra fields.
+
+Remaining acceptance scope: raw mixed-rate preprocessing vs original librosa;
+automatic Silero selection and actual supplied-clip averaging; actual tau0.3 shared-noise replay; quant variants
+with sensitive tensors retained; full shared Session/CLI model execution;
+additional languages, natural references and supported device families.
+Public reference archives belong in `cstr/crispasr-regression-fixtures`, with
+immutable revisions, source/model/file hashes and licenses. Keep private
+operational paths and account details in ignored maintainer notes.
+
+## Checkpoint-free numerical encoder probe
+
+[The synthetic receipt](openvoice2-refenc-synthetic-2026-10-19.json) compares
+the unmodified original ReferenceEncoder class to the literal native CPU encoder
+body, using deterministic F32 tensors and synthetic coefficients. Input129x513
+exercises all six convolutions and three GRU steps. All nine boundaries pass:
+minimum cosine0.9999999999998275; maximum norm-ratio deviation3.02e-8; maximum
+relative L2 error5.88e-7. Restoring the historical H/W-axis swap yields first
+convolution cosine0.405004 and final embedding cosine0.971432, with final norm
+ratio1.0663; the probe rejects it.
+
+```sh
+python tools/validation/openvoice_refenc_toy.py --upstream "$OPENVOICE_SOURCE"   --out "$ARTIFACTS/toy-refenc"
+```
+
+No pretrained checkpoint, GGUF decoding, STFT, full SDK, CUDA or waveform is
+involved in this small arithmetic check. Coefficients are read as F32 vectors.
+It establishes the encoder's CPU math/layout and a rejecting structural control;
+it does not replace the pending actual-model/GPU/quality matrix.

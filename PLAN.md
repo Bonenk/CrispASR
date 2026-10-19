@@ -1,5 +1,51 @@
 # CrispASR — Pending work
 
+## NOW — OpenVoice2 actual-model and CUDA acceptance
+
+Owner: maintainer coordinator (active, 2026-10-19). Implementation, exact source
+speaker dispatch, clip means/noise replay and the nine-stage synthetic CPU
+encoder proof are archived in HISTORY.md. Method and scopes:
+[OpenVoice baking](docs/openvoice2-baking.md). The synthetic F32 arithmetic
+receipt does not establish pretrained embedding/conversion or GPU quality.
+
+External state and next actions:
+
+1. Full-CMake39255636270 failed configuration. Repaired39258859196/source6be9fda36
+   compiled model/driver objects but failed executable linking because the CUDA
+   toolkit stub lacked its libcuda.so.1 SONAME alias. The worker now creates a
+   link-only alias outside the bundle. Run39264728906 then compiled, linked
+   and passed dependency closure, but packaging failed on Python3.10 lacking
+   hashlib.file_digest. Streaming SHA256 is repaired; dispatch/audit packaging.
+   Never ship a driver/stub or call a green build model acceptance.
+2. Kaggle `openvoice-bake` version2 is queued on old native source71e329ccf.
+   Version1 terminal logs/output are retained after its pre-inference loader
+   failure. Version2 preserves host loader paths but lacks the later dynamic
+   backend ABI flags/discovery repair; it cannot qualify current conditioning.
+   Retain logs/output before superseding it. Do not guess session IDs, launch
+   hardware-fishing retries or exceed the two-session GPU cap.
+3. Prepared `tools/kaggle/openvoice-conditioning/` pins a shared worker and
+   native source6be9fda36, including DL repair and early producer checkpoints.
+   Its submission was rejected by the two-session batch-GPU cap: both the old
+   OpenVoice and needed alignment jobs are queued. Cancellation needs an exact
+   session ID, which the public API cannot resolve from a kernel slug; the
+   maintainer has been asked to stop the obsolete run or supply its session ID.
+   Submit only after a slot is confirmed free. The
+   prebuilt base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
+   the small model/driver delta with that macro, discover modules from the
+   bundle directory and isolate Torch with host loader paths/different cwd.
+4. Independently audit27/28 required stages, original pristine/captured replay,
+   exact PCM and actual posterior noise, both norms/errors, clip means and
+   mean-conditioned waveforms, uninstrumented C API/cache reuse and actual
+   CUDA scheduler splits. Retain original/model/GGUF/input/library/source hashes.
+   Publish vetted immutable reference artifacts. Keep F32-sensitive and any
+   quant variants explicitly identified; no silent threshold relaxation.
+5. Require baseline/original/clone ASR WER<=0.2 and independent speaker cosine
+   improvement>0.01 in the bounded synthetic matrix. Then extend only new
+   scope: full shared Session/CLI actual-model paths, raw mixed-rate processing,
+   automatic Silero selection, natural references/languages, free-running noise
+   and additional devices/quantization. GPU vocoder remains gated by
+   CRISPASR_OV2_GPU=1; reference encoder/flows remain CPU. No release claim yet.
+
 ## Character-alignment acceptance qualification
 
 Arabic CTC/Java39214206020 is complete and its retained output is independently
@@ -19,14 +65,18 @@ completed successfully on frozen source191815511, branchdiag/550-cuda-memory-202
 Claimed by the maintainer coordinator: actual GPU execution and output audit.
 The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
 archive/provenance and27 member hashes. Worker and method:
-`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.1).
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.2).
 Source/model/fixture pins are frozen; GPU acceptance is still pending.
 Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
 this task's acceptance concerns CTC alignment memory. Inspect build provenance,
 source/library/archive hashes and dependency closure before GPU execution.
 
-Kaggle worker version1 was pushed once and is queued at this checkpoint.
-Do not repush while it is live; retain terminal logs before any repair push.
+Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
+Named credential fallback is repaired and version2 uses an immutable public HF
+mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
+verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2
+is prepared for one fresh run after quota/concurrency checks. Keep actual
+GPU/cache/long-file acceptance open; delivery is not inference proof.
 
 Kernel acceptance, per the maintainer's external Kaggle guide:
 
@@ -52,18 +102,30 @@ Kernel acceptance, per the maintainer's external Kaggle guide:
    unused in align-only. A green build, device enumeration, weights on GPU or
    the44-second CPU result alone cannot close the45-minute CUDA report.
 
-## Go lifecycle follow-up after the high-level repair
+## Go lifecycle — remaining scope after actual CPU model acceptance
 
-The built-in high-level Model now enforces nonblocking ownership across native
-operations/close and separately synchronizes options. Completed implementation,
-47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
-All six hosted binding contracts39215435420 pass. Claimed: actual small-model
-Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
-and tools/ci-heavy/go-model-lifecycle/. The worker/probe are prepared; hosted
-compile and execution remain pending. Raw low-level
-Go pointers still require caller serialization; assess an owned low-level
-adapter before promising their concurrent lifetime safety. Native result states
-remain shared across high-level Contexts. Other-language lifecycle remains open.
+High-level Model implementation,51 Go race cases/35 Rust cases/five doctests,
+and the real tiny.en/JFK Go model proof are complete; see HISTORY.md and
+[the independent audit](docs/go-model-lifecycle-audit-2026-10-19.json).
+Run39228691810/source5aba585ce verifies actual callback close/re-entry,
+concurrent rejection, cancellation/recovery, parallel decoding and owned results.
+Do not rerun the same accepted fixture merely because an older note says pending.
+Next extend only new scope: beam/partial UTF-8, actual VAD model, DTW model mode,
+other supported platforms/devices and other wrapper languages. Raw low-level
+Go pointers and generic speaker handles remain caller-serialized; assess an
+owned adapter before promising concurrent safety. High-level Contexts share the
+latest native result state. All six earlier binding contracts39215435420 pass;
+current-tip CI remains a separate integration gate.
+
+## Generic speaker primitives — remaining model/platform scope
+
+Python/Dart and C#/Java operation review is now complete alongside Go/Rust and
+Ruby/WASM; repairs and their scoped local probes are archived in HISTORY.md and
+mapped in docs/wrapper-callable-coverage.md. Do not reimplement these methods.
+Remaining: real speaker-model/device quality, additional target platforms,
+owned concurrent adapters and callback/concurrent-close behavior. Generic
+handles remain caller-serialized; static/callable closure is not model or
+universal concurrency acceptance. Broader API inventory remains below.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
@@ -285,20 +347,21 @@ loads a helper compiled against that build. A fixture library is never the
 native model acceptance gate.
 
 Frozen implementation source `c12707299c5dcbca7bafe60a073688250238cdd9`
-is on immutable `diag/python-api-20261018`. Full CI
-[39120101432](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101432)
-and lint
-[39120101602](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101602)
-are dispatched and queued. Secret scan `39120093240` also targets that source.
-Verify terminal conclusions, source SHA and actual test/helper output before
-accepting the hosted gates. Later documentation commits on main do not alter
-this pinned implementation.
+is on immutable `diag/python-api-20261018`. CI39120101432 finished with12
+successful jobs and a Linux metadata-fixture failure after all2,033 native
+unit tests passed; lint39120101602 passed all10 jobs. The failure was untyped
+optional Parakeet word-alternative getters truncating a pointer, repaired by
+ff3aeeefd; its observed failure/repair is in HISTORY.md. Do not rerun that old
+source as though it were queued. Refreshed PR521 headab6c92cae's Linux unit job
+39223238352 passes the full metadata/getter/export/helper step, including
+297-function inventory and189 pytest cases/34 subtests. That is PR-source
+integration evidence, not current-main release or real-model acceptance.
 
 Next acceptance work, in order:
 
-1. Audit the immutable source's full CI/lint pinned above,
-   especially the complete shared library, legacy helper link/load, the
-   164-symbol smoke subset and native exported metadata. Do not accept a stale
+1. Check exact current-main full-library CI after subsequent wrapper changes,
+   including legacy helper link/load, export smoke and native metadata. Preserve
+   the corrected terminal outcomes above; do not repeat the old failed fixture. Do not accept a stale
    build discovered from another checkout. Local symbol-resolution checks skip
    when no current native library was explicitly supplied.
 2. Exercise representative real models through Python: piano (including empty
@@ -521,10 +584,10 @@ not establish native speech acceptance.
 
 See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
 entry points, bounded next action, acceptance gates and external dependencies.
-No task remains assigned to a departed agent. Inspect existing Echo runs first;
-then audit the current-main #547 fix and its validation before repeating
-streaming diagnosis. Actual MiMo71-row
-Q/K/V capture follows. Research and hardware waits are explicitly separate.
+No task remains assigned to a departed agent. Follow the approved ordered
+roadmap below:550 GPU, wrapper closure, PR521, release, then bounded numerical
+work. Preserve accepted Echo audits and current-main547 fixes; research and
+hardware waits remain separate.
 
 Issue #547 now has the streaming utterance-open throttle fix on main in
 `dd14099c3`, including literal boundary tests and the dedicated
@@ -560,8 +623,9 @@ claiming full hardware validation; this #549 task did not execute that worker.
    Separate reporter/hardware/gated-asset waits; keep machine details ignored.
    Drama3 stays deferred outside active/release scope.
 
-General CI39216228487 on65b851a91 is queued at this checkpoint; green component
-workflows do not replace exact-tip general CI. Hardware waits do not justify
+Documentation-tip CI runs can be superseded by newer pushes. Inspect Actions
+for the actual main SHA; green component workflows or older cancelled runs do
+not replace exact-tip general CI. Hardware waits do not justify
 repeating accepted diagnostics. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per the external guide. Neither supplies Ascend.
 
@@ -657,11 +721,15 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
 - **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
   The standalone utilities are integrated with complete original/native array
-  replay and hosted checks; see HISTORY.md. The PR is now ready-for-review, headc1e7b73a8 (2026-10-19).
+  replay and hosted checks; see HISTORY.md. The PR is ready-for-review; updated headab6c92cae incorporates main35df8d6d4
+  while preserving contributor history. The helper-test conflict is resolved;
+  main's newer ggml pin preserves two CANN fixes. A literal UBSan regression
+  reproduced and now guards the signed128-minimum formatter overflow.
   Its body/discussion/review comments were re-read. The Linux failure is the
   stale vibevoice architecture expectation already fixed on main; CLANG64 lacks
   `<cstdlib>` in the deprecated executable (now fixed on main);
-  CUDA11.8 setup hit Chocolatey504 before compilation. Rebase and inspect new CI.
+  CUDA11.8 setup hit Chocolatey504 before compilation. Fresh head checks are
+  queued; inspect them rather than rerunning stale-source jobs.
   Full diff/runtime review, original utility proof and unchanged cloning-quality
   gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.

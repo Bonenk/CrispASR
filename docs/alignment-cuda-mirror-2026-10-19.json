@@ -1,0 +1,19 @@
+{
+  "revision": "425c555beb63de4665cba604c47ea38232f5d080",
+  "files": {
+    "alignment-long-cuda-20261019/v2/runtime.tar.gz": {
+      "sha256": "63474b5f034ebac850b7b87ef76eecec12d009092d4c72370aeeb6be341365c5",
+      "bytes": 489213512
+    },
+    "alignment-long-cuda-20261019/v2/fixture.tar.gz": {
+      "sha256": "c46cdb1044d6837714ab7572a2edc319fc15ccf3e3645fb8991b93503995c4c8",
+      "bytes": 269096
+    }
+  },
+  "anonymous_full_byte_verification": true,
+  "source": "191815511b85a526aace111b1bda2e28ecb7faad",
+  "source_build_run": 39215806310,
+  "source_fixture_run": 39212307554,
+  "gpu_executed": false,
+  "scope": "immutable anonymous runtime/fixture delivery; original v1 failed before inference with HTTP401"
+}

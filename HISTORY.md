@@ -12,6 +12,168 @@ the regression is wired into ordinary CI. The actual native output-function
 allocator/OOM extraction and Python helper routing checks also pass.
 Original/native clone speech still fails the unchanged gate. Integration stays
 in review pending fresh CI and a separately accepted full-runtime scope.
+## 2026-10-19 — OpenVoice checkpoint-free encoder arithmetic proof
+
+The original pinned ReferenceEncoder class and unchanged native CPU encoder
+body agree across layer norm, six convolutions, three-step GRU and projection:
+all nine cosines>=0.9999999999998275, maximum relative L2 error5.88e-7, norm
+ratios within3.02e-8 of1. Deterministic synthetic F32 tensors/coefficient buffers
+use no pretrained checkpoint or full SDK build. Restoring the historical axis
+swap drops the first convolution to0.405004 and final embedding to0.971432;
+the control is rejected. Receipt: docs/openvoice2-refenc-synthetic-2026-10-19.json.
+
+This checks CPU encoder arithmetic/layout, not GGUF/dequantization, STFT,
+trained embeddings, CUDA, conversion waveform or speaker/intelligibility quality.
+Those actual-model/hardware gates remain in PLAN.md.
+
+## 2026-10-19 — OpenVoice producer checkpoint and packaging repairs
+
+Model conversion and each original-module reference are now checkpointed to HF
+before native validation. Staging weights are explicitly unvalidated; accepted
+model publication remains behind parity and quality gates. Conditioning notices
+are saved beside their references. Both workers use streaming SHA256 compatible
+with Python3.10. CUDA run39264728906 compiled/linked and passed dependency
+closure, then failed receipt packaging on the replaced hash API; GPU inference
+and pretrained acceptance remain pending, tracked in PLAN.md.
+
+## 2026-10-19 — Python/Dart and C#/Java generic speaker contracts
+
+Python now rejects malformed success codes/counts/labels, invalid mono/shape
+inputs, NUL/overflowing options and use after close, including array coercion
+that closes the handle. Dart uses temporary allocator arenas, exact1-success,
+checked matrix dimensions, native count/label checks and cache packing/lifetime
+guards. New Python/Dart probes failed before repair; seven Python cases and
+strict Dart analyzer/all40 actual FFI tests pass.
+
+C#/Java auxiliary probes reproduced accepted oversized cluster counts and NUL
+paths before repair. Both now validate returned count/labels, preserve native
+zero/all-unassigned semantics and reject truncated speaker/cache paths. C# also
+rejects nonfinite clustering thresholds and empty cache PCM. Final expanded
+auxiliary probes cover exact1-success versus2/-1 and invalid dimensions as well.
+C# auxiliary53 assertions and Java auxiliary137 assertions pass.
+The callable ledger maps all eight generic-speaker adapters. These are compiled
+operation/ownership checks, not actual speaker-model or concurrent-handle proof.
+
+## 2026-10-19 — OpenVoice explicit clip means and posterior-noise replay
+
+Added native equal-weight clip embedding extraction, owned target-identity
+conditioning and owned original posterior-noise replay. Invalid replacements
+leave prior conditioning intact; invalid/overlapping spans and failed extraction
+leave caller output unchanged. Unequal clip lengths guard averaging semantics.
+The Python original-module dumper supports tau0.3 by capturing the actual
+standard-normal input, then removes hooks and requires byte-identical pristine
+replay. Strict diff requires28 stages for this recipe; tau0 remains27.
+
+Tiny conditioning and strict-driver contracts pass, including missing shared
+noise rejection. Numerical, multi-clip and free-running quality acceptance is
+still pending; Kaggle v2 remains frozen on the preceding deterministic runtime
+source71e329ccf. Do not claim this new scope from its eventual result.
+
+## 2026-10-19 — OpenVoice deterministic reference wiring and source identity
+
+Checkpoint71e329ccf adds original-module reference hooks, strict unified diff
+registration and27 required runtime snapshots with cosine/magnitude/error
+checks. The CLI and C ABI now use the selected MeloTTS speaker's metadata key;
+unknown identities fall back to actual source-audio embedding extraction.
+Reference cache keys include encoder coefficients and diagnostics bypass cache
+hits. Corrected documentation of native tau0; opt-in CUDA vocoder backend now
+honors the caller under CRISPASR_OV2_GPU=1. GPU/quality acceptance remains open.
+
+The actual session-dispatch probe was observed failing on prior source because
+source identity was never selected, and passes after repair (four test cases).
+The strict-driver contract accepts all stages and rejects eleven injected
+missing/shape/scale/nonfinite/recipe/identity/conversion failures, with resource
+cleanup. Tiny compilation/syntax checks pass; these establish glue/gate behavior,
+not numerical model parity. See docs/openvoice2-baking.md and PLAN.md.
+
+## Kaggle credential preflight repaired; immutable CUDA delivery — 2026-10-19
+
+Alignment CUDA worker v1 reached terminal ERROR before any inference: a missing
+GH credential silently fell back to an HF token and Actions returned401. Both
+missing-named-token and wrong-earlier-dataset cases fail before the resolver
+repair. Named credentials now resolve only their requested filename; default
+HF lookup retains its historical aliases. All17 hermetic resolver controls pass,
+including downloader absence and rejected-token refusal. Canonical/bundled
+harness copies remain synchronized. Production token validation is unchanged;
+mount/precedence tests no longer send synthetic credentials to live services.
+
+Version2 uses an immutable anonymous HF mirror of the previously audited CUDA
+archive and five licensed pinned fixture inputs. Full anonymous downloads verify
+489,213,512 runtime bytes and269,096 fixture bytes; revision/hashes are retained
+in docs/alignment-cuda-mirror-2026-10-19.json. Native/model pins are unchanged.
+The worker frees the cached context after short/long/short acceptance before
+loading a fresh CLI model. No GPU or long-file acceptance follows from delivery;
+the remaining hardware test is in PLAN.md. Terminal v1 logs are retained privately.
+
+## Real-model high-level Go lifecycle accepted — 2026-10-19
+
+Run39228691810/source5aba585ce passes after the Opus build preflight repair.
+Independent audit verifies26 retained artifacts and34 source hashes, native
+library/probe/audio identities and the actual Go binary's race instrumentation.
+All four real tiny.en/JFK cases return two segments; callback guards perform4
+checks sequentially and8 across two native workers. Sequential baseline,
+callback-guarded and cancellation-recovery segment/token values are exact.
+The audit checks105 segment token rows,58 first-segment detailed snapshots and
+116 alternatives, raw text bytes, timing units/bounds and unavailable DTW=-1.
+[Public receipt](docs/go-model-lifecycle-audit-2026-10-19.json).
+
+The verified probe rejects callback/concurrent close and re-entry, recovers
+from a held encoder cancellation, exercises two-worker parallel decode and
+retains owned results after close. This is CPU/high-level/greedy acceptance;
+Go race instrumentation does not instrument C++, and no original-reference,
+WER/speed, GPU, actual VAD/DTW model or universal raw-handle safety is claimed.
+
+## Older Python CI queue labels reconciled — 2026-10-19
+
+Frozen c12707299 CI39120101432 actually completed:12 jobs pass, Linux unit
+fails after all2,033 native tests at the known Parakeet metadata test pointer
+truncation. All10 lint39120101602 jobs pass. The signature repairff3aeeefd is
+already integrated and has an observed tiny exit139 negative. Refreshed PR521
+headab6c92cae's Linux unit job39223238352 now passes the complete exported
+metadata/Python step:13 session and six window tests,297-function inventory,
+189 pytest cases/34 subtests and freshly compiled native helper load. These
+are source-scoped integration results, not current-main release/model proof.
+
+## Go/Rust generic speaker operation gaps repaired — 2026-10-19
+
+New actual-method/shared-header probes reproduced a Go cluster-size overflow
+followed by an empty-buffer indexing panic, and acceptance of malformed native
+embedding success code2 in both Go and Rust. The adapters now require exactly1,
+validate int32 sample/count conversions and matrix sizes before allocation or
+native access, and reject inconsistent native cluster counts/labels. Go also
+rejects truncated NUL strings in generic embedder/cache construction. Native
+zero-count/all-unassigned output is preserved rather than rejected.
+
+The former abort-only C fixture entries now reuse the Ruby/WASM generic speaker
+oracle with literal runtime diarization PODs. Public embed/name/dim, clustering,
+cache apply, native failures, owned values and close/drop are exercised. Final
+strict isolated run passes51 race-enabled Go cases,35 Rust cases and five
+doctests. Both observed failing runs are retained privately; no local full
+runtime/model build or inference was used. The callable ledger and contributing
+method are updated. Generic Go handles remain caller-serialized; no real speaker
+quality, GPU or universal concurrent-lifetime acceptance is claimed.
+
+## Go model-worker link preflight repair — 2026-10-19
+
+Run39222679421/source35df8d6d4 built the real native library but failed the
+ordinary generated Go link before any inference: Opus/Ogg/crispasr_opusfile were
+not built. The hosted worker now enables CRISPASR_OPUS_FETCH, matching existing
+Go CI. Binding linker directives and speech/lifetime gates are unchanged.
+Runtime artifacts are retained before Go linking; completed model cases are
+checkpointed. Model download follows successful Go compilation. Syntax and Go
+format checks pass; actual corrected hosted acceptance remains in PLAN.md.
+
+## PR521 refreshed for review; no full-runtime promotion — 2026-10-19
+
+Review headab6c92cae incorporates main35df8d6d4 while preserving contributor
+history. Its Python helper conflict retains main's tested routing. Its ggml pin
+retains main's two newer CANN fixes. The branch's signed128 formatter overflow
+was observed under UBSan at the signed minimum; unsigned magnitude conversion
+now passes five extrema/control values, with a permanent CI regression. Literal
+native allocator/OOM and helper tests also pass. The PR description now states
+current acceptance and limitations. Fresh hosted checks are pending; unchanged
+original/native cloned-speech failures still block full-runtime/default merge.
+These PR-only changes are not advertised as shipped on main.
 
 ## Arabic character/Java retained-output audit accepted — 2026-10-19
 

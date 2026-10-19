@@ -55,7 +55,7 @@ now explicitly directs callers to `open`, rather than invoking a retired
 native function. The operation fixture checks actual UTF-8 result copies,
 missing consent/roster, native failure codes, no-match semantics and lifetime.
 
-## Generic speaker primitives: Ruby and WASM follow-up
+## Generic speaker primitives: reviewed callable adapters
 
 Native `crispasr_speaker_embedder_*_abi` has make/free/dim/name/embed operations;
 embedding succeeds with **1**. `crispasr_speaker_cluster_abi` returns the number
@@ -66,11 +66,36 @@ zero-success apply and native centisecond segment/offset fields.
 | --- | --- | --- |
 | Ruby | `CrispASR::SpeakerEmbedder.new`, `.dimension`, `.name`, `.embed`, `.close`; `CrispASR.speaker_cluster(rows, threshold, maximum)`; `CrispASR::PyannoteCache.new`, `.apply(segments, offset_cs)`, `.close` | `RubyWrapperContract`, native shared fixture; TypedData GC and recursive coercion/GC checks |
 | WASM | `SpeakerEmbedder`, `.dimension`, `.name`, `.embed`, `.close`/`.delete`; `speakerCluster(rows, threshold, maximum)`; `PyannoteCache`, `.apply(segments, offsetCs)`, `.close`/`.delete` | `WasmWrapperContract`, same shared fixture compiled into WASM |
+| Go | `NewSpeakerEmbedder`, `.Dim`, `.Name`, `.Embed`, `.Close`; `AgglomerativeCluster`; `NewPyannoteCache`, `.Apply`, `.Close` | `TestProbeGenericSpeakerOwnershipAndReturnCodes`, `TestProbeGenericClusterBoundsAndNativeOutput`, `TestProbeGenericPyannoteOwnedResource`, `TestProbeGenericSpeakerRejectsNulAndOversizedOptions`, shared actual-header/POD oracle |
+| Rust | `SpeakerEmbedder::new`, `.dim`, `.name`, `.embed`, `Drop`; `agglomerative_cluster`; `PyannoteCache::compute`, `.apply`, `Drop` | `probe_generic_speaker_returns_clusters_and_cache`, same shared compiled oracle |
+| Python | `SpeakerEmbedder`, `.dim`, `.name`, `.embed`, `.close`; `agglomerative_cluster`; `PyannoteCache`, `.apply`, `.close` | `test_python_speaker_primitives.py`: seven actual-header fixture cases, coercion/closed guards and exact success/count/label contracts |
+| Dart | `CrispasrSpeakerEmbedder`, `.dim`, `.name`, `.embed`, `.close`; `crispasrAgglomerativeCluster`; `CrispasrPyannoteCache`, `.apply`, `.close` | Strict analyzer and40 FFI tests, including three shared-oracle generic cases; allocator arenas release temporary buffers on exceptions |
+| C# | `SpeakerEmbedder`, `.Dimension`, `.Name`, `.Embed`, `.Dispose`, `.Cluster`; `PyannoteCache`, `.Apply`, `.Dispose` | Actual .NET auxiliary probe with malformed counts/labels, exact success, unassigned output, NUL paths and failure cleanup |
+| Java | `CrispasrAuxiliary.SpeakerEmbedder`, `.dim`, `.name`, `.embed`, `.close`; `.cluster`; `.PyannoteCache`, `.apply`, `.close` | Real JNA auxiliary probe, same native faults as C# plus existing ownership/closed guards |
+
+
+Go's oversized cluster dimension previously overflowed the size product and
+panicked on an empty buffer. Both Go and Rust accepted an embedding return code
+of2 instead of requiring the native1-success contract. The new probes observed
+these failures before repair. Counts/conversions are checked before allocation
+or native entry, and returned cluster counts/labels are validated. Native
+zero-count/all-unassigned output remains distinct from malformed labels. Go
+cache offsets are centiseconds; Rust cache offsets/segments are seconds. Each
+method returns owned data and closes/drops its model/cache once. Go's generic
+handles require caller serialization across operations and Close; the separate
+high-level Whisper model guard does not cover them. These are operation probes,
+not real speaker-quality or universal concurrency acceptance.
 
 Clustering returns labels plus `n_clusters` (Ruby) / `nClusters` (WASM).
-Cache apply returns owned `{t0,t1,speaker}` records and leaves input records
-unchanged. Explicit close is idempotent; subsequent operations raise. Other
-languages' existing generic primitives still need their ledger rows reviewed.
+Ruby/WASM cache apply returns owned `{t0,t1,speaker}` records and leaves input
+records unchanged. Their explicit close is idempotent; subsequent operations
+raise. Go/Rust apply updates caller segment speakers only after native success.
+Python/Dart accept only exact1-success and validate count/label results before
+returning owned data. C#/Java already required1; their malformed count/label
+and NUL-path gaps are repaired. Dart bounds division precedes allocation, and
+its cache packing rejects nonfinite/out-of-range timings with arena cleanup.
+These generic handles remain caller-serialized. Actual speaker-model quality,
+thread contention and further platforms remain separate acceptance tasks.
 
 ## Go/Rust options, text and polling follow-up
 

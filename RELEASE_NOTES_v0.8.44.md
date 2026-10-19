@@ -676,7 +676,7 @@ regressions pass, alongside35 parallel/VAD cases. Hosted run39211685024 now pass
 raw/hash audit confirms exact input/segment bounds, DTW and owned alternatives.
 No model-quality, GPU or concurrent-lifecycle acceptance is claimed.
 
-### Long-input CTC alignment (implementation; validation pending)
+### Long-input CTC alignment (CPU accepted; CUDA validation pending)
 
 Canary/FastConformer forced alignment uses30-second encoder cores with two-second
 context while retaining one global transcript alignment. CLI align-only honors
@@ -692,8 +692,9 @@ duration, and align-only does not apply VAD.
 
 Actual Japanese CTC CPU profiling now has independently verified native logits,
 reference/DP, CLI and Python/C ABI output. The DP heap reduction is substantial;
-its measured0.055ms saving is negligible beside4.59s encoder inference on this
-clip. Echo9B's32-layer same-input FFN attribution is also independently audited.
+the earlier0.055ms saving is negligible beside4.59s encoder inference, and a
+later same-run matrix measured the opt-in DP path slower. No robust end-to-end
+speedup or default promotion is established. Echo9B's32-layer same-input FFN attribution is also independently audited.
 These diagnostics do not establish long-form boundary accuracy, an accepted Q4
 recipe or GPU performance. Drama3 is excluded from this release's active scope.
 
@@ -706,5 +707,56 @@ snapshot. Concurrent/repeated close frees once, and returned segments/tokens
 remain owned. Contexts still share the model's latest native results. Raw
 low-level Context pointers still require caller serialization. Language lookup
 also frees its C string and lists the final supported language. Validation:
-47 Go race cases,34 Rust cases and five doctests; actual Go/model/platform checks
-remain pending.
+51 Go race cases,35 Rust cases and five doctests. The independently audited
+real Go tiny.en/JFK CPU run also passes four cases, including callback guards,
+cancellation/recovery, parallel decode and owned snapshots. Other model modes
+and platforms remain separate; raw low-level/generic handles require caller
+serialization.
+
+### Arabic character alignment through Java and Python
+
+The Java standalone worker now compiles its session dependencies explicitly.
+The real Arabic Q4 CPU output audit passes15 words,85 character spans and100
+exact Java UTF-8/centisecond rows, including a3.25-second absolute offset and
+three host-encoding controls. CLI word/segment JSON agrees with the retained
+post-logit reference. This proves the bounded output/transport scope, not
+original encoder parity, acoustic boundary accuracy or GPU behavior. See
+[the audit](docs/arabic-characters-java-audit-2026-10-19.json) for missing replay
+inputs and the distinction between independent and hosted-worker evidence.
+
+The CUDA alignment bundle is independently hash-audited; a2703-second Kaggle
+cache/memory test remains queued. The real-model Go lifecycle run now passes
+and is independently audited; see
+[the receipt](docs/go-model-lifecycle-audit-2026-10-19.json). Final release
+package/tip CI and actual long-file CUDA acceptance are still pending.
+
+### Go/Rust generic speaker input and result contracts
+
+Generic speaker methods now reject invalid native embedding success codes and
+inconsistent cluster counts/labels. Go clustering validates dimensions before
+multiplication, preventing an oversized-input indexing panic. Int32 sample/count
+bounds and Go NUL strings are checked before native entry. Shared compiled
+operation tests cover embedder, clustering, cache and cleanup; native unassigned
+results are preserved. These changes do not add concurrent generic-handle safety
+or establish speaker-model quality.
+
+## OpenVoice reference wiring and generic speaker contracts
+
+OpenVoice2 now has unified original-module reference dumps and strict27-stage
+runtime comparison, including projected embeddings, norms/errors and raw/final
+waveforms. Source identity follows the actual MeloTTS speaker on CLI and C ABI.
+Explicit clip means and shared posterior-noise replay support a28-stage tau0.3
+recipe. CUDA vocoder execution remains opt-in; fresh model/hardware/quality
+acceptance is pending. See docs/openvoice2-baking.md for exact scope and pins.
+
+Python/Dart generic speaker adapters now guard lifetime, shape/count/label
+results, exact1-success and exception cleanup. C#/Java reject malformed cluster
+results and NUL-truncated speaker/cache paths. Seven Python cases, strict Dart
+analyzer/all40 FFI tests,53 C# auxiliary and137 Java auxiliary assertions pass.
+These are compiled wrapper contracts, not real speaker-model quality or
+universal concurrent-handle acceptance. No release tag is implied by this draft.
+
+The checkpoint-free original/native CPU encoder probe now passes all nine
+boundaries (cosine>=0.9999999999998275, norm ratios within3.02e-8). Its historical
+axis-swap control fails. This synthetic arithmetic evidence is separate from
+pretrained/GGUF/STFT/CUDA/voice-quality acceptance, which remains pending.

@@ -128,6 +128,9 @@ func main() {
 		encoded, e := json.Marshal(snapshots)
 		check(e)
 		results = append(results, outcome{label, segments, int(checks.Load())})
+		partial, e := json.Marshal(results)
+		check(e)
+		check(os.WriteFile(os.Args[3], partial, 0600))
 		// Retain exact metadata independently of the next native decoder mutation.
 		check(os.WriteFile(os.Args[3]+"-"+label+"-tokens.json", encoded, 0600))
 	}

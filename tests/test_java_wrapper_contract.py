@@ -178,6 +178,7 @@ public class WrapperAuxProbe {
             eqFloat(out[2],0.75f);
             out[2]=999f; float[] out2=emb.embed(pcm); eqFloat(out2[2],0.75f); // copy test
             Probe.INSTANCE.probe_aux_mode(2); reject(IllegalStateException.class, ()-> emb.embed(pcm)); Probe.INSTANCE.probe_aux_mode(0);
+            for(int invalid:new int[]{15,16,17}){Probe.INSTANCE.probe_aux_mode(invalid);reject(IllegalStateException.class,()->emb.embed(pcm));}Probe.INSTANCE.probe_aux_mode(0);
         }
         CrispasrAuxiliary.SpeakerEmbedder emb2=new CrispasrAuxiliary.SpeakerEmbedder("probe");
         emb2.close();
@@ -190,6 +191,11 @@ public class WrapperAuxProbe {
         reject(IllegalArgumentException.class, ()-> new CrispasrAuxiliary.SpeakerEmbedder("probe",0,null));
         reject(NullPointerException.class, ()-> { try(CrispasrAuxiliary.SpeakerEmbedder x=new CrispasrAuxiliary.SpeakerEmbedder("probe")){ x.embed(null); } });
 
+        reject(IllegalArgumentException.class, ()->new CrispasrAuxiliary.SpeakerEmbedder("probe\u0000bad"));
+        reject(IllegalArgumentException.class, ()->new CrispasrAuxiliary.SpeakerEmbedder("probe",4,"cache\u0000bad"));
+        for(int invalid:new int[]{11,12,13}){Probe.INSTANCE.probe_aux_mode(invalid);reject(IllegalStateException.class,()->CrispasrAuxiliary.cluster(new float[]{1,0,0,0,1,0},3,.65f,8));}
+        Probe.INSTANCE.probe_aux_mode(14);CrispasrAuxiliary.ClusterResult unassigned=CrispasrAuxiliary.cluster(new float[]{1,0,0,0,1,0},3,.65f,8);eq(unassigned.clusterCount,0);eq(unassigned.labels[1],-1);Probe.INSTANCE.probe_aux_mode(0);
+        reject(IllegalArgumentException.class, ()->new CrispasrAuxiliary.PyannoteCache(pcm,"model\u0000bad"));
         // clustering
         CrispasrAuxiliary.ClusterResult cr=CrispasrAuxiliary.cluster(new float[]{1,0,0,0,1,0},3,0.65f,8);
         eq(cr.clusterCount,2);eq(cr.labels[1],1);

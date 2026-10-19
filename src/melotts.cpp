@@ -925,6 +925,7 @@ struct melotts_context {
     int n_threads;
     uint32_t seed;
     std::string dump_dir;
+    std::map<int, std::string> speaker_names;
 
     std::unordered_map<ggml_tensor*, std::vector<float>> weight_cache;
     bool weight_cache_enabled = true;
@@ -2331,6 +2332,34 @@ static bool load_weights(melotts_context* ctx, const char* path) {
     std::string cmudict_json = core_gguf::kv_str(meta, "melotts.cmudict_json", "{}");
     std::string g2p_en_json = core_gguf::kv_str(meta, "melotts.g2p_en_json", "");
 
+    const std::string speakers = core_gguf::kv_str(meta, "melotts.spk2id_json", "{}");
+    // Converter writes a simple JSON object of ASCII speaker keys to integer IDs.
+    size_t sp = 0;
+    while ((sp = speakers.find('"', sp)) != std::string::npos) {
+        const size_t end = speakers.find('"', sp + 1);
+        if (end == std::string::npos)
+            break;
+        const size_t colon = speakers.find(':', end + 1);
+        if (colon == std::string::npos)
+            break;
+        char* stop = nullptr;
+        long id = std::strtol(speakers.c_str() + colon + 1, &stop, 10);
+        if (stop != speakers.c_str() + colon + 1 && id >= 0 && id < ctx->hp.n_speakers) {
+            std::string name = speakers.substr(sp + 1, end - sp - 1);
+            for (char& c : name) {
+                if (c >= 'A' && c <= 'Z')
+                    c += 'a' - 'A';
+                else if (c == '_')
+                    c = '-';
+            }
+            ctx->speaker_names[(int)id] = name;
+        }
+        sp = end + 1;
+        const size_t comma = speakers.find(',', colon + 1);
+        if (comma == std::string::npos)
+            break;
+        sp = comma + 1;
+    }
     core_gguf::free_metadata(meta);
 
     // Parse symbols
@@ -3045,4 +3074,11 @@ int melotts_num_speakers(const struct melotts_context* ctx) {
 void melotts_set_dump_dir(struct melotts_context* ctx, const char* dir) {
     if (ctx && dir)
         ctx->dump_dir = dir;
+}
+
+const char* melotts_source_speaker(const struct melotts_context* ctx) {
+    if (!ctx)
+        return nullptr;
+    const auto found = ctx->speaker_names.find(ctx->speaker_id);
+    return found == ctx->speaker_names.end() ? nullptr : found->second.c_str();
 }

@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""OpenVoice2 TCC reference — dump intermediate values for diff harness."""
+"""Historical manual OpenVoice2 binary-dump diagnostic.
+
+For acceptance use tools/dump_reference.py --backend openvoice2: that plugin
+calls pinned original modules and writes the strict, input-aligned GGUF recipe.
+This older manual reconstruction is retained for historical debugging only.
+"""
 import json, struct, sys, os
 import numpy as np
 import torch
