@@ -4,6 +4,9 @@
 
 Owner: maintainer coordinator (active, 2026-10-19). Wiring/source identity
 checkpoint71e329ccf is on main. Full-CMake CUDA bundle39255636270 is queued;
+Kaggle v1 stopped before inference after replacing the host loader path;
+terminal logs are retained. Version2 preserves host paths and isolates Torch
+subprocesses from bundled CUDA12.4; local loader/embedded-phase checks pass.
 Kaggle can use the exact-ggml audited base runtime with a bounded model-file
 delta compile, avoiding a full native build. Method and scoped open gates:
 [OpenVoice baking](docs/openvoice2-baking.md). Audit found native

@@ -19,7 +19,7 @@ import time
 import traceback
 import urllib.request
 
-VERSION = '2026-10-19.openvoice-bake.1'
+VERSION = '2026-10-19.openvoice-bake.2'
 SOURCE = '71e329ccfbb33dc99fa53743565292b1dba13b1e'
 UPSTREAM = '74a1d147b17a8c3092dd5430504bd83ef6c7eb23'
 BASE_SOURCE = '191815511b85a526aace111b1bda2e28ecb7faad'
@@ -46,8 +46,19 @@ def save():
     (OUT / 'validation.json').write_text(json.dumps(RECEIPT, indent=2) + '\n')
 
 
+def host_environment():
+    env=dict(os.environ)
+    env['LD_LIBRARY_PATH']=env.get('CRISPASR_OV2_HOST_LD_LIBRARY_PATH',env.get('LD_LIBRARY_PATH',''))
+    return env
+
+
 def run(command, name, **kwargs):
+    if str(command[0])==sys.executable:
+        kwargs.setdefault('env',host_environment())
     print(name, flush=True)
+    harness=sys.modules.get('kaggle_harness')
+    if harness:
+        harness.step(name)
     with (OUT / (name + '.log')).open('w') as log:
         subprocess.run(list(map(str, command)), stdout=log, stderr=subprocess.STDOUT,
                        check=True, timeout=kwargs.pop('timeout', 1200), **kwargs)
@@ -93,7 +104,9 @@ def bootstrap():
     assert ggml=='0a862076567afd8468822ccc512c97ac6a69b340'
     RECEIPT.update(base_runtime_source=BASE_SOURCE,base_runtime_sha256=BASE_SHA,ggml=ggml)
     if os.environ.get('CRISPASR_OV2_BUNDLE_READY')!='1':
-        env=dict(os.environ,CRISPASR_OV2_BUNDLE_READY='1',LD_LIBRARY_PATH=str(BUNDLE))
+        host_path=os.environ.get('LD_LIBRARY_PATH','')
+        env=dict(os.environ,CRISPASR_OV2_BUNDLE_READY='1',CRISPASR_OV2_HOST_LD_LIBRARY_PATH=host_path,
+                 LD_LIBRARY_PATH=str(BUNDLE)+os.pathsep+host_path)
         os.execve(sys.executable,[sys.executable,str(Path(__file__).resolve())],env)
     return kh
 
@@ -127,9 +140,8 @@ def main():
         RECEIPT['native_delta']={name:sha(WORK/name) for name in ['libopenvoice-probe.so','openvoice-bake']}
         import numpy as np
         import soundfile as sf
-        import torch
-        RECEIPT['torch_version']=torch.__version__
-        RECEIPT['torch_reference_device']='cuda' if torch.cuda.get_device_capability()[0]>=7 else 'cpu'
+        cap=float(RECEIPT['hardware'].splitlines()[0].split(',')[1])
+        RECEIPT['torch_reference_device']='cuda' if cap>=7 else 'cpu'
         from huggingface_hub import HfApi,hf_hub_download,snapshot_download
         hub=HfApi()
         model_rev=hub.model_info('myshell-ai/OpenVoiceV2').sha
@@ -179,11 +191,8 @@ def main():
         reference,ref_sr,ref_key=synth('This is a reference voice for a simple speech test.',1)
         sf.write(OUT/'reference.wav',reference,ref_sr,subtype='FLOAT')
         RECEIPT['reference']={'speaker':ref_key,'rate':ref_sr,'sha256':sha(OUT/'reference.wav')}
-        sys.path.insert(0,str(ROOT/'tools'))
-        from dump_reference import write_gguf_archive
-        from reference_backends.openvoice2 import dump,DEFAULT_STAGES
         os.environ.update(CRISPASR_OV2_UPSTREAM=str(upstream),CRISPASR_OV2_REFERENCE_WAV=str(OUT/'reference.wav'),
-                          CRISPASR_OV2_DEVICE='cuda' if torch.cuda.get_device_capability()[0]>=7 else 'cpu',
+                          CRISPASR_OV2_DEVICE=RECEIPT['torch_reference_device'],
                           CRISPASR_OV2_TAU='0')
         class OpenParams(ct.Structure):
             _fields_=[('n_threads',ct.c_int),('verbosity',ct.c_int),('use_gpu',ct.c_bool),('tau',ct.c_float)]
@@ -206,17 +215,36 @@ def main():
             import librosa
             source16=librosa.resample(baseline,orig_sr=sr,target_sr=16000)
             os.environ['CRISPASR_OV2_SOURCE_SPEAKER']=key
-            captures=dump(model,source16,set(DEFAULT_STAGES))
-            meta={name:captures.pop(name) for name in list(captures) if isinstance(captures[name],str)}
-            meta.update(backend='openvoice2',source_commit=SOURCE,upstream_commit=UPSTREAM,model_revision=model_rev)
+            # Original Torch runs in a separate process with the host CUDA
+            # stack. The native process keeps the audited CUDA12.4 libraries.
+            np.save(WORK/'source16.npy',source16)
+            reference_script=WORK/'reference.py'
+            reference_script.write_text("""import sys,os,json
+from pathlib import Path
+import numpy as np
+import soundfile as sf
+sys.path.insert(0,sys.argv[1])
+from dump_reference import write_gguf_archive
+from reference_backends.openvoice2 import dump,DEFAULT_STAGES
+model=Path(sys.argv[2]);source=np.load(sys.argv[3],allow_pickle=False)
+captures=dump(model,source,set(DEFAULT_STAGES))
+meta={name:captures.pop(name) for name in list(captures) if isinstance(captures[name],str)}
+meta.update(backend='openvoice2',source_commit=sys.argv[6],upstream_commit=sys.argv[7],model_revision=sys.argv[8])
+write_gguf_archive(captures,meta,Path(sys.argv[4]))
+np.savez(sys.argv[5],**captures)
+""")
             ref=OUT/f'reference-{i}.gguf'
-            write_gguf_archive(captures,meta,ref)
+            run([sys.executable,reference_script,ROOT/'tools',model,WORK/'source16.npy',ref,
+                 WORK/'captures.npz',SOURCE,UPSTREAM,model_rev],f'original-reference-{i}')
+            with np.load(WORK/'captures.npz',allow_pickle=False) as archive:
+                captures={name:archive[name].copy() for name in archive.files}
             sf.write(OUT/f'original-{i}.wav',captures['output_pcm'].flatten(),22050,subtype='FLOAT')
             kh.step('native-gpu-parity',case=i)
             env=dict(os.environ,CRISPASR_DIFF_USE_GPU='1')
             run([WORK/'openvoice-bake',WORK/'openvoice-f32sens.gguf',ref],f'diff-gpu-{i}',env=env)
             log=(OUT/f'diff-gpu-{i}.log').read_text()
-            if log.count('[PASS]')!=27 or '[FAIL]' in log or 'vocoder backend CUDA' not in log:
+            import re
+            if log.count('[PASS]')!=27 or '[FAIL]' in log or 'vocoder backend CUDA' not in log or not re.search(r'## SPLIT #\d+: CUDA',log):
                 raise RuntimeError('GPU stages missing or not actually CUDA')
             # Same public model C ABI without instrumentation, including
             # reference-cache reuse. Original tensors feed the native input.
@@ -251,6 +279,14 @@ def main():
                     repo_type='dataset',path_in_repo=f'openvoice2/bake-20261019/v1/reference-{i}.gguf',
                     commit_message=f'OpenVoice original-module reference case {i}; quality gate separate')
                 RECEIPT['cases'][-1]['published_revision']=published.oid
+                notice=("OpenVoice2 reference from original MIT modules at "+UPSTREAM+".\n"
+                        "Inputs are synthetic MeloTTS audio from cstr/melotts-en-v2-GGUF revision "+melo_rev+".\n"
+                        "No external speaker recording. Model/source hashes and recipe are inside the archive.\n"
+                        "Structural parity and speech quality are separate gates; consult the validation receipt.\n")
+                hub.upload_file(path_or_fileobj=notice.encode(),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
+                    path_in_repo='openvoice2/bake-20261019/v1/ATTRIBUTION.txt',commit_message='Document OpenVoice reference provenance')
+                hub.upload_file(path_or_fileobj=str(upstream/'LICENSE'),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
+                    path_in_repo='openvoice2/bake-20261019/v1/OpenVoice-LICENSE.txt',commit_message='Retain OpenVoice MIT notice')
             except Exception as exc:
                 RECEIPT['cases'][-1]['publication_error']=type(exc).__name__
             save()
@@ -259,35 +295,42 @@ def main():
         RECEIPT['gpu_executed']=True
         # Independent ASR content and speaker encoder, not OpenVoice's own
         # embedding space, judge actual converted waveforms.
-        from faster_whisper import WhisperModel
-        from resemblyzer import VoiceEncoder,preprocess_wav
-        asr_rev=hub.model_info('Systran/faster-whisper-tiny.en').sha
-        asr_dir=snapshot_download('Systran/faster-whisper-tiny.en',revision=asr_rev)
-        asr=WhisperModel(asr_dir,device='cpu',compute_type='int8',cpu_threads=2)
-        encoder=VoiceEncoder(device=RECEIPT['torch_reference_device'])
-        ref_vector=encoder.embed_utterance(preprocess_wav(OUT/'reference.wav'))
-        def wer(expected,actual):
-            import re
-            a=re.findall(r"[a-z]+",expected.lower());b=re.findall(r"[a-z]+",actual.lower())
-            row=list(range(len(b)+1))
-            for i,x in enumerate(a,1):
-                nxt=[i]
-                for j,y in enumerate(b,1):nxt.append(min(row[j]+1,nxt[-1]+1,row[j-1]+(x!=y)))
-                row=nxt
-            return row[-1]/max(1,len(a))
-        for i,case in enumerate(RECEIPT['cases']):
-            quality={}
-            for name in ['baseline','original','clone']:
-                path=OUT/f'{name}-{i}.wav'
-                segments,_=asr.transcribe(str(path),language='en',beam_size=5)
-                text=' '.join(segment.text.strip() for segment in segments)
-                vector=encoder.embed_utterance(preprocess_wav(path))
-                quality[name]={'transcript':text,'wer':wer(case['text'],text),'speaker_cosine':float(np.dot(vector,ref_vector))}
-            case['quality']=quality
-            case['quality_pass']=all(q['wer']<=.2 for q in quality.values()) and \
-                quality['clone']['speaker_cosine']>quality['baseline']['speaker_cosine']+.01
-            save()
-        RECEIPT['asr']={'repo':'Systran/faster-whisper-tiny.en','revision':asr_rev}
+        quality_script=WORK/'quality.py'
+        quality_script.write_text("""import sys,json,re
+from pathlib import Path
+from huggingface_hub import HfApi,snapshot_download
+from faster_whisper import WhisperModel
+from resemblyzer import VoiceEncoder,preprocess_wav
+import numpy as np
+out=Path(sys.argv[1]);receipt=json.loads((out/'validation.json').read_text())
+hub=HfApi();revision=hub.model_info('Systran/faster-whisper-tiny.en').sha
+model=snapshot_download('Systran/faster-whisper-tiny.en',revision=revision)
+asr=WhisperModel(model,device='cpu',compute_type='int8',cpu_threads=2)
+encoder=VoiceEncoder(device=receipt['torch_reference_device'])
+reference=encoder.embed_utterance(preprocess_wav(out/'reference.wav'))
+def wer(expected,actual):
+ a=re.findall(r'[a-z]+',expected.lower());b=re.findall(r'[a-z]+',actual.lower());row=list(range(len(b)+1))
+ for i,x in enumerate(a,1):
+  nxt=[i]
+  for j,y in enumerate(b,1):nxt.append(min(row[j]+1,nxt[-1]+1,row[j-1]+(x!=y)))
+  row=nxt
+ return row[-1]/max(1,len(a))
+for i,case in enumerate(receipt['cases']):
+ quality={}
+ for name in ['baseline','original','clone']:
+  path=out/f'{name}-{i}.wav';segments,_=asr.transcribe(str(path),language='en',beam_size=5)
+  text=' '.join(segment.text.strip() for segment in segments)
+  vector=encoder.embed_utterance(preprocess_wav(path))
+  quality[name]={'transcript':text,'wer':wer(case['text'],text),'speaker_cosine':float(np.dot(vector,reference))}
+ case['quality']=quality
+ case['quality_pass']=all(q['wer']<=.2 for q in quality.values()) and quality['clone']['speaker_cosine']>quality['baseline']['speaker_cosine']+.01
+receipt['asr']={'repo':'Systran/faster-whisper-tiny.en','revision':revision}
+(out/'quality.json').write_text(json.dumps(receipt,indent=2))
+""")
+        save()
+        run([sys.executable,quality_script,OUT],'independent-quality')
+        quality=json.loads((OUT/'quality.json').read_text())
+        RECEIPT['cases']=quality['cases'];RECEIPT['asr']=quality['asr']
         RECEIPT['references_published']=all('published_revision' in case for case in RECEIPT['cases'])
         RECEIPT['model_acceptance']=all(case['quality_pass'] for case in RECEIPT['cases'])
         RECEIPT['complete']=True

@@ -92,6 +92,9 @@ ggml, CUDA kernels or the full SDK. Record both base and delta identities.
 A separate full-CMake build check is queued as run39255636270; it is not a
 prerequisite for this bounded model experiment and is not model acceptance.
 
+The kernel preserves the host NVIDIA loader paths and runs Torch phases in
+separate processes from the packaged native CUDA stack. Version1 failed at
+post-reexec nvidia-smi before inference; version2 repairs this preflight.
 The kernel records two text cases, original/native stage comparison,
 uninstrumented public model C API waveform/embedding parity and deterministic
 cache reuse, with CPU Torch fallback on sm60 while the native vocoder genuinely
