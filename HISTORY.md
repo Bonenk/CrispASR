@@ -12,6 +12,16 @@ This checks CPU encoder arithmetic/layout, not GGUF/dequantization, STFT,
 trained embeddings, CUDA, conversion waveform or speaker/intelligibility quality.
 Those actual-model/hardware gates remain in PLAN.md.
 
+## 2026-10-19 — OpenVoice producer checkpoint and packaging repairs
+
+Model conversion and each original-module reference are now checkpointed to HF
+before native validation. Staging weights are explicitly unvalidated; accepted
+model publication remains behind parity and quality gates. Conditioning notices
+are saved beside their references. Both workers use streaming SHA256 compatible
+with Python3.10. CUDA run39264728906 compiled/linked and passed dependency
+closure, then failed receipt packaging on the replaced hash API; GPU inference
+and pretrained acceptance remain pending, tracked in PLAN.md.
+
 ## 2026-10-19 — Python/Dart and C#/Java generic speaker contracts
 
 Python now rejects malformed success codes/counts/labels, invalid mono/shape

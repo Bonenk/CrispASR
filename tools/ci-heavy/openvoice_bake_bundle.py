@@ -16,8 +16,11 @@ CUDA = Path(os.environ.get('CUDA_PATH', '/usr/local/cuda'))
 
 
 def sha(path):
+    digest = hashlib.sha256()
     with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def run(command, label):

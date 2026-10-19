@@ -13,8 +13,10 @@ External state and next actions:
 1. Full-CMake39255636270 failed configuration. Repaired39258859196/source6be9fda36
    compiled model/driver objects but failed executable linking because the CUDA
    toolkit stub lacked its libcuda.so.1 SONAME alias. The worker now creates a
-   link-only alias outside the bundle. Dispatch/audit the repaired build; never
-   ship a driver or stub and never call a green build model acceptance.
+   link-only alias outside the bundle. Run39264728906 then compiled, linked
+   and passed dependency closure, but packaging failed on Python3.10 lacking
+   hashlib.file_digest. Streaming SHA256 is repaired; dispatch/audit packaging.
+   Never ship a driver/stub or call a green build model acceptance.
 2. Kaggle `openvoice-bake` version2 is queued on old native source71e329ccf.
    Version1 terminal logs/output are retained after its pre-inference loader
    failure. Version2 preserves host loader paths but lacks the later dynamic
@@ -22,8 +24,12 @@ External state and next actions:
    Retain logs/output before superseding it. Do not guess session IDs, launch
    hardware-fishing retries or exceed the two-session GPU cap.
 3. Prepared `tools/kaggle/openvoice-conditioning/` pins a shared worker and
-   native source6be9fda36. Its shared-worker pin is refreshed to c5aa111bd
-   including the DL repair. Submit it when the earlier job is terminal or safely stopped. The
+   native source6be9fda36, including DL repair and early producer checkpoints.
+   Its submission was rejected by the two-session batch-GPU cap: both the old
+   OpenVoice and needed alignment jobs are queued. Cancellation needs an exact
+   session ID, which the public API cannot resolve from a kernel slug; the
+   maintainer has been asked to stop the obsolete run or supply its session ID.
+   Submit only after a slot is confirmed free. The
    prebuilt base191815511 uses GGML_BACKEND_DL and exact ggml0a862076; compile
    the small model/driver delta with that macro, discover modules from the
    bundle directory and isolate Torch with host loader paths/different cwd.

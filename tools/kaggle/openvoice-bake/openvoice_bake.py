@@ -39,8 +39,11 @@ RECEIPT = {'schema': 1, 'version': VERSION, 'source': SOURCE, 'upstream': UPSTRE
 
 
 def sha(path):
+    digest = hashlib.sha256()
     with Path(path).open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def save():
@@ -154,18 +157,34 @@ def main():
                     allow_patterns=['converter/*','base_speakers/ses/*.pth','README.md']))
         RECEIPT['original_model']={'repo':'myshell-ai/OpenVoiceV2','revision':model_rev,
             'files':{str(p.relative_to(model)):sha(p) for p in model.rglob('*') if p.is_file()}}
-        run([sys.executable,ROOT/'models/convert-openvoice2-to-gguf.py','--ckpt',model/'converter/checkpoint.pth',
-             '--config',model/'converter/config.json','--output',WORK/'openvoice-f32sens.gguf'],'convert-f32-sensitive')
-        converted=OUT/'openvoice2-tcc-f32sens.gguf'
-        shutil.copy2(WORK/'openvoice-f32sens.gguf',converted)
-        RECEIPT['converted_model']={'bytes':converted.stat().st_size,'sha256':sha(converted),'name':converted.name}
-        save()
         upstream_tar=WORK/'upstream.tar.gz'
         download(f'https://codeload.github.com/myshell-ai/OpenVoice/tar.gz/{UPSTREAM}',upstream_tar)
         with tarfile.open(upstream_tar) as archive:
             archive.extractall(WORK,filter='data')
         upstream=WORK/('OpenVoice-'+UPSTREAM)
         shutil.copy2(upstream/'LICENSE',OUT/'OpenVoice-LICENSE.txt')
+        run([sys.executable,ROOT/'models/convert-openvoice2-to-gguf.py','--ckpt',model/'converter/checkpoint.pth',
+             '--config',model/'converter/config.json','--output',WORK/'openvoice-f32sens.gguf'],'convert-f32-sensitive')
+        converted=OUT/'openvoice2-tcc-f32sens.gguf'
+        shutil.copy2(WORK/'openvoice-f32sens.gguf',converted)
+        RECEIPT['converted_model']={'bytes':converted.stat().st_size,'sha256':sha(converted),'name':converted.name}
+        save()
+        # Producer checkpoints precede crash-prone native execution. Staging
+        # artifacts are explicitly unvalidated and are not registry defaults.
+        model_repo='cstr/openvoice2-tcc-GGUF'
+        hub.create_repo(model_repo,repo_type='model',private=False,exist_ok=True)
+        if not hub.file_exists(model_repo,'README.md'):
+            pending=('---\nlicense: mit\npipeline_tag: audio-to-audio\n---\n\n'
+                     '# OpenVoice V2 GGUF experimental artifacts\n\n'
+                     'Files under staging/ are producer checkpoints, not accepted releases. '
+                     'Actual parity, GPU and speech-quality validation is pending.\n\n'
+                     'Original MIT model: https://huggingface.co/myshell-ai/OpenVoiceV2/tree/'+model_rev+'\n')
+            hub.upload_file(path_or_fileobj=pending.encode(),repo_id=model_repo,path_in_repo='README.md',commit_message='Mark producer staging artifacts unvalidated')
+        staged=hub.upload_file(path_or_fileobj=str(converted),repo_id=model_repo,
+            path_in_repo='staging/'+VERSION+'/'+converted.name,commit_message='Checkpoint unvalidated conversion before hardware validation')
+        hub.upload_file(path_or_fileobj=str(upstream/'LICENSE'),repo_id=model_repo,path_in_repo='LICENSE',commit_message='Retain original MIT notice')
+        RECEIPT['model_checkpoint']={'repo':model_repo,'revision':staged.oid,'path':'staging/'+VERSION+'/'+converted.name}
+        save()
         melo_rev=hub.model_info('cstr/melotts-en-v2-GGUF').sha
         melo=hf_hub_download('cstr/melotts-en-v2-GGUF','melotts-en-v2-f16.gguf',revision=melo_rev)
         bert=hf_hub_download('cstr/melotts-en-v2-GGUF','bert-base-uncased-q4k.gguf',revision=melo_rev)
@@ -281,6 +300,28 @@ np.savez(sys.argv[5],**captures)
             with np.load(WORK/'captures.npz',allow_pickle=False) as archive:
                 captures={name:archive[name].copy() for name in archive.files}
             sf.write(OUT/f'original-{i}.wav',captures['output_pcm'].flatten(),22050,subtype='FLOAT')
+            # Checkpoint immediately after production, before native execution.
+            fixture_prefix='openvoice2/bake-20261019/'+('conditioning-v1' if CONDITIONING else 'v1')
+            reference_checkpoint={'case':i,'sha256':sha(ref)}
+            try:
+                published=hub.upload_file(path_or_fileobj=str(ref),repo_id='cstr/crispasr-regression-fixtures',
+                    repo_type='dataset',path_in_repo=f'{fixture_prefix}/reference-{i}.gguf',
+                    commit_message=f'OpenVoice original-module reference case {i}; quality gate separate')
+                reference_checkpoint['published_revision']=published.oid
+                notice=("OpenVoice2 reference from original MIT modules at "+UPSTREAM+".\n"
+                        "Inputs are synthetic MeloTTS audio from cstr/melotts-en-v2-GGUF revision "+melo_rev+".\n"
+                        "No external speaker recording. Model/source hashes and recipe are inside the archive.\n"
+                        "Structural parity and speech quality are separate gates; consult the validation receipt.\n")
+                hub.upload_file(path_or_fileobj=notice.encode(),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
+                    path_in_repo=fixture_prefix+'/ATTRIBUTION.txt',commit_message='Document OpenVoice reference provenance')
+                hub.upload_file(path_or_fileobj=str(upstream/'LICENSE'),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
+                    path_in_repo=fixture_prefix+'/OpenVoice-LICENSE.txt',commit_message='Retain OpenVoice MIT notice')
+            except Exception as exc:
+                reference_checkpoint['publication_error']=type(exc).__name__
+            RECEIPT.setdefault('reference_checkpoints',[]).append(reference_checkpoint)
+            save()
+            if 'publication_error' in reference_checkpoint:
+                raise RuntimeError('Reference checkpoint publication failed before native execution')
             kh.step('native-gpu-parity',case=i)
             env=dict(os.environ,CRISPASR_DIFF_USE_GPU='1')
             run([WORK/'openvoice-bake',WORK/'openvoice-f32sens.gguf',ref],f'diff-gpu-{i}',env=env)
@@ -348,25 +389,8 @@ np.savez(sys.argv[5],**captures)
                 if not lib.openvoice2_set_target_embedding(ov,None):raise RuntimeError('Clearing conditioning failed')
                 RECEIPT.setdefault('clip_means',[]).append({'case':i,'embedding_cosine':average_cos,'waveform_cosine':mean_cos,'waveform_norm_ratio':mean_ratio})
             sf.write(OUT/f'clone-{i}.wav',native[0],22050,subtype='FLOAT')
-            RECEIPT['cases'].append({'text':text,'speaker':key,'tau':tau,'ref_sha256':sha(ref),'gpu_parity':True,
+            RECEIPT['cases'].append({'text':text,'speaker':key,'tau':tau,'ref_sha256':sha(ref),'gpu_parity':True,'published_revision':reference_checkpoint['published_revision'],
                                      'uninstrumented_waveform_cosine':cosine,'embedding_cosine':emb_cos,'embedding_norm_ratio':emb_ratio,'repeat_exact':True})
-            save()
-            # Checkpoint each completed reference before any later quality run.
-            try:
-                published=hub.upload_file(path_or_fileobj=str(ref),repo_id='cstr/crispasr-regression-fixtures',
-                    repo_type='dataset',path_in_repo=f'openvoice2/bake-20261019/{"conditioning-v1" if CONDITIONING else "v1"}/reference-{i}.gguf',
-                    commit_message=f'OpenVoice original-module reference case {i}; quality gate separate')
-                RECEIPT['cases'][-1]['published_revision']=published.oid
-                notice=("OpenVoice2 reference from original MIT modules at "+UPSTREAM+".\n"
-                        "Inputs are synthetic MeloTTS audio from cstr/melotts-en-v2-GGUF revision "+melo_rev+".\n"
-                        "No external speaker recording. Model/source hashes and recipe are inside the archive.\n"
-                        "Structural parity and speech quality are separate gates; consult the validation receipt.\n")
-                hub.upload_file(path_or_fileobj=notice.encode(),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
-                    path_in_repo='openvoice2/bake-20261019/v1/ATTRIBUTION.txt',commit_message='Document OpenVoice reference provenance')
-                hub.upload_file(path_or_fileobj=str(upstream/'LICENSE'),repo_id='cstr/crispasr-regression-fixtures',repo_type='dataset',
-                    path_in_repo='openvoice2/bake-20261019/v1/OpenVoice-LICENSE.txt',commit_message='Retain OpenVoice MIT notice')
-            except Exception as exc:
-                RECEIPT['cases'][-1]['publication_error']=type(exc).__name__
             save()
         lib.melotts_free(ctx)
         lib.openvoice2_free(ov)
