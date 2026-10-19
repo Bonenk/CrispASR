@@ -1,3 +1,18 @@
+## Arabic character/Java retained-output audit accepted — 2026-10-19
+
+Hosted run39214206020/sourcea9ee23d5f passes. Independent artifact inspection
+confirms15 ordered words and85 positive in-word character spans, CLI word versus
+segment JSON equality, equality to the retained post-logit reference,407x51
+finite logits, and100 exact Java UTF-8/centisecond rows with a325cs offset.
+Three host JNA encoding controls pass. The public audit records every retained
+artifact hash: docs/arabic-characters-java-audit-2026-10-19.json.
+
+This is a single Arabic Q4 CPU output acceptance, not labeled boundary accuracy,
+new encoder/original-stage, GPU or WER parity. Model identity and Python/C ABI
+execution are hosted-worker evidence: this older worker retained no vocabulary,
+native binaries or separate raw Python result archive, so independent DP replay
+is not claimed. All six binding ABI contract jobs39215435420 also pass.
+
 ## 2026-10-19 — hosted CUDA build and wrapper workflows completed
 
 CUDA bundle39215806310 completed on191815511 (sm60/sm75); this proves the

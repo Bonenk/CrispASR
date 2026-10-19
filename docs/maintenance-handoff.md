@@ -13,8 +13,9 @@ CPU alignment39212307554 (source62e598ca0) is now independently audited too.
 Current priority is actual long-input CUDA memory/reuse, hosted/high-level Go
 model acceptance, remaining callable/lifecycle gaps, PR521 and release validation.
 CUDA build39215806310 succeeded on frozen191815511. Arabic CTC/Java39214206020
-and binding contracts39215435420 also succeeded; artifact audit/model scope
-remain distinct from workflow success. General CI39216228487 on65b851a91
+and all six binding contracts39215435420 also succeeded. The retained Arabic
+15-word/85-character/100-Java-row outputs are independently audited; see
+arabic-characters-java-audit-2026-10-19.json for scope and missing replay inputs. General CI39216228487 on65b851a91
 is queued at this checkpoint. PLAN.md scopes the
 Kaggle memory/cache follow-up in tools/kaggle/alignment-cuda-memory/;
 the archive and27 member hashes are independently audited. No GPU acceptance
@@ -67,7 +68,9 @@ release blocker.
    short/long/short cache changes on real CUDA. PLAN.md gives the exact gates.
    Host DP/logits remain linear; VAD is unused in align-only. Keep550 open.
 3. Inspect the new high-level Go lifecycle contracts:47 Go race cases pass,
-   including actual pthread callbacks and concurrent close/option updates. Raw
+   including actual pthread callbacks and concurrent close/option updates. New
+   hosted-only tools/ci-heavy/go_model_lifecycle.py prepares real-model callback,
+   abort/recovery and parallel ownership acceptance; execution is pending. Raw
    low-level pointers and other-language lifecycle remain separate. Validate
    actual Go/model behavior and continue the callable ledger from PLAN.md.
 4. Rebase/review PR521 after main's Python expectation/deprecated-launcher fixes.

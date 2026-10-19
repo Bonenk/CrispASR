@@ -1,11 +1,12 @@
 # CrispASR — Pending work
 
-## Character-alignment hosted follow-up
+## Character-alignment acceptance qualification
 
-The standalone Java preflight is repaired and all four strict Java contracts
-pass; see HISTORY.md. Fresh workflow39214206020 is green; independently audit
-its retained model/Java outputs before accepting Arabic Q4/model/Java span parity. The prior
-run39212277740 failed before model work and is not acceptance.
+Arabic CTC/Java39214206020 is complete and its retained output is independently
+audited; see HISTORY.md and docs/arabic-characters-java-audit-2026-10-19.json.
+Do not rerun the repaired Java preflight or accepted output matrix without a
+new scope. Separate future oracle/DP replay needs retained vocabulary/binaries;
+this older worker did not preserve those, or a separate raw Python output.
 
 ## Active — issue550 real CUDA long-input memory/reuse
 
@@ -24,7 +25,10 @@ Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
 this task's acceptance concerns CTC alignment memory. Inspect build provenance,
 source/library/archive hashes and dependency closure before GPU execution.
 
-Next kernel, per the maintainer's external Kaggle guide:
+Kaggle worker version1 was pushed once and is queued at this checkpoint.
+Do not repush while it is live; retain terminal logs before any repair push.
+
+Kernel acceptance, per the maintainer's external Kaggle guide:
 
 1. Use that prebuilt runtime; clone the exact source for harness/binding code,
    with no heavy Kaggle build. Record actual CUDA device/capability. The package
@@ -53,8 +57,10 @@ Next kernel, per the maintainer's external Kaggle guide:
 The built-in high-level Model now enforces nonblocking ownership across native
 operations/close and separately synchronizes options. Completed implementation,
 47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
-Next inspect current hosted binding contracts and validate the high-level Go
-callback-close/re-entry guard with an actual small Whisper model. Raw low-level
+All six hosted binding contracts39215435420 pass. Claimed: actual small-model
+Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
+and tools/ci-heavy/go-model-lifecycle/. The worker/probe are prepared; hosted
+compile and execution remain pending. Raw low-level
 Go pointers still require caller serialization; assess an owned low-level
 adapter before promising their concurrent lifetime safety. Native result states
 remain shared across high-level Contexts. Other-language lifecycle remains open.
