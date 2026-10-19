@@ -178,6 +178,41 @@ and invalid parallel processor counts are rejected before native calls.
 Serialize operations on a native context and do not mutate one `Params` value
 concurrently; independent value copies may be configured separately.
 
+`Whisper_init_with_dtw(path, AHEADS_BASE_EN, 0)` enables experimental DTW
+before model loading. The higher-level package exposes `NewWithDTW` with the
+same arguments. `AHEADS_N_TOP_MOST` requires a positive int32 top-layer count;
+model presets require zero. Native loading checks the preset against model
+dimensions. Unsupported/custom presets, invalid paths and null allocations
+return errors. Ordinary `Whisper_init` keeps its nil-on-error signature and
+native defaults; both constructors use pointer parameters and matching frees.
+Use a native library whose DTW helper disables incompatible flash attention.
+`Whisper_full_get_token_dtw_t` checks indices and returns native centiseconds,
+preserving `-1` when unavailable; copied `TokenData` also exposes `TDtw()`.
+`Whisper_token_snapshot(segment, token)` and `Whisper_token_snapshots(segment)`
+return owned IDs, raw bytes, native-centisecond timing/DTW, probability and
+alternatives. `Text` is a Go string containing the raw bytes, including incomplete
+UTF-8; concatenate `Raw` values for exact reconstruction. Negative unavailable
+metadata is preserved, and snapshots survive model close. Readers reject invalid
+indices/counts and malformed native alternative buffers; limits are one million
+tokens per segment, 32 alternatives per token and 1 MiB per token/candidate text.
+
+The higher-level package exposes `TokenSnapshots(ctx, segment)` through optional
+`TokenSnapshotProvider` support. It returns the same owned snapshots, including
+DTW and alternatives. Existing `Context` implementations and `Token` struct
+literals are unchanged; unsupported providers and closed models return errors.
+
+Callback registry access is synchronized across contexts. The registry lock is
+released before invoking a callback, allowing registration changes during
+callback delivery. Continue to serialize inference/close/re-entry on the same
+native context; registry synchronization does not enforce that ownership rule.
+
+`Whisper_full_parallel` uses the native pointer-parameter parallel wrapper,
+including CrispASR's global progress lifecycle. The additive
+`Whisper_full_parallel_with_progress` also accepts a per-call progress callback;
+encoder, segment and progress closures are removed on success and native failure.
+Existing `Whisper_full_parallel` callers keep their signature. Use a matching
+native library exporting `crispasr_transcribe_parallel_by_ref`.
+
 Both low-level `Params` and the higher-level `Context` expose `SetBestOf`,
 `SetDetectLanguage`, `SetSuppressBlank`, `SetTdrz`, and `SetAltN`. Candidate
 counts clamp to 0–32; nonpositive best-of values leave the setting unchanged.

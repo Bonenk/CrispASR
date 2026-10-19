@@ -1,3 +1,209 @@
+## Compatible Rust Whisper scalar controls — 2026-10-18
+
+`WhisperDecodeControls` exposes language/prompt strings, eleven flags, threads,
+greedy best-of, temperature, length/token limits and alternatives. Sequential
+`transcribe_pcm_with_controls` and progress-tracked
+`transcribe_pcm_parallel_with_controls` share validation, owned string lifetime,
+VAD/tinydiarize handling, copied segments and matching native parameter cleanup.
+The controls type is non-exhaustive and created with Default; existing
+`TranscribeOptions`, result shapes and older entry points remain compatible.
+The earlier sequential alternative-capture method delegates to these controls.
+
+Unset fields preserve native defaults; explicit false/zero fields apply where
+valid. Positive threads/best-of, nonnegative limits, finite/nonnegative
+temperature, nonempty language and NUL-free strings are validated before native
+full-parameter allocation. Empty prompts are allowed. Owned language/prompt C
+strings outlive native inference and parameter destruction; alternatives retain
+the native 0–32 clamp. Native greedy/beam and parallel chunk semantics still apply.
+
+The Go/Rust fixture now compiles the actual runtime's **25 C++ scalar setters**
+instead of handwritten C mirrors. The 19 new control routes plus six existing
+VAD/tinydiarize routes cover that exported helper family, without claiming every
+raw full-params field or callback API. Field oracles check every control against
+distinct defaults on sequential/parallel and greedy/beam routes, explicit clears,
+UTF-8 strings, defaults, native/allocation errors, empty output and cleanup.
+Rejected controls make no native parameter requests. Heap churn catches premature
+string release: deliberately dropping the prepared owner before inference
+reproduced a native language mismatch; restoring the lifetime passes.
+
+Validation: **39 Go tests with the race detector, 34 Rust tests and five
+doctests pass**, including source-family completeness checks alongside the
+compiled operation probes. Formatting, documentation anchors and workflow shell
+checks pass. Review of the native parallel loop also found separate timestamp
+merge/worker-error/VAD concerns; those are precisely scoped in PLAN.md for
+model-free runtime regressions and later actual-model acceptance. Controls
+transport probes do not establish that runtime merge behavior or full parity.
+
+## Repair stale CPU CI assertions — 2026-10-18
+
+The six hosted binding contract jobs passed on `9bbbd8228`, as did the separate
+Go, Rust and Ruby binding workflows. The broader CPU unit suite exposed three
+stale source assertions: registry metadata still pinned C API `0.7.0` after the
+pointer-parallel API advanced it to `0.7.1`, and two Ruby checks expected direct
+registrations after generated context guards were introduced. The version pin
+now matches the shipped API. Ruby checks require the guarded registration and
+its generated forwarding declaration, retaining checks that both public methods
+reach their implementations.
+
+Focused verification passes **243 assertions in 33 test cases** using the actual
+Catch2 tests, literal runtime registry/version adapters and real registry
+catalog code, without building model/GGML backends. The generated Ruby guard
+check also passes. Full hosted CI rerun remains required; the earlier failure
+was not a missing speaker-identity or watermark operation.
+
+## Owned legacy Whisper tokens and alternatives — 2026-10-18
+
+Rust `CrispASR::token/tokens` now returns owned `WhisperToken` values with IDs,
+raw text bytes, native-centisecond timing/DTW, probabilities and owned candidate
+alternatives. The additive `transcribe_pcm_with_alternatives` method enables
+per-call capture through the native 0–32 clamp and reuses existing options,
+parameter cleanup and VAD-path lifetime. Existing `TranscribeOptions` and
+`Segment` literal shapes remain unchanged. Alternative capture is greedy-only
+in the native decoder; the parallel scalar-control extension remains pending.
+
+Go's `Whisper_token_snapshot(s)` returns owned `WhisperTokenSnapshot` values.
+Its higher-level `TokenSnapshots(ctx, segment)` helper uses the optional
+`TokenSnapshotProvider` capability, exposing DTW and candidates without changing
+the existing `Context` interface or `Token` struct. Unsupported providers,
+nil contexts and closed models return errors. Existing `SetAltN` paths enable
+Go capture. Go strings retain native bytes; Rust also provides replacement-
+decoded display text. Both preserve split UTF-8 in raw byte arrays and negative
+unavailable metadata. Neither result retains a borrowed native pointer.
+
+Readers validate indices/counts before native indexed access, copy chosen and
+candidate text, bound native-string scans and candidate buffer retries, and
+verify returned lengths plus actual NUL terminators. Poisoned caller buffers
+catch unwritten terminators. Limits are one million tokens per segment, 32
+alternatives per token and 1 MiB of text per token/candidate. Empty/null text
+and empty token/candidate lists are supported. Invalid counts, negative or
+oversized text lengths, missing terminators and inconsistent embedded NULs
+return errors. Bulk operations discard partially copied results on error.
+
+Validation: **37 low-level Go tests plus two higher-level operation tests under
+the race detector**, **32 Rust tests and five doctests pass** against the compiled
+public-header fixture. New probes verify native IDs/data equivalence, 2 KiB
+candidate retry/copy behavior, split UTF-8 reconstruction, metadata sentinels,
+invalid/native-failure paths, parameter cleanup, legacy source compatibility and
+snapshots after native-buffer mutation/model close. Missing public snapshot
+methods were reproduced before implementation. Actual model/candidate quality,
+parallel Rust capture and remaining lifecycle/platform acceptance remain scoped
+in PLAN.md; component probes do not establish full wrapper parity.
+
+## DTW constructors/getters and Go callback registry races — 2026-10-18
+
+Rust's deprecated `CrispASR` now supports `new_with_dtw` and typed `DtwPreset`
+selection, including positive top-layer counts and all twelve built-in model
+presets. Go exposes the same preset family through `Whisper_init_with_dtw` and
+higher-level `NewWithDTW`. Ordinary Go initialization also now uses native
+pointer parameters, validates model paths and frees context parameters with the
+matching destructor. Its existing nil-on-error signature is preserved. Native
+model loading retains responsibility for checking selected heads/layers against
+actual model dimensions. Custom head arrays are not exposed by these additions.
+
+Rust `token_dtw_timestamp` and Go `Whisper_full_get_token_dtw_t` validate segment
+and token indices/counts before native indexed access. They return native
+centiseconds and preserve the unavailable -1 sentinel. Copied Go `TokenData`
+also exposes `TDtw()`. The older higher-level Go `Token` result still lacks DTW
+output; the compatible result-surface task remains in PLAN.md.
+
+Inspection found a prerequisite missed by the original zeroed test fixtures:
+real Whisper defaults enable flash attention, and native loading disables DTW
+if both flags are enabled. A probe compiling the literal runtime DTW helper
+reproduced flash remaining enabled. `crispasr_ctx_params_set_dtw` now disables
+incompatible flash attention when enabling DTW; disabling DTW leaves the current
+attention setting unchanged. Both public declarations document this policy.
+Native-default probes now start with flash enabled, test default construction,
+and check helper enable/disable/null behavior and context cleanup.
+
+Eight concurrent Go contexts reproduced a fatal concurrent-map-write crash in
+the shared callback registries. Registration and lookup now synchronize with a
+mutex; delivery snapshots the callback and releases the lock before invoking it.
+The regression executes 512 native callback sequences, including registration
+changes within delivery. Native fixture counters are atomic. Same-context
+inference/close/re-entry still requires caller serialization; the registry fix
+does not establish model lifecycle safety. Hosted Go/Rust ABI contracts now
+enable Go's race detector and run the higher-level DTW constructor operation
+test, in addition to package compilation. Changes to the native C API source
+also trigger the contract workflow because its literal adapters are tested.
+
+Validation: **36 low-level Go tests plus one higher-level operation test with
+the race detector**, **31 Rust tests and five doctests**, **five Python tests**,
+**35 C# legacy assertions**, **224 Java assertions plus 44 legacy assertions in
+each of two encodings**, and **37 Dart tests with a clean analyzer** pass.
+Formatting, documentation anchors and workflow shell checks pass. These establish
+component transport, ownership and registry synchronization; full native/model,
+GPU alignment quality, actual DTW timing and platform acceptance remain pending.
+
+## Rust legacy parallel/LID and Go parallel progress — 2026-10-18
+
+Rust's deprecated `CrispASR` now exposes `transcribe_pcm_parallel` with the same
+strategy, VAD/tinydiarize validation and owned segment reader as sequential
+inference. It calls `crispasr_transcribe_parallel_by_ref`, retaining native
+parameters and VAD path through decode and freeing parameters on all native
+return paths. Positive processor counts are required. `detect_language` runs
+the native PCM mel/encoder language pass and returns an owned code/probability
+pair. It validates samples/threads, native negative or nonfinite/out-of-range
+probabilities, and bounded NUL-terminated UTF-8 codes; zero probability is valid.
+The old `detected_language` getter remains the last-transcription query.
+The Rust README quick start now uses the existing `Session` PCM API instead of
+nonexistent type/file-transcription names.
+
+Go's existing parallel method bypassed CrispASR's global progress lifecycle by
+calling `whisper_full_parallel` directly. A compiled regression reproduced that
+bypass with a separate pointer-export counter. Both existing and additive
+`Whisper_full_parallel_with_progress` methods now use the pointer/progress
+wrapper. The new method accepts a per-call progress callback; encoder, segment
+and progress registrations retire after success and native failure. Existing
+method signatures and copyable parameter-string ownership are preserved.
+
+Validation: **34 Go tests, 30 Rust tests and five Rust doctests pass**, with the
+higher-level Go package also compiled against the isolated native fixture.
+The literal public-header fixture checks processor/thread/PCM forwarding,
+VAD plus tinydiarize, copied metadata, empty/error output, parameter/context
+cleanup, callback GC/retirement, and malformed language buffers/probabilities.
+Formatting, doc anchors and workflow shell checks pass. No model accuracy,
+progress frequency, native exception safety or platform acceptance is inferred
+from these component probes; those remain scoped in PLAN.md.
+
+## Rust legacy Whisper ABI and Java context/parameter repairs — 2026-10-18
+
+Rust's deprecated `CrispASR` path declared pointer arguments but linked the native
+struct-by-value initializer and inference symbols. A public-header fixture
+reproduced an abort at the wrong initializer. The existing Rust sys names now
+link to native `*_by_ref` exports. Null native parameters, invalid sample counts,
+strategy/VAD settings and NUL-containing VAD paths return errors. VAD and
+tinydiarize can be enabled together; the previous VAD branch skipped tinydiarize.
+Parameters and the VAD path remain owned through inference and are released on
+success/failure. Negative native segment counts are rejected. Deprecation and
+the direct legacy API's native exception-safety limitations remain unchanged.
+
+Java's `WhisperCpp` leaked native defaults, copied only two context flags, and
+left freed context pointers live. Defaults are now independent Java-owned
+copies, with temporary C++ allocations freed through matching native destructors.
+Context initialization forwards GPU/device/flash and every exposed DTW option;
+custom heads are copied for the model lifetime. Native initialization failure
+retires the old context, while option/allocation failure preserves it. Close is
+idempotent and reinitialization is supported. Both decode methods use the
+pointer inference export, reject invalid native counts and retain parameters and
+callbacks through GC. Short operation leases reject overlap and re-entry from
+both ordinary and foreign callback threads without holding a Java monitor
+through native execution. Legacy full-parameter decoding explicitly requires a
+64-bit JVM until its size_t fields have a target-tested layout.
+
+A forced non-UTF-8 JNA default reproduced broken legacy transcription. Library
+strings and full-parameter strings now use explicit UTF-8. Fixtures verify
+non-ASCII prompts and copied text under both default and ISO-8859-1 settings.
+Separate regressions reproduced the native-default leak and dropped DTW options.
+
+Validation: **34 Go tests, 29 Rust tests plus five doctests**, and the existing
+**224 Java assertions plus 44 legacy assertions in each of two encoding modes**
+pass. Shared native-fixture checks also pass **four Python tests, 35 C# legacy
+assertions and 37 Dart tests with a clean analyzer**. These compiled public-header
+probes establish ABI/options/ownership transport; actual models and target
+platforms remain pending in PLAN.md. The preceding WASM event checkpoint
+`6eda4a9da2c867fcbda2262f2cd867dd0c6e5915` passed all six hosted binding contract
+jobs before this checkpoint.
+
 ## WASM retained ASR event callbacks — 2026-10-18
 
 New `asrSetSegmentCallback`, `asrSetTokenCallback` and

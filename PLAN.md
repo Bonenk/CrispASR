@@ -2,10 +2,13 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: legacy callable-wrapper inventory
-and residual ownership/coercion audits after WASM event/stream checkpoints. Continue the cross-language wrapper
-task; the bounded external agent tasks have ended. Completed source repairs and measured
-probe counts are archived in HISTORY.md. Start with the incremental
+Owner: maintainer coordinator. Active next: native parallel timestamp/worker
+validation, then remaining parameter/lifecycle and cross-language audits.
+The Rust scalar-helper family now has compatible public controls and parallel
+forwarding; completed repairs and measured probes are archived in HISTORY.md.
+Track the full CI rerun after repairing the stale API-version/Ruby assertions.
+Continue the cross-language wrapper task; the bounded external agent tasks have
+ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
 The [initial audit](docs/binding-gaps-2026-10-18.md) is a historical snapshot.
 Do not reimplement rows merely because an older note says they are missing.
@@ -22,28 +25,77 @@ Recommended implementation order and concrete acceptance:
    Record bulk/superset equivalents, retired refusing stubs and deliberate
    platform exclusions separately. TitaNet and roster DB now have reviewed
    public paths in all eight; extend the ledger beyond those families.
-2. **Legacy Whisper controls.** First fix two verified high-level paths:
-   - Rust `crispasr-sys/src/lib.rs` declares pointer parameters for
-     `whisper_init_from_file_with_params` and `whisper_full`, while those native
-     symbols take structs by value. Route the legacy wrapper through the real
-     `*_by_ref` exports and add a literal-header ABI/operation regression; its
-     deprecation does not make the current signature mismatch acceptable.
-   - Java `WhisperCpp.initContextImpl` copies only `use_gpu` and `flash_attn`
-     into newly allocated native defaults, ignoring GPU-device/DTW settings.
-     Forward the remaining public options through pointer-safe native adapters,
-     free each default-params allocation, and make `freeContext` retire `ctx`
-     before native free (it currently leaves the pointer set). Probe repeated
-     close/reinitialization, initialization failure and actual DTW forwarding.
-   Then extend the cross-language inventory. C#/Python/Dart have pointer-safe parameter,
-   DTW and parallel probes; inspect Go's compiled parameter routes and finish
+2. **Legacy Whisper controls.** Rust legacy pointer-symbol routing and Java
+   context/parameter ownership and option forwarding now have operation probes;
+   completed repairs are in HISTORY.md. Validate actual Whisper models and
+   supported native platforms, including callback threads and failed reinitialization.
+   Java's legacy full-params struct is still 64-bit only: 32-bit decode refuses
+   explicitly until size_t/pointer layouts are repaired and exercised on a target
+   runtime. Preserve the existing Java long-valued public options when adding a
+   pointer-width-aware native layout. Continue auditing mutable parameter objects
+   and caller-owned pointer arrays/strings during callbacks and concurrent calls.
+   C#/Python/Dart have pointer-safe parameter, DTW and parallel probes; inspect Go's compiled parameter routes and finish
    Java/Rust/Ruby/WASM callable gaps. Cover scalar setters, language detection,
    native progress/parallel, token IDs/raw bytes/alternatives/DTW and disposal.
    Use `tests/build_legacy_wrapper_probe.py`; a bare ABI declaration is not an
    implementation. Direct Parakeet uses an integer centisecond offset.
    Go's legacy parameter-string ownership and five scalar decode controls now
-   have compiled operation probes; verify actual model behavior. Continue DTW,
+   have compiled operation probes. Rust now has parallel decoding and PCM language
+   detection, and Go parallel decoding uses the progress-tracked pointer route
+   with optional per-call progress callbacks. Verify actual model behavior and
+   progress frequency. Continue DTW,
    remaining token introspection and legacy context/callback lifecycle auditing.
    Review higher-level APIs as well as the low-level bindings.
+   Rust/Go built-in DTW constructors, validated scalar DTW getters and Go's
+   high-level model constructor now have operation probes. The shared helper
+   disables incompatible flash attention. Owned Rust/Go token snapshots now expose
+   IDs/raw bytes, timing/probability, DTW and alternatives; Go has a compatible
+   high-level optional accessor without changing the older `Token` struct.
+   Validate actual model output and candidate quality, including greedy/beam
+   behavior, partial UTF-8 and alignment with the Python wrapper/reference.
+   Custom-head configuration remains pending: own the head storage for model
+   lifetime and validate model dimensions if exposing it. Audit the remaining
+   Java/Ruby/WASM token operations against actual public methods; do not infer
+   coverage from declarations. Preserve unavailable sentinels and split UTF-8.
+   Extend
+   `tests/fixtures/go-rust-wrapper-abi.c` and the actual Rust/Go public-method
+   probes, including invalid indices/counts, null/empty native output and cleanup.
+   Native declarations alone do not satisfy these rows. Go callback registries
+   now synchronize concurrent contexts without holding locks through user
+   callbacks, with a hosted race-detector gate. Same-context inference/close/
+   re-entry still requires caller serialization; audit/enforce that lifecycle
+   in low-level and high-level APIs, including foreign callback threads.
+   Rust's 25 scalar-helper routes now have compiled controls/old-options probes;
+   validate language/prompt/thread/temperature and alternative behavior with
+   actual models, including native parallel chunk merging. Audit raw full-params
+   fields and legacy callback routes outside that helper family separately.
+   Reuse the owned controls in `crispasr/src/whisper_controls.rs`, common decode
+   path `crispasr/src/lib.rs::transcribe_pcm_impl` and the owned token reader in
+   `crispasr/src/whisper_tokens.rs`; do not reimplement completed setters. Go's owned
+   reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
+   is in `bindings/go/pkg/whisper/token_snapshots.go`.
+
+### Next runtime check: legacy parallel merge, errors and VAD
+
+Inspect `src/crispasr.cpp::whisper_full_parallel` with a model-free fixture that
+compiles the actual function against tiny fake worker states and PCM, then run
+actual-model acceptance through hosted CPU/GPU jobs. The source currently:
+
+- shifts merged segment times but does not shift their token t0/t1/DTW fields;
+  verify absolute token times for later chunks and preserve unavailable -1;
+- computes offset/sample-to-centisecond products with int intermediates;
+  test multi-minute offsets/long clips and use bounded 64-bit arithmetic;
+- joins workers but ignores their return codes; test worker failure, state
+  allocation failure and partial-result cleanup rather than returning success;
+- preprocesses VAD before dispatch while preserving the VAD flag for worker
+  calls; audit double filtering, timeline mapping and stale results on silence.
+
+Keep alternative arrays associated with their moved token/segment data. Use
+synthetic worker failures and nonzero chunk offsets to isolate glue correctness
+before downloading models. Wrapper transport probes do not prove this runtime
+merge behavior. Add these checks to hosted CI and keep actual model acceptance
+separate from the model-free regression suite.
+
 3. **Ruby remaining resource/legacy audit.** Session/stream/chat borrows,
    opaque tickets, child-close ordering and raw text processor ownership now
    have compiled regressions; see HISTORY.md. Audit microphone ring/close and
@@ -105,13 +157,12 @@ Recommended implementation order and concrete acceptance:
    Review real CI logs before acceptance. No release from fixture success or
    queued jobs.
 
-The stream checkpoint `f8ef307cf4ab68f6e1f61ef5168f7fe48b15182c` passed all
-six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625865),
-including Ruby's finalizer regression. Its
-[full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39149625808)
-was still pending at inspection. Retained ASR event changes require their own
-hosted results for the actual tip. Older source checkpoints establish only their
-recorded component contracts, not full current-wrapper/model acceptance.
+The ASR event checkpoint `6eda4a9da2c867fcbda2262f2cd867dd0c6e5915` passed all
+six hosted [binding contract jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39151650142).
+The [full WASM build](https://github.com/CrispStrobe/CrispASR/actions/runs/39151650113)
+and actual-model/platform gates still require review. Subsequent legacy
+Rust/Java changes require their own hosted results for the actual tip.
+Older source checkpoints establish only their recorded component contracts.
 Heavy CPU/native builds belong in GitHub CI; genuine GPU validation uses the
 maintainer's external Kaggle guide. Keep private paths/toolchains/handoff data
 only in ignored maintainer notes.

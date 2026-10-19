@@ -14,6 +14,16 @@ void probe_streamed_ready(int ready);
 void probe_legacy_expect(const char*, const char*);
 void probe_legacy_mode(int);
 int probe_legacy_calls(void);
+int probe_parallel_by_ref_calls(void);
+int probe_dtw_enabled(void);
+int probe_legacy_context_flash(void);
+void probe_legacy_tokens_reset(void);
+void probe_legacy_tokens_mutate(void);
+int probe_legacy_alt_text_calls(void);
+
+int probe_dtw_preset(void);
+int probe_dtw_top(void);
+int probe_rust_legacy_contexts(void);
 void probe_text_mode(int mode);
 int probe_text_live(void);
 int probe_text_contexts(void);
@@ -74,5 +84,21 @@ func probeLegacyExpect(prompt, model string) {
 	C.probe_legacy_expect(p, m)
 }
 func probeLegacyMode(mode int)        { C.probe_legacy_mode(C.int(mode)) }
+func probeParallelByRefCalls() int    { return int(C.probe_parallel_by_ref_calls()) }
 func probeLegacyCalls() int           { return int(C.probe_legacy_calls()) }
 func newProbeLegacyContext() *Context { return (*Context)(unsafe.Pointer(uintptr(0x100000001))) }
+
+func probeDTWState() (bool, int, int) {
+	return C.probe_dtw_enabled() != 0, int(C.probe_dtw_preset()), int(C.probe_dtw_top())
+}
+func probeLegacyContexts() int { return int(C.probe_rust_legacy_contexts()) }
+
+func newProbeLegacyContextForWorker(worker int) *Context {
+	return (*Context)(unsafe.Pointer(uintptr(0x100020000) + uintptr(worker)*16))
+}
+
+func probeLegacyContextFlash() bool { return C.probe_legacy_context_flash() != 0 }
+
+func probeLegacyTokensReset()      { C.probe_legacy_tokens_reset() }
+func probeLegacyTokensMutate()     { C.probe_legacy_tokens_mutate() }
+func probeLegacyAltTextCalls() int { return int(C.probe_legacy_alt_text_calls()) }

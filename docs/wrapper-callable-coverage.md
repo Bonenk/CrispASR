@@ -198,10 +198,27 @@ free temporary native strings instead of leaking allocations in setters.
 public-header struct transport, independent copies, repeated replacement,
 GC inside callbacks, parallel/sequential calls and failures. Invalid PCM,
 processor counts and NUL strings never reach the native oracle.
+`Whisper_full_parallel` and the additive `Whisper_full_parallel_with_progress`
+route through `crispasr_transcribe_parallel_by_ref`; the latter delivers per-call
+progress. The oracle counts the pointer export independently and exercises
+encoder/segment/progress callbacks, GC and callback retirement after success
+and native failure. This proves routing, not actual model progress frequency.
 `TestProbeLegacyEmptyPCMReturnsError` reproduced the old index-out-of-range
 panic and now passes. The contract also compiles the higher-level package;
-that compilation does not run its model-dependent tests. DTW and remaining
-legacy context/token/resource paths are still pending.
+that compilation does not run its model-dependent tests.
+
+`Whisper_init_with_dtw` and high-level `NewWithDTW` now expose built-in DTW
+presets/top-layer selection. Ordinary `Whisper_init` also uses native pointer
+parameters with matching cleanup. `Whisper_full_get_token_dtw_t` validates
+indices/counts; `TokenData.TDtw()` exposes the copied field. Both preserve native
+centiseconds and -1. `TestProbeLegacyDTWConstruction` checks all presets,
+constructor cleanup/errors, incompatible flash attention, invalid indexed access
+and DTW sentinels; `TestProbeModelDTWConstructor` exercises the higher-level model
+constructor and close. Those are operation probes, not model-dependent tests.
+`TestProbeLegacyCallbacksAcrossContexts` exercises eight contexts through native
+callbacks, including registration changes within delivery. The strict hosted
+Go/Rust contract enables Go's race detector. Custom heads and remaining legacy context/resource controls are still pending.
+The owned-token and compatible higher-level DTW paths are described below.
 
 
 WASM token polling copies all NUL-separated strings into owned C++ storage
@@ -262,3 +279,98 @@ public-header callbacks and emit borrowed buffers which are immediately mutated.
 They also exercise foreign-thread emission, stale userdata, replacement/close,
 callback and encoder errors, backlog limits and popped-event cleanup. This does
 not prove each backend emits every hook; real-model event acceptance is in PLAN.
+
+
+## Legacy Rust and Java Whisper operations
+
+Rust `CrispASR::new` and `transcribe_pcm[_with_strategy/_with_options]` retain
+source-compatible sys function names that link to native pointer-parameter
+exports. The deprecated path remains deprecated; the symbol repair does not
+change its native exception-safety limitations. `new_with_dtw` configures built-in
+heads or positive top layers before native initialization; the native helper
+selects compatible attention. `token_dtw_timestamp` validates result indices
+and returns native centiseconds/-1. The literal-header Go/Rust
+fixture exercises initialization, copied segments, VAD plus tinydiarize, native
+failure/null parameters, input rejection and parameter/context cleanup.
+
+Rust `transcribe_pcm_parallel` shares sequential option validation and copied
+results, using `crispasr_transcribe_parallel_by_ref`. `detect_language` calls
+`crispasr_detect_language` on PCM and returns an owned code/probability pair.
+`probe_legacy_rust_parallel_and_audio_language_detection` verifies processors,
+threads, samples, VAD plus tinydiarize, copied metadata, empty/error results,
+parameter cleanup and malformed language output. Neither method establishes
+Whisper model accuracy or makes the deprecated direct API exception-safe.
+
+Java `WhisperCpp.getContextDefaultParams/getFullDefaultParams` return independent
+Java-owned copies. `initContext` forwards GPU/flash/device and DTW flags,
+preset/top count, custom heads and memory size through native pointer parameters.
+Custom heads are snapshotted for model lifetime. `fullTranscribe` and
+`fullTranscribeWithTime` use the pointer inference export; close/reinitialization
+retire old ownership and reject overlap/re-entry, including foreign callback
+threads. `JavaLegacyWrapperContract` compiles the actual legacy classes against
+`build_legacy_wrapper_probe.py`, rather than counting raw JNA declarations.
+The legacy full-params layout requires a 64-bit JVM; broader token/parallel
+features and actual-model/platform acceptance remain in PLAN.md.
+
+
+## Owned legacy Whisper tokens and alternatives
+
+The family includes `whisper_full_n_tokens`, token text/ID/data, the scalar
+`crispasr_token_t0/t1/p/dtw_t` helpers, alternative count/ID/probability/text and
+`crispasr_params_set_alt_n`. Go's token-data field reads are bulk equivalents of
+the scalar metadata helpers; Rust calls the scalar helpers without mirroring a
+struct returned by value.
+
+| Wrapper | Callable operation | Probe |
+|---|---|---|
+| Rust | `CrispASR::token/tokens`, owned `WhisperToken` and candidates; `transcribe_pcm_with_alternatives` enables capture using existing options | `probe_legacy_rust_owned_token_snapshots_and_alternative_capture` |
+| Go | `Whisper_token_snapshot(s)` returns owned `WhisperTokenSnapshot` values; existing `Params.SetAltN` enables capture | `TestProbeLegacyOwnedTokenSnapshots` |
+| Go higher-level | `TokenSnapshots(ctx, segment)`, optional `TokenSnapshotProvider`; `Context.SetAltN` enables capture | `TestProbeModelTokenSnapshotsWithoutChangingContextInterface` |
+
+Raw token and alternative bytes are copied, including incomplete UTF-8, and
+metadata preserves native centiseconds and unavailable negative values. Rust
+also provides replacement-decoded display text; Go strings keep the same bytes
+as `Raw`. No borrowed native string or result pointer escapes. Snapshots remain
+valid after native buffers are mutated and the model is closed. Existing Go
+`Context` implementations/`Token` literals and Rust `TranscribeOptions`/`Segment`
+literals keep their shapes. Rust's original alternative-capture convenience
+method remains sequential; the controls API below also forwards capture during
+parallel decode. Native worker/merge and model acceptance remain in PLAN.md.
+
+Probes exercise long alternative buffer retries, token/alternative count limits,
+negative/oversized lengths, missing terminators, inconsistent embedded NULs,
+null/empty native text, invalid indices, unavailable sentinels and partial UTF-8
+reconstruction. The limits are one million tokens per segment, 32 alternatives
+and 1 MiB text per token/candidate. These compiled public-header fixtures do not
+establish real model accuracy/candidate quality or concurrent close safety;
+serialize access/inference/close on the same legacy context.
+
+
+## Rust legacy Whisper scalar controls
+
+`WhisperDecodeControls`, `transcribe_pcm_with_controls` and
+`transcribe_pcm_parallel_with_controls` expose all **19 non-VAD scalar setter
+routes**, including language/prompt strings, eleven flags, threads, maximum
+length/tokens, best-of, temperature and alternative count. The existing
+`TranscribeOptions` supplies the six VAD/tinydiarize setter routes, covering the
+current **25 `crispasr_params_set_*` exports**. This does not cover every field
+of the upstream raw `whisper_full_params` struct or the separate callback APIs.
+
+`None` leaves native defaults intact; explicit false/zero values apply where
+valid. Positive threads/best-of, nonnegative limits, finite/nonnegative temperature,
+nonempty language and NUL-free strings are checked before native parameter
+allocation. Owned prompt/language C strings outlive inference and parameter free.
+Alternative counts use native clamping. Existing options and result shapes remain
+unchanged; the new controls type is non-exhaustive and constructed with Default.
+
+The Go/Rust contract compiles the actual runtime's 25 C++ setters against the
+public headers, replacing mirrored C setter bodies. Field oracles check every
+control on sequential/parallel and greedy/beam routes, explicit clears, unset
+native defaults, VAD plus tinydiarize, UTF-8 strings, native failures and cleanup.
+The oracle also churns heap blocks before reading borrowed string fields; an
+injected early owner drop reproduced a mismatch and the restored lifetime passes.
+`probe_legacy_rust_decode_controls_reject_invalid_before_parameter_allocation`
+also checks that rejected inputs never request native parameters. A source-family
+tripwire flags new setters without public Rust routes; that check supplements
+operation probes and does not establish behavioral coverage by itself. Actual
+model behavior, worker errors and parallel timestamp merging remain in PLAN.md.

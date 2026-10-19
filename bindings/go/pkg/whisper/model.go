@@ -38,6 +38,19 @@ func New(path string) (Model, error) {
 	return model, nil
 }
 
+// NewWithDTW loads a Whisper model with experimental DTW token alignment.
+// Presets and top-layer counts follow the low-level Whisper_init_with_dtw API.
+func NewWithDTW(path string, preset whisper.AlignmentHeadsPreset, nTop int) (Model, error) {
+	if _, err := os.Stat(path); err != nil {
+		return nil, err
+	}
+	ctx, err := whisper.Whisper_init_with_dtw(path, preset, nTop)
+	if err != nil {
+		return nil, err
+	}
+	return &model{path: path, ctx: ctx}, nil
+}
+
 func (model *model) Close() error {
 	if model.ctx != nil {
 		model.ctx.Whisper_free()

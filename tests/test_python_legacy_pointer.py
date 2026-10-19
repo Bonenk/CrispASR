@@ -20,6 +20,7 @@ class LegacyPointerContract(unittest.TestCase):
             self.assertEqual(lib.probe_legacy_live(),0)
             model=CrispASR('probe',lib_path=str(path),dtw=True,dtw_n_top=2)
             self.assertEqual(lib.probe_legacy_dtw(),102)
+            self.assertEqual(lib.probe_legacy_flash(),0)
             self.assertEqual(lib.probe_legacy_live(),0)
             # Exercise native pointer inference even on clones with a built helper.
             model._helpers = None
@@ -42,6 +43,30 @@ class LegacyPointerContract(unittest.TestCase):
             with self.assertRaises(ValueError):model.transcribe_pcm(pcm,n_processors=0)
             self.assertEqual(lib.probe_legacy_live(),0)
             model.close();self.assertEqual(lib.probe_legacy_contexts(),0)
+
+    def test_literal_dtw_helper_attention_policy(self):
+        with tempfile.TemporaryDirectory(prefix='native-dtw-policy-') as tmp:
+            lib=C.CDLL(str(build(Path(tmp)/'libcrispasr.so')))
+            lib.whisper_context_default_params_by_ref.restype=C.c_void_p
+            lib.whisper_free_context_params.argtypes=[C.c_void_p]
+            lib.whisper_init_from_file_with_params_by_ref.argtypes=[C.c_char_p,C.c_void_p]
+            lib.whisper_init_from_file_with_params_by_ref.restype=C.c_void_p
+            lib.whisper_free.argtypes=[C.c_void_p]
+            setter=lib.crispasr_ctx_params_set_dtw
+            setter.argtypes=[C.c_void_p,C.c_bool,C.c_int,C.c_int];setter.restype=None
+            setter(None,True,3,0)  # Null remains harmless.
+            for sequence, expected_flash in [([False],1),([True],0),([True,False],0)]:
+                params=lib.whisper_context_default_params_by_ref()
+                self.assertTrue(params)
+                try:
+                    for enable in sequence:setter(params,enable,3,0)
+                    ctx=lib.whisper_init_from_file_with_params_by_ref(b'probe',params)
+                    self.assertTrue(ctx)
+                    try:self.assertEqual(lib.probe_legacy_flash(),expected_flash)
+                    finally:lib.whisper_free(ctx)
+                finally:lib.whisper_free_context_params(params)
+                self.assertEqual(lib.probe_legacy_live(),0)
+                self.assertEqual(lib.probe_legacy_contexts(),0)
 
     def test_parakeet_uses_int64_offset_and_copies_partial_tokens(self):
         with tempfile.TemporaryDirectory(prefix='python-parakeet-') as tmp:

@@ -18,6 +18,12 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_void};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod whisper_controls;
+pub use whisper_controls::WhisperDecodeControls;
+
+mod whisper_tokens;
+pub use whisper_tokens::{WhisperToken, WhisperTokenAlternative};
+
 pub mod extra;
 pub use extra::*;
 
@@ -45,6 +51,48 @@ pub struct TranscribeOptions {
     pub tdrz: bool,
 }
 
+/// Built-in experimental Whisper DTW alignment heads. Custom head arrays are
+/// not supported here. Native loading checks heads against the model dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DtwPreset {
+    /// Use every attention head in the last N text layers. N must be positive.
+    TopMost(i32),
+    TinyEn,
+    Tiny,
+    BaseEn,
+    Base,
+    SmallEn,
+    Small,
+    MediumEn,
+    Medium,
+    LargeV1,
+    LargeV2,
+    LargeV3,
+    LargeV3Turbo,
+}
+
+impl DtwPreset {
+    fn native(self) -> Result<(i32, i32), String> {
+        use crispasr_sys::*;
+        Ok(match self {
+            Self::TopMost(n) if n > 0 => (CRISPASR_AHEADS_N_TOP_MOST, n),
+            Self::TopMost(_) => return Err("DTW requires positive top layers".into()),
+            Self::TinyEn => (CRISPASR_AHEADS_TINY_EN, 0),
+            Self::Tiny => (CRISPASR_AHEADS_TINY, 0),
+            Self::BaseEn => (CRISPASR_AHEADS_BASE_EN, 0),
+            Self::Base => (CRISPASR_AHEADS_BASE, 0),
+            Self::SmallEn => (CRISPASR_AHEADS_SMALL_EN, 0),
+            Self::Small => (CRISPASR_AHEADS_SMALL, 0),
+            Self::MediumEn => (CRISPASR_AHEADS_MEDIUM_EN, 0),
+            Self::Medium => (CRISPASR_AHEADS_MEDIUM, 0),
+            Self::LargeV1 => (CRISPASR_AHEADS_LARGE_V1, 0),
+            Self::LargeV2 => (CRISPASR_AHEADS_LARGE_V2, 0),
+            Self::LargeV3 => (CRISPASR_AHEADS_LARGE_V3, 0),
+            Self::LargeV3Turbo => (CRISPASR_AHEADS_LARGE_V3_TURBO, 0),
+        })
+    }
+}
+
 /// A loaded CrispASR model (whisper-only, legacy API).
 ///
 /// **Deprecated:** Use [`Session`] instead. `CrispASR` wraps `whisper_full()`
@@ -65,8 +113,28 @@ unsafe impl Send for CrispASR {}
 impl CrispASR {
     /// Load a GGUF/GGML whisper model file.
     pub fn new(model_path: &str) -> Result<Self, String> {
+        Self::new_impl(model_path, None)
+    }
+
+    /// Load Whisper with experimental DTW token alignment. The native loader
+    /// checks the preset/top-layer count against the actual model dimensions.
+    pub fn new_with_dtw(model_path: &str, preset: DtwPreset) -> Result<Self, String> {
+        Self::new_impl(model_path, Some(preset))
+    }
+
+    fn new_impl(model_path: &str, dtw: Option<DtwPreset>) -> Result<Self, String> {
+        if model_path.is_empty() {
+            return Err("nonempty model path required".into());
+        }
+        let dtw = dtw.map(DtwPreset::native).transpose()?;
         let path = CString::new(model_path).map_err(|e| format!("invalid path: {e}"))?;
         let cparams = unsafe { crispasr_sys::whisper_context_default_params_by_ref() };
+        if cparams.is_null() {
+            return Err("could not allocate context parameters".into());
+        }
+        if let Some((preset, top)) = dtw {
+            unsafe { crispasr_sys::crispasr_ctx_params_set_dtw(cparams, true, preset, top) };
+        }
         let ctx =
             unsafe { crispasr_sys::whisper_init_from_file_with_params(path.as_ptr(), cparams) };
         unsafe { crispasr_sys::whisper_free_context_params(cparams) };
@@ -98,52 +166,138 @@ impl CrispASR {
         )
     }
 
-    /// Transcribe with full option control — VAD, tinydiarize, and future
-    /// knobs as they land upstream. Safe against older dylibs: setters
-    /// that the loaded library doesn't expose are no-ops.
+    /// Transcribe with VAD and tinydiarize options. Requires the native
+    /// pointer-parameter and option-helper exports from the matching library.
     pub fn transcribe_pcm_with_options(
         &self,
         pcm: &[f32],
         opts: &TranscribeOptions,
     ) -> Result<Vec<Segment>, String> {
+        self.transcribe_pcm_impl(pcm, opts, None, None)
+    }
+
+    /// Split PCM into `processors` chunks using native progress-tracked parallel
+    /// Whisper decoding. Chunk boundaries may reduce transcription accuracy.
+    /// Options and owned result handling are identical to sequential decoding.
+    pub fn transcribe_pcm_parallel(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        processors: i32,
+    ) -> Result<Vec<Segment>, String> {
+        if processors <= 0 {
+            return Err("parallel decoding requires positive processors".into());
+        }
+        self.transcribe_pcm_impl(pcm, opts, Some(processors), None)
+    }
+
+    /// Decode while capturing greedy token alternatives. Counts use the native
+    /// 0..32 clamp; beam decoding does not emit alternatives. Retrieve owned
+    /// candidates afterward with `token` or `tokens`. Existing options stay valid.
+    pub fn transcribe_pcm_with_alternatives(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        alt_n: i32,
+    ) -> Result<Vec<Segment>, String> {
+        let mut controls = WhisperDecodeControls::default();
+        controls.alt_n = Some(alt_n);
+        self.transcribe_pcm_impl(pcm, opts, None, Some(&controls))
+    }
+
+    /// Decode with optional language/prompt, scalar flags and token controls.
+    /// Owned strings remain alive until inference and parameter cleanup finish.
+    /// `None` fields preserve native defaults; invalid controls fail before
+    /// native full-parameter allocation.
+    pub fn transcribe_pcm_with_controls(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        controls: &WhisperDecodeControls,
+    ) -> Result<Vec<Segment>, String> {
+        self.transcribe_pcm_impl(pcm, opts, None, Some(controls))
+    }
+
+    /// Progress-tracked parallel decode with the same controls, validation and
+    /// owned string lifetimes as sequential decoding. Processors must be positive.
+    /// Greedy alternative capture follows native chunk/merge behavior.
+    pub fn transcribe_pcm_parallel_with_controls(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        controls: &WhisperDecodeControls,
+        processors: i32,
+    ) -> Result<Vec<Segment>, String> {
+        if processors <= 0 {
+            return Err("parallel decoding requires positive processors".into());
+        }
+        self.transcribe_pcm_impl(pcm, opts, Some(processors), Some(controls))
+    }
+
+    fn transcribe_pcm_impl(
+        &self,
+        pcm: &[f32],
+        opts: &TranscribeOptions,
+        processors: Option<i32>,
+        controls: Option<&WhisperDecodeControls>,
+    ) -> Result<Vec<Segment>, String> {
+        if pcm.is_empty() || pcm.len() > i32::MAX as usize {
+            return Err("nonempty PCM with an int32 sample count required".into());
+        }
         let strategy = opts
             .strategy
             .unwrap_or(crispasr_sys::CRISPASR_SAMPLING_GREEDY);
+        if strategy != crispasr_sys::CRISPASR_SAMPLING_GREEDY
+            && strategy != crispasr_sys::CRISPASR_SAMPLING_BEAM_SEARCH
+        {
+            return Err("unsupported sampling strategy".into());
+        }
+        let prepared_controls = controls.map(WhisperDecodeControls::prepare).transpose()?;
+        let vad_path = if opts.vad {
+            if opts
+                .vad_threshold
+                .is_some_and(|t| !t.is_finite() || !(0.0..=1.0).contains(&t))
+                || opts.vad_min_speech_ms.is_some_and(|n| n < 0)
+                || opts.vad_min_silence_ms.is_some_and(|n| n < 0)
+            {
+                return Err("invalid VAD options".into());
+            }
+            opts.vad_model_path
+                .as_ref()
+                .map(|s| CString::new(s.as_str()))
+                .transpose()
+                .map_err(|e| format!("invalid VAD path: {e}"))?
+        } else {
+            None
+        };
         let params = unsafe { crispasr_sys::whisper_full_default_params_by_ref(strategy) };
-
-        // VAD
-        if opts.vad {
-            unsafe {
+        if params.is_null() {
+            return Err("could not allocate transcription parameters".into());
+        }
+        unsafe {
+            if let Some(prepared) = &prepared_controls {
+                prepared.apply(params);
+            }
+            if opts.vad {
                 crispasr_sys::crispasr_params_set_vad(params, 1);
                 if let Some(t) = opts.vad_threshold {
                     crispasr_sys::crispasr_params_set_vad_threshold(params, t);
                 }
-                if let Some(ms) = opts.vad_min_speech_ms {
-                    crispasr_sys::crispasr_params_set_vad_min_speech_ms(params, ms);
+                if let Some(n) = opts.vad_min_speech_ms {
+                    crispasr_sys::crispasr_params_set_vad_min_speech_ms(params, n);
                 }
-                if let Some(ms) = opts.vad_min_silence_ms {
-                    crispasr_sys::crispasr_params_set_vad_min_silence_ms(params, ms);
+                if let Some(n) = opts.vad_min_silence_ms {
+                    crispasr_sys::crispasr_params_set_vad_min_silence_ms(params, n);
                 }
-            }
-            // Keep the CString alive until after whisper_full returns.
-            let vad_path_cstr = opts
-                .vad_model_path
-                .as_ref()
-                .map(|s| CString::new(s.as_str()).ok())
-                .flatten();
-            if let Some(cs) = &vad_path_cstr {
-                unsafe {
-                    crispasr_sys::crispasr_params_set_vad_model_path(params, cs.as_ptr());
+                if let Some(path) = &vad_path {
+                    crispasr_sys::crispasr_params_set_vad_model_path(params, path.as_ptr());
                 }
             }
-            // vad_path_cstr stays in scope for the whisper_full call below.
-            return self.run_full(pcm, params, vad_path_cstr);
+            if opts.tdrz {
+                crispasr_sys::crispasr_params_set_tdrz(params, 1);
+            }
         }
-        if opts.tdrz {
-            unsafe { crispasr_sys::crispasr_params_set_tdrz(params, 1) };
-        }
-
-        self.run_full(pcm, params, None)
+        self.run_full(pcm, params, vad_path, processors)
     }
 
     fn run_full(
@@ -151,9 +305,22 @@ impl CrispASR {
         pcm: &[f32],
         params: *mut crispasr_sys::WhisperFullParams,
         _keep_alive_vad_path: Option<CString>,
+        processors: Option<i32>,
     ) -> Result<Vec<Segment>, String> {
-        let ret =
-            unsafe { crispasr_sys::whisper_full(self.ctx, params, pcm.as_ptr(), pcm.len() as i32) };
+        let ret = unsafe {
+            match processors {
+                Some(n) => crispasr_sys::crispasr_transcribe_parallel_by_ref(
+                    self.ctx,
+                    params,
+                    pcm.as_ptr(),
+                    pcm.len() as i32,
+                    n,
+                ),
+                None => {
+                    crispasr_sys::whisper_full(self.ctx, params, pcm.as_ptr(), pcm.len() as i32)
+                }
+            }
+        };
         unsafe { crispasr_sys::whisper_free_params(params) };
 
         if ret != 0 {
@@ -161,6 +328,9 @@ impl CrispASR {
         }
 
         let n = unsafe { crispasr_sys::whisper_full_n_segments(self.ctx) };
+        if n < 0 {
+            return Err("invalid native segment count".into());
+        }
         let mut segments = Vec::with_capacity(n as usize);
 
         for i in 0..n {
@@ -185,6 +355,62 @@ impl CrispASR {
         }
 
         Ok(segments)
+    }
+
+    /// Return a token's DTW timestamp in native centiseconds. Native -1 means
+    /// unavailable and is preserved. Requires a model loaded with DTW enabled.
+    /// Segment/token indices are checked before native indexed access.
+    pub fn token_dtw_timestamp(&self, segment: i32, token: i32) -> Result<i64, String> {
+        if segment < 0 || token < 0 {
+            return Err("nonnegative segment and token indices required".into());
+        }
+        let segments = unsafe { crispasr_sys::whisper_full_n_segments(self.ctx) };
+        if segments < 0 || segment >= segments {
+            return Err("segment index outside native results".into());
+        }
+        let tokens = unsafe { crispasr_sys::whisper_full_n_tokens(self.ctx, segment) };
+        if tokens < 0 || token >= tokens {
+            return Err("token index outside native results".into());
+        }
+        Ok(unsafe { crispasr_sys::crispasr_token_dtw_t(self.ctx, segment, token) })
+    }
+
+    /// Detect language directly from mono 16 kHz PCM, returning an owned language
+    /// code and probability. This runs Whisper mel/encoder inference and replaces
+    /// native encoder state. `n_threads` must be positive.
+    pub fn detect_language(&self, pcm: &[f32], n_threads: i32) -> Result<(String, f32), String> {
+        if pcm.is_empty() || pcm.len() > i32::MAX as usize || n_threads <= 0 {
+            return Err(
+                "language detection requires nonempty int32 PCM and positive threads".into(),
+            );
+        }
+        let mut code = [0 as c_char; 32];
+        let probability = unsafe {
+            crispasr_sys::crispasr_detect_language(
+                self.ctx,
+                pcm.as_ptr(),
+                pcm.len() as i32,
+                n_threads,
+                code.as_mut_ptr(),
+                code.len() as i32,
+            )
+        };
+        if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+            return Err(format!(
+                "language detection failed (probability {probability})"
+            ));
+        }
+        let end = code
+            .iter()
+            .position(|&b| b == 0)
+            .ok_or("unterminated native language code")?;
+        if end == 0 {
+            return Err("empty native language code".into());
+        }
+        let bytes: Vec<u8> = code[..end].iter().map(|&b| b as u8).collect();
+        let language =
+            String::from_utf8(bytes).map_err(|_| "invalid UTF-8 native language code")?;
+        Ok((language, probability))
     }
 
     /// Get the detected language from the last transcription.

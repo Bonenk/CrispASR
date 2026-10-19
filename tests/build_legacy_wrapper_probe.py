@@ -29,7 +29,7 @@ def build(output):
     cpp=output.parent/'legacy-native-adapters.cpp'
     cpp.write_text('#include "crispasr.h"\n#include "crispasr_session.h"\n#include <atomic>\n#include <cstring>\n#define CA_EXPORT extern "C"\nstatic std::atomic<int> g_progress{-1};\n'+
         '\n'.join(extract_function(source,name) for name in names))
-    subprocess.run([os.environ.get('CXX','c++'),'-std=c++17','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
+    subprocess.run([os.environ.get('CXX','c++'),'-std=c++17','-pthread','-shared','-fPIC','-Werror','-I'+str(ROOT/'include'),'-I'+str(ROOT/'ggml/include'),
         str(cpp),str(ROOT/'tests/fixtures/wrapper-whisper-legacy.cpp'),'-o',str(output)],check=True)
     return output
 

@@ -1,6 +1,8 @@
 // Included by the Go/Rust probe; real public-header struct transport.
 static char legacy_prompt[256], legacy_model[256];
-static int legacy_mode, legacy_calls;
+#include <stdatomic.h>
+static int legacy_mode;
+static _Atomic int legacy_calls;
 void probe_legacy_expect(const char* prompt, const char* model) {
     snprintf(legacy_prompt, sizeof(legacy_prompt), "%s", prompt);
     snprintf(legacy_model, sizeof(legacy_model), "%s", model);

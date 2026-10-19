@@ -889,3 +889,484 @@ fn probe_polled_results_share_metadata_validation_and_cleanup() {
         probe_mode_set(0);
     }
 }
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_pointer_entrypoints_and_owned_parameters() {
+    extern "C" {
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe {
+        probe_reset();
+    }
+    assert!(crispasr::CrispASR::new("bad\0path").is_err());
+    assert!(crispasr::CrispASR::new("fail").is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe { probe_mode_set(10) };
+    assert!(crispasr::CrispASR::new("model").is_err());
+    unsafe { probe_mode_set(0) };
+    let model = crispasr::CrispASR::new("model").expect("legacy pointer init");
+    let pcm = [1., 3., 5.];
+    let segments = model
+        .transcribe_pcm(&pcm)
+        .expect("legacy pointer inference");
+    assert_eq!(segments[0].text, "日");
+    assert_eq!(segments[0].start, 1.);
+    assert_eq!(segments[0].end, 2.);
+    assert_eq!(segments[0].no_speech_prob, 0.125);
+    let options = crispasr::TranscribeOptions {
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    assert!(model.transcribe_pcm_with_options(&pcm, &options).is_ok());
+    assert!(model.transcribe_pcm_with_strategy(&pcm, 1).is_ok());
+    let calls = unsafe { probe_calls_get() };
+    assert!(model.transcribe_pcm(&[]).is_err());
+    assert!(model.transcribe_pcm_with_strategy(&pcm, 2).is_err());
+    let mut bad = options.clone();
+    bad.vad_model_path = Some("bad\0path".into());
+    assert!(model.transcribe_pcm_with_options(&pcm, &bad).is_err());
+    bad = options.clone();
+    bad.vad_threshold = Some(f32::NAN);
+    assert!(model.transcribe_pcm_with_options(&pcm, &bad).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    for mode in [2, 11, 12] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.transcribe_pcm(&pcm).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    unsafe { probe_mode_set(1) };
+    assert!(model.transcribe_pcm(&pcm).unwrap().is_empty());
+    unsafe { probe_mode_set(0) };
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    drop(model);
+    assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_parallel_and_audio_language_detection() {
+    extern "C" {
+        fn probe_parallel_by_ref_calls() -> c_int;
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let pcm = [1., 3., 5.];
+    let options = crispasr::TranscribeOptions {
+        strategy: Some(1),
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    let before = unsafe { probe_parallel_by_ref_calls() };
+    let segments = model.transcribe_pcm_parallel(&pcm, &options, 2).unwrap();
+    assert_eq!(unsafe { probe_parallel_by_ref_calls() }, before + 1);
+    assert_eq!(segments[0].text, "日");
+    assert_eq!(segments[0].start, 1.);
+    assert_eq!(segments[0].no_speech_prob, 0.125);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    // A processor mismatch is rejected by the fixture inside the native route.
+    assert!(model.transcribe_pcm_parallel(&pcm, &options, 3).is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    let calls = unsafe { probe_calls_get() };
+    for processors in [0, -1] {
+        assert!(model
+            .transcribe_pcm_parallel(&pcm, &options, processors)
+            .is_err());
+    }
+    assert!(model.transcribe_pcm_parallel(&[], &options, 2).is_err());
+    let mut bad = options.clone();
+    bad.vad_model_path = Some("bad\0path".into());
+    assert!(model.transcribe_pcm_parallel(&pcm, &bad, 2).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    for mode in [2, 11, 12] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.transcribe_pcm_parallel(&pcm, &options, 2).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    unsafe { probe_mode_set(1) };
+    assert!(model
+        .transcribe_pcm_parallel(&pcm, &options, 2)
+        .unwrap()
+        .is_empty());
+    unsafe { probe_mode_set(0) };
+    let language = model.detect_language(&pcm, 3).unwrap();
+    assert_eq!(language, ("de".to_owned(), 0.875));
+    let calls = unsafe { probe_calls_get() };
+    assert!(model.detect_language(&[], 3).is_err());
+    assert!(model.detect_language(&pcm, 0).is_err());
+    assert!(model.detect_language(&pcm, -1).is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    // Wrong thread count reaches the native fixture and returns an error.
+    assert!(model.detect_language(&pcm, 4).is_err());
+    for mode in [2, 13, 14, 15, 16, 18] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.detect_language(&pcm, 3).is_err(), "mode {mode}");
+    }
+    unsafe { probe_mode_set(17) };
+    assert_eq!(
+        model.detect_language(&pcm, 3).unwrap(),
+        ("de".to_owned(), 0.)
+    );
+    // The returned language is an owned copy, independent of later calls.
+    assert_eq!(language.0, "de");
+    unsafe { probe_mode_set(0) };
+    drop(model);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_dtw_context_construction() {
+    use crispasr::DtwPreset::*;
+    extern "C" {
+        fn probe_dtw_enabled() -> c_int;
+        fn probe_legacy_context_flash() -> c_int;
+        fn probe_dtw_preset() -> c_int;
+        fn probe_dtw_top() -> c_int;
+        fn probe_rust_legacy_contexts() -> c_int;
+    }
+    unsafe { probe_reset() };
+    for (preset, expected, top) in [
+        (TopMost(3), 1, 3),
+        (TinyEn, 3, 0),
+        (Tiny, 4, 0),
+        (BaseEn, 5, 0),
+        (Base, 6, 0),
+        (SmallEn, 7, 0),
+        (Small, 8, 0),
+        (MediumEn, 9, 0),
+        (Medium, 10, 0),
+        (LargeV1, 11, 0),
+        (LargeV2, 12, 0),
+        (LargeV3, 13, 0),
+        (LargeV3Turbo, 14, 0),
+    ] {
+        let model = crispasr::CrispASR::new_with_dtw("model", preset).unwrap();
+        assert_eq!(unsafe { probe_dtw_enabled() }, 1);
+        assert_eq!(unsafe { probe_legacy_context_flash() }, 0);
+        assert_eq!(unsafe { probe_dtw_preset() }, expected);
+        assert_eq!(unsafe { probe_dtw_top() }, top);
+        assert_eq!(model.token_dtw_timestamp(0, 0).unwrap(), 100);
+        assert_eq!(model.token_dtw_timestamp(0, 1).unwrap(), 101);
+        for (segment, token) in [(-1, 0), (0, -1), (1, 0), (0, 2)] {
+            assert!(model.token_dtw_timestamp(segment, token).is_err());
+        }
+        for mode in [1, 12, 20, 21] {
+            unsafe { probe_mode_set(mode) };
+            assert!(model.token_dtw_timestamp(0, 0).is_err());
+        }
+        unsafe { probe_mode_set(22) };
+        assert_eq!(model.token_dtw_timestamp(0, 0).unwrap(), -1);
+        unsafe { probe_mode_set(0) };
+        assert_eq!(unsafe { probe_live_get() }, 0);
+        drop(model);
+        assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+    }
+    // Ordinary construction must keep native DTW defaults.
+    drop(crispasr::CrispASR::new("model").unwrap());
+    assert_eq!(unsafe { probe_dtw_enabled() }, 0);
+    assert_eq!(unsafe { probe_legacy_context_flash() }, 1);
+    let calls = unsafe { probe_calls_get() };
+    for preset in [TopMost(0), TopMost(-1)] {
+        assert!(crispasr::CrispASR::new_with_dtw("model", preset).is_err());
+    }
+    for path in ["", "bad\0path"] {
+        assert!(crispasr::CrispASR::new_with_dtw(path, TinyEn).is_err());
+        assert!(crispasr::CrispASR::new(path).is_err());
+    }
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    assert!(crispasr::CrispASR::new_with_dtw("fail", TinyEn).is_err());
+    for mode in [10, 19] {
+        unsafe { probe_mode_set(mode) };
+        assert!(crispasr::CrispASR::new_with_dtw("model", TinyEn).is_err());
+        assert_eq!(unsafe { probe_live_get() }, 0);
+        assert_eq!(unsafe { probe_rust_legacy_contexts() }, 0);
+    }
+    unsafe { probe_mode_set(0) };
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_owned_token_snapshots_and_alternative_capture() {
+    extern "C" {
+        fn probe_legacy_tokens_reset();
+        fn probe_legacy_tokens_mutate();
+        fn probe_legacy_alt_text_calls() -> c_int;
+        fn probe_legacy_rust_alt_n() -> c_int;
+    }
+    unsafe {
+        probe_reset();
+        probe_legacy_tokens_reset();
+    }
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let options = crispasr::TranscribeOptions::default();
+    for (requested, expected) in [(-1, 0), (0, 0), (2, 2), (100, 32)] {
+        model
+            .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, requested)
+            .unwrap();
+        assert_eq!(unsafe { probe_legacy_rust_alt_n() }, expected);
+        assert_eq!(unsafe { probe_live_get() }, 0);
+    }
+    let calls = unsafe { probe_calls_get() };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[], &options, 2)
+        .is_err());
+    let bad = crispasr::TranscribeOptions {
+        strategy: Some(2),
+        ..Default::default()
+    };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &bad, 2)
+        .is_err());
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    unsafe { probe_mode_set(11) };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, 2)
+        .is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe { probe_mode_set(0) };
+    let tokens = model.tokens(0).unwrap();
+    assert_eq!(tokens.len(), 2);
+    assert_eq!(tokens[0].id, 11);
+    assert_eq!(tokens[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].text, "�");
+    assert_eq!((tokens[0].t0, tokens[0].t1, tokens[0].dtw), (100, 120, 100));
+    assert_eq!(tokens[0].probability, 0.75);
+    assert_eq!(
+        (tokens[1].t0, tokens[1].t1, tokens[1].probability),
+        (-1, -1, -1.)
+    );
+    assert_eq!(tokens[1].dtw, 101);
+    assert_eq!(tokens[0].alternatives.len(), 2);
+    assert_eq!(tokens[0].alternatives[0].id, 42);
+    assert_eq!(tokens[0].alternatives[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[0].probability, 0.25);
+    assert_eq!(tokens[0].alternatives[1].raw, vec![b'L'; 2048]);
+    assert_eq!(tokens[0].alternatives[1].probability, -1.);
+    assert!(tokens[1].alternatives.is_empty());
+    assert!(unsafe { probe_legacy_alt_text_calls() } > 2); // Real resize/retry.
+    assert_eq!(model.token(0, 1).unwrap().raw, vec![0xa5]);
+    for (segment, token) in [(-1, 0), (0, -1), (1, 0), (0, 2)] {
+        assert!(model.token(segment, token).is_err());
+    }
+    assert!(model.tokens(-1).is_err());
+    assert!(model.tokens(1).is_err());
+    for mode in [1, 12, 20, 23, 24, 25, 26, 27, 29, 30, 31, 32, 33] {
+        unsafe { probe_mode_set(mode) };
+        assert!(model.token(0, 0).is_err(), "token mode {mode}");
+        assert!(model.tokens(0).is_err(), "bulk mode {mode}");
+    }
+    unsafe { probe_mode_set(21) };
+    assert!(model.tokens(0).unwrap().is_empty());
+    unsafe { probe_mode_set(28) };
+    let empty = model.token(0, 0).unwrap();
+    assert!(empty.raw.is_empty());
+    assert!(empty.alternatives[0].raw.is_empty());
+    unsafe { probe_mode_set(34) };
+    assert!(model.token(0, 0).unwrap().alternatives.is_empty());
+    unsafe { probe_mode_set(22) };
+    assert_eq!(model.token(0, 0).unwrap().dtw, -1);
+    unsafe { probe_mode_set(2) };
+    assert!(model
+        .transcribe_pcm_with_alternatives(&[1., 3., 5.], &options, 3)
+        .is_err());
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe {
+        probe_mode_set(0);
+        probe_legacy_tokens_mutate();
+    }
+    drop(model);
+    assert_eq!(tokens[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[0].raw, vec![0xe6, 0x97]);
+    assert_eq!(tokens[0].alternatives[1].raw, vec![b'L'; 2048]);
+    assert_eq!(
+        [tokens[0].raw.clone(), tokens[1].raw.clone()].concat(),
+        "日".as_bytes()
+    );
+    unsafe { probe_legacy_tokens_reset() };
+}
+
+fn configured_legacy_controls(enabled: bool) -> crispasr::WhisperDecodeControls {
+    let mut controls = crispasr::WhisperDecodeControls::default();
+    controls.translate = Some(enabled);
+    controls.detect_language = Some(enabled);
+    controls.token_timestamps = Some(enabled);
+    controls.split_on_word = Some(enabled);
+    controls.no_context = Some(enabled);
+    controls.single_segment = Some(enabled);
+    controls.print_realtime = Some(enabled);
+    controls.print_progress = Some(enabled);
+    controls.print_timestamps = Some(enabled);
+    controls.print_special = Some(enabled);
+    controls.suppress_blank = Some(enabled);
+
+    controls.language = Some(if enabled { "ja" } else { "auto" }.into());
+    controls.initial_prompt = Some(if enabled { "Grüße 日" } else { "" }.into());
+    controls.n_threads = Some(if enabled { 3 } else { 1 });
+    controls.max_len = Some(if enabled { 77 } else { 0 });
+    controls.best_of = Some(if enabled { 7 } else { 1 });
+    controls.max_tokens = Some(if enabled { 23 } else { 0 });
+    controls.temperature = Some(if enabled { 0.625 } else { 0. });
+    controls.alt_n = Some(if enabled { 100 } else { -10 });
+    controls
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_decode_controls_sequential_parallel_and_defaults() {
+    extern "C" {
+        fn probe_legacy_controls_expect(mode: c_int);
+        fn probe_legacy_rust_alt_n() -> c_int;
+        fn probe_parallel_by_ref_calls() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let pcm = [1., 3., 5.];
+    let mut options = crispasr::TranscribeOptions {
+        vad: true,
+        tdrz: true,
+        vad_model_path: Some("vad".into()),
+        vad_threshold: Some(0.7),
+        vad_min_speech_ms: Some(300),
+        vad_min_silence_ms: Some(200),
+        ..Default::default()
+    };
+    for (expect, controls) in [
+        (1, configured_legacy_controls(true)),
+        (2, configured_legacy_controls(false)),
+        (3, crispasr::WhisperDecodeControls::default()),
+    ] {
+        unsafe { probe_legacy_controls_expect(expect) };
+        for strategy in [0, 1] {
+            options.strategy = Some(strategy);
+            let segments = model
+                .transcribe_pcm_with_controls(&pcm, &options, &controls)
+                .unwrap();
+            assert_eq!(segments[0].text, "日");
+            assert_eq!(segments[0].start, 1.);
+            assert_eq!(unsafe { probe_live_get() }, 0);
+            let calls = unsafe { probe_parallel_by_ref_calls() };
+            let segments = model
+                .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+                .unwrap();
+            assert_eq!(segments[0].text, "日");
+            assert_eq!(unsafe { probe_parallel_by_ref_calls() }, calls + 1);
+            assert_eq!(
+                unsafe { probe_legacy_rust_alt_n() },
+                if expect == 1 {
+                    32
+                } else if expect == 2 {
+                    0
+                } else {
+                    7
+                }
+            );
+            assert_eq!(unsafe { probe_live_get() }, 0);
+        }
+    }
+    // Existing routes keep unset native defaults too.
+    assert!(model.transcribe_pcm_with_options(&pcm, &options).is_ok());
+    assert!(model.transcribe_pcm_parallel(&pcm, &options, 2).is_ok());
+    unsafe { probe_legacy_controls_expect(1) };
+    let controls = configured_legacy_controls(true);
+    for parallel in [false, true] {
+        for mode in [2, 11, 12] {
+            unsafe { probe_mode_set(mode) };
+            let result = if parallel {
+                model.transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+            } else {
+                model.transcribe_pcm_with_controls(&pcm, &options, &controls)
+            };
+            assert!(result.is_err(), "parallel={parallel} mode={mode}");
+            assert_eq!(unsafe { probe_live_get() }, 0);
+        }
+        unsafe { probe_mode_set(1) };
+        let empty = if parallel {
+            model.transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+        } else {
+            model.transcribe_pcm_with_controls(&pcm, &options, &controls)
+        };
+        assert!(empty.unwrap().is_empty());
+    }
+    unsafe {
+        probe_mode_set(0);
+        probe_legacy_controls_expect(0)
+    };
+}
+
+#[test]
+#[allow(deprecated)]
+fn probe_legacy_rust_decode_controls_reject_invalid_before_parameter_allocation() {
+    extern "C" {
+        fn probe_legacy_param_requests() -> c_int;
+    }
+    unsafe { probe_reset() };
+    let model = crispasr::CrispASR::new("model").unwrap();
+    let options = crispasr::TranscribeOptions::default();
+    let pcm = [1., 3., 5.];
+    let mut invalid = Vec::new();
+    for value in ["", "bad\0language"] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.language = Some(value.into());
+        invalid.push(c);
+    }
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.initial_prompt = Some("bad\0prompt".into());
+    invalid.push(c);
+    for value in [0, -1] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.n_threads = Some(value);
+        invalid.push(c);
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.best_of = Some(value);
+        invalid.push(c);
+    }
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.max_len = Some(-1);
+    invalid.push(c);
+    let mut c = crispasr::WhisperDecodeControls::default();
+    c.max_tokens = Some(-1);
+    invalid.push(c);
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1] {
+        let mut c = crispasr::WhisperDecodeControls::default();
+        c.temperature = Some(value);
+        invalid.push(c);
+    }
+    let requests = unsafe { probe_legacy_param_requests() };
+    let calls = unsafe { probe_calls_get() };
+    for controls in invalid {
+        assert!(model
+            .transcribe_pcm_with_controls(&pcm, &options, &controls)
+            .is_err());
+        assert!(model
+            .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, 2)
+            .is_err());
+    }
+    let controls = configured_legacy_controls(true);
+    assert!(model
+        .transcribe_pcm_with_controls(&[], &options, &controls)
+        .is_err());
+    assert!(model
+        .transcribe_pcm_parallel_with_controls(&[], &options, &controls, 2)
+        .is_err());
+    for processors in [0, -1] {
+        assert!(model
+            .transcribe_pcm_parallel_with_controls(&pcm, &options, &controls, processors)
+            .is_err());
+    }
+    assert_eq!(unsafe { probe_legacy_param_requests() }, requests);
+    assert_eq!(unsafe { probe_calls_get() }, calls);
+    assert_eq!(unsafe { probe_live_get() }, 0);
+}

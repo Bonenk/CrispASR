@@ -1,5 +1,5 @@
 //! Raw FFI bindings to CrispASR.
-//! Mirrors the public C API in include/whisper.h.
+//! Mirrors the public C API in include/crispasr.h and include/crispasr_session.h.
 
 use std::ffi::{c_char, c_float, c_int, c_void};
 
@@ -23,6 +23,23 @@ pub struct WhisperContextParams(c_void);
 pub const CRISPASR_SAMPLING_GREEDY: c_int = 0;
 pub const CRISPASR_SAMPLING_BEAM_SEARCH: c_int = 1;
 
+/// Built-in Whisper DTW alignment-head presets (public C enum values).
+pub const CRISPASR_AHEADS_NONE: c_int = 0;
+pub const CRISPASR_AHEADS_N_TOP_MOST: c_int = 1;
+pub const CRISPASR_AHEADS_CUSTOM: c_int = 2;
+pub const CRISPASR_AHEADS_TINY_EN: c_int = 3;
+pub const CRISPASR_AHEADS_TINY: c_int = 4;
+pub const CRISPASR_AHEADS_BASE_EN: c_int = 5;
+pub const CRISPASR_AHEADS_BASE: c_int = 6;
+pub const CRISPASR_AHEADS_SMALL_EN: c_int = 7;
+pub const CRISPASR_AHEADS_SMALL: c_int = 8;
+pub const CRISPASR_AHEADS_MEDIUM_EN: c_int = 9;
+pub const CRISPASR_AHEADS_MEDIUM: c_int = 10;
+pub const CRISPASR_AHEADS_LARGE_V1: c_int = 11;
+pub const CRISPASR_AHEADS_LARGE_V2: c_int = 12;
+pub const CRISPASR_AHEADS_LARGE_V3: c_int = 13;
+pub const CRISPASR_AHEADS_LARGE_V3_TURBO: c_int = 14;
+
 /// Progress callback for long-form (chunked) transcription (issue #208).
 /// `Option<...>` so a null pointer clears the callback (C `NULL`).
 pub type CrispasrProgressCallback =
@@ -30,6 +47,8 @@ pub type CrispasrProgressCallback =
 
 extern "C" {
     // --- Lifecycle ---
+    // Preserve the Rust spelling; pointer arguments require the native by-ref ABI.
+    #[link_name = "whisper_init_from_file_with_params_by_ref"]
     pub fn whisper_init_from_file_with_params(
         path: *const c_char,
         params: *const WhisperContextParams,
@@ -39,8 +58,15 @@ extern "C" {
     pub fn whisper_free(ctx: *mut WhisperContext);
     pub fn whisper_free_params(params: *mut WhisperFullParams);
     pub fn whisper_free_context_params(params: *mut WhisperContextParams);
+    pub fn crispasr_ctx_params_set_dtw(
+        params: *mut WhisperContextParams,
+        enable: bool,
+        aheads_preset: c_int,
+        n_top: c_int,
+    );
 
     // --- Inference ---
+    #[link_name = "whisper_full_by_ref"]
     pub fn whisper_full(
         ctx: *mut WhisperContext,
         params: *const WhisperFullParams,
@@ -50,8 +76,30 @@ extern "C" {
 
     pub fn whisper_full_default_params_by_ref(strategy: c_int) -> *mut WhisperFullParams;
 
+    /// Pointer-parameter parallel decode with native progress tracking.
+    pub fn crispasr_transcribe_parallel_by_ref(
+        ctx: *mut WhisperContext,
+        params: *const WhisperFullParams,
+        samples: *const c_float,
+        n_samples: c_int,
+        n_processors: c_int,
+    ) -> c_int;
+
     // --- Results ---
     pub fn whisper_full_n_segments(ctx: *mut WhisperContext) -> c_int;
+    pub fn whisper_full_n_tokens(ctx: *mut WhisperContext, i_segment: c_int) -> c_int;
+    pub fn whisper_full_get_token_text(
+        ctx: *mut WhisperContext,
+        i_segment: c_int,
+        i_token: c_int,
+    ) -> *const c_char;
+    pub fn whisper_full_get_token_id(
+        ctx: *mut WhisperContext,
+        i_segment: c_int,
+        i_token: c_int,
+    ) -> i32;
+
+    pub fn crispasr_token_dtw_t(ctx: *mut WhisperContext, i_segment: c_int, i_token: c_int) -> i64;
 
     pub fn whisper_full_get_segment_text(
         ctx: *mut WhisperContext,

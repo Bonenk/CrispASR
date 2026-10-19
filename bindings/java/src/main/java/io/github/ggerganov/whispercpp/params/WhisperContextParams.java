@@ -68,22 +68,109 @@ public class WhisperContextParams extends Structure {
         dtw_aheads_preset = preset;
     }
 
+    /** Pointer-width-aware native layout; the public fields remain Java configuration values. */
+    public static class SizeT extends IntegerType {
+        public SizeT() {
+            this(0);
+        }
+        public SizeT(long value) {
+            super(Native.SIZE_T_SIZE, value, true);
+        }
+    }
+    public static class NativeAheads extends Structure {
+        public SizeT n_heads = new SizeT();
+        public Pointer heads;
+        @Override
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("n_heads", "heads");
+        }
+    }
+    public static class NativeLayout extends Structure {
+        public CBool use_gpu, flash_attn;
+        public int gpu_device;
+        public CBool dtw_token_timestamps;
+        public int dtw_aheads_preset, dtw_n_top;
+        public NativeAheads dtw_aheads;
+        public SizeT dtw_mem_size;
+        public NativeLayout(Pointer pointer) {
+            super(pointer);
+        }
+        @Override
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("use_gpu", "flash_attn", "gpu_device", "dtw_token_timestamps",
+                    "dtw_aheads_preset", "dtw_n_top", "dtw_aheads", "dtw_mem_size");
+        }
+    }
+    public static ByValue readNative(Pointer pointer) {
+        NativeLayout nativeParams = new NativeLayout(pointer);
+        nativeParams.read();
+        ByValue out = new ByValue();
+        out.use_gpu = nativeParams.use_gpu;
+        out.flash_attn = nativeParams.flash_attn;
+        out.gpu_device = nativeParams.gpu_device;
+        out.dtw_token_timestamps = nativeParams.dtw_token_timestamps;
+        out.dtw_aheads_preset = nativeParams.dtw_aheads_preset;
+        out.dtw_n_top = nativeParams.dtw_n_top;
+        out.dtw_aheads = new WhisperAheads.ByValue();
+        out.dtw_aheads.n_heads = nativeParams.dtw_aheads.n_heads.longValue();
+        out.dtw_aheads.heads = nativeParams.dtw_aheads.heads;
+        out.dtw_mem_size = nativeParams.dtw_mem_size.longValue();
+        return out.snapshot();
+    }
+    /** Retain an independent copy of custom alignment heads for the model lifetime. */
+    public ByValue snapshot() {
+        ByValue out = new ByValue();
+        out.use_gpu = new CBool(use_gpu == null ? 1 : use_gpu.longValue());
+        out.flash_attn = new CBool(flash_attn == null ? 1 : flash_attn.longValue());
+        out.gpu_device = gpu_device;
+        out.dtw_token_timestamps =
+                new CBool(dtw_token_timestamps == null ? 0 : dtw_token_timestamps.longValue());
+        out.dtw_aheads_preset = dtw_aheads_preset;
+        out.dtw_n_top = dtw_n_top;
+        if (dtw_mem_size < 0 || (Native.SIZE_T_SIZE == 4 && dtw_mem_size > 0xffffffffL))
+            throw new IllegalArgumentException("Invalid DTW memory size");
+        out.dtw_mem_size = dtw_mem_size;
+        out.dtw_aheads = new WhisperAheads.ByValue();
+        long count = dtw_aheads == null ? 0 : dtw_aheads.n_heads;
+        if (count < 0 || count > Integer.MAX_VALUE / 8)
+            throw new IllegalArgumentException("Invalid alignment-head count");
+        out.dtw_aheads.n_heads = count;
+        if (count > 0) {
+            if (dtw_aheads.heads == null)
+                throw new IllegalArgumentException("Missing alignment heads");
+            byte[] bytes = dtw_aheads.heads.getByteArray(0, (int) (count * 8));
+            Memory owned = new Memory(bytes.length);
+            owned.write(0, bytes, 0, bytes.length);
+            out.dtw_aheads.heads = owned;
+        }
+        return out;
+    }
+    public void writeNative(Pointer pointer) {
+        NativeLayout out = new NativeLayout(pointer);
+        out.use_gpu = use_gpu;
+        out.flash_attn = flash_attn;
+        out.gpu_device = gpu_device;
+        out.dtw_token_timestamps = dtw_token_timestamps;
+        out.dtw_aheads_preset = dtw_aheads_preset;
+        out.dtw_n_top = dtw_n_top;
+        out.dtw_aheads.n_heads = new SizeT(dtw_aheads.n_heads);
+        out.dtw_aheads.heads = dtw_aheads.heads;
+        out.dtw_mem_size = new SizeT(dtw_mem_size);
+        out.write();
+    }
+
     @Override
     protected List<String> getFieldOrder() {
-        return Arrays.asList(
-            "use_gpu",
-            "flash_attn",
-            "gpu_device",
-            "dtw_token_timestamps",
-            "dtw_aheads_preset",
-            "dtw_n_top",
-            "dtw_aheads",
-            "dtw_mem_size"
-        );
+        return Arrays.asList("use_gpu", "flash_attn", "gpu_device", "dtw_token_timestamps",
+                "dtw_aheads_preset", "dtw_n_top", "dtw_aheads", "dtw_mem_size");
     }
 
     public static class ByValue extends WhisperContextParams implements Structure.ByValue {
-        public ByValue() { super(); }
-        public ByValue(Pointer p) { super(p); }
+        public ByValue() {
+            super();
+        }
+        public ByValue(Pointer p) {
+            super(p);
+        }
     }
 }

@@ -184,10 +184,6 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
     // them could answer it. Same shape as the earlier gap where a binding could
     // opt out of marking (synthesize_raw) but had no way to mark the result —
     // a duty you can be told about and cannot discharge is not a mechanism.
-    //
-    // The ruby entry names the registered function, so it follows the
-    // rb_context_guard_* symbol the context-guard refactor registered the
-    // calls through (tools/sync_ruby_context_guards.py).
     struct Binding {
         const char* file;
         const char* needle;
@@ -208,6 +204,9 @@ TEST_CASE("every binding can answer the speaker-identity question", "[unit][comp
     for (const auto& b : kBindings) {
         INFO("binding=" << b.file);
         REQUIRE(contains(read_file(b.file), b.needle));
+        if (std::string(b.file) == "bindings/ruby/ext/ruby_crispasr_session.c") {
+            REQUIRE(contains(read_file(b.file), "RB_CONTEXT_WRAPPER_2(rb_session_set_speaker_identity);"));
+        }
     }
 }
 
@@ -547,6 +546,8 @@ TEST_CASE("every binding that can opt out of marking can also mark", "[unit][com
     SECTION("ruby") {
         REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
                          "\"watermark_embed\", rb_context_guard_rb_watermark_embed"));
+        REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
+                         "RB_CONTEXT_WRAPPER_1(rb_watermark_embed);"));
     }
     SECTION("java") {
         REQUIRE(contains(read_file("bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java"),

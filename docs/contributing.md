@@ -723,8 +723,62 @@ struct by value. Use `crispasr_transcribe_parallel_by_ref` for parallel inferenc
 with progress tracking. Retain the language/prompt/VAD-model string storage
 until inference returns, and free opaque parameter objects on every path.
 `tests/build_legacy_wrapper_probe.py` compiles the literal runtime setters and
-parallel/token adapters against the real Whisper structs; Python, C# and Dart
-exercise these adapters with a model-free decoder.
+parallel/token adapters against the real Whisper structs; Python, C#, Dart and
+Java exercise these adapters with a model-free decoder. Rust's legacy opaque
+pointer declarations preserve their Rust names but link to the actual native
+`*_by_ref` symbols; the Go/Rust fixture keeps the wrong by-value initializer as
+an aborting trap and exercises the deprecated Rust path too.
+Count the parallel pointer export independently: a successful result from
+`whisper_full_parallel` alone does not prove CrispASR progress tracking. Go's
+parallel progress closures must retire on both success and native failure.
+Rust's PCM language detector must bound its native output scan and reject
+negative/nonfinite probabilities, empty codes and malformed UTF-8; zero
+probability is a valid result. Model progress frequency and detection accuracy
+require separate model acceptance.
+
+DTW must be configured before context creation. Native defaults enable flash
+attention, and the loader disables DTW if both remain enabled. The shared
+`crispasr_ctx_params_set_dtw` helper therefore disables flash attention when
+DTW is enabled; disabling DTW leaves that choice unchanged. Probe with the
+actual native default, not a zeroed fake flash flag. The literal native helper
+policy is checked by `test_python_legacy_pointer.py`; Go/Rust probes also check
+preset mappings, top-layer validation, context cleanup and indexed DTW output.
+The high-level Go DTW constructor now has an operation test in addition to
+package compilation. Go's hosted wrapper contract enables the race detector;
+callback registry locks must be released before invoking user callbacks. Registry
+locking alone does not serialize same-context inference and close.
+
+Legacy token adapters must copy both chosen-token and candidate text before
+native buffers can be reused or the model closed. Preserve raw UTF-8 fragments
+and native timing/probability sentinels. Validate segment/token indices and
+counts before indexed native access, bound alternative text retries, and verify
+the declared length plus terminator before copying. Poison the output buffer in
+probes so unwritten terminators cannot pass accidentally. Go's owned snapshots
+also have a high-level optional capability: keep existing public interfaces and
+result struct literals compatible when adding detailed results. Rust's per-call
+alternative capture reuses `TranscribeOptions` instead of adding required fields.
+
+The Rust `WhisperDecodeControls` companion carries the remaining scalar options
+without breaking old options literals. Prepare/validate language and prompt
+C strings before native parameter allocation, and keep their owner alive until
+inference and parameter destruction finish. Test unset versus explicit false
+and zero against distinct native defaults, on both sequential and parallel
+routes. The Go/Rust fixture compiles all `crispasr_params_set_*` definitions from
+the actual C++ runtime; do not replace those with handwritten setter bodies.
+Its source-family inventory is only a completeness tripwire, alongside compiled
+field/lifetime/cleanup operation probes. Raw full-params fields and callback
+controls outside that helper family still require their own audit.
+
+
+Java native defaults must be copied into Java-owned parameter storage, then
+freed with the matching native destructor; never `Native.free()` a C++-allocated
+parameter object. Forward every context option, deep-copy custom heads for the
+loaded model, and retain callback functions through inference and GC. A short
+operation lease must reject close/re-entry across callback threads without
+holding the Java monitor throughout native execution. Test foreign-thread
+callbacks, repeated close, failed initialization and literal native struct sizes.
+Legacy Java full-params layout remains a deliberate 64-bit-only exclusion until
+its size_t fields have a target-tested native layout.
 
 `crispasr_parakeet_transcribe` takes an **int64 centisecond offset** as its fourth
 argument. It has no language-string argument. Use unified session language hints

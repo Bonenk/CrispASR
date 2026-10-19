@@ -1066,6 +1066,8 @@ CRISPASR_API int crispasr_transcribe_parallel_by_ref(struct whisper_context* ctx
 //
 // crispasr_ctx_params_set_dtw: configure DTW token-level timestamps
 // on a whisper_context_params before context init.
+// Enabling DTW disables incompatible flash attention. Disabling DTW leaves
+// the current flash-attention setting unchanged.
 // crispasr_token_dtw_t: retrieve the DTW timestamp for a given token.
 CRISPASR_API void crispasr_ctx_params_set_dtw(struct whisper_context_params* p, bool enable, int aheads_preset,
                                               int n_top);

@@ -4,8 +4,34 @@
 #include "crispasr_session.h"
 #include <cstdlib>
 #include <cstring>
+#include <thread>
 static int live, contexts, calls, processors, dtw, mode, saw_zero;
+static whisper_context_params captured_context{};
 extern "C" {
+int probe_legacy_gpu_device() {
+    return captured_context.gpu_device;
+}
+int probe_legacy_use_gpu() {
+    return captured_context.use_gpu;
+}
+int probe_legacy_flash() {
+    return captured_context.flash_attn;
+}
+int probe_legacy_head_count() {
+    return int(captured_context.dtw_aheads.n_heads);
+}
+int probe_legacy_head_value() {
+    return captured_context.dtw_aheads.heads
+               ? captured_context.dtw_aheads.heads[0].n_text_layer * 100 + captured_context.dtw_aheads.heads[0].n_head
+               : -1;
+}
+uint64_t probe_legacy_dtw_memory() {
+    return captured_context.dtw_mem_size;
+}
+int probe_legacy_full_size() {
+    return sizeof(whisper_full_params);
+}
+
 int probe_legacy_live() {
     return live;
 }
@@ -28,8 +54,11 @@ void probe_legacy_mode(int value) {
     mode = value;
 }
 whisper_context_params* whisper_context_default_params_by_ref() {
+    if (mode == 4)
+        return nullptr;
     auto p = new whisper_context_params{};
     p->use_gpu = true;
+    p->flash_attn = true;
     ++live;
     return p;
 }
@@ -57,8 +86,9 @@ void whisper_free_params(whisper_full_params* p) {
     }
 }
 whisper_context* whisper_init_from_file_with_params_by_ref(const char* path, whisper_context_params* p) {
+    captured_context = *p;
     dtw = p->dtw_token_timestamps ? (int)p->dtw_aheads_preset * 100 + p->dtw_n_top : 0;
-    if (!std::strcmp(path, "fail"))
+    if (std::strstr(path, "fail"))
         return nullptr;
     ++contexts;
     return reinterpret_cast<whisper_context*>(uintptr_t(0x100000001ULL));
@@ -77,6 +107,14 @@ int whisper_full_by_ref(whisper_context* ctx, whisper_full_params* p, const floa
         return -8;
     if (p->initial_prompt && std::strcmp(p->initial_prompt, "Grüße"))
         return -7;
+    if (p->progress_callback) {
+        auto callback = [&]() { p->progress_callback(ctx, nullptr, 37, p->progress_callback_user_data); };
+        if (mode == 6) {
+            std::thread producer(callback);
+            producer.join();
+        } else
+            callback();
+    }
     return 0;
 }
 int whisper_full_parallel(whisper_context* ctx, whisper_full_params p, const float* pcm, int n, int count) {
@@ -91,7 +129,7 @@ const char* whisper_lang_str(int) {
     return "de";
 }
 int whisper_full_n_segments(whisper_context* ctx) {
-    return mode == 1 ? 0 : 1;
+    return mode == 7 ? -1 : mode == 1 ? 0 : 1;
 }
 const char* whisper_full_get_segment_text(whisper_context* ctx, int index) {
     return "日";
