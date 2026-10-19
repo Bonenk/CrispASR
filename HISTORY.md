@@ -1,3 +1,14 @@
+## 2026-10-19 — hosted CUDA build and wrapper workflows completed
+
+CUDA bundle39215806310 completed on191815511 (sm60/sm75); this proves the
+portable build, not GPU alignment. Independent archive/provenance and27-member
+hash audit is retained in docs/alignment-cuda-bundle-audit-2026-10-19.json.
+The new tools/kaggle/alignment-cuda-memory worker passes syntax/metadata and
+exact retained147-unit/repeated-transcript preparation checks; actual GPU
+execution remains in PLAN.md. Arabic CTC/Java39214206020 and binding
+contracts39215435420 are green. Their remaining artifact/model acceptance and
+the approved execution order are tracked in PLAN.md. No release was tagged.
+
 ## Bounded CTC CPU model/seam acceptance audited — 2026-10-19
 
 Run39212307554/source62e598ca0 completes the actual Japanese CTC CPU worker,
@@ -17,10 +28,10 @@ real conversational recording. No CUDA peak-memory, original encoder, WER,
 Subtimer or new release acceptance follows. The separate same-run short DP
 medians are1.430403ms off and1.5135695ms on; no robust DP speedup is established.
 
-Actual CUDA preparation is dispatched: frozen191815511 on
+Actual CUDA preparation completed: frozen191815511 on
 `diag/550-cuda-memory-20261019`, build39215806310, reusing the existing portable
 CLI/shared-ABI CUDA package workflow. No model/GPU execution is claimed from
-that queued build. Concrete long-input/cache/device-memory acceptance is scoped
+that successful build. Concrete long-input/cache/device-memory acceptance is scoped
 in PLAN.md; the issue remains open and has a progress/evidence comment.
 
 ## High-level Go legacy lifecycle and language repairs — 2026-10-19

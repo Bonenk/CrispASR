@@ -3,8 +3,8 @@
 ## Character-alignment hosted follow-up
 
 The standalone Java preflight is repaired and all four strict Java contracts
-pass; see HISTORY.md. Inspect the fresh `CTC character alignment` workflow after
-this repair before accepting actual Arabic Q4/model/Java span parity. The prior
+pass; see HISTORY.md. Fresh workflow39214206020 is green; independently audit
+its retained model/Java outputs before accepting Arabic Q4/model/Java span parity. The prior
 run39212277740 failed before model work and is not acceptance.
 
 ## Active — issue550 real CUDA long-input memory/reuse
@@ -14,7 +14,12 @@ audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
 implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
 
 Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
-is dispatched on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+completed successfully on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+Claimed by the maintainer coordinator: actual GPU execution and output audit.
+The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
+archive/provenance and27 member hashes. Worker and method:
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.1).
+Source/model/fixture pins are frozen; GPU acceptance is still pending.
 Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
 this task's acceptance concerns CTC alignment memory. Inspect build provenance,
 source/library/archive hashes and dependency closure before GPU execution.
@@ -522,24 +527,37 @@ the old stale-cache hypothesis or reimplement that fix. Audit the worker's
 existing runs/results and fresh/reused-session/multi-turn acceptance before
 claiming full hardware validation; this #549 task did not execute that worker.
 
-## Ordered roadmap
+## Ordered roadmap — maintainer-approved execution order (2026-10-19)
 
-The immediate handoff priorities above supersede this longer-term research order.
+1. **Close issue550 GPU acceptance.** Audit successful CUDA bundle39215806310,
+   then run the pinned 45-minute short/long/short Kaggle matrix above. Publish
+   evidence before closing the issue; a portable build alone is not GPU proof.
+2. **Close wrapper acceptance and implementation gaps.** Audit green Arabic
+   CTC/Java39214206020 and binding contracts39215435420. Validate high-level
+   Go lifetime/re-entry on a real small model, then assess an owned low-level
+   Go adapter and remaining language lifecycle/callable-ledger gaps. Validate
+   Japanese multi-window ASR for549 separately from CTC forced alignment.
+3. **Finish PR521.** Rebase on current main, inspect the complete runtime diff,
+   repair genuine CI failures and preserve contributor history. Merge only
+   accepted scope; keep original/native clone failures and quality gates intact.
+4. **Release accepted work.** Require exact-tip CI/lint and package/wheel
+   relocation/load checks, reconcile comprehensive notes, then use
+   scripts/bump-version.sh, publish and inspect assets. Do not hold accepted
+   release scope indefinitely for unrelated research; do not advertise failed
+   or hardware-unvalidated model paths.
+5. **Resume bounded numerical work.** Echo: one identical-input projection
+   precision counterfactual. MiMo: actual failing71-row Q/K/V, masks, scores,
+   probabilities and pre-output capture. Dia remains experimental until real
+   speech acceptance; do not repeat completed sweeps without a new hypothesis.
+6. **Maintain the handoff continuously.** Archive completed work in HISTORY.md;
+   give every PLAN.md item an entry point, exact next action and acceptance gate.
+   Separate reporter/hardware/gated-asset waits; keep machine details ignored.
+   Drama3 stays deferred outside active/release scope.
 
-1. **Dia correctness:** validate current-main speech, reconcile reference/diff
-   wiring, then broaden prompts/seeds before GPU/Q4 and profiling.
-2. **CANN hardware preparation:** compose fallback/ACL controls and execute on
-   physical Ascend when available; do useful CPU/SDK preparation meanwhile.
-3. **Remaining PR decisions:** salvage independently accepted #492/#521 pieces
-   with contributor history intact; retain failed quality/performance gates.
-4. **Quantization:** bounded Echo Q4 and Nemotron precision experiments.
-5. **Documentation:** keep this plan current and archive terminal work promptly.
-6. **Release:** freeze accepted scope and run immutable package/wheel validation
-   before scripts/bump-version.sh, tag and publication.
-
-Hardware waits do not justify repeating accepted diagnostics or waiting hours
-without independent useful work. GH handles heavy CPU/builds; Kaggle handles
-actual supported GPU tests per ../kaggle_usage.md. Neither supplies Ascend.
+General CI39216228487 on65b851a91 is queued at this checkpoint; green component
+workflows do not replace exact-tip general CI. Hardware waits do not justify
+repeating accepted diagnostics. GH handles heavy CPU/builds; Kaggle handles
+actual supported GPU tests per the external guide. Neither supplies Ascend.
 
 ## Dia correctness — current dependencies
 
