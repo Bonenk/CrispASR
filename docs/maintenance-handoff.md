@@ -1,4 +1,4 @@
-# Maintainer handoff — 2026-10-18
+# Maintainer handoff — 2026-10-19
 
 Start with AGENTS.md, the optional sibling development guide, and PLAN.md.
 Machine-specific paths, session names and operational recovery instructions belong
@@ -7,9 +7,15 @@ in gitignored CLAUDE.md. Public receipts use `${CRISPASR_STORAGE}` and
 Historical artifact hashes describe original retained bytes; sanitizing a location
 in a tracked receipt does not change an immutable public artifact's hash.
 
-This update reconciles #217/#549 and the integrated #547 source fix. Other
-fronts below retain their October 17 audit state; inspect current evidence
-before assuming their queued/pending labels are still current.
+Whisper CPU model run39211685024 (sourceafeffa1a5) is complete and independently
+audited:12 native/six Python cases pass exact raw timestamp bounds. Current
+priority is bounded long CTC alignment acceptance39212307554 (source62e598ca0),
+wrapper lifecycle/callable gaps, updated PR521 and release validation. Inspect
+the pending alignment artifacts before claiming success. Drama3 is
+outside active/release scope by maintainer decision. PLAN.md owns remaining
+work; completed Japanese/Echo proof is in HISTORY.md and the new audit receipts.
+Other dated fronts below need current evidence before their pending labels are
+used. Physical host paths and collector details stay in ignored CLAUDE.md.
 
 ## What is integrated
 
@@ -18,8 +24,8 @@ its observer-setup repair, are now on main with original authorship preserved.
 They add diagnostic tools; they do not change inference arithmetic or defaults.
 The attention source02bd2aee passed all13 CI jobs39003202215 and all10 lint
 jobs39003053402. Echo repair sourcec2deea37 passes six local actual released
-Transformers5.6.0/Torch2.6CPU controls and all secret checks. Its hosted model job
-is still pending. Earlier source967a62e0 passes all10 lint39001788270 jobs but
+Transformers5.6.0/Torch2.6CPU controls and all secret checks. Its hosted model job39008086579 is complete and independently audited; see
+[index-echo-owned-ffn-audit-2026-10-19.json](index-echo-owned-ffn-audit-2026-10-19.json). Earlier source967a62e0 passes all10 lint39001788270 jobs but
 its first heavy model diagnostic failed; that failure remains archived.
 
 The combined main tip needs its own applicable CI/lint. Check Actions for the
@@ -33,35 +39,37 @@ character-CTC workspace is opt-in (`CRISPASR_CTC_ALIGN_OPT=1`, default off).
 A separate subword workspace now has its own default-off gate
 `CRISPASR_SUBWORD_CTC_ALIGN_OPT=1` and five GCC/Clang acceptance tests; the
 subword complete-path/ABI failure fix remains integrated. The character synthetic heavy run39112822169 passes all seven shapes;
-full-library, subword hosted and actual-model acceptance remain pending. The
+the Japanese actual-model CPU proof is independently audited; long-form and
+hardware validation remain pending. The
 [comparison and clean-room audit](alignment-cleanroom-2026-10-18.md) records
 scope, local synthetic measurements and the absence of a matched Subtimer
 accuracy/runtime benchmark. No external code or fitted asset is ported/vendored.
 
 ## First actions
 
-1. Check both Echo jobs below and current main CI/lint. Retrieve terminal logs,
-   artifacts and public checkpoints before changing the frozen worker.
-2. Audit the integrated issue547 utterance-open throttle fix `dd14099c3` and
-   the existing `tools/ci-heavy/issue547_nemotron_multiturn.py` worker/results.
-   Do not reimplement that fix or conflate remaining hardware/reporter
-   validation with speculative cache teardown or experimental Q4 promotion.
-3. Audit Echo's actual same-input FFN tensors if produced. Only then propose a
-   bounded precision change. If the job fails, preserve it and repair a fresh
-   branch/worktree; do not mutate the tested source or reuse its fixture prefix.
-4. Continue MiMo's actual same-input attention capture, then the other quality
-   investigations below. Hardware and reporter waits are separate dependencies.
-5. Freeze accepted release scope, validate exact packages/wheels and finalize
-   release notes after applicable CI. Research failures need explicit scope,
-   rather than unsupported fixes or relaxed quality gates.
+1. Preserve the completed [Whisper CPU model audit](whisper-wrapper-model-audit-2026-10-19.json).
+   Extend actual VAD-model, beam/UTF-8, callback/device/platform and lifecycle
+   scope rather than repeating the accepted12 native/six Python cases.
+2. Inspect issue550 run39212307554: short parity first, then44.52-second repeated
+   speech, full/10s/30s encoder seams and default C ABI/Python offset parity.
+   Follow with actual long-input CUDA memory/reuse; host DP/logits remain linear
+   in recording length. VAD is unused in align-only.
+3. Finish wrapper lifecycle/callable ledger gates from PLAN.md. Same-context
+   inference/close/re-entry still requires caller serialization; do not infer
+   concurrent safety from synchronized callback maps.
+4. Rebase/review PR521 after main's Python expectation/deprecated-launcher fixes.
+   CUDA11.8's old failure is a Chocolatey504 setup failure. Preserve unchanged
+   original/native clone failures and contributor history when deciding scope.
+5. Freeze accepted release scope, inspect exact package/wheel CI, then finalize
+   notes/tag/publication. No release from queued jobs or fixture-only claims.
 
 ## Concrete remaining tasks
 
 | Front | Next bounded action and entry points | Acceptance / dependency |
 |---|---|---|
-| Alignment / issue217 | Character synthetic benchmark `567fc431e`/heavy `39112822169` passes all seven shapes (audited aggregate receipt); combined contract source `deaf9c010`, CI `39113844983`, lint `39113846749`. Subword workspace source `a1434c9b2` has heavy `39115492999`, CI `39115494689` and lint `39115496152` queued; audit its exact-source artifacts. The hosted-only actual-model worker `tools/ci-heavy/alignment_model_profile.py` now pins a licensed 6.36s Japanese FLEURS recording, retains native logits, and checks real C ABI/Python/CLI parity; source `08aea3537` is frozen on `diag/217-japanese-model-profile-20261018`, heavy `39116431721` queued; audit per its method. Boundary-labeled corpus acceptance remains separate. See PLAN.md and the clean-room audit. | Six character-kernel, four subword-contract and five subword-workspace tests pass locally; character larger synthetic evidence is accepted; full-library/subword/model evidence is pending. Preserve default-off gating, exact timestamps and model-family distinctions. No direct Subtimer performance/quality ranking is established. |
+| Alignment / issue217 | Character synthetic benchmark `567fc431e`/heavy `39112822169` passes all seven shapes (audited aggregate receipt); combined contract source `deaf9c010`, CI `39113844983`, lint `39113846749`. Subword workspace source `a1434c9b2` has heavy `39115492999`, CI `39115494689` and lint `39115496152` queued; audit its exact-source artifacts. The hosted-only actual-model worker `tools/ci-heavy/alignment_model_profile.py` now pins a licensed 6.36s Japanese FLEURS recording, retains native logits, and checks real C ABI/Python/CLI parity; source `08aea3537` is frozen on `diag/217-japanese-model-profile-20261018`, heavy `39116431721` complete and independently audited; see the new audit receipt. Boundary-labeled corpus acceptance remains separate. See PLAN.md and the clean-room audit. | Six character-kernel, four subword-contract and five subword-workspace tests pass locally; character larger synthetic evidence is accepted; actual Japanese CPU model proof is accepted within its stated scope; long-form/GPU and labeled-boundary proof remain pending. Preserve default-off gating, exact timestamps and model-family distinctions. No direct Subtimer performance/quality ranking is established. |
 | Python metadata / issue549 | Preserve accepted source `741141118`, CI `39104662258`, lint `39104663518`. Japanese slice/gap-fill and legacy overlap now preserve owned token blocks; shared repair fixes tied-frame duplication, and both explicit-output splitters retain same-frame continuation tokens with their owning word. Final source `ebf69c437` is frozen on `diag/549-token-boundaries-20261018`: CI `39117921894`/lint `39117923785` queued. Audit those, then actual Japanese ASR multi-window fixtures per PLAN.md. #217 CTC aligner evidence is a different route. | Existing API fixes pass all 13 CI/10 lint, 2,033 unit cases and 11 metadata tests. All 12 metadata and six ownership tests pass under GCC/Clang, including 2,000 frozen-grouping comparisons; fresh exported-getter CI and a licensed Japanese ASR clip remain. Audit generic CLI timestamp filtering separately before a whole-pipeline parity claim. Not yet in v0.8.43 wheels. |
-| Echo9B Q4 / issue485 | Inspect [heavy39008086579](https://github.com/CrispStrobe/CrispASR/actions/runs/39008086579) and [lint39008088033](https://github.com/CrispStrobe/CrispASR/actions/runs/39008088033), sourcec2deea373f9bd27f526f873bc01cb97068e1bff7. Worker: tools/ci-heavy/echo_owned_ffn_run.py; method: tools/ci-heavy/echo-owned-ffn/README.md. Public dataset cstr/crispasr-regression-fixtures, prefix index-echo-9b/owned-ffn-20261017/v2. | First require native FFN OFF/ON/OFF block/logit/prompt identity and complete32-layer JFK/ZH actual-original replay. Independently verify every payload/source/input/physical-weight ledger, cosine, both norms and relative errors. No numerical9B result exists from failedv1. |
+| Echo9B Q4 / issue485 | Inspect [heavy39008086579](https://github.com/CrispStrobe/CrispASR/actions/runs/39008086579) and [lint39008088033](https://github.com/CrispStrobe/CrispASR/actions/runs/39008088033), sourcec2deea373f9bd27f526f873bc01cb97068e1bff7. Worker: tools/ci-heavy/echo_owned_ffn_run.py; method: tools/ci-heavy/echo-owned-ffn/README.md. Public dataset cstr/crispasr-regression-fixtures, prefix index-echo-9b/owned-ffn-20261017/v2. | Completed v2 audit verifies1,153 payloads,72 shared tensor triples and512 same-input metric rows. Use the audited attribution for a bounded new intervention; source weights were not re-downloaded. No Q4/speech/GPU/default promotion. |
 | Echo targeted precision | From the completed attribution, identify gate/up/product/down error on identical native inputs, including original down projection on native down input. Choose one measured intervention; use a new public prefix and exact model/source pins. | Re-run complete original EN/ZH stages, magnitudes, cache behavior, decoded/subtitle and TTS-ASR checks. All seven existing Q4 recipes remain rejected. Component attribution alone cannot promote a recipe. |
 | Nemotron streaming / issue547 | Source fix `dd14099c3` is integrated; audit the dedicated multi-turn worker and current results before new diagnosis. Read [the complete report](https://github.com/CrispStrobe/CrispASR/issues/547) and any new comments. Exact WAV/PCM and Python repro are offered but not attached as of handoff. Reproduce eb633d90/v0.8.43 and current main, CPU F16 first: four reported Spanish turns with1.2s gaps, stdin s16le16k mono, --stream --stream-json --vad, final-on-silence400ms; compare3000/500ms step, redecode/prefix, reordered and fresh-process controls. Entry points: examples/cli/crispasr_run.cpp, crispasr_backend_nemotron.cpp, src/nemotron.cpp. | Assert every standalone-recognized turn retains a nonempty correct final and appropriate partials across repeated reset cycles, ordering and packet sizes. Capture VAD input spans, consumed samples, frontend/encoder counters, host/device caches and RNNT state. Then C-ABI/session, Q4 and Windows CPU validation. Reporter fixture/Windows evidence is pending. |
 | MiMo / closed PR492 | Add actual same-input Q/K/V, mask, scores/probabilities and pre-output-projection capture on the71-row fixture. Entry points: src/core/attention.h existing DBG capture hooks, src/mimo_asr.cpp extraction API, tools/ci-heavy/attention-owned-* diagnostic. Use native OFF/ON/OFF controls and replay original operands, not two separately drifted histories. | Find the earliest unequal operator with norms/relative error. The old capture has no Q/K/V. The tiny scalar F16 accumulator mechanism does not explain71-row tiled prefill. Preserve the0.5% hidden/logit gate, original-stage and real CLI/C-ABI speech checks. Do not repeat old BLAS/cache-read sweeps or reopen the complete closed PR. |

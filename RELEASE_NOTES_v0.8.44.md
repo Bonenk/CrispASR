@@ -672,9 +672,9 @@ docs/dia-sampler-device-results-2026-10-17.json.
 Segment and available token/DTW times are bounded to the supplied decoder
 window before callbacks, including wrapped output. DTW callbacks report the
 new-segment count correctly after earlier windows. Six literal native emission
-regressions pass, alongside35 parallel/VAD cases. Hosted actual-model rerun is
-still required; the preceding run passed bounded sequential and exposed the
-parallel timestamp overrun. No model-quality or GPU acceptance is claimed.
+regressions pass, alongside35 parallel/VAD cases. Hosted run39211685024 now passes12 native and six Python cases; an independent
+raw/hash audit confirms exact input/segment bounds, DTW and owned alternatives.
+No model-quality, GPU or concurrent-lifecycle acceptance is claimed.
 
 ### Long-input CTC alignment (implementation; validation pending)
 
@@ -684,3 +684,12 @@ context while retaining one global transcript alignment. CLI align-only honors
 unchanged; zero explicitly disables windows. Nine tiny runtime tests pass.
 Actual-model seam and long-file CUDA memory validation remain pending. Host
 logits/DP memory still scales with duration, and align-only does not apply VAD.
+
+### Audited alignment and quantization diagnostics
+
+Actual Japanese CTC CPU profiling now has independently verified native logits,
+reference/DP, CLI and Python/C ABI output. The DP heap reduction is substantial;
+its measured0.055ms saving is negligible beside4.59s encoder inference on this
+clip. Echo9B's32-layer same-input FFN attribution is also independently audited.
+These diagnostics do not establish long-form boundary accuracy, an accepted Q4
+recipe or GPU performance. Drama3 is excluded from this release's active scope.

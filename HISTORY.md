@@ -1,3 +1,65 @@
+## Whisper actual-model CPU acceptance audited — 2026-10-19
+
+Run39211685024/sourceafeffa1a5 passes12 native pointer cases (DTW off/on ×
+1/2/3 processors × full/bounded input) and six Python metadata cases. Actual
+library/dependency, native/probe source, compiled probe and audio identities are
+independently verified. Model revision/hash, audio and probe source match the
+preceding failed run. The audit checks all258 native token rows,516 alternative
+rows,103 available DTW rows and Python162 tokens/324 alternatives/68 DTW values.
+Every available raw timestamp is inside its exact segment and selected input
+bounds; this independent check needs no timestamp margin. The verified worker
+also asserts scalar/struct equality, progress retirement and Python owned result
+retention through reuse/close. [Audit receipt](docs/whisper-wrapper-model-audit-2026-10-19.json).
+
+This closes CPU tiny.en/JFK greedy pointer/Python metadata acceptance. It does
+not establish original-reference, WER, speed, actual VAD-model, GPU/other-wrapper
+or same-context concurrent lifecycle safety. Model weights were hash-checked by
+the hosted worker and were not downloaded again locally. Keep future coverage
+and release/platform gates separate from this completed matrix.
+
+## Japanese alignment and Echo FFN independent audits — 2026-10-19
+
+Japanese CPU run39116431721/source08aea3537 passes independent verification of
+all60 retained artifacts,16 frozen source snapshots, library/CLI identities,
+byte-exact finite80×4001 OFF/ON/OFF logits,22 native calls, five Python/C ABI
+calls and three CLI calls. The actual saved logits/vocabulary were independently
+replayed through the immutable own reference and current literal DP: identical
+word text/times, tracked heap1,290,804→24,568 bytes and137→56 allocations.
+These are postprocessor counters, not encoder/process RSS. On this6.36-second
+FLEURS recording the encoder median is4591.176ms; DP off/on medians are
+1.511408/1.4569045ms (1.0374×, about0.055ms saved). No long-form, manually
+labeled boundary, original encoder, GPU or Subtimer comparison is established.
+The unchanged endpoint gate allows one encoder frame beyond PCM. Both workspace
+gates remain default-off. [Verified receipt](docs/alignment-japanese-audit-2026-10-19.json).
+
+Echo CPU run39008086579/sourcec2deea373 now has independently verified hashes for
+all1,153 payloads and13 source snapshots, library identity, released original
+MLP class provenance,72 byte-exact shared OFF/ON/OFF tensor triples and all512
+same-input metric rows across32 layers and JFK/Mandarin. One hidden workflow
+snapshot omitted by Actions was recovered from the immutable anonymous public
+checkpoint and verified against the receipt/source. Actual coefficient weights
+were not downloaded again; their receipt hashes remain provenance, not a new
+independent weight-byte check. [Verified receipt](docs/index-echo-owned-ffn-audit-2026-10-19.json).
+
+On those identical captured inputs, activation-product maximum relative L2 is
+7.21e-8; gate/up errors reach6.40%/7.75%, isolated down projection8.00%, and
+complete MLP output11.26%. These are quantized component comparisons, not proof
+of a runtime activation bug or a whole-model trajectory. Layer25 Mandarin has
+the largest isolated down error. All seven failed recipes remain rejected;
+no speech/Q4/GPU/performance acceptance or production default changes follow.
+Do not repeat the completed attribution merely because older plans say queued.
+
+## PR521 CI failure triage — 2026-10-19
+
+The current PR is open and ready-for-review atc1e7b73a8. Its Linux failure is the
+stale vibevoice architecture expectation already repaired on main. Windows
+CLANG64 fails because the deprecated launcher uses EXIT_FAILURE without its
+own standard-library include; `<cstdlib>` is now included explicitly, with
+GCC/Clang syntax checks. CUDA11.8 fails before compilation when Chocolatey's
+unzip feed returns HTTP504. Rebase/review and new CI remain necessary. Original
+and native fixed cloning controls still fail the unchanged2/9 WER gate; no
+cloning-quality repair or merge is claimed.
+
 ## Issue550 bounded CTC encoder implementation — 2026-10-19
 
 The shared Canary/FastConformer alignment path now uses overlapping frame-grid

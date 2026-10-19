@@ -861,7 +861,9 @@ Whisper emission changes must also run
 `python3 tests/test_whisper_emission_bounds.py -v`. Its literal production block
 checks segment/token/DTW bounds before callbacks, wrapped output, negative
 sentinels and later-window DTW new-segment counts. Model-free callback tests do
-not replace hosted actual-model validation.
+not replace hosted actual-model validation. The scoped CPU pointer/Python
+[model audit](whisper-wrapper-model-audit-2026-10-19.json) passes12 native/six
+Python cases; extend its stated limits rather than treating it as full parity.
 
 ## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
 

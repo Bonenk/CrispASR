@@ -2,27 +2,26 @@
 
 ## Active — issue550 bounded FastConformer alignment memory
 
-Owner: maintainer coordinator. The CLI align-only path and shared C ABI still
-send full PCM through one Canary/FastConformer encoder, causing quadratic GPU
-activation growth on long recordings. Implement frame-grid-aligned overlapping
-encoder windows (30-second core, two-second context), stitch CPU logits exactly
+Owner: maintainer coordinator. Implementation62e598ca0 is on main; actual-model
+acceptance is pending in run39212307554. The prior CLI/shared C ABI sent full
+PCM through one encoder, causing quadratic GPU activation growth. The repair
+uses frame-grid-aligned overlapping encoder windows (30-second core, two-second context), stitch CPU logits exactly
 once per global frame, then run one global CTC alignment over the complete
 transcript. Keep short-input inference unchanged; avoid proportional word splits.
 Pass CLI `--chunk-seconds` to this shared implementation; bindings inherit the
 safe default. VAD remains unused in align-only and must be documented accurately.
-Prove exact frame ownership, final partial window, failures and call bounds with
-tiny tensors, then actual CPU model/window-boundary quality and genuine CUDA
+Nine tiny tests prove frame ownership, final partial window, failures and call
+bounds. Next inspect actual CPU model/window-boundary quality and genuine CUDA
 peak-memory/reuse. Host logits/DP memory still grows with duration; this is not
 an unlimited-length or constant-host-memory claim. Do not close550 before real
 long-input GPU validation. No foreign alignment implementation is used.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator (active). Next: repair callback-visible emission
-bounds exposed by hosted run39208655226, rerun the actual-model matrix, then
-fix issue550 bounded CTC encoder memory. After that audit completed Japanese
-alignment/Echo artifacts, finish wrapper lifecycle/callable gaps, review the
-updated PR521 and release accepted changes after validation.
+Owner: maintainer coordinator (active). Whisper CPU pointer/Python model proof
+and Japanese/Echo artifact audits are now complete; see HISTORY.md and receipts.
+Next inspect issue550 long-window model run39212307554, then actual CUDA memory.
+Continue wrapper lifecycle/callable gaps, updated PR521 and release acceptance.
 Go high-level parallel access and Python CI expectation repairs are complete;
 see HISTORY.md. Do not infer model acceptance from the local glue regressions.
 The Rust scalar-helper family now has compatible public controls and parallel
@@ -100,33 +99,17 @@ Recommended implementation order and concrete acceptance:
    reader lives in `bindings/go/whisper_tokens.go`; higher-level detailed access
    is in `bindings/go/pkg/whisper/token_snapshots.go`.
 
-### Native parallel follow-up: actual-model acceptance and timeline audit
+### Native parallel follow-up: remaining timeline/model-platform scope
 
-The literal parallel loop now has a model-free UBSan regression suite in
-`tests/test_whisper_parallel_runtime.py`; completed timestamp/error/silence
-repairs are archived in HISTORY.md. Keep this gate in CTest and hosted CI.
-Next, use a hosted CPU build and a small existing Whisper fixture (no local
-model downloads/native builds) to call the exported pointer ABI with 1/2/3
-processors, nonzero offsets, token timestamps, DTW and alternative capture.
-The first model attempt, [run39206481422](https://github.com/CrispStrobe/CrispASR/actions/runs/39206481422),
-passed build/load/full sequential, then failed the first bounded sequential
-segment-time check. PCM bounding is now fixed in the actual state-decoder entry;
-13 state/VAD and 22 parallel regression cases pass. The probe preserves failing
-segment rows before checking. The rerun39208655226 passes bounded sequential
-then fails parallel2 on a prediction beyond the supplied PCM. Emission bounds
-and later-window DTW callbacks are now repaired, with six red-before/green-after
-literal-emission cases. Rerun and inspect the new artifact; never accept
-the failed receipt or relax the one-second sanity margin to make it green.
-Run `tools/ci-heavy/whisper_wrapper_validate.py` through `heavy-cpu.yml` with
-`pip=numpy` and a 60-minute timeout; inspect `receipt.json`, native/Python raw
-metadata and failure logs from the exact dispatched commit before marking model
-acceptance done. It uses a resolved immutable public model revision and records
-SHA256 identities. It does not exercise an actual VAD model. The model sanity
-gate allows a one-second timestamp margin; the state/parallel runtime gates require
-exact input geometry. Extend acceptance to actual VAD and supported native
-platforms separately.
-Assert per-run timestamp bounds/order and candidate ownership, with unavailable
--1 preserved. Do not require identical text between different chunkings.
+CPU actual-model metadata acceptance is complete: run39211685024 passes all12
+native and six Python cases, independently audited against exact source/library/
+probe/audio identities and raw timestamps. See
+[the receipt](docs/whisper-wrapper-model-audit-2026-10-19.json) and HISTORY.md.
+The tiny suites (22 parallel,13 VAD/entry, six emission) remain CTest/CI gates.
+Do not rerun the same tiny.en/JFK matrix merely because an old note says failed.
+Extend coverage to beam candidates, partial UTF-8, actual VAD-model detections,
+foreign callback threads, GPU/supported platforms and model-specific behavior.
+The scoped CPU proof is not original-reference/WER/speed or whole-wrapper parity.
 
 Still audit these distinct semantics before claiming complete timeline parity:
 
@@ -365,41 +348,28 @@ Audit source and baseline hashes, exact return/text/bounds, successful complete 
 allocation/heap reductions and timing distributions. Never promote from these
 synthetic results alone. Keep input/encoder memory and model quality separate.
 
-## #217 actual Japanese model profiling — worker implemented; hosted proof pending
+## #217 Japanese alignment — CPU proof audited; long-form/hardware pending
 
-`tools/ci-heavy/alignment_model_profile.py` builds the real CPU library/CLI and
-pins the F16 Japanese CTC 1.1B model plus a 6.36-second FLEURS Japanese recording
-(CC BY 4.0; attribution/card retained). It queries the actual library's
-label/display splitters, retains native OFF/ON/OFF logits, times encoder versus
-postprocessor separately, replays those exact logits through the immutable own
-DP reference, and checks actual Python/exported C ABI and CLI output plus a
-12.34-second absolute offset. Cold/warm cache cases are distinguished. No
-boundary labels, long-file, Python-blueprint encoder, GPU/VRAM or Subtimer
-comparison is implied. The default-off optimization is not promoted.
-Six tiny rejection-contract tests pass and are wired into CTest/ordinary CI;
-model work is refused locally. Frozen source `08aea3537ad075ffa17e66a6f601c42519213aea` is on
-`diag/217-japanese-model-profile-20261018`; heavy CPU `39116431721` was
-dispatched with pinned packages and timeout120 and is queued at dispatch audit.
-See [the complete method](tools/ci-heavy/alignment-model-profile/README.md).
-Do not report model evidence before independently auditing the terminal raw
-payload/source/ELF ledger, exact logits and native/reference/public/CLI outputs.
-Earlier frozen production CI/lint remain acceptance gates. No runtime source
-changed while adding this worker; production source remains unchanged from
-`a1434c9b2`. Actual ELF identity is recorded separately by the worker. If a model case fails, preserve the frozen receipt and repair in a
-new scope; do not widen nonempty/ordering/timestamp checks to obtain green.
+Completed CPU evidence is archived in HISTORY.md and the
+[verified audit](docs/alignment-japanese-audit-2026-10-19.json). Keep both workspace
+gates default-off. The measured DP saving is0.055ms beside4591ms encoder time;
+do not prioritize another DP micro-optimization as an end-to-end speed fix.
+Next: inspect issue550 long-window worker
+[run39212307554](https://github.com/CrispStrobe/CrispASR/actions/runs/39212307554)
+at source62e598ca0, then long-input CUDA memory, seams and labeled boundaries.
+Short-clip parity does not establish long-form acoustic accuracy, Japanese ASR
+multiwindow ownership (#549), original encoder parity or Subtimer superiority.
 
 ## #217 clean-room accuracy follow-ups — bounded next tasks
 
-After hosted acceptance of both exact-output CPU workspace experiments, profile
-`canary_ctc_align_words` on actual frozen model logits and split encoder versus
-postprocessor time on a matched Japanese clip. Synthetic timings alone do not
-characterize Parakeet. Preserve native centisecond-output/tokenizer parity and
+The actual Japanese model profile is audited (see HISTORY.md). Preserve the
+measured encoder/postprocessor split when choosing another optimization. Preserve native centisecond-output/tokenizer parity and
 keep original behavior available for A/B. The unchanged per-word path scans
 remain a separate candidate only if profiling justifies them; do not conflate
 invalid-path semantic repair with a speed change.
 
 Long-form accuracy requires audio/text anchors before changing the current
-proportional Qwen chunk assignment or unbounded CTC encoder use. Build a small
+proportional Qwen chunk assignment or extending the new bounded CTC encoder windows. Build a small
 licensed Japanese boundary-labeled corpus with long pauses, music, repeated
 phrases and subtitle omissions. Acceptance: no dropped/reordered lines, correct
 absolute offsets, reported median/p95 boundary error and coverage, and bounded
@@ -614,11 +584,16 @@ commands: [CANN TODO](docs/cann-todo.md) and
   array-audited and permanently republished with a verified anonymous download.
   See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
   work is runtime/input/precision/quality diagnosis, not another proof search.
-- **Issue518 / draft PR521 / OmniVoice:** audio/text utilities match upstream;
+- **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
   The standalone utilities are integrated with complete original/native array
-  replay and hosted checks; see HISTORY.md. The full runtime PR remains a draft.
-  Do not call the onset repaired or relax the clone gate. Preserve controls and
+  replay and hosted checks; see HISTORY.md. The PR is now ready-for-review, headc1e7b73a8 (2026-10-19).
+  Its body/discussion/review comments were re-read. The Linux failure is the
+  stale vibevoice architecture expectation already fixed on main; CLANG64 lacks
+  `<cstdlib>` in the deprecated executable (now fixed on main);
+  CUDA11.8 setup hit Chocolatey504 before compilation. Rebase and inspect new CI.
+  Full diff/runtime review, original utility proof and unchanged cloning-quality
+  gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.
 - **Breeze:** accepted guided/voice/server fixes are merged. Investigate canonical
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
@@ -633,16 +608,18 @@ commands: [CANN TODO](docs/cann-todo.md) and
   global0.999 summary floor at block0; guarded at11/12/15 and middle at12/12/15
   for JFK/JFK-tail/ZH. These differ from native per-stage quantized gates: JFK's
   literal FAIL remains teacherforced_logits (.967303/.983031/.979347).
-  Block4 middle cosine0.999908 passes0.999. No FFN projection is identified by
-  those cumulative block outputs; old block logs omit norms. Next capture actual
-  paired FFN gate/up/product/down on owned identical inputs with both norms and
-  relative error. Single-file safetensors permits lazy per-tensor loading; use a
-  bounded actual original MLP module rather than requiring a full9B resident
-  model merely to attribute one FFN. The retained630KB proof contains logs and
-  metadata, zero GGUF files or FFN tensors. See
-  docs/index-echo-q4-first-failures-2026-10-17.json. Then test targeted precision changes against complete EN/ZH stages, magnitudes,
-  cache behavior, decoded/subtitle output and TTS-ASR. Do not repeat rejected
-  recipes unchanged. Evidence: docs/index-echo-q4-imatrix-validation-2026-10-09.json.
+  Block4 middle cosine0.999908 passes0.999. Completed owned-input attribution is
+  audited; see HISTORY.md and [the receipt](docs/index-echo-owned-ffn-audit-2026-10-19.json).
+  Next evaluate one bounded projection intervention on identical saved inputs
+  before a full decoder: isolate down-projection layer25 (worst owned-down-input
+  error,8.00% on Mandarin), then inspect gate/up error if MLP output remains
+  outside the existing gate. Cumulative first crossings are not causal layers.
+  Audit previous guarded Q8-down/F16 recipes before choosing another override;
+  avoid repeating an already rejected recipe. Use a fresh public prefix and
+  retain original/converted/physical-type/input pins and exact byte-size cost.
+  Only after component improvement run complete EN/ZH stages/magnitudes, cache,
+  CLI/subtitles/session and TTS-ASR plus actual GPU validation. No accepted Q4
+  recipe or runtime arithmetic repair follows from attribution.
 - **Echo performance:** scheduler opt-in has narrow T4 evidence; new CPU/Metal/
   CUDA A/B must establish output and timing before any default change.
 - **Nemotron:** accepted experimental hybrid T4 controls are not compact-Q4
@@ -862,24 +839,11 @@ are historical, not work to reimplement. Consumer-requested binding expansion
 can be scheduled after checking actual exported and wrapped surfaces.
 
 
-## In flight — Echo9B owned-input FFN worker
+## Echo9B owned-input FFN follow-up
 
-The corrected worker is integrated on main. Frozen dispatched sourcec2deea37
-remains unchanged on diag/echo-9b-owned-ffn-repair-20261017. A new maintainer
-should inspect the existing run, retrieve and independently audit results; avoid
-duplicate dispatches. Exact commands, local collectors and recovery locations
-are in ignored CLAUDE.md; public source/run IDs and acceptance are below.
-
-Frozen repairc2deea373f9bd27f526f873bc01cb97068e1bff7 is pushed. Local actual
-released5.6.0/Torch2.6CPU controls pass6/6, including missing-block/stale-FFN
-negatives, and all four secret checks pass unskipped. Heavy CPU39008086579
-and lint39008088033 are dispatched to fresh immutable v2 fixture prefix.
-All runtime files and physical model pins are unchanged from failedv1.
-Independent failed-v1 audit verifies36payloads,37anonymous public files and14
-source snapshots; GH upload omitted the hidden workflow method snapshot, which
-was recovered and hash/source-verified from the public checkpoint. No9B FFN
-arrays exist in that failed proof. Both failed auditor assumption and correction
-remain retained. See docs/index-echo-owned-ffn-failed-2026-10-17.json and the
-updated preparation receipt. Await actual native OFF/ON/OFF and source-layer
-results before diagnosing projections, changing precision or promoting Q4.
-MiMo actual Q/K/V capture remains the next independent implementation task.
+The completed v2 worker/source/payload/tensor/metric audit is archived in
+HISTORY.md. Do not dispatch it again to recreate accepted attribution. Next
+precision task and all quality gates are in the quantization section above.
+Keep all seven rejected recipes rejected and production defaults unchanged.
+Component proof does not reproduce a whole original model trajectory or
+validate speech, Q4 quality, GPU portability or speed.

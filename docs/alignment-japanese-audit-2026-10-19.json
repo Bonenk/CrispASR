@@ -1,0 +1,43 @@
+{
+  "run": 39116431721,
+  "source": "08aea3537ad075ffa17e66a6f601c42519213aea",
+  "status": "raw payload/source/tensor/call audit passed",
+  "artifacts_verified": 60,
+  "source_files_verified": 16,
+  "logits_shape": [
+    80,
+    4001
+  ],
+  "native_calls_verified": 22,
+  "public_calls_verified": 5,
+  "cli_calls_verified": 3,
+  "encoder_median_ms": 4591.176223,
+  "dp_off_median_ms": 1.511408,
+  "dp_on_median_ms": 1.4569044999999998,
+  "receipt_sha256": "4573c4e6b2fe3ab5e0ab9a967eba33aac3404982fb9e731e4e8734c15b2376e2",
+  "limits": [
+    "one 6.36s recording; one encoder-frame endpoint margin",
+    "no labeled boundaries, long-form, GPU or original encoder parity",
+    "tracked postprocessor heap is not encoder/process RSS"
+  ],
+  "independent_literal_replay": [
+    {
+      "reference": true,
+      "gate": 0,
+      "peak_heap_bytes": 1290804,
+      "allocations": 137
+    },
+    {
+      "reference": false,
+      "gate": 0,
+      "peak_heap_bytes": 1290804,
+      "allocations": 137
+    },
+    {
+      "reference": false,
+      "gate": 1,
+      "peak_heap_bytes": 24568,
+      "allocations": 56
+    }
+  ]
+}
