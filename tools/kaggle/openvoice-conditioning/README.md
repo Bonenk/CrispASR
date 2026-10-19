@@ -1,6 +1,7 @@
 # OpenVoice clip conditioning and shared-noise proof
 
-Prepared follow-up to `openvoice-bake`; not submitted yet. Save the previous
+Prepared follow-up to `openvoice-bake`; submission was rejected because both
+batch-GPU slots are occupied by queued jobs. No conditioning run was created. Save the previous
 kernel's terminal log/output before replacing or superseding a live job, and
 respect the two-GPU-session cap. The bootstrap pins the shared worker by commit
 and SHA256; it enables conditioning mode before loading it. Only the bootstrap
