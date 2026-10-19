@@ -676,7 +676,7 @@ regressions pass, alongside35 parallel/VAD cases. Hosted run39211685024 now pass
 raw/hash audit confirms exact input/segment bounds, DTW and owned alternatives.
 No model-quality, GPU or concurrent-lifecycle acceptance is claimed.
 
-### Long-input CTC alignment (implementation; validation pending)
+### Long-input CTC alignment (CPU accepted; CUDA validation pending)
 
 Canary/FastConformer forced alignment uses30-second encoder cores with two-second
 context while retaining one global transcript alignment. CLI align-only honors
@@ -692,8 +692,9 @@ duration, and align-only does not apply VAD.
 
 Actual Japanese CTC CPU profiling now has independently verified native logits,
 reference/DP, CLI and Python/C ABI output. The DP heap reduction is substantial;
-its measured0.055ms saving is negligible beside4.59s encoder inference on this
-clip. Echo9B's32-layer same-input FFN attribution is also independently audited.
+the earlier0.055ms saving is negligible beside4.59s encoder inference, and a
+later same-run matrix measured the opt-in DP path slower. No robust end-to-end
+speedup or default promotion is established. Echo9B's32-layer same-input FFN attribution is also independently audited.
 These diagnostics do not establish long-form boundary accuracy, an accepted Q4
 recipe or GPU performance. Drama3 is excluded from this release's active scope.
 
@@ -708,3 +709,18 @@ low-level Context pointers still require caller serialization. Language lookup
 also frees its C string and lists the final supported language. Validation:
 47 Go race cases,34 Rust cases and five doctests; actual Go/model/platform checks
 remain pending.
+
+### Arabic character alignment through Java and Python
+
+The Java standalone worker now compiles its session dependencies explicitly.
+The real Arabic Q4 CPU output audit passes15 words,85 character spans and100
+exact Java UTF-8/centisecond rows, including a3.25-second absolute offset and
+three host-encoding controls. CLI word/segment JSON agrees with the retained
+post-logit reference. This proves the bounded output/transport scope, not
+original encoder parity, acoustic boundary accuracy or GPU behavior. See
+[the audit](docs/arabic-characters-java-audit-2026-10-19.json) for missing replay
+inputs and the distinction between independent and hosted-worker evidence.
+
+The CUDA alignment bundle is independently hash-audited; a2703-second Kaggle
+cache/memory test is dispatched. The real-model Go lifecycle check is separately
+dispatched on GitHub Actions. Neither pending run is release acceptance yet.

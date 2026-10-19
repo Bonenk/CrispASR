@@ -59,8 +59,9 @@ operations/close and separately synchronizes options. Completed implementation,
 47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
 All six hosted binding contracts39215435420 pass. Claimed: actual small-model
 Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
-and tools/ci-heavy/go-model-lifecycle/. The worker/probe are prepared; hosted
-compile and execution remain pending. Raw low-level
+and tools/ci-heavy/go-model-lifecycle/. Hosted run39222679421 is dispatched
+on frozen35df8d6d4, branchdiag/go-model-lifecycle-20261019; it is in progress
+at this checkpoint. Inspect retained raw outputs before accepting model scope. Raw low-level
 Go pointers still require caller serialization; assess an owned low-level
 adapter before promising their concurrent lifetime safety. Native result states
 remain shared across high-level Contexts. Other-language lifecycle remains open.
@@ -521,10 +522,10 @@ not establish native speech acceptance.
 
 See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
 entry points, bounded next action, acceptance gates and external dependencies.
-No task remains assigned to a departed agent. Inspect existing Echo runs first;
-then audit the current-main #547 fix and its validation before repeating
-streaming diagnosis. Actual MiMo71-row
-Q/K/V capture follows. Research and hardware waits are explicitly separate.
+No task remains assigned to a departed agent. Follow the approved ordered
+roadmap below:550 GPU, wrapper closure, PR521, release, then bounded numerical
+work. Preserve accepted Echo audits and current-main547 fixes; research and
+hardware waits remain separate.
 
 Issue #547 now has the streaming utterance-open throttle fix on main in
 `dd14099c3`, including literal boundary tests and the dedicated
@@ -560,8 +561,9 @@ claiming full hardware validation; this #549 task did not execute that worker.
    Separate reporter/hardware/gated-asset waits; keep machine details ignored.
    Drama3 stays deferred outside active/release scope.
 
-General CI39216228487 on65b851a91 is queued at this checkpoint; green component
-workflows do not replace exact-tip general CI. Hardware waits do not justify
+Documentation-tip CI runs can be superseded by newer pushes. Inspect Actions
+for the actual main SHA; green component workflows or older cancelled runs do
+not replace exact-tip general CI. Hardware waits do not justify
 repeating accepted diagnostics. GH handles heavy CPU/builds; Kaggle handles
 actual supported GPU tests per the external guide. Neither supplies Ascend.
 
@@ -650,11 +652,15 @@ commands: [CANN TODO](docs/cann-todo.md) and
 - **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
   the fixed clone gate fails2/9 WER in both original Python and native output.
   The standalone utilities are integrated with complete original/native array
-  replay and hosted checks; see HISTORY.md. The PR is now ready-for-review, headc1e7b73a8 (2026-10-19).
+  replay and hosted checks; see HISTORY.md. The PR is ready-for-review; updated headab6c92cae incorporates main35df8d6d4
+  while preserving contributor history. The helper-test conflict is resolved;
+  main's newer ggml pin preserves two CANN fixes. A literal UBSan regression
+  reproduced and now guards the signed128-minimum formatter overflow.
   Its body/discussion/review comments were re-read. The Linux failure is the
   stale vibevoice architecture expectation already fixed on main; CLANG64 lacks
   `<cstdlib>` in the deprecated executable (now fixed on main);
-  CUDA11.8 setup hit Chocolatey504 before compilation. Rebase and inspect new CI.
+  CUDA11.8 setup hit Chocolatey504 before compilation. Fresh head checks are
+  queued; inspect them rather than rerunning stale-source jobs.
   Full diff/runtime review, original utility proof and unchanged cloning-quality
   gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.

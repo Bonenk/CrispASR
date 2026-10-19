@@ -1,3 +1,15 @@
+## PR521 refreshed for review; no full-runtime promotion — 2026-10-19
+
+Review headab6c92cae incorporates main35df8d6d4 while preserving contributor
+history. Its Python helper conflict retains main's tested routing. Its ggml pin
+retains main's two newer CANN fixes. The branch's signed128 formatter overflow
+was observed under UBSan at the signed minimum; unsigned magnitude conversion
+now passes five extrema/control values, with a permanent CI regression. Literal
+native allocator/OOM and helper tests also pass. The PR description now states
+current acceptance and limitations. Fresh hosted checks are pending; unchanged
+original/native cloned-speech failures still block full-runtime/default merge.
+These PR-only changes are not advertised as shipped on main.
+
 ## Arabic character/Java retained-output audit accepted — 2026-10-19
 
 Hosted run39214206020/sourcea9ee23d5f passes. Independent artifact inspection
