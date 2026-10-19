@@ -1223,56 +1223,7 @@ int32_t crispasr_speaker_db_enroll(const char* dir, const char* n, const float* 
     (void)dim;
     return -1;
 }
-void* crispasr_speaker_embedder_make_abi(const char* spec, int32_t nt, const char* cache) {
-    (void)spec;
-    (void)nt;
-    (void)cache;
-    return (void*)1;
-}
-void crispasr_speaker_embedder_free_abi(void* e) {
-    (void)e;
-}
-int32_t crispasr_speaker_embedder_dim_abi(const void* e) {
-    (void)e;
-    return 192;
-}
-int32_t crispasr_speaker_embedder_embed_abi(void* e, const float* pcm, int32_t n, float* out) {
-    (void)e;
-    (void)pcm;
-    (void)n;
-    (void)out;
-    return 1;
-}
-const char* crispasr_speaker_embedder_name_abi(const void* e) {
-    (void)e;
-    return "titanet";
-}
-int32_t crispasr_speaker_cluster_abi(const float* emb, int32_t n, int32_t dim, float th, int32_t max, int32_t* out) {
-    (void)emb;
-    (void)dim;
-    (void)th;
-    (void)max;
-    for (int i = 0; i < n; i++)
-        out[i] = i % 2;
-    return 0;
-}
-void* crispasr_pyannote_cache_compute_abi(const float* pcm, int32_t n, const char* m, int32_t nt) {
-    (void)pcm;
-    (void)n;
-    (void)m;
-    (void)nt;
-    return (void*)1;
-}
-void crispasr_pyannote_cache_free_abi(void* c) {
-    (void)c;
-}
-int32_t crispasr_pyannote_cache_apply_abi(const void* c, int64_t t0, crispasr_diarize_seg_abi* segs, int32_t n) {
-    (void)c;
-    (void)t0;
-    (void)segs;
-    (void)n;
-    return 0;
-}
+#include "wrapper-speaker-primitives.c"
 int crispasr_detect_language_pcm(const float* s, int32_t n, int32_t met, const char* m, int32_t nt, int32_t gpu,
                                  int32_t dev, int32_t flash, char* out, int32_t cap, float* conf) {
     (void)s;

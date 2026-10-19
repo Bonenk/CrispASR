@@ -241,6 +241,7 @@ jobs:
           CRISPASR_LIB="$PWD/$library" python3 tests/test_session_metadata.py -v
           CRISPASR_LIB="$PWD/$library" python3 tests/test_parakeet_window_metadata.py -v
           CRISPASR_LIB="$PWD/$library" python3 tests/test_python_wrapper_operations.py -v
+          python3 tests/test_python_speaker_primitives.py -v
           python3 tests/test_python_audio_utilities.py -v
           python3 tools/check-python-api-coverage.py --library "$PWD/$library"
           python3 tests/test_python_legacy_pointer.py -v

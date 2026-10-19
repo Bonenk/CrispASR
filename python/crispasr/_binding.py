@@ -3746,6 +3746,34 @@ class SpeakerDB:
 # pipelines can compose their own diarization without shelling out.
 
 
+def _speaker_int32(value, name):
+    import operator
+    try:
+        result = operator.index(value)
+    except TypeError:
+        raise ValueError(f"{name} must be an int32") from None
+    if not -(2**31) <= result < 2**31:
+        raise ValueError(f"{name} exceeds int32")
+    return result
+
+
+def _speaker_text(value, name):
+    if not isinstance(value, str) or "\0" in value:
+        raise ValueError(f"{name} must be a NUL-free string")
+    return value.encode("utf-8")
+
+
+def _speaker_centiseconds(value):
+    import math
+    scaled = float(value) * 100
+    if not math.isfinite(scaled):
+        raise ValueError("speaker timing must be finite")
+    result = round(scaled)
+    if not -(2**63) <= result < 2**63:
+        raise ValueError("speaker timing exceeds int64 centiseconds")
+    return result
+
+
 class SpeakerEmbedder:
     """Pluggable speaker-embedding model (TitaNet or IndexTTS today).
 
@@ -3762,6 +3790,9 @@ class SpeakerEmbedder:
 
     def __init__(self, model_spec: str, n_threads: int = 4,
                  cache_dir: str = "", lib_path: str = None):
+        spec = _speaker_text(model_spec, "model_spec")
+        cache = _speaker_text(cache_dir, "cache_dir")
+        threads = _speaker_int32(n_threads, "n_threads")
         self._lib = ctypes.CDLL(lib_path or _find_lib())
         self._lib.crispasr_speaker_embedder_make_abi.argtypes = [
             ctypes.c_char_p, ctypes.c_int32, ctypes.c_char_p,
@@ -3779,17 +3810,23 @@ class SpeakerEmbedder:
         self._lib.crispasr_speaker_embedder_name_abi.argtypes = [ctypes.c_void_p]
         self._lib.crispasr_speaker_embedder_name_abi.restype = ctypes.c_char_p
         self._ctx = self._lib.crispasr_speaker_embedder_make_abi(
-            model_spec.encode("utf-8"), int(n_threads), cache_dir.encode("utf-8"),
+            spec, threads, cache,
         )
         if not self._ctx:
             raise RuntimeError(f"Failed to build speaker embedder '{model_spec}'")
 
+    def _check_open(self):
+        if not getattr(self, "_ctx", None):
+            raise RuntimeError("SpeakerEmbedder is closed")
+
     @property
     def dim(self) -> int:
+        self._check_open()
         return int(self._lib.crispasr_speaker_embedder_dim_abi(self._ctx))
 
     @property
     def name(self) -> str:
+        self._check_open()
         name = self._lib.crispasr_speaker_embedder_name_abi(self._ctx)
         return name.decode("utf-8") if name else ""
 
@@ -3801,15 +3838,19 @@ class SpeakerEmbedder:
         underlying model's mel pipeline).
         """
         import numpy as np
-        pcm = np.ascontiguousarray(pcm_16k, dtype=np.float32)
-        out = np.zeros(self.dim, dtype=np.float32)
+        self._check_open()
+        pcm = _mono_pcm(pcm_16k)
+        dim = self.dim  # Recheck after caller-controlled array coercion.
+        if dim <= 0 or not pcm.size:
+            return None
+        out = np.zeros(dim, dtype=np.float32)
         ok = self._lib.crispasr_speaker_embedder_embed_abi(
             self._ctx,
             pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
             len(pcm),
             out.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
         )
-        return out if ok else None
+        return out if ok == 1 else None
 
     def close(self):
         if getattr(self, "_ctx", None):
@@ -3837,10 +3878,19 @@ def agglomerative_cluster(embeddings, *, merge_threshold: float = 0.5,
     ``[0, k)`` assigned in first-appearance order.
     """
     import numpy as np
-    arr = np.ascontiguousarray(embeddings, dtype=np.float32)
-    if arr.ndim != 2 or arr.size == 0:
+    arr = np.asarray(embeddings, dtype=np.float32)
+    if arr.ndim != 2:
+        raise ValueError("expected a two-dimensional speaker embedding matrix")
+    if arr.size == 0:
         return np.zeros(0, dtype=np.int32)
     n, dim = arr.shape
+    if arr.size > 2147483647:
+        raise ValueError("speaker matrix exceeds native int32 size")
+    maximum = _speaker_int32(max_speakers, "max_speakers")
+    threshold = ctypes.c_float(float(merge_threshold)).value
+    if not np.isfinite(threshold):
+        raise ValueError("merge_threshold must be finite float32")
+    arr = np.ascontiguousarray(arr)
 
     lib = ctypes.CDLL(lib_path or _find_lib())
     lib.crispasr_speaker_cluster_abi.argtypes = [
@@ -3851,11 +3901,13 @@ def agglomerative_cluster(embeddings, *, merge_threshold: float = 0.5,
     out = np.zeros(n, dtype=np.int32)
     rc = lib.crispasr_speaker_cluster_abi(
         arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), n, dim,
-        ctypes.c_float(merge_threshold), int(max_speakers),
+        ctypes.c_float(threshold), maximum,
         out.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
     )
-    if rc < 0:
+    if rc < 0 or rc > n:
         raise RuntimeError("agglomerative_cluster: invalid arguments")
+    if (rc == 0 and np.any(out != -1)) or (rc > 0 and np.any((out < 0) | (out >= rc))):
+        raise RuntimeError("agglomerative_cluster: invalid native labels")
     return out
 
 
@@ -3871,6 +3923,8 @@ class PyannoteCache:
     def __init__(self, pcm_16k, model_path: str, n_threads: int = 4,
                  lib_path: str = None):
         import numpy as np
+        model = _speaker_text(model_path, "model_path")
+        threads = _speaker_int32(n_threads, "n_threads")
         self._lib = ctypes.CDLL(lib_path or _find_lib())
         self._lib.crispasr_pyannote_cache_compute_abi.argtypes = [
             ctypes.POINTER(ctypes.c_float), ctypes.c_int32, ctypes.c_char_p,
@@ -3884,18 +3938,27 @@ class PyannoteCache:
         ]
         self._lib.crispasr_pyannote_cache_apply_abi.restype = ctypes.c_int32
 
-        pcm = np.ascontiguousarray(pcm_16k, dtype=np.float32)
+        pcm = _mono_pcm(pcm_16k)
+        if not pcm.size:
+            raise ValueError("nonempty mono PCM required")
         self._ctx = self._lib.crispasr_pyannote_cache_compute_abi(
             pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float)),
-            int(len(pcm)), model_path.encode("utf-8"), int(n_threads),
+            int(len(pcm)), model, threads,
         )
         if not self._ctx:
             raise RuntimeError(
                 f"Failed to compute pyannote cache from model '{model_path}'"
             )
 
+    def _check_open(self):
+        if not getattr(self, "_ctx", None):
+            raise RuntimeError("PyannoteCache is closed")
+
     def apply(self, segs: List[DiarizeSegment], slice_t0: float = 0.0) -> None:
         """Score ``segs`` against the cached posteriors, mutating ``speaker``."""
+        self._check_open()
+        count = _speaker_int32(len(segs), "segment count")
+        offset = _speaker_centiseconds(slice_t0)
         if not segs:
             return
 
@@ -3909,12 +3972,15 @@ class PyannoteCache:
 
         seg_array = (_SegAbi * len(segs))()
         for i, s in enumerate(segs):
-            seg_array[i].t0_cs = int(round(s.t0 * 100))
-            seg_array[i].t1_cs = int(round(s.t1 * 100))
-            seg_array[i].speaker = s.speaker
+            seg_array[i].t0_cs = _speaker_centiseconds(s.t0)
+            seg_array[i].t1_cs = _speaker_centiseconds(s.t1)
+            if seg_array[i].t0_cs < 0 or seg_array[i].t1_cs < seg_array[i].t0_cs:
+                raise ValueError("invalid speaker segment bounds")
+            seg_array[i].speaker = _speaker_int32(s.speaker, "speaker")
+        self._check_open()
         rc = self._lib.crispasr_pyannote_cache_apply_abi(
-            self._ctx, int(round(slice_t0 * 100)),
-            ctypes.byref(seg_array), len(segs),
+            self._ctx, offset,
+            ctypes.byref(seg_array), count,
         )
         if rc != 0:
             raise RuntimeError("PyannoteCache.apply: invalid arguments")
