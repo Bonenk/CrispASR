@@ -739,3 +739,19 @@ bounds and Go NUL strings are checked before native entry. Shared compiled
 operation tests cover embedder, clustering, cache and cleanup; native unassigned
 results are preserved. These changes do not add concurrent generic-handle safety
 or establish speaker-model quality.
+
+## OpenVoice reference wiring and generic speaker contracts
+
+OpenVoice2 now has unified original-module reference dumps and strict27-stage
+runtime comparison, including projected embeddings, norms/errors and raw/final
+waveforms. Source identity follows the actual MeloTTS speaker on CLI and C ABI.
+Explicit clip means and shared posterior-noise replay support a28-stage tau0.3
+recipe. CUDA vocoder execution remains opt-in; fresh model/hardware/quality
+acceptance is pending. See docs/openvoice2-baking.md for exact scope and pins.
+
+Python/Dart generic speaker adapters now guard lifetime, shape/count/label
+results, exact1-success and exception cleanup. C#/Java reject malformed cluster
+results and NUL-truncated speaker/cache paths. Seven Python cases, strict Dart
+analyzer/all40 FFI tests,53 C# auxiliary and137 Java auxiliary assertions pass.
+These are compiled wrapper contracts, not real speaker-model quality or
+universal concurrent-handle acceptance. No release tag is implied by this draft.

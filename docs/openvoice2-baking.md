@@ -117,7 +117,8 @@ This is a synthetic closed-loop voice test, not general human-speaker accuracy.
 The prepared conditioning mode (`CRISPASR_OV2_CONDITIONING=1`) freezes newer
 source6be9fda36, adds a third tau0.3 replay and unequal-length original/native
 clip means plus mean-conditioned waveform comparison. Its entry version and
-source are distinct from submitted v2; it has not been run. Converted GGUFs and
+source are distinct from submitted v2; it has not been run. Its standalone
+immutable bootstrap is `tools/kaggle/openvoice-conditioning/`. Converted GGUFs and
 producer versions are retained in newer receipts; v2 lacks those extra fields.
 
 Remaining acceptance scope: raw mixed-rate preprocessing vs original librosa;

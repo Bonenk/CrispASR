@@ -8,7 +8,7 @@
 //
 // Usage:
 //   auto * ctx = openvoice2_init_from_file("openvoice2-tcc-f16.gguf", params);
-//   openvoice2_convert(ctx, src_pcm, n_src, ref_pcm, n_ref, &out_pcm, &n_out);
+//   openvoice2_convert(ctx, src_pcm, n_src, src_sr, ref_pcm, n_ref, ref_sr, &out_pcm, &n_out);
 //   openvoice2_free(ctx);
 
 #ifndef OPENVOICE2_H

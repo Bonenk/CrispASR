@@ -11,7 +11,8 @@ validates frozen native source71e329ccf. New clip-mean/target-override and
 tau0.3 shared-noise APIs have local contract checks; a later model run must
 validate those separately. A conditioning worker is prepared with source6be9fda36,
 three cases including original tau0.3 noise replay, unequal clip means and
-independent quality gates; do not submit it over the live v2 run. Version2 preserves host paths and isolates Torch
+independent quality gates (`tools/kaggle/openvoice-conditioning/`, pinned shared
+worker/source hashes). It is not submitted; do not submit it over the live v2 run. Version2 preserves host paths and isolates Torch
 subprocesses from bundled CUDA12.4; local loader/embedded-phase checks pass.
 Kaggle can use the exact-ggml audited base runtime with a bounded model-file
 delta compile, avoiding a full native build. Method and scoped open gates:
