@@ -30,10 +30,10 @@ def run(command, label):
 def main():
     OUT.mkdir(exist_ok=True)
     PROJECT.mkdir(exist_ok=True)
-    (PROJECT / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.18)
-project(openvoice_bake LANGUAGES C CXX)
+    (PROJECT / 'targets.cmake').write_text('''if(TARGET openvoice-bake)
+  return()
+endif()
 set(CMAKE_CXX_STANDARD 17)
-add_subdirectory("${CRISPASR_SOURCE}" runtime)
 add_executable(openvoice-bake "${CRISPASR_SOURCE}/tools/ci-heavy/openvoice-bake/main.cpp"
   "${CRISPASR_SOURCE}/examples/cli/crispasr_diff.cpp")
 target_include_directories(openvoice-bake PRIVATE "${CRISPASR_SOURCE}/examples/cli"
@@ -43,8 +43,9 @@ add_library(openvoice-probe SHARED "${CRISPASR_SOURCE}/src/openvoice2.cpp" "${CR
 target_link_libraries(openvoice-probe PRIVATE melotts crispasr-core ggml ggml-base ggml-cpu)
 target_include_directories(openvoice-probe PRIVATE "${CRISPASR_SOURCE}/src")
 ''')
-    run(['cmake', '-S', PROJECT, '-B', BUILD, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
-         f'-DCRISPASR_SOURCE={ROOT}', '-DBUILD_SHARED_LIBS=ON', '-DGGML_CUDA=ON',
+    run(['cmake', '-S', ROOT, '-B', BUILD, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
+         f'-DCRISPASR_SOURCE={ROOT}', f'-DCMAKE_PROJECT_crispasr_INCLUDE={PROJECT / "targets.cmake"}',
+         f'-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,{CUDA / "lib64/stubs"}', '-DBUILD_SHARED_LIBS=ON', '-DGGML_CUDA=ON',
          '-DCMAKE_CUDA_ARCHITECTURES=60;75', '-DGGML_NATIVE=OFF', '-DCRISPASR_BUILD_TESTS=OFF',
          '-DCRISPASR_BUILD_EXAMPLES=OFF', '-DCRISPASR_BUILD_SERVER=OFF',
          '-DCRISPASR_OPUS_FETCH=ON', '-DCMAKE_C_COMPILER_LAUNCHER=ccache',

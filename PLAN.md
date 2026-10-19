@@ -3,7 +3,8 @@
 ## NOW — OpenVoice2 reproducible baking and cloning acceptance
 
 Owner: maintainer coordinator (active, 2026-10-19). Wiring/source identity
-checkpoint71e329ccf is on main. Full-CMake CUDA bundle39255636270 is queued;
+checkpoint71e329ccf is on main. Full-CMake CUDA bundle39255636270 failed configuration before compilation;
+the root-project injection repair is prepared for a fresh build check;
 Kaggle v1 stopped before inference after replacing the host loader path;
 terminal logs/output are retained. Version2 is submitted and queued; it
 validates frozen native source71e329ccf. New clip-mean/target-override and

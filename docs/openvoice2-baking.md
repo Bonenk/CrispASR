@@ -99,8 +99,10 @@ Do not flip the gate without recorded numerical and decoded-output proof.
 runtime from source191815511 and its exact ggml revision. It compiles only the
 changed model files and strict driver against those prebuilt libraries, not
 ggml, CUDA kernels or the full SDK. Record both base and delta identities.
-A separate full-CMake build check is queued as run39255636270; it is not a
-prerequisite for this bounded model experiment and is not model acceptance.
+The separate full-CMake check39255636270 failed during configuration because
+the parent wrapper project changed CMAKE_SOURCE_DIR used by existing C2PA/llama
+paths. The worker now configures the repository root and injects only its
+target declarations. This build check is not a prerequisite for this bounded model experiment and is not model acceptance.
 
 The kernel preserves the host NVIDIA loader paths and runs Torch phases in
 separate processes from the packaged native CUDA stack. Version1 failed at
