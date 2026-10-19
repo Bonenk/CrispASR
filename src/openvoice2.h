@@ -15,6 +15,8 @@
 #define OPENVOICE2_H
 
 #include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,7 +28,7 @@ struct openvoice2_context_params {
     int n_threads;
     int verbosity; // 0=silent, 1=info, 2=debug
     bool use_gpu;
-    float tau; // posterior encoder sampling temperature (default 0.3)
+    float tau; // posterior encoder sampling temperature (default 0: deterministic; upstream uses 0.3)
 };
 
 struct openvoice2_context_params openvoice2_context_default_params(void);
@@ -52,6 +54,14 @@ bool openvoice2_extract_speaker_embedding(struct openvoice2_context* ctx, const 
 void openvoice2_free(struct openvoice2_context* ctx);
 
 // Diff harness: dump intermediates to directory.
+// Explicit source identity; rejects unknown names without changing the selection.
+// NULL clears selection and extracts identity from the actual source PCM.
+bool openvoice2_set_source_speaker(struct openvoice2_context* ctx, const char* name);
+
+// Synchronous diagnostic snapshots, valid only during callback; no re-entry.
+typedef void (*openvoice2_stage_callback)(const char*, const float*, size_t, void*);
+void openvoice2_set_stage_callback(struct openvoice2_context* ctx, openvoice2_stage_callback callback, void* user);
+
 void openvoice2_set_dump_dir(struct openvoice2_context* ctx, const char* dir);
 
 #ifdef __cplusplus

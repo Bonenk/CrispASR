@@ -64,6 +64,9 @@ void melotts_set_seed(struct melotts_context* ctx, uint32_t seed);
 int melotts_sample_rate(const struct melotts_context* ctx);
 int melotts_num_speakers(const struct melotts_context* ctx);
 
+// Selected upstream base-speaker key, e.g. "en-us"; NULL if metadata is missing.
+const char* melotts_source_speaker(const struct melotts_context* ctx);
+
 // Diff harness: dump intermediates to this directory.
 void melotts_set_dump_dir(struct melotts_context* ctx, const char* dir);
 

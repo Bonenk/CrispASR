@@ -84,12 +84,19 @@ extern "C" bool moss_tts_local_set_codec_path(moss_tts_local_context*,const char
 static bool mini_omni2_load_snac(void*,const char*) {return !codec_failure;}
 extern "C" void moss_tts_local_free(moss_tts_local_context*) {}
 extern "C" int moss_tts_local_sampling_rate(const moss_tts_local_context*) {return 48000;}
+static const char* melo_source="en-us";
+static std::string selected_source;
+static const char* melotts_source_speaker(void*) {return melo_source;}
+static bool openvoice2_set_source_speaker(void*, const char* name) {
+    if(name && std::string(name)=="missing") return false;
+    selected_source=name?name:"";return true;
+}
 static int melotts_sample_rate(void*) {return 44100;}
 static int melotts_synthesize(void*,const char*,float** p,int* sr) {
     *sr=44100;*p=static_cast<float*>(tracked_malloc(4*sizeof(float)));assert(*p);return 4;
 }
 static bool openvoice2_convert(void*,const float*,int,int sr,const float*,int,int,float** p,int* n) {
-    assert(sr==44100);*n=2;*p=static_cast<float*>(tracked_malloc(2*sizeof(float)));assert(*p);
+    assert(sr==44100); assert(selected_source==(melo_source && std::string(melo_source)!="missing"?melo_source:""));*n=2;*p=static_cast<float*>(tracked_malloc(2*sizeof(float)));assert(*p);
     (*p)[0]=.1f;(*p)[1]=.2f;return !conversion_failure;
 }
 static int openvoice2_sample_rate(void*) {return 22050;}
@@ -133,6 +140,10 @@ int main(int argc,char** argv) {
   s.melotts_ctx=&s;assert(crispasr_session_output_sample_rate(&s)==44100);
   s.ov2_ctx=&s;s.ov2_ref_pcm={.1f};assert(crispasr_session_output_sample_rate(&s)==22050);int n=0;
   for(int i=0;i<100;++i) {float* p=synthesize_melo(&s,"hello",&n);assert(p && n==2);tracked_free(p);assert(allocations.empty());}
+  for(const char* name : {"en-br","en-au","missing"}) {
+    melo_source=name;float* p=synthesize_melo(&s,"hello",&n);assert(p);tracked_free(p);
+  }
+  melo_source=nullptr;float* q=synthesize_melo(&s,"hello",&n);assert(q);tracked_free(q);
   conversion_failure=true;assert(!synthesize_melo(&s,"hello",&n));assert(allocations.empty());
  } else {return 2;}
  assert(allocations.empty());

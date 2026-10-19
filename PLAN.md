@@ -1,5 +1,23 @@
 # CrispASR — Pending work
 
+## NOW — OpenVoice2 reproducible baking and cloning acceptance
+
+Owner: maintainer coordinator (active, 2026-10-19). Audit found native
+inference avoids whisper-timestamped/Unidecode, but historical parity is not
+a pinned current acceptance receipt. Complete unified Python blueprint hooks
+and strict crispasr-diff dispatch; dump resampled PCM, STFT, all reference
+encoder boundaries, projected embeddings, posterior/flow and decoder stages.
+Reconcile actual MeloTTS source-speaker selection and reference speech
+segmentation/averaging without copying copyleft helpers. Preserve deterministic
+tau=0 diagnostics separately from default recipe quality. Publish immutable
+licensed inputs/reference GGUFs, model/source/checksum pins and norms/errors.
+Use Kaggle for GPU execution; hosted build delivery remains separate. Require
+ASR content roundtrips plus independent cloned-vs-baseline speaker similarity,
+CLI/C ABI coverage and cache/reuse checks before claiming accepted cloning.
+Scope F32-sensitive/F16 and supported quantization explicitly; do not silently
+relax gates or claim full GPU execution for CPU reference-encoder stages.
+
+
 ## Character-alignment acceptance qualification
 
 Arabic CTC/Java39214206020 is complete and its retained output is independently

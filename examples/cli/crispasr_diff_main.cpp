@@ -35,6 +35,7 @@
 
 #include "crispasr_diff.h"
 #include "crispasr_dia_diff.h"
+#include "crispasr_openvoice_diff.h"
 #include "core/backend_validation.h"
 #include "gguf.h"
 
@@ -8831,6 +8832,8 @@ int main(int argc, char** argv) {
         }
 
         moss_transcribe_free(ctx);
+    } else if (backend_name == "openvoice2") {
+        return crispasr_openvoice_diff(model_path, ref, std::getenv("CRISPASR_DIFF_USE_GPU") != nullptr);
     } else if (backend_name == "melotts") {
         // MeloTTS (VITS2): text-driven TTS. The reference archive
         // contains intermediate activations (enc_output, enc_mean,
