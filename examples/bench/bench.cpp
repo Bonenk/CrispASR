@@ -1,6 +1,7 @@
 #include "crispasr.h"
 
 #include <cstdio>
+#include <cstdlib> // [libc++ 23.1.3] exit / atoi are no longer pulled in transitively
 #include <cstring>
 #include <string>
 #include <thread>
