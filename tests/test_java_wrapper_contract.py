@@ -302,6 +302,33 @@ public class WrapperAuxProbe {
 
 @unittest.skipUnless(JAVA and JAR and Path(JAR).is_file(), 'Java runtime/compiler and CRISPASR_JNA_JAR required')
 class JavaWrapperContract(unittest.TestCase):
+    def test_alignment_worker_compiles_parent_classes_and_utf8_boundary(self):
+        # Execute the worker's actual javac argv without importing its model job.
+        import ast
+        tree = ast.parse((ROOT/'tools/ci-heavy/issue490_characters.py').read_text())
+        commands = [node.args[0] for node in ast.walk(tree)
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == 'run' and len(node.args) == 2
+                    and isinstance(node.args[1], ast.Constant) and node.args[1].value == 'java-compile']
+        self.assertEqual(len(commands), 1)
+        with tempfile.TemporaryDirectory(prefix='java-align-preflight-') as tmp:
+            path = Path(tmp)
+            javac = shutil.which('javac')
+            compiler = [javac] if javac else [JAVA, '-m', 'jdk.compiler/com.sun.tools.javac.Main']
+            argv = eval(compile(ast.Expression(commands[0]), '<worker javac argv>', 'eval'),
+                        {'ROOT': ROOT, 'jna': Path(JAR), 'classes': path})
+            subprocess.run(compiler + list(map(str, argv[1:])), cwd=path, check=True)
+            subprocess.run([os.environ.get('CC') or 'cc', '-shared', '-fPIC',
+                            str(ROOT/'tools/ci-heavy/issue490_jna_utf8.c'),
+                            '-o', str(path/'libcrispasr.so')], check=True)
+            for encoding in ('US-ASCII', 'ISO-8859-1', 'UTF-8'):
+                run = subprocess.run([JAVA, '-Djna.tmpdir='+str(path), '-Djna.library.path='+str(path),
+                                      '-Dfile.encoding=UTF-8', '-Djna.encoding='+encoding,
+                                      '-cp', str(path)+os.pathsep+JAR, 'Issue490Utf8'],
+                                     capture_output=True, text=True, timeout=30)
+                self.assertEqual(run.returncode, 0, run.stdout+run.stderr)
+                self.assertIn('JAVA_BIDIRECTIONAL_UTF8_PASS', run.stdout)
+
     def test_transport_ownership_metadata_and_task_operations(self):
         with tempfile.TemporaryDirectory(prefix='java-contract-') as tmp:
             path=Path(tmp);(path/'WrapperAbiProbe.java').write_text(PROGRAM)

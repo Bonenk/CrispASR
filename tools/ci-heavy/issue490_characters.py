@@ -114,6 +114,7 @@ assert hashlib.sha256(jna.read_bytes()).hexdigest() == '66d4f819a062a51a1d5627bf
 classes = SCRATCH / 'java-classes'
 classes.mkdir(exist_ok=True)
 run(['javac', '-encoding', 'UTF-8', '-cp', jna, '-d', classes,
+     '-sourcepath', ROOT / 'bindings/java/src/main/java',
      ROOT / 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java',
      ROOT / 'tools/ci-heavy/Issue490Characters.java',
      ROOT / 'tools/ci-heavy/Issue490Utf8.java'], 'java-compile')

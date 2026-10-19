@@ -1,5 +1,12 @@
 # CrispASR — Pending work
 
+## Character-alignment hosted follow-up
+
+The standalone Java preflight is repaired and all four strict Java contracts
+pass; see HISTORY.md. Inspect the fresh `CTC character alignment` workflow after
+this repair before accepting actual Arabic Q4/model/Java span parity. The prior
+run39212277740 failed before model work and is not acceptance.
+
 ## Active — issue550 bounded FastConformer alignment memory
 
 Owner: maintainer coordinator. Implementation62e598ca0 is on main; actual-model
@@ -15,6 +22,19 @@ bounds. Next inspect actual CPU model/window-boundary quality and genuine CUDA
 peak-memory/reuse. Host logits/DP memory still grows with duration; this is not
 an unlimited-length or constant-host-memory claim. Do not close550 before real
 long-input GPU validation. No foreign alignment implementation is used.
+
+## Active — high-level Go legacy model lifecycle
+
+Owner: maintainer coordinator. Enforce one native operation/close at a time per
+shared high-level Model, including its multiple Contexts. Use a nonblocking
+borrow so callback re-entry/close returns a busy error rather than self-deadlock.
+Guard option mutation/copy separately so callback setters affect later calls.
+Guard result/cursor/token readers through the native copy, including concurrent
+close; retain owned callback results. Operations without error returns must
+reject busy/closed access explicitly. Preserve public interfaces and legacy
+pointer ABI. Add race-enabled real public-method probes for callback close,
+re-entry, blocked concurrent decode, option updates, recovery and repeated close.
+Low-level raw Go pointers and other-language lifecycle remain separate scope.
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 

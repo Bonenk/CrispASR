@@ -1,3 +1,19 @@
+## Character alignment Java build preflight repaired — 2026-10-19
+
+Hosted character-alignment run39212277740 failed before model download/build:
+its standalone javac invocation could not resolve CrispasrSessionTasks and its
+utility parent after the session API expansion. The worker now supplies the
+binding source root, letting javac resolve the actual dependency graph. Runtime
+callback guards are unchanged.
+
+A new strict Java contract executes the exact worker javac argument expression
+from an unrelated temporary working directory. It reproduces the missing-parent
+failure before the fix and passes afterward, then calls the real UTF-8 native
+guard under US-ASCII, ISO-8859-1 and UTF-8 host defaults. All four strict Java
+contracts pass (126 auxiliary,92 modern,6 older-ABI and44 legacy assertions under
+each of two encodings, plus the new worker/UTF-8 preflight). Hosted Arabic Q4
+character/model acceptance must rerun on the repaired source.
+
 ## Whisper actual-model CPU acceptance audited — 2026-10-19
 
 Run39211685024/sourceafeffa1a5 passes12 native pointer cases (DTW off/on ×
