@@ -5639,6 +5639,10 @@ if(UNIX AND Python3_EXECUTABLE)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whisper_parallel_runtime.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
     set_tests_properties(test-whisper-parallel-runtime PROPERTIES LABELS "unit;whisper" TIMEOUT 60)
+    add_test(NAME test-ctc-windows
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ctc_windows.py
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-ctc-windows PROPERTIES LABELS "unit;align" TIMEOUT 60)
     add_test(NAME test-whisper-emission-bounds
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_whisper_emission_bounds.py
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})

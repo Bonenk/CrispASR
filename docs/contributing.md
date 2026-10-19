@@ -840,6 +840,29 @@ frames finish. Full native/browser/model and opt-in bundle-size gates are
 required separately from the tiny Embind probe. Threaded browser chat remains
 pending a servicer/compute dispatch implementation.
 
+### Alignment memory and callback timelines
+
+The shared Canary/FastConformer aligner bounds long-input encoder inference with
+30-second cores and two-second context, stitches logits on the encoder frame
+grid, and aligns the complete transcript once. CLI align-only forwards
+`--chunk-seconds` (zero explicitly disables windows); C ABI and bindings inherit
+the default. VAD is unused in align-only. This bounds encoder activations, not
+host logits or traceback memory. Qwen3-FA and wav2vec2 have separate paths; do not
+infer their long-input behavior from this implementation.
+
+Run `python3 tests/test_ctc_windows.py -v` for tiny actual shared-dispatch/frame
+ownership checks. Hosted `alignment_model_profile.py --long-windows` additionally
+compares full versus windowed native alignment, repeated 44.52-second speech,
+10/30-second seams, exact repeatability and CLI/Python/C ABI offset parity. This
+is not manually labeled boundary accuracy or a CUDA peak-memory result. Keep
+issue550 open until long-input hardware validation is recorded.
+
+Whisper emission changes must also run
+`python3 tests/test_whisper_emission_bounds.py -v`. Its literal production block
+checks segment/token/DTW bounds before callbacks, wrapped output, negative
+sentinels and later-window DTW new-segment counts. Model-free callback tests do
+not replace hosted actual-model validation.
+
 ## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
 
 Everything above assumes the backend produces TEXT and therefore fits

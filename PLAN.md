@@ -1,5 +1,21 @@
 # CrispASR — Pending work
 
+## Active — issue550 bounded FastConformer alignment memory
+
+Owner: maintainer coordinator. The CLI align-only path and shared C ABI still
+send full PCM through one Canary/FastConformer encoder, causing quadratic GPU
+activation growth on long recordings. Implement frame-grid-aligned overlapping
+encoder windows (30-second core, two-second context), stitch CPU logits exactly
+once per global frame, then run one global CTC alignment over the complete
+transcript. Keep short-input inference unchanged; avoid proportional word splits.
+Pass CLI `--chunk-seconds` to this shared implementation; bindings inherit the
+safe default. VAD remains unused in align-only and must be documented accurately.
+Prove exact frame ownership, final partial window, failures and call bounds with
+tiny tensors, then actual CPU model/window-boundary quality and genuine CUDA
+peak-memory/reuse. Host logits/DP memory still grows with duration; this is not
+an unlimited-length or constant-host-memory claim. Do not close550 before real
+long-input GPU validation. No foreign alignment implementation is used.
+
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
 Owner: maintainer coordinator (active). Next: repair callback-visible emission

@@ -259,6 +259,7 @@ def run_hosted(args):
         source_dir = out / 'source'
         source_dir.mkdir()
         for name in ('src/canary_ctc.cpp', 'src/canary_ctc.h', 'src/crispasr_aligner.cpp',
+                     'src/core/ctc_windows.h', 'src/crispasr_aligner.h',
                      'src/crispasr_c_api.cpp', 'examples/cli/crispasr_run.cpp', 'examples/common-crispasr.cpp',
                      'src/crispasr_audio.cpp', 'include/crispasr_session.h',
                      'python/crispasr/_binding.py', 'tools/ci-heavy/alignment_model_profile.py',
@@ -404,6 +405,54 @@ def run_hosted(args):
             if stamps != expected_display:
                 raise ValueError('Actual CLI versus C ABI/native word parity failed')
         receipt['phases']['cli'] = {'off_on_off': 'exact native/C ABI word text and centisecond bounds'}
+        if args.long_windows:
+            # Repeated licensed speech tests real window seams and global label
+            # ownership. It supplies no manually measured boundary ground truth.
+            long_pcm = np.tile(pcm, 7)
+            long_text = ' '.join([transcript] * 7)
+            long_units = json.loads(subprocess.check_output([str(unit_program), long_text], text=True))
+            long_display = long_units['display']
+            if len(long_display) != len(display) * 7:
+                raise ValueError('Repeated transcript changed native alignment unit count')
+            (out / 'long-units.json').write_text(json.dumps(long_units, ensure_ascii=False, indent=2))
+            sf.write(out / 'long-fixture.wav', long_pcm, rate, subtype='FLOAT')
+            (out / 'long-transcript.txt').write_text(long_text)
+            long_calls = []
+            for chunk in (0, 30, 10, 30):
+                index = len(long_calls)
+                target = out / f'long-cli-{index}-chunk{chunk}.json'
+                started = time.perf_counter_ns()
+                command([cli, '--align-only', '-am', files['model'], '-f', out / 'long-fixture.wav',
+                         '--text-file', out / 'long-transcript.txt', '--align-format', 'json',
+                         '--align-granularity', 'word', '--align-output', target, '--chunk-seconds', chunk,
+                         '--no-gpu', '-t', args.threads, '-l', 'ja'], f'long-cli-{index}-chunk{chunk}')
+                elapsed_ms = (time.perf_counter_ns() - started) / 1e6
+                actual = json.loads(target.read_text())
+                stamps = [{'word': w['word'], 't0': centiseconds(w['start']), 't1': centiseconds(w['end'])}
+                          for w in actual]
+                validate_words(stamps, long_display, math.ceil(len(long_pcm) * 100 / rate) + frame_cs)
+                long_calls.append({'chunk_seconds': chunk, 'elapsed_ms': elapsed_ms, 'words': stamps})
+                (out / 'long-calls.json').write_text(json.dumps(long_calls, ensure_ascii=False, indent=2))
+            if long_calls[1]['words'] != long_calls[3]['words']:
+                raise ValueError('Repeated 30-second window inference changed alignment')
+            free_aligner_cache(lib_path=str(library))
+            try:
+                result = align_words(str(files['model']), long_text, long_pcm, t_offset=12.34,
+                                     n_threads=args.threads, lib_path=str(library))
+                public = [{'word': w.text, 't0': centiseconds(w.start), 't1': centiseconds(w.end)} for w in result]
+                expected_long = [dict(w, t0=w['t0'] + 1234, t1=w['t1'] + 1234) for w in long_calls[1]['words']]
+                if public != expected_long:
+                    raise ValueError('Long default C ABI/Python versus CLI window/offset parity failed')
+                (out / 'long-python-cabi.json').write_text(json.dumps(public, ensure_ascii=False, indent=2))
+            finally:
+                free_aligner_cache(lib_path=str(library))
+            baseline = long_calls[0]['words']
+            drift = [abs(w[k] - b[k]) for w, b in zip(long_calls[1]['words'], baseline) for k in ('t0', 't1')]
+            receipt['phases']['long_windows'] = {
+                'samples': len(long_pcm), 'seconds': len(long_pcm) / rate, 'units': len(long_display),
+                'max_boundary_difference_cs_vs_full_native': max(drift),
+                'mean_boundary_difference_cs_vs_full_native': sum(drift) / len(drift),
+                'scope': 'full-native comparison, exact repeat/default public parity; no labeled boundary accuracy or GPU claim'}
         receipt['status'] = 'passed'
     except BaseException as exc:
         receipt['status'] = 'failed'
@@ -422,6 +471,7 @@ def run_hosted(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--threads', type=int, default=4)
+    parser.add_argument('--long-windows', action='store_true', help='Also validate 44.52s repeated speech through bounded CLI and public ABI')
     parser.add_argument('--repeats', type=int, default=5, help='Measured OFF/ON/ON/OFF cycles on frozen logits')
     args = parser.parse_args()
     if not 1 <= args.threads <= 8 or not 3 <= args.repeats <= 15:

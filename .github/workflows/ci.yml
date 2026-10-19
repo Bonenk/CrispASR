@@ -225,6 +225,7 @@ jobs:
           python3 tests/test_whisper_parallel_runtime.py -v
           python3 tests/test_whisper_vad_timeline.py -v
           python3 tests/test_whisper_emission_bounds.py -v
+          python3 tests/test_ctc_windows.py -v
 
       - name: Session result UTF-8 contract (native functions and strict Python decode)
         run: python3 tests/test_session_utf8.py -v

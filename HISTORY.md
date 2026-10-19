@@ -1,3 +1,20 @@
+## Issue550 bounded CTC encoder implementation — 2026-10-19
+
+The shared Canary/FastConformer alignment path now uses overlapping frame-grid
+encoder windows for long audio:30-second cores with two-second context. Every
+global frame belongs to exactly one window; logits feed one global transcript
+DP, without proportional word assignment. CLI align-only forwards its existing
+`--chunk-seconds`; C ABI/bindings inherit the default. Zero explicitly disables
+windowing. Short-input inference stays on its original path. Window failures
+return no partial alignment; malloc/vector logits have distinct RAII ownership.
+
+Nine tiny UBSan tests cover actual shared inference dispatch, exact global row
+ownership, context/tails/endpoints, malformed vocabulary, failure cleanup and
+short/disabled routes. The hosted Japanese worker now has optional44.52-second
+repeated-speech CLI/default-public-ABI/seam validation. Actual-model and CUDA
+long-file peak-memory acceptance remain pending; issue550 is not closed. Host
+logits/DP memory still grows with duration; VAD remains unused in align-only.
+
 ## Bound Whisper emission before callbacks — 2026-10-19
 
 Hosted run39208655226 confirms bounded sequential decoding now passes, then

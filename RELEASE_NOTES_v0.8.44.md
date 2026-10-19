@@ -675,3 +675,12 @@ new-segment count correctly after earlier windows. Six literal native emission
 regressions pass, alongside35 parallel/VAD cases. Hosted actual-model rerun is
 still required; the preceding run passed bounded sequential and exposed the
 parallel timestamp overrun. No model-quality or GPU acceptance is claimed.
+
+### Long-input CTC alignment (implementation; validation pending)
+
+Canary/FastConformer forced alignment uses30-second encoder cores with two-second
+context while retaining one global transcript alignment. CLI align-only honors
+`--chunk-seconds`; bindings receive the safe default. Short-input inference is
+unchanged; zero explicitly disables windows. Nine tiny runtime tests pass.
+Actual-model seam and long-file CUDA memory validation remain pending. Host
+logits/DP memory still scales with duration, and align-only does not apply VAD.
