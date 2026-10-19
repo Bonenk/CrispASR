@@ -1,3 +1,28 @@
+## Bounded CTC CPU model/seam acceptance audited — 2026-10-19
+
+Run39212307554/source62e598ca0 completes the actual Japanese CTC CPU worker,
+including44.52 seconds of repeated licensed FLEURS speech. Independent audit
+verifies all75 artifact hashes,18 source snapshots and library/CLI identities,
+finite byte-exact short-input OFF/ON/OFF logits,22 native/five public/three CLI
+short cases, the exact repeated PCM/transcript, four long CLI calls and the long
+public result. All147 units have ordered positive spans within the existing
+one-frame endpoint allowance. CLI cores0/30/10/30 finish; both30-second results
+match exactly, and default Python/C ABI matches with a12.34-second offset.
+[Audit receipt](docs/alignment-windows-cpu-audit-2026-10-19.json).
+
+Versus full native context,30-second windowing has mean0.92517-centisecond and
+maximum40-centisecond boundary differences (9.25/400ms). These are differences,
+not manually labeled accuracy. The repeated fixture is not a45-minute GPU or
+real conversational recording. No CUDA peak-memory, original encoder, WER,
+Subtimer or new release acceptance follows. The separate same-run short DP
+medians are1.430403ms off and1.5135695ms on; no robust DP speedup is established.
+
+Actual CUDA preparation is dispatched: frozen191815511 on
+`diag/550-cuda-memory-20261019`, build39215806310, reusing the existing portable
+CLI/shared-ABI CUDA package workflow. No model/GPU execution is claimed from
+that queued build. Concrete long-input/cache/device-memory acceptance is scoped
+in PLAN.md; the issue remains open and has a progress/evidence comment.
+
 ## High-level Go legacy lifecycle and language repairs — 2026-10-19
 
 The high-level Model now owns a nonblocking native borrow shared by its Contexts.

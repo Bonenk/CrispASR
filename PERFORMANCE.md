@@ -17,6 +17,14 @@ limits are in [the audit](docs/alignment-japanese-audit-2026-10-19.json).
 No labeled-boundary accuracy, long-form, original encoder parity, GPU or matched
 Subtimer performance claim follows. The workspace gates remain default-off.
 
+A separate hosted run39212307554 gives short-input DP medians1.430403ms off
+and1.5135695ms on (gate on is slower in that run). Do not infer a robust DP
+speedup or compare encoder medians across these separate runs as a runtime
+improvement. Its44.52-second window/full/public seam controls pass; maximum
+boundary difference versus full context is400ms, without boundary ground truth.
+See [the independently audited receipt](docs/alignment-windows-cpu-audit-2026-10-19.json).
+Actual long-input CUDA memory/reuse is still pending.
+
 ## Hosted character CTC workspace — 2026-10-18
 
 Heavy CPU39112822169 passes seven synthetic shapes on EPYC7763/GCC13.3.

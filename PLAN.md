@@ -7,21 +7,41 @@ pass; see HISTORY.md. Inspect the fresh `CTC character alignment` workflow after
 this repair before accepting actual Arabic Q4/model/Java span parity. The prior
 run39212277740 failed before model work and is not acceptance.
 
-## Active — issue550 bounded FastConformer alignment memory
+## Active — issue550 real CUDA long-input memory/reuse
 
-Owner: maintainer coordinator. Implementation62e598ca0 is on main; actual-model
-acceptance is pending in run39212307554. The prior CLI/shared C ABI sent full
-PCM through one encoder, causing quadratic GPU activation growth. The repair
-uses frame-grid-aligned overlapping encoder windows (30-second core, two-second context), stitch CPU logits exactly
-once per global frame, then run one global CTC alignment over the complete
-transcript. Keep short-input inference unchanged; avoid proportional word splits.
-Pass CLI `--chunk-seconds` to this shared implementation; bindings inherit the
-safe default. VAD remains unused in align-only and must be documented accurately.
-Nine tiny tests prove frame ownership, final partial window, failures and call
-bounds. Next inspect actual CPU model/window-boundary quality and genuine CUDA
-peak-memory/reuse. Host logits/DP memory still grows with duration; this is not
-an unlimited-length or constant-host-memory claim. Do not close550 before real
-long-input GPU validation. No foreign alignment implementation is used.
+Owner: maintainer coordinator. CPU acceptance is complete and independently
+audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
+implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
+
+Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
+is dispatched on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
+this task's acceptance concerns CTC alignment memory. Inspect build provenance,
+source/library/archive hashes and dependency closure before GPU execution.
+
+Next kernel, per the maintainer's external Kaggle guide:
+
+1. Use that prebuilt runtime; clone the exact source for harness/binding code,
+   with no heavy Kaggle build. Record actual CUDA device/capability. The package
+   targets60/75; no Torch is needed for this F16 CTC memory test. Check account
+   quota/concurrency first; do not retry sessions to select hardware.
+2. Reuse the pinned licensed Japanese FLEURS fixture, model and transcript from
+   CPU run39212307554. Verify model/audio/runtime bytes. Compare44.52 seconds,
+   approximately45 minutes (425 repeats gives2703 seconds), then44.52 seconds
+   again through one cached public C ABI/Python model. Long input exercises
+   first32s, interior34s and final partial encoder shapes and scheduler reuse.
+   Also compare a CLI call against default public output with absolute offsets.
+3. Require complete ordered word ownership, positive in-range spans with the
+   existing one-frame tolerance, correct text/offsets, CUDA execution evidence,
+   successful long input and repeatability after the shape/cache changes.
+   Retain source/runtime/model/input identities, raw word results, logs and
+   sampled device memory/utilization with idle baseline. A sampled memory peak
+   is not an exact allocator peak. Preserve CPU/full-window boundary differences;
+   do not invent acoustic accuracy or byte-exact CPU/GPU parity.
+4. Keep public proof separate from weights and credentials; publish only vetted
+   portable evidence. Host logits/DP memory still scales with duration. VAD is
+   unused in align-only. A green build, device enumeration, weights on GPU or
+   the44-second CPU result alone cannot close the45-minute CUDA report.
 
 ## Go lifecycle follow-up after the high-level repair
 
@@ -38,7 +58,7 @@ remain shared across high-level Contexts. Other-language lifecycle remains open.
 
 Owner: maintainer coordinator (active). Whisper CPU pointer/Python model proof
 and Japanese/Echo artifact audits are now complete; see HISTORY.md and receipts.
-Next inspect issue550 long-window model run39212307554, then actual CUDA memory.
+Next complete issue550 actual CUDA memory/reuse; its CPU matrix is audited.
 Continue wrapper lifecycle/callable gaps, updated PR521 and release acceptance.
 Go high-level parallel access and Python CI expectation repairs are complete;
 see HISTORY.md. Do not infer model acceptance from the local glue regressions.

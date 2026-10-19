@@ -1,0 +1,39 @@
+{
+  "run": 39212307554,
+  "source": "62e598ca01471ad9e8c6ee3c4f7bb77e1cef62f1",
+  "status": "CPU short/long native and public seam audit passed",
+  "artifacts_verified": 75,
+  "source_files_verified": 18,
+  "logits_shape": [
+    80,
+    4001
+  ],
+  "native_calls_verified": 22,
+  "public_calls_verified": 5,
+  "cli_calls_verified": 3,
+  "encoder_median_ms": 3576.11521,
+  "dp_off_median_ms": 1.430403,
+  "dp_on_median_ms": 1.5135695,
+  "receipt_sha256": "792e91f1df1e0e9277e0b397905b1b7bfa5c9ffffab6d7002d6aef33089a0e3a",
+  "limits": [
+    "one repeated licensed Japanese clip; no labeled boundary accuracy",
+    "windowing changes encoder context/frontend normalization; nonzero boundary differences retained",
+    "no GPU execution/peak memory/45-minute hardware proof or release acceptance",
+    "model weights hash-checked on hosted worker, not downloaded again locally"
+  ],
+  "long_samples": 712320,
+  "long_seconds": 44.52,
+  "long_units": 147,
+  "long_cli_calls": 4,
+  "long_python_cabi_calls": 1,
+  "core_seconds": [
+    0,
+    30,
+    10,
+    30
+  ],
+  "repeat_exact": true,
+  "default_public_offset_cs": 1234,
+  "max_boundary_difference_cs_vs_full_native": 40,
+  "mean_boundary_difference_cs_vs_full_native": 0.9251700680272109
+}

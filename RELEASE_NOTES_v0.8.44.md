@@ -682,8 +682,11 @@ Canary/FastConformer forced alignment uses30-second encoder cores with two-secon
 context while retaining one global transcript alignment. CLI align-only honors
 `--chunk-seconds`; bindings receive the safe default. Short-input inference is
 unchanged; zero explicitly disables windows. Nine tiny runtime tests pass.
-Actual-model seam and long-file CUDA memory validation remain pending. Host
-logits/DP memory still scales with duration, and align-only does not apply VAD.
+The independently audited CPU seam run now passes all147 units in44.52 seconds,
+repeatability and CLI/Python/C ABI offset parity. Mean/max boundary differences
+versus full native context are9.25/400ms; no labeled accuracy claim follows.
+Long-file CUDA memory/reuse remains pending. Host logits/DP memory scales with
+duration, and align-only does not apply VAD.
 
 ### Audited alignment and quantization diagnostics
 

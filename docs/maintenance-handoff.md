@@ -9,9 +9,11 @@ in a tracked receipt does not change an immutable public artifact's hash.
 
 Whisper CPU model run39211685024 (sourceafeffa1a5) is complete and independently
 audited:12 native/six Python cases pass exact raw timestamp bounds. Current
-priority is bounded long CTC alignment acceptance39212307554 (source62e598ca0),
-wrapper lifecycle/callable gaps, updated PR521 and release validation. Inspect
-the pending alignment artifacts before claiming success. Drama3 is
+CPU alignment39212307554 (source62e598ca0) is now independently audited too.
+Current priority is actual long-input CUDA memory/reuse, hosted/high-level Go
+model acceptance, remaining callable/lifecycle gaps, PR521 and release validation.
+CUDA build39215806310 is dispatched on frozen191815511. PLAN.md scopes the
+Kaggle memory/cache follow-up; no GPU acceptance is claimed. Drama3 is
 outside active/release scope by maintainer decision. PLAN.md owns remaining
 work; completed Japanese/Echo proof is in HISTORY.md and the new audit receipts.
 Other dated fronts below need current evidence before their pending labels are
@@ -50,10 +52,10 @@ accuracy/runtime benchmark. No external code or fitted asset is ported/vendored.
 1. Preserve the completed [Whisper CPU model audit](whisper-wrapper-model-audit-2026-10-19.json).
    Extend actual VAD-model, beam/UTF-8, callback/device/platform and lifecycle
    scope rather than repeating the accepted12 native/six Python cases.
-2. Inspect issue550 run39212307554: short parity first, then44.52-second repeated
-   speech, full/10s/30s encoder seams and default C ABI/Python offset parity.
-   Follow with actual long-input CUDA memory/reuse; host DP/logits remain linear
-   in recording length. VAD is unused in align-only.
+2. Preserve the accepted [CTC CPU window audit](alignment-windows-cpu-audit-2026-10-19.json).
+   Inspect CUDA bundle39215806310, then run approximately45 minutes plus warm
+   short/long/short cache changes on real CUDA. PLAN.md gives the exact gates.
+   Host DP/logits remain linear; VAD is unused in align-only. Keep550 open.
 3. Inspect the new high-level Go lifecycle contracts:47 Go race cases pass,
    including actual pthread callbacks and concurrent close/option updates. Raw
    low-level pointers and other-language lifecycle remain separate. Validate
