@@ -707,8 +707,11 @@ snapshot. Concurrent/repeated close frees once, and returned segments/tokens
 remain owned. Contexts still share the model's latest native results. Raw
 low-level Context pointers still require caller serialization. Language lookup
 also frees its C string and lists the final supported language. Validation:
-47 Go race cases,34 Rust cases and five doctests; actual Go/model/platform checks
-remain pending.
+51 Go race cases,35 Rust cases and five doctests. The independently audited
+real Go tiny.en/JFK CPU run also passes four cases, including callback guards,
+cancellation/recovery, parallel decode and owned snapshots. Other model modes
+and platforms remain separate; raw low-level/generic handles require caller
+serialization.
 
 ### Arabic character alignment through Java and Python
 
@@ -722,8 +725,10 @@ original encoder parity, acoustic boundary accuracy or GPU behavior. See
 inputs and the distinction between independent and hosted-worker evidence.
 
 The CUDA alignment bundle is independently hash-audited; a2703-second Kaggle
-cache/memory test is dispatched. The real-model Go lifecycle check is separately
-dispatched on GitHub Actions. Neither pending run is release acceptance yet.
+cache/memory test remains queued. The real-model Go lifecycle run now passes
+and is independently audited; see
+[the receipt](docs/go-model-lifecycle-audit-2026-10-19.json). Final release
+package/tip CI and actual long-file CUDA acceptance are still pending.
 
 ### Go/Rust generic speaker input and result contracts
 

@@ -217,6 +217,11 @@ lifecycle through the error-returning operations; do not call native queries
 from callbacks. `String` remains safe and reports a busy model. Close is
 idempotent after inference ends; a rejected close leaves the model usable.
 
+A hosted real tiny.en/JFK CPU run independently verifies callback/concurrent
+rejection, cancellation recovery, parallel decode and owned outputs. See
+[the audit](../../docs/go-model-lifecycle-audit-2026-10-19.json) for exact source
+and limits; this does not certify raw contexts, other devices or model modes.
+
 Go-owned option setters use a separate mutex and can update the next decode's
 snapshot while inference runs; `SetLanguage` requires the native borrow. Contexts
 share the latest native result set: read it before another decode, or retain the

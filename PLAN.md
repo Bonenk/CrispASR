@@ -52,23 +52,20 @@ Kernel acceptance, per the maintainer's external Kaggle guide:
    unused in align-only. A green build, device enumeration, weights on GPU or
    the44-second CPU result alone cannot close the45-minute CUDA report.
 
-## Go lifecycle follow-up after the high-level repair
+## Go lifecycle — remaining scope after actual CPU model acceptance
 
-The built-in high-level Model now enforces nonblocking ownership across native
-operations/close and separately synchronizes options. Completed implementation,
-47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
-All six hosted binding contracts39215435420 pass. Claimed: actual small-model
-Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
-and tools/ci-heavy/go-model-lifecycle/. Hosted run39222679421 on frozen35df8d6d4 built native successfully but
-failed before model execution: the generated Go link requires Opus/Ogg and
-crispasr_opusfile, which the worker omitted. The worker now explicitly enables
-CRISPASR_OPUS_FETCH like existing Go CI, retains native evidence before Go
-linking, and checkpoints each completed model case. Corrected run39228691810 is in progress on frozen5aba585ce, branch
-diag/go-model-lifecycle-v2-20261019. The first failure is not a decoder/lifetime
-result; audit the rerun's raw outputs before accepting model behavior. Inspect retained raw outputs before accepting model scope. Raw low-level
-Go pointers still require caller serialization; assess an owned low-level
-adapter before promising their concurrent lifetime safety. Native result states
-remain shared across high-level Contexts. Other-language lifecycle remains open.
+High-level Model implementation,51 Go race cases/35 Rust cases/five doctests,
+and the real tiny.en/JFK Go model proof are complete; see HISTORY.md and
+[the independent audit](docs/go-model-lifecycle-audit-2026-10-19.json).
+Run39228691810/source5aba585ce verifies actual callback close/re-entry,
+concurrent rejection, cancellation/recovery, parallel decoding and owned results.
+Do not rerun the same accepted fixture merely because an older note says pending.
+Next extend only new scope: beam/partial UTF-8, actual VAD model, DTW model mode,
+other supported platforms/devices and other wrapper languages. Raw low-level
+Go pointers and generic speaker handles remain caller-serialized; assess an
+owned adapter before promising concurrent safety. High-level Contexts share the
+latest native result state. All six earlier binding contracts39215435420 pass;
+current-tip CI remains a separate integration gate.
 
 ## Generic speaker primitives — remaining languages/model scope
 
@@ -302,20 +299,21 @@ loads a helper compiled against that build. A fixture library is never the
 native model acceptance gate.
 
 Frozen implementation source `c12707299c5dcbca7bafe60a073688250238cdd9`
-is on immutable `diag/python-api-20261018`. Full CI
-[39120101432](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101432)
-and lint
-[39120101602](https://github.com/CrispStrobe/CrispASR/actions/runs/39120101602)
-are dispatched and queued. Secret scan `39120093240` also targets that source.
-Verify terminal conclusions, source SHA and actual test/helper output before
-accepting the hosted gates. Later documentation commits on main do not alter
-this pinned implementation.
+is on immutable `diag/python-api-20261018`. CI39120101432 finished with12
+successful jobs and a Linux metadata-fixture failure after all2,033 native
+unit tests passed; lint39120101602 passed all10 jobs. The failure was untyped
+optional Parakeet word-alternative getters truncating a pointer, repaired by
+ff3aeeefd; its observed failure/repair is in HISTORY.md. Do not rerun that old
+source as though it were queued. Refreshed PR521 headab6c92cae's Linux unit job
+39223238352 passes the full metadata/getter/export/helper step, including
+297-function inventory and189 pytest cases/34 subtests. That is PR-source
+integration evidence, not current-main release or real-model acceptance.
 
 Next acceptance work, in order:
 
-1. Audit the immutable source's full CI/lint pinned above,
-   especially the complete shared library, legacy helper link/load, the
-   164-symbol smoke subset and native exported metadata. Do not accept a stale
+1. Check exact current-main full-library CI after subsequent wrapper changes,
+   including legacy helper link/load, export smoke and native metadata. Preserve
+   the corrected terminal outcomes above; do not repeat the old failed fixture. Do not accept a stale
    build discovered from another checkout. Local symbol-resolution checks skip
    when no current native library was explicitly supplied.
 2. Exercise representative real models through Python: piano (including empty

@@ -808,6 +808,13 @@ counts/labels, NUL strings, repeated close/drop and native failures. Go/Rust and
 Ruby/WASM share this oracle. Go generic handles still need caller serialization;
 the high-level Whisper borrow guard does not protect unrelated model handles.
 
+The actual high-level Go tiny.en/JFK run is independently audited in
+[the model receipt](go-model-lifecycle-audit-2026-10-19.json). Preserve that
+accepted bounded fixture; expand VAD/DTW/beam/device scope rather than repeating
+it as a substitute for a missing acceptance gate. Build native Go validation
+with `CRISPASR_OPUS_FETCH=ON`, matching the ordinary generated link; never remove
+link directives or supply stub dependencies to claim actual-model acceptance.
+
 Legacy token adapters must copy both chosen-token and candidate text before
 native buffers can be reused or the model closed. Preserve raw UTF-8 fragments
 and native timing/probability sentinels. Validate segment/token indices and

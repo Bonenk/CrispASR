@@ -1,3 +1,32 @@
+## Real-model high-level Go lifecycle accepted — 2026-10-19
+
+Run39228691810/source5aba585ce passes after the Opus build preflight repair.
+Independent audit verifies26 retained artifacts and34 source hashes, native
+library/probe/audio identities and the actual Go binary's race instrumentation.
+All four real tiny.en/JFK cases return two segments; callback guards perform4
+checks sequentially and8 across two native workers. Sequential baseline,
+callback-guarded and cancellation-recovery segment/token values are exact.
+The audit checks105 segment token rows,58 first-segment detailed snapshots and
+116 alternatives, raw text bytes, timing units/bounds and unavailable DTW=-1.
+[Public receipt](docs/go-model-lifecycle-audit-2026-10-19.json).
+
+The verified probe rejects callback/concurrent close and re-entry, recovers
+from a held encoder cancellation, exercises two-worker parallel decode and
+retains owned results after close. This is CPU/high-level/greedy acceptance;
+Go race instrumentation does not instrument C++, and no original-reference,
+WER/speed, GPU, actual VAD/DTW model or universal raw-handle safety is claimed.
+
+## Older Python CI queue labels reconciled — 2026-10-19
+
+Frozen c12707299 CI39120101432 actually completed:12 jobs pass, Linux unit
+fails after all2,033 native tests at the known Parakeet metadata test pointer
+truncation. All10 lint39120101602 jobs pass. The signature repairff3aeeefd is
+already integrated and has an observed tiny exit139 negative. Refreshed PR521
+headab6c92cae's Linux unit job39223238352 now passes the complete exported
+metadata/Python step:13 session and six window tests,297-function inventory,
+189 pytest cases/34 subtests and freshly compiled native helper load. These
+are source-scoped integration results, not current-main release/model proof.
+
 ## Go/Rust generic speaker operation gaps repaired — 2026-10-19
 
 New actual-method/shared-header probes reproduced a Go cluster-size overflow
