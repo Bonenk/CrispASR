@@ -4,7 +4,10 @@ Dispatch `heavy-cpu.yml` with `script=tools/ci-heavy/go_model_lifecycle.py` on
 an immutable source branch, Linux runner, no extra pip dependencies. This is
 hosted-only: it builds the real native library and ordinary public Go packages,
 including generated linker directives. No substitute C headers or stub libraries
-are allowed. `go build -race` checks Go-visible accesses; it does not instrument
+are allowed. Enable `CRISPASR_OPUS_FETCH=ON`, as the generated Go link also
+requires the actual Opus/Ogg/opusfile libraries. Runtime artifacts are retained
+before linking; no model is downloaded until Go compilation succeeds.
+`go build -race` checks Go-visible accesses; it does not instrument
 native C++ memory accesses.
 
 The tiny.en model revision/hash and JFK audio hash match the accepted earlier

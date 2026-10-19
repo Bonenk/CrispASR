@@ -59,9 +59,12 @@ operations/close and separately synchronizes options. Completed implementation,
 47 race-enabled Go cases,34 Rust cases and five doctests are in HISTORY.md.
 All six hosted binding contracts39215435420 pass. Claimed: actual small-model
 Go callback-close/re-entry acceptance, using tools/ci-heavy/go_model_lifecycle.py
-and tools/ci-heavy/go-model-lifecycle/. Hosted run39222679421 is dispatched
-on frozen35df8d6d4, branchdiag/go-model-lifecycle-20261019; it is in progress
-at this checkpoint. Inspect retained raw outputs before accepting model scope. Raw low-level
+and tools/ci-heavy/go-model-lifecycle/. Hosted run39222679421 on frozen35df8d6d4 built native successfully but
+failed before model execution: the generated Go link requires Opus/Ogg and
+crispasr_opusfile, which the worker omitted. The worker now explicitly enables
+CRISPASR_OPUS_FETCH like existing Go CI, retains native evidence before Go
+linking, and checkpoints each completed model case. A corrected hosted run is
+required; this failure is not a decoder/lifetime result. Inspect retained raw outputs before accepting model scope. Raw low-level
 Go pointers still require caller serialization; assess an owned low-level
 adapter before promising their concurrent lifetime safety. Native result states
 remain shared across high-level Contexts. Other-language lifecycle remains open.

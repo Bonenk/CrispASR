@@ -1,3 +1,13 @@
+## Go model-worker link preflight repair — 2026-10-19
+
+Run39222679421/source35df8d6d4 built the real native library but failed the
+ordinary generated Go link before any inference: Opus/Ogg/crispasr_opusfile were
+not built. The hosted worker now enables CRISPASR_OPUS_FETCH, matching existing
+Go CI. Binding linker directives and speech/lifetime gates are unchanged.
+Runtime artifacts are retained before Go linking; completed model cases are
+checkpointed. Model download follows successful Go compilation. Syntax and Go
+format checks pass; actual corrected hosted acceptance remains in PLAN.md.
+
 ## PR521 refreshed for review; no full-runtime promotion — 2026-10-19
 
 Review headab6c92cae incorporates main35df8d6d4 while preserving contributor

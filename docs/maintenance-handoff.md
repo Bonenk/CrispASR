@@ -71,7 +71,9 @@ release blocker.
    including actual pthread callbacks and concurrent close/option updates. New
    hosted-only tools/ci-heavy/go_model_lifecycle.py prepares real-model callback,
    abort/recovery and parallel ownership acceptance. Run39222679421 on frozen
-   35df8d6d4 is in progress; audit retained outputs when terminal. Raw
+   35df8d6d4 failed before inference because Opus/Ogg/opusfile were omitted
+   from the worker build. Explicit OPUS_FETCH and early artifact checkpoints
+   repair the preflight; audit the corrected run rather than accepting the old one. Raw
    low-level pointers and other-language lifecycle remain separate. Validate
    actual Go/model behavior and continue the callable ledger from PLAN.md.
 4. Inspect PR521 headab6c92cae and its fresh checks. Current main is merged
