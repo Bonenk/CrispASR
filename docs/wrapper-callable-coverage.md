@@ -380,12 +380,16 @@ model behavior, worker errors and parallel timestamp merging remain in PLAN.md.
 
 `tests/test_whisper_parallel_runtime.py` compiles the literal runtime loop and
 segment layout against real public parameter/token headers, controlled worker
-states and real threads. Fifteen UBSan cases cover chunk token/DTW shifts,
+states and real threads. Twenty-two UBSan cases cover chunk token/DTW shifts,
 unavailable sentinels, alternative association, wide/fractional boundary math,
 worker/main errors, worker exceptions, null state allocation, silence cleanup,
 parent VAD mapping retention and sequential/tiny-input routing. It is a runtime
-glue gate, separate from the language transport fixtures. Duration/callback
-semantics and actual-model/device acceptance remain in PLAN.md.
+glue gate, separate from the language transport fixtures. Seven of these cases
+add exact bounded-interval coverage, fractional/clipped/large durations and
+negative/tiny-limit routing. Callback semantics and actual-model/device
+acceptance remain in PLAN.md. The hosted-only
+`tools/ci-heavy/whisper_wrapper_validate.py` prepares actual tiny.en pointer/Python
+metadata acceptance; its artifacts must be reviewed before claiming completion.
 
 `tests/test_whisper_vad_timeline.py` adds nine UBSan cases using the literal VAD
 stitcher/interpolator, token getters, scalar adapters, sequential/parallel routes

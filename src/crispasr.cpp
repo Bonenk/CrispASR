@@ -9128,7 +9128,7 @@ int whisper_full(struct whisper_context* ctx, struct whisper_full_params params,
 
 int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_params params, const float* samples,
                           int n_samples, int n_processors) {
-    if (!ctx || !ctx->state || n_processors < 1 || n_samples < 0 || params.offset_ms < 0 ||
+    if (!ctx || !ctx->state || n_processors < 1 || n_samples < 0 || params.offset_ms < 0 || params.duration_ms < 0 ||
         (n_samples > 0 && !samples)) {
         return -1;
     }
@@ -9164,6 +9164,14 @@ int whisper_full_parallel(struct whisper_context* ctx, struct whisper_full_param
     if (offset_samples_wide >= n_samples) {
         ctx->state->result_all.clear();
         return 0;
+    }
+    // duration_ms limits the entire requested interval, not each worker.
+    // Bound PCM before splitting so encoders cannot see the unrequested tail.
+    // Offsets/duration retain the existing post-VAD (processed-audio) units.
+    if (params.duration_ms > 0) {
+        const int64_t end_samples = offset_samples_wide + int64_t(CRISPASR_SAMPLE_RATE) * params.duration_ms / 1000;
+        n_samples = int(std::min<int64_t>(n_samples, end_samples));
+        params.duration_ms = 0; // The PCM bound now owns the global limit.
     }
     const int offset_samples = int(offset_samples_wide);
     const int n_samples_per_processor = (n_samples - offset_samples) / n_processors;

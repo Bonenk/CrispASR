@@ -783,6 +783,10 @@ CRISPASR_API int whisper_full_with_state(struct whisper_context* ctx, struct whi
 // Not thread safe if executed in parallel on the same context.
 // It seems this approach can offer some speedup in some cases.
 // However, the transcription accuracy can be worse at the beginning and end of each chunk.
+// For multiple processors, duration_ms bounds one interval before splitting;
+// each worker decodes its slice without reapplying the global duration. Zero
+// duration uses the remaining audio. With VAD, interval selection retains its
+// existing processed-audio units. Negative offset/duration is invalid.
 // Available token/DTW times receive the same chunk offset as segment times;
 // negative unavailable-time sentinels and token alternatives are preserved.
 // Worker errors are propagated after all started workers are joined. Failed

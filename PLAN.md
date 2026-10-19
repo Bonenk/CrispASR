@@ -2,8 +2,8 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Next: hosted model acceptance and bounded
-parallel duration/callback semantics, then remaining lifecycle/cross-language audits.
+Owner: maintainer coordinator. Next: review hosted Whisper pointer/Python
+model acceptance, then callbacks and remaining lifecycle/cross-language audits.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
 All 2,033 native unit tests passed; rerun hosted CI after the Parakeet
@@ -84,6 +84,14 @@ repairs are archived in HISTORY.md. Keep this gate in CTest and hosted CI.
 Next, use a hosted CPU build and a small existing Whisper fixture (no local
 model downloads/native builds) to call the exported pointer ABI with 1/2/3
 processors, nonzero offsets, token timestamps, DTW and alternative capture.
+Run `tools/ci-heavy/whisper_wrapper_validate.py` through `heavy-cpu.yml` with
+`pip=numpy` and a 60-minute timeout; inspect `receipt.json`, native/Python raw
+metadata and failure logs from the exact dispatched commit before marking model
+acceptance done. It uses a resolved immutable public model revision and records
+SHA256 identities. It does not exercise an actual VAD model. The model sanity
+gate allows a one-second timestamp margin; the 22-case runtime gate requires
+exact input geometry. Extend acceptance to actual VAD and supported native
+platforms separately.
 Assert per-run timestamp bounds/order and candidate ownership, with unavailable
 -1 preserved. Do not require identical text between different chunkings.
 
@@ -96,8 +104,11 @@ Still audit these distinct semantics before claiming complete timeline parity:
   repairs. Validate actual VAD detections, overlap/clipping boundaries and
   VAD-on -> plain -> VAD-on model reuse through each public wrapper; do not
   assume the controlled detector fixture establishes real alignment quality.
-- Inspect `duration_ms` globally versus per worker. Test an offset plus a bounded
-  requested interval before changing how audio is split.
+- Global parallel duration now clips PCM once before splitting, with exact
+  sample geometry and forwarding checked by seven additional regressions.
+  VAD offsets/duration still select in processed-audio units after the prepass;
+  establish whether a future original-time selection API is needed without
+  silently changing that existing contract.
 - The first chunk may have delivered callbacks before another worker fails;
   failure clears the stored result but cannot retract callbacks. Exercise
   foreign-thread encoder/abort callbacks and actual context/device allocation

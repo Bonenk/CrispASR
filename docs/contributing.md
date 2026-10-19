@@ -746,6 +746,16 @@ proves glue behavior; hosted actual-model tests must separately check VAD
 original-time mapping, bounded duration and callback/device behavior. Do not
 infer original-time VAD token parity from a successful chunk merge.
 
+For bounded parallel decoding, clip one global offset/duration interval before
+splitting, clear the now-consumed per-worker duration, and cover exact contiguous
+sample coverage including remainder, fractional offsets, overflow-sized limits
+and tiny-interval fallback. VAD selection currently uses processed-audio units.
+`tools/ci-heavy/whisper_wrapper_validate.py` is a hosted-only actual-library/model
+pointer/Python smoke worker (`heavy-cpu.yml`, `pip=numpy`). Review its artifacts;
+preparing or dispatching it does not establish model acceptance. Exact geometry
+belongs to the tiny regressions; its real-model timestamp sanity has a one-second
+margin and establishes no transcript/numerical/GPU parity.
+
 `python3 tests/test_whisper_vad_timeline.py -v` also compiles the literal VAD
 stitcher/interpolator, token getters and scalar adapters. Available token/DTW
 times must use original-audio time consistently with segments. Map returned

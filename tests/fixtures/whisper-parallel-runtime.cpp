@@ -1,5 +1,6 @@
 #include "crispasr.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
@@ -33,6 +34,13 @@ static int vad_calls = 0, sequential_calls = 0, fail_sequential = 0;
 static bool vad_silence = false, vad_failure = false, allocation_throws = false;
 static std::atomic<int> completed{0}, callbacks{0};
 static std::vector<int64_t> logged_boundaries;
+struct decode_call {
+    const float* samples = nullptr;
+    int count = 0, offset_ms = 0, duration_ms = 0;
+};
+static const float* tracked_pcm = nullptr;
+static std::array<decode_call, 4> decode_calls;
+
 static void log_message(const char*, ...) {}
 #define CRISPASR_LOG_INFO log_message
 #define CRISPASR_LOG_ERROR log_message
@@ -76,11 +84,15 @@ static bool whisper_vad(whisper_context*, whisper_state* state, whisper_full_par
     }
     return true;
 }
-int whisper_full_with_state(whisper_context* ctx, whisper_state* state, whisper_full_params params, const float*,
-                            int n) {
+int whisper_full_with_state(whisper_context* ctx, whisper_state* state, whisper_full_params params,
+                            const float* samples, int n) {
     // PRODUCTION_DECODE_ENTRY
     require(state != nullptr, "decode received null worker state");
     require(n > 0, "decode received empty chunk");
+    if (tracked_pcm) {
+        require(state->id >= 0 && state->id < int(decode_calls.size()), "unexpected worker ID");
+        decode_calls[state->id] = {samples, n, params.offset_ms, params.duration_ms};
+    }
     state->result_all.clear();
     const int64_t offset = params.offset_ms / 10;
     whisper_segment seg{};
@@ -133,6 +145,25 @@ int main(int argc, char** argv) {
     params.new_segment_callback = [](whisper_context*, whisper_state*, int, void*) { ++callbacks; };
     int n = 64000, processors = 3;
     params.offset_ms = 1000;
+    if (test.rfind("duration", 0) == 0) {
+        n = 100007;
+        params.duration_ms = 1700;
+        if (test == "duration-zero-offset") {
+            params.offset_ms = 0;
+        } else if (test == "duration-clipped") {
+            params.duration_ms = 6000;
+        } else if (test == "duration-large") {
+            params.duration_ms = 2147483647;
+        } else if (test == "duration-fractional") {
+            params.offset_ms = 1009;
+            params.duration_ms = 1709;
+        } else if (test == "duration-tiny") {
+            params.duration_ms = 1;
+            processors = 32;
+        } else if (test == "duration-negative") {
+            params.duration_ms = -1;
+        }
+    }
     if (test == "fractional-offset") {
         params.offset_ms = 1009;
     }
@@ -171,6 +202,40 @@ int main(int argc, char** argv) {
     std::unique_ptr<float[]> pcm(new float[n]);
     if (params.vad) {
         std::fill_n(pcm.get(), n, 0.f);
+    }
+    if (test.rfind("duration", 0) == 0) {
+        tracked_pcm = pcm.get();
+        if (test == "duration-negative") {
+            require(whisper_full_parallel(&ctx, params, pcm.get(), n, 3) < 0, "negative duration accepted");
+            require(whisper_full_parallel(&ctx, params, pcm.get(), n, 1) < 0,
+                    "single-worker negative duration accepted");
+            require(completed == 0 && allocated == 0, "negative duration reached decoding");
+            return 0;
+        }
+        require(whisper_full_parallel(&ctx, params, pcm.get(), n, processors) == 0, "bounded decode failed");
+        require(allocated == freed, "bounded decode leaked worker states");
+        // Independent interval oracle: these are exact 16 kHz PCM endpoints,
+        // not a second implementation of the production split/merge loop.
+        const int64_t begin = int64_t(params.offset_ms) * 16;
+        const int64_t end = std::min<int64_t>(n, begin + int64_t(params.duration_ms) * 16);
+        const int expected_decoders = test == "duration-tiny" ? 1 : processors;
+        require(completed == expected_decoders, "bounded interval launched empty/excess workers");
+        int64_t cursor = begin;
+        for (int i = 0; i < expected_decoders; ++i) {
+            const auto& call = decode_calls[i];
+            require(call.samples != nullptr && call.count > 0, "bounded decoder call missing");
+            const int64_t effective_begin = call.samples - tracked_pcm + int64_t(call.offset_ms) * 16;
+            const int64_t effective_end = call.samples - tracked_pcm + call.count;
+            require(effective_begin == cursor, "bounded split skipped or repeated input samples");
+            require(effective_end > effective_begin && effective_end <= end,
+                    "worker saw audio outside requested interval");
+            require(call.duration_ms == 0, "global duration was reapplied separately per worker");
+            cursor = effective_end;
+        }
+        require(cursor == end, "bounded split omitted interval tail/remainder");
+        require(decode_calls[0].samples == pcm.get() && decode_calls[0].offset_ms == params.offset_ms,
+                "first-chunk offset routing changed");
+        return 0;
     }
     if (test == "inputs") {
         require(whisper_full_parallel(&ctx, params, pcm.get(), n, 0) < 0, "accepted zero processors");

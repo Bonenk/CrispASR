@@ -83,6 +83,27 @@ class WhisperParallelRuntime(unittest.TestCase):
     def test_invalid_inputs_and_excess_processors(self):
         self.check_case('inputs')
 
+    def test_bounded_duration_is_split_once_over_the_requested_interval(self):
+        self.check_case('duration')
+
+    def test_duration_at_zero_offset_ignores_the_unrequested_tail(self):
+        self.check_case('duration-zero-offset')
+
+    def test_duration_clips_to_available_audio_and_keeps_remainder(self):
+        self.check_case('duration-clipped')
+
+    def test_large_duration_uses_wide_arithmetic_before_clipping(self):
+        self.check_case('duration-large')
+
+    def test_fractional_duration_preserves_exact_sample_boundaries(self):
+        self.check_case('duration-fractional')
+
+    def test_duration_with_too_many_workers_uses_bounded_fallback(self):
+        self.check_case('duration-tiny')
+
+    def test_negative_duration_is_rejected(self):
+        self.check_case('duration-negative')
+
     def test_single_processor_preserves_sequential_route(self):
         self.check_case('single')
 

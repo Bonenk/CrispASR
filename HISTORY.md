@@ -1,3 +1,33 @@
+## Parallel decoding bounds duration once before splitting — 2026-10-19
+
+With multiple processors, `whisper_full_parallel` now caps PCM at the requested
+offset plus duration before dividing work. Previously it split the remaining
+recording and passed the full requested duration to every worker, so workers
+could skip requested spans and decode unrelated later audio. The bounded PCM
+owns the interval limit; per-worker duration is zero. End-point arithmetic is
+64-bit and clips to available samples, preserving the final chunk remainder,
+nonzero/fractional offsets and the short-interval fallback. Negative duration
+is rejected before dispatch, including the one-processor route. Zero duration
+remains unbounded; VAD interval units remain processed-audio time.
+
+Seven new literal-runtime cases fail before repair and pass afterward. The
+independent call recorder checks exact contiguous PCM coverage and rejects
+out-of-interval tails and repeated duration forwarding. The suite now passes
+**22 parallel cases plus nine VAD timeline cases under UBSan**. Full runtime and
+hosted model probe syntax checks pass. These establish dispatch geometry, not
+transcript equality across chunkings or original-model numerical parity.
+
+`tools/ci-heavy/whisper_wrapper_validate.py` prepares hosted CPU acceptance using
+a revision-resolved public tiny.en GGML model and the repository JFK WAV. It
+builds the actual shared library and runs a compiled pointer-ABI matrix (12
+runs: DTW off/on, 1/2/3 processors, full/bounded intervals), then six Python
+wrapper runs with owned metadata retained across reuse/close. It retains binary/
+model/audio identities, actual native binaries, raw metadata and failure logs.
+Timestamp sanity uses a documented one-second model margin; the tiny runtime
+suite separately gates exact sample geometry. Model execution is pending until
+the hosted artifact is reviewed; no model, WER, speed, VAD-detector or GPU parity
+is claimed from preparing this worker.
+
 ## Whisper VAD token timeline and reusable state — 2026-10-19
 
 Token-data getters now map available t0/t1/DTW times back to original audio
