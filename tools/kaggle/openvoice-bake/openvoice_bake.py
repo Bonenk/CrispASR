@@ -19,8 +19,9 @@ import time
 import traceback
 import urllib.request
 
-VERSION = '2026-10-19.openvoice-bake.2'
-SOURCE = '71e329ccfbb33dc99fa53743565292b1dba13b1e'
+CONDITIONING = os.environ.get('CRISPASR_OV2_CONDITIONING') == '1'
+VERSION = '2026-10-19.openvoice-conditioning.1' if CONDITIONING else '2026-10-19.openvoice-bake.3'
+SOURCE = '6be9fda3629d9314da97101b8574fb25db06150f' if CONDITIONING else '71e329ccfbb33dc99fa53743565292b1dba13b1e'
 UPSTREAM = '74a1d147b17a8c3092dd5430504bd83ef6c7eb23'
 BASE_SOURCE = '191815511b85a526aace111b1bda2e28ecb7faad'
 BASE_REV = '425c555beb63de4665cba604c47ea38232f5d080'
@@ -33,7 +34,7 @@ RECEIPT = {'schema': 1, 'version': VERSION, 'source': SOURCE, 'upstream': UPSTRE
            'complete': False, 'model_acceptance': False, 'gpu_executed': False,
            'cases': [], 'limitations': ['native reference encoder and flows are CPU; vocoder uses CUDA',
                                       'native-rate replay isolates resampling; raw reference without VAD',
-                                      'deterministic tau=0; upstream tau=0.3 quality separate',
+                                      'tau0.3 uses original shared noise; free-running RNG parity is separate' if CONDITIONING else 'deterministic tau=0; upstream tau=0.3 quality separate',
                                       'closed-loop synthetic speakers, not human speaker verification']}
 
 
@@ -151,6 +152,10 @@ def main():
             'files':{str(p.relative_to(model)):sha(p) for p in model.rglob('*') if p.is_file()}}
         run([sys.executable,ROOT/'models/convert-openvoice2-to-gguf.py','--ckpt',model/'converter/checkpoint.pth',
              '--config',model/'converter/config.json','--output',WORK/'openvoice-f32sens.gguf'],'convert-f32-sensitive')
+        converted=OUT/'openvoice2-tcc-f32sens.gguf'
+        shutil.copy2(WORK/'openvoice-f32sens.gguf',converted)
+        RECEIPT['converted_model']={'bytes':converted.stat().st_size,'sha256':sha(converted),'name':converted.name}
+        save()
         upstream_tar=WORK/'upstream.tar.gz'
         download(f'https://codeload.github.com/myshell-ai/OpenVoice/tar.gz/{UPSTREAM}',upstream_tar)
         with tarfile.open(upstream_tar) as archive:
@@ -209,12 +214,18 @@ def main():
         op=lib.openvoice2_context_default_params();op.n_threads=2;op.use_gpu=True;op.tau=0
         ov=lib.openvoice2_init_from_file(os.fsencode(WORK/'openvoice-f32sens.gguf'),op)
         if not ov:raise RuntimeError('Native conversion context load failed')
-        for i,text in enumerate(texts):
+        cases=[(text,0.0) for text in texts]+([(texts[0],.3)] if CONDITIONING else [])
+        for i,(text,tau) in enumerate(cases):
             baseline,sr,key=synth(text,0)
             sf.write(OUT/f'baseline-{i}.wav',baseline,sr,subtype='FLOAT')
             import librosa
             source16=librosa.resample(baseline,orig_sr=sr,target_sr=16000)
             os.environ['CRISPASR_OV2_SOURCE_SPEAKER']=key
+            os.environ['CRISPASR_OV2_TAU']=str(tau)
+            if tau:
+                lib.openvoice2_free(ov);op.tau=tau
+                ov=lib.openvoice2_init_from_file(os.fsencode(WORK/'openvoice-f32sens.gguf'),op)
+                if not ov:raise RuntimeError('Noisy context load failed')
             # Original Torch runs in a separate process with the host CUDA
             # stack. The native process keeps the audited CUDA12.4 libraries.
             np.save(WORK/'source16.npy',source16)
@@ -229,13 +240,40 @@ from reference_backends.openvoice2 import dump,DEFAULT_STAGES
 model=Path(sys.argv[2]);source=np.load(sys.argv[3],allow_pickle=False)
 captures=dump(model,source,set(DEFAULT_STAGES))
 meta={name:captures.pop(name) for name in list(captures) if isinstance(captures[name],str)}
-meta.update(backend='openvoice2',source_commit=sys.argv[6],upstream_commit=sys.argv[7],model_revision=sys.argv[8])
+import torch
+meta.update(backend='openvoice2',source_commit=sys.argv[6],upstream_commit=sys.argv[7],model_revision=sys.argv[8],torch_version=torch.__version__)
+Path(sys.argv[5]+'.versions.json').write_text(json.dumps({'torch':torch.__version__,'numpy':np.__version__}))
+if os.environ.get('CRISPASR_OV2_CONDITIONING')=='1' and float(meta['ov2_tau'])==0:
+ import torch
+ from openvoice.models import SynthesizerTrn
+ from openvoice.mel_processing import spectrogram_torch
+ cfg=json.loads((model/'converter/config.json').read_text());data=cfg['data']
+ m=SynthesizerTrn(len(cfg.get('symbols',[])),data['filter_length']//2+1,n_speakers=data['n_speakers'],**cfg['model']).eval()
+ m.load_state_dict(torch.load(model/'converter/checkpoint.pth',map_location='cpu',weights_only=False)['model'],strict=True)
+ device=os.environ.get('CRISPASR_OV2_DEVICE','cpu');m=m.to(device)
+ pcm=captures['ref_pcm'].flatten();n=len(pcm);cut=n//3
+ def spec(x):
+  y=torch.from_numpy(np.ascontiguousarray(x)).unsqueeze(0).to(device)
+  return spectrogram_torch(y,data['filter_length'],data['sampling_rate'],data['hop_length'],data['win_length'],center=False)
+ with torch.inference_mode():
+  embeddings=[m.ref_enc(spec(pcm[a:b]).transpose(1,2)) for a,b in [(0,cut),(cut,n)]]
+  mean=torch.stack(embeddings).mean(0).unsqueeze(-1)
+  source_spec=torch.from_numpy(captures['src_spec'].T.copy()).unsqueeze(0).to(device)
+  source_se=torch.from_numpy(captures['src_se'].reshape(1,-1,1).copy()).to(device)
+  lengths=torch.tensor([source_spec.shape[-1]],device=device)
+  wave=m.voice_conversion(source_spec,lengths,source_se,mean,tau=0)[0][0,0].cpu().numpy().copy()
+  peak=np.max(np.abs(wave))
+  if peak>.01:wave*=np.float32(.95)/peak
+ captures['segment_mean']=mean.cpu().numpy().copy()
+ captures['segment_spans']=np.array([0,cut,cut,n],dtype=np.int32)
+ captures['segment_output_pcm']=wave
 write_gguf_archive(captures,meta,Path(sys.argv[4]))
 np.savez(sys.argv[5],**captures)
 """)
             ref=OUT/f'reference-{i}.gguf'
             run([sys.executable,reference_script,ROOT/'tools',model,WORK/'source16.npy',ref,
                  WORK/'captures.npz',SOURCE,UPSTREAM,model_rev],f'original-reference-{i}')
+            RECEIPT['producer_versions']=json.loads((WORK/'captures.npz.versions.json').read_text())
             with np.load(WORK/'captures.npz',allow_pickle=False) as archive:
                 captures={name:archive[name].copy() for name in archive.files}
             sf.write(OUT/f'original-{i}.wav',captures['output_pcm'].flatten(),22050,subtype='FLOAT')
@@ -244,13 +282,20 @@ np.savez(sys.argv[5],**captures)
             run([WORK/'openvoice-bake',WORK/'openvoice-f32sens.gguf',ref],f'diff-gpu-{i}',env=env)
             log=(OUT/f'diff-gpu-{i}.log').read_text()
             import re
-            if log.count('[PASS]')!=27 or '[FAIL]' in log or 'vocoder backend CUDA' not in log or not re.search(r'## SPLIT #\d+: CUDA',log):
+            expected_stages=28 if tau else 27
+            if log.count('[PASS]')!=expected_stages or '[FAIL]' in log or 'vocoder backend CUDA' not in log or not re.search(r'## SPLIT #\d+: CUDA',log):
                 raise RuntimeError('GPU stages missing or not actually CUDA')
             # Same public model C ABI without instrumentation, including
             # reference-cache reuse. Original tensors feed the native input.
             source_pcm=np.ascontiguousarray(captures['src_pcm'].flatten(),dtype=np.float32)
             target_pcm=np.ascontiguousarray(captures['ref_pcm'].flatten(),dtype=np.float32)
             if not lib.openvoice2_set_source_speaker(ov,key.encode()):raise RuntimeError('Source identity rejected')
+            if tau:
+                lib.openvoice2_set_posterior_noise.argtypes=[ct.c_void_p,floatp,ct.c_int]
+                lib.openvoice2_set_posterior_noise.restype=ct.c_bool
+                noise=np.ascontiguousarray(captures['enc_q_noise'].flatten(),dtype=np.float32)
+                if not lib.openvoice2_set_posterior_noise(ov,noise.ctypes.data_as(floatp),len(noise)):
+                    raise RuntimeError('Original posterior noise was rejected')
             native=[]
             for repeat in range(2):
                 output=floatp();count=ct.c_int()
@@ -268,15 +313,44 @@ np.savez(sys.argv[5],**captures)
                                                          embedding.ctypes.data_as(floatp)):raise RuntimeError('Embedding C ABI failed')
             original_embedding=captures['target_se'].flatten()
             emb_cos=float(np.dot(embedding,original_embedding)/(np.linalg.norm(embedding)*np.linalg.norm(original_embedding)))
-            if emb_cos<.999:raise RuntimeError('Embedding C ABI parity failed')
+            emb_ratio=float(np.linalg.norm(embedding)/np.linalg.norm(original_embedding))
+            if emb_cos<.999 or not .98<emb_ratio<1.02:raise RuntimeError('Embedding C ABI parity failed')
+            if CONDITIONING and not tau:
+                lib.openvoice2_extract_speaker_embedding_segments.argtypes=[ct.c_void_p,floatp,ct.c_int,ct.c_int,
+                                                                           ct.POINTER(ct.c_int),ct.POINTER(ct.c_int),ct.c_int,floatp]
+                lib.openvoice2_extract_speaker_embedding_segments.restype=ct.c_bool
+                spans=captures['segment_spans'].astype(np.int32)
+                starts=np.ascontiguousarray(spans[[0,2]]);ends=np.ascontiguousarray(spans[[1,3]])
+                average=np.empty(256,dtype=np.float32)
+                ok=lib.openvoice2_extract_speaker_embedding_segments(ov,target_pcm.ctypes.data_as(floatp),len(target_pcm),22050,
+                    starts.ctypes.data_as(ct.POINTER(ct.c_int)),ends.ctypes.data_as(ct.POINTER(ct.c_int)),2,average.ctypes.data_as(floatp))
+                if not ok:raise RuntimeError('Native segment averaging failed')
+                truth_mean=captures['segment_mean'].flatten()
+                average_cos=float(np.dot(average,truth_mean)/(np.linalg.norm(average)*np.linalg.norm(truth_mean)))
+                if average_cos<.999 or not .98<float(np.linalg.norm(average)/np.linalg.norm(truth_mean))<1.02:
+                    raise RuntimeError('Original clip-mean embedding parity failed')
+                lib.openvoice2_set_target_embedding.argtypes=[ct.c_void_p,floatp];lib.openvoice2_set_target_embedding.restype=ct.c_bool
+                if not lib.openvoice2_set_target_embedding(ov,average.ctypes.data_as(floatp)):raise RuntimeError('Mean conditioning rejected')
+                ptr=floatp();size=ct.c_int()
+                if not lib.openvoice2_convert(ov,source_pcm.ctypes.data_as(floatp),len(source_pcm),22050,
+                    target_pcm.ctypes.data_as(floatp),len(target_pcm),22050,ct.byref(ptr),ct.byref(size)):
+                    raise RuntimeError('Mean-conditioned conversion failed')
+                try:mean_wave=np.ctypeslib.as_array(ptr,shape=(size.value,)).copy()
+                finally:libc.free(ptr)
+                original_mean_wave=captures['segment_output_pcm'].flatten()
+                mean_cos=float(np.dot(mean_wave.astype(np.float64),original_mean_wave)/(np.linalg.norm(mean_wave.astype(np.float64))*np.linalg.norm(original_mean_wave)))
+                mean_ratio=float(np.linalg.norm(mean_wave)/np.linalg.norm(original_mean_wave))
+                if mean_cos<.99 or not .98<mean_ratio<1.02:raise RuntimeError('Mean-conditioned waveform parity failed')
+                if not lib.openvoice2_set_target_embedding(ov,None):raise RuntimeError('Clearing conditioning failed')
+                RECEIPT.setdefault('clip_means',[]).append({'case':i,'embedding_cosine':average_cos,'waveform_cosine':mean_cos,'waveform_norm_ratio':mean_ratio})
             sf.write(OUT/f'clone-{i}.wav',native[0],22050,subtype='FLOAT')
-            RECEIPT['cases'].append({'text':text,'speaker':key,'ref_sha256':sha(ref),'gpu_parity':True,
-                                     'uninstrumented_waveform_cosine':cosine,'embedding_cosine':emb_cos,'repeat_exact':True})
+            RECEIPT['cases'].append({'text':text,'speaker':key,'tau':tau,'ref_sha256':sha(ref),'gpu_parity':True,
+                                     'uninstrumented_waveform_cosine':cosine,'embedding_cosine':emb_cos,'embedding_norm_ratio':emb_ratio,'repeat_exact':True})
             save()
             # Checkpoint each completed reference before any later quality run.
             try:
                 published=hub.upload_file(path_or_fileobj=str(ref),repo_id='cstr/crispasr-regression-fixtures',
-                    repo_type='dataset',path_in_repo=f'openvoice2/bake-20261019/v1/reference-{i}.gguf',
+                    repo_type='dataset',path_in_repo=f'openvoice2/bake-20261019/{"conditioning-v1" if CONDITIONING else "v1"}/reference-{i}.gguf',
                     commit_message=f'OpenVoice original-module reference case {i}; quality gate separate')
                 RECEIPT['cases'][-1]['published_revision']=published.oid
                 notice=("OpenVoice2 reference from original MIT modules at "+UPSTREAM+".\n"
@@ -334,6 +408,24 @@ receipt['asr']={'repo':'Systran/faster-whisper-tiny.en','revision':revision}
         RECEIPT['references_published']=all('published_revision' in case for case in RECEIPT['cases'])
         RECEIPT['model_acceptance']=all(case['quality_pass'] for case in RECEIPT['cases'])
         RECEIPT['complete']=True
+        if RECEIPT['model_acceptance']:
+            try:
+                repo='cstr/openvoice2-tcc-GGUF'
+                hub.create_repo(repo,repo_type='model',private=False,exist_ok=True)
+                published=hub.upload_file(path_or_fileobj=str(converted),repo_id=repo,
+                    path_in_repo=converted.name,commit_message='OpenVoice V2 F32-sensitive conversion with recorded parity')
+                RECEIPT['published_model']={'repo':repo,'revision':published.oid,**RECEIPT['converted_model']}
+                readme=('---\nlicense: mit\npipeline_tag: audio-to-audio\n---\n\n'
+                        '# OpenVoice V2 tone-color converter\n\n'
+                        'GGUF for CrispASR. Reference encoder, posterior encoder and flows retain F32; decoder weights use F16.\n\n'
+                        'Original MIT model: https://huggingface.co/myshell-ai/OpenVoiceV2/tree/'+model_rev+'\n\n'
+                        'This is a voice converter, not a standalone text-to-speech model. Use the exact source speaker embedding.\n'
+                        'The recorded validation is bounded synthetic English speech; broader languages, natural references and devices remain unqualified.\n'
+                        'Reference recipe: https://github.com/CrispStrobe/CrispASR/blob/'+SOURCE+'/docs/openvoice2-baking.md\n')
+                hub.upload_file(path_or_fileobj=readme.encode(),repo_id=repo,path_in_repo='README.md',commit_message='Document model scope and upstream license')
+                hub.upload_file(path_or_fileobj=str(upstream/'LICENSE'),repo_id=repo,path_in_repo='LICENSE',commit_message='Retain original MIT notice')
+            except Exception as exc:
+                RECEIPT['model_publication_error']=type(exc).__name__
         RECEIPT['artifacts']={p.name:{'bytes':p.stat().st_size,'sha256':sha(p)} for p in OUT.iterdir() if p.is_file() and p.name!='validation.json'}
         save()
         kh.step('parity-complete',cases=len(RECEIPT['cases']),quality=RECEIPT['model_acceptance'])

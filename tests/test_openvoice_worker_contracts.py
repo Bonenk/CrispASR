@@ -28,7 +28,8 @@ class WorkerContracts(unittest.TestCase):
             if isinstance(node,ast.Constant) and isinstance(node.value,str) and node.value.startswith('import sys,'):
                 compile(node.value,'embedded-phase','exec');phases.append(node.value)
         self.assertEqual(len(phases),2)
-        self.assertTrue(all('import torch' not in x for x in phases))
+        outer_imports=[alias.name for node in ast.walk(tree) if isinstance(node,ast.Import) for alias in node.names]
+        self.assertNotIn('torch',outer_imports)
         # Modules may load Torch in these isolated child processes; never put
         # CUDA12.4's LD_LIBRARY_PATH into the child environment.
 

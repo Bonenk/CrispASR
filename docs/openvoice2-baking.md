@@ -102,18 +102,23 @@ ggml, CUDA kernels or the full SDK. Record both base and delta identities.
 The separate full-CMake check39255636270 failed during configuration because
 the parent wrapper project changed CMAKE_SOURCE_DIR used by existing C2PA/llama
 paths. The worker now configures the repository root and injects only its
-target declarations. This build check is not a prerequisite for this bounded model experiment and is not model acceptance.
+target declarations; repaired run39258859196/source6be9fda36 is queued. This build check is not a prerequisite for this bounded model experiment and is not model acceptance.
 
 The kernel preserves the host NVIDIA loader paths and runs Torch phases in
 separate processes from the packaged native CUDA stack. Version1 failed at
 post-reexec nvidia-smi before inference; version2 repairs this preflight.
-The kernel records two text cases, original/native stage comparison,
+The submitted v2 kernel records two text cases, original/native stage comparison,
 uninstrumented public model C API waveform/embedding parity and deterministic
 cache reuse, with CPU Torch fallback on sm60 while the native vocoder genuinely
 uses CUDA. It then checks independent ASR WER<=0.2 for baseline/original/clone
 and independent Resemblyzer similarity improvement>0.01 over baseline. Preserve
 failed originals as controls; do not relax thresholds after seeing a result.
 This is a synthetic closed-loop voice test, not general human-speaker accuracy.
+The prepared conditioning mode (`CRISPASR_OV2_CONDITIONING=1`) freezes newer
+source6be9fda36, adds a third tau0.3 replay and unequal-length original/native
+clip means plus mean-conditioned waveform comparison. Its entry version and
+source are distinct from submitted v2; it has not been run. Converted GGUFs and
+producer versions are retained in newer receipts; v2 lacks those extra fields.
 
 Remaining acceptance scope: raw mixed-rate preprocessing vs original librosa;
 automatic Silero selection and actual supplied-clip averaging; actual tau0.3 shared-noise replay; quant variants

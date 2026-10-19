@@ -72,7 +72,8 @@ target_include_directories(openvoice-probe PRIVATE "${CRISPASR_SOURCE}/src")
     for name in ['LICENSE', 'THIRD_PARTY_NOTICES.txt']:
         shutil.copy2(ROOT / name, bundle)
     receipt = dict(source=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-                   build_complete=True, gpu_executed=False, architectures=[60,75],
+                   ggml=subprocess.check_output(['git','-C',ROOT/'ggml','rev-parse','HEAD'],text=True).strip(),
+                   cuda='12.4.1',build_complete=True, gpu_executed=False, architectures=[60,75],
                    files={p.name:dict(bytes=p.stat().st_size,sha256=sha(p)) for p in bundle.iterdir()})
     (bundle / 'provenance.json').write_text(json.dumps(receipt,indent=2)+'\n')
     with tarfile.open(OUT / 'openvoice-cuda-bake.tar.gz','w:gz') as archive:
