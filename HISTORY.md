@@ -1,3 +1,17 @@
+## Parakeet metadata CI fixture pointer signatures — 2026-10-19
+
+All 2,033 native unit tests pass after the earlier assertion repairs. The next
+hosted metadata step exposed missing ctypes signatures for optional word
+alternative getters in `test_parakeet_window_metadata.py`: `_read_result`
+discovers them in the full library, but the untyped call truncates its opaque
+result pointer. This is a test harness error, not a measured decoder failure.
+
+The tiny fixture now exports the same three literal production alternative
+getters and declares their pointer/index/return types. Before the signature
+repair this reproduces exit 139 without models or a full native build; after it,
+all six grouping/window/repair tests pass. Hosted validation against the complete
+library remains required and stays enabled.
+
 ## Compatible Rust Whisper scalar controls — 2026-10-18
 
 `WhisperDecodeControls` exposes language/prompt strings, eleven flags, threads,

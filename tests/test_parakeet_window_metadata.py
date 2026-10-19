@@ -153,7 +153,8 @@ extern "C" int compare_grouping() {
 '''
         for name in ('n_segments', 'segment_text', 'segment_t0', 'segment_t1', 'segment_speaker',
                      'segment_no_speech_prob', 'n_words', 'word_text', 'word_t0', 'word_t1', 'word_p',
-                     'n_tokens', 'token_text', 'token_t0', 'token_t1', 'token_p', 'free'):
+                     'n_tokens', 'token_text', 'token_t0', 'token_t1', 'token_p',
+                     'word_n_alts', 'word_alt_text', 'word_alt_p', 'free'):
             marker = re.search(r'^CA_EXPORT [^\n]*\bcrispasr_session_result_' + name + r'\(', api, re.MULTILINE).group()
             code += definition(api, marker) + '\n'
         (path / 'probe.cpp').write_text(code)
@@ -179,6 +180,16 @@ extern "C" int compare_grouping() {
                 if kind == 'segment' and field == 'p': continue
                 fn = getattr(cls.result_lib, 'crispasr_session_result_' + kind + '_' + field)
                 fn.argtypes, fn.restype = [ctypes.c_void_p] + [ctypes.c_int] * count, restype
+
+        # _read_result also discovers alternatives when present in a full library.
+        # Leaving these untyped truncates the opaque result pointer to C int.
+        # Export them in the tiny fixture too, so local runs exercise this path.
+        for name, count, restype in [('word_n_alts', 2, ctypes.c_int),
+                                     ('word_alt_text', 3, ctypes.c_char_p),
+                                     ('word_alt_p', 3, ctypes.c_float)]:
+            fn = getattr(cls.result_lib, 'crispasr_session_result_' + name)
+            fn.argtypes = [ctypes.c_void_p] + [ctypes.c_int] * count
+            fn.restype = restype
 
     @classmethod
     def tearDownClass(cls):

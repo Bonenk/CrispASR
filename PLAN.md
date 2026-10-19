@@ -2,11 +2,12 @@
 
 ## NOW — finish the callable wrapper inventory and remaining adapters
 
-Owner: maintainer coordinator. Active next: native parallel timestamp/worker
+Owner: maintainer coordinator. Active: native parallel timestamp/worker
 validation, then remaining parameter/lifecycle and cross-language audits.
 The Rust scalar-helper family now has compatible public controls and parallel
 forwarding; completed repairs and measured probes are archived in HISTORY.md.
-Track the full CI rerun after repairing the stale API-version/Ruby assertions.
+All 2,033 native unit tests passed; rerun hosted CI after the Parakeet
+metadata fixture optional-signature repair (see HISTORY.md).
 Continue the cross-language wrapper task; the bounded external agent tasks have
 ended. Start with the incremental
 [callable ledger](docs/wrapper-callable-coverage.md), then inspect actual code.
