@@ -1,3 +1,22 @@
+## 2026-10-20 — CANN lifecycle and Mac live follow-up completed
+
+Implementation `18b540bd5` and shared ggml `e2ae679a` are integrated on canonical
+branches. The cache remains off. All 53 host lifecycle checks pass, including a
+retained failed-before/fixed-after zero-length alias write control. All 576 CPU
+probe computations pass independent saved-input arithmetic verification. Actual
+Mac CPU/Metal F32 Moonshine reference, CLI, Session and short/double/short reuse
+checks pass; both devices produce matching transcripts and 22/44/22 words.
+[Receipt, complete public proof and immutable device procedure](docs/cann-layout-followup-2026-10-20.md).
+
+Results and the optional model-free Ascend request are posted on
+[PR544](https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6288185477)
+and [ggml PR4](https://github.com/CrispStrobe/ggml/pull/4#issuecomment-6288187900).
+Refreshed SDK39401353196, CI39401352847 and lint39401352899 remain pending/running
+at this checkpoint. Earlier SDK39391430100 passed both compiler architectures
+on its earlier source. Physical NZ arithmetic, ACL replay, CANN model quality
+and resource/performance acceptance remain open in PLAN.md. No Kaggle job or
+model artifact rewrite was needed.
+
 ## 2026-10-20 — Optional CANN weight usage and NZ cache integrated
 
 Model-supplied usage hints cover normal/filtered/split/fit/repack GGUF loaders;
