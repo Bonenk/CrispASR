@@ -53,7 +53,7 @@ def main(argv):
         if leftover:
             sys.exit(f"kpush: unrendered placeholder in {leftover}")
         env = dict(os.environ, KAGGLE_API_TOKEN=token)
-        return subprocess.call([sys.executable, "-m", "kaggle", "kernels", "push", "-p", str(dst)] + argv[2:], env=env)
+        return subprocess.call([sys.executable, "-c", "from kaggle.cli import main; main()", "kernels", "push", "-p", str(dst)] + argv[2:], env=env)
 
 
 if __name__ == "__main__":
