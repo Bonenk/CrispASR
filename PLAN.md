@@ -11,9 +11,14 @@ independent review. Shared ggml PR2 passes CPU/Metal and hosted CPU/software-
 Vulkan controls and remains unmerged. Repaired Linux/Mac/Windows native bundles
 and all three hosted installed-wheel checks pass; library bytes match the
 frozen bundles. [Package acceptance](docs/followup-package-dry-runs-2026-10-20.json).
-Main0c355f398 now passes all13 CI39445302976 jobs and all10 lint39445303065
-jobs. NOW, owner Codex: finish model-free PR2 BF16-weight and Metal/Vulkan
-non-contiguous-input fallback controls, preserving the exact reviewed candidate.
+Main `0c355f398` now passes all 13 CI39445302976 jobs and all 10 lint39445303065
+jobs. The remaining host review now passes 108 cases each on Mac CPU,
+Metal/CPU, Linux CPU and software Vulkan/CPU, including BF16-weight and
+strided-input fallback with actual placement checks. The candidate is unchanged.
+The retained T4 trace also proves a sampled 2,735 → 125 MiB transition after the
+public cache-free call and before fresh CLI model residency; six guards reject
+wrong-device/phase interpretations. No new Kaggle run is needed.
+[Cache-release audit](docs/alignment-cache-release-2026-10-20.json).
 Future release checks, custom-license review and actual Radeon/Ascend gates
 remain open. No tag or release is published here.
 Checkpoint: [follow-up evidence and reporter actions](docs/issue-followups-2026-10-20.md).

@@ -174,3 +174,51 @@ byte readback is verified. No native binaries, wheels or weights are embedded.
 The older archives remain immutable snapshots. General main-tip CI/lint remain
 separate from these completed package jobs; no release or public wheel update
 is published by this work.
+
+
+## Final main CI and expanded fallback review
+
+Main source `0c355f398400d7f2ef7fd838ddcb91b32dd9089b` passes all 13
+[CI jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39445302976)
+and all 10 [lint jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39445303065).
+Each job was checked individually. The retained full Linux unit log confirms
+2,039 CTest cases, 189 Python cases and 34 subtests passed. These are completed
+frozen-source results; earlier pending checkpoints above are historical.
+
+The unchanged PR2 candidate now passes 108 cases each on Mac CPU, Metal/CPU,
+Linux CPU and software Vulkan/CPU. Each matrix retains the 100 ordinary/large-
+activation cases and adds four strided-input plus four BF16-weight controls.
+All 50 eligible direct convolutions execute on the requested backend. Metal and
+software Vulkan each place six strided IM2COL operations on CPU, including
+two BF16 cases. The outputs match the scalar oracle. The original direct-only
+Metal harness aborted when it forced an operation Metal declares unsupported;
+that harness control is retained. The corrected probe preallocates leaves and
+uses the normal scheduler, with supported-operation/placement checks.
+A buffered log previously interleaved backend stderr into one case record;
+line-buffered output now passes strict per-row auditing.
+[Expanded hosted run](https://github.com/CrispStrobe/CrispASR/actions/runs/39460690445)
+and the machine receipt record exact source/probe/binary/log hashes.
+This covers the tested types/layouts; actual Radeon precision and matched
+Chatterbox decoded-speech/performance acceptance remain open. PR2 stays unmerged.
+
+## Cache release already captured by the CUDA run
+
+The pinned v3 worker calls public `free_aligner_cache()` before launching its
+fresh CLI child. Independent reanalysis follows the one resident NVML device,
+index 0: the short-after samples retain 2,735 MiB; the first CLI-phase sample is
+125 MiB, followed by fresh CLI model residency peaking at 2,823 MiB. The observed
+device-total drop is 2,610 MiB. The parent remains running while the child executes.
+The second idle GPU is excluded from the comparison. Six tests reject ambiguous
+or wrong-device/phase readings and missing fresh-model residency. The full
+alignment audit still passes and reproduces exactly from the public data.
+[Receipt](alignment-cache-release-2026-10-20.json).
+This is sampled device-total evidence, not per-process allocator accounting,
+exact idle return, free-call latency or a same-process reload test. No GPU
+session or accepted long-input run was repeated.
+
+[Complete CI/fallback/cache proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1ed61568906ba43e509cc35f184dd50fb743277c/issue-followups-20261020/fallback-cache-proof.zip): 59 files,
+599,965 bytes; SHA256 `0b3dd058be4cecb24c7683371562391622456f7b8e5279632080dc012b34d115`. Expanded hashes and
+credential scans pass; full anonymous byte readback is verified. An extracted
+archive replays the complete CUDA-data audit and all six telemetry guards
+without model weights or native libraries. It includes fixture attribution,
+project license, successful logs and earlier harness controls.

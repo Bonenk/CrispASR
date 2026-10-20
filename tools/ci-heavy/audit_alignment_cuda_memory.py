@@ -13,6 +13,55 @@ def sha(path):
         return hashlib.file_digest(f, 'sha256').hexdigest()
 
 
+
+def audit_cache_release(samples, model_bytes):
+    """Audit the v3 worker's public-free -> fresh CLI transition on one device.
+
+    The pinned source calls free_aligner_cache before switching to phase `cli`.
+    The new child overlaps the next sample, so this is a device-total drop, not
+    an allocator balance, exact idle return, free latency or same-process reload.
+    """
+    if model_bytes <= 0:
+        raise ValueError('Positive frozen model size required')
+    cached = {}
+    first_cli = None
+    cli = {}
+    for sample in samples:
+        rows = {}
+        for line in sample.get('samples', '').splitlines():
+            device, memory, _ = map(int, line.split(','))
+            if device < 0 or memory < 0 or device in rows:
+                raise ValueError('Malformed device sample')
+            rows[device] = memory
+        if sample.get('phase') == 'short-after':
+            for device, memory in rows.items():
+                cached.setdefault(device, []).append(memory)
+        elif sample.get('phase') == 'cli':
+            if first_cli is None:
+                first_cli = rows
+            for device, memory in rows.items():
+                cli.setdefault(device, []).append(memory)
+    model_mib = model_bytes / 2**20
+    active = [device for device, values in cached.items() if min(values) > model_mib / 2]
+    if len(active) != 1:
+        raise ValueError('Cache release needs one unambiguous resident device')
+    device = active[0]
+    if first_cli is None or device not in first_cli:
+        raise ValueError('No boundary sample for the resident device')
+    before = min(cached[device])
+    after = first_cli[device]
+    drop = before - after
+    if drop < .8 * model_mib:
+        raise ValueError('Samples do not establish model-sized release on the resident device')
+    if max(cli[device]) < .8 * model_mib:
+        raise ValueError('Fresh CLI model residency not observed')
+    return dict(active_device_index=device, cached_before_min_mib=before,
+                first_cli_sample_mib=after, observed_device_total_drop_mib=drop,
+                cli_peak_after_reload_mib=max(cli[device]),
+                scope='Sampled device-total transition after public cache free and during fresh CLI startup; '
+                      'not per-process allocator balance, exact idle return, free-call latency or same-process reload')
+
+
 def audit(out, fixture, entry):
     import numpy as np
     receipt = json.loads((out/'validation.json').read_text())
@@ -80,6 +129,7 @@ def audit(out, fixture, entry):
                 input_hashes_recomputed=True, artifact_hashes_verified=True,
                 mutable_terminal_progress_prefix_verified=mutable, device_samples_summary=summaries,
                 hardware=receipt['hardware'], source=receipt['source'], bundle_sha256=receipt['bundle_sha256'],
+                cache_release_evidence=audit_cache_release(samples, receipt['model']['bytes']),
                 scope='repeated licensed speech; sampled device totals, not allocator maxima or RTX3090 certification')
 
 

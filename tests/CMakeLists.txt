@@ -5625,6 +5625,9 @@ if(UNIX AND Python3_EXECUTABLE)
     add_test(NAME alignment-cuda-loader
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cuda_loader.py -v)
     set_tests_properties(alignment-cuda-loader PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
+    add_test(NAME alignment-cache-release-samples
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cache_release_samples.py -v)
+    set_tests_properties(alignment-cache-release-samples PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
     add_test(NAME kaggle-cli-launcher
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_kpush.py -v)
     set_tests_properties(kaggle-cli-launcher PROPERTIES LABELS "unit;tooling" TIMEOUT 30)

@@ -796,3 +796,13 @@ wheel loading and exported Session/pointer-wrapper APIs without publication.
 Fresh fixed-bundle and hosted installed-wheel acceptance passes on all three
 platforms, with native library byte identity independently checked. General
 tip CI/lint and actual tagged release/package acceptance remain pending.
+
+
+Main `0c355f398` now has all 13 CI and all 10 lint jobs green, including the full
+2,039-case CTest and 189-case Python unit run. Reanalysis of the existing T4 trace
+also captures device-total cache release (2,735 → 125 MiB) before the fresh CLI
+loads its model, with six guards against wrong-device/phase interpretations.
+This is sampled evidence; allocator balance, exact idle return and release
+latency remain unmeasured. The unmerged Conv1D proposal additionally passes
+BF16-weight and strided-input scheduler controls on CPU/Metal/software Vulkan;
+its Radeon and decoded-speech/performance gates remain open.

@@ -1,3 +1,20 @@
+## 2026-10-20 — Main CI and remaining host fallback checks accepted
+
+Main `0c355f398` passes all 13 CI and all 10 lint jobs; the full unit log confirms
+2,039 CTest cases, 189 Python cases and 34 subtests. The unchanged shared-ggml PR2
+candidate passes 108 cases each on Mac CPU, Metal/CPU, Linux CPU and software
+Vulkan/CPU. BF16 weights retain the legacy graph; strided IM2COL falls back to
+CPU when the requested backend rejects it. Each matrix's 50 direct convolutions
+execute on its requested backend. Earlier invalid direct-only/buffered harness
+controls are retained. PR2 remains unmerged for Radeon and speech/performance gates.
+
+The retained T4 trace independently establishes a sampled device-total drop
+from 2,735 MiB to 125 MiB after public cache free, then fresh CLI residency reaches
+2,823 MiB. Six guards reject misleading idle-device/phase readings. Full public
+replay is exact; no new Kaggle run is needed. This does not establish per-process
+allocator balance, exact idle return, release latency or same-process reload.
+[Complete evidence and limits](docs/issue-followups-2026-10-20.md).
+
 ## 2026-10-20 — Installed-wheel and software-Vulkan follow-up
 
 Shared ggml PR2's adapted candidate compiles and passes 100 CPU, four CPU fallback
