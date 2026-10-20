@@ -1,5 +1,15 @@
 # CrispASR — Pending work
 
+## NOW — CANN weight usage and NZ compatibility
+
+Owner: Codex (2026-10-20), branch `feat/cann-weight-layout`.
+Implement explicit model-supplied weight usage before allocation, conservative
+legacy-name compatibility including fused QKV, and an opt-in CANN NZ cache that
+preserves ordinary tensor bytes for reads/copies/fallback. Existing artifacts
+remain valid. Add host regression controls and a runnable physical-device probe.
+Keep the existing implementation available for A/B; cache defaults remain off
+until Ascend model quality, memory and timing acceptance. No Kaggle rewrite needed.
+
 ## NOW — OpenVoice2 actual-model and CUDA acceptance
 
 Owner: unassigned; ready for a fresh agent (handoff 2026-10-19). Implementation, exact source

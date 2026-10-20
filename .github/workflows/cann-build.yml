@@ -39,6 +39,9 @@ jobs:
       - name: CANN rotary cache-capacity controls
         run: python3 tests/test_cann_rope_capacity.py -v
 
+      - name: CANN weight-layout policy controls
+        run: python3 tests/test_cann_weight_layout.py -v
+
       - name: Free disk space
         uses: ggml-org/free-disk-space@v1.3.1
         with:
@@ -65,13 +68,14 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
                 -DGGML_CANN=ON \
+                -DCRISPASR_BUILD_CANN_LAYOUT_PROBE=ON \
                 -DGGML_BUILD_TESTS=ON \
                 -DSOC_TYPE="${SOC_TYPE}" \
                 -DUSE_ACL_GRAPH="${USE_ACL_GRAPH}" \
                 -DCRISPASR_BUILD_TESTS=OFF \
                 -DCRISPASR_BUILD_SERVER=OFF
               cmake --build build-cann \
-                --target crispasr-cli crispasr-lib crispasr-diff crispasr-quantize test-backend-ops \
+                --target crispasr-cli crispasr-lib crispasr-diff crispasr-quantize test-backend-ops cann-weight-layout \
                 -j "$(nproc)"
               chown -R '"${HOST_UID}"':'"${HOST_GID}"' /workspace/build-cann
             '

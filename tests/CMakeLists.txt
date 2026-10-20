@@ -6352,3 +6352,8 @@ target_include_directories(test-dolphin-depthwise PRIVATE ${PROJECT_SOURCE_DIR}/
 target_link_libraries(test-dolphin-depthwise PRIVATE ggml ggml-cpu)
 add_test(NAME dolphin-depthwise-checkpoint-padding COMMAND test-dolphin-depthwise)
 set_tests_properties(dolphin-depthwise-checkpoint-padding PROPERTIES LABELS "unit;dolphin")
+
+add_executable(test-weight-usage test-weight-usage.cpp)
+target_include_directories(test-weight-usage PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/src)
+target_link_libraries(test-weight-usage PRIVATE Catch2::Catch2WithMain crispasr-core ggml crispasr_link_ggml_cpu)
+catch_discover_tests(test-weight-usage PROPERTIES LABELS "unit;weight-usage")

@@ -129,13 +129,26 @@ struct WeightLoad {
     tensor_map tensors;
 };
 
+// Usage is a model-level contract, separate from names and device placement.
+// An absent policy preserves legacy behavior. A supplied policy should return
+// General for embeddings, tied weights, convolutions, views and unclassified tensors.
+// Applied to selected tensors before sizing/allocation/upload on every load path.
+enum class WeightUsage { Unspecified, General, MatmulOnly };
+using ClassifyWeight = WeightUsage (*)(const char* tensor_name, void* user);
+struct WeightUsagePolicy {
+    ClassifyWeight classify = nullptr;
+    void* user = nullptr;
+};
+void apply_weight_usage(ggml_tensor* tensor, WeightUsagePolicy policy);
+
 // Load all tensor metadata + weights into a new ggml_context backed by
 // a newly-allocated backend buffer. On success the WeightLoad struct is
 // populated and the caller takes ownership of ctx/buf (typically moving
 // them into the model struct).
 //
 // model_tag is used only in error messages ("parakeet: ...").
-bool load_weights(const char* path, ggml_backend_t backend, const char* model_tag, WeightLoad& out);
+bool load_weights(const char* path, ggml_backend_t backend, const char* model_tag, WeightLoad& out,
+                  WeightUsagePolicy usage = {});
 
 // Load only tensors accepted by `include_tensor`. Metadata keys remain
 // available through the caller's separate open_metadata() pass, while the
@@ -147,7 +160,7 @@ bool load_weights(const char* path, ggml_backend_t backend, const char* model_ta
 // path so excluded parent tensors do not become resident as a side effect.
 using IncludeTensor = bool (*)(const char* tensor_name, void* user);
 bool load_weights_filtered(const char* path, ggml_backend_t backend, IncludeTensor include_tensor, void* user,
-                           const char* model_tag, WeightLoad& out);
+                           const char* model_tag, WeightLoad& out, WeightUsagePolicy usage = {});
 
 // PLAN #69a: layer-residency-aware weight loader. Tensors for which
 // `is_gpu(tensor_name, user) == true` go on the GPU backend; the rest
@@ -170,7 +183,7 @@ bool load_weights_filtered(const char* path, ggml_backend_t backend, IncludeTens
 // stderr message; partial state is freed before returning.
 using IsGpuTensor = bool (*)(const char* tensor_name, void* user);
 bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backend_t cpu_backend, IsGpuTensor is_gpu,
-                        void* user, const char* model_tag, WeightLoad& out);
+                        void* user, const char* model_tag, WeightLoad& out, WeightUsagePolicy usage = {});
 
 // load_weights() onto `backend`, except tensors that backend cannot bind go to
 // `cpu_backend`. "Cannot bind" is the backend's own supports_op() on the weight
@@ -182,7 +195,7 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
 // otherwise it is load_weights_split() and the caller owns out.buf_cpu too.
 // `n_offloaded` (optional) receives the number of tensors routed to the CPU.
 bool load_weights_fit(const char* path, ggml_backend_t backend, ggml_backend_t cpu_backend, const char* model_tag,
-                      WeightLoad& out, int* n_offloaded = nullptr);
+                      WeightLoad& out, int* n_offloaded = nullptr, WeightUsagePolicy usage = {});
 
 // ---------------------------------------------------------------------------
 // ggml CPU repack ("extra") buffer type — docs/ggml-optimisation-playbook.md §4

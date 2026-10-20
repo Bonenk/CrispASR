@@ -6,6 +6,7 @@
 #include "core/attention.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
+#include "core/model_weight_usage.h"
 #include "core/repeat_break.h"     // fix/moonshine-repeat-break: decode-time loop break
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/crispasr_env.h"
@@ -247,9 +248,10 @@ struct moonshine_context* moonshine_init_with_params(struct moonshine_init_param
     bool loaded;
     if (ctx->use_gpu && !all_gpu) {
         loaded = core_gguf::load_weights_split(model_path, ctx->backend, ctx->backend_cpu, moonshine_is_gpu_tensor,
-                                               nullptr, "moonshine", wl);
+                                               nullptr, "moonshine", wl, {core_gguf::moonshine_weight_usage, nullptr});
     } else {
-        loaded = core_gguf::load_weights(model_path, ctx->backend, "moonshine", wl);
+        loaded = core_gguf::load_weights(model_path, ctx->backend, "moonshine", wl,
+                                         {core_gguf::moonshine_weight_usage, nullptr});
     }
     if (!loaded) {
         fprintf(stderr, "%s: failed to load weights from '%s'\n", __func__, model_path);
