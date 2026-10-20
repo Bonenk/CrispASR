@@ -56,7 +56,7 @@ def main():
         receipt['candidate_source_hashes'] = identity['source_hashes']
         receipt['probe_sha256'] = identity['probe_sha256']
         run('dependencies',['sudo','apt-get','update'])
-        run('install',['sudo','apt-get','install','-y','ninja-build','libvulkan-dev','vulkan-tools','glslc','mesa-vulkan-drivers'])
+        run('install',['sudo','apt-get','install','-y','ninja-build','libvulkan-dev','vulkan-tools','spirv-headers','glslc','mesa-vulkan-drivers'])
         env = dict(os.environ, GGML_VK_VISIBLE_DEVICES='0')
         run('vulkan-devices',['vulkaninfo','--summary'],env=env)
         build = scratch/'build'
