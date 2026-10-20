@@ -8,6 +8,9 @@
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <vector>
+#include <set>
+#include <cstdint>
 
 // Opt-in validation only. Select an exact registry and device ordinal without
 // the normal preference helper's auto fallback. No graph/eval callback changes.
@@ -82,10 +85,49 @@ struct Placement {
     std::map<std::string, int> operations;
     int required_matmuls = 0;
     int unassigned = 0;
+    using CacheSize = size_t (*)(const ggml_tensor*);
+    using CacheSelections = uint64_t (*)(const ggml_tensor*);
+    CacheSize cache_size = nullptr;
+    CacheSelections cache_selections = nullptr;
+    std::vector<ggml_tensor*> matmul_weights;
+
+    struct NzUsage {
+        int matmuls = 0, weights = 0, selected_weights = 0;
+        size_t bytes = 0;
+        uint64_t selections = 0;
+    };
+    NzUsage nz_usage() const {
+        NzUsage usage;
+        std::set<const void*> seen;
+        if (!cache_size || !cache_selections)
+            return usage;
+        for (auto* weight : matmul_weights) {
+            const size_t bytes = cache_size(weight);
+            if (!bytes)
+                continue;
+            ++usage.matmuls;
+            if (!seen.insert(weight->data).second)
+                continue;
+            ++usage.weights;
+            usage.bytes += bytes;
+            const uint64_t selections = cache_selections(weight);
+            usage.selections += selections;
+            if (selections)
+                ++usage.selected_weights;
+        }
+        return usage;
+    }
 
     Placement() = default;
 
     Placement(ggml_backend_sched_t sched, ggml_cgraph* graph, ggml_backend_t required) {
+        const auto reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(required));
+        if (reg) {
+            cache_size =
+                reinterpret_cast<CacheSize>(ggml_backend_reg_get_proc_address(reg, "ggml_backend_cann_nz_cache_size"));
+            cache_selections = reinterpret_cast<CacheSelections>(
+                ggml_backend_reg_get_proc_address(reg, "ggml_backend_cann_nz_cache_selections"));
+        }
         for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {
             auto* node = ggml_graph_node(graph, i);
             auto backend = ggml_backend_sched_get_tensor_backend(sched, node);
@@ -94,8 +136,10 @@ struct Placement {
                 continue;
             }
             operations[std::string(ggml_backend_name(backend)) + "/" + ggml_op_name(node->op)]++;
-            if (backend == required && node->op == GGML_OP_MUL_MAT)
+            if (backend == required && node->op == GGML_OP_MUL_MAT) {
                 required_matmuls++;
+                matmul_weights.push_back(node->src[0]);
+            }
         }
     }
 
@@ -107,6 +151,11 @@ struct Placement {
                          row.second);
         std::fprintf(stderr, "backend_validation[%s]: required_matmuls=%d unassigned=%d compute_success=%d\n", label,
                      required_matmuls, unassigned, computed);
+        const auto nz = nz_usage();
+        std::fprintf(stderr,
+                     "backend_validation[%s]: nz_cached_matmuls=%d nz_unique_weights=%d nz_bytes=%zu "
+                     "nz_selections=%llu nz_selected_weights=%d\n",
+                     label, nz.matmuls, nz.weights, nz.bytes, (unsigned long long)nz.selections, nz.selected_weights);
     }
 };
 

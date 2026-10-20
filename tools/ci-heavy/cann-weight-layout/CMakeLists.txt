@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 if(NOT TARGET ggml)
     project(cann_weight_layout_probe LANGUAGES C CXX)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
     set(GGML_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(GGML_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     add_subdirectory(../../../ggml ggml)

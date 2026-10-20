@@ -727,8 +727,16 @@ static int moonshine_run_encoder(struct moonshine_context* ctx, const float* aud
         return -1;
     }
 
-    if (ctx->validate_backend)
+    if (ctx->validate_backend) {
         placement.dump("moonshine.encoder", true);
+        const char* require_nz = std::getenv("CRISPASR_MOONSHINE_REQUIRE_NZ_CACHE");
+        if (require_nz && std::strcmp(require_nz, "1") == 0 && placement.nz_usage().selected_weights == 0) {
+            fprintf(stderr, "%s: required NZ cache was not selected; refusing validation\n", __func__);
+            if (transient_ctx)
+                ggml_free(transient_ctx);
+            return -1;
+        }
+    }
 
     struct ggml_tensor* enc_output = ggml_graph_get_tensor(graph, "encoder_output");
     const int hidden_dim = (int)enc_output->ne[0];

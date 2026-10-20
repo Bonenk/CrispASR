@@ -59,6 +59,28 @@ other SDK failures remain errors. This does not guarantee sufficient remaining
 memory for a model's compute graph. Measure load time, peak memory and steady-state
 latency before adopting it for a model/device. Quantized model recipes are unchanged.
 
+## Follow-up lifecycle and live controls
+
+The lifecycle host test executes the production cache function bodies with
+mocked SDK memory calls. It covers overlapping uploads, alias/range invalidation,
+copy destinations, allocation failure/recovery, destruction and zero-length
+writes. It is not an Ascend conversion or numerical test. A zero-length alias
+write failed before the follow-up repair; it now preserves cache readiness and
+the layout epoch.
+
+Model validation can require actual cache selection with `--nz-cache on`.
+Each encoder receipt records cached matmul nodes, unique weights/bytes and host
+matmul encodes that selected the NZ pointer. These selection counts are not
+physical kernel execution counts. Ordinary ND controls require zero NZ usage.
+CANN placement and successful output are checked separately. The `--exercise-reuse`
+option adds public Session short/double-length/short calls; CPU/device transcripts
+must agree, short output must survive the shape change and the longer input must
+establish proportional work. The double-length input is a CPU/device regression
+comparison, not a newly dumped independent original-model oracle.
+
+The model validator supports macOS CPU/Metal as local regression controls and
+Linux CPU/CANN for the physical test. Metal cannot satisfy an NZ-on request.
+
 ## Host controls
 
 The [retained host receipt](cann-weight-layout-host-2026-10-20.json) records both
@@ -79,7 +101,7 @@ Its CPU control is:
 build/bin/cann-weight-layout --backend cpu --device 0 --out proof-cpu --require-nd
 ```
 
-It verifies the independent scalar oracle, actual ordinary read/copy bytes,
+The extended probe executes576 computes in48 cases. It verifies the independent scalar oracle, actual ordinary read/copy bytes,
 F32/F16, aligned/irregular widths, repeated graph execution and changing input
 shapes. A CANN request fails if CANN or the requested device is unavailable;
 a CPU run cannot satisfy `--require-nz`.
@@ -99,7 +121,9 @@ GGML_CANN_WEIGHT_NZ=on GGML_CANN_WEIGHT_NZ_CACHE=on \
   build/bin/cann-weight-layout --backend cann --device 0 --out proof-cann-cache --require-nz
 ```
 
-Run both with `GGML_CANN_ACL_GRAPH=off`, and repeat on 910B with it `on`.
+Run both with `GGML_CANN_ACL_GRAPH=off`, and repeat on 910B with it `on` and
+`--require-acl-replay`. The latter requires positive actual capture and replay
+counters, not merely an enabled build flag.
 Keep all payloads and logs. Require every supported case, cache readiness check,
 exact ordinary-byte check and independent arithmetic comparison to pass.
 No unsupported case or zero-test run is accepted as a pass.
@@ -127,3 +151,29 @@ retained for A/B. Host controls are accepted; final-source
 [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39391434462) were still
 pending/running at integration. No physical NPU, model-quality or speed claim
 is established by merging this optional implementation.
+
+## Bounded device runner
+
+`tools/ci-heavy/cann-weight-layout/run_device.py` accepts an exact40-hex source
+revision, requires a clean matching checkout/submodule and puts all build/proof
+files outside it. Source the installed CANN SDK environment first, then run:
+
+```sh
+python3 tools/ci-heavy/cann-weight-layout/run_device.py \
+  --source EXACT_40_HEX_COMMIT --chip 310p --device 0 --out ../proof-310p-layout
+```
+
+Use `--chip 910b` for the910B eager plus capture/replay matrix. The first request
+is probe-only and needs no speech-model download. The runner checks actual
+compiler chip/ACL definitions, exact device selection and source/binary hashes,
+retains full logs/payloads and independently recomputes all576 products per arm.
+It rejects missing/duplicate cases, zero work, absent NZ selections, absent
+payloads and absent required replay. Every failed run leaves its proof intact.
+
+After the small probe passes, `--with-model` adds the immutable108,495,214-byte
+Moonshine fixture (SHA2567d63d2a5b90eb77843aff25107b1d1f70bafcfc1c8f73075e2f5a9a3f87d5e84)
+and actual diff/CLI/Session/reuse checks with NZ off/on in eager mode. This needs
+NumPy and the repository GGUF Python module, but no Torch or model reconversion.
+Full-model ACL capture and performance are still separate acceptance tasks.
+Return the complete proof directory, including failures, rather than just the
+final PASS line. Review private machine paths before publishing raw logs.

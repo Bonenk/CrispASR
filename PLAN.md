@@ -3,6 +3,12 @@
 ## CANN weight layout — remaining device and CI acceptance
 
 Owner: maintainer; optional implementation integrated 2026-10-20.
+
+NOW (2026-10-20), owner Codex: add cache lifecycle controls and model-level
+NZ-use evidence; execute pinned Moonshine CPU/Metal CLI/Session regressions on
+the Mac; prepare a self-contained immutable Ascend rerun procedure, then post
+the verified scope and optional device request on PR544 and shared-ggml PR4.
+No Kaggle work is needed for CANN. Physical Ascend execution remains external.
 Implemented explicit usage hints across normal/filtered/split/fit/repack loads,
 audited MiMo/Moonshine policies and shared-ggml optional NZ cache. The ordinary
 ND representation is retained for reads/copies/fallback, with chunk coverage,
