@@ -17,9 +17,15 @@ and probe targets link. This is not physical NPU/model or performance acceptance
 
 Shared candidate4d734595 includes completion synchronization before publishing
 cache readiness. The first SDK/CI/lint jobs target146392764 /ggmldc3bc0bb;
-refresh them against the final pin before accepting compilation. Physical310P3
-and910B3 cache-on/off, ACL replay, full-model diff/magnitudes/CLI/Session and
-memory/timing gates remain open under [the procedure](docs/cann-weight-layout.md).
+they are superseded for final-source acceptance by source3d808b76d, pinning
+ggml4d734595: [SDK39391430100](https://github.com/CrispStrobe/CrispASR/actions/runs/39391430100),
+[CI39391432699](https://github.com/CrispStrobe/CrispASR/actions/runs/39391432699) and
+[lint39391434462](https://github.com/CrispStrobe/CrispASR/actions/runs/39391434462).
+These jobs were submitted and pending/running at this checkpoint, not accepted
+as passing. Physical310P3 and910B3 cache-on/off, ACL replay, full-model
+diff/magnitudes/CLI/Session and memory/timing gates remain open under
+[the procedure](docs/cann-weight-layout.md). This checkpoint changes only tracking;
+the compiled candidate code is unchanged from3d808b76d.
 
 ## NOW — OpenVoice2 actual-model and CUDA acceptance
 
