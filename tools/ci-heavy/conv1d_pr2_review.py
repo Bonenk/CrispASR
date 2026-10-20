@@ -17,6 +17,7 @@ BASE = 'e2ae679a563014f46c546ce6c6448e8601e4dea6'
 PROOF_URL = ('https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/'
              'ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip')
 PROOF_SHA = 'e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e'
+PATCH_URL = 'https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/10385d27b50d21906fff6ee407ac8031c1a08e02/issue-followups-20261020/ggml-pr2-applied.patch'
 
 
 def sha(path):
@@ -42,9 +43,10 @@ def main():
         with urllib.request.urlopen(PROOF_URL,timeout=60) as r:archive.write_bytes(r.read())
         assert sha(archive) == PROOF_SHA
         with zipfile.ZipFile(archive) as z:
-            patch = scratch/'candidate.patch'
-            patch.write_bytes(z.read('controls/conv1d-pr2-applied.patch'))
             identity = json.loads(z.read('controls/conv1d-pr2-review-identity.json'))
+        patch = scratch/'candidate.patch'
+        with urllib.request.urlopen(PATCH_URL,timeout=30) as response:
+            patch.write_bytes(response.read())
         assert sha(patch) == identity['applied_patch_sha256']
         assert sha(ROOT/'tools/ci-heavy/conv1d_pr2_probe.cpp') == identity['probe_sha256']
         candidate = scratch/'ggml'
