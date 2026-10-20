@@ -42,11 +42,11 @@ and local credentials are not republished.
 The [refreshed two-architecture SDK matrix](https://github.com/CrispStrobe/CrispASR/actions/runs/39401353196),
 [general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/39401352847) and
 [lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39401352899) target the
-exact implementation source above. They were pending/running when this receipt
-was written. The earlier SDK matrix 39391430100 passed its own earlier source;
-that result is not substituted for the refreshed compilation.
+exact implementation source above. Both refreshed SDK legs (310P/off and
+910B/ACL-on), all13 general CI jobs and all10 lint jobs pass. These are the
+refreshed-source results; no earlier compilation is substituted.
 
-After SDK compilation passes, optional hardware help starts with the bounded,
+With SDK compilation passed, optional hardware help starts with the bounded,
 model-free probe on 310P. Source the host's installed CANN SDK environment, then:
 
 ```sh

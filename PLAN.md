@@ -30,11 +30,11 @@ are implemented at18b540bd5 (ggmle2ae679a).53 host lifecycle checks and576
 independently audited CPU probe computes pass. The real Mac CPU/Metal F32
 reference/CLI/Session/short-long-short matrix passes unchanged gates, with
 22/44/22 words on each device. [Complete receipt and pinned device procedure](docs/cann-layout-followup-2026-10-20.md).
-SDK39401353196, CI39401352847 and lint39401352899 are pending/running for this
-exact source. Code and evidence are on remote main; verified scope and the optional
+SDK39401353196 (both device families), all13 CI39401352847 jobs and all10
+lint39401352899 jobs pass for this exact source. Code and evidence are on remote main; verified scope and the optional
 bounded request are posted on [PR544](https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6288185477)
 and [shared-ggml PR4](https://github.com/CrispStrobe/ggml/pull/4#issuecomment-6288187900).
-Next: retain refreshed SDK/CI results, then optional physical Ascend proof.
+Next: optional physical Ascend proof; completed host/SDK controls need no rerun.
 No Kaggle work is needed. Physical Ascend execution remains external.
 
 Implemented explicit usage hints across normal/filtered/split/fit/repack loads,

@@ -43,7 +43,7 @@ logs are retained; four additional non-contiguous CPU fallback controls pass
 with the option both ON and OFF. [Receipt](ggml-conv1d-pr2-review-2026-10-20.json).
 These synthetic controls establish no AMD Vulkan execution,
 Chatterbox speech quality or performance result. Incompatible-type and non-CPU layout
-fallback, current Vulkan compilation, actual Radeon finite/magnitude/cancellation
+fallback, actual Radeon finite/magnitude/cancellation
 controls and decoded audio remain acceptance gates. No ggml change is merged.
 The reusable source is `tools/ci-heavy/conv1d_pr2_probe.cpp`; it deliberately
 rejects a build where the option does not actually alter the graph.
@@ -105,8 +105,9 @@ prefix, and the public manifest covers the complete retained file.
 [Three bounded library dry runs](followup-package-dry-runs-2026-10-20.json) are
 dispatched on frozen native source `f0199f54f`: Linux39429480076,
 Mac39429485161 and Windows39429489355. Their tag inputs are empty, so they
-upload workflow artifacts and cannot publish a release. They were queued at
-this checkpoint. The later receipt/tooling changes do not modify native library
+upload workflow artifacts and cannot publish a release. All three native build jobs pass; Linux and Mac logs also prove relocated
+load and Session ABI resolution. Their original library bundles omit the
+Session header; the follow-up below repairs that packaging defect. The later receipt/tooling changes do not modify native library
 or wheel runtime sources; package claims still require reading actual results
 and inspecting staged artifacts.
 
@@ -117,6 +118,41 @@ retains the exact CMake-adapted patch as well. Full anonymous readback and hash
 checks passed before hosted dispatch.
 
 The [hosted PR2 CPU/software-Vulkan review](https://github.com/CrispStrobe/CrispASR/actions/runs/39430148014)
-is dispatched at exact source `08d47ff38` and queued at this checkpoint.
+stopped at configuration because the worker omitted `spirv-headers`. Its
+[repaired replay](https://github.com/CrispStrobe/CrispASR/actions/runs/39438818205)
+at source `306c17c65` passes 100 CPU, four CPU fallback and 100 software-Vulkan
+cases. All11 output hashes and per-case logs are independently verified. The
+Vulkan device is llvmpipe LLVM20.1.2 / Mesa25.2.8 on a CPU.
 It is a read-only counterfactual in a separate ggml worktree, not a merge or
 a physical Radeon performance/speech result.
+
+## Installed-wheel and library header checks
+
+The original frozen-source Mac wheel builds, installs into a separate venv,
+loads from a foreign cwd, and resolves nine native Session-token/pointer-wrapper
+symbols. The real Japanese Metal short/long/short test through that installed
+package passes 17/123/17 tokens, exact returning-short metadata and direct-native
+short comparison. The worker differs only by removing its repository `sys.path`
+injection; both source hashes are retained. This is an unpublished test wheel
+still carrying the development tree's 0.8.43 version, not a replacement for the
+published release.
+
+Actual staging found that all11 library bundle packagers omit
+`include/crispasr_session.h`. The helper compiler rejects that omission and
+passes when the header is present; the repaired helper also loads and resolves
+all three wrappers. Current native pointer exports remain available, so missing
+the optional helper alone does not establish a broken legacy class. Commit
+`241b01455` ships both public headers consistently and adds a non-publishing
+cross-platform artifact/wheel smoke workflow. It verifies bundle source pins,
+header presence, clean installed-package loading and the actual ABI. Running it
+against the original bundles is a deliberate negative control; fresh repaired
+bundle runs are listed in the machine receipt and remain pending acceptance.
+
+[Complete package/Vulkan proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2376f0bd253731bff1639e57d6d1b6c29e8be79a/issue-followups-20261020/package-vulkan-proof.zip):
+35 files, 221,589 bytes, SHA256
+`51eb9e0cdb04fab690273dd8fa1700fd1480bc953593e6f93aa01667d2664960`.
+Full anonymous byte readback passes. It retains native build logs/inventories,
+all successful and unsuccessful hosted Vulkan output, the installed Mac wheel
+live outputs, worker identities and the compiler control. Private local path
+prefixes are replaced with portable aliases with both original/public hashes.
+No model weights or native binaries are included.

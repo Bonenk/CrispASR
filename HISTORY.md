@@ -1,3 +1,22 @@
+## 2026-10-20 — Installed-wheel and software-Vulkan follow-up
+
+Shared ggml PR2's adapted candidate compiles and passes 100 CPU, four CPU fallback
+and 100 llvmpipe software-Vulkan controls on the hosted runner; all11 output
+hashes and per-case logs are independently verified. A failed pre-build worker
+missing SPIRV headers is retained. The PR remains unmerged with Radeon precision,
+other fallback and Chatterbox decoded-speech/performance gates open.
+
+Frozen-source native Linux/Mac/Windows library build jobs pass. The installed
+Mac wheel resolves nine ABI symbols and passes real Japanese Metal metadata
+short/long/short 17/123/17 plus direct-native comparison. Actual staging exposes
+missing Session headers in all11 library packagers; a compiler negative control
+rejects that omission and the repaired helper compiles/loads. All packagers now
+ship both public headers. A non-publishing artifact smoke workflow checks bundle
+pins, headers, installed-wheel loading and ABI. Fresh repaired bundles and tip CI
+are still acceptance gates. The full35-file package/Vulkan proof is anonymously
+byte-verified; [scope and immutable receipt](docs/issue-followups-2026-10-20.md).
+No tag, release or portable GPU performance promotion is made here.
+
 ## 2026-10-20 — License gates and completed issue acceptance
 
 Ordinary NC support remains behind explicit acceptance. The pinned OmniVoice

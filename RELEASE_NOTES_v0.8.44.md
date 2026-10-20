@@ -731,11 +731,11 @@ original encoder parity, acoustic boundary accuracy or GPU behavior. See
 [the audit](docs/arabic-characters-java-audit-2026-10-19.json) for missing replay
 inputs and the distinction between independent and hosted-worker evidence.
 
-The CUDA alignment bundle is independently hash-audited; a2703-second Kaggle
-cache/memory test remains queued. The real-model Go lifecycle run now passes
+The CUDA alignment bundle and completed 2,703-second T4 cache/memory test
+are independently audited; see the October20 acceptance update below. The real-model Go lifecycle run now passes
 and is independently audited; see
 [the receipt](docs/go-model-lifecycle-audit-2026-10-19.json). Final release
-package/tip CI and actual long-file CUDA acceptance are still pending.
+package/tip CI remain pending; the long-file CUDA acceptance is completed.
 
 ### Go/Rust generic speaker input and result contracts
 
@@ -784,3 +784,13 @@ Japanese Session metadata has a real Metal short/long/short and direct-native
 comparison. [Evidence and limitations](docs/issue-followups-2026-10-20.md).
 New optional CANN NZ caching stays off; shared ggml Conv1D PR2 remains unmerged.
 The gates for producing and inspecting the next release's packages still apply.
+
+
+The pre-release library dry runs pass on Linux x86_64, Mac arm64 and Windows
+x86_64. The installed Mac wheel also passes actual Japanese Metal metadata
+short/long/short reuse and direct-native comparison. Follow-up packaging now
+ships `crispasr_session.h` alongside `crispasr.h` in all11 library bundle variants;
+a missing-header compiler control fails before the fix and passes afterward.
+A separate artifact smoke workflow checks source pins, public headers, installed
+wheel loading and exported Session/pointer-wrapper APIs without publication.
+Fresh fixed-bundle/tip CI acceptance remains required before release.

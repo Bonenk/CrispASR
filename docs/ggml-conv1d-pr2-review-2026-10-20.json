@@ -51,6 +51,42 @@
     "run": 39430148014,
     "source": "08d47ff3864b99062625e8a1d43e491d587de6df",
     "status_at_dispatch": "queued; not claimed passing",
-    "scope": "CPU + software Vulkan only; no physical Radeon"
+    "scope": "CPU + software Vulkan only; no physical Radeon",
+    "conclusion": "failure before build: missing SPIRV-Headers CMake package",
+    "retry": {
+      "run": 39438818205,
+      "source": "306c17c6565c89eafa44321a614b98ab42db6f33",
+      "repair": "install spirv-headers, as existing main Vulkan CI does",
+      "status": "passed; independently verified all 11 output hashes and per-case logs",
+      "device": "llvmpipe LLVM20.1.2 / Mesa25.2.8 CPU software Vulkan, not physical GPU",
+      "results": {
+        "cpu": {
+          "cases": 100,
+          "failed": 0,
+          "max_relative_l2": 1.04739571e-07,
+          "log_sha256": "7f1daf2d0200d7348d69aa5d4c8f7b6f0c76df6b4962c3e5f41ce4502937fe7e"
+        },
+        "cpu-fallback": {
+          "cases": 4,
+          "failed": 0,
+          "max_relative_l2": 6.66804714e-08,
+          "log_sha256": "c20e3c003b77aa7555519516ec3478c6df620b44641c536886c8d31556a398bd"
+        },
+        "vulkan": {
+          "cases": 100,
+          "failed": 0,
+          "max_relative_l2": 1.03294844e-07,
+          "log_sha256": "8c59628d89e0519443115973e291fdfc214931f8e953356cea5a9624746c56f2"
+        }
+      }
+    }
+  },
+  "package_vulkan_public_proof": {
+    "bytes": 221589,
+    "sha256": "51eb9e0cdb04fab690273dd8fa1700fd1480bc953593e6f93aa01667d2664960",
+    "files": 35,
+    "revision": "2376f0bd253731bff1639e57d6d1b6c29e8be79a",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2376f0bd253731bff1639e57d6d1b6c29e8be79a/issue-followups-20261020/package-vulkan-proof.zip",
+    "anonymous_full_download_verified": true
   }
 }
