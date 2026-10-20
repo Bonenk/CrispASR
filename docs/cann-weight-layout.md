@@ -61,6 +61,11 @@ latency before adopting it for a model/device. Quantized model recipes are uncha
 
 ## Host controls
 
+The [retained host receipt](cann-weight-layout-host-2026-10-20.json) records both
+mmap modes, loader regressions, the432-compute CPU execution control and rejection
+of an unavailable CANN device. It establishes no NPU result.
+
+
 Build `test-weight-usage`, `moonshine` and `mimo_asr` with the ordinary repository
 build. Run `test-weight-usage` and `python tests/test_cann_weight_layout.py -v`.
 The Python test compiles the production SDK-free policy; it does not simulate NPU

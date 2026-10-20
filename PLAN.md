@@ -3,12 +3,23 @@
 ## NOW — CANN weight usage and NZ compatibility
 
 Owner: Codex (2026-10-20), branch `feat/cann-weight-layout`.
-Implement explicit model-supplied weight usage before allocation, conservative
-legacy-name compatibility including fused QKV, and an opt-in CANN NZ cache that
-preserves ordinary tensor bytes for reads/copies/fallback. Existing artifacts
-remain valid. Add host regression controls and a runnable physical-device probe.
-Keep the existing implementation available for A/B; cache defaults remain off
-until Ascend model quality, memory and timing acceptance. No Kaggle rewrite needed.
+Implemented explicit usage hints across normal/filtered/split/fit/repack loads,
+audited MiMo/Moonshine policies and shared-ggml optional NZ cache. The ordinary
+ND representation is retained for reads/copies/fallback, with chunk coverage,
+write invalidation and captured-graph pointer invalidation. Published artifacts
+remain unchanged; the cache is off by default and the old path remains for A/B.
+
+Host proof: [receipt](docs/cann-weight-layout-host-2026-10-20.json):83 usage
+assertions in each mmap mode,188 split/11 bounds/28 release assertions,26 SDK-free
+policy checks and432 actual CPU probe computes over48 cases pass. The actual
+CANN request correctly rejects absent hardware. MiMo/Moonshine/core/shared ABI
+and probe targets link. This is not physical NPU/model or performance acceptance.
+
+Shared candidate4d734595 includes completion synchronization before publishing
+cache readiness. The first SDK/CI/lint jobs target146392764 /ggmldc3bc0bb;
+refresh them against the final pin before accepting compilation. Physical310P3
+and910B3 cache-on/off, ACL replay, full-model diff/magnitudes/CLI/Session and
+memory/timing gates remain open under [the procedure](docs/cann-weight-layout.md).
 
 ## NOW — OpenVoice2 actual-model and CUDA acceptance
 
