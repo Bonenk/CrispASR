@@ -75,6 +75,7 @@ jobs:
           set -euo pipefail
           mkdir bundle
           tar xzf bundle_dl/*.tar.gz -C bundle
+          test -f bundle/libcrispasr-${{ matrix.name }}/include/crispasr_session.h
       - name: Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -108,7 +109,9 @@ jobs:
           lib = ctypes.CDLL(str(path))
           for symbol in ('crispasr_session_open', 'crispasr_session_close',
                          'crispasr_session_result_n_tokens', 'crispasr_session_result_token_text',
-                         'crispasr_session_result_token_t0', 'crispasr_session_result_token_p'):
+                         'crispasr_session_result_token_t0', 'crispasr_session_result_token_p',
+                         'whisper_init_from_file_with_params_by_ref', 'whisper_full_by_ref',
+                         'crispasr_transcribe_parallel_by_ref'):
               getattr(lib, symbol)
           receipt = {'passed': True, 'library': path.name,
                      'library_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
