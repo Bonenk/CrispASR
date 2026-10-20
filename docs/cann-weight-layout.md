@@ -1,6 +1,6 @@
 # CANN weight usage and NZ cache
 
-Candidate implementation, 2026-10-20. Physical Ascend acceptance is pending.
+Optional implementation integrated 2026-10-20. Physical Ascend acceptance is pending.
 No model files are renamed or republished.
 
 ## Contract
@@ -115,3 +115,15 @@ is not full scheduler-fallback acceptance. Retain original failed evidence.
 Only after quality acceptance, profile load/encoder/decode and repeated warmed
 medians under identical load, with memory measurements. Leave the cache optional
 until both quality and resource/performance evidence justify a default change.
+
+## Integration scope
+
+Shared-fork integration6b4bd833 preserves its newer canonical history with
+exactly the same source tree as tested candidate4d734595. CrispASR pins that
+integration commit. The new cache remains off by default, with the legacy path
+retained for A/B. Host controls are accepted; final-source
+[SDK compilation](https://github.com/CrispStrobe/CrispASR/actions/runs/39391430100),
+[general CI](https://github.com/CrispStrobe/CrispASR/actions/runs/39391432699) and
+[lint](https://github.com/CrispStrobe/CrispASR/actions/runs/39391434462) were still
+pending/running at integration. No physical NPU, model-quality or speed claim
+is established by merging this optional implementation.

@@ -1,3 +1,21 @@
+## 2026-10-20 — Optional CANN weight usage and NZ cache integrated
+
+Model-supplied usage hints cover normal/filtered/split/fit/repack GGUF loaders;
+MiMo and Moonshine declare audited policies. The optional CANN cache preserves
+ND bytes for reads/copies/CPU transfer, covers fused QKV names, merges chunk
+coverage and invalidates cached weights/captured graphs on writes. Existing
+artifacts need no rename. Shared-fork merge6b4bd833 preserves newer history with
+an identical source tree to candidate4d734595. CrispASR pins the merge.
+
+[Host receipt](docs/cann-weight-layout-host-2026-10-20.json):83 usage assertions
+per mmap mode,188 split/11 bounds/28 release assertions and432 CPU probe computes
+pass, along with production policy and existing CANN routing/capacity controls.
+Metal-cache39391419338 and Vulkan-replay39391419483 checks also pass.
+Final-source SDK39391430100, general CI39391432699 and lint39391434462 remain
+pending/running at integration. The cache is off by default; physical310P3/910B3,
+ACL replay, full-model quality and resource/performance acceptance remain open.
+[Procedure and scope](docs/cann-weight-layout.md). No release or default flip.
+
 ## 2026-10-19 — OpenVoice CUDA package build completed; work handed off
 
 [Run39266520251](https://github.com/CrispStrobe/CrispASR/actions/runs/39266520251)

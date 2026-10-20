@@ -1,8 +1,8 @@
 # CrispASR — Pending work
 
-## NOW — CANN weight usage and NZ compatibility
+## CANN weight layout — remaining device and CI acceptance
 
-Owner: Codex (2026-10-20), branch `feat/cann-weight-layout`.
+Owner: maintainer; optional implementation integrated 2026-10-20.
 Implemented explicit usage hints across normal/filtered/split/fit/repack loads,
 audited MiMo/Moonshine policies and shared-ggml optional NZ cache. The ordinary
 ND representation is retained for reads/copies/fallback, with chunk coverage,
@@ -25,7 +25,11 @@ These jobs were submitted and pending/running at this checkpoint, not accepted
 as passing. Physical310P3 and910B3 cache-on/off, ACL replay, full-model
 diff/magnitudes/CLI/Session and memory/timing gates remain open under
 [the procedure](docs/cann-weight-layout.md). This checkpoint changes only tracking;
-the compiled candidate code is unchanged from3d808b76d.
+the compiled implementation code is unchanged from3d808b76d. Integration uses
+shared-fork merge6b4bd833, whose source tree is exactly identical to4d734595
+(tree30cc056e19599bb7667013c02be3cd75bb6f48e3). The newer fork history is
+preserved on its canonical `crispstrobe-ops` branch. The cache remains off by
+default; this integration does not accept pending CI or physical performance.
 
 ## NOW — OpenVoice2 actual-model and CUDA acceptance
 
