@@ -12,8 +12,9 @@ short/long/short 17/123/17 plus direct-native comparison. Actual staging exposes
 missing Session headers in all11 library packagers; a compiler negative control
 rejects that omission and the repaired helper compiles/loads. All packagers now
 ship both public headers. A non-publishing artifact smoke workflow checks bundle
-pins, headers, installed-wheel loading and ABI. Fresh repaired bundles and tip CI
-are still acceptance gates. The full35-file package/Vulkan proof is anonymously
+pins, headers, installed-wheel loading and ABI. All three repaired native builds
+and all three hosted installed-wheel checks now pass; loaded library bytes
+independently match the bundles. General tip CI/lint remain pending. The full35-file package/Vulkan proof is anonymously
 byte-verified; [scope and immutable receipt](docs/issue-followups-2026-10-20.md).
 No tag, release or portable GPU performance promotion is made here.
 

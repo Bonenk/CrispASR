@@ -793,4 +793,6 @@ ships `crispasr_session.h` alongside `crispasr.h` in all11 library bundle varian
 a missing-header compiler control fails before the fix and passes afterward.
 A separate artifact smoke workflow checks source pins, public headers, installed
 wheel loading and exported Session/pointer-wrapper APIs without publication.
-Fresh fixed-bundle/tip CI acceptance remains required before release.
+Fresh fixed-bundle and hosted installed-wheel acceptance passes on all three
+platforms, with native library byte identity independently checked. General
+tip CI/lint and actual tagged release/package acceptance remain pending.

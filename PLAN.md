@@ -7,10 +7,12 @@ Owner: Codex, branch `fix/issue-followups-20261020`, base `069365a42`.
 Completed checkpoint: ordinary NC support retained; missing OmniVoice/OpenRAIL
 acceptance gates repaired and the public OmniVoice license card corrected.
 Issue550 actual T4 long-input and issue549 actual Metal metadata controls pass
-independent review; shared ggml PR2 has 200 CPU/Metal numerical cases plus four
-CPU non-contiguous fallback controls, and remains unmerged. See the linked
-receipts and reporter actions below. Next: inspect fresh tip CI and the dispatched Linux/Mac/Windows library
-[dry runs](docs/followup-package-dry-runs-2026-10-20.json), then staged wheels; keep custom-license, actual Radeon and Ascend gates open.
+independent review. Shared ggml PR2 passes CPU/Metal and hosted CPU/software-
+Vulkan controls and remains unmerged. Repaired Linux/Mac/Windows native bundles
+and all three hosted installed-wheel checks pass; library bytes match the
+frozen bundles. [Package acceptance](docs/followup-package-dry-runs-2026-10-20.json).
+Next: remaining general tip CI/lint and future release checks; keep custom-license,
+actual Radeon and Ascend gates open. No tag or release is published here.
 Checkpoint: [follow-up evidence and reporter actions](docs/issue-followups-2026-10-20.md).
 NC models remain eligible behind explicit license opt-in; research-only and
 additional use/revenue/hosting restrictions require separate review and are not

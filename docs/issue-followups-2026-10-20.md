@@ -146,7 +146,13 @@ the optional helper alone does not establish a broken legacy class. Commit
 cross-platform artifact/wheel smoke workflow. It verifies bundle source pins,
 header presence, clean installed-package loading and the actual ABI. Running it
 against the original bundles is a deliberate negative control; fresh repaired
-bundle runs are listed in the machine receipt and remain pending acceptance.
+bundle runs pass on Linux x86_64, Mac arm64 and Windows x86_64. All three
+[hosted installed-wheel jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/39442789304)
+also pass. Their receipts and wheel contents independently match the native
+bundle bytes. The repaired Mac wheel additionally passes locally, including
+three helper exports; its native library is byte-identical to the earlier
+installed-wheel Japanese live test. The staging warning now correctly describes
+its optional helper and native by-reference alternatives.
 
 [Complete package/Vulkan proof](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2376f0bd253731bff1639e57d6d1b6c29e8be79a/issue-followups-20261020/package-vulkan-proof.zip):
 35 files, 221,589 bytes, SHA256
@@ -156,3 +162,15 @@ all successful and unsuccessful hosted Vulkan output, the installed Mac wheel
 live outputs, worker identities and the compiler control. Private local path
 prefixes are replaced with portable aliases with both original/public hashes.
 No model weights or native binaries are included.
+
+
+The final [complete package acceptance archive](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/85bf50e0dfb93745e55441d4798269b6f71720f2/issue-followups-20261020/package-acceptance-proof.zip) retains all three
+successful native builds, all three hosted installed-wheel receipts/logs,
+independent library/wheel hashes, local repaired Mac checks, compiler controls,
+software-Vulkan controls and fixture/license attribution. It contains
+58 files, 445,477 bytes; SHA256 `d39af2c6eddd25d68189f2f44ca07103772d834af11791dfe082591291ec5f02`.
+Every expanded public-file hash and credential scan passes, and anonymous full
+byte readback is verified. No native binaries, wheels or weights are embedded.
+The older archives remain immutable snapshots. General main-tip CI/lint remain
+separate from these completed package jobs; no release or public wheel update
+is published by this work.

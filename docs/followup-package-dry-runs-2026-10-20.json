@@ -8,7 +8,7 @@
     "macos-arm64": 39429485161,
     "windows-x86_64": 39429489355
   },
-  "scope": "bounded native library bundle dry runs and relocation/load gates; wheels and release publication remain pending",
+  "scope": "Original f019 library dry runs plus repaired 241b bundles and installed-wheel relocation/load/exported-ABI acceptance; general CI/lint and release publication remain pending",
   "native_source_equivalence": "follow-up receipt/tooling commit changes no native library or wheel runtime source relative to this frozen build source",
   "native_build_jobs_passed": true,
   "library_build_jobs": {
@@ -79,7 +79,10 @@
         "job": 118687111608,
         "failed_step": "Extract bundle: required Session header absent"
       },
-      "linux-x86_64": "queued; no result claimed"
+      "linux-x86_64": {
+        "job": 118687111567,
+        "failed_step": "Extract bundle: required Session header absent"
+      }
     }
   },
   "fixed_bundle_runs": {
@@ -87,7 +90,7 @@
     "macos-arm64": 39440035299,
     "windows-x86_64": 39440040007
   },
-  "fixed_bundle_status": "dispatched; not claimed passing",
+  "fixed_bundle_status": "all three native build jobs passed; inspected headers match source (Windows CRLF normalized)",
   "package_vulkan_public_proof": {
     "bytes": 221589,
     "sha256": "51eb9e0cdb04fab690273dd8fa1700fd1480bc953593e6f93aa01667d2664960",
@@ -101,5 +104,86 @@
     "privacy_tests": 5,
     "bash_run_blocks_parsed": 456,
     "portable_x86_64_jobs_checked": 21
+  },
+  "fixed_bundle_inventory": [
+    {
+      "bundle": "libcrispasr-linux-x86_64.tar.gz",
+      "bytes": 22622726,
+      "sha256": "94aceab8d311ee9832ebdc27f45818c323e13dc2fd040a790fb72f2cb47e36b4",
+      "session_header_sha256": "364c14710e66af71a857fa4eab2c733cded59c3d496fd7b5a4e32734eef2bdd6",
+      "header_matches_source": true,
+      "source": "241b014553d4df81013d5c5b09ca1b82e0d8a0d9",
+      "run": 39440030179
+    },
+    {
+      "bundle": "libcrispasr-macos-arm64.tar.gz",
+      "bytes": 9205255,
+      "sha256": "d036f53409233b74e8c2a5457677412a1bb19c783857c29803f8eaebb5986dd9",
+      "session_header_sha256": "364c14710e66af71a857fa4eab2c733cded59c3d496fd7b5a4e32734eef2bdd6",
+      "header_matches_source": true,
+      "source": "241b014553d4df81013d5c5b09ca1b82e0d8a0d9",
+      "run": 39440035299
+    },
+    {
+      "bundle": "libcrispasr-windows-x86_64.tar.gz",
+      "bytes": 58202847,
+      "sha256": "0bfb6505759fcf45af8492ee04f681dfdc9618cdd25a81a8a9cf4c13008e5088",
+      "session_header_sha256": "f070e4c8fdfc1fad650b80394e54afc0e5d9c7f4eaa6a87e56dbef9256f6ed9e",
+      "header_matches_source_after_CRLF_normalization": true,
+      "source": "241b014553d4df81013d5c5b09ca1b82e0d8a0d9",
+      "run": 39440040007
+    }
+  ],
+  "positive_wheel_smoke_run": 39442789304,
+  "positive_installed_wheel_results": [
+    {
+      "platform": "linux",
+      "passed": true,
+      "library_sha256": "02805a590ffce86dd2e49dde3ff59bdca8f834373aec92266eb69c859fad5e60",
+      "wheel": "crispasr-0.8.43-py3-none-manylinux_2_28_x86_64.whl",
+      "wheel_sha256": "3c6133617f8f9bcdd5a531668c880a047c1757b2510310650dfdc5e321376dd8",
+      "wheel_bytes": 53533226,
+      "native_bundle_bytes_exact": true
+    },
+    {
+      "platform": "mac",
+      "passed": true,
+      "library_sha256": "a901055a45b031ac12882f6666690ad292478b68aefb6c143bcf66d1bd238d21",
+      "wheel": "crispasr-0.8.43-py3-none-macosx_11_0_arm64.whl",
+      "wheel_sha256": "4baef3d1996ace277737066140811378f42cfb4ff7b78c566abf69d5607da6b7",
+      "wheel_bytes": 34782325,
+      "native_bundle_bytes_exact": true
+    },
+    {
+      "platform": "windows",
+      "passed": true,
+      "library_sha256": "b0398d0989a1d53deef2fb08a307c3e6b3b357b9f580bafea3fcb18f51c27fbc",
+      "wheel": "crispasr-0.8.43-py3-none-win_amd64.whl",
+      "wheel_sha256": "93a10b219acea4d61d4b0f1afc988d42040c8eae94f9b431d4b58598d18e62c3",
+      "wheel_bytes": 14703783,
+      "native_bundle_bytes_exact": true
+    }
+  ],
+  "repaired_mac_library_identical_to_live_tested_library": true,
+  "positive_hosted_mac_status": "passed; separate repaired Mac wheel also passes locally including three compatibility-helper exports",
+  "positive_wheel_smoke_status": "all three hosted installed-wheel jobs passed; all library bytes independently match the frozen native bundles",
+  "complete_package_acceptance_proof": {
+    "files": 58,
+    "bytes": 445477,
+    "sha256": "d39af2c6eddd25d68189f2f44ca07103772d834af11791dfe082591291ec5f02",
+    "revision": "85bf50e0dfb93745e55441d4798269b6f71720f2",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/85bf50e0dfb93745e55441d4798269b6f71720f2/issue-followups-20261020/package-acceptance-proof.zip",
+    "anonymous_full_download_verified": true,
+    "expanded_manifest_hashes_verified": true,
+    "expanded_secret_scan_passed": true
+  },
+  "frozen_ci_source": "241b014553d4df81013d5c5b09ca1b82e0d8a0d9",
+  "frozen_ci_run": 39439962824,
+  "frozen_ci_inspected_unit_result": {
+    "ctest": 2039,
+    "pytest": 189,
+    "pytest_subtests": 34,
+    "all_passed": true,
+    "scope": "completed Linux unit job; other tip CI jobs remain queued/running"
   }
 }
