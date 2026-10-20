@@ -1,0 +1,41 @@
+{
+  "scope": "source cards and license texts only; exact converted codec provenance remains open",
+  "sources": [
+    {
+      "repo": "k2-fsa/OmniVoice",
+      "revision": "c5fdb5ccb189668d56333f77ba2629f4cd7535f4",
+      "file": "README.md",
+      "url": "https://huggingface.co/k2-fsa/OmniVoice/resolve/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/README.md",
+      "sha256": "b5d645a1874baa96a460a0e3a7d5a262811d682d04ce235878a16d5fed287fd3",
+      "bytes": 9424
+    },
+    {
+      "repo": "k2-fsa/OmniVoice",
+      "revision": "main",
+      "file": "README.md",
+      "url": "https://huggingface.co/k2-fsa/OmniVoice/resolve/main/README.md",
+      "sha256": "b5d645a1874baa96a460a0e3a7d5a262811d682d04ce235878a16d5fed287fd3",
+      "bytes": 9424
+    },
+    {
+      "repo": "bosonai/higgs-audio-v2-tokenizer",
+      "revision": "main",
+      "file": "LICENSE",
+      "url": "https://huggingface.co/bosonai/higgs-audio-v2-tokenizer/resolve/main/LICENSE",
+      "sha256": "8b2e018eeb3967a4636ccc57528440b33c14dd6e02ad67571fc7759489dde9a0",
+      "bytes": 9172
+    }
+  ],
+  "registry_tests": {
+    "before": "3 cases fail on old production registry",
+    "after": "6224 assertions in 63 cases pass"
+  },
+  "alignment_v2": {
+    "version": "2026-10-19.alignment-cuda-memory.2",
+    "hardware": "two Tesla T4 GPUs",
+    "complete": false,
+    "short_words": 0,
+    "native_error": "no CPU ggml backend registered",
+    "logs_retained": true
+  }
+}

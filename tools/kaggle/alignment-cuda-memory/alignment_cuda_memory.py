@@ -4,6 +4,7 @@
 No build or Torch. A failure remains a failure; no CPU fallback acceptance,
 whole-file OOM baseline, acoustic-accuracy or exact allocator-peak claim.
 """
+import ctypes
 import hashlib
 import json
 import os
@@ -19,7 +20,7 @@ import time
 import traceback
 import urllib.request
 
-VERSION = '2026-10-19.alignment-cuda-memory.2'
+VERSION = '2026-10-20.alignment-cuda-memory.3'
 SOURCE = '191815511b85a526aace111b1bda2e28ecb7faad'
 REPO_URL = 'https://github.com/CrispStrobe/CrispASR.git'
 MIRROR_REV = '425c555beb63de4665cba604c47ea38232f5d080'
@@ -54,6 +55,22 @@ def download_public(name, expected_sha, target):
 
 def save_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+
+
+def load_bundle_backends(bundle):
+    # This frozen runtime predates adjacent-library plugin discovery. Python's
+    # executable and cwd are outside the bundle; LD_LIBRARY_PATH resolves ELF
+    # dependencies but does not register ggml's dynamically loaded backends.
+    ggml = ctypes.CDLL(str(bundle / 'libggml.so'))
+    ggml.ggml_backend_load_all_from_path.argtypes = [ctypes.c_char_p]
+    ggml.ggml_backend_load_all_from_path.restype = None
+    ggml.ggml_backend_load_all_from_path(os.fsencode(bundle))
+    ggml.ggml_backend_dev_by_name.argtypes = [ctypes.c_char_p]
+    ggml.ggml_backend_dev_by_name.restype = ctypes.c_void_p
+    for name in (b'CPU', b'CUDA0'):
+        if not ggml.ggml_backend_dev_by_name(name):
+            raise RuntimeError('Frozen bundle backend unavailable: ' + name.decode())
+    return ggml  # retain the exact registry library for the public calls
 
 
 def bootstrap():
@@ -109,6 +126,9 @@ def bootstrap():
 
 def main():
     kh, hardware, provenance = bootstrap()
+    # Fail before downloading weights when package discovery is broken.
+    backend_registry = load_bundle_backends(BUNDLE)
+    kh.step('bundle-backends', cpu=True, cuda=True)
     import numpy as np
     from huggingface_hub import hf_hub_download
     sys.path.insert(0, str(ROOT / 'tools/ci-heavy'))

@@ -5622,6 +5622,9 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME alignment-cuda-loader
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cuda_loader.py -v)
+    set_tests_properties(alignment-cuda-loader PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
     # Model-free language ABI probes skip on developer machines without SDKs.
     # binding-contracts.yml uses the strict runner and rejects every skip.
     foreach(wrapper_language csharp java ruby dart wasm)
