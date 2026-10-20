@@ -35680,4 +35680,3 @@ Kernel acceptance, per the maintainer's external Kaggle guide:
    portable evidence. Host logits/DP memory still scales with duration. VAD is
    unused in align-only. A green build, device enumeration, weights on GPU or
    the44-second CPU result alone cannot close the45-minute CUDA report.
-
