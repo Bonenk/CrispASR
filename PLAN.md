@@ -4,11 +4,16 @@
 
 Owner: maintainer; optional implementation integrated 2026-10-20.
 
-NOW (2026-10-20), owner Codex: add cache lifecycle controls and model-level
-NZ-use evidence; execute pinned Moonshine CPU/Metal CLI/Session regressions on
-the Mac; prepare a self-contained immutable Ascend rerun procedure, then post
-the verified scope and optional device request on PR544 and shared-ggml PR4.
-No Kaggle work is needed for CANN. Physical Ascend execution remains external.
+NOW (2026-10-20), owner Codex: lifecycle/telemetry and pinned physical runner
+are implemented at18b540bd5 (ggmle2ae679a).53 host lifecycle checks and576
+independently audited CPU probe computes pass. The real Mac CPU/Metal F32
+reference/CLI/Session/short-long-short matrix passes unchanged gates, with
+22/44/22 words on each device. [Complete receipt and pinned device procedure](docs/cann-layout-followup-2026-10-20.md).
+SDK39401353196, CI39401352847 and lint39401352899 are pending/running for this
+exact source. Next: retain actual SDK results, integrate the same code tree and
+post verified scope/optional bounded request on PR544 and shared-ggml PR4.
+No Kaggle work is needed. Physical Ascend execution remains external.
+
 Implemented explicit usage hints across normal/filtered/split/fit/repack loads,
 audited MiMo/Moonshine policies and shared-ggml optional NZ cache. The ordinary
 ND representation is retained for reads/copies/fallback, with chunk coverage,

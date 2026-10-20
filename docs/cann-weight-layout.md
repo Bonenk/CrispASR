@@ -177,3 +177,5 @@ NumPy and the repository GGUF Python module, but no Torch or model reconversion.
 Full-model ACL capture and performance are still separate acceptance tasks.
 Return the complete proof directory, including failures, rather than just the
 final PASS line. Review private machine paths before publishing raw logs.
+
+[Completed follow-up host/Mac controls and immutable device procedure](cann-layout-followup-2026-10-20.md).
