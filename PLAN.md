@@ -1,5 +1,18 @@
 # CrispASR — Pending work
 
+## NOW — issue follow-ups and license policy (2026-10-20)
+
+Owner: Codex, branch `fix/issue-followups-20261020`, base `069365a42`.
+NC models remain eligible behind explicit license opt-in; research-only and
+additional use/revenue/hosting restrictions require separate review and are not
+automatically accepted by a generic switch. Audit original revision and codec
+licenses for OmniVoice; do not remove ordinary NC support. Inspect the existing
+issue550 CUDA run before dispatching anything; audit issue549 exported-getter
+CI and real Japanese multi-window token ownership. Review shared ggml PR2 with
+precision and fallback controls before considering integration. Reconcile
+fulfilled issue485 and keep hardware/reporter dependencies explicit.
+
+
 ## CANN weight layout — remaining device and CI acceptance
 
 Owner: maintainer; optional implementation integrated 2026-10-20.
