@@ -5429,6 +5429,10 @@ set_tests_properties(test-package-lib-bundle PROPERTIES
     SKIP_RETURN_CODE 77
     TIMEOUT 120)
 
+# Discover Python before constructing commands or guarding their registration.
+# A later find_package leaves clean builds without the guarded unit tests.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+
 # ─── test-server-ws-stream — live: --ws-port real-time WebSocket ASR streaming.
 # Raw-socket client (stdlib only) verifies the RFC 6455 handshake + a streaming
 # transcription. Needs a whisper ggml model; SKIPs otherwise.
@@ -5631,9 +5635,9 @@ if(UNIX AND Python3_EXECUTABLE)
     add_test(NAME kaggle-cli-launcher
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_kpush.py -v)
     set_tests_properties(kaggle-cli-launcher PROPERTIES LABELS "unit;tooling" TIMEOUT 30)
-    add_test(NAME ja-metadata-live-validator
+    add_test(NAME ja-metadata-validator
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ja_metadata_live_validator.py -v)
-    set_tests_properties(ja-metadata-live-validator PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
+    set_tests_properties(ja-metadata-validator PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
     # Model-free language ABI probes skip on developer machines without SDKs.
     # binding-contracts.yml uses the strict runner and rejects every skip.
     foreach(wrapper_language csharp java ruby dart wasm)
@@ -6327,7 +6331,6 @@ target_link_libraries(test-ctc-stitch PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(test-ctc-stitch TEST_SPEC "[ctc-stitch]" PROPERTIES LABELS "unit;omniasr")
 
 # Phonon-2 reuses Parakeet; exercise its model alias and metadata through real surfaces.
-find_package(Python3 COMPONENTS Interpreter QUIET)
 # examples/cli is added after tests, so its target does not exist yet here.
 if (Python3_Interpreter_FOUND AND CRISPASR_BUILD_EXAMPLES AND BUILD_SHARED_LIBS
     AND NOT EMSCRIPTEN AND NOT CRISPASR_BUILD_COMMON_ONLY)
@@ -6370,7 +6373,6 @@ target_include_directories(test-weight-usage PRIVATE ${PROJECT_SOURCE_DIR}/src $
 target_link_libraries(test-weight-usage PRIVATE Catch2::Catch2WithMain crispasr-core ggml crispasr_link_ggml_cpu)
 catch_discover_tests(test-weight-usage PROPERTIES LABELS "unit;weight-usage")
 
-find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND AND UNIX)
     add_test(NAME cann-nz-cache-lifecycle COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_cann_nz_lifecycle.py -v)
     set_tests_properties(cann-nz-cache-lifecycle PROPERTIES LABELS "unit;cann" TIMEOUT 60)

@@ -4,6 +4,18 @@
 
 Owner: Codex, branch `fix/issue-followups-20261020`, base `069365a42`.
 
+Active follow-up: exact-tip Linux CI at8237 passes 2,039 CTest cases, but its
+full log exposes missing Python test registration in a clean configuration:
+the interpreter is discovered after the guarded declarations. Discovery ordering
+is repaired, the model-free Japanese validator no longer matches `-E live`, and
+CI asserts all four follow-up validators are selected before compilation.
+The exact CI guard rejects the original clean configuration and accepts a new
+fixed configuration; 29 Python tests become eligible. All 23 non-SDK suites pass
+through CTest locally; six language SDK probes retain separate acceptance.
+Fresh hosted CI is required; do not count local tests as hosted coverage.
+The same run's macOS job never acquired a hosted runner (capacity annotation),
+so its cancellation is not a source build result.
+
 Completed checkpoint: ordinary NC support retained; missing OmniVoice/OpenRAIL
 acceptance gates repaired and the public OmniVoice license card corrected.
 Issue550 actual T4 long-input and issue549 actual Metal metadata controls pass

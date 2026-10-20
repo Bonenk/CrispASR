@@ -222,3 +222,36 @@ credential scans pass; full anonymous byte readback is verified. An extracted
 archive replays the complete CUDA-data audit and all six telemetry guards
 without model weights or native libraries. It includes fixture attribution,
 project license, successful logs and earlier harness controls.
+
+## Clean-build Python unit registration
+
+Inspecting the complete Linux unit log for source `8237fd36c` exposed a test
+registration gap: all 2,039 selected CTest cases pass, but the Python guard
+block ran before `find_package(Python3)`, so it registered no tests in that
+clean build. The separate 189-case/34-subtest pytest result also passes; it
+does not establish execution of the missing cache telemetry guards.
+
+Python discovery now precedes the first Python test command. The model-free
+Japanese metadata validator is named `ja-metadata-validator`, keeping it out
+of the `-E live` exclusion. CI reads the actual selected unit inventory and
+requires that validator plus `alignment-cuda-loader`,
+`alignment-cache-release-samples` and `kaggle-cli-launcher` before compiling.
+The exact workflow guard rejects the original clean configuration and passes
+a fresh fixed configuration. The fixed inventory adds 29 Python suites.
+All 23 non-SDK suites pass through CTest locally, including the six cache
+guards, three loader controls, launcher control and three Japanese metadata
+controls. The six language SDK suites are separately gated and are not claimed
+as executed by this local run. No native runtime or binding source changes.
+
+To reproduce, configure a **new** build directory with
+`-DCRISPASR_BUILD_TESTS=ON`, then inspect
+`ctest --test-dir BUILD --show-only=json-v1 -L unit -E live`.
+The four required names must be present. Run those suites with
+`ctest --test-dir BUILD -R '^(alignment-cuda-loader|alignment-cache-release-samples|kaggle-cli-launcher|ja-metadata-validator)$' --no-tests=error --output-on-failure`.
+The normal hosted unit tier will execute the wider inventory after building.
+Local before/after inventory, configure logs and the 23-suite CTest log are
+retained with the follow-up artifacts. Fresh hosted results remain pending.
+
+The8237 macOS job was cancelled without acquiring a runner: its check
+annotations explicitly report hosted macOS arm64 capacity constraints and no
+job steps ran. This is not a failed source build or a passing macOS check.

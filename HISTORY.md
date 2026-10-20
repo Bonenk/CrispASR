@@ -1,3 +1,16 @@
+## 2026-10-20 — Clean-build Python unit registration repaired
+
+The8237 Linux unit log passes 2,039 CTest cases but contains no cache-release,
+loader or launcher test: Python discovery occurred after their conditional
+registration. Discovery now precedes the first Python test command. The
+model-free Japanese metadata validator also drops `live` from its CTest name so
+the normal unit filter selects it. CI checks the actual selected inventory for
+all four follow-up validators before compilation. The guard rejects an original
+clean configuration and accepts a fresh fixed one; 29 Python suites become
+eligible. All 23 non-SDK suites pass through CTest locally. The six SDK wrapper
+probes are not claimed by that local result. Fresh hosted checks remain separate.
+[Reproduction and scope](docs/issue-followups-2026-10-20.md#clean-build-python-unit-registration).
+
 ## 2026-10-20 — Main CI and remaining host fallback checks accepted
 
 Main `0c355f398` passes all 13 CI and all 10 lint jobs; the full unit log confirms
