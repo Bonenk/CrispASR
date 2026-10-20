@@ -5625,6 +5625,12 @@ if(UNIX AND Python3_EXECUTABLE)
     add_test(NAME alignment-cuda-loader
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cuda_loader.py -v)
     set_tests_properties(alignment-cuda-loader PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
+    add_test(NAME kaggle-cli-launcher
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_kpush.py -v)
+    set_tests_properties(kaggle-cli-launcher PROPERTIES LABELS "unit;tooling" TIMEOUT 30)
+    add_test(NAME ja-metadata-live-validator
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ja_metadata_live_validator.py -v)
+    set_tests_properties(ja-metadata-live-validator PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
     # Model-free language ABI probes skip on developer machines without SDKs.
     # binding-contracts.yml uses the strict runner and rejects every skip.
     foreach(wrapper_language csharp java ruby dart wasm)

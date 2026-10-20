@@ -767,3 +767,20 @@ The checkpoint-free original/native CPU encoder probe now passes all nine
 boundaries (cosine>=0.9999999999998275, norm ratios within3.02e-8). Its historical
 axis-swap control fails. This synthetic arithmetic evidence is separate from
 pretrained/GGUF/STFT/CUDA/voice-quality acceptance, which remains pending.
+
+## 2026-10-20 acceptance and license update
+
+Model support distinguishes permissive/attribution/share-alike terms, explicitly
+accepted ordinary NC models, and custom terms requiring separate review. The
+OmniVoice bundle's main weights are NC and its tokenizer has additional Boson
+terms; its blanket Apache card is corrected. Managed downloads now require
+`omnivoice-terms` acceptance. OpenRAIL requires explicit acceptance as well.
+No new commercial rights or general custom-license approval is implied.
+[Policy and source audit](docs/model-license-policy.md).
+
+Issue550 now has independently audited T4 2,703-second repeated-speech alignment,
+complete word ownership, exact returning-short reuse and CLI/public-API agreement.
+Japanese Session metadata has a real Metal short/long/short and direct-native
+comparison. [Evidence and limitations](docs/issue-followups-2026-10-20.md).
+New optional CANN NZ caching stays off; shared ggml Conv1D PR2 remains unmerged.
+The gates for producing and inspecting the next release's packages still apply.

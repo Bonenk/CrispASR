@@ -1,3 +1,28 @@
+## 2026-10-20 — License gates and completed issue acceptance
+
+Ordinary NC support remains behind explicit acceptance. The pinned OmniVoice
+source distinguishes NC weights and additional Boson codec terms; its public
+blanket Apache card is corrected without weight changes. The registry now gates
+the bundle distinctly and gates OpenRAIL downloads. Three failing-before cases
+are repaired; 6,224 assertions in 63 registry cases pass.
+
+Issue550 actual T4 acceptance completes: 44.52/2,703/44.52 seconds retain all
+147/8,925/147 units, exact returning-short offset reuse, fresh CLI parity and
+95 CUDA encoder splits. Long-phase sampled device total peaks at 2,735 MiB.
+An independent audit rejects three forged controls with recomputed hashes.
+The failed prerequisite run is retained; its plugin discovery and the local
+Kaggle CLI launcher are repaired with four host protocol tests.
+
+Issue549 actual Metal Japanese metadata short/long/short passes 17/123/17 tokens,
+exact returning-short metadata and direct-native short bytes/times/probabilities.
+Shared ggml PR2 has 100 CPU/100 Metal scalar-oracle controls and four CPU
+non-contiguous fallback controls, but remains unmerged pending other acceptance.
+Index-Echo485 is completed; Drama545/546 are not planned under current custom
+terms. Nyra, OmniVoice, Radeon and Ascend restrictions/gates stay explicit.
+[Full evidence, limitations and reporter actions](docs/issue-followups-2026-10-20.md).
+The immutable complete public archive is anonymously verified.
+No release/tag or unvalidated default promotion is made by this checkpoint.
+
 ## 2026-10-20 — CANN lifecycle and Mac live follow-up completed
 
 Implementation `18b540bd5` and shared ggml `e2ae679a` are integrated on canonical

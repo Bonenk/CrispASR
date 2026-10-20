@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "compiled_runtime_source": "18b540bd5c3e3abe2a3d51e797bd40d81daabc9f",
+  "library_sha256": "53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455",
+  "model": {
+    "repo": "cstr/parakeet-tdt-0.6b-ja-GGUF",
+    "revision": "fd1963a153f09c883662624a8ac2fbf57c97a98d",
+    "file": "parakeet-tdt-0.6b-ja.gguf",
+    "sha256": "a9c43116b180b8a2ada2771ac829cf751b9e73adcbe69b7c8379593f9e5da31e",
+    "bytes": 1240626816
+  },
+  "backend": "actual Metal on Apple M1",
+  "fixture": "pinned CC-BY-4.0 Japanese FLEURS recording, exact repeats 1/7/1",
+  "case_tokens": [
+    17,
+    123,
+    17
+  ],
+  "case_samples": [
+    101760,
+    712320,
+    101760
+  ],
+  "short_return_metadata_exact": true,
+  "short_native_token_bytes_times_probabilities_exact": true,
+  "scope": "Actual JA Session metadata and short/long/short ownership regression.\n\nThis complements the native grouping fixtures. It is not original-model parity\nor a boundary-accuracy evaluation, and does not cover generic CLI postprocessing.\n",
+  "separator_note": "Native separator-only tokens may retain an earlier frame; content-order/reconstruction guards reject genuine inversions or missing units. Original timestamps are preserved.",
+  "harness_sha256": "7d26be2f673f9fc47c8dfcc3338825e4477be14f3df50bdd5195a5dbe9346af1",
+  "public_proof": {
+    "revision": "ad638b4cd525c5633f831da9eb763864e9827ce9",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip",
+    "bytes": 420650,
+    "sha256": "e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e",
+    "anonymous_full_download_verified": true,
+    "files": 55
+  }
+}

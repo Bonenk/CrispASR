@@ -217,3 +217,24 @@ Python/exported-C-ABI/CLI parity, with separate load/encoder/DP timing scopes.
 Run only on hosted Linux with the immutable pins/packages and timeout120 in
 [the method](alignment-model-profile/README.md). This is not a word-boundary,
 long-form, GPU/VRAM, original-Python or Subtimer comparison/default acceptance.
+
+### Issue follow-up validation (2026-10-20)
+
+`conv1d_pr2_review.py` runs on a Linux hosted CPU runner. It verifies the
+immutable published proposal patch/probe hashes, applies the patch to an
+isolated shared-ggml worktree, builds CPU + Vulkan with the option enabled,
+and runs scalar-oracle checks on CPU and software Vulkan. It downloads no
+weights and establishes no physical Radeon speed or speech acceptance.
+
+`parakeet_ja_metadata_live.py --model FILE --lib LIB --pcm PCM.npy --out DIR
+--use-gpu` runs one real public Session through short/long/short Japanese ASR
+and independently compares the short native token bytes/times/probabilities.
+The validated fixture/model/binary identities and scope are in
+`docs/ja-session-metadata-live-2026-10-20.json`. For CPU use, supply a CPU-only
+library: the direct Parakeet wrapper follows the native default device.
+
+`audit_alignment_cuda_memory.py OUTPUT FIXTURE --receipt FILE` independently
+checks the retained issue550 word arrays, input hashes, CLI/public equality,
+return offsets, CUDA splits and sampled memory. The actual T4 results are in
+`docs/alignment-cuda-live-2026-10-20.json`; this is not an original-model
+acoustic-accuracy or constant-host-memory gate.

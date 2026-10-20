@@ -1,0 +1,43 @@
+{
+  "ggml_base": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "proposal_head": "2ef4ee11c73e3a4186c4e2b1e8b522472de787ed",
+  "merged": false,
+  "build_option": "GGML_CONV1D_VIA_CONV2D=ON",
+  "probe_sha256": "4c7c839daa1c0ae28f12e72768ed42f3bdfe6588f8afb41bd0d2bada34d70572",
+  "binary_sha256": "cffaef460d320c189f429ac127be9f7bae3d6b133a1812b2e4a5de8c158ab4bc",
+  "applied_patch_sha256": "7505375a1ef40726da05a0d52c14c07ef88b00128f1f2459cf1fcd6ece3951b2",
+  "source_hashes": {
+    "src/ggml.c": "7430261114cac818f5182bada26623cc7f783471a04d67b0e5ecbac683afe5a0",
+    "CMakeLists.txt": "baf7dbd0a2bd20b0935ee76c823b67a158d4ee3703a1242343a81265875ae864",
+    "src/CMakeLists.txt": "d06680d336fb78e47ea0e62954b552762d92919561ed67994953ef7753f862ab"
+  },
+  "scope": "CPU/Metal synthetic scalar convolution and CPU fallback only; not Radeon Vulkan, Chatterbox speech or speed acceptance",
+  "results": {
+    "cpu": {
+      "passed": true,
+      "cases": 100,
+      "max_relative_l2": 1.04739571e-07,
+      "log_sha256": "44ef7de3886ec37f5a6bb52a11f7f2423c87df7e0d84d88cf924826efe979a30"
+    },
+    "metal": {
+      "passed": true,
+      "cases": 100,
+      "max_relative_l2": 8.22925224e-08,
+      "log_sha256": "6494a00a26ac9b90afcde0bb028e5e1fea7d039caf6865b9beb63254bd3ddd4f"
+    },
+    "cpu_noncontiguous_fallback": {
+      "passed": true,
+      "cases": 4,
+      "max_relative_l2": 6.66804714e-08,
+      "log_sha256": "28b75624cfc655ae861185daf5e6b3b1802b3320050c259b24040c6a9ac30dd9"
+    }
+  },
+  "public_proof": {
+    "revision": "ad638b4cd525c5633f831da9eb763864e9827ce9",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip",
+    "bytes": 420650,
+    "sha256": "e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e",
+    "anonymous_full_download_verified": true,
+    "files": 55
+  }
+}

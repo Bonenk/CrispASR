@@ -3,6 +3,15 @@
 ## NOW — issue follow-ups and license policy (2026-10-20)
 
 Owner: Codex, branch `fix/issue-followups-20261020`, base `069365a42`.
+
+Completed checkpoint: ordinary NC support retained; missing OmniVoice/OpenRAIL
+acceptance gates repaired and the public OmniVoice license card corrected.
+Issue550 actual T4 long-input and issue549 actual Metal metadata controls pass
+independent review; shared ggml PR2 has 200 CPU/Metal numerical cases plus four
+CPU non-contiguous fallback controls, and remains unmerged. See the linked
+receipts and reporter actions below. Next: inspect fresh tip CI and the dispatched Linux/Mac/Windows library
+[dry runs](docs/followup-package-dry-runs-2026-10-20.json), then staged wheels; keep custom-license, actual Radeon and Ascend gates open.
+Checkpoint: [follow-up evidence and reporter actions](docs/issue-followups-2026-10-20.md).
 NC models remain eligible behind explicit license opt-in; research-only and
 additional use/revenue/hosting restrictions require separate review and are not
 automatically accepted by a generic switch. Audit original revision and codec
@@ -134,9 +143,12 @@ source/library/archive hashes and dependency closure before GPU execution.
 Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
 Named credential fallback is repaired and version2 uses an immutable public HF
 mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
-verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2
-was submitted and is QUEUED at the handoff; inspect this existing run, do not
-submit a duplicate. Keep actual
+verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2 is terminal ERROR before inference (unregistered CPU plugin). Logs/partial
+outputs are retained. Version3 completed with identical runtime/model/fixture pins and passed an
+independent audit: all 147/8,925/147 units, exact returning-short offset reuse,
+CLI parity and 95 actual CUDA encoder splits. Long-phase sampled device total
+peaks at 2,735 MiB. [Receipt](docs/alignment-cuda-live-2026-10-20.json). Do not
+repeat this completed matrix merely to rediscover acceptance. Keep actual
 GPU/cache/long-file acceptance open; delivery is not inference proof.
 
 Kernel acceptance, per the maintainer's external Kaggle guide:
@@ -670,7 +682,9 @@ claiming full hardware validation; this #549 task did not execute that worker.
    wrappers are reviewed. Continue owned low-level adapters, other model modes,
    language lifecycle/platform checks and the remaining callable ledger. Validate
    Japanese multi-window ASR for549 separately from CTC forced alignment.
-3. **Finish PR521.** Rebase on current main, inspect the complete runtime diff,
+3. **PR521 is held for bundle license review and speech acceptance.** NC main
+   weights are distinct from the bundled Boson tokenizer conditions. Do not
+   merge full runtime support merely because CI passes. Review the complete diff,
    repair genuine CI failures and preserve contributor history. Merge only
    accepted scope; keep original/native clone failures and quality gates intact.
 4. **Release accepted work.** Require exact-tip CI/lint and package/wheel
@@ -834,8 +848,9 @@ commands: [CANN TODO](docs/cann-todo.md) and
   Eight-step RTF1.019 and poorer reported quality do not justify changing the
   ten-step quality default. Issue478 Windows/Khmer retest, Q4 batching and
   other-ISA/GPU coverage remain separate; verify current issue state first.
-- **Issue456 / Nyra:** gated NC model/lexicon/GMM-HMM/Viterbi assets and licence
-  scope must be resolved before a port; espeak-ng cannot be assumed bundled.
+- **Issue456 / Nyra:** deferred for separate research/output-license review;
+  this is not an approved ordinary-NC integration. No port or conversion is
+  queued; espeak-ng cannot be assumed bundled.
 - **Dolphin:** merged original-reference fix does not prove reporter Kylin/GCC9,
   private clips or GPU behavior. Obtain those inputs if further work is needed.
 

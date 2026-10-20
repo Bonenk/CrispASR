@@ -30,8 +30,11 @@ terms are not evidence of permission.
   `c5fdb5ccb189668d56333f77ba2629f4cd7535f4` already distinguishes Apache-2.0 code
   from CC-BY-NC weights. This is not merely a later change to today's card. The
   converted-model card's blanket Apache label needs reconciliation. Its named
-  HiggsAudioV2 companion has published Boson community terms; verify exact codec
-  source provenance before changing distribution claims. The registry uses the
+  HiggsAudioV2 companion has Boson community terms in that same revision under
+  `audio_tokenizer/LICENSE`; its text is independently downloaded and hashed.
+  The converted-model card is corrected at HF revision
+  `3425b20adc97e495b2710cb3a97aac577460f21f`, with anonymous readback verification
+  and no weight changes. The registry uses the
   distinct `omnivoice-terms` gate for the bundle, not plain NC acceptance. PR521
   remains subject to both this review and its unchanged speech-quality gates.
 - Supertonic-3: OpenRAIL permits some commercial uses but adds use restrictions.

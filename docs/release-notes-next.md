@@ -622,3 +622,27 @@ speech across all arms. These results correct the earlier cross-device causal
 interpretation; they do not change defaults or establish broader native/Q4
 acceptance. Complete evidence and limitations are archived in HISTORY.md and
 docs/dia-sampler-device-results-2026-10-17.json.
+
+## License declarations and validation follow-up (2026-10-20)
+
+Ordinary NC models remain supported behind explicit acceptance. OmniVoice now
+uses a distinct bundle gate because its NC main weights and Boson tokenizer
+terms differ; OpenRAIL models also require explicit acceptance. The public
+OmniVoice card's blanket Apache-2.0 label was corrected without modifying weights.
+These gates do not approve additional custom restrictions or grant new rights.
+See [policy and source audit](model-license-policy.md).
+
+The issue550 45-minute repeated-speech CUDA memory/reuse run passes independent
+output, hash and placement audits on T4. A 2,703-second input retains all 8,925
+units; the returning short input is exact after offset adjustment. Its observed
+long-phase device peak is 2,735 MiB (sampled device total, not allocator maximum).
+VAD remains unused in align-only, and host alignment memory grows with duration.
+
+The actual Japanese Session metadata short/long/short sequence passes on Metal
+with 17/123/17 tokens and exact native short-token bytes/times/probabilities.
+This complements the exported-getter tests; it does not certify generic CLI
+postprocessing, all long-form models or original-model acoustic accuracy.
+
+Shared ggml PR2 remains under review; no Conv1D default or new shader is merged.
+CANN NZ caching also remains off by default despite green hosted compilation
+and Mac controls. Physical Ascend cache/model/performance acceptance is pending.

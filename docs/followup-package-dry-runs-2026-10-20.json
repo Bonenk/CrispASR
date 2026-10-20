@@ -1,0 +1,13 @@
+{
+  "source": "f0199f54f332bb43cec11ad96d1f64e83b51d6f1",
+  "tag": "",
+  "publishes": false,
+  "status_at_dispatch": "queued; not claimed passing",
+  "jobs": {
+    "linux-x86_64": 39429480076,
+    "macos-arm64": 39429485161,
+    "windows-x86_64": 39429489355
+  },
+  "scope": "bounded native library bundle dry runs and relocation/load gates; wheels and release publication remain pending",
+  "native_source_equivalence": "follow-up receipt/tooling commit changes no native library or wheel runtime source relative to this frozen build source"
+}
