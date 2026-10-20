@@ -15,9 +15,8 @@ Checkpoint: [follow-up evidence and reporter actions](docs/issue-followups-2026-
 NC models remain eligible behind explicit license opt-in; research-only and
 additional use/revenue/hosting restrictions require separate review and are not
 automatically accepted by a generic switch. Audit original revision and codec
-licenses for OmniVoice; do not remove ordinary NC support. Inspect the existing
-issue550 CUDA run before dispatching anything; audit issue549 exported-getter
-CI and real Japanese multi-window token ownership. Review shared ggml PR2 with
+licenses for OmniVoice; do not remove ordinary NC support. The existing issue550 CUDA run and issue549 exported-getter/live metadata
+proofs are now audited; do not dispatch duplicates. Review shared ggml PR2 with
 precision and fallback controls before considering integration. Reconcile
 fulfilled issue485 and keep hardware/reporter dependencies explicit.
 
@@ -123,57 +122,17 @@ Do not rerun the repaired Java preflight or accepted output matrix without a
 new scope. Separate future oracle/DP replay needs retained vocabulary/binaries;
 this older worker did not preserve those, or a separate raw Python output.
 
-## Active — issue550 real CUDA long-input memory/reuse
+## Issue550 — completed actual CUDA acceptance
 
-Owner: maintainer coordinator. CPU acceptance is complete and independently
-audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
-implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
-
-Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
-completed successfully on frozen source191815511, branchdiag/550-cuda-memory-20261019.
-Claimed by the maintainer coordinator: actual GPU execution and output audit.
-The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
-archive/provenance and27 member hashes. Worker and method:
-`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.2).
-Source/model/fixture pins are frozen; GPU acceptance is still pending.
-Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
-this task's acceptance concerns CTC alignment memory. Inspect build provenance,
-source/library/archive hashes and dependency closure before GPU execution.
-
-Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
-Named credential fallback is repaired and version2 uses an immutable public HF
-mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
-verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2 is terminal ERROR before inference (unregistered CPU plugin). Logs/partial
-outputs are retained. Version3 completed with identical runtime/model/fixture pins and passed an
-independent audit: all 147/8,925/147 units, exact returning-short offset reuse,
-CLI parity and 95 actual CUDA encoder splits. Long-phase sampled device total
-peaks at 2,735 MiB. [Receipt](docs/alignment-cuda-live-2026-10-20.json). Do not
-repeat this completed matrix merely to rediscover acceptance. Keep actual
-GPU/cache/long-file acceptance open; delivery is not inference proof.
-
-Kernel acceptance, per the maintainer's external Kaggle guide:
-
-1. Use that prebuilt runtime; clone the exact source for harness/binding code,
-   with no heavy Kaggle build. Record actual CUDA device/capability. The package
-   targets60/75; no Torch is needed for this F16 CTC memory test. Check account
-   quota/concurrency first; do not retry sessions to select hardware.
-2. Reuse the pinned licensed Japanese FLEURS fixture, model and transcript from
-   CPU run39212307554. Verify model/audio/runtime bytes. Compare44.52 seconds,
-   approximately45 minutes (425 repeats gives2703 seconds), then44.52 seconds
-   again through one cached public C ABI/Python model. Long input exercises
-   first32s, interior34s and final partial encoder shapes and scheduler reuse.
-   Also compare a CLI call against default public output with absolute offsets.
-3. Require complete ordered word ownership, positive in-range spans with the
-   existing one-frame tolerance, correct text/offsets, CUDA execution evidence,
-   successful long input and repeatability after the shape/cache changes.
-   Retain source/runtime/model/input identities, raw word results, logs and
-   sampled device memory/utilization with idle baseline. A sampled memory peak
-   is not an exact allocator peak. Preserve CPU/full-window boundary differences;
-   do not invent acoustic accuracy or byte-exact CPU/GPU parity.
-4. Keep public proof separate from weights and credentials; publish only vetted
-   portable evidence. Host logits/DP memory still scales with duration. VAD is
-   unused in align-only. A green build, device enumeration, weights on GPU or
-   the44-second CPU result alone cannot close the45-minute CUDA report.
+Closed after the independently audited T4 short/long/short matrix: complete
+147/8,925/147 units, exact returning-short offset reuse, fresh CLI agreement
+and 95 actual CUDA encoder splits. Long-phase sampled device total peaks at
+2,735 MiB. The complete former procedure and failed controls are archived in
+HISTORY.md; do not submit another run to recreate this acceptance.
+[Receipt](docs/alignment-cuda-live-2026-10-20.json),
+[closure and scope](https://github.com/CrispStrobe/CrispASR/issues/550#issuecomment-6291711315).
+Host memory still grows with duration; natural-speech boundary accuracy and
+RTX3090-specific behavior are not certified.
 
 ## Go lifecycle — remaining scope after actual CPU model acceptance
 
@@ -204,7 +163,7 @@ universal concurrency acceptance. Broader API inventory remains below.
 
 Owner: maintainer coordinator (active). Whisper CPU pointer/Python model proof
 and Japanese/Echo artifact audits are now complete; see HISTORY.md and receipts.
-Next complete issue550 actual CUDA memory/reuse; its CPU matrix is audited.
+Issue550 actual CUDA memory/reuse is completed and independently audited.
 Continue wrapper lifecycle/callable gaps, updated PR521 and release acceptance.
 Go high-level parallel access and Python CI expectation repairs are complete;
 see HISTORY.md. Do not infer model acceptance from the local glue regressions.
@@ -447,7 +406,8 @@ Next acceptance work, in order:
    exists; TTS still requires ASR roundtrips and conversion its pinned reference
    recipe. Retain model/revision/source/input pins. Use hosted CPU/GPU capacity
    for heavy work; no performance/accuracy claim from transport fixtures.
-3. Keep #549 real Japanese ASR multiwindow/gap-fill ownership acceptance open;
+3. #549 real Japanese Metal multi-window metadata acceptance now passes; keep
+   other-platform/package/downstream validation open;
    the separate #217 forced-alignment worker does not validate that route.
 4. Audit other language bindings independently, including the two new replay
    dimension getters. Python's complete census does not establish Go/Rust/Dart/
@@ -542,7 +502,7 @@ Completed CPU evidence is archived in HISTORY.md and the
 [verified audit](docs/alignment-japanese-audit-2026-10-19.json). Keep both workspace
 gates default-off. The measured DP saving is0.055ms beside4591ms encoder time;
 do not prioritize another DP micro-optimization as an end-to-end speed fix.
-Next: inspect issue550 long-window worker
+Issue550 long-window CUDA worker is completed; do not repeat it. Next: inspect release bundles
 [run39212307554](https://github.com/CrispStrobe/CrispASR/actions/runs/39212307554)
 at source62e598ca0, then long-input CUDA memory, seams and labeled boundaries.
 Short-clip parity does not establish long-form acoustic accuracy, Japanese ASR
@@ -567,7 +527,7 @@ parameters, exact feature recipes or source may be reused. The comparison and
 licensing/provenance constraints are in
 [the audit](docs/alignment-cleanroom-2026-10-18.md).
 
-## #549 — token ownership implemented; follow-up CI/audio validation pending
+## #549 — token ownership and real Metal metadata accepted; packaging pending
 
 Frozen source `741141118335643adc7d29b61bc95e1d77c7f43a` passes all 13 CI jobs
 (`39104662258`) and all 10 lint jobs (`39104663518`). Independent audit checked
@@ -604,12 +564,11 @@ Keep the issue open for full-library/platform follow-up and reporter validation.
 The first window-only source `aaa5f21a9` has CI39117671481/lint39117673618
 pending. Final integrated source `ebf69c43721e56a43b7c8f637873902098f523ba`
 is frozen on `diag/549-token-boundaries-20261018`, CI `39117921894` and lint
-`39117923785` (both queued at dispatch audit). Audit the actual exported-getter
-step for both metadata suites. Earlier green source `741141118` does not validate
-this follow-up. Then use a licensed Japanese ASR multi-window fixture: keep
-original native decodes/window choices fixed, require identical word/text/time
-outputs and exact retained token bytes/probabilities/offsets, without dropped
-units or duplicate seams. The CTC-aligner profile for #217 is a different model
+`39117923785` now both pass. The actual exported-getter step for both suites
+is independently audited. The real licensed Japanese Metal short/long/short
+Session matrix also passes 17/123/17 tokens, exact returning-short metadata and
+a distinct native short-token byte/time/probability comparison.
+[Live receipt](docs/ja-session-metadata-live-2026-10-20.json). The CTC-aligner profile for #217 is a different model
 route and cannot stand in for this transcription validation. Generic CLI
 postprocessing (`examples/cli/crispasr_gap_fill.h`) retains timestamp-based token
 filtering for multiple model families; audit that separately before claiming
@@ -660,7 +619,8 @@ not establish native speech acceptance.
 See [the maintainer handoff](docs/maintenance-handoff.md) for every active front's
 entry points, bounded next action, acceptance gates and external dependencies.
 No task remains assigned to a departed agent. Follow the approved ordered
-roadmap below:550 GPU, wrapper closure, PR521, release, then bounded numerical
+roadmap below:550 GPU completed, wrapper/package closure, PR521 license review,
+release, then bounded numerical
 work. Preserve accepted Echo audits and current-main547 fixes; research and
 hardware waits remain separate.
 
@@ -673,15 +633,15 @@ claiming full hardware validation; this #549 task did not execute that worker.
 
 ## Ordered roadmap — maintainer-approved execution order (2026-10-19)
 
-1. **Close issue550 GPU acceptance.** Audit successful CUDA bundle39215806310,
-   then run the pinned 45-minute short/long/short Kaggle matrix above. Publish
-   evidence before closing the issue; a portable build alone is not GPU proof.
+1. **Issue550 GPU acceptance is completed.** Preserve the audited T4 proof and
+   closed issue; no repeat dispatch is needed. Continue wrapper/package work.
 2. **Close wrapper acceptance and implementation gaps.** Audit green Arabic
    CTC/Java39214206020 and binding contracts39215435420; bounded Go CPU model
    lifetime/re-entry is also audited. Generic speaker operations in all eight
    wrappers are reviewed. Continue owned low-level adapters, other model modes,
    language lifecycle/platform checks and the remaining callable ledger. Validate
-   Japanese multi-window ASR for549 separately from CTC forced alignment.
+   Japanese Metal multi-window metadata for549 is accepted separately from
+   CTC forced alignment; complete published-wheel/downstream validation next.
 3. **PR521 is held for bundle license review and speech acceptance.** NC main
    weights are distinct from the bundled Boson tokenizer conditions. Do not
    merge full runtime support merely because CI passes. Review the complete diff,

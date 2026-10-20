@@ -39,5 +39,18 @@
     "sha256": "e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e",
     "anonymous_full_download_verified": true,
     "files": 55
+  },
+  "supplemental_applied_patch": {
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/10385d27b50d21906fff6ee407ac8031c1a08e02/issue-followups-20261020/ggml-pr2-applied.patch",
+    "revision": "10385d27b50d21906fff6ee407ac8031c1a08e02",
+    "sha256": "7505375a1ef40726da05a0d52c14c07ef88b00128f1f2459cf1fcd6ece3951b2",
+    "bytes": 3146,
+    "anonymous_read_verified": true
+  },
+  "hosted_review": {
+    "run": 39430148014,
+    "source": "08d47ff3864b99062625e8a1d43e491d587de6df",
+    "status_at_dispatch": "queued; not claimed passing",
+    "scope": "CPU + software Vulkan only; no physical Radeon"
   }
 }

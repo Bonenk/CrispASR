@@ -35622,3 +35622,62 @@ or synthesis is needed to rediscover these accepted diagnostic observations.
 Echo production-builder diagnosis and completed tiny proofs are archived in
 HISTORY.md. The current full-model and CI dependencies are claimed above;
 old e344/run38931686491 is a retained failed prerequisite run, not a live queue.
+
+
+### Archived issue550 preacceptance procedure (completed 2026-10-20)
+
+The following was the bounded procedure before the successful T4 audit; its
+future-tense status text is historical, not pending work.
+
+## Active — issue550 real CUDA long-input memory/reuse
+
+Owner: maintainer coordinator. CPU acceptance is complete and independently
+audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
+implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
+
+Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
+completed successfully on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+Claimed by the maintainer coordinator: actual GPU execution and output audit.
+The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
+archive/provenance and27 member hashes. Worker and method:
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.2).
+Source/model/fixture pins are frozen; GPU acceptance is still pending.
+Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
+this task's acceptance concerns CTC alignment memory. Inspect build provenance,
+source/library/archive hashes and dependency closure before GPU execution.
+
+Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
+Named credential fallback is repaired and version2 uses an immutable public HF
+mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
+verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2 is terminal ERROR before inference (unregistered CPU plugin). Logs/partial
+outputs are retained. Version3 completed with identical runtime/model/fixture pins and passed an
+independent audit: all 147/8,925/147 units, exact returning-short offset reuse,
+CLI parity and 95 actual CUDA encoder splits. Long-phase sampled device total
+peaks at 2,735 MiB. [Receipt](docs/alignment-cuda-live-2026-10-20.json). Do not
+repeat this completed matrix merely to rediscover acceptance. Keep actual
+GPU/cache/long-file acceptance open; delivery is not inference proof.
+
+Kernel acceptance, per the maintainer's external Kaggle guide:
+
+1. Use that prebuilt runtime; clone the exact source for harness/binding code,
+   with no heavy Kaggle build. Record actual CUDA device/capability. The package
+   targets60/75; no Torch is needed for this F16 CTC memory test. Check account
+   quota/concurrency first; do not retry sessions to select hardware.
+2. Reuse the pinned licensed Japanese FLEURS fixture, model and transcript from
+   CPU run39212307554. Verify model/audio/runtime bytes. Compare44.52 seconds,
+   approximately45 minutes (425 repeats gives2703 seconds), then44.52 seconds
+   again through one cached public C ABI/Python model. Long input exercises
+   first32s, interior34s and final partial encoder shapes and scheduler reuse.
+   Also compare a CLI call against default public output with absolute offsets.
+3. Require complete ordered word ownership, positive in-range spans with the
+   existing one-frame tolerance, correct text/offsets, CUDA execution evidence,
+   successful long input and repeatability after the shape/cache changes.
+   Retain source/runtime/model/input identities, raw word results, logs and
+   sampled device memory/utilization with idle baseline. A sampled memory peak
+   is not an exact allocator peak. Preserve CPU/full-window boundary differences;
+   do not invent acoustic accuracy or byte-exact CPU/GPU parity.
+4. Keep public proof separate from weights and credentials; publish only vetted
+   portable evidence. Host logits/DP memory still scales with duration. VAD is
+   unused in align-only. A green build, device enumeration, weights on GPU or
+   the44-second CPU result alone cannot close the45-minute CUDA report.
+

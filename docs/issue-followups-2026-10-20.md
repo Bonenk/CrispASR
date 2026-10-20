@@ -109,3 +109,14 @@ upload workflow artifacts and cannot publish a release. They were queued at
 this checkpoint. The later receipt/tooling changes do not modify native library
 or wheel runtime sources; package claims still require reading actual results
 and inspecting staged artifacts.
+
+The hosted PR2 replay also pins the [supplemental applied patch](https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/10385d27b50d21906fff6ee407ac8031c1a08e02/issue-followups-20261020/ggml-pr2-applied.patch),
+3,146 bytes, SHA256 `7505375a1ef40726da05a0d52c14c07ef88b00128f1f2459cf1fcd6ece3951b2`.
+The initial archive includes the proposal and its source hashes; this supplement
+retains the exact CMake-adapted patch as well. Full anonymous readback and hash
+checks passed before hosted dispatch.
+
+The [hosted PR2 CPU/software-Vulkan review](https://github.com/CrispStrobe/CrispASR/actions/runs/39430148014)
+is dispatched at exact source `08d47ff38` and queued at this checkpoint.
+It is a read-only counterfactual in a separate ggml worktree, not a merge or
+a physical Radeon performance/speech result.
