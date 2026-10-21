@@ -11,6 +11,12 @@ then require versioned CI/lint and inspected package/wheel dry runs before tag
 publication. Inspect the complete published asset set and downstream wheels;
 update issue549 for the actual shipped release and request downstream validation.
 Physical Radeon/Ascend and private reporter inputs remain external dependencies.
+Initial versioned candidate7f612fb8e exposed two Dart formatting failures with
+CI SDK3.13.6. Exact-SDK formatting and11 analyzer brace fixes now pass strict
+analysis plus all40 compiled FFI tests locally. Pin that formatter SDK and run
+the analyzer explicitly in the binding job. Re-freeze the unpublished local tag
+through the bump script, then require fresh source-bound CI and package checks.
+Native runtime/model sources remain unchanged; no release tag is public yet.
 
 ## NOW — issue follow-ups and license policy (2026-10-20)
 
