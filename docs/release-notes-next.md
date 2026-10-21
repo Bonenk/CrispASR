@@ -4,7 +4,10 @@ The published release is documented in [v0.8.43 release notes](../RELEASE_NOTES_
 and [the tagged validation receipt](release-tag-v0.8.43-2026-10-12.json). No later
 tag has been cut.
 
-**Current 2026-10-19 handoff:** the canonical notes are
+**Current 2026-10-21 release preparation:** source883549696 passed all13
+CI39467977527 and10 lint39467977612 jobs, with2,068 selected CTest tests,
+zero failures/four dictionary-data skips, plus189 Python tests/34 subtests.
+The user authorized preparing and publishing0.8.44. The concise canonical notes are
 [RELEASE_NOTES_v0.8.44.md](../RELEASE_NOTES_v0.8.44.md); remaining release gates
 are in [PLAN.md](../PLAN.md) and [the handoff](maintenance-handoff.md).
 OpenVoice reference/conditioning integration and bounded synthetic encoder

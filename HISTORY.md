@@ -1,3 +1,16 @@
+## 2026-10-21 — Final issue-follow-up source accepted for release preparation
+
+Source883549696 passes all13 CI39467977527 and all10 lint39467977612 jobs,
+plus Ruby bindings, Metal-cache, CTC-alignment and secret checks. The full unit
+log confirms2,068 selected CTest tests, zero failures and four dictionary-data
+skips; the separate Python suite passes189 tests and34 subtests. All four
+cache/loader/launcher/metadata validators execute. SDK probes retain conditional
+skips. Native/binding sources are unchanged from accepted0c355f398.
+The23-file final proof archive is anonymously byte-verified at HF revision
+8b3d5083445e36a43e13a5e9450af066aea4fcc5, SHA256
+23ad6fa33b9dd555db8f4f78423b7b59a3bfadac1e4fe9e6fab665a54c122b8f.
+The existing issue549 reply records the completed checks and distribution gate.
+
 ## 2026-10-20 — Clean-build Python unit registration repaired
 
 The8237 Linux unit log passes 2,039 CTest cases but contains no cache-release,

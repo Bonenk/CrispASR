@@ -1,5 +1,17 @@
 # CrispASR — Pending work
 
+## NOW — v0.8.44 release (2026-10-21)
+
+Owner: Codex, branch `fix/issue-followups-20261020`, accepted base `883549696`.
+User authorized release preparation and publication after the validated issue
+follow-ups. Freeze scope to integrated fixes; keep optional NZ caching off,
+shared-ggml PR2 unmerged, and OmniVoice PR521/custom-license promotion held.
+Reconcile user-facing notes and Flutter changelog, use the version-bump script,
+then require versioned CI/lint and inspected package/wheel dry runs before tag
+publication. Inspect the complete published asset set and downstream wheels;
+update issue549 for the actual shipped release and request downstream validation.
+Physical Radeon/Ascend and private reporter inputs remain external dependencies.
+
 ## NOW — issue follow-ups and license policy (2026-10-20)
 
 Owner: Codex, branch `fix/issue-followups-20261020`, base `069365a42`.
@@ -12,7 +24,11 @@ CI asserts all four follow-up validators are selected before compilation.
 The exact CI guard rejects the original clean configuration and accepts a new
 fixed configuration; 29 Python tests become eligible. All 23 non-SDK suites pass
 through CTest locally; six language SDK probes retain separate acceptance.
-Fresh hosted CI is required; do not count local tests as hosted coverage.
+Completed source883549696 passes all13 CI39467977527 jobs and all10
+lint39467977612 jobs, plus Ruby, Metal-cache, CTC-alignment and secret checks.
+The full unit log confirms 2,068 selected CTest tests with zero failures and four
+dictionary-data skips, plus189 Python tests and34 subtests. All four required
+validators actually execute. Conditional SDK skips are not complete SDK coverage.
 The same run's macOS job never acquired a hosted runner (capacity annotation),
 so its cancellation is not a source build result.
 

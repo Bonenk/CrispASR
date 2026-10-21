@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.8.44
+
+* **Native results and alignment:** preserve owned Session token metadata and
+  structured diarization results; bound long CTC encoder windows and expose
+  aligner cache release through Python/native APIs.
+* **Native runtime:** fix Dolphin decoding, Breeze instructions/reference audio
+  and server voice handling, Whisper callback/parallel timelines, and TTS
+  reference ownership and sample rates.
+* **Bindings:** harden speaker-result validation, native lifetimes and callback
+  ownership across the supported wrappers. Raw low-level handles still require
+  caller serialization.
+* **Distribution:** ship both public native headers consistently and verify
+  clean installed-wheel loading. Optional CANN NZ caching stays off by default;
+  experimental quantizations and unmerged OmniVoice/Conv1D changes are excluded.
+* **Model downloads:** retain explicit ordinary-NC opt-ins and require separate
+  acknowledgment for OmniVoice companion terms and OpenRAIL restrictions.
+
 ## 0.8.43
 
 * **Transcript correctness:** preserve UTF-8 continuation bytes during cleanup
