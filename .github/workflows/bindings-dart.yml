@@ -37,7 +37,7 @@ jobs:
           submodules: recursive
       - uses: dart-lang/setup-dart@v1
         with:
-          # Keep the formatter reproducible; ABI contracts also test stable.
+          # Keep formatting reproducible; ABI contracts also test an older SDK.
           sdk: '3.13.6'
 
       # crispasr-lib, not crispasr: the latter is the CLI's OUTPUT_NAME and is

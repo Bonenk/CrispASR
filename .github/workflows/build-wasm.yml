@@ -86,8 +86,13 @@ jobs:
           # All-backend budget includes Index-Echo's hybrid decoder (#485).
           # Pinned emsdk 6.0.2: 10,045,300–10,127,779 bytes before Index-Echo,
           # 11,211,244–11,296,245 after it (runs 36879830550/36959052416).
-          # Keep a bounded 12 MiB WASM budget and the existing 200 KiB JS intent.
-          [ "$(wc -c < build-wasm/bin/libwhisper.wasm)" -lt 12582912 ] || (echo "WASM exceeds 12 MiB budget" && exit 1)
+          # Keep the 12.75 MiB budget validated in run 39223238293 (9bf5994ea),
+          # independently of the held feature branch that carried that CI fix.
+          # New binding/context-guard exports grew the last 12 MiB pass from
+          # 12,541,018 bytes (39146619505) to 12,636,435–12,638,521 threaded.
+          # Release preflight 39566986243: 12,639,767–12,641,853 threaded;
+          # JS remains 148,460–149,240 bytes, below its unchanged 200 KiB cap.
+          [ "$(wc -c < build-wasm/bin/libwhisper.wasm)" -lt 13372416 ] || (echo "WASM exceeds 12.75 MiB budget" && exit 1)
           [ "$(wc -c < build-wasm/bin/libwhisper.js)" -lt 204800 ] || (echo "JS exceeds 200 KiB budget" && exit 1)
           # The proxy build must export the async, deadlock-free synth entry.
           if [[ "${{ matrix.name }}" == proxy-to-pthread* ]]; then

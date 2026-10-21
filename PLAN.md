@@ -17,6 +17,11 @@ analysis plus all40 compiled FFI tests locally. Pin that formatter SDK and run
 the analyzer explicitly in the binding job. Re-freeze the unpublished local tag
 through the bump script, then require fresh source-bound CI and package checks.
 Native runtime/model sources remain unchanged; no release tag is public yet.
+WASM preflight39566986243 compiles all variants but the three threaded arms
+exceed the stale12MiB size gate (12,639,767–12,641,853 bytes). Owner Codex:
+recover the isolated, previously validated size-budget adjustment9bf5994ea
+without merging its held feature branch, retain the200KiB JS gate, and require
+all five variants and export/runtime checks before publication.
 
 ## NOW — issue follow-ups and license policy (2026-10-20)
 
