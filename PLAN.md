@@ -1,27 +1,32 @@
 # CrispASR — Pending work
 
-## NOW — v0.8.44 release (2026-10-21)
+## NOW — v0.8.44 publication and wheel compatibility (2026-10-21)
 
-Owner: Codex, branch `fix/issue-followups-20261020`, accepted base `883549696`.
-User authorized release preparation and publication after the validated issue
-follow-ups. Freeze scope to integrated fixes; keep optional NZ caching off,
-shared-ggml PR2 unmerged, and OmniVoice PR521/custom-license promotion held.
-Reconcile user-facing notes and Flutter changelog, use the version-bump script,
-then require versioned CI/lint and inspected package/wheel dry runs before tag
-publication. Inspect the complete published asset set and downstream wheels;
-update issue549 for the actual shipped release and request downstream validation.
-Physical Radeon/Ascend and private reporter inputs remain external dependencies.
-Initial versioned candidate7f612fb8e exposed two Dart formatting failures with
-CI SDK3.13.6. Exact-SDK formatting and11 analyzer brace fixes now pass strict
-analysis plus all40 compiled FFI tests locally. Pin that formatter SDK and run
-the analyzer explicitly in the binding job. Re-freeze the unpublished local tag
-through the bump script, then require fresh source-bound CI and package checks.
-Native runtime/model sources remain unchanged; no release tag is public yet.
-WASM preflight39566986243 compiles all variants but the three threaded arms
-exceed the stale12MiB size gate (12,639,767–12,641,853 bytes). Owner Codex:
-recover the isolated, previously validated size-budget adjustment9bf5994ea
-without merging its held feature branch, retain the200KiB JS gate, and require
-all five variants and export/runtime checks before publication.
+Owner: Codex, branch `fix/issue-followups-20261020`. User authorized publication.
+Runtime tag `v0.8.44` is public and immutable at `46506786d`: CI13/lint10/WASM5,
+Dart/Ruby and all6 SDK ABI jobs pass. Three versioned installed-wheel controls
+and actual Japanese Metal17/123/17 metadata reuse pass. Published Mac runtime
+libraries are byte-identical to that test; shipped Linux/Windows metadata and
+cache-release exports are independently inspected. Rust/sys/pub.dev0.8.44 are
+published; the native Release workflow is still completing its platform builds.
+
+The artifact audit found incorrect wheel compatibility labels before PyPI upload:
+Linux importsGLIBC2.34/GLIBCXX3.4.30, requiring the pinned manylinux2_35 policy;
+the Mac core targets11.0 but the optional helper was accidentally built for14.0.
+Python publication is temporarily disabled. The fix keeps Mac11.0 by compiling
+its helper for that target and checks every finished wheel's OS/stdlib floor.
+Packaging QA follows the workflow revision; runtime/Python sources remain at the
+requested tag. All15 guard tests pass; actual old Linux/Mac artifacts are rejected,
+corrected wheels pass, and the rebuilt Mac helper loads all3 bridge exports.
+
+Finish corrected publisher checks, push/re-enable it, and dispatch from updated
+main with `tag=v0.8.44` if the automatic event was missed. Inspect all4 CPU wheels
+plus sdist, all3 GPU wheels/index links, all53 expected GitHub assets (explicitly
+record the Linux GPU filename's corrected platform tag), and registry versions.
+Then update issue549/PR544, keep549open for WhisperJAV retest, and archive the
+final receipt/history. Optional NZ caching stays off; shared-ggml PR2 and
+OmniVoice/custom-license promotion stay held. Hardware/private reporter inputs
+remain external. No runtime retagging or model conversion is required.
 
 ## NOW — issue follow-ups and license policy (2026-10-20)
 

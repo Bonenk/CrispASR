@@ -1,5 +1,19 @@
 ## 2026-10-21 — Final issue-follow-up source accepted for release preparation
 
+## 2026-10-21 — wheel OS/stdlib compatibility audit before v0.8.44 PyPI upload
+
+Actual staged Linux libraries import GLIBC2.34 and GLIBCXX3.4.30; their old
+manylinux2_28 label was inaccurate. Use the auditwheel manylinux2_35 policy,
+pinned at63a51b2f62936e38b6504faa60db5ca042559f97 with its MIT notice. The Mac core
+already targets11.0; compile the optional C shim for11.0 too, rather than inheriting
+the build host's14.0 minimum. Finished-wheel checks inspect all native libraries,
+including vendored dependencies and the shim, before upload. QA tooling is pinned
+to the workflow revision while package/runtime sources remain at the requested tag.
+Fifteen guard tests pass. Real old Linux/Mac artifacts fail the checks; corrected
+wheels pass, and the rebuilt helper loads its3 exports. Runtime tagv0.8.44 is
+unchanged. Python publication remains held until this corrected workflow is active.
+
+
 Source883549696 passes all13 CI39467977527 and all10 lint39467977612 jobs,
 plus Ruby bindings, Metal-cache, CTC-alignment and secret checks. The full unit
 log confirms2,068 selected CTest tests, zero failures and four dictionary-data
