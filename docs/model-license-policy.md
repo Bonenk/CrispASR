@@ -14,7 +14,12 @@ loading is not a rights-verification system.
 Research-only terms and additional use, output, revenue, user-count or hosted
 service restrictions need a separate review before support or promotion. An
 acceptance switch records the user's acknowledgment; it is not project approval
-of a license. Existing custom-license entries are not automatically certified
+of every possible use. For eligible custom-license support, supplying the switch
+affirms that the user accepts the full terms, is eligible, and will fulfill the
+conditions applicable to them, including obtaining separately required rights.
+This is the user's obligation; CrispASR does not waive those conditions or grant
+extra rights. We retain responsibility for our own distribution/notices.
+Existing custom-license entries are not automatically certified
 by this policy. Do not add new restricted models under a permissive or ordinary
 NC label. Review the main weights, tokenizer/codec, other companions and source
 code separately, retaining immutable revisions and the actual terms. Unknown
@@ -74,8 +79,9 @@ conditions apply to Cosmos models; do not present them as a Parakeet requirement
 Disposition: fixing issue551's erroneous routing/rejection does not add model
 support or a registry entry. Before managed Unified support, review the exact
 checkpoint/conversion, retain its terms and NOTICE, and use a distinct explicit
-`nvidia-open-model-license` acceptance tag. This proposed tag is not an existing
-Unified download entry and is not ordinary NC acceptance.
+`nvidia-open-model-license` acceptance tag. The gate now recognizes this tag;
+there is no Unified registry entry or inference support yet. Acceptance affirms
+the user's eligibility and compliance, independently of ordinary NC acceptance.
 
 Sources: [original model](https://huggingface.co/nvidia/parakeet-unified-en-0.6b),
 [converted model terms](https://huggingface.co/handy-computer/parakeet-unified-en-0.6b-gguf/blob/main/LICENSE),
@@ -99,12 +105,12 @@ policy. Their requirements extend beyond attribution:
   needs review for the particular integration. Sections 1.b.iv and 5.c add the
   acceptable-use policy and indemnity.
 
-Disposition: keep the existing distinct `omnivoice-terms` gate. It covers review
-of both the NC main weights and companion terms; it does not waive either.
-Do not promote PR521 merely because a user can acknowledge them. Bundle notices,
-eligibility and the applicable naming obligations remain separate, alongside the
-unchanged speech-quality acceptance gate. Any broader support or naming
-uncertainty needs clarification from the licensor before promotion.
+Disposition: keep the existing distinct `omnivoice-terms` gate. Supplying it
+affirms acceptance of both the NC main weights and companion terms, eligibility
+and compliance, including any separately required Boson permission. These remain
+the user's obligations. Our distribution/notices and any naming obligations that
+apply to our integration still need to be fulfilled; a switch does not transfer
+them to users. PR521's speech-quality acceptance gate remains unchanged.
 
 Sources: [exact bundled Boson terms](https://huggingface.co/k2-fsa/OmniVoice/blob/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/audio_tokenizer/LICENSE),
 [incorporated Llama3 agreement](https://www.llama.com/llama3/license/),

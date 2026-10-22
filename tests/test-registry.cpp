@@ -118,6 +118,21 @@ TEST_CASE("registry: NC acceptance does not accept a custom bundle license", "[u
     REQUIRE_FALSE(crispasr_license_requires_acceptance("MIT"));
 }
 
+TEST_CASE("registry: NVIDIA and OmniVoice acceptance affirm distinct full terms", "[unit][registry][license]") {
+    REQUIRE(crispasr_license_requires_acceptance("NVIDIA-Open-Model-License"));
+    REQUIRE(crispasr_license_accepted("NVIDIA-Open-Model-License", "nvidia-open-model-license"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "cc-by-nc-4.0"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "apache-2.0"));
+    REQUIRE(crispasr_license_requires_acceptance("omnivoice-terms"));
+    REQUIRE(crispasr_license_accepted("omnivoice-terms", "omnivoice-terms"));
+    REQUIRE_FALSE(crispasr_license_accepted("omnivoice-terms", "nvidia-open-model-license"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "omnivoice-terms"));
+    CrispasrRegistryEntry e;
+    REQUIRE(crispasr_registry_lookup("omnivoice", e));
+    REQUIRE(e.license.find("100,000") != std::string::npos);
+    REQUIRE(e.license.find("materials/outputs") != std::string::npos);
+}
+
 TEST_CASE("registry: the Breeze TTS 2 non-commercial gate actually blocks", "[unit][registry][license]") {
     // #412. The weights are non-commercial and this is the only thing standing
     // between `-m auto` and downloading them without acceptance, so it gets its
