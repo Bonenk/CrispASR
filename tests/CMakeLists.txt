@@ -5429,6 +5429,10 @@ set_tests_properties(test-package-lib-bundle PROPERTIES
     SKIP_RETURN_CODE 77
     TIMEOUT 120)
 
+# Discover Python before constructing commands or guarding their registration.
+# A later find_package leaves clean builds without the guarded unit tests.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+
 # ─── test-server-ws-stream — live: --ws-port real-time WebSocket ASR streaming.
 # Raw-socket client (stdlib only) verifies the RFC 6455 handshake + a streaming
 # transcription. Needs a whisper ggml model; SKIPs otherwise.
@@ -5622,6 +5626,21 @@ set_tests_properties(test-separate-live PROPERTIES
 
 # #533: compile native finalization/getters and decode via Python ctypes.
 if(UNIX AND Python3_EXECUTABLE)
+    add_test(NAME alignment-cuda-loader
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cuda_loader.py -v)
+    set_tests_properties(alignment-cuda-loader PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
+    add_test(NAME alignment-cache-release-samples
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_alignment_cache_release_samples.py -v)
+    set_tests_properties(alignment-cache-release-samples PROPERTIES LABELS "unit;alignment" TIMEOUT 30)
+    add_test(NAME kaggle-cli-launcher
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_kpush.py -v)
+    set_tests_properties(kaggle-cli-launcher PROPERTIES LABELS "unit;tooling" TIMEOUT 30)
+    add_test(NAME ja-metadata-validator
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_ja_metadata_live_validator.py -v)
+    set_tests_properties(ja-metadata-validator PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
+    add_test(NAME wheel-platform-floor
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_wheel_platform_floor.py -v)
+    set_tests_properties(wheel-platform-floor PROPERTIES LABELS "unit;packaging" TIMEOUT 30)
     # Model-free language ABI probes skip on developer machines without SDKs.
     # binding-contracts.yml uses the strict runner and rejects every skip.
     foreach(wrapper_language csharp java ruby dart wasm)
@@ -5817,6 +5836,23 @@ catch_discover_tests(test-arch-backend-map
         LABELS unit
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
+
+# ─── #551: real GGUF schema routing and C ABI/CLI rejection (no weights)
+add_executable(test-parakeet-gguf test-parakeet-gguf.cpp)
+target_include_directories(test-parakeet-gguf PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-parakeet-gguf PRIVATE Catch2::Catch2WithMain crispasr-lib)
+catch_discover_tests(test-parakeet-gguf
+    TEST_SPEC "[parakeet-schema]"
+    PROPERTIES LABELS "unit;parakeet"
+)
+# The examples directory defines crispasr-cli after this directory. Test the
+# build option here; the target-file generator expression resolves later.
+if(Python3_EXECUTABLE AND CRISPASR_BUILD_EXAMPLES)
+    add_test(NAME parakeet-schema-cli COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_parakeet_schema_cli.py
+        --cli $<TARGET_FILE:crispasr-cli> --audio ${PROJECT_SOURCE_DIR}/samples/jfk.wav)
+    set_tests_properties(parakeet-schema-cli PROPERTIES LABELS "unit;parakeet" TIMEOUT 120)
+endif()
 
 # ─── test-btc-vocab — chord vocabulary + positional encoding (hermetic, unit)
 add_executable(test-btc-vocab test-btc-vocab.cpp)
@@ -6315,7 +6351,6 @@ target_link_libraries(test-ctc-stitch PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(test-ctc-stitch TEST_SPEC "[ctc-stitch]" PROPERTIES LABELS "unit;omniasr")
 
 # Phonon-2 reuses Parakeet; exercise its model alias and metadata through real surfaces.
-find_package(Python3 COMPONENTS Interpreter QUIET)
 # examples/cli is added after tests, so its target does not exist yet here.
 if (Python3_Interpreter_FOUND AND CRISPASR_BUILD_EXAMPLES AND BUILD_SHARED_LIBS
     AND NOT EMSCRIPTEN AND NOT CRISPASR_BUILD_COMMON_ONLY)
@@ -6352,3 +6387,13 @@ target_include_directories(test-dolphin-depthwise PRIVATE ${PROJECT_SOURCE_DIR}/
 target_link_libraries(test-dolphin-depthwise PRIVATE ggml ggml-cpu)
 add_test(NAME dolphin-depthwise-checkpoint-padding COMMAND test-dolphin-depthwise)
 set_tests_properties(dolphin-depthwise-checkpoint-padding PROPERTIES LABELS "unit;dolphin")
+
+add_executable(test-weight-usage test-weight-usage.cpp)
+target_include_directories(test-weight-usage PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/src)
+target_link_libraries(test-weight-usage PRIVATE Catch2::Catch2WithMain crispasr-core ggml crispasr_link_ggml_cpu)
+catch_discover_tests(test-weight-usage PROPERTIES LABELS "unit;weight-usage")
+
+if(Python3_Interpreter_FOUND AND UNIX)
+    add_test(NAME cann-nz-cache-lifecycle COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tests/test_cann_nz_lifecycle.py -v)
+    set_tests_properties(cann-nz-cache-lifecycle PROPERTIES LABELS "unit;cann" TIMEOUT 60)
+endif()

@@ -1,0 +1,96 @@
+{
+  "scope": "Host controls only; no NPU inference, SDK completion, speech quality or speed claim.",
+  "source": {
+    "crispasr_code": "146392764265cf88d47136da40e984151055fe53",
+    "ggml": "4d7345958cea1e88e56a60270a711baeb16a697e"
+  },
+  "host": {
+    "system": "Darwin",
+    "architecture": "arm64"
+  },
+  "results": [
+    {
+      "name": "usage-mmap",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "6c7a8210c995ec776acddf280ef4e48614e6e7cd9715b00e3ce77b643cb1d6f3"
+    },
+    {
+      "name": "usage-copy",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "d858517724ab7f1864c07cdfd33510c2f44f09767b4a80b3fdab7a5b92269330"
+    },
+    {
+      "name": "gguf-split",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "754e7a0c3adb541d7df57cece8cf9261f71d39a604c8e4393b98f61e66847629"
+    },
+    {
+      "name": "gguf-bounds",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "56e46f465315a432d89be7834ed793669900e08b10978c28bbbddd51315482a1"
+    },
+    {
+      "name": "gguf-release",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "2b0cf80da5a93e0059ce284560a3283a6c771f60d97cc20c2161dde79344b877"
+    },
+    {
+      "name": "cpu-execution",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "5f454ce8f07d3eb83667b06a16d709df434ea4812645671a0873a9ee38de118e"
+    },
+    {
+      "name": "reject-missing-cann",
+      "returncode": 1,
+      "expected_returncode": 1,
+      "pass": true,
+      "log_sha256": "996448bfd9e0b44d42b4e92c42121cec4cc3774e2fc680fefa30881cbde1db6e"
+    },
+    {
+      "name": "cann-policy",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "3b93329bae3ba977c66ec20a0cb970ac31958ee524efda5f16a85d14880fc1f5"
+    },
+    {
+      "name": "cann-bf16",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "96e30b7f7eb50f805e9efc122c5300a606db002c495096de2526d9d465da13b4"
+    },
+    {
+      "name": "cann-rope",
+      "returncode": 0,
+      "expected_returncode": 0,
+      "pass": true,
+      "log_sha256": "3bf30c4cc2b1eadf78552aedf17909abc304c99cc8fc9152cde9b2bba6a8aeb4"
+    }
+  ],
+  "assertions": {
+    "usage_each_mmap_mode": 83,
+    "gguf_split": 188,
+    "gguf_bounds": 11,
+    "gguf_release": 28,
+    "cpu_probe_cases": 48,
+    "cpu_probe_computes": 432
+  },
+  "limitations": [
+    "CANN unavailable on this host; explicit CANN request correctly rejects it.",
+    "Production policy compiles without the SDK; CANN cache execution requires the official SDK build and physical device probe.",
+    "Raw host proof is retained under build-layout/layout-proof-local in the task worktree."
+  ]
+}

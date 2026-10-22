@@ -1,0 +1,30 @@
+{
+  "runtime_source": "191815511b85a526aace111b1bda2e28ecb7faad",
+  "bundle_sha256": "63474b5f034ebac850b7b87ef76eecec12d009092d4c72370aeeb6be341365c5",
+  "worker_sha256": "459a7304c3fb8cddf45693db56e31e1263087a420144092c53ccd820962bee9d",
+  "raw_device_samples_sha256": "19ace7269ec5971cf440d2a6208aaccf6d51bf41b63161c9b8eaf7cd42af0fa9",
+  "retained_alignment_audit_passed": true,
+  "public_archive_replay_exact": true,
+  "cache_release_evidence": {
+    "active_device_index": 0,
+    "cached_before_min_mib": 2735,
+    "first_cli_sample_mib": 125,
+    "observed_device_total_drop_mib": 2610,
+    "cli_peak_after_reload_mib": 2823,
+    "scope": "Sampled device-total transition after public cache free and during fresh CLI startup; not per-process allocator balance, exact idle return, free-call latency or same-process reload"
+  },
+  "counter_guard_tests_passed": 6,
+  "raw_proof": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip",
+  "new_kaggle_dispatches": 0,
+  "followup_public_proof": {
+    "files": 59,
+    "bytes": 599965,
+    "sha256": "0b3dd058be4cecb24c7683371562391622456f7b8e5279632080dc012b34d115",
+    "revision": "1ed61568906ba43e509cc35f184dd50fb743277c",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1ed61568906ba43e509cc35f184dd50fb743277c/issue-followups-20261020/fallback-cache-proof.zip",
+    "anonymous_full_readback_verified": true,
+    "expanded_hashes_and_secret_scan_passed": true,
+    "standalone_public_data_replay_exact": true,
+    "standalone_counter_tests_passed": 6
+  }
+}

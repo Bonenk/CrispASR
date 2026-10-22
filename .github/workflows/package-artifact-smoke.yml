@@ -1,0 +1,127 @@
+name: Package artifact smoke
+
+# Reuse bounded Release dry-run bundles; never publish or rebuild native code.
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Full source commit used by all three bundle builds'
+        required: true
+        type: string
+      linux_run:
+        description: 'Linux x86_64 Release dry-run ID'
+        required: true
+        type: string
+      macos_run:
+        description: 'macOS arm64 Release dry-run ID'
+        required: true
+        type: string
+      windows_run:
+        description: 'Windows x86_64 Release dry-run ID'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+            platform: manylinux_2_28_x86_64
+            run: linux_run
+          - name: macos-arm64
+            runner: macos-14
+            platform: macosx_11_0_arm64
+            run: macos_run
+          - name: windows-x86_64
+            runner: windows-latest
+            platform: win_amd64
+            run: windows_run
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify bundle provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs[matrix.run] }}
+          EXPECTED_SOURCE: ${{ inputs.source }}
+        run: |
+          set -euo pipefail
+          actual=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq .head_sha)
+          test "$actual" = "$EXPECTED_SOURCE"
+          echo "Verified source: $actual; bundle run: $RUN_ID"
+      - uses: actions/download-artifact@v4
+        with:
+          name: libcrispasr-${{ matrix.name }}
+          path: bundle_dl
+          run-id: ${{ inputs[matrix.run] }}
+          github-token: ${{ github.token }}
+      - name: Extract bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir bundle
+          tar xzf bundle_dl/*.tar.gz -C bundle
+          test -f bundle/libcrispasr-${{ matrix.name }}/include/crispasr_session.h
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends patchelf libopenblas0 libespeak-ng1 libfdk-aac2 libasound2
+      - name: Stage, build and install wheel
+        shell: bash
+        env:
+          BUNDLE: libcrispasr-${{ matrix.name }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          python python/tools/stage_libs.py --bundle "bundle/$BUNDLE"
+          python -m pip install build wheel
+          (cd python && python -m build --wheel)
+          python -m wheel tags --python-tag py3 --abi-tag none --platform-tag "$PLATFORM" --remove python/dist/*.whl
+          python -m venv .wt
+          if [ -f .wt/bin/activate ]; then . .wt/bin/activate; else . .wt/Scripts/activate; fi
+          pip install python/dist/*.whl
+          mkdir foreign-cwd
+          cd foreign-cwd
+          unset PYTHONPATH CRISPASR_LIB_PATH DYLD_LIBRARY_PATH LD_LIBRARY_PATH
+          python - <<'PY'
+          import ctypes
+          import hashlib
+          import json
+          from pathlib import Path
+          import crispasr._binding as binding
+          path = Path(binding._find_lib()).resolve()
+          assert 'site-packages' in path.parts, path
+          lib = ctypes.CDLL(str(path))
+          for symbol in ('crispasr_session_open', 'crispasr_session_close',
+                         'crispasr_session_result_n_tokens', 'crispasr_session_result_token_text',
+                         'crispasr_session_result_token_t0', 'crispasr_session_result_token_p',
+                         'whisper_init_from_file_with_params_by_ref', 'whisper_full_by_ref',
+                         'crispasr_transcribe_parallel_by_ref'):
+              getattr(lib, symbol)
+          receipt = {'passed': True, 'library': path.name,
+                     'library_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                     'scope': 'installed wheel relocation/load and exported Session token ABI; no model inference'}
+          print(json.dumps(receipt, indent=2))
+          Path('../wheel-smoke.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-wheel-${{ matrix.name }}
+          path: |
+            python/dist/*.whl
+            wheel-smoke.json

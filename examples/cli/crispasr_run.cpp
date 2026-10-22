@@ -9,6 +9,7 @@
 
 #include "core/align_json.h"
 #include "core/lid_probe.h"
+#include "core/parakeet_gguf.h"
 #include "crispasr_backend.h"
 #include "crispasr_cache.h"
 #include "crispasr_gap_fill.h"
@@ -3114,6 +3115,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         } else {
             backend_name = crispasr_detect_backend_from_gguf(params.model);
             if (backend_name.empty()) {
+                if (core_parakeet_gguf::reject_external_file(params.model.c_str()))
+                    return 11;
                 fprintf(stderr,
                         "crispasr: error: could not auto-detect backend from '%s'. "
                         "Use --backend NAME to force one.\n",
@@ -3279,6 +3282,12 @@ int crispasr_run_backend(const whisper_params& params_in) {
         return 11;
     }
     params.model = resolved;
+
+    // Reject the foreign Parakeet schema even if a filename or explicit backend
+    // bypassed metadata auto-detection. Do this before loading weights/processing.
+    if (core_parakeet_gguf::family_backend(backend_name.c_str()) &&
+        core_parakeet_gguf::reject_external_file(params.model.c_str()))
+        return 11;
 
     // A pure-CTC FastConformer model (parakeet-ctc-*, stt_*_fastconformer_ctc:
     // encoder + CTC head, no RNN-T decoder/joint) cannot run on the parakeet

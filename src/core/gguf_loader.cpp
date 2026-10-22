@@ -43,6 +43,17 @@
 
 namespace core_gguf {
 
+void apply_weight_usage(ggml_tensor* tensor, WeightUsagePolicy policy) {
+    if (!policy.classify)
+        return;
+    const auto usage = policy.classify(ggml_get_name(tensor), policy.user);
+    tensor->flags &= ~(GGML_TENSOR_FLAG_WEIGHT_MATMUL_ONLY | GGML_TENSOR_FLAG_WEIGHT_GENERAL);
+    if (usage == WeightUsage::MatmulOnly && ggml_n_dims(tensor) == 2 && !tensor->view_src)
+        tensor->flags |= GGML_TENSOR_FLAG_WEIGHT_MATMUL_ONLY;
+    else if (usage != WeightUsage::Unspecified)
+        tensor->flags |= GGML_TENSOR_FLAG_WEIGHT_GENERAL;
+}
+
 // ---------------------------------------------------------------------------
 // Pass 1: metadata
 // ---------------------------------------------------------------------------
@@ -560,7 +571,7 @@ static void try_mlock(const char* tag, void* base, size_t size) {
 } // namespace
 
 static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeTensor include_tensor, void* user,
-                              const char* model_tag, WeightLoad& out) {
+                              const char* model_tag, WeightLoad& out, WeightUsagePolicy usage) {
     const char* tag = model_tag ? model_tag : "core_gguf";
 
     // Issue #405: under GGML_BACKEND_DL every backend init can legitimately
@@ -642,6 +653,9 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
     } else {
         out.ctx = source_ctx;
     }
+
+    for (ggml_tensor* t = ggml_get_first_tensor(out.ctx); t; t = ggml_get_next_tensor(out.ctx, t))
+        apply_weight_usage(t, usage);
 
     // PLAN #51a: zero-copy CPU path. Skip ggml_backend_alloc_ctx_tensors
     // (which would allocate a fresh backend-side buffer) and instead bind
@@ -1011,7 +1025,8 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
     return true;
 }
 
-bool load_weights(const char* path, ggml_backend_t backend, const char* model_tag, WeightLoad& out) {
+bool load_weights(const char* path, ggml_backend_t backend, const char* model_tag, WeightLoad& out,
+                  WeightUsagePolicy usage) {
     // A GPU backend that cannot bind some weights (Vulkan: a tensor past
     // maxStorageBufferRange - allocatable, not bindable) would otherwise load
     // "fine" and abort later in ggml_backend_sched. Those weights go to a CPU
@@ -1025,7 +1040,7 @@ bool load_weights(const char* path, ggml_backend_t backend, const char* model_ta
             const char* tag = model_tag ? model_tag : "core_gguf";
             log_unbindable(tag, fit, backend);
             ggml_backend_t cpu = core_cpu_backend::init();
-            const bool ok = cpu && load_weights_split(path, backend, cpu, fit_is_gpu, &fit, model_tag, out);
+            const bool ok = cpu && load_weights_split(path, backend, cpu, fit_is_gpu, &fit, model_tag, out, usage);
             if (cpu)
                 ggml_backend_free(cpu); // the CPU buffers do not depend on the backend instance
             if (ok && out.buf_cpu) {
@@ -1041,17 +1056,17 @@ bool load_weights(const char* path, ggml_backend_t backend, const char* model_ta
             return ok;
         }
     }
-    return load_weights_impl(path, backend, nullptr, nullptr, model_tag, out);
+    return load_weights_impl(path, backend, nullptr, nullptr, model_tag, out, usage);
 }
 
 bool load_weights_filtered(const char* path, ggml_backend_t backend, IncludeTensor include_tensor, void* user,
-                           const char* model_tag, WeightLoad& out) {
+                           const char* model_tag, WeightLoad& out, WeightUsagePolicy usage) {
     if (!include_tensor) {
         fprintf(stderr, "%s: load_weights_filtered requires a non-null tensor predicate\n",
                 model_tag ? model_tag : "core_gguf");
         return false;
     }
-    return load_weights_impl(path, backend, include_tensor, user, model_tag, out);
+    return load_weights_impl(path, backend, include_tensor, user, model_tag, out, usage);
 }
 
 void release_weight_buffer(ggml_backend_buffer_t& buf) {
@@ -1123,24 +1138,24 @@ bool is_gpu_tensor_blk(const char* tensor_name, void* user) {
 }
 
 bool load_weights_fit(const char* path, ggml_backend_t backend, ggml_backend_t cpu_backend, const char* model_tag,
-                      WeightLoad& out, int* n_offloaded) {
+                      WeightLoad& out, int* n_offloaded, WeightUsagePolicy usage) {
     const char* tag = model_tag ? model_tag : "core_gguf";
     if (n_offloaded)
         *n_offloaded = 0;
     if (!backend || !cpu_backend || backend == cpu_backend)
-        return load_weights_impl(path, backend ? backend : cpu_backend, nullptr, nullptr, model_tag, out);
+        return load_weights_impl(path, backend ? backend : cpu_backend, nullptr, nullptr, model_tag, out, usage);
     const FitSet fit = scan_unbindable(path, backend);
     if (fit.cpu.empty())
-        return load_weights_impl(path, backend, nullptr, nullptr, model_tag, out);
+        return load_weights_impl(path, backend, nullptr, nullptr, model_tag, out, usage);
     log_unbindable(tag, fit, backend);
     if (n_offloaded)
         *n_offloaded = (int)fit.cpu.size();
     FitSet f = fit;
-    return load_weights_split(path, backend, cpu_backend, fit_is_gpu, &f, model_tag, out);
+    return load_weights_split(path, backend, cpu_backend, fit_is_gpu, &f, model_tag, out, usage);
 }
 
 bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backend_t cpu_backend, IsGpuTensor is_gpu,
-                        void* user, const char* model_tag, WeightLoad& out) {
+                        void* user, const char* model_tag, WeightLoad& out, WeightUsagePolicy usage) {
     const char* tag = model_tag ? model_tag : "core_gguf";
 
     if (!gpu_backend || !cpu_backend) {
@@ -1167,6 +1182,7 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
     size_t gpu_size = 0, cpu_size = 0;
     for (ggml_tensor* t = ggml_get_first_tensor(out.ctx); t; t = ggml_get_next_tensor(out.ctx, t)) {
         const char* tname = ggml_get_name(t);
+        apply_weight_usage(t, usage);
         const bool to_gpu = is_gpu(tname, user);
         if (to_gpu) {
             gpu_tensors.push_back(t);
@@ -1463,8 +1479,17 @@ bool load_weights_repack(const char* path, ggml_backend_t cpu_backend, IsMatmulW
     // Repack is a CPU-backend concept. On anything else, and when the host
     // offers no extra buffer type, fall straight back to the normal loader so
     // callers can adopt this unconditionally.
+    struct UsageContext {
+        IsMatmulWeight classify;
+        void* user;
+    } usage_context{is_matmul_weight, user};
+    const WeightUsagePolicy usage{
+        is_matmul_weight ? +[](const char* name, void* value) {
+            const auto& context = *static_cast<UsageContext*>(value);
+            return context.classify(name, context.user) ? WeightUsage::MatmulOnly : WeightUsage::General;
+        } : nullptr, &usage_context};
     if (!is_matmul_weight || !repack_enabled() || !repack_buft() || !core_cpu_backend::is_cpu(cpu_backend))
-        return load_weights(path, cpu_backend, model_tag, out);
+        return load_weights(path, cpu_backend, model_tag, out, usage);
 
     gguf_init_params gp = {/*.no_alloc=*/true, /*.ctx=*/&out.ctx};
     gguf_context* gctx = gguf_init_from_file(path, gp);
@@ -1489,8 +1514,10 @@ bool load_weights_repack(const char* path, ggml_backend_t cpu_backend, IsMatmulW
     std::map<std::tuple<int, int64_t, int64_t>, bool> accept_cache;
     for (ggml_tensor* t = ggml_get_first_tensor(out.ctx); t; t = ggml_get_next_tensor(out.ctx, t)) {
         const char* tname = ggml_get_name(t);
+        apply_weight_usage(t, usage);
+        const bool matmul_only = (t->flags & GGML_TENSOR_FLAG_WEIGHT_MATMUL_ONLY) != 0;
         bool to_repack = false;
-        if (ggml_n_dims(t) == 2 && is_matmul_weight(tname, user)) {
+        if (ggml_n_dims(t) == 2 && matmul_only) {
             const auto key = std::make_tuple((int)t->type, t->ne[0], t->ne[1]);
             auto it = accept_cache.find(key);
             if (it == accept_cache.end())
@@ -1514,7 +1541,7 @@ bool load_weights_repack(const char* path, ggml_backend_t cpu_backend, IsMatmulW
         ggml_free(out.ctx);
         out.ctx = nullptr;
         out.tensors.clear();
-        return load_weights(path, cpu_backend, model_tag, out);
+        return load_weights(path, cpu_backend, model_tag, out, usage);
     }
 
     auto round_up = [](size_t n, size_t a) { return (n + a - 1) & ~(a - 1); };

@@ -3,6 +3,10 @@
 Status (2026-10-19): strict reference/runtime wiring is implemented. Fresh
 model, CUDA and speech-quality acceptance is pending execution and independent
 audit; the June cosine measurements in HISTORY.md are historical evidence.
+CUDA package run39266520251/source0b4213c39 passed compilation, linking and
+dependency checks. Package delivery audit is still pending; it did not execute
+a GPU/model test. See [the handoff](maintenance-handoff.md) and [PLAN.md](../PLAN.md)
+for current queue blockers, exact source pins and acceptance tasks.
 
 ## Recipe and license boundary
 
@@ -155,3 +159,14 @@ No pretrained checkpoint, GGUF decoding, STFT, full SDK, CUDA or waveform is
 involved in this small arithmetic check. Coefficients are read as F32 vectors.
 It establishes the encoder's CPU math/layout and a rejecting structural control;
 it does not replace the pending actual-model/GPU/quality matrix.
+
+## Producer checkpoint and publication policy
+
+The shared worker checkpoints the converted GGUF under an explicitly unvalidated
+staging path and each original-module reference before native execution. Each
+receipt records hashes and immutable publication revisions; attribution and MIT
+notices accompany the artifacts. A later native/quality failure must preserve
+these producer outputs. Staging is not accepted model publication. Canonical
+model publication is gated by the bounded parity/quality matrix, and its receipt
+still needs independent audit. No actual pretrained/GPU acceptance is claimed
+by the prepared worker or by a successful package build.

@@ -1007,7 +1007,11 @@ constexpr Entry k_registry[] = {
      "~1.2 GB",
      "omnivoice-tokenizer-f16.gguf",
      "https://huggingface.co/cstr/omnivoice-GGUF/resolve/main/omnivoice-tokenizer-f16.gguf",
-     "~400 MB"},
+     "~400 MB",
+     "omnivoice-terms — main weights CC-BY-NC; HiggsAudioV2 tokenizer has additional Boson community terms. "
+     "Acceptance affirms eligibility and compliance with both, including the Boson 100,000 annual-active-user "
+     "condition and restriction on improving other LLMs with materials/outputs. "
+     "Full terms: https://huggingface.co/k2-fsa/OmniVoice#license"},
     //
     // Orpheus-3B (canopylabs/orpheus-3b-0.1-ft is gated; we convert
     // from the non-gated mirror unsloth/orpheus-3b-0.1-ft, llama3.2 —
@@ -1304,8 +1308,9 @@ constexpr Entry k_registry[] = {
     // Supertonic-3 (#434): Supertone/supertonic-3, non-AR flow-matching TTS,
     // 44.1 kHz, 31 languages, 10 preset voices baked into the single GGUF
     // (unicode indexer + NFKD tables included — no companions). Weights are
-    // OpenRAIL-M: permissive incl. commercial, but carries use restrictions +
-    // attribution, so the license field prints on first download.
+    // OpenRAIL-M permits commercial use but has additional use restrictions.
+    // Require explicit acceptance; this is not a permissive license or an
+    // ordinary NC model. Further support needs a separate policy review.
     {"supertonic", "supertonic3-f16.gguf",
      "https://huggingface.co/cstr/supertonic-3-GGUF/resolve/main/supertonic3-f16.gguf",
      "~200 MB", nullptr, nullptr, nullptr,
@@ -2090,9 +2095,11 @@ static bool license_requires_acceptance_tag(const std::string& tag) {
         return true;
     if (tag.rfind("llama", 0) == 0)
         return true;
-    static const char* restricted[] = {"gemma",  "gemma-terms",  "qwen-research", "mistral-ai-research",
-                                       "lfm1.0", "lfm-open-1.0", "funasr-v1.1",   "pocket-tts-terms",
-                                       "other",  nullptr};
+    if (tag.rfind("openrail", 0) == 0 || tag.rfind("creativeml-openrail", 0) == 0)
+        return true;
+    static const char* restricted[] = {
+        "gemma",       "gemma-terms",      "qwen-research",   "mistral-ai-research",       "lfm1.0", "lfm-open-1.0",
+        "funasr-v1.1", "pocket-tts-terms", "omnivoice-terms", "nvidia-open-model-license", "other",  nullptr};
     for (const char** p = restricted; *p; ++p)
         if (tag == *p)
             return true;
@@ -2143,6 +2150,8 @@ static bool license_gate_allows_download(const CrispasrRegistryEntry& e, const s
     fprintf(stderr,
             "crispasr: refusing to download without explicit licence acceptance.\n"
             "  Pass --accept-license %s (or set CRISPASR_ACCEPT_LICENSE=%s).\n"
+            "  Supplying acceptance affirms that you accept the full terms, are eligible to use the model,\n"
+            "  and will comply with all conditions, including obtaining any separately required permission.\n"
             "  --auto-download / -m auto alone is NOT sufficient for a restricted licence.\n",
             tag.c_str(), tag.c_str());
     return false;

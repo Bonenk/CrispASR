@@ -6,6 +6,7 @@
 #include "moonshine_onnx.h"
 #endif
 #include "core/arch_backend_map.h" // #335: general.architecture → backend table, SHARED with the C ABI
+#include "core/parakeet_gguf.h"
 
 // Forward declarations of per-backend constructors. Each is implemented in
 // its own crispasr_backend_X.cpp file and compiled only if the backend's
@@ -682,7 +683,7 @@ void crispasr_print_backend_matrix_json() {
 // Mappings are based on the value that each model's converter writes into
 // the GGUF file. When a converter doesn't write this key we fall back to
 // filename heuristics.
-std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
+static std::string detect_backend_unchecked(const std::string& model_path) {
     if (model_path.empty())
         return "";
 
@@ -948,27 +949,22 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
     return result;
 }
 
+std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
+    const std::string backend = detect_backend_unchecked(model_path);
+    if (core_parakeet_gguf::family_backend(backend.c_str()) &&
+        core_parakeet_gguf::reject_external_file(model_path.c_str(), false))
+        return "";
+    return backend;
+}
+
 bool crispasr_gguf_is_pure_ctc(const std::string& model_path) {
-    // Mirror the parakeet backend's pure-CTC guard (src/parakeet.cpp): a NeMo
-    // EncDecCTCModelBPE (parakeet-ctc-*, stt_*_fastconformer_ctc) has an encoder +
-    // CTC head but NO RNN-T prediction network / joint — so it lacks both the
-    // single-embedding predictor (decoder.embed.weight) and the LSTM predictor
-    // (decoder.lstm.0.w_ih). Reads tensor infos only; no weights loaded.
+    // Require positive evidence of the encoder/head schema our CTC loader uses.
+    // Absence of familiar predictor names alone also matches foreign RNN-T GGUFs.
     struct gguf_init_params gip = {/*.no_alloc=*/true, /*.ctx=*/nullptr};
     gguf_context* gctx = gguf_init_from_file(model_path.c_str(), gip);
     if (!gctx)
         return false;
-    bool has_embed = false, has_lstm = false;
-    const int64_t n_tensors = gguf_get_n_tensors(gctx);
-    for (int64_t i = 0; i < n_tensors; i++) {
-        const char* name = gguf_get_tensor_name(gctx, i);
-        if (!name)
-            continue;
-        if (std::strcmp(name, "decoder.embed.weight") == 0)
-            has_embed = true;
-        else if (std::strcmp(name, "decoder.lstm.0.w_ih") == 0)
-            has_lstm = true;
-    }
+    const bool ctc = core_parakeet_gguf::compatible_ctc(gctx);
     gguf_free(gctx);
-    return !has_embed && !has_lstm;
+    return ctc;
 }

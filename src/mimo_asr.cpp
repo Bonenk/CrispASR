@@ -33,6 +33,7 @@
 #include "core/bpe.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
+#include "core/model_weight_usage.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/crispasr_env.h"
 #include "ggml-alloc.h"
@@ -433,7 +434,8 @@ extern "C" struct mimo_asr_context* mimo_asr_init_from_file(const char* path_mod
     if (do_split) {
         core_gguf::LayerSplitConfig cfg{"model.layers.", n_gpu_layers_env};
         if (!core_gguf::load_weights_split(path_model, ctx->backend_cpu, ctx->backend_cpu,
-                                           core_gguf::is_gpu_tensor_with_prefix, &cfg, "mimo_asr", wl)) {
+                                           core_gguf::is_gpu_tensor_with_prefix, &cfg, "mimo_asr", wl,
+                                           {core_gguf::mimo_weight_usage, nullptr})) {
             fprintf(stderr, "mimo_asr: split load failed from '%s'\n", path_model);
             delete ctx;
             return nullptr;
@@ -452,14 +454,15 @@ extern "C" struct mimo_asr_context* mimo_asr_init_from_file(const char* path_mod
             return !(std::strstr(n, "embed") || std::strstr(n, "audio.emb"));
         };
         if (!core_gguf::load_weights_split(path_model, ctx->backend, ctx->backend_cpu, is_gpu_weight, nullptr,
-                                           "mimo_asr", wl)) {
+                                           "mimo_asr", wl, {core_gguf::mimo_weight_usage, nullptr})) {
             fprintf(stderr, "mimo_asr: GPU split load failed from '%s'\n", path_model);
             delete ctx;
             return nullptr;
         }
         ctx->gpu_embed_split = true;
     } else {
-        if (!core_gguf::load_weights(path_model, ctx->backend_cpu, "mimo_asr", wl)) {
+        if (!core_gguf::load_weights(path_model, ctx->backend_cpu, "mimo_asr", wl,
+                                     {core_gguf::mimo_weight_usage, nullptr})) {
             fprintf(stderr, "mimo_asr: failed to load weights from '%s'\n", path_model);
             delete ctx;
             return nullptr;

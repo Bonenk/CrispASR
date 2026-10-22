@@ -1,0 +1,201 @@
+{
+  "source": "18b540bd5c3e3abe2a3d51e797bd40d81daabc9f",
+  "ggml": "e2ae679a",
+  "scope": "Host lifecycle and real Mac CPU/Metal F32 regression only; physical Ascend, NZ numerical inference, model ACL replay and speed remain pending.",
+  "host_lifecycle": {
+    "passed": true,
+    "checks": 53,
+    "sdk_calls_mocked": true,
+    "red_before_fix": {
+      "test": "test_cann_nz_lifecycle.py",
+      "result": "failed before zero-length fix",
+      "message": "FAIL host lifecycle: zero-length alias write preserves cache",
+      "source_sha256": "b2e3eaf02f49969b2a52538cbd81d02639e2cc2ddc77d63e9b1a4a8dd95c284b"
+    }
+  },
+  "guards": {
+    "model_validator_tests": 10,
+    "device_receipt_tests": 6,
+    "production_policy_checks": 26,
+    "weight_usage_assertions": 83,
+    "registered_ctest_passed": true,
+    "Mac_cannot_satisfy_device_runner": true
+  },
+  "probe_cpu": {
+    "passed": true,
+    "independently_checked_computes": 576,
+    "cases": 48,
+    "acl_captures": 0,
+    "acl_replays": 0,
+    "nz_required": false,
+    "scope": "CPU harness control"
+  },
+  "fixture": {
+    "bytes": 108495214,
+    "sha256": "7d63d2a5b90eb77843aff25107b1d1f70bafcfc1c8f73075e2f5a9a3f87d5e84"
+  },
+  "live_cpu_metal": {
+    "passed": true,
+    "binary_snapshots": [
+      {
+        "path": "ggml/src/libggml.dylib",
+        "bytes": 60112,
+        "sha256": "89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d",
+        "snapshot": "binaries/89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d"
+      },
+      {
+        "path": "ggml/src/libggml.0.dylib",
+        "bytes": 60112,
+        "sha256": "89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d",
+        "snapshot": "binaries/89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d"
+      },
+      {
+        "path": "ggml/src/libggml-base.dylib",
+        "bytes": 774584,
+        "sha256": "c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35",
+        "snapshot": "binaries/c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35"
+      },
+      {
+        "path": "ggml/src/libggml-cpu.0.26.0.dylib",
+        "bytes": 992800,
+        "sha256": "64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc",
+        "snapshot": "binaries/64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc"
+      },
+      {
+        "path": "ggml/src/libggml.0.26.0.dylib",
+        "bytes": 60112,
+        "sha256": "89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d",
+        "snapshot": "binaries/89aae97af7cb0e5ef001c0d8ed1da25dcf77df59accebdff77c5bac1292e4c5d"
+      },
+      {
+        "path": "ggml/src/libggml-cpu.dylib",
+        "bytes": 992800,
+        "sha256": "64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc",
+        "snapshot": "binaries/64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc"
+      },
+      {
+        "path": "ggml/src/libggml-base.0.26.0.dylib",
+        "bytes": 774584,
+        "sha256": "c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35",
+        "snapshot": "binaries/c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35"
+      },
+      {
+        "path": "ggml/src/libggml-base.0.dylib",
+        "bytes": 774584,
+        "sha256": "c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35",
+        "snapshot": "binaries/c998a3c2abeced35d4637d118b620b5fc96add7a790d6234876ee27969cadb35"
+      },
+      {
+        "path": "ggml/src/libggml-cpu.0.dylib",
+        "bytes": 992800,
+        "sha256": "64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc",
+        "snapshot": "binaries/64c5c6130a9fb54a0b9f2b38fa80c70b8081b347fe6f9fa1ee1cbc4dbe53cffc"
+      },
+      {
+        "path": "ggml/src/ggml-metal/libggml-metal.0.26.0.dylib",
+        "bytes": 5737912,
+        "sha256": "24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc",
+        "snapshot": "binaries/24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc"
+      },
+      {
+        "path": "ggml/src/ggml-metal/libggml-metal.0.dylib",
+        "bytes": 5737912,
+        "sha256": "24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc",
+        "snapshot": "binaries/24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc"
+      },
+      {
+        "path": "ggml/src/ggml-metal/libggml-metal.dylib",
+        "bytes": 5737912,
+        "sha256": "24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc",
+        "snapshot": "binaries/24d54cc570ad00af50eda5c282683e5e54fc8bc9e37fef13b527db4ab637e5cc"
+      },
+      {
+        "path": "src/libcrispasr.0.8.43.dylib",
+        "bytes": 16921472,
+        "sha256": "53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455",
+        "snapshot": "binaries/53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455"
+      },
+      {
+        "path": "src/libcrispasr.1.dylib",
+        "bytes": 16921472,
+        "sha256": "53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455",
+        "snapshot": "binaries/53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455"
+      },
+      {
+        "path": "src/libwhisper.dylib",
+        "bytes": 16921472,
+        "sha256": "53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455",
+        "snapshot": "binaries/53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455"
+      },
+      {
+        "path": "src/libcrispasr.dylib",
+        "bytes": 16921472,
+        "sha256": "53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455",
+        "snapshot": "binaries/53403944d21c5e5ed2d3e6e79153dce521c5f648d6d7c56841cf1a72a671f455"
+      },
+      {
+        "path": "bin/crispasr",
+        "bytes": 3667288,
+        "sha256": "d2206eb79ebcc8e8e84f1bd48b91323a80f351e44b69af166f2e0ef4439732ae",
+        "snapshot": "binaries/d2206eb79ebcc8e8e84f1bd48b91323a80f351e44b69af166f2e0ef4439732ae"
+      },
+      {
+        "path": "bin/crispasr-diff",
+        "bytes": 763568,
+        "sha256": "b0f027a984b979af54c5c5ccdee78aee26749ea08ee1df9d90564ad3532bfa89",
+        "snapshot": "binaries/b0f027a984b979af54c5c5ccdee78aee26749ea08ee1df9d90564ad3532bfa89"
+      }
+    ],
+    "cpu_encoder": {
+      "cosine_min": 0.9999999990452337,
+      "max_row_norm_error": 8.33266190358728e-06,
+      "relative_l2": 8.719468866284272e-06,
+      "max_abs": 0.0002168118953704834
+    },
+    "metal_encoder": {
+      "cosine_min": 0.9999823471355497,
+      "max_row_norm_error": 0.000772650490458604,
+      "relative_l2": 0.0005737506189523035,
+      "max_abs": 0.012892484664916992
+    },
+    "cpu_metal_encoder": {
+      "cosine_min": 0.9999824120131078,
+      "max_row_norm_error": 0.0007714033363430683,
+      "relative_l2": 0.0005738020173972011,
+      "max_abs": 0.012858867645263672
+    },
+    "normalized_transcripts_equal": true,
+    "short_long_short_word_counts": {
+      "cpu": [
+        22,
+        44,
+        22
+      ],
+      "metal": [
+        22,
+        44,
+        22
+      ]
+    },
+    "cli_original_word_match": true,
+    "auto_and_explicit_Session_original_word_match": true,
+    "exact_Metal_encoder_placement_verified": true
+  },
+  "public_proof": {
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/a4cfe1799f153f86591ba6956d0da442b376c032/cann-layout-20261020/mac-host-proof.zip",
+    "revision": "a4cfe1799f153f86591ba6956d0da442b376c032",
+    "bytes": 3005130,
+    "sha256": "820ec04e9d69507975e249ba050f19b707ca65194ae07003bff6409e963b5a32",
+    "anonymous_full_download_verified": true
+  },
+  "latest_validation_jobs": {
+    "sdk": "https://github.com/CrispStrobe/CrispASR/actions/runs/39401353196",
+    "ci": "https://github.com/CrispStrobe/CrispASR/actions/runs/39401352847",
+    "lint": "https://github.com/CrispStrobe/CrispASR/actions/runs/39401352899",
+    "status_at_receipt": "all passed: both SDK legs, 13 general CI jobs, 10 lint jobs; no physical Ascend inference"
+  },
+  "published_comments": {
+    "crispasr": "https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6288185477",
+    "ggml": "https://github.com/CrispStrobe/ggml/pull/4#issuecomment-6288187900"
+  }
+}

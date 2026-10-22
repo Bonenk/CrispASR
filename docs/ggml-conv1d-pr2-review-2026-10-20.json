@@ -1,0 +1,231 @@
+{
+  "ggml_base": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "proposal_head": "2ef4ee11c73e3a4186c4e2b1e8b522472de787ed",
+  "merged": false,
+  "build_option": "GGML_CONV1D_VIA_CONV2D=ON",
+  "probe_sha256": "4c7c839daa1c0ae28f12e72768ed42f3bdfe6588f8afb41bd0d2bada34d70572",
+  "binary_sha256": "cffaef460d320c189f429ac127be9f7bae3d6b133a1812b2e4a5de8c158ab4bc",
+  "applied_patch_sha256": "7505375a1ef40726da05a0d52c14c07ef88b00128f1f2459cf1fcd6ece3951b2",
+  "source_hashes": {
+    "src/ggml.c": "7430261114cac818f5182bada26623cc7f783471a04d67b0e5ecbac683afe5a0",
+    "CMakeLists.txt": "baf7dbd0a2bd20b0935ee76c823b67a158d4ee3703a1242343a81265875ae864",
+    "src/CMakeLists.txt": "d06680d336fb78e47ea0e62954b552762d92919561ed67994953ef7753f862ab"
+  },
+  "scope": "Original numerical controls and expanded scheduler CPU/Metal/software-Vulkan BF16-weight and strided-input controls; no Radeon, Chatterbox speech or speed acceptance",
+  "results": {
+    "cpu": {
+      "passed": true,
+      "cases": 100,
+      "max_relative_l2": 1.04739571e-07,
+      "log_sha256": "44ef7de3886ec37f5a6bb52a11f7f2423c87df7e0d84d88cf924826efe979a30"
+    },
+    "metal": {
+      "passed": true,
+      "cases": 100,
+      "max_relative_l2": 8.22925224e-08,
+      "log_sha256": "6494a00a26ac9b90afcde0bb028e5e1fea7d039caf6865b9beb63254bd3ddd4f"
+    },
+    "cpu_noncontiguous_fallback": {
+      "passed": true,
+      "cases": 4,
+      "max_relative_l2": 6.66804714e-08,
+      "log_sha256": "28b75624cfc655ae861185daf5e6b3b1802b3320050c259b24040c6a9ac30dd9"
+    }
+  },
+  "public_proof": {
+    "revision": "ad638b4cd525c5633f831da9eb763864e9827ce9",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip",
+    "bytes": 420650,
+    "sha256": "e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e",
+    "anonymous_full_download_verified": true,
+    "files": 55
+  },
+  "supplemental_applied_patch": {
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/10385d27b50d21906fff6ee407ac8031c1a08e02/issue-followups-20261020/ggml-pr2-applied.patch",
+    "revision": "10385d27b50d21906fff6ee407ac8031c1a08e02",
+    "sha256": "7505375a1ef40726da05a0d52c14c07ef88b00128f1f2459cf1fcd6ece3951b2",
+    "bytes": 3146,
+    "anonymous_read_verified": true
+  },
+  "hosted_review": {
+    "run": 39430148014,
+    "source": "08d47ff3864b99062625e8a1d43e491d587de6df",
+    "status_at_dispatch": "queued; not claimed passing",
+    "scope": "CPU + software Vulkan only; no physical Radeon",
+    "conclusion": "failure before build: missing SPIRV-Headers CMake package",
+    "retry": {
+      "run": 39438818205,
+      "source": "306c17c6565c89eafa44321a614b98ab42db6f33",
+      "repair": "install spirv-headers, as existing main Vulkan CI does",
+      "status": "passed; independently verified all 11 output hashes and per-case logs",
+      "device": "llvmpipe LLVM20.1.2 / Mesa25.2.8 CPU software Vulkan, not physical GPU",
+      "results": {
+        "cpu": {
+          "cases": 100,
+          "failed": 0,
+          "max_relative_l2": 1.04739571e-07,
+          "log_sha256": "7f1daf2d0200d7348d69aa5d4c8f7b6f0c76df6b4962c3e5f41ce4502937fe7e"
+        },
+        "cpu-fallback": {
+          "cases": 4,
+          "failed": 0,
+          "max_relative_l2": 6.66804714e-08,
+          "log_sha256": "c20e3c003b77aa7555519516ec3478c6df620b44641c536886c8d31556a398bd"
+        },
+        "vulkan": {
+          "cases": 100,
+          "failed": 0,
+          "max_relative_l2": 1.03294844e-07,
+          "log_sha256": "8c59628d89e0519443115973e291fdfc214931f8e953356cea5a9624746c56f2"
+        }
+      }
+    }
+  },
+  "package_vulkan_public_proof": {
+    "bytes": 221589,
+    "sha256": "51eb9e0cdb04fab690273dd8fa1700fd1480bc953593e6f93aa01667d2664960",
+    "files": 35,
+    "revision": "2376f0bd253731bff1639e57d6d1b6c29e8be79a",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/2376f0bd253731bff1639e57d6d1b6c29e8be79a/issue-followups-20261020/package-vulkan-proof.zip",
+    "anonymous_full_download_verified": true
+  },
+  "expanded_scheduler_review": {
+    "probe_sha256": "5a6d48da9ddcb5c886a911db0e802d7fbebf2d582bf343d633061bb229aea8be",
+    "ggml_candidate_sources_unchanged": true,
+    "local": {
+      "candidate_sources_unchanged": true,
+      "ggml_base": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+      "candidate_source_hashes": {
+        "src/ggml.c": "7430261114cac818f5182bada26623cc7f783471a04d67b0e5ecbac683afe5a0",
+        "CMakeLists.txt": "baf7dbd0a2bd20b0935ee76c823b67a158d4ee3703a1242343a81265875ae864",
+        "src/CMakeLists.txt": "d06680d336fb78e47ea0e62954b552762d92919561ed67994953ef7753f862ab"
+      },
+      "probe_sha256": "5a6d48da9ddcb5c886a911db0e802d7fbebf2d582bf343d633061bb229aea8be",
+      "binary_sha256": "9715fdaf8823011a3e6d54baec0d2af5ce232b8d3d7d3e1ccdc47d66840f5028",
+      "results": {
+        "cpu": {
+          "cases": 100,
+          "passed": true,
+          "max_relative_l2": 1.04739571e-07,
+          "sha256": "8835d57a71d3a2c993bba0ff5b948e016f6a2e5dd1e01cdf219ff97117d42c2d"
+        },
+        "fallback-cpu": {
+          "cases": 4,
+          "passed": true,
+          "max_relative_l2": 6.66804714e-08,
+          "sha256": "080993073911c94e06d8cb6f57fac3435fde37a9f61f49e6caf20551e01103fb"
+        },
+        "bf16-cpu": {
+          "cases": 4,
+          "passed": true,
+          "max_relative_l2": 6.13376572e-08,
+          "sha256": "22f41a778f73f9d90b34809d1bebcf904118cddfe2d598c4455aaa3f51938919"
+        },
+        "mtl0": {
+          "cases": 100,
+          "passed": true,
+          "max_relative_l2": 8.22925224e-08,
+          "sha256": "d8d4821f1c8917736b9222f0fafdddfffba8e6ecadb824775391ac2d6323294b"
+        },
+        "fallback-mtl0": {
+          "cases": 4,
+          "passed": true,
+          "max_relative_l2": 6.0351486e-08,
+          "sha256": "213f0f62bc3be9c801bb386db68f57d2434c43b90a83605c4548050d60dd403f"
+        },
+        "bf16-mtl0": {
+          "cases": 4,
+          "passed": true,
+          "max_relative_l2": 6.10875886e-08,
+          "sha256": "754cf14417cf1a51df23f925a94f975885c6a8343faf4fab3433d711083a63a7"
+        }
+      },
+      "scope": "108 CPU and 108 Metal/CPU scheduler cases; all 50 direct convolution cases per device execute there. Metal IM2COL falls back to CPU for four layout and two BF16-strided cases. No model, Radeon or speed acceptance.",
+      "negative_controls": {
+        "wrong_device_alias": {
+          "name": "Metal",
+          "exit": 3,
+          "log": "conv1d-pr2-fallback-metal-v2.log"
+        },
+        "forced_unsupported_Metal_im2col": {
+          "exit": 134,
+          "log": "conv1d-pr2-fallback-mtl0-v2.log",
+          "probe_sha256": "be21b649b9b70952744f246c6d454c1b75de1b5c86cd3135a59c2476d5501d7f",
+          "scope": "invalid direct single-backend harness; Metal declares non-contiguous IM2COL unsupported; actual scheduler test passes"
+        },
+        "buffered_output": {
+          "probe_sha256": "2fb7fbed1e23cfe555d327d171b14741c2841b83ac9d494453369a6867e08fce",
+          "scope": "all numerical cases completed, but backend stderr interleaved one Metal case record; final probe line-buffers stdout for strict row auditing",
+          "log": "conv1d-pr2-mtl0-v3.log"
+        }
+      }
+    },
+    "hosted": {
+      "run": 39460690445,
+      "source": "99129e539aa628cbf017b8b5f9d134cda47eb042",
+      "passed": true,
+      "physical_gpu": false,
+      "device": "llvmpipe LLVM20.1.2 / Mesa25.2.8",
+      "audit": {
+        "passed": true,
+        "all_original_file_hashes_verified": true,
+        "results": {
+          "cpu": {
+            "cases": 100,
+            "passed": true,
+            "max_relative_l2": 1.04739571e-07,
+            "cpu_fallbacks": 0,
+            "sha256": "e8515277f343ec6a1038d7d9ce9607abe74dcdfddba2482c15cd60ae05eafb06"
+          },
+          "cpu-fallback": {
+            "cases": 4,
+            "passed": true,
+            "max_relative_l2": 6.66804714e-08,
+            "cpu_fallbacks": 0,
+            "sha256": "b42aecd8f9255b2f6ea9aa17c4a6ae4839822d6d67c037c3800e530a366a9625"
+          },
+          "cpu-bf16": {
+            "cases": 4,
+            "passed": true,
+            "max_relative_l2": 6.13376572e-08,
+            "cpu_fallbacks": 0,
+            "sha256": "cdf4f7a13afe72c6cafaf7e1e27ef83bec16bf23957adfe73b1012d291ec2586"
+          },
+          "vulkan": {
+            "cases": 100,
+            "passed": true,
+            "max_relative_l2": 1.03294844e-07,
+            "cpu_fallbacks": 0,
+            "sha256": "336e496e41f111f391e631dfce10d807b3ac4b9a50ba0e1be4323552d23f8f58"
+          },
+          "vulkan-fallback": {
+            "cases": 4,
+            "passed": true,
+            "max_relative_l2": 5.38646607e-08,
+            "cpu_fallbacks": 4,
+            "sha256": "cfc846e44c10327981da492124279cedd9601c9468bcc927e2808237107eb5c8"
+          },
+          "vulkan-bf16": {
+            "cases": 4,
+            "passed": true,
+            "max_relative_l2": 4.92597919e-08,
+            "cpu_fallbacks": 2,
+            "sha256": "5c940371bf7e7f0143bd9e899ac9f6227b22e6eb3c5129193010a4a15641ba16"
+          }
+        }
+      }
+    },
+    "remaining": "Actual Radeon numerical/precision and matched Chatterbox decoded-speech/warmed performance acceptance. Other untested shapes or types are not certified."
+  },
+  "followup_public_proof": {
+    "files": 59,
+    "bytes": 599965,
+    "sha256": "0b3dd058be4cecb24c7683371562391622456f7b8e5279632080dc012b34d115",
+    "revision": "1ed61568906ba43e509cc35f184dd50fb743277c",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/1ed61568906ba43e509cc35f184dd50fb743277c/issue-followups-20261020/fallback-cache-proof.zip",
+    "anonymous_full_readback_verified": true,
+    "expanded_hashes_and_secret_scan_passed": true,
+    "standalone_public_data_replay_exact": true,
+    "standalone_counter_tests_passed": 6
+  }
+}

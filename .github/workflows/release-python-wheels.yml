@@ -27,10 +27,9 @@ name: Release Python wheels
 #             it at https://crispstrobe.github.io/CrispASR/whl/{cuda,vulkan}/ and
 #             the existing README landing page is left untouched.
 #
-# NOTE ON THE manylinux TAG: the linux bundles come from release.yml's runners.
-# We label the wheels `manylinux_2_28_*` (broadly compatible). If the bundle
-# turns out to need a newer glibc, bump MANYLINUX below — verify on the first
-# tagged run with `auditwheel show`.
+# Linux bundles import GLIBC_2.34 and GLIBCXX_3.4.30; auditwheel's pinned
+# manylinux_2_35 policy covers both. Audit every packaged native library before
+# upload rather than inferring compatibility from the build runner's name.
 
 on:
   workflow_run:
@@ -48,8 +47,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  MANYLINUX_X86_64: manylinux_2_28_x86_64
-  MANYLINUX_AARCH64: manylinux_2_28_aarch64
+  MANYLINUX_X86_64: manylinux_2_35_x86_64
+  MANYLINUX_AARCH64: manylinux_2_35_aarch64
 
 jobs:
   # Only proceed if the triggering Release run succeeded (or on manual dispatch),
@@ -102,12 +101,12 @@ jobs:
           - name: linux-x86_64
             runner: ubuntu-22.04
             asset: libcrispasr-linux-x86_64
-            plat: manylinux_2_28_x86_64
+            plat: manylinux_2_35_x86_64
             smoke: true
           - name: linux-arm64
             runner: ubuntu-22.04-arm
             asset: libcrispasr-linux-arm64
-            plat: manylinux_2_28_aarch64
+            plat: manylinux_2_35_aarch64
             smoke: true
           - name: macos-arm64
             runner: macos-14
@@ -138,6 +137,20 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      # Packaging QA follows this workflow revision; package/runtime sources
+      # above remain pinned to the requested tag, including older releases.
+      - name: Checkout pinned packaging QA
+        if: runner.os != 'Windows'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .wheel-qa
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            python/tools/check_wheel_platform.py
+            python/tools/wheel_abi_policies.json
+            python/tools/auditwheel-policy.LICENSE
 
       - name: Download + extract the prebuilt lib bundle
         shell: bash
@@ -166,6 +179,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             patchelf libopenblas0 libespeak-ng1 libfdk-aac2 libasound2
 
+      - name: Match the helper deployment target to the Mac wheel
+        if: runner.os == 'macOS'
+        run: echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> "$GITHUB_ENV"
+
       - name: Stage libs into the package
         shell: bash
         run: python python/tools/stage_libs.py --bundle "$BUNDLE_DIR"
@@ -179,6 +196,20 @@ jobs:
           python -m wheel tags --python-tag py3 --abi-tag none \
             --platform-tag "${{ matrix.plat }}" --remove python/dist/*.whl
           echo "built:"; ls -la python/dist
+
+      - name: Verify wheel OS and host-stdlib compatibility floor
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python .wheel-qa/python/tools/check_wheel_platform.py \
+            --wheel python/dist/*.whl --platform-tag "${{ matrix.plat }}" \
+            --receipt wheel-abi.json
+      - name: Retain wheel ABI assessment
+        if: always() && runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-wheel-abi-${{ matrix.name }}
+          path: wheel-abi.json
 
       - name: Smoke test (install + locate bundled lib)
         if: matrix.smoke
@@ -274,7 +305,7 @@ jobs:
           - name: linux-x86_64-cuda
             runner: ubuntu-22.04
             asset: libcrispasr-linux-x86_64-cuda
-            plat: manylinux_2_28_x86_64
+            plat: manylinux_2_35_x86_64
             local: cuda
           - name: windows-x86_64-cuda
             runner: windows-latest
@@ -300,6 +331,20 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      # Packaging QA follows this workflow revision; package/runtime sources
+      # above remain pinned to the requested tag, including older releases.
+      - name: Checkout pinned packaging QA
+        if: runner.os != 'Windows'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .wheel-qa
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            python/tools/check_wheel_platform.py
+            python/tools/wheel_abi_policies.json
+            python/tools/auditwheel-policy.LICENSE
 
       - name: Download + extract the prebuilt lib bundle
         shell: bash
@@ -355,6 +400,20 @@ jobs:
           python -m wheel tags --python-tag py3 --abi-tag none \
             --platform-tag "${{ matrix.plat }}" --remove python/dist/*.whl
           echo "built:"; ls -la python/dist
+
+      - name: Verify wheel OS and host-stdlib compatibility floor
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          python .wheel-qa/python/tools/check_wheel_platform.py \
+            --wheel python/dist/*.whl --platform-tag "${{ matrix.plat }}" \
+            --receipt wheel-abi.json
+      - name: Retain wheel ABI assessment
+        if: always() && runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-wheel-abi-${{ matrix.name }}
+          path: wheel-abi.json
 
       - uses: actions/upload-artifact@v4
         with:

@@ -47,7 +47,8 @@ TEST_CASE("registry: default bundle reports the exact canonical artifacts", "[un
     CrispasrRegistryBundle bundle;
     REQUIRE(crispasr_registry_default_bundle("omnivoice", bundle));
     REQUIRE(bundle.backend == "omnivoice");
-    REQUIRE_FALSE(bundle.requires_license_acceptance);
+    REQUIRE(bundle.requires_license_acceptance);
+    REQUIRE(bundle.license.find("omnivoice-terms") == 0);
     REQUIRE(bundle.artifacts.size() == 2);
     REQUIRE(bundle.artifacts[0].kind == CrispasrRegistryArtifactKind::Primary);
     REQUIRE(bundle.artifacts[0].filename == "omnivoice-f16.gguf");
@@ -95,6 +96,8 @@ TEST_CASE("registry: non-permissive supported weights carry policy metadata", "[
         {"pocket-tts", "pocket-tts-terms", true},
         {"tada", "llama3.2", true},
         {"orpheus", "llama3.2", true},
+        {"omnivoice", "omnivoice-terms", true},
+        {"supertonic", "OpenRAIL-M", true},
     };
     for (const auto& c : cases) {
         CrispasrRegistryEntry e;
@@ -102,6 +105,32 @@ TEST_CASE("registry: non-permissive supported weights carry policy metadata", "[
         REQUIRE(std::string(e.license).find(c.needle) != std::string::npos);
         REQUIRE(crispasr_license_requires_acceptance(e.license) == c.requires_acceptance);
     }
+}
+
+TEST_CASE("registry: NC acceptance does not accept a custom bundle license", "[unit][registry][license]") {
+    REQUIRE(crispasr_license_requires_acceptance("CC-BY-NC-4.0"));
+    REQUIRE(crispasr_license_accepted("CC-BY-NC-4.0", "cc-by-nc-4.0"));
+    REQUIRE_FALSE(crispasr_license_accepted("omnivoice-terms", "cc-by-nc-4.0"));
+    REQUIRE_FALSE(crispasr_license_accepted("OpenRAIL-M", "cc-by-nc-4.0"));
+    REQUIRE(crispasr_license_requires_acceptance("CreativeML-OpenRAIL-M"));
+    REQUIRE(crispasr_license_accepted("OpenRAIL-M", "openrail-m"));
+    REQUIRE_FALSE(crispasr_license_requires_acceptance("CC-BY-4.0"));
+    REQUIRE_FALSE(crispasr_license_requires_acceptance("MIT"));
+}
+
+TEST_CASE("registry: NVIDIA and OmniVoice acceptance affirm distinct full terms", "[unit][registry][license]") {
+    REQUIRE(crispasr_license_requires_acceptance("NVIDIA-Open-Model-License"));
+    REQUIRE(crispasr_license_accepted("NVIDIA-Open-Model-License", "nvidia-open-model-license"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "cc-by-nc-4.0"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "apache-2.0"));
+    REQUIRE(crispasr_license_requires_acceptance("omnivoice-terms"));
+    REQUIRE(crispasr_license_accepted("omnivoice-terms", "omnivoice-terms"));
+    REQUIRE_FALSE(crispasr_license_accepted("omnivoice-terms", "nvidia-open-model-license"));
+    REQUIRE_FALSE(crispasr_license_accepted("NVIDIA-Open-Model-License", "omnivoice-terms"));
+    CrispasrRegistryEntry e;
+    REQUIRE(crispasr_registry_lookup("omnivoice", e));
+    REQUIRE(e.license.find("100,000") != std::string::npos);
+    REQUIRE(e.license.find("materials/outputs") != std::string::npos);
 }
 
 TEST_CASE("registry: the Breeze TTS 2 non-commercial gate actually blocks", "[unit][registry][license]") {

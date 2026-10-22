@@ -1,0 +1,91 @@
+{
+  "repo": "handy-computer/parakeet-unified-en-0.6b-gguf",
+  "revision": "843b1b175ace04f5a89d379c79e2518c0d065b25",
+  "filename": "parakeet-unified-en-0.6b-Q8_0.gguf",
+  "scope": "first 2 MiB only; metadata inspection, no complete model/inference claim",
+  "status": 206,
+  "content_range": "bytes 0-2097151/731357568",
+  "bytes": 2097152,
+  "sha256": "b11bd9aa60acf8e5e757067fc46874013c6ea053300e9758ba254b8ea3d2f36f",
+  "observed": {
+    "architecture": "parakeet",
+    "head_kind": "rnnt",
+    "tensor_count": 961,
+    "pred.embed.weight": true
+  },
+  "control": {
+    "original_cli_ctc_predicate": true,
+    "fixed_external_schema_rejected": true,
+    "native_ctc_and_hybrid_controls_passed": true,
+    "pre_fix_c_abi_advertised": "parakeet"
+  },
+  "implementation_source": "17de1a726ded2f7d60aab1ef4179a9cb6addbd75",
+  "ggml_source": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "native_validation": {
+    "status": "passed_scoped_local",
+    "schema": {
+      "cases": 4,
+      "assertions": 113
+    },
+    "registry": {
+      "cases": 64,
+      "assertions": 6235
+    },
+    "architecture_map": {
+      "cases": 6,
+      "assertions": 570
+    },
+    "parakeet_params": {
+      "cases": 5,
+      "assertions": 7
+    },
+    "ctc_params": {
+      "cases": 4,
+      "assertions": 5
+    },
+    "cli_cases": 24,
+    "ctest_selected_and_executed": 5,
+    "ci_registration_guard": "5 required validators selected, local build path substituted",
+    "actual_header_rejection": {
+      "crispasr_detect_backend_from_gguf": {
+        "rc": 0,
+        "output": ""
+      },
+      "crispasr_detect_backends_from_gguf": {
+        "rc": 0,
+        "output": ""
+      },
+      "auto_session_rejected": true,
+      "forced_sessions_rejected": [
+        "parakeet",
+        "fastconformer-ctc",
+        "canary-ctc",
+        "whisper"
+      ],
+      "actual_header_cli_exit": 11
+    },
+    "python_session": {
+      "passed": true,
+      "rejected_backends": [
+        "",
+        "parakeet",
+        "fastconformer-ctc"
+      ]
+    },
+    "scope": "Routing/rejection only; partial GGUF header, no complete Unified inference or streaming support claim."
+  },
+  "license_acceptance": {
+    "tags": [
+      "nvidia-open-model-license",
+      "omnivoice-terms"
+    ],
+    "meaning": "User affirms acceptance, eligibility and compliance, including separately required permission. No additional rights granted. Project redistribution obligations remain ours.",
+    "unified_registry_entry_added": false
+  },
+  "hosted": {
+    "ci_run": 39722231798,
+    "lint_run": 39722234064,
+    "status": "in_progress; inspect individual jobs before claiming full hosted acceptance"
+  },
+  "license_notice_receipt": "omnivoice-license-notices-2026-10-22.json"
+}

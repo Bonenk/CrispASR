@@ -44,6 +44,28 @@ class ModelValidatorTest(unittest.TestCase):
             with self.subTest(text=text), self.assertRaises(ValueError):
                 validator.assess_placement(text, 'cpu', 0, 2)
 
+    def test_nz_on_requires_actual_model_selection(self):
+        evidence = 'backend_validation[moonshine.encoder]: nz_cached_matmuls=20 nz_unique_weights=20 nz_bytes=8192 nz_selections=20 nz_selected_weights=20\n'
+        result = validator.assess_placement(CANN+evidence, 'cann', 1, 1, 'on')
+        self.assertEqual(result['nz_usage'][0]['selected_weights'], 20)
+        for text in (CANN, CANN+evidence.replace('nz_selected_weights=20', 'nz_selected_weights=0'),
+                     CANN+evidence.replace('nz_selections=20', 'nz_selections=0'), CANN+evidence*2):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                validator.assess_placement(text, 'cann', 1, 1, 'on')
+        with self.assertRaises(ValueError):
+            validator.assess_placement(CANN+evidence, 'cann', 1, 1, 'off')
+        empty = 'backend_validation[moonshine.encoder]: nz_cached_matmuls=0 nz_unique_weights=0 nz_bytes=0 nz_selections=0 nz_selected_weights=0\n'
+        validator.assess_placement(CANN+empty, 'cann', 1, 1, 'off')
+        with self.assertRaises(ValueError):
+            validator.assess_placement(CANN+empty, 'cann', 1, 1, 'on')
+
+    def test_metal_requires_exact_device_assignment(self):
+        text = CANN.replace('CANN', 'MTL').replace('registry=MTL', 'registry=Metal')
+        result = validator.assess_placement(text, 'metal', 1, 1)
+        self.assertEqual(result['assigned_devices'], ['MTL1'])
+        with self.assertRaises(ValueError):
+            validator.assess_placement(CPU, 'metal', 0, 1)
+
     def test_gpu_flags_cannot_be_silently_ignored(self):
         helper=Path(validator.fixture.__file__)
         for args in (['--use-gpu'], ['--encoder-only'], ['--native']):

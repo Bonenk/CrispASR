@@ -176,9 +176,12 @@ def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str], list[str]]:
 
 
 def compile_helpers(pkg: Path, include_dir: Path, extra_includes: list[Path]) -> None:
-    """Compile `_helpers.c` into the package dir. Best-effort: the legacy
-    whisper `CrispASR` class uses it, but the modern `Session` API does not, so
-    a failure only degrades that one class — never fail the wheel over it.
+    """Compile the optional compatibility shim into the package directory.
+
+    Current libraries export native by-reference wrappers, which the legacy
+    `CrispASR` class prefers. Older libraries need this shim for those calls.
+    The `Session` API does not use it. Compilation remains best-effort; the
+    installed-wheel smoke test checks the current native exports separately.
 
     `extra_includes` matters more than it looks: `crispasr.h` line 4 includes
     `ggml.h`, which lives in the bundle's `ggml/include`, NOT next to
@@ -227,9 +230,9 @@ def compile_helpers(pkg: Path, include_dir: Path, extra_includes: list[Path]) ->
                                check=False)
         print(f"stage_libs: compiled helpers -> {out.name}", flush=True)
     except (subprocess.CalledProcessError, OSError) as exc:
-        print(f"stage_libs: WARNING helpers compile failed ({exc}); the wheel "
-              "will work for the Session API but not the legacy CrispASR class",
-              flush=True)
+        print(f"stage_libs: WARNING helpers compile failed ({exc}); Session "
+              "does not use this shim. Legacy Whisper requires native "
+              "by-reference exports or this helper library", flush=True)
 
 
 def main() -> int:

@@ -1,3 +1,187 @@
+## 2026-10-22 — issue551 Parakeet schema rejection and license acceptance
+
+The external transcribe.cpp Unified GGUF uses arch `parakeet` but a distinct
+`stt.parakeet.*` / `pred.*` schema. Its actual header declares RNN-T and 961
+tensors. Absence of CrispASR predictor names no longer classifies it as CTC.
+A shared metadata check rejects that layout before weight loading, including
+CLI filename/forced aliases, legacy Whisper fallback and C ABI/Python opens.
+Compatible native CTC heads still route correctly; native transducer/hybrid
+controls retain their route. This adds explicit unsupported-layout handling,
+not Unified inference/streaming support.
+
+Actual compiled local checks pass 24 CLI combinations,113 schema assertions,
+64 registry cases,570 architecture-map assertions and9 existing parameter cases.
+The real model's first 2 MiB header also rejects through both detectors, automatic
+and forced C ABI sessions, the real CLI (exit 11), and Python Session. No complete
+model download or inference result is claimed. CTest actually selects/executes
+all 5 routing tests; CI requires the CLI test to prevent silent registration loss.
+Hosted acceptance is pending on source 17de1a7, CI 39722231798/lint 39722234064.
+[Portable routing evidence](docs/issue551-routing-2026-10-22.json).
+
+Custom-license acceptance affirms user eligibility, compliance and obtaining any
+separately required permission. Added the distinct NVIDIA Open Model License
+tag to managed-download gating; no Unified registry entry is added. OmniVoice's
+existing bundle gate covers both NC weights and Boson companion conditions.
+Corrected a remaining Apache-only provenance footer and added full Boson/Meta
+terms, policy and notices to the converted-model repository, with five anonymous
+byte/hash readbacks and no weight changes. This does not waive project
+redistribution obligations or PR #521's unchanged speech-quality gate.
+[Terms and disposition](docs/model-license-policy.md),
+[notice publication receipt](docs/omnivoice-license-notices-2026-10-22.json).
+
+## 2026-10-21 — Final issue-follow-up source accepted for release preparation
+
+## 2026-10-21 — wheel OS/stdlib compatibility audit before v0.8.44 PyPI upload
+
+Actual staged Linux libraries import GLIBC2.34 and GLIBCXX3.4.30; their old
+manylinux2_28 label was inaccurate. Use the auditwheel manylinux2_35 policy,
+pinned at63a51b2f62936e38b6504faa60db5ca042559f97 with its MIT notice. The Mac core
+already targets11.0; compile the optional C shim for11.0 too, rather than inheriting
+the build host's14.0 minimum. Finished-wheel checks inspect all native libraries,
+including vendored dependencies and the shim, before upload. QA tooling is pinned
+to the workflow revision while package/runtime sources remain at the requested tag.
+Fifteen guard tests pass. Real old Linux/Mac artifacts fail the checks; corrected
+wheels pass, and the rebuilt helper loads its3 exports. Runtime tagv0.8.44 is
+unchanged. Python publication remains held until this corrected workflow is active.
+
+
+Source883549696 passes all13 CI39467977527 and all10 lint39467977612 jobs,
+plus Ruby bindings, Metal-cache, CTC-alignment and secret checks. The full unit
+log confirms2,068 selected CTest tests, zero failures and four dictionary-data
+skips; the separate Python suite passes189 tests and34 subtests. All four
+cache/loader/launcher/metadata validators execute. SDK probes retain conditional
+skips. Native/binding sources are unchanged from accepted0c355f398.
+The23-file final proof archive is anonymously byte-verified at HF revision
+8b3d5083445e36a43e13a5e9450af066aea4fcc5, SHA256
+23ad6fa33b9dd555db8f4f78423b7b59a3bfadac1e4fe9e6fab665a54c122b8f.
+The existing issue549 reply records the completed checks and distribution gate.
+
+## 2026-10-20 — Clean-build Python unit registration repaired
+
+The8237 Linux unit log passes 2,039 CTest cases but contains no cache-release,
+loader or launcher test: Python discovery occurred after their conditional
+registration. Discovery now precedes the first Python test command. The
+model-free Japanese metadata validator also drops `live` from its CTest name so
+the normal unit filter selects it. CI checks the actual selected inventory for
+all four follow-up validators before compilation. The guard rejects an original
+clean configuration and accepts a fresh fixed one; 29 Python suites become
+eligible. All 23 non-SDK suites pass through CTest locally. The six SDK wrapper
+probes are not claimed by that local result. Fresh hosted checks remain separate.
+[Reproduction and scope](docs/issue-followups-2026-10-20.md#clean-build-python-unit-registration).
+
+## 2026-10-20 — Main CI and remaining host fallback checks accepted
+
+Main `0c355f398` passes all 13 CI and all 10 lint jobs; the full unit log confirms
+2,039 CTest cases, 189 Python cases and 34 subtests. The unchanged shared-ggml PR2
+candidate passes 108 cases each on Mac CPU, Metal/CPU, Linux CPU and software
+Vulkan/CPU. BF16 weights retain the legacy graph; strided IM2COL falls back to
+CPU when the requested backend rejects it. Each matrix's 50 direct convolutions
+execute on its requested backend. Earlier invalid direct-only/buffered harness
+controls are retained. PR2 remains unmerged for Radeon and speech/performance gates.
+
+The retained T4 trace independently establishes a sampled device-total drop
+from 2,735 MiB to 125 MiB after public cache free, then fresh CLI residency reaches
+2,823 MiB. Six guards reject misleading idle-device/phase readings. Full public
+replay is exact; no new Kaggle run is needed. This does not establish per-process
+allocator balance, exact idle return, release latency or same-process reload.
+[Complete evidence and limits](docs/issue-followups-2026-10-20.md).
+
+## 2026-10-20 — Installed-wheel and software-Vulkan follow-up
+
+Shared ggml PR2's adapted candidate compiles and passes 100 CPU, four CPU fallback
+and 100 llvmpipe software-Vulkan controls on the hosted runner; all11 output
+hashes and per-case logs are independently verified. A failed pre-build worker
+missing SPIRV headers is retained. The PR remains unmerged with Radeon precision,
+other fallback and Chatterbox decoded-speech/performance gates open.
+
+Frozen-source native Linux/Mac/Windows library build jobs pass. The installed
+Mac wheel resolves nine ABI symbols and passes real Japanese Metal metadata
+short/long/short 17/123/17 plus direct-native comparison. Actual staging exposes
+missing Session headers in all11 library packagers; a compiler negative control
+rejects that omission and the repaired helper compiles/loads. All packagers now
+ship both public headers. A non-publishing artifact smoke workflow checks bundle
+pins, headers, installed-wheel loading and ABI. All three repaired native builds
+and all three hosted installed-wheel checks now pass; loaded library bytes
+independently match the bundles. General tip CI/lint remain pending. The full35-file package/Vulkan proof is anonymously
+byte-verified; [scope and immutable receipt](docs/issue-followups-2026-10-20.md).
+No tag, release or portable GPU performance promotion is made here.
+
+## 2026-10-20 — License gates and completed issue acceptance
+
+Ordinary NC support remains behind explicit acceptance. The pinned OmniVoice
+source distinguishes NC weights and additional Boson codec terms; its public
+blanket Apache card is corrected without weight changes. The registry now gates
+the bundle distinctly and gates OpenRAIL downloads. Three failing-before cases
+are repaired; 6,224 assertions in 63 registry cases pass.
+
+Issue550 actual T4 acceptance completes: 44.52/2,703/44.52 seconds retain all
+147/8,925/147 units, exact returning-short offset reuse, fresh CLI parity and
+95 CUDA encoder splits. Long-phase sampled device total peaks at 2,735 MiB.
+An independent audit rejects three forged controls with recomputed hashes.
+The failed prerequisite run is retained; its plugin discovery and the local
+Kaggle CLI launcher are repaired with four host protocol tests.
+
+Issue549 actual Metal Japanese metadata short/long/short passes 17/123/17 tokens,
+exact returning-short metadata and direct-native short bytes/times/probabilities.
+Shared ggml PR2 has 100 CPU/100 Metal scalar-oracle controls and four CPU
+non-contiguous fallback controls, but remains unmerged pending other acceptance.
+Index-Echo485 is completed; Drama545/546 are not planned under current custom
+terms. Nyra, OmniVoice, Radeon and Ascend restrictions/gates stay explicit.
+[Full evidence, limitations and reporter actions](docs/issue-followups-2026-10-20.md).
+The immutable complete public archive is anonymously verified.
+No release/tag or unvalidated default promotion is made by this checkpoint.
+
+## 2026-10-20 — CANN lifecycle and Mac live follow-up completed
+
+Implementation `18b540bd5` and shared ggml `e2ae679a` are integrated on canonical
+branches. The cache remains off. All 53 host lifecycle checks pass, including a
+retained failed-before/fixed-after zero-length alias write control. All 576 CPU
+probe computations pass independent saved-input arithmetic verification. Actual
+Mac CPU/Metal F32 Moonshine reference, CLI, Session and short/double/short reuse
+checks pass; both devices produce matching transcripts and 22/44/22 words.
+[Receipt, complete public proof and immutable device procedure](docs/cann-layout-followup-2026-10-20.md).
+
+Results and the optional model-free Ascend request are posted on
+[PR544](https://github.com/CrispStrobe/CrispASR/pull/544#issuecomment-6288185477)
+and [ggml PR4](https://github.com/CrispStrobe/ggml/pull/4#issuecomment-6288187900).
+Refreshed SDK39401353196, CI39401352847 and lint39401352899 remain pending/running
+at this checkpoint. Earlier SDK39391430100 passed both compiler architectures
+on its earlier source. Physical NZ arithmetic, ACL replay, CANN model quality
+and resource/performance acceptance remain open in PLAN.md. No Kaggle job or
+model artifact rewrite was needed.
+
+## 2026-10-20 — Optional CANN weight usage and NZ cache integrated
+
+Model-supplied usage hints cover normal/filtered/split/fit/repack GGUF loaders;
+MiMo and Moonshine declare audited policies. The optional CANN cache preserves
+ND bytes for reads/copies/CPU transfer, covers fused QKV names, merges chunk
+coverage and invalidates cached weights/captured graphs on writes. Existing
+artifacts need no rename. Shared-fork merge6b4bd833 preserves newer history with
+an identical source tree to candidate4d734595. CrispASR pins the merge.
+
+[Host receipt](docs/cann-weight-layout-host-2026-10-20.json):83 usage assertions
+per mmap mode,188 split/11 bounds/28 release assertions and432 CPU probe computes
+pass, along with production policy and existing CANN routing/capacity controls.
+Metal-cache39391419338 and Vulkan-replay39391419483 checks also pass.
+Final-source SDK39391430100, general CI39391432699 and lint39391434462 remain
+pending/running at integration. The cache is off by default; physical310P3/910B3,
+ACL replay, full-model quality and resource/performance acceptance remain open.
+[Procedure and scope](docs/cann-weight-layout.md). No release or default flip.
+
+## 2026-10-19 — OpenVoice CUDA package build completed; work handed off
+
+[Run39266520251](https://github.com/CrispStrobe/CrispASR/actions/runs/39266520251)
+passes on0b4213c39d9ae335df32fb8d09f80febd2f2d8ae after the root-CMake,
+link-only CUDA stub alias and Python3.10 streaming-hash repairs. Build and
+runtime dependency checks pass; Actions artifact12193662775 is698,965,729
+bytes, ZIP SHA256 bce0538953a84094fc86c63729c37e2bc8dc41e27d25337a27f5de793bbc5030.
+Independent delivery audit and actual GPU/pretrained/quality acceptance remain
+open. No tag/release or model promotion was made. PLAN.md and
+[the handoff](docs/maintenance-handoff.md) scope the remaining work; operational
+paths/account recovery are in ignored maintainer notes. All five privacy checks
+passed before the implementation pushes. Two worker contracts, embedded-phase
+compilation and streaming hash verification pass locally.
+
 ## PR521 integration preparation — 2026-10-19
 
 Updated the review branch with current main while preserving contributor and
@@ -10,8 +194,13 @@ arithmetic. A literal-header UBSan probe reproduced the overflow before the
 fix. Unsigned magnitude conversion now passes0,1,-1 and both signed extrema;
 the regression is wired into ordinary CI. The actual native output-function
 allocator/OOM extraction and Python helper routing checks also pass.
-Original/native clone speech still fails the unchanged gate. Integration stays
-in review pending fresh CI and a separately accepted full-runtime scope.
+Corrected 2026-10-22: that clone failure was the reference clip, not the port.
+Pinned `fox.wav` says "fex/dig" under both an RNNT and a CTC judge and every
+clone arm inherited those two words, while the no-reference control was right.
+The acceptance harness now vets reference audio against its transcript before
+synthesizing and clones cross-sentence on a vetted reference; seven arms pass
+the unchanged0.2 gate, maximum0.111. Receipt:
+docs/omnivoice-clone-reference-integrity-2026-10-22.json.
 ## 2026-10-19 — OpenVoice checkpoint-free encoder arithmetic proof
 
 The original pinned ReferenceEncoder class and unchanged native CPU encoder
@@ -35560,3 +35749,61 @@ or synthesis is needed to rediscover these accepted diagnostic observations.
 Echo production-builder diagnosis and completed tiny proofs are archived in
 HISTORY.md. The current full-model and CI dependencies are claimed above;
 old e344/run38931686491 is a retained failed prerequisite run, not a live queue.
+
+
+### Archived issue550 preacceptance procedure (completed 2026-10-20)
+
+The following was the bounded procedure before the successful T4 audit; its
+future-tense status text is historical, not pending work.
+
+## Active — issue550 real CUDA long-input memory/reuse
+
+Owner: maintainer coordinator. CPU acceptance is complete and independently
+audited: [receipt](docs/alignment-windows-cpu-audit-2026-10-19.json). Completed
+implementation/CPU work is archived in HISTORY.md. Keep550 open for GPU proof.
+
+Portable CUDA build [run39215806310](https://github.com/CrispStrobe/CrispASR/actions/runs/39215806310)
+completed successfully on frozen source191815511, branchdiag/550-cuda-memory-20261019.
+Claimed by the maintainer coordinator: actual GPU execution and output audit.
+The [bundle audit](docs/alignment-cuda-bundle-audit-2026-10-19.json) verifies
+archive/provenance and27 member hashes. Worker and method:
+`tools/kaggle/alignment-cuda-memory/` (version2026-10-19.alignment-cuda-memory.2).
+Source/model/fixture pins are frozen; GPU acceptance is still pending.
+Reuse `breeze-cuda-speech-validation.yml` for its general CLI/shared ABI bundle;
+this task's acceptance concerns CTC alignment memory. Inspect build provenance,
+source/library/archive hashes and dependency closure before GPU execution.
+
+Kaggle v1 failed before inference on Actions HTTP401; logs are retained.
+Named credential fallback is repaired and version2 uses an immutable public HF
+mirror: docs/alignment-cuda-mirror-2026-10-19.json. Anonymous full-byte reads
+verify489,213,512 runtime bytes and269,096 licensed fixture bytes. Version2 is terminal ERROR before inference (unregistered CPU plugin). Logs/partial
+outputs are retained. Version3 completed with identical runtime/model/fixture pins and passed an
+independent audit: all 147/8,925/147 units, exact returning-short offset reuse,
+CLI parity and 95 actual CUDA encoder splits. Long-phase sampled device total
+peaks at 2,735 MiB. [Receipt](docs/alignment-cuda-live-2026-10-20.json). Do not
+repeat this completed matrix merely to rediscover acceptance. Keep actual
+GPU/cache/long-file acceptance open; delivery is not inference proof.
+
+Kernel acceptance, per the maintainer's external Kaggle guide:
+
+1. Use that prebuilt runtime; clone the exact source for harness/binding code,
+   with no heavy Kaggle build. Record actual CUDA device/capability. The package
+   targets60/75; no Torch is needed for this F16 CTC memory test. Check account
+   quota/concurrency first; do not retry sessions to select hardware.
+2. Reuse the pinned licensed Japanese FLEURS fixture, model and transcript from
+   CPU run39212307554. Verify model/audio/runtime bytes. Compare44.52 seconds,
+   approximately45 minutes (425 repeats gives2703 seconds), then44.52 seconds
+   again through one cached public C ABI/Python model. Long input exercises
+   first32s, interior34s and final partial encoder shapes and scheduler reuse.
+   Also compare a CLI call against default public output with absolute offsets.
+3. Require complete ordered word ownership, positive in-range spans with the
+   existing one-frame tolerance, correct text/offsets, CUDA execution evidence,
+   successful long input and repeatability after the shape/cache changes.
+   Retain source/runtime/model/input identities, raw word results, logs and
+   sampled device memory/utilization with idle baseline. A sampled memory peak
+   is not an exact allocator peak. Preserve CPU/full-window boundary differences;
+   do not invent acoustic accuracy or byte-exact CPU/GPU parity.
+4. Keep public proof separate from weights and credentials; publish only vetted
+   portable evidence. Host logits/DP memory still scales with duration. VAD is
+   unused in align-only. A green build, device enumeration, weights on GPU or
+   the44-second CPU result alone cannot close the45-minute CUDA report.

@@ -36,6 +36,9 @@ jobs:
         with:
           submodules: recursive
       - uses: dart-lang/setup-dart@v1
+        with:
+          # Keep formatting reproducible; ABI contracts also test an older SDK.
+          sdk: '3.13.6'
 
       # crispasr-lib, not crispasr: the latter is the CLI's OUTPUT_NAME and is
       # only defined when the examples are built (the mistake that made the Rust
@@ -57,6 +60,7 @@ jobs:
         run: |
           dart pub get
           dart format --output=none --set-exit-if-changed lib test
+          dart analyze --fatal-infos
 
       - name: dart test (symbol resolution + pure-Dart; model cases self-skip)
         working-directory: flutter/crispasr

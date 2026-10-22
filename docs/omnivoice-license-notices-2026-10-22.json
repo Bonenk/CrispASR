@@ -1,0 +1,31 @@
+{
+  "model_repo": "cstr/omnivoice-GGUF",
+  "before_revision": "3425b20adc97e495b2710cb3a97aac577460f21f",
+  "boson_source_revision": "c5fdb5ccb189668d56333f77ba2629f4cd7535f4",
+  "meta_source_revision": "a0940f9cf7065d45bb6675660f80d305c041a754",
+  "files": {
+    "LICENSE.boson-higgs-audio-2.txt": {
+      "sha256": "ac933dc084d119bd20401956b90d11ae87c248b2da62622cd580d82cdf2fa049",
+      "bytes": 9171
+    },
+    "LICENSE.meta-llama-3.txt": {
+      "sha256": "4fa551d4f938f68b8c1e6afa9d28befb70e3f33f75d0753248d530364aeea40f",
+      "bytes": 12403
+    },
+    "USE-POLICY.meta-llama-3.md": {
+      "sha256": "716a6b46e9bc75220c7b78f27382f7d0b8ca4c95818661a0936c081708f87f7c",
+      "bytes": 4771
+    },
+    "NOTICE.txt": {
+      "sha256": "4e4be379a0451ae044443def907ec91b5a5cde41d8493e5280bf3d2cdd12391f",
+      "bytes": 713
+    },
+    "README.md": {
+      "sha256": "1a3ff6c36ba8a62f37ff767f4633cd66fa931de521f4b04ed8fd659683414a4c",
+      "bytes": 5633
+    }
+  },
+  "weight_changes": false,
+  "after_revision": "a2ad2630338fc80d1a0565c8e58aa8eff615db85",
+  "anonymous_readback_passed": true
+}

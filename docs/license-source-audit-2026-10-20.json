@@ -1,0 +1,55 @@
+{
+  "scope": "Exact upstream model card and bundled codec license; metadata correction only, not bundle support approval",
+  "sources": [
+    {
+      "repo": "k2-fsa/OmniVoice",
+      "revision": "c5fdb5ccb189668d56333f77ba2629f4cd7535f4",
+      "file": "README.md",
+      "url": "https://huggingface.co/k2-fsa/OmniVoice/resolve/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/README.md",
+      "sha256": "b5d645a1874baa96a460a0e3a7d5a262811d682d04ce235878a16d5fed287fd3",
+      "bytes": 9424
+    },
+    {
+      "repo": "k2-fsa/OmniVoice",
+      "revision": "main",
+      "file": "README.md",
+      "url": "https://huggingface.co/k2-fsa/OmniVoice/resolve/main/README.md",
+      "sha256": "b5d645a1874baa96a460a0e3a7d5a262811d682d04ce235878a16d5fed287fd3",
+      "bytes": 9424
+    },
+    {
+      "repo": "bosonai/higgs-audio-v2-tokenizer",
+      "revision": "main",
+      "file": "LICENSE",
+      "url": "https://huggingface.co/bosonai/higgs-audio-v2-tokenizer/resolve/main/LICENSE",
+      "sha256": "8b2e018eeb3967a4636ccc57528440b33c14dd6e02ad67571fc7759489dde9a0",
+      "bytes": 9172
+    }
+  ],
+  "registry_tests": {
+    "before": "3 cases fail on old production registry",
+    "after": "6224 assertions in 63 cases pass"
+  },
+  "alignment_v2": {
+    "version": "2026-10-19.alignment-cuda-memory.2",
+    "hardware": "two Tesla T4 GPUs",
+    "complete": false,
+    "short_words": 0,
+    "native_error": "no CPU ggml backend registered",
+    "logs_retained": true
+  },
+  "pinned_codec_license": {
+    "url": "https://huggingface.co/k2-fsa/OmniVoice/resolve/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/audio_tokenizer/LICENSE",
+    "bytes": 9171,
+    "sha256": "ac933dc084d119bd20401956b90d11ae87c248b2da62622cd580d82cdf2fa049"
+  },
+  "hf_card_correction": {
+    "repo": "cstr/omnivoice-GGUF",
+    "parent": "92266739c4496b04a497e164cf8c2801a792551e",
+    "revision": "3425b20adc97e495b2710cb3a97aac577460f21f",
+    "before_sha256": "292ebb49d796c53803ca6b4a02ac566d4bd8c04c96a16c9084aa3b6249c77da9",
+    "after_sha256": "4a143de22bb7d4693aa8807b49d1cd08bc29095a79706f099bb759c2f7f4deff",
+    "anonymous_read_verified": true,
+    "weights_unchanged": true
+  }
+}

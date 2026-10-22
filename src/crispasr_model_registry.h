@@ -54,12 +54,13 @@ std::string crispasr_license_tag(const std::string& license);
 
 /// True when the licence designates a RESTRICTED model the user must
 /// explicitly accept before download: cc-by-nc-*, gemma, llama*,
-/// qwen-research, mistral-ai-research, lfm1.0, other.
-/// Same list as CrispEmbed's crispembed_mgr::license_requires_acceptance.
+/// qwen-research, mistral-ai-research, lfm1.0, omnivoice-terms,
+/// nvidia-open-model-license, other.
 bool crispasr_license_requires_acceptance(const std::string& license);
 
 /// True when `accepted` attests this licence: the exact tag, or "all" / "*".
 /// Falls back to the CRISPASR_ACCEPT_LICENSE env var.
+/// Acceptance affirms eligibility and compliance; it grants no extra rights.
 bool crispasr_license_accepted(const std::string& license, const std::string& accepted);
 
 /// Download a CrispASR-managed auxiliary artifact after applying the same

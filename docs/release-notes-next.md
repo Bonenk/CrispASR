@@ -4,15 +4,20 @@ The published release is documented in [v0.8.43 release notes](../RELEASE_NOTES_
 and [the tagged validation receipt](release-tag-v0.8.43-2026-10-12.json). No later
 tag has been cut.
 
-**Current 2026-10-16 status:** the canonical next-release notes are
-[RELEASE_NOTES_v0.8.44.md](../RELEASE_NOTES_v0.8.44.md). Dia reference/diff
-wiring and all three opt-in CPU controls are now integrated. The current-runtime
-factorial restores one fixed prompt/seed through both DACs and CLI (WER0);
-four broader cases are in validation. Dated investigations below retain their
-original pins/outcomes; statements that an older control failed or was unmerged
-do not describe the current three-control candidate. Defaults, GPU/Q4 and
-performance remain unpromoted. Completed investigation history is archived in
-[HISTORY.md](../HISTORY.md).
+**Current 2026-10-21 release preparation:** source883549696 passed all13
+CI39467977527 and10 lint39467977612 jobs, with2,068 selected CTest tests,
+zero failures/four dictionary-data skips, plus189 Python tests/34 subtests.
+The user authorized preparing and publishing0.8.44. The concise canonical notes are
+[RELEASE_NOTES_v0.8.44.md](../RELEASE_NOTES_v0.8.44.md); remaining release gates
+are in [PLAN.md](../PLAN.md) and [the handoff](maintenance-handoff.md).
+OpenVoice reference/conditioning integration and bounded synthetic encoder
+proof are complete; CUDA package39266520251 passes but actual pretrained/GPU
+and speech quality remain unaccepted. Generic speaker operation review covers
+all eight wrappers; real-model/platform/concurrency scope remains separate.
+Dia's broader speech gates failed despite numerical evidence; older dated
+investigations below are historical, not a pending validation claim. Preserve
+all failed gates and do not advertise defaults, GPU/Q4 or performance promotion.
+Completed work is archived in [HISTORY.md](../HISTORY.md).
 
 ## Dia DAC precision conversion
 
@@ -620,3 +625,27 @@ speech across all arms. These results correct the earlier cross-device causal
 interpretation; they do not change defaults or establish broader native/Q4
 acceptance. Complete evidence and limitations are archived in HISTORY.md and
 docs/dia-sampler-device-results-2026-10-17.json.
+
+## License declarations and validation follow-up (2026-10-20)
+
+Ordinary NC models remain supported behind explicit acceptance. OmniVoice now
+uses a distinct bundle gate because its NC main weights and Boson tokenizer
+terms differ; OpenRAIL models also require explicit acceptance. The public
+OmniVoice card's blanket Apache-2.0 label was corrected without modifying weights.
+These gates do not approve additional custom restrictions or grant new rights.
+See [policy and source audit](model-license-policy.md).
+
+The issue550 45-minute repeated-speech CUDA memory/reuse run passes independent
+output, hash and placement audits on T4. A 2,703-second input retains all 8,925
+units; the returning short input is exact after offset adjustment. Its observed
+long-phase device peak is 2,735 MiB (sampled device total, not allocator maximum).
+VAD remains unused in align-only, and host alignment memory grows with duration.
+
+The actual Japanese Session metadata short/long/short sequence passes on Metal
+with 17/123/17 tokens and exact native short-token bytes/times/probabilities.
+This complements the exported-getter tests; it does not certify generic CLI
+postprocessing, all long-form models or original-model acoustic accuracy.
+
+Shared ggml PR2 remains under review; no Conv1D default or new shader is merged.
+CANN NZ caching also remains off by default despite green hosted compilation
+and Mac controls. Physical Ascend cache/model/performance acceptance is pending.

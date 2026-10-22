@@ -709,7 +709,7 @@ jobs:
           python3 scripts/check-bundled-deps.py "$OUT/lib" \
             --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*' \
             --allow 'libhipblas.so.*' --allow 'libomp.so*'
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1303,7 +1303,7 @@ jobs:
           # that cannot dlopen — which is what happened in v0.8.17.
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1399,7 +1399,7 @@ jobs:
           python3 scripts/check-bundled-deps.py "$OUT/lib"
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1476,7 +1476,7 @@ jobs:
           # shipped needing an unbundled libomp.so (#341). This is the same gate
           # the CLI tarballs have had since #296.
           python3 scripts/check-bundled-deps.py "$OUT/lib"
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1558,7 +1558,7 @@ jobs:
           python3 scripts/check-bundled-deps.py "$OUT/lib"
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1623,7 +1623,7 @@ jobs:
           Get-ChildItem build-libs\ggml\src\Release\*.lib -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\src\Release\"
           # Headers
-          Copy-Item include\crispasr.h "$OUT\include\"
+          Copy-Item include\crispasr.h,include\crispasr_session.h "$OUT\include\"
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
@@ -1719,7 +1719,7 @@ jobs:
             }
           }
           # Headers
-          Copy-Item include\crispasr.h "$OUT\include\"
+          Copy-Item include\crispasr.h,include\crispasr_session.h "$OUT\include\"
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
@@ -1821,7 +1821,7 @@ jobs:
           # the CLI tarballs have had since #296.
           python3 scripts/check-bundled-deps.py "$OUT/lib" \
             --allow 'libcuda.so.*' --allow 'libcudart.so.*' --allow 'libcublas*.so.*' --allow 'libnv*.so.*'
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
@@ -1921,7 +1921,7 @@ jobs:
                 Copy-Item -Destination "$OUT\ggml\src\Release\"
             }
           }
-          Copy-Item include\crispasr.h "$OUT\include\"
+          Copy-Item include\crispasr.h,include\crispasr_session.h "$OUT\include\"
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
@@ -2050,7 +2050,7 @@ jobs:
             Copy-Item -Destination "$OUT\src\Release\"
           Get-ChildItem build-libs\ggml\src\Release\*.lib -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\src\Release\"
-          Copy-Item include\crispasr.h "$OUT\include\"
+          Copy-Item include\crispasr.h,include\crispasr_session.h "$OUT\include\"
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
@@ -2610,7 +2610,7 @@ jobs:
             -exec cp -P {} "$OUT/lib/" \;
           # Headers for JNI authors who want to bind directly without
           # vendoring the whole repo.
-          cp include/crispasr.h "$OUT/include/"
+          cp include/crispasr.h include/crispasr_session.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"

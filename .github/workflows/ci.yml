@@ -155,6 +155,23 @@ jobs:
           -DCRISPASR_BUILD_TESTS=ON
           -DCRISPASR_ONNXRUNTIME_ROOT="$RUNNER_TEMP/onnxruntime-sdk"
 
+      - name: Check Python unit registration
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          result = subprocess.run(
+              ['ctest', '--test-dir', 'build', '--show-only=json-v1', '-L', 'unit', '-E', 'live'],
+              check=True, capture_output=True, text=True)
+          names = {test['name'] for test in json.loads(result.stdout)['tests']}
+          required = {'alignment-cuda-loader', 'alignment-cache-release-samples',
+                      'kaggle-cli-launcher', 'ja-metadata-validator', 'parakeet-schema-cli'}
+          missing = required - names
+          if missing:
+              raise SystemExit(f'Missing Python unit tests: {sorted(missing)}')
+          print(f'All {len(required)} required Python validators selected by the unit tier')
+          PY
+
       - name: Build
         run: cmake --build build -j $(nproc)
 

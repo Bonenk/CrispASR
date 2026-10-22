@@ -58,3 +58,9 @@ computes over three shapes and rejects false backend/device/fallback claims.
 The static consumer SDK search-directory repair is included; initial failed
 links and complete public proofs remain retained. Physical310P composed
 fallback and910B ACL capture/replay remain unvalidated.
+
+
+[Weight usage and optional NZ cache implementation](cann-weight-layout.md): explicit
+pre-allocation model hints, bounded name compatibility including fused QKV,
+and an ordinary-byte-preserving optional cache are integrated, off by default. Host controls and SDK compilation do not establish physical/model or
+performance acceptance. Existing published artifacts need no rename.

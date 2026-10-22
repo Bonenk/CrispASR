@@ -537,3 +537,8 @@ if (MSVC)
         disable_msvc_warnings(vad-speech-segments)
     endif()
 endif()
+
+option(CRISPASR_BUILD_CANN_LAYOUT_PROBE "Build the optional CANN weight-layout device probe" OFF)
+if(CRISPASR_BUILD_CANN_LAYOUT_PROBE)
+    add_subdirectory(tools/ci-heavy/cann-weight-layout)
+endif()

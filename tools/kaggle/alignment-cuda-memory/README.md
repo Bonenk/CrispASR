@@ -33,3 +33,17 @@ publishing a portable audit or closing550. This does not prove natural45-minute
 speech quality, ground-truth word boundaries, RTX3090-specific behavior,
 CPU/GPU byte parity or constant host RAM. Host logits and traceback grow with
 recording length; align-only does not apply VAD.
+
+## Version 3: explicit frozen-package plugin discovery
+
+Version 2 reached a real T4 but returned no alignment units on its first short
+call. The retained native log identifies missing CPU backend registration, before
+model inference; this is not a long-file CUDA arithmetic or memory result.
+The frozen package loader searches the Python executable directory and current
+directory, while LD_LIBRARY_PATH only resolves ELF dependencies. Version 3
+explicitly registers plugins from the already checksum-verified bundle through
+`ggml_backend_load_all_from_path`, then requires both CPU and CUDA0 before any
+weight download. It retains the exact same runtime, model, inputs and gates.
+Three host protocol controls cover explicit paths, missing CPU and missing CUDA;
+actual CUDA execution remains a separate gate. The complete version 2 logs and
+partial artifacts were downloaded before replacing its uploaded script.

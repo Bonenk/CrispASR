@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "cases": 3,
+  "units": [
+    147,
+    8925,
+    147
+  ],
+  "cuda_splits": 95,
+  "short_after_exact_with_offset": true,
+  "cli_public_exact": true,
+  "input_hashes_recomputed": true,
+  "artifact_hashes_verified": true,
+  "mutable_terminal_progress_prefix_verified": [
+    "progress.jsonl"
+  ],
+  "device_samples_summary": {
+    "idle": {
+      "sampled_device_peak_mib": 3,
+      "sampled_utilization_max": 0
+    },
+    "short-before": {
+      "sampled_device_peak_mib": 2701,
+      "sampled_utilization_max": 81
+    },
+    "long": {
+      "sampled_device_peak_mib": 2735,
+      "sampled_utilization_max": 100
+    },
+    "short-after": {
+      "sampled_device_peak_mib": 2735,
+      "sampled_utilization_max": 100
+    },
+    "cli": {
+      "sampled_device_peak_mib": 2823,
+      "sampled_utilization_max": 87
+    }
+  },
+  "hardware": "Tesla T4, 7.5, 15360 MiB, 580.178.04\nTesla T4, 7.5, 15360 MiB, 580.178.04",
+  "bundle_sha256": "63474b5f034ebac850b7b87ef76eecec12d009092d4c72370aeeb6be341365c5",
+  "scope": "repeated licensed speech; sampled device totals, not allocator maxima or RTX3090 certification",
+  "negative_controls": [
+    {
+      "control": "missing-unit",
+      "rejected": true,
+      "artifact_hashes_recomputed": true
+    },
+    {
+      "control": "no-cuda-placement",
+      "rejected": true,
+      "artifact_hashes_recomputed": true
+    },
+    {
+      "control": "changed-return-offset",
+      "rejected": true,
+      "artifact_hashes_recomputed": true
+    }
+  ],
+  "worker_source": "947874aa65c659d4386c98f621ec5b98141c564f",
+  "runtime_source": "191815511b85a526aace111b1bda2e28ecb7faad",
+  "version": "2026-10-20.alignment-cuda-memory.3",
+  "public_proof": {
+    "revision": "ad638b4cd525c5633f831da9eb763864e9827ce9",
+    "url": "https://huggingface.co/datasets/cstr/crispasr-regression-fixtures/resolve/ad638b4cd525c5633f831da9eb763864e9827ce9/issue-followups-20261020/complete-proof.zip",
+    "bytes": 420650,
+    "sha256": "e446e1a4b2a3c925033598677d3555558f35470d5957d058d0c4c37e9731c70e",
+    "anonymous_full_download_verified": true,
+    "files": 55
+  }
+}
