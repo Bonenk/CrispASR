@@ -75,6 +75,16 @@ output arrays, compiler/actual ELF and per-file hashes. It changes no native
 speech funnel or default. Run with `-f pip="numpy==1.26.4 pydub==0.25.1"` on
 Linux Python3.12. Details: [standalone utility scope](../../docs/omnivoice-utility-split-2026-10-15.md).
 
+`omnivoice_audio_acceptance.py` is the speech gate for PR521. It runs that
+utility oracle, builds the CLI, checks same-code raw/processed waveform parity,
+transcribes every fixture with two independent ASR architectures (Nemotron RNNT
+and Parakeet CTC) before anything is cloned, and requires seven CLI/session arms
+at WER <= 0.2 against the unchanged gate. Clones are cross-sentence on the
+vetted `window` reference; `fox` is kept only as the known-bad control because
+its own audio says "fex/dig" (0.222 under both judges), which is why every
+earlier clone arm failed. Run with `-f pip="numpy pydub"`. Receipt:
+[reference integrity](../../docs/omnivoice-clone-reference-integrity-2026-10-22.json).
+
 `dia_full_codec_crossdecode.py` replays retained native stopping/BOS/delay
 records, verifies every feedback row and complete code/PCM frame count, then
 runs the actual pinned original DAC on the native codes and original-code

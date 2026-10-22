@@ -730,6 +730,16 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
   `<cstdlib>` in the deprecated executable (now fixed on main);
   CUDA11.8 setup hit Chocolatey504 before compilation. Fresh head checks are
   queued; inspect them rather than rerunning stale-source jobs.
+  Cloning quality root-caused 2026-10-22: the pinned `fox.wav` does not say its
+  transcript ("fex/fixed … dig" under both the Nemotron RNNT and the Parakeet
+  CTC judge, 0.222 each), every clone arm inherited exactly those two words,
+  and the no-reference control says "fox/dog". The acceptance harness now
+  transcribes every fixture with both architectures before synthesizing,
+  refuses a reference no engine can read back, and scores clones cross-sentence
+  on `window` (0.000 both). Seven gated arms, max 0.111 against the unchanged
+  0.2 gate. Receipt
+  `docs/omnivoice-clone-reference-integrity-2026-10-22.json`, method in
+  `docs/omnivoice-audio-processing.md`.
   Full diff/runtime review, original utility proof and unchanged cloning-quality
   gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.

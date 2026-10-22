@@ -1,0 +1,168 @@
+{
+  "passed": true,
+  "scope": "OmniVoice #518/#521 cloning quality: the pinned cloning reference was audited against its own transcript, and the unchanged 0.2 WER gate was re-run on a vetted cross-sentence reference",
+  "seed": 42,
+  "steps": 32,
+  "wer_gate": 0.2,
+  "model_revision": "92266739c4496b04a497e164cf8c2801a792551e",
+  "fixture_revision": "d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3",
+  "source_commit": "8c989823910c2334e63e621d148b987621681af6",
+  "asr_models": {
+    "nemotron": {
+      "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+      "name": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+      "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2"
+    },
+    "parakeet": {
+      "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+      "name": "parakeet-ctc-0.6b-q4_k.gguf",
+      "revision": "159612ab8741e595e95e992298acfc400dc502b7"
+    }
+  },
+  "fixtures": {
+    "fox": {
+      "text": "The quick brown fox jumps over the lazy dog.",
+      "sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
+      "seconds": 2.67025
+    },
+    "window": {
+      "text": "Please close the window before you leave the room.",
+      "sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
+      "seconds": 2.6006875
+    },
+    "station": {
+      "text": "We will meet at the train station tomorrow morning.",
+      "sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a",
+      "seconds": 2.4729375
+    }
+  },
+  "reference_integrity": {
+    "fox": {
+      "text": "The quick brown fox jumps over the lazy dog.",
+      "seconds": 2.67025,
+      "engines": {
+        "nemotron": {
+          "transcript": "The quick brown fixed jumps over the lazy dig.",
+          "wer": 0.2222222222222222
+        },
+        "parakeet": {
+          "transcript": "the quick brown fex jumps over the lazy dig",
+          "wer": 0.2222222222222222
+        }
+      },
+      "min_wer": 0.2222222222222222,
+      "max_wer": 0.2222222222222222
+    },
+    "window": {
+      "text": "Please close the window before you leave the room.",
+      "seconds": 2.6006875,
+      "engines": {
+        "nemotron": {
+          "transcript": "Please close the window before you leave the room.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "transcript": "please close the window before you leave the room",
+          "wer": 0.0
+        }
+      },
+      "min_wer": 0.0,
+      "max_wer": 0.0
+    },
+    "station": {
+      "text": "We will meet at the train station tomorrow morning.",
+      "seconds": 2.4729375,
+      "engines": {
+        "nemotron": {
+          "transcript": "We will meet at the train station tomorrow mor",
+          "wer": 0.1111111111111111
+        },
+        "parakeet": {
+          "transcript": "we will meet at the train station to morrow morning",
+          "wer": 0.2222222222222222
+        }
+      },
+      "min_wer": 0.1111111111111111,
+      "max_wer": 0.2222222222222222
+    }
+  },
+  "clone_references": [
+    "window"
+  ],
+  "roundtrips": {
+    "session-raw": {
+      "transcript": "The quick brown Fox jumps over the lazy dog.",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "samples": 62375,
+      "sha256": "243a65a1df2d5c2b574257e5e6d54dd4897450d90707f0c7b96ab32692f5ca9b"
+    },
+    "session-full": {
+      "transcript": "The quick brown Fox jumps over the lazy dog",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "samples": 67176,
+      "sha256": "ab41038505d95cc0ff39a08cd378e73f40f7c0bd09b5ff0e01ae31d3d92be828"
+    },
+    "session-marked": {
+      "transcript": "The quick brown Fox jumps over the lazy dog",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.0,
+      "samples": 67176,
+      "sha256": "d7bf8a6e10f11db88ac4fc41168b6afeceb2211498dd2f9e44e1f82fa66613f6"
+    },
+    "session-clone-window-primary": {
+      "transcript": "Quick brown Fox jumps over the lazy dog.",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.1111111111111111,
+      "samples": 57576,
+      "sha256": "d00bc9d19e2a983b09b2e926acd406fe5bfaab77612a1a5b92122b98487a8b89"
+    },
+    "session-marked-clone": {
+      "transcript": "Quick brown Fox jumps over the lazy dog.",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.1111111111111111,
+      "samples": 57576,
+      "sha256": "3f004915d9477166956effaeded32567a9dbfcba343284c2ae981da848a0efd1"
+    },
+    "session-clone-window-second": {
+      "transcript": "We should bring enough water and food for the long walk home.",
+      "expected": "We should bring enough water and food for the long walk home.",
+      "wer": 0.0,
+      "samples": 78696,
+      "sha256": "0110e412fee0ab51a9902505ed1cf5442448ff7fcfe88e7f65da51ea54ed1adc"
+    },
+    "cli-clone": {
+      "transcript": "Quick brown Fox jumps over the lazy dog.",
+      "expected": "The quick brown fox jumps over the lazy dog.",
+      "wer": 0.1111111111111111,
+      "samples": 57576,
+      "sha256": "1844488a1835f34c738a2470ee22aa4f22e7c67e0fe9ee11152298a6fa8693f8"
+    }
+  },
+  "decode_waveform_max_abs": 0.0,
+  "decode_codes_exact": true,
+  "historical_fox_clone_arms": {
+    "reference": "fox.wav",
+    "reference_transcript": "The quick brown fex jumps over the lazy dig.",
+    "native_outputs": {
+      "legacy": "The quick brown fex jumps over the lazy dig.",
+      "punctuation": "The quick brown fex jumps over the lazy dig.",
+      "reference-cleanup": "The quick brown fix jumps over the lazy dig.",
+      "output-cleanup": "The quick brown fex jumps over the lazy dig."
+    },
+    "original_upstream_outputs": {
+      "unprocessed": "The quick brown fix jumps over the lazy dig.",
+      "full-cleanup": "The quick brown fect jumps over the lazy dig."
+    },
+    "interpretation": "Every clone arm inherits the reference's two word changes. The no-reference control says fox/dog. The 2/9 WER is the reference's pronunciation, not a decode or DSP regression."
+  },
+  "interpretation": "The 2/9 gate failure was the reference, not the port. `fox.wav` renders its own text as \"fex/fixed ... dig\" under both independent ASR architectures, and every historical clone arm (native legacy/punctuation/reference-cleanup/output-cleanup and upstream unprocessed/full-cleanup) inherited exactly those two words while the no-reference control said \"fox/dog\". The harness now transcribes each fixture with an RNNT and a CTC model before any cloning, refuses a reference that no engine can read back, and scores clones on two sentences that are not the reference text. `window.wav` reads back at 0.000 on both engines and is the only gated reference. Every arm is <= 0.111 against the unchanged 0.2 gate; the residual is Nemotron dropping the leading \"The\" on cloned speech (1/9), which the second target does not share (0.000).",
+  "not_claimed": [
+    "no change to the OmniVoice codec/license hold and no merge",
+    "no threshold relaxation, no seed selection, no fixture-outcome selection",
+    "fox.wav stays unusable as a cloning gate reference; it is kept as the known-bad control",
+    "station.wav is readable audio but not a gate reference: the CTC split (\"to morrow\") and the clone's faster rate make a short WER judge unstable",
+    "a frozen upstream-vs-native cloning comparison on fox.wav is moot until it uses a vetted reference; none is claimed here"
+  ]
+}
