@@ -35,10 +35,11 @@ def main():
     count = 0
     with tempfile.TemporaryDirectory(prefix="crispasr-551-") as folder:
         root = Path(folder)
-        for name in ("parakeet-unified-en-0.6b-Q8_0.gguf", "renamed.gguf"):
+        for name in ("parakeet-unified-en-0.6b-Q8_0.gguf", "renamed.gguf", "parakeet-ctc-external.gguf"):
             model = root / name
             fixture(model)
-            for backend in (None, "parakeet", "fastconformer-ctc", "canary-ctc"):
+            for backend in (None, "parakeet", "fastconformer-ctc", "canary-ctc",
+                            "fastconformer_ctc", "canary_ctc", "quds-fa"):
                 output = root / "transcript"
                 command = [str(cli), "-m", str(model), "-f", str(audio), "--no-gpu",
                            "-l", "en", "-oj", "-of", str(output)]

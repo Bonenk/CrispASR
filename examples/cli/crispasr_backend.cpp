@@ -683,7 +683,7 @@ void crispasr_print_backend_matrix_json() {
 // Mappings are based on the value that each model's converter writes into
 // the GGUF file. When a converter doesn't write this key we fall back to
 // filename heuristics.
-std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
+static std::string detect_backend_unchecked(const std::string& model_path) {
     if (model_path.empty())
         return "";
 
@@ -947,6 +947,14 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
     }
     gguf_free(gctx);
     return result;
+}
+
+std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
+    const std::string backend = detect_backend_unchecked(model_path);
+    if (core_parakeet_gguf::family_backend(backend.c_str()) &&
+        core_parakeet_gguf::reject_external_file(model_path.c_str(), false))
+        return "";
+    return backend;
 }
 
 bool crispasr_gguf_is_pure_ctc(const std::string& model_path) {

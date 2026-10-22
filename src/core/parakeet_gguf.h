@@ -4,11 +4,21 @@
 
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 // #551: architecture names are not tensor schemas. In particular,
 // transcribe.cpp writes arch=parakeet too, with stt.parakeet.* metadata and
 // pred.* tensors. Missing CrispASR predictor names does NOT imply CTC.
 namespace core_parakeet_gguf {
+
+inline bool family_backend(const char* name) {
+    for (const char* candidate : {"parakeet", "phonon2", "reazonspeech", "quds", "quds-fa", "fastconformer-ctc",
+                                  "fastconformer_ctc", "canary-ctc", "canary_ctc"}) {
+        if (std::strcmp(name, candidate) == 0)
+            return true;
+    }
+    return false;
+}
 
 inline bool external_schema(const gguf_context* ctx) {
     for (int64_t i = 0; i < gguf_get_n_kv(ctx); ++i) {
@@ -43,14 +53,14 @@ inline bool reject_external(const gguf_context* ctx, const char* path) {
     return true;
 }
 
-inline bool reject_external_file(const char* path) {
+inline bool reject_external_file(const char* path, bool report = true) {
     if (!path || !*path)
         return false;
     gguf_init_params params = {true, nullptr};
     gguf_context* ctx = gguf_init_from_file(path, params);
     if (!ctx)
         return false;
-    const bool rejected = reject_external(ctx, path);
+    const bool rejected = report ? reject_external(ctx, path) : external_schema(ctx);
     gguf_free(ctx);
     return rejected;
 }

@@ -2800,10 +2800,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     if (!model_path || !backend_name)
         return nullptr;
 
-    if ((std::strcmp(backend_name, "parakeet") == 0 || std::strcmp(backend_name, "phonon2") == 0 ||
-         std::strcmp(backend_name, "reazonspeech") == 0 || std::strcmp(backend_name, "fastconformer-ctc") == 0 ||
-         std::strcmp(backend_name, "canary-ctc") == 0) &&
-        core_parakeet_gguf::reject_external_file(model_path))
+    if (core_parakeet_gguf::family_backend(backend_name) && core_parakeet_gguf::reject_external_file(model_path))
         return nullptr;
 
     ensure_dynamic_backends_loaded();

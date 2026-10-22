@@ -3115,6 +3115,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         } else {
             backend_name = crispasr_detect_backend_from_gguf(params.model);
             if (backend_name.empty()) {
+                if (core_parakeet_gguf::reject_external_file(params.model.c_str()))
+                    return 11;
                 fprintf(stderr,
                         "crispasr: error: could not auto-detect backend from '%s'. "
                         "Use --backend NAME to force one.\n",
@@ -3283,8 +3285,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
     // Reject the foreign Parakeet schema even if a filename or explicit backend
     // bypassed metadata auto-detection. Do this before loading weights/processing.
-    if ((backend_name == "parakeet" || backend_name == "phonon2" || backend_name == "reazonspeech" ||
-         backend_name == "fastconformer-ctc" || backend_name == "canary-ctc") &&
+    if (core_parakeet_gguf::family_backend(backend_name.c_str()) &&
         core_parakeet_gguf::reject_external_file(params.model.c_str()))
         return 11;
 
