@@ -165,7 +165,7 @@ jobs:
               check=True, capture_output=True, text=True)
           names = {test['name'] for test in json.loads(result.stdout)['tests']}
           required = {'alignment-cuda-loader', 'alignment-cache-release-samples',
-                      'kaggle-cli-launcher', 'ja-metadata-validator'}
+                      'kaggle-cli-launcher', 'ja-metadata-validator', 'parakeet-schema-cli'}
           missing = required - names
           if missing:
               raise SystemExit(f'Missing Python unit tests: {sorted(missing)}')

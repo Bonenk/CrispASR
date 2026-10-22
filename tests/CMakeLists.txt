@@ -5845,7 +5845,9 @@ catch_discover_tests(test-parakeet-gguf
     TEST_SPEC "[parakeet-schema]"
     PROPERTIES LABELS "unit;parakeet"
 )
-if(Python3_Interpreter_FOUND AND TARGET crispasr-cli)
+# The examples directory defines crispasr-cli after this directory. Test the
+# build option here; the target-file generator expression resolves later.
+if(Python3_EXECUTABLE AND CRISPASR_BUILD_EXAMPLES)
     add_test(NAME parakeet-schema-cli COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/test_parakeet_schema_cli.py
         --cli $<TARGET_FILE:crispasr-cli> --audio ${PROJECT_SOURCE_DIR}/samples/jfk.wav)
