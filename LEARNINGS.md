@@ -51,12 +51,25 @@ only `CODEC_GPU` changing:
   ... every later stage Metal is worse, ending at e_acoustic 0.995934 FAIL
 
 `ac_block0` is the first `enc_conv1d_strided` (`ggml_conv_1d`, stride 8, kernel
-16). So `ggml_conv_1d` at stride > 1 is the inaccurate Metal path; stride-1 convs
-are exact. Two ways out: decompose the strided conv into stride-1 convs by phase
-(polyphase, keeps the GPU codec), or run the ENCODER on the CPU and only the
-DECODER on the GPU — the decoder's weights are a small fraction of the 403 MB
-tokenizer (the bulk is HuBERT), so a ~50 MB GPU copy of the decoder tensors
-would do it, at the cost of twin tensor pointers in the decode path. The same trap made the decode slow in the first place —
+16), which makes "stride > 1 is the bad Metal path" the obvious reading — and that
+reading is **WRONG**: replacing every strided conv with an exactly-equivalent
+full-rate stride-1 conv followed by decimation (`y[t] = z[t*s]`, same weights, same
+padding) leaves `e_acoustic` **bit-for-bit identical** on Metal — same 0.995934 /
+2.846e-01 to six digits. So the strided form is not the culprit; the divergence is
+elsewhere in that graph, and the remaining suspects are the **dilated** convs
+(d=3, d=9 — `ac_conv1` is d=1 and exact) and the **snake** activation. (The
+intermediate bisect numbers also drift on the CPU against a hand-dumped archive
+while the CPU top stage converges to 1.000000, so treat per-stage intermediate
+cos as advisory and the top-stage CPU/Metal pair as the measurement.)
+Two ways to take the fast DECODE without trusting the Metal encoder:
+`CRISPASR_OMNIVOICE_CODEC_SPLIT=1` encodes on the CPU (diff passes) and re-hosts
+the tokenizer on the GPU for the decode — measured decode_compute 2.25× faster
+(2.65 s vs 5.96 s on an 18.4 s paragraph) with identical transcripts
+(nemotron WER 0.022 both), but the rebind re-reads the 403 MB tokenizer and cost
+~10 s on an external volume, i.e. a net loss for one call and break-even around
+3-4. The fix that makes it a win is copying only the DECODER weights (~50 MB) to
+the GPU instead of re-hosting everything, which needs twin tensor pointers in the
+decode path. The same trap made the decode slow in the first place —
 `ggml_conv_transpose_1d` is dispatch-bound on Metal, so the Metal codec was
 1759 ms vs 685 ms on CPU until the upsampler was decomposed. With the decomposed
 path the Metal DECODE is the fastest of all (242 ms), but it stays opt-in until the

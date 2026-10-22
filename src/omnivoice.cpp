@@ -335,6 +335,11 @@ struct ov_higgs_tokenizer {
     ggml_context* ctx_perm = nullptr;
     ggml_backend_buffer_t buf_perm = nullptr;
     bool loaded = false;
+    // Re-hosting state (CRISPASR_OMNIVOICE_CODEC_SPLIT): the tokenizer buffer can
+    // be rebuilt on another backend without re-parsing the GGUF body, so the
+    // ENCODER can run on the CPU while the DECODER runs on the GPU.
+    std::string path;
+    bool on_gpu = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -682,8 +687,10 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 static bool codec_fastconv_enabled();
 static bool codec_decomp_enabled();
 static bool codec_gpu_enabled(const omnivoice_context* ctx);
+static bool codec_split_enabled();
+static bool codec_decode_on_gpu(const omnivoice_context* ctx);
 
-static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
+static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want_gpu) {
     auto& tok = ctx->tokenizer;
 
     struct gguf_init_params gp = {/*.no_alloc=*/true, /*.ctx=*/&tok.ctx_w};
@@ -875,14 +882,10 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
         return false;
     }
 
-    // Create backend + buffer. CUDA defaults to GPU for the conv-heavy codec;
-    // Metal/CPU stay on CPU: Metal's DECODE is faster with the decomposed
-    // upsampler (242 ms vs 472 ms for 2.8 s), but the tokenizer buffer also
-    // serves the voice-clone ENCODER, and the Metal encoder's codes derail the
-    // clone (WER 1.0) — see codec_gpu_enabled. OMNIVOICE_CODEC_GPU=0/1
-    // overrides automatic placement. A fresh GPU backend keeps the tokenizer
-    // independent of ctx->backend for clean teardown.
-    const bool codec_gpu = ctx->use_gpu && codec_gpu_enabled(ctx);
+    // Create backend + buffer on the requested placement. A fresh GPU backend
+    // keeps the tokenizer independent of ctx->backend for clean teardown.
+    const bool codec_gpu = ctx->use_gpu && want_gpu;
+    tok.on_gpu = codec_gpu;
     tok.backend = codec_gpu ? crispasr_init_gpu_backend() : nullptr;
     if (!tok.backend)
         tok.backend = core_cpu_backend::init();
@@ -962,6 +965,74 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
                 tok.n_quantizers);
     }
     return true;
+}
+
+// Free everything the tokenizer holds for its CURRENT backend, so it can be
+// rebuilt elsewhere. The GGUF is re-read from `path`; nothing else survives.
+static void tok_release_backend(ov_higgs_tokenizer& tok) {
+    tok.fc.free();
+    if (tok.buf_perm)
+        ggml_backend_buffer_free(tok.buf_perm);
+    tok.buf_perm = nullptr;
+    if (tok.ctx_perm)
+        ggml_free(tok.ctx_perm);
+    tok.ctx_perm = nullptr;
+    for (auto& blk : tok.dec_blocks)
+        blk.conv_t1_w_perm = nullptr;
+    if (tok.buf_w)
+        ggml_backend_buffer_free(tok.buf_w);
+    tok.buf_w = nullptr;
+    if (tok.backend)
+        ggml_backend_free(tok.backend);
+    tok.backend = nullptr;
+    if (tok.ctx_w)
+        ggml_free(tok.ctx_w);
+    tok.ctx_w = nullptr;
+    // Every weight pointer is about to be resolved again; clear the ones we can
+    // reach cheaply so a failed rebuild cannot leave dangling pointers behind.
+    tok.dec_conv1_w = tok.dec_conv1_b = tok.dec_snake_alpha = nullptr;
+    tok.dec_conv2_w = tok.dec_conv2_b = nullptr;
+    tok.fc2_w = tok.fc2_b = nullptr;
+    for (auto& q : tok.quantizers) {
+        q.codebook = q.proj_out_w = q.proj_out_b = nullptr;
+        q.proj_in_w = q.proj_in_b = nullptr;
+    }
+    for (auto& blk : tok.dec_blocks) {
+        blk.snake_alpha = blk.conv_t1_w = blk.conv_t1_b = nullptr;
+        for (auto& ru : blk.res)
+            ru.snake1_alpha = ru.conv1_w = ru.conv1_b = ru.snake2_alpha = ru.conv2_w = ru.conv2_b = nullptr;
+    }
+    tok.enc_conv1_w = tok.enc_conv1_b = tok.enc_snake1_alpha = nullptr;
+    tok.enc_conv2_w = tok.enc_conv2_b = nullptr;
+    tok.fc_w = tok.fc_b = nullptr;
+    tok.sem_featproj_ln_w = tok.sem_featproj_ln_b = nullptr;
+    tok.sem_featproj_w = tok.sem_featproj_b = nullptr;
+    tok.sem_enc_ln_w = tok.sem_enc_ln_b = nullptr;
+    tok.encsem_conv_w = nullptr;
+    tok.loaded = false;
+}
+
+// Move the tokenizer weights to `want_gpu` if they are not already there.
+// Used by CRISPASR_OMNIVOICE_CODEC_SPLIT: encode on the CPU (exact), decode on
+// the GPU. Costs one re-upload, only when the placement actually changes.
+static bool tok_rebind(omnivoice_context* ctx, bool want_gpu) {
+    auto& tok = ctx->tokenizer;
+    if (tok.loaded && tok.on_gpu == want_gpu)
+        return true;
+    const std::string path = tok.path;
+    tok_release_backend(tok);
+    if (path.empty() || !tok_load_backend(ctx, path.c_str(), want_gpu)) {
+        fprintf(stderr, "omnivoice: failed to re-host the tokenizer on %s\n", want_gpu ? "the GPU" : "the CPU");
+        return false;
+    }
+    return true;
+}
+
+static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
+    ctx->tokenizer.path = path;
+    const bool gpu =
+        ctx->use_gpu && codec_gpu_enabled(ctx) && !codec_split_enabled(); // split starts on the CPU (encoder first)
+    return tok_load_backend(ctx, path, gpu);
 }
 
 // ---------------------------------------------------------------------------
@@ -1058,6 +1129,32 @@ static bool codec_gpu_enabled(const omnivoice_context* ctx) {
         return e[0] != '0';
     return ctx && ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr;
 }
+
+// CRISPASR_OMNIVOICE_CODEC_SPLIT: keep the voice-clone ENCODER on the CPU (exact)
+// and put only the DECODER on the GPU. The tokenizer buffer is re-hosted on
+// demand (tok_rebind), so the two never share a placement.
+//
+// Why: the Metal codec DECODE is 2x faster than the CPU one (242 ms vs 472 ms for
+// 2.8 s of audio) but the Metal ENCODER is wrong — its first strided conv
+// (ggml_conv_1d, stride 8) diverges (ac_block0 0.997416 vs 0.999092 on the CPU
+// bisect) and the clone derails (WER 1.0). Splitting takes the fast half.
+//
+// Default OFF until the A/B is green; =1 enables, =0 restores the single
+// placement (both halves on the backend chosen by codec_gpu_enabled).
+static bool codec_split_enabled() {
+    const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_SPLIT");
+    return e && e[0] && e[0] != '0';
+}
+
+// Which placement the DECODE half should use.
+static bool codec_decode_on_gpu(const omnivoice_context* ctx) {
+    if (!ctx || !ctx->use_gpu)
+        return false;
+    if (codec_split_enabled())
+        return true;
+    return codec_gpu_enabled(ctx);
+}
+
 
 // Bake F32 copies of every decode-path conv kernel into a dedicated buffer on
 // the tokenizer backend. Only F16 kernels are baked (k-quant would need a
@@ -3612,6 +3709,10 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
         }
     }
     if (codes.empty()) {
+        // SPLIT: the encoder always runs on the CPU (the Metal encoder's strided
+        // convs are wrong); tok_rebind is a no-op unless the placement changed.
+        if (!ctx->tokenizer.path.empty() && !tok_rebind(ctx, false))
+            return -1;
         codes = higgs_encode(ctx, pcm.data(), (int)pcm.size(), &T_ref);
         if (codes.empty() || T_ref <= 0) {
             fprintf(stderr, "omnivoice: voice-prompt encode failed\n");
@@ -3751,8 +3852,13 @@ void omnivoice_codes_free(int32_t* codes) {
 float* omnivoice_decode_codes(struct omnivoice_context* ctx, const int32_t* codes, int n_codes, int* out_n_samples) {
     if (!ctx || !codes || n_codes <= 0 || !out_n_samples)
         return nullptr;
-    if (!ctx->tokenizer.loaded) {
+    if (ctx->tokenizer.path.empty() && !ctx->tokenizer.loaded) {
         fprintf(stderr, "omnivoice: decode requires audio tokenizer — call omnivoice_set_tokenizer_path first\n");
+        *out_n_samples = 0;
+        return nullptr;
+    }
+    // SPLIT: the decoder may want a different backend than the encoder left it on.
+    if (!tok_rebind(ctx, codec_decode_on_gpu(ctx))) {
         *out_n_samples = 0;
         return nullptr;
     }

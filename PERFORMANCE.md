@@ -803,10 +803,21 @@ the §232 campaign. Verified against current code, not carried from this doc.
   F16→F32 widening is lossless. The per-block bisect lands on the first **strided**
   stage (`ac_block0`, `ggml_conv_1d` stride 8): same archive both backends give
   1.000000/4.47e-04 on the stride-1 `ac_conv1`, then 0.999092 (CPU) vs 0.997416
-  (Metal) at `ac_block0`, compounding from there. Fix = polyphase the strided conv
-  into stride-1 convs, or keep the ENCODER on the CPU and copy only the decoder
-  weights (~50 MB of the 403 MB) to the GPU. See LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
-  for reference-free TTS.
+  (Metal) at `ac_block0`, compounding from there. `CRISPASR_OMNIVOICE_CODEC_GPU=1`
+  opts in for reference-free TTS.
+  Two alternative paths were built and measured: the `ac_block0` reading suggested
+  "stride > 1 is the bad Metal path", so every strided conv was rewritten as an
+  exactly-equivalent full-rate stride-1 conv + decimation — and `e_acoustic` came
+  out **bit-identical** on Metal (same 0.995934 / 2.846e-01), which disproves that
+  reading; the variant was dropped (s× the FLOPs for nothing) and the remaining
+  suspects are the d=3/d=9 dilated convs and snake.
+  `CRISPASR_OMNIVOICE_CODEC_SPLIT=1` does work: encode on the CPU (`ENCODE_DIFF`
+  passes), re-host the tokenizer on the GPU on demand for the decode —
+  `decode_compute` **2.25×** faster (2.65 s vs 5.96 s, 18.4 s paragraph), identical
+  transcripts (nemotron WER 0.022 both), PCM within 34/32768. But the rebind
+  re-reads the 403 MB tokenizer (~10 s on this external volume), so a one-shot CLI
+  is a net loss and it breaks even around 3-4 decodes per process. Default OFF; a
+  decoder-only (~50 MB) GPU copy is what would make it a win. See LEARNINGS 41.
   `CRISPASR_OMNIVOICE_BENCH=1` also splits the codec bucket: `decode_graph_build`
   0.31 ms, `decode_gallocr` 0.26 ms, `decode_readback` 2.4 ms — graph caching is not
   worth it; `decode_compute` is the whole cost.
