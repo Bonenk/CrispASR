@@ -1,5 +1,15 @@
 # CrispASR — Pending work
 
+## NOW — M1 OmniVoice engine comparison and latency (2026-10-23)
+
+Owner: Codex. Baseline main `c34459b2e`. Compare supplied omnivoice.cpp
+`1a468d8` / ggml `cc5df49a` against a fresh current-source CrispASR build.
+Record model/codec precision differences, matched recipe and per-stage timings;
+keep package comparison separate from fixed-weight optimization A/B. Profile
+before implementing, retain experimental gates and validate generated audio.
+One heavy build/model at a time. Quality acceptance limitations from the prior
+audit remain in force.
+
 ## NOW — OmniVoice codec and acceptance audit (2026-10-22)
 
 Owner: Codex. Repairs landed on main at runtime source `5acff9f21`. Audit baseline main
