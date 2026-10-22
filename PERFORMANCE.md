@@ -778,6 +778,29 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Metal decode is the same f32-no-cast path). GPU codec decode measured slower on M1
   Metal (dispatch-bound) → gated `OMNIVOICE_CODEC_GPU`, default OFF, pending Kaggle CUDA.
   `--tts-steps` now drives omnivoice's stage0 step count (default 32).
+- **omnivoice codec decode: decomposed upsampler (2026-10-22, default ON):** the five
+  ConvTranspose1d stages ran through `ggml_conv_transpose_1d`, which materialises an
+  audio-rate im2col copy. The pre-permuted `[IC, K*OC]` F32 kernel +
+  `mul_mat`/`col2im_1d` form (`core_convt::convt1d_decomp`, already used by
+  voxcpm2/chatterbox) replaces it; `CRISPASR_OMNIVOICE_CODEC_DECOMP=0` restores the
+  crop path. M1 A/B (same text/seed/steps/reference, decode only): 2.8 s audio
+  **685 ms → 472 ms** (−31%); cross-sentence clone, 2.4 s audio, **0.38 s → 0.30 s**
+  (−23%, two pairs each); 18.4 s paragraph 4754 ms → 3.2–4.8 s.
+  Process CPU time (min of 3, load-invariant): 2.8 s clip 7.54 → 6.85 s (−9%),
+  18.4 s paragraph 31.03 → 28.47 s (−8%). Quality: the clone's ASR transcript is
+  **identical on nemotron AND parakeet** (WER 0.111 both arms) and the waveform
+  differs by max 1 int16 LSB on 0.11% of samples (reduction order only).
+  The same rewrite is what makes the Metal codec viable — with the crop path the
+  Metal codec decode was 1759 ms vs 685 ms on CPU (conv_transpose_1d is dispatch-bound
+  on Metal), with the decomposed path Metal decodes 2.8 s of audio in **242 ms**, the
+  fastest of the three. It stays OFF by default anyway: the tokenizer buffer also
+  serves the voice-clone ENCODER and the Metal encoder produces different codes that
+  derail the clone (nemotron WER 1.0 vs 0.333 for the CPU encoder on the same input,
+  same 65 ref frames) — see LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
+  for reference-free TTS.
+  `CRISPASR_OMNIVOICE_BENCH=1` also splits the codec bucket: `decode_graph_build`
+  0.31 ms, `decode_gallocr` 0.26 ms, `decode_readback` 2.4 ms — graph caching is not
+  worth it; `decode_compute` is the whole cost.
 - **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
   the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
   (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to

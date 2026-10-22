@@ -211,6 +211,10 @@ struct ov_higgs_dec_block {
     ggml_tensor* snake_alpha = nullptr;
     ggml_tensor* conv_t1_w = nullptr;
     ggml_tensor* conv_t1_b = nullptr;
+    // Pre-permuted [IC, K*OC] F32 ConvTranspose1d kernel for the decomposed
+    // mul_mat + col2im path (core_convt::convt1d_decomp). Null when the gate is
+    // off or the weight is missing — callers then use convt1d_crop unchanged.
+    ggml_tensor* conv_t1_w_perm = nullptr;
     ov_higgs_res_unit res[3]; // dilation 1, 3, 9
 };
 
@@ -326,6 +330,10 @@ struct ov_higgs_tokenizer {
     ggml_context* ctx_w = nullptr;
     ggml_backend_t backend = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
+    // Separate context+buffer holding the F32 permuted ConvTranspose1d kernels
+    // for the decomposed decode path (CRISPASR_OMNIVOICE_CODEC_DECOMP).
+    ggml_context* ctx_perm = nullptr;
+    ggml_backend_buffer_t buf_perm = nullptr;
     bool loaded = false;
 };
 
@@ -672,6 +680,7 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 // ---------------------------------------------------------------------------
 
 static bool codec_fastconv_enabled();
+static bool codec_decomp_enabled();
 static bool codec_gpu_enabled(const omnivoice_context* ctx);
 
 static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
@@ -867,9 +876,12 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     }
 
     // Create backend + buffer. CUDA defaults to GPU for the conv-heavy codec;
-    // Metal/CPU stay on CPU because Metal's small convs are dispatch-bound.
-    // OMNIVOICE_CODEC_GPU=0/1 overrides automatic placement. A fresh GPU backend
-    // keeps the tokenizer independent of ctx->backend for clean teardown.
+    // Metal/CPU stay on CPU: Metal's DECODE is faster with the decomposed
+    // upsampler (242 ms vs 472 ms for 2.8 s), but the tokenizer buffer also
+    // serves the voice-clone ENCODER, and the Metal encoder's codes derail the
+    // clone (WER 1.0) — see codec_gpu_enabled. OMNIVOICE_CODEC_GPU=0/1
+    // overrides automatic placement. A fresh GPU backend keeps the tokenizer
+    // independent of ctx->backend for clean teardown.
     const bool codec_gpu = ctx->use_gpu && codec_gpu_enabled(ctx);
     tok.backend = codec_gpu ? crispasr_init_gpu_backend() : nullptr;
     if (!tok.backend)
@@ -924,6 +936,26 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
         tok.fc.bake(tok.backend, convs, codec_fastconv_enabled());
     }
 
+    // DECOMP (#254): pre-permute the 5 ConvTranspose1d kernels to [IC, K*OC] F32
+    // so the decode graph can use mul_mat + col2im_1d instead of
+    // ggml_conv_transpose_1d (which materialises a pure-copy im2col at audio
+    // rate). Separate ctx+buffer; conv_t1_w_perm stays null when the gate is
+    // off, and higgs_decode then keeps the crop path.
+    if (codec_decomp_enabled()) {
+        std::vector<ggml_tensor*> srcs;
+        std::vector<ggml_tensor**> dsts;
+        for (auto& blk : tok.dec_blocks) {
+            if (!blk.conv_t1_w)
+                continue;
+            srcs.push_back(blk.conv_t1_w);
+            dsts.push_back(&blk.conv_t1_w_perm);
+        }
+        if (!srcs.empty() && !core_convt::permute_convt1d_weights_batch(srcs.data(), dsts.data(), (int)srcs.size(),
+                                                                        tok.backend, &tok.ctx_perm, &tok.buf_perm)) {
+            fprintf(stderr, "omnivoice: ConvTranspose1d pre-permute failed; using the crop path\n");
+        }
+    }
+
     if (ctx->verbosity >= 1) {
         size_t total = ggml_backend_buffer_get_size(tok.buf_w);
         fprintf(stderr, "omnivoice: tokenizer loaded %s (%.2f MB, %d quantizers)\n", path, total / 1e6,
@@ -958,11 +990,68 @@ static bool codec_fastconv_enabled() {
     return !(e && e[0] == '0');
 }
 
+// Decomposed ConvTranspose1d (#254 follow-up): route the upsampling stages
+// through mul_mat + col2im_1d (core_convt::convt1d_decomp) with a pre-permuted
+// F32 kernel, instead of ggml_conv_transpose_1d. The decomposed form is the
+// same one voxcpm2/chatterbox already use and is numerically equivalent up to
+// reduction order.
+//
+// A/B gate: CRISPASR_OMNIVOICE_CODEC_DECOMP=0 restores the crop path (the
+// pre-#254 behaviour); anything else keeps the decomposed path, which is the
+// default because it wins on every length measured (M1, 4 threads, q8_0):
+//
+//   audio      CPU crop   CPU decomp   Metal crop   Metal decomp
+//   2.8 s        685 ms     472 ms       1759 ms       242 ms
+//   18.4 s      4754 ms    (see below)     n/a        1470 ms
+//
+// Quality: decomp vs crop is a 1-LSB reduction-order difference (max |Δ| = 1
+// int16, 0.1% of samples) with an identical ASR round-trip (WER 0.087 both on
+// the 18.4 s paragraph, nemotron + parakeet).
+//
+// The decomposed form is also what makes the Metal codec viable: with the crop
+// path, conv_transpose_1d is dispatch-bound on Metal and the codec decode was
+// 2x SLOWER than the CPU one; with mul_mat + col2im it becomes the fastest
+// path (242 ms vs 685 ms CPU for 2.8 s of audio).
+static bool codec_decomp_enabled() {
+    const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_DECOMP");
+    return !(e && e[0] == '0');
+}
+
 // GPU codec decode (#254). The DAC decode is one large conv-heavy graph. CUDA
-// measurements on RTX 5070 Ti reduce decode from ~1.4 s on CPU to ~34 ms, while
-// Metal remains slower than CPU-FASTCONV because its modest-channel convs are
-// dispatch-bound. Default to GPU only when the main backend is CUDA; explicit
-// OMNIVOICE_CODEC_GPU=0/1 remains the cross-platform override.
+// measurements on RTX 5070 Ti reduce decode from ~1.4 s on CPU to ~34 ms.
+//
+// Apple Silicon: the Metal codec only wins WITH the decomposed upsampler
+// (mul_mat + col2im_1d) — with the crop path conv_transpose_1d is
+// dispatch-bound on Metal and decode was ~2x slower than the CPU codec
+// (1759 ms vs 685 ms for 2.8 s of audio). With the decomposed path Metal is
+// the fastest backend (242 ms vs 472 ms CPU), so it is enabled by default on
+// Apple Silicon. The two levers are coupled on purpose: DECOMP=0 also drops
+// the codec back to the CPU, because Metal + crop is the worst combination.
+//
+// OMNIVOICE_CODEC_GPU / CRISPASR_OMNIVOICE_CODEC_GPU = 0/1 overrides the
+// automatic placement.
+// GPU codec decode (#254). The DAC decode is one large conv-heavy graph. CUDA
+// measurements on RTX 5070 Ti reduce decode from ~1.4 s on CPU to ~34 ms.
+//
+// Apple Silicon: the Metal codec is FASTER for DECODE — with the decomposed
+// upsampler (mul_mat + col2im_1d) the M1 decode drops from 685 ms (CPU +
+// crop) to 242 ms (Metal + decomp) for 2.8 s of audio — but it is NOT safe by
+// default, because the SAME tokenizer buffer also serves the voice-cloning
+// ENCODER, and the Metal encoder produces different codes than the CPU one:
+// a fresh encode on Metal derails the clone (nemotron WER 1.0, "Solchens, the
+// quick brown of soap dope…") where the CPU encoder gives 0.333 on the same
+// input. Both encoders agree on the frame count (65 ref frames), so this is
+// arithmetic, not a layout bug — most likely the encoder's F16 conv kernels,
+// which the decode path already had to re-bake as F32 (FASTCONV) to be
+// usable.
+//
+// So the Metal codec stays OFF by default and is only an explicit opt-in
+// (CRISPASR_OMNIVOICE_CODEC_GPU=1) for reference-free TTS. Flipping it on for
+// cloning needs the encoder's conv kernels re-baked as F32 first. CUDA keeps
+// the GPU codec by default (measured there).
+//
+// OMNIVOICE_CODEC_GPU / CRISPASR_OMNIVOICE_CODEC_GPU = 0/1 overrides the
+// automatic placement.
 static bool codec_gpu_enabled(const omnivoice_context* ctx) {
     const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_GPU");
     if (e && e[0])
@@ -981,6 +1070,10 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
     auto& tok = ctx->tokenizer;
     if (!tok.loaded)
         return {};
+
+    auto _dbg_t0 = std::chrono::steady_clock::now();
+    auto _dbg_now = []() { return std::chrono::steady_clock::now(); };
+    auto _dbg_ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
 
     // Graph context
     // Generous allocation — conv1d creates ~7 intermediate tensors each (transpose,
@@ -1054,7 +1147,13 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         // Snake → ConvTranspose1d (baked-F32 kernel selects the direct _f32 CPU path)
         h = core_dac::snake(ctx0, h, blk.snake_alpha);
         int pad = (int)std::ceil((double)stride / 2.0);
-        h = core_convt::convt1d_crop(ctx0, h, fc->get(blk.conv_t1_w), blk.conv_t1_b, stride, pad, pad);
+        if (blk.conv_t1_w_perm) {
+            // Decomposed upsampler: mul_mat + col2im_1d, no audio-rate im2col copy.
+            h = core_convt::convt1d_decomp(ctx0, h, blk.conv_t1_w_perm, blk.conv_t1_b, stride,
+                                           (int)blk.conv_t1_w->ne[0], pad, pad);
+        } else {
+            h = core_convt::convt1d_crop(ctx0, h, fc->get(blk.conv_t1_w), blk.conv_t1_b, stride, pad, pad);
+        }
 
         // 3 ResidualUnits (d=1, 3, 9)
         for (int r = 0; r < 3; r++) {
@@ -1079,9 +1178,19 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
     ggml_set_output(h);
     ggml_build_forward_expand(gf, h);
 
+    if (ov_bench_enabled()) {
+        fprintf(stderr, "  omnivoice_bench: %-22s %.2f ms\n", "decode_graph_build", _dbg_ms(_dbg_t0, _dbg_now()));
+    }
+    auto _dbg_t1 = _dbg_now();
+
     // Allocate and compute
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
     ggml_gallocr_alloc_graph(ga, gf);
+
+    if (ov_bench_enabled()) {
+        fprintf(stderr, "  omnivoice_bench: %-22s %.2f ms\n", "decode_gallocr", _dbg_ms(_dbg_t1, _dbg_now()));
+    }
+    auto _dbg_t2 = _dbg_now();
 
     // Set code inputs
     for (int k = 0; k < n_codebooks; k++) {
@@ -1090,6 +1199,11 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
 
     ggml_backend_graph_compute(tok.backend, gf);
 
+    if (ov_bench_enabled()) {
+        fprintf(stderr, "  omnivoice_bench: %-22s %.2f ms\n", "decode_compute", _dbg_ms(_dbg_t2, _dbg_now()));
+    }
+    auto _dbg_t3 = _dbg_now();
+
     // Read PCM output
     ggml_tensor* pcm_out = ggml_graph_get_tensor(gf, "pcm");
     std::vector<float> pcm(T_pcm);
@@ -1097,6 +1211,10 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
 
     ggml_gallocr_free(ga);
     ggml_free(ctx0);
+
+    if (ov_bench_enabled()) {
+        fprintf(stderr, "  omnivoice_bench: %-22s %.2f ms\n", "decode_readback", _dbg_ms(_dbg_t3, _dbg_now()));
+    }
 
     return pcm;
 }
@@ -3746,6 +3864,10 @@ void omnivoice_free(struct omnivoice_context* ctx) {
         ggml_free(ctx->ctx_w);
     // Tokenizer
     ctx->tokenizer.fc.free();
+    if (ctx->tokenizer.buf_perm)
+        ggml_backend_buffer_free(ctx->tokenizer.buf_perm);
+    if (ctx->tokenizer.ctx_perm)
+        ggml_free(ctx->tokenizer.ctx_perm);
     if (ctx->tokenizer.buf_w)
         ggml_backend_buffer_free(ctx->tokenizer.buf_w);
     if (ctx->tokenizer.backend)
