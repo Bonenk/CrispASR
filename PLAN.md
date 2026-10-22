@@ -8,7 +8,16 @@ Record model/codec precision differences, matched recipe and per-stage timings;
 keep package comparison separate from fixed-weight optimization A/B. Profile
 before implementing, retain experimental gates and validate generated audio.
 One heavy build/model at a time. Quality acceptance limitations from the prior
-audit remain in force.
+audit remain in force. First supplied-package warm runs are around30–32 s for
+an explicit6 s target; this is not an isolated engine verdict. A benchmark
+adapter preserves all active LLM/decoder tensor bytes for a matched run (unused
+encoder retains its original template schema; no cloning claim for the adapter).
+Resident decoder prototype is off by default and retains CPU encoding. Four
+counterbalanced fixed-code cases measure CPU1.92–2.82 s, split reload1.02–1.48 s,
+resident0.38–0.55 s;16 resident/old-Metal PCM pairs are byte-exact. Serialized
+resident weights44,196,000 B plus80,888,704 B caches. Selected4 CTest cases and
+native ASan/UBSan lifecycle pass. Pending: both-ASR roundtrips, fresh encoder
+reuse, matched active-weight engine timings, and final default disposition.
 
 ## NOW — OmniVoice codec and acceptance audit (2026-10-22)
 
