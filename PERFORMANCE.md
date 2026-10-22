@@ -796,7 +796,12 @@ the §232 campaign. Verified against current code, not carried from this doc.
   fastest of the three. It stays OFF by default anyway: the tokenizer buffer also
   serves the voice-clone ENCODER and the Metal encoder produces different codes that
   derail the clone (nemotron WER 1.0 vs 0.333 for the CPU encoder on the same input,
-  same 65 ref frames) — see LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
+  same 65 ref frames). `CRISPASR_OMNIVOICE_ENCODE_DIFF` pins it to the DAC
+  acoustic-encoder stage (cos_min 0.9959, max_abs 0.285 on Metal vs 1.000000 on CPU;
+  semantic and fc stages pass) and it is NOT weight precision — baking F32 copies of
+  all 74 encoder conv kernels changes the diff bit-for-bit *not at all*, because
+  F16→F32 widening is lossless. A Metal kernel bug in that graph; needs a per-block
+  bisect. See LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
   for reference-free TTS.
   `CRISPASR_OMNIVOICE_BENCH=1` also splits the codec bucket: `decode_graph_build`
   0.31 ms, `decode_gallocr` 0.26 ms, `decode_readback` 2.4 ms — graph caching is not

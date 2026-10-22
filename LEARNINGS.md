@@ -30,7 +30,20 @@ frames, so it is arithmetic, not a layout bug) and the clone derails: nemotron W
 1.0 ("Solchens, the quick brown of soap dope…") where the CPU encoder gives 0.333
 on the same input. A/B a backend move on the WHOLE pipeline (clone + decode),
 never on the decode alone: the decode is the cheap half, the encoder is where the
-clone lives. The same trap made the decode slow in the first place —
+clone lives. `CRISPASR_OMNIVOICE_ENCODE_DIFF=<ref.gguf>` localizes it in one run:
+on Metal `acoustic_enc` is cos_min 0.995934 / max_abs 2.846e-01 (FAIL) while
+`encoder_semantic` (0.999999) and `concat+fc` (1.000000) PASS, so it is the DAC
+acoustic-encoder graph, not the HuBERT branch. **It is NOT weight precision**:
+baking F32 copies of all 74 encoder conv kernels (`FASTCONV`) changes the diff
+numbers bit-for-bit *not at all*, because F16→F32 widening is lossless — the
+cached F32 kernel holds exactly the values the F16 one dequantises to. The bug is
+in a Metal kernel the encoder graph uses (strided `ggml_conv_1d` / im2col with
+those shapes), and localizing it needs `CRISPASR_OMNIVOICE_ACENC_BISECT=<archive>`
+against per-block tensors (`ac_conv1`, `ac_b0_snake`, `ac_block0..4`,
+`ac_snake1`) — the archive the current dumper does not emit yet. Next step is to
+dump those stages from the HF `audio_tokenizer` with
+`tools/dump_omnivoice_encode_reference.py` extended, then bisect the first block
+whose cos_min drops. The same trap made the decode slow in the first place —
 `ggml_conv_transpose_1d` is dispatch-bound on Metal, so the Metal codec was
 1759 ms vs 685 ms on CPU until the upsampler was decomposed. With the decomposed
 path the Metal DECODE is the fastest of all (242 ms), but it stays opt-in until the
