@@ -115,3 +115,10 @@ them to users. PR521's speech-quality acceptance gate remains unchanged.
 Sources: [exact bundled Boson terms](https://huggingface.co/k2-fsa/OmniVoice/blob/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/audio_tokenizer/LICENSE),
 [incorporated Llama3 agreement](https://www.llama.com/llama3/license/),
 [incorporated use policy](https://www.llama.com/llama3/use-policy/).
+
+The converted bundle now includes the full Boson/Meta texts, acceptable-use policy
+and NOTICE, plus corrected card attribution/provenance, at immutable HF revision
+[`a2ad263`](https://huggingface.co/cstr/omnivoice-GGUF/tree/a2ad2630338fc80d1a0565c8e58aa8eff615db85).
+All five text files were anonymously downloaded and hashed; no weights changed.
+[Publication receipt](omnivoice-license-notices-2026-10-22.json). These notices do
+not certify every downstream use or resolve every possible naming question.

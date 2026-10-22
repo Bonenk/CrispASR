@@ -1,17 +1,24 @@
 # CrispASR — Pending work
 
-## NOW — issue551 unsupported Parakeet GGUF routing (2026-10-22)
+## NOW — issue551 hosted validation (2026-10-22)
 
 Owner: Codex, branch `fix/issue551-routing`, base `95e454b49`.
-Read the complete reporter issue and referenced model/converter documentation.
-The external Unified GGUF is RNN-T with a different schema; missing our two
-predictor tensor names is not positive CTC evidence. Add a shared metadata-only
-layout check, preserve positively identified compatible CTC routing, and reject
-unsupported layouts before weight loading through CLI and C ABI/bindings.
-Verify the original failure, CLI nonzero exit and direct C ABI rejection with
-small schema fixtures, plus existing native transducer/CTC controls. Full Unified
-inference/streaming support is separate. Explain NVIDIA/Boson terms against the
-existing license policy; do not promote either custom-license bundle here.
+Implemented and locally validated through source `17de1a7`: shared schema
+rejection, positive CTC detection, CLI filename/alias/legacy-Whisper protection,
+and C ABI/Python rejection. Actual external Unified metadata is RNN-T; full
+Unified inference/streaming support is separate. All 24 CLI controls,113 schema
+assertions,64 registry cases and existing architecture/parameter guards pass.
+CTest selects and executes all 5 routing tests; CI now requires that registration.
+[Scoped evidence](docs/issue551-routing-2026-10-22.json).
+
+Hosted CI 39722231798 and lint 39722234064 are running/queued; inspect individual
+jobs before claiming complete hosted acceptance. Older heads are superseded and
+do not certify this source. NVIDIA and OmniVoice acceptance now explicitly
+affirm the user's eligibility/compliance obligations; project redistribution
+obligations remain ours. Five corrected model-card/notice documents are published
+and anonymously verified, with no weight changes.
+[Notice receipt](docs/omnivoice-license-notices-2026-10-22.json).
+PR #521 remains subject to its unchanged speech-quality gate.
 
 ## NOW — v0.8.44 publication and wheel compatibility (2026-10-21)
 

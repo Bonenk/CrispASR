@@ -1,3 +1,34 @@
+## 2026-10-22 — issue551 Parakeet schema rejection and license acceptance
+
+The external transcribe.cpp Unified GGUF uses arch `parakeet` but a distinct
+`stt.parakeet.*` / `pred.*` schema. Its actual header declares RNN-T and 961
+tensors. Absence of CrispASR predictor names no longer classifies it as CTC.
+A shared metadata check rejects that layout before weight loading, including
+CLI filename/forced aliases, legacy Whisper fallback and C ABI/Python opens.
+Compatible native CTC heads still route correctly; native transducer/hybrid
+controls retain their route. This adds explicit unsupported-layout handling,
+not Unified inference/streaming support.
+
+Actual compiled local checks pass 24 CLI combinations,113 schema assertions,
+64 registry cases,570 architecture-map assertions and9 existing parameter cases.
+The real model's first 2 MiB header also rejects through both detectors, automatic
+and forced C ABI sessions, the real CLI (exit 11), and Python Session. No complete
+model download or inference result is claimed. CTest actually selects/executes
+all 5 routing tests; CI requires the CLI test to prevent silent registration loss.
+Hosted acceptance is pending on source 17de1a7, CI 39722231798/lint 39722234064.
+[Portable routing evidence](docs/issue551-routing-2026-10-22.json).
+
+Custom-license acceptance affirms user eligibility, compliance and obtaining any
+separately required permission. Added the distinct NVIDIA Open Model License
+tag to managed-download gating; no Unified registry entry is added. OmniVoice's
+existing bundle gate covers both NC weights and Boson companion conditions.
+Corrected a remaining Apache-only provenance footer and added full Boson/Meta
+terms, policy and notices to the converted-model repository, with five anonymous
+byte/hash readbacks and no weight changes. This does not waive project
+redistribution obligations or PR #521's unchanged speech-quality gate.
+[Terms and disposition](docs/model-license-policy.md),
+[notice publication receipt](docs/omnivoice-license-notices-2026-10-22.json).
+
 ## 2026-10-21 — Final issue-follow-up source accepted for release preparation
 
 ## 2026-10-21 — wheel OS/stdlib compatibility audit before v0.8.44 PyPI upload
