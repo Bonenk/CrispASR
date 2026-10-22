@@ -1,5 +1,18 @@
 # CrispASR — Pending work
 
+## NOW — issue551 unsupported Parakeet GGUF routing (2026-10-22)
+
+Owner: Codex, branch `fix/issue551-routing`, base `95e454b49`.
+Read the complete reporter issue and referenced model/converter documentation.
+The external Unified GGUF is RNN-T with a different schema; missing our two
+predictor tensor names is not positive CTC evidence. Add a shared metadata-only
+layout check, preserve positively identified compatible CTC routing, and reject
+unsupported layouts before weight loading through CLI and C ABI/bindings.
+Verify the original failure, CLI nonzero exit and direct C ABI rejection with
+small schema fixtures, plus existing native transducer/CTC controls. Full Unified
+inference/streaming support is separate. Explain NVIDIA/Boson terms against the
+existing license policy; do not promote either custom-license bundle here.
+
 ## NOW — v0.8.44 publication and wheel compatibility (2026-10-21)
 
 Owner: Codex, branch `fix/issue-followups-20261020`. User authorized publication.

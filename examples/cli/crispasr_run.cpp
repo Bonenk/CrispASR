@@ -9,6 +9,7 @@
 
 #include "core/align_json.h"
 #include "core/lid_probe.h"
+#include "core/parakeet_gguf.h"
 #include "crispasr_backend.h"
 #include "crispasr_cache.h"
 #include "crispasr_gap_fill.h"
@@ -3279,6 +3280,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
         return 11;
     }
     params.model = resolved;
+
+    // Reject the foreign Parakeet schema even if a filename or explicit backend
+    // bypassed metadata auto-detection. Do this before loading weights/processing.
+    if ((backend_name == "parakeet" || backend_name == "phonon2" || backend_name == "reazonspeech" ||
+         backend_name == "fastconformer-ctc" || backend_name == "canary-ctc") &&
+        core_parakeet_gguf::reject_external_file(params.model.c_str()))
+        return 11;
 
     // A pure-CTC FastConformer model (parakeet-ctc-*, stt_*_fastconformer_ctc:
     // encoder + CTC head, no RNN-T decoder/joint) cannot run on the parakeet

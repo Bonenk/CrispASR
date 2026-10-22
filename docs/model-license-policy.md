@@ -47,3 +47,65 @@ Sources: [Fish terms](https://huggingface.co/fishaudio/drama-3/blob/main/LICENSE
 [codec terms](https://huggingface.co/bosonai/higgs-audio-v2-tokenizer/blob/main/LICENSE),
 [Supertonic](https://huggingface.co/Supertone/supertonic-3),
 [CC-BY-SA](https://creativecommons.org/licenses/by-sa/4.0/).
+
+## NVIDIA Unified and Boson companion review, 2026-10-22
+
+This is an engineering disposition of the published terms, not a determination
+that every downstream use is permitted. A managed-download acceptance switch
+records acknowledgment; it cannot supply missing rights or satisfy our own
+redistribution obligations. Independently written runtime code and the weights
+it loads have separate licenses.
+
+### Parakeet Unified: NVIDIA Open Model License
+
+The original and referenced third-party Unified cards name the NVIDIA Open Model
+License, not CC-BY or Apache-2.0. The agreement dated October 24, 2025 permits
+commercial use and redistribution, with license/NOTICE requirements, and claims
+no ownership of outputs. It is not research-only or NC.
+
+Additional conditions matter: section 2.1 terminates rights for removing a
+guardrail without a substantially similar replacement, and requires compliance
+with later regulatory license updates or cessation of use/distribution.
+Section 2.3 incorporates NVIDIA's Trustworthy AI terms; section 8 includes an
+indemnity. Whether a particular conversion removes any guardrail must be checked
+against that checkpoint, not presumed from the GGUF format. Cosmos branding
+conditions apply to Cosmos models; do not present them as a Parakeet requirement.
+
+Disposition: fixing issue551's erroneous routing/rejection does not add model
+support or a registry entry. Before managed Unified support, review the exact
+checkpoint/conversion, retain its terms and NOTICE, and use a distinct explicit
+`nvidia-open-model-license` acceptance tag. This proposed tag is not an existing
+Unified download entry and is not ordinary NC acceptance.
+
+Sources: [original model](https://huggingface.co/nvidia/parakeet-unified-en-0.6b),
+[converted model terms](https://huggingface.co/handy-computer/parakeet-unified-en-0.6b-gguf/blob/main/LICENSE),
+[NVIDIA agreement](https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/),
+[incorporated terms](https://www.nvidia.com/en-us/agreements/trustworthy-ai/terms/).
+
+### OmniVoice's Boson Higgs Audio 2 tokenizer
+
+The pinned companion terms incorporate Meta Llama3's license and acceptable-use
+policy. Their requirements extend beyond attribution:
+
+- Section 2 requires Boson's expanded permission above 100,000 annual active users
+  in the preceding year. Its wording covers the licensee's/affiliates' products
+  and services, not just users of this tokenizer; small model usage does not
+  establish eligibility for a large organization.
+- Section 1.b.v prohibits using the materials or their outputs/results to improve
+  another LLM, except Higgs Audio2/derivatives. Generated training data can
+  therefore raise a separate issue.
+- Section 1.b.i requires license copies and prominent Boson/Meta attribution for
+  covered distributions/products/services; its model/software naming clause
+  needs review for the particular integration. Sections 1.b.iv and 5.c add the
+  acceptable-use policy and indemnity.
+
+Disposition: keep the existing distinct `omnivoice-terms` gate. It covers review
+of both the NC main weights and companion terms; it does not waive either.
+Do not promote PR521 merely because a user can acknowledge them. Bundle notices,
+eligibility and the applicable naming obligations remain separate, alongside the
+unchanged speech-quality acceptance gate. Any broader support or naming
+uncertainty needs clarification from the licensor before promotion.
+
+Sources: [exact bundled Boson terms](https://huggingface.co/k2-fsa/OmniVoice/blob/c5fdb5ccb189668d56333f77ba2629f4cd7535f4/audio_tokenizer/LICENSE),
+[incorporated Llama3 agreement](https://www.llama.com/llama3/license/),
+[incorporated use policy](https://www.llama.com/llama3/use-policy/).

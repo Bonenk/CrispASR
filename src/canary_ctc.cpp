@@ -10,6 +10,7 @@
 // sanity checking.
 
 #include "canary_ctc.h"
+#include "core/parakeet_gguf.h"
 #include "core/crispasr_env.h"
 
 #ifndef M_PI
@@ -510,6 +511,11 @@ static bool cc_load_model(cc_model& model, canary_ctc_vocab& vocab, const char* 
         gguf_context* gctx = core_gguf::open_metadata(path);
         if (!gctx)
             return false;
+
+        if (core_parakeet_gguf::reject_external(gctx, path)) {
+            core_gguf::free_metadata(gctx);
+            return false;
+        }
 
         auto& hp = model.hparams;
         hp.sample_rate = core_gguf::kv_u32(gctx, "canary_ctc.sample_rate", hp.sample_rate);

@@ -5837,6 +5837,21 @@ catch_discover_tests(test-arch-backend-map
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── #551: real GGUF schema routing and C ABI/CLI rejection (no weights)
+add_executable(test-parakeet-gguf test-parakeet-gguf.cpp)
+target_include_directories(test-parakeet-gguf PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-parakeet-gguf PRIVATE Catch2::Catch2WithMain crispasr-lib)
+catch_discover_tests(test-parakeet-gguf
+    TEST_SPEC "[parakeet-schema]"
+    PROPERTIES LABELS "unit;parakeet"
+)
+if(Python3_Interpreter_FOUND AND TARGET crispasr-cli)
+    add_test(NAME parakeet-schema-cli COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_parakeet_schema_cli.py
+        --cli $<TARGET_FILE:crispasr-cli> --audio ${PROJECT_SOURCE_DIR}/samples/jfk.wav)
+    set_tests_properties(parakeet-schema-cli PROPERTIES LABELS "unit;parakeet" TIMEOUT 120)
+endif()
+
 # ─── test-btc-vocab — chord vocabulary + positional encoding (hermetic, unit)
 add_executable(test-btc-vocab test-btc-vocab.cpp)
 target_include_directories(test-btc-vocab PRIVATE ${PROJECT_SOURCE_DIR}/src)

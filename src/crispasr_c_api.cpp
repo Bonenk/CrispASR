@@ -15,6 +15,7 @@
 #include "crispasr_session.h"
 #include "core/win_compat.h"
 #include "core/arch_backend_map.h" // #335: general.architecture → backend table, SHARED with the CLI
+#include "core/parakeet_gguf.h"
 #include "core/bpe.h"
 #include "core/utf8.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
@@ -1656,7 +1657,13 @@ CA_EXPORT int crispasr_detect_backends_from_gguf(const char* path, char* out, in
         gguf_free(gctx);
         return -4;
     }
-    const std::vector<std::string> names = core_arch::backends_for_arch(arch);
+    if (core_parakeet_gguf::reject_external(gctx, path)) {
+        gguf_free(gctx);
+        return 0;
+    }
+    std::vector<std::string> names = core_arch::backends_for_arch(arch);
+    if (!names.empty() && names.front() == "parakeet" && core_parakeet_gguf::compatible_ctc(gctx))
+        names = {"fastconformer-ctc"};
     gguf_free(gctx);
 
     std::string joined;
@@ -1701,6 +1708,12 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
     // writes) while this copy only knew the hyphen spelling, so the CLI opened
     // the model via its filename pass and every binding got a NULL session.
     const char* backend = core_arch::backend_for_arch(arch);
+    if (core_parakeet_gguf::reject_external(gctx, path)) {
+        gguf_free(gctx);
+        return 0;
+    }
+    if (std::strcmp(backend, "parakeet") == 0 && core_parakeet_gguf::compatible_ctc(gctx))
+        backend = "fastconformer-ctc";
 
     std::strncpy(out_name, backend, out_cap - 1);
     out_name[out_cap - 1] = '\0';
@@ -2785,6 +2798,12 @@ static void filter_words_by_ngram_collapse(std::vector<crispasr_session_seg::wor
 CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_path, const char* backend_name,
                                                            int n_threads) {
     if (!model_path || !backend_name)
+        return nullptr;
+
+    if ((std::strcmp(backend_name, "parakeet") == 0 || std::strcmp(backend_name, "phonon2") == 0 ||
+         std::strcmp(backend_name, "reazonspeech") == 0 || std::strcmp(backend_name, "fastconformer-ctc") == 0 ||
+         std::strcmp(backend_name, "canary-ctc") == 0) &&
+        core_parakeet_gguf::reject_external_file(model_path))
         return nullptr;
 
     ensure_dynamic_backends_loaded();
