@@ -661,6 +661,13 @@
         "sha256": "ae55da53a237d7c771a30031d8fc19fce0fea2e8e3dfc27a2fe4c806fc1f5d8b"
       }
     },
-    "current_runtime_not_certified": "This run precedes the cache reduction and default-off correction. Current runtime source 5acff9f21 has its own pending campaign 39860613583."
+    "current_runtime_not_certified": "This run precedes the cache reduction and default-off correction. Runtime source 5acff9f21 and full-code-capture harness f87af58aa have pending campaign 39861560201."
+  },
+  "pending_full_campaign": {
+    "run_id": 39861560201,
+    "harness_source": "f87af58aab41ed970f69a161614eb7cd3354a36f",
+    "runtime_source": "5acff9f217220cdbecb268e7a453baed8cc29e5a",
+    "status_at_checkpoint": "queued",
+    "superseded_run_id": 39860613583
   }
 }

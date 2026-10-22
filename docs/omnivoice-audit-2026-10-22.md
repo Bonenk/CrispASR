@@ -161,8 +161,10 @@ Artifact `12459969252` was downloaded and checked, ZIP SHA256
 The live receipt retains its transcripts and component results. It predates the
 cache/default corrections and does not certify current runtime source `5acff9f21`.
 The current-source full campaign is
-[run 39860613583](https://github.com/CrispStrobe/CrispASR/actions/runs/39860613583),
-queued at this checkpoint. CI/lint for the latest main tip remain pending.
+[run 39861560201](https://github.com/CrispStrobe/CrispASR/actions/runs/39861560201),
+queued at harness source `f87af58aa` (runtime code `5acff9f21`). The earlier
+queued39860613583 was cancelled after adding per-surface code capture.
+CI/lint for the latest main tip remain pending.
 
 The current harness retains generated code arrays and hashes for every CLI/
 session arm, including separate marked outputs. Marking-only comparisons must
