@@ -16,8 +16,37 @@
 
 #include <chrono>
 #include <filesystem>
+#include <ostream>
 #include <string>
 #include <system_error>
+
+#if defined(__SIZEOF_INT128__)
+// MSYS2/clang64's libc++ uses a 128-bit rep for std::filesystem::
+// file_time_type, and no standard library provides
+// operator<<(std::ostream&, __int128) — so streaming one (e.g. a Catch2
+// assertion that compares two file_time_types) is ambiguous across every
+// integer overload. Provide the missing overload; guarded so MSVC (which
+// has no __int128) is unaffected.
+inline std::ostream& operator<<(std::ostream& os, __int128 value) {
+    // Convert before negation: signed minimum has no positive signed value.
+    unsigned __int128 mag = static_cast<unsigned __int128>(value);
+    if (value < 0)
+        mag = 0 - mag;
+    char buffer[64];
+    char* d = buffer + sizeof(buffer);
+    do {
+        --d;
+        *d = "0123456789"[mag % 10];
+        mag /= 10;
+    } while (mag != 0);
+    if (value < 0) {
+        --d;
+        *d = '-';
+    }
+    os.write(d, static_cast<std::streamsize>(buffer + sizeof(buffer) - d));
+    return os;
+}
+#endif
 
 namespace core_tts_voice {
 

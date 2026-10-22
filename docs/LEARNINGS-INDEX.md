@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (330 lessons)
+## Index by topic (331 lessons)
 
 **Security & untrusted input** (2)
 
@@ -95,7 +95,7 @@ cross-reference when you already know which model you are touching.
 - L19181 — Fused ggml_flash_attn_ext accumulates KQ in F16 and set_prec is silently ignored on P100/sm_60 — a repo-wide latent class, but fix by SENSITIVITY not by count
 - L19218 — The session ABI re-implements every backend — a rate the CLI resamples is a constant there, and a runtime probe turns a 2-hour check into 4 seconds
 
-**Parity, the diff harness & ground truth** (45)
+**Parity, the diff harness & ground truth** (46)
 
 - L20 — Dia: teacher forcing, real feedback and complete speech catch different bugs
 - L56 — Nemotron: CPU window parity does not establish CUDA window parity (2026-10-02, #487)
@@ -142,6 +142,7 @@ cross-reference when you already know which model you are touching.
 - L18608 — Chatterbox Multilingual V3: checkpoint names, quant hashes, and a non-silent clone are not parity
 - L18957 — Device-side argmax can cost more than the readback it removes, and an unused graph output still runs
 - L19398 — 314. Index-Echo 9B: preload functional child weights before trusting offloaded cache references
+- L19644 — 2026-10-22 — A voice-clone gate grades the REFERENCE as much as the port: vet the reference audio against its transcript first
 
 **ggml graphs, allocation & caching** (51)
 

@@ -213,6 +213,9 @@ jobs:
       - name: Omnivoice output allocation guards (literal bodies)
         run: python3 tests/test_omnivoice_alloc.py -v
 
+      - name: Signed128 portability formatter UBSan regression
+        run: python3 tests/test_tts_voice_int128.py -v
+
       - name: TTS session failure, ownership and conversion contracts
         run: |
           python3 tests/test_tts_session_contracts.py -v

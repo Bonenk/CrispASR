@@ -182,6 +182,25 @@ paths/account recovery are in ignored maintainer notes. All five privacy checks
 passed before the implementation pushes. Two worker contracts, embedded-phase
 compilation and streaming hash verification pass locally.
 
+## PR521 integration preparation — 2026-10-19
+
+Updated the review branch with current main while preserving contributor and
+merge history. Resolved the Python helper conflict with main's tested native
+pointer/fallback matrix; retained main's newer ggml pin, preserving both CANN
+fixes. No full-runtime merge or speech/default promotion is implied.
+
+The branch's portability formatter negated signed128 minimum in signed
+arithmetic. A literal-header UBSan probe reproduced the overflow before the
+fix. Unsigned magnitude conversion now passes0,1,-1 and both signed extrema;
+the regression is wired into ordinary CI. The actual native output-function
+allocator/OOM extraction and Python helper routing checks also pass.
+Corrected 2026-10-22: that clone failure was the reference clip, not the port.
+Pinned `fox.wav` says "fex/dig" under both an RNNT and a CTC judge and every
+clone arm inherited those two words, while the no-reference control was right.
+The acceptance harness now vets reference audio against its transcript before
+synthesizing and clones cross-sentence on a vetted reference; seven arms pass
+the unchanged0.2 gate, maximum0.111. Receipt:
+docs/omnivoice-clone-reference-integrity-2026-10-22.json.
 ## 2026-10-19 — OpenVoice checkpoint-free encoder arithmetic proof
 
 The original pinned ReferenceEncoder class and unchanged native CPU encoder

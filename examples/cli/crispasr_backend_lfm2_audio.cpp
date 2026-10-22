@@ -11,6 +11,7 @@
 #include "lfm2_audio.h"
 
 #include <cstdio>
+#include <cstdlib> // [libc++ 23.1.3] free is no longer pulled in transitively
 #include <cstring>
 #include <string>
 #include <vector>

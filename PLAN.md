@@ -801,6 +801,13 @@ commands: [CANN TODO](docs/cann-todo.md) and
 
 ## Remaining PRs — scoped salvage and acceptance
 
+PR521 review branch now incorporates current main without rewriting contributor
+history. Python helper conflict is resolved with main's tested matrix; ggml
+retains main's newer CANN fixes. The signed128-minimum formatter overflow is
+fixed after an observed UBSan failure, with a permanent CI regression. Inspect
+fresh branch checks; unchanged original/native clone speech failures still
+prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
+
 - **PR492 / MiMo:** author KokerZhou closed the PR unmerged on2026-10-15;
   it is no longer an open merge candidate. Independent opt-in mel/cached-decode pieces are merged.
   Dynamic Q8 activation amplification is measured; the existing F32 cache-read
@@ -824,7 +831,7 @@ commands: [CANN TODO](docs/cann-todo.md) and
   See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
   work is runtime/input/precision/quality diagnosis, not another proof search.
 - **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
-  the fixed clone gate fails2/9 WER in both original Python and native output.
+  the2/9 clone WER was the reference clip, not the gate or the port (see below).
   The standalone utilities are integrated with complete original/native array
   replay and hosted checks; see HISTORY.md. The PR is ready-for-review; updated headab6c92cae incorporates main35df8d6d4
   while preserving contributor history. The helper-test conflict is resolved;
@@ -835,6 +842,16 @@ commands: [CANN TODO](docs/cann-todo.md) and
   `<cstdlib>` in the deprecated executable (now fixed on main);
   CUDA11.8 setup hit Chocolatey504 before compilation. Fresh head checks are
   queued; inspect them rather than rerunning stale-source jobs.
+  Cloning quality root-caused 2026-10-22: the pinned `fox.wav` does not say its
+  transcript ("fex/fixed … dig" under both the Nemotron RNNT and the Parakeet
+  CTC judge, 0.222 each), every clone arm inherited exactly those two words,
+  and the no-reference control says "fox/dog". The acceptance harness now
+  transcribes every fixture with both architectures before synthesizing,
+  refuses a reference no engine can read back, and scores clones cross-sentence
+  on `window` (0.000 both). Seven gated arms, max 0.111 against the unchanged
+  0.2 gate. Receipt
+  `docs/omnivoice-clone-reference-integrity-2026-10-22.json`, method in
+  `docs/omnivoice-audio-processing.md`.
   Full diff/runtime review, original utility proof and unchanged cloning-quality
   gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
   contributor history.

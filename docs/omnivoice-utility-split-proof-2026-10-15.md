@@ -15,6 +15,15 @@ fail the unchanged 20% WER gate at 2/9 words. Upstream issue256 attributes the
 reported onset to an abruptly truncated reference; utility parity does not
 prove that the onset or cloned speech has been repaired.
 
+Corrected2026-10-22: the2/9 was the reference clip itself. `fox.wav` says
+"fex/dig" under both an RNNT and a CTC recognizer, and every clone arm inherited
+those two words; the no-reference control says "fox/dog". The speech gate now
+transcribes each fixture before cloning and scores clones cross-sentence on a
+vetted reference, where seven arms pass the unchanged0.2 gate at maximum0.111.
+See [reference integrity](omnivoice-clone-reference-integrity-2026-10-22.json).
+Utility parity alone still does not prove a speech repair, and no gate was
+relaxed.
+
 ## Complete local original/native replay
 
 On isolated Python 3.12, NumPy 1.26.4 and pydub 0.25.1, the inherited oracle

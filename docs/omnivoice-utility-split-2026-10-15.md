@@ -13,6 +13,16 @@ words in both original and native controls. Upstream issue256 attributes the
 reported onset to an abruptly cut reference; fades attenuate a transient but
 do not prove a reference or speech repair.
 
+Corrected2026-10-22: the2/9 was the reference clip, not the gate or the port.
+Pinned `fox.wav` says "fex/dig" under both the Nemotron RNNT and the Parakeet
+CTC judge and every clone arm inherited those two words, while the no-reference
+control was correct. The speech gate now vets reference audio against its
+transcript before synthesizing and clones cross-sentence on a vetted reference;
+seven arms pass the unchanged0.2 gate, maximum0.111. See [reference
+integrity](omnivoice-clone-reference-integrity-2026-10-22.json) and the [audio
+processing method](omnivoice-audio-processing.md). Do not reuse `fox.wav` as a
+cloning reference.
+
 The oracle executes original functions at upstream
 `08be0b4ccbac3e13e374e86fbfead4b4cac343e2`, with complete source SHA256 checks.
 It compares738 waveform calls and18 multilingual text cases. PCM16 silence
