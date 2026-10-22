@@ -162,7 +162,7 @@
     "no change to the OmniVoice codec/license hold and no merge",
     "no threshold relaxation, no seed selection, no fixture-outcome selection",
     "fox.wav stays unusable as a cloning gate reference; it is kept as the known-bad control",
-    "station.wav is readable audio but not a gate reference: the CTC split (\"to morrow\") and the clone's faster rate make a short WER judge unstable",
+    "station.wav is readable audio but not a gate reference: parakeet splits \"tomorrow\" (\"to morrow\", 0.222) and the clone reads back as \"lazy lady\" under nemotron, which a 9-word WER judge cannot separate from a port defect",
     "a frozen upstream-vs-native cloning comparison on fox.wav is moot until it uses a vetted reference; none is claimed here"
   ]
 }

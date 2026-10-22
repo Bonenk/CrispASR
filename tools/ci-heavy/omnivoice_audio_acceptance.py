@@ -120,9 +120,11 @@ with ExitStack() as stack:
 
 # A valid reference is one that at least one independent recognizer can read
 # back. ``fox`` fails both (2/9 each) and is retained only as the known-bad
-# control. ``station`` is readable but its fast rate makes the cloned output
-# merge "lazy dog" for the RNNT judge, so it is evidence, not a gate reference.
+# control. ``station`` is readable but its clone says "lazy lady" to the RNNT
+# judge (measured 2026-10-22), so it is evidence, not a gate reference.
 CLONE_REFS = ('window',)
+vetted = tuple(name for name in fixtures if integrity[name]['min_wer'] <= WER_GATE)
+assert set(CLONE_REFS) <= set(vetted), (CLONE_REFS, vetted)
 for name in CLONE_REFS:
     assert integrity[name]['min_wer'] <= WER_GATE, (
         f'{name}.wav does not say its transcript ({integrity[name]["engines"]}); '
