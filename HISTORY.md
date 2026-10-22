@@ -1,3 +1,13 @@
+## 2026-10-22 — OmniVoice audit correction
+
+The PR521 merge remains recorded below, but its broad cloning acceptance claim
+is superseded: the campaign excluded `station` based on a failed clone despite
+that reference passing its stated integrity rule. The harness now tests every
+eligible reference at the same threshold. Seven passing `window` arms and the
+independent DSP oracle remain scoped evidence; neither proves general cloning
+quality or the cause of `fox` substitutions. See
+`docs/omnivoice-audit-2026-10-22.md` for runtime findings and verification.
+
 ## 2026-10-22 — PR521 merged: upstream OmniVoice audio utilities, with a vetted cloning reference
 
 Merged `0cd80cba2` (PR #521, contributor history preserved). Reference

@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """Pinned utility oracle, real CLI/session synthesis, and TTS->ASR acceptance.
 
-The cloning gate refuses to run on a reference whose own audio does not say its
-transcript. A voice clone reproduces the reference's pronunciation, so an
-unvetted reference silently moves the acceptance target: the pinned ``fox``
-fixture renders "fox/dog" as "fex/dig" (four independent ASR architectures,
-2026-10-22), and every clone arm inherited exactly those two errors. Cloning is
-also scored cross-sentence, so a reference can never be graded by copying its
-own text back.
+References must pass their own transcript with at least one of the two pinned
+ASR judges. Every eligible reference is scored on both cross-sentence targets;
+clone outcomes must never determine reference eligibility. ASR disagreement is
+evidence about this benchmark, not proof of what a speaker actually pronounced.
 """
 import hashlib
 import json
@@ -96,8 +93,8 @@ sys.path.insert(0,str(ROOT/'python'))
 from crispasr import Session
 lib = next(p for p in build.rglob('libcrispasr.*') if p.suffix in ('.so', '.dylib'))
 
-# --- reference integrity gate: the clone's pronunciation target is the audio,
-# not the fixture's transcript. Verify the audio before it becomes a prompt.
+# --- reference integrity gate: check ASR readability before any synthesis.
+# This evaluates benchmark suitability, without assigning error causality.
 asr_paths = {}
 for engine, (repo, name, rev) in ASR_MODELS.items():
     asr_paths[engine] = hf_hub_download(repo, name, revision=rev, local_dir=TEMP/'asr'/engine)
@@ -118,17 +115,11 @@ with ExitStack() as stack:
         print('reference', name, row['min_wer'], row['engines'], flush=True)
 (OUT/'reference-integrity.json').write_text(json.dumps(integrity, indent=2) + '\n')
 
-# A valid reference is one that at least one independent recognizer can read
-# back. ``fox`` fails both (2/9 each) and is retained only as the known-bad
-# control. ``station`` is readable but its clone says "lazy lady" to the RNNT
-# judge (measured 2026-10-22), so it is evidence, not a gate reference.
-CLONE_REFS = ('window',)
-vetted = tuple(name for name in fixtures if integrity[name]['min_wer'] <= WER_GATE)
-assert set(CLONE_REFS) <= set(vetted), (CLONE_REFS, vetted)
-for name in CLONE_REFS:
-    assert integrity[name]['min_wer'] <= WER_GATE, (
-        f'{name}.wav does not say its transcript ({integrity[name]["engines"]}); '
-        'it cannot be a cloning acceptance reference')
+# Apply the declared integrity rule before observing any clone output.
+# Every eligible reference participates; a failed synthesis is a failed gate,
+# never a reason to remove that reference from this campaign.
+CLONE_REFS = tuple(name for name in fixtures if integrity[name]['min_wer'] <= WER_GATE)
+assert CLONE_REFS, 'No reference passes the integrity gate'
 assert all(fixtures[name]['text'].rstrip('.') != target.rstrip('.')
            for name in CLONE_REFS for target in (TEXT, TEXT2)), 'clone target repeats the reference text'
 os.environ['CRISPASR_OMNIVOICE_AUDIO_LEGACY'] = '0'
@@ -174,8 +165,8 @@ error = float(np.max(np.abs(expected-outputs['session-full'])))
 assert error <= 2e-6, error
 assert not np.array_equal(outputs['session-marked'],outputs['session-full']), 'Default watermark not exercised'
 
-# Cloning runs through both real user surfaces, cross-sentence, on both vetted
-# references and both targets. The marked arm keeps the default watermark path.
+# Cloning runs through both real user surfaces, cross-sentence, on every vetted
+# reference and both targets. The marked arm keeps the default watermark path.
 os.environ.pop('CRISPASR_OMNIVOICE_DUMP_CODES',None)
 for ref_name in CLONE_REFS:
     ref = fixtures[ref_name]
@@ -205,9 +196,11 @@ run([build/'bin/crispasr','--backend','omnivoice','-m',paths['omnivoice-q8_0.ggu
 with wave.open(str(cli_wav)) as wav:
     assert wav.getframerate() == 24000 and wav.getnchannels() == 1 and wav.getsampwidth() == 2
     outputs['cli-clone'] = np.frombuffer(wav.readframes(wav.getnframes()),dtype='<i2').astype(np.float32)/32768
-assert set(outputs) == {
-    'session-raw','session-full','session-marked','session-marked-clone','cli-clone',
-    'session-clone-window-primary','session-clone-window-second'}, sorted(outputs)
+expected_outputs = {'session-raw', 'session-full', 'session-marked',
+                    'session-marked-clone', 'cli-clone'}
+expected_outputs.update(f'session-clone-{ref}-{target}'
+                        for ref in CLONE_REFS for target in ('primary', 'second'))
+assert set(outputs) == expected_outputs, sorted(outputs)
 
 # Every clone arm is scored against its own target; the no-reference arms keep
 # the original control text.
@@ -226,7 +219,7 @@ with Session(asr_paths['nemotron'],lib_path=str(lib),backend='nemotron',n_thread
                               wer=word_wer(gate_targets[label], actual), samples=len(pcm),
                               sha256=hashlib.sha256(pcm.tobytes()).hexdigest())
         (OUT/'roundtrips.json').write_text(json.dumps(results,indent=2)+'\n')
-assert len(results) == 7 and all(case['wer'] <= WER_GATE for case in results.values()), results
+assert set(results) == expected_outputs and all(case['wer'] <= WER_GATE for case in results.values()), results
 receipt = dict(passed=True,model_revision=MODEL_PIN,fixture_revision=FIXTURE_PIN,
     asr_models={engine:dict(repo=repo,name=name,revision=rev)
                 for engine,(repo,name,rev) in ASR_MODELS.items()},

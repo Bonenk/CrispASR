@@ -292,6 +292,12 @@ static inline std::unique_ptr<float[]> permute_convt1d_weight(ggml_tensor* src) 
 //   permute_convt1d_weights_batch(src_list, dst_list, n, backend, &ctx_perm, &buf_perm);
 static inline bool permute_convt1d_weights_batch(ggml_tensor** srcs, ggml_tensor*** dsts, int n, ggml_backend_t backend,
                                                  ggml_context** out_ctx, ggml_backend_buffer_t* out_buf) {
+    // Publish borrowed tensor pointers only after the allocation succeeds.
+    // Otherwise callers' fallback paths would dereference a freed context.
+    for (int i = 0; i < n; i++)
+        if (srcs[i] && srcs[i]->type != GGML_TYPE_F32 && srcs[i]->type != GGML_TYPE_F16)
+            return false;
+    std::vector<ggml_tensor*> pending(n, nullptr);
     const size_t meta_bytes = ggml_tensor_overhead() * (size_t)n + 4096;
     struct ggml_init_params pp = {meta_bytes, nullptr, true};
     ggml_context* ctx = ggml_init(pp);
@@ -306,7 +312,7 @@ static inline bool permute_convt1d_weights_batch(ggml_tensor** srcs, ggml_tensor
         const int IC = (int)srcs[i]->ne[2];
         const int K = (int)srcs[i]->ne[0];
         const int OC = (int)srcs[i]->ne[1];
-        *dsts[i] = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, IC, K * OC);
+        pending[i] = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, IC, K * OC);
     }
     ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(ctx, backend);
     if (!buf) {
@@ -314,8 +320,11 @@ static inline bool permute_convt1d_weights_batch(ggml_tensor** srcs, ggml_tensor
         return false;
     }
     for (int i = 0; i < n; i++) {
-        if (*dsts[i] && bufs[i])
-            ggml_backend_tensor_set(*dsts[i], bufs[i].get(), 0, ggml_nbytes(*dsts[i]));
+        if (pending[i] && bufs[i])
+            ggml_backend_tensor_set(pending[i], bufs[i].get(), 0, ggml_nbytes(pending[i]));
+    }
+    for (int i = 0; i < n; i++) {
+        *dsts[i] = pending[i];
     }
     *out_ctx = ctx;
     *out_buf = buf;

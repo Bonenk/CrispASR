@@ -1,5 +1,13 @@
 # CrispASR — Pending work
 
+## NOW — OmniVoice codec and acceptance audit (2026-10-22)
+
+Owner: Codex, branch `fix/codec-audit-internal`. Audit remote main `22e1b6ada`
+and codec branch `f76d4b190`. Check placement gates, failed/repeated tokenizer
+loads, decomposed-kernel allocation failure, and reference selection independent
+of synthesis outcomes. Keep performance claims scoped to their actual hardware
+and measured boundaries; no broad cloning-quality certification from one reference.
+
 ## NOW — issue551 hosted validation (2026-10-22)
 
 Owner: Codex, branch `fix/issue551-routing`, base `95e454b49`.
@@ -18,7 +26,7 @@ affirm the user's eligibility/compliance obligations; project redistribution
 obligations remain ours. Five corrected model-card/notice documents are published
 and anonymously verified, with no weight changes.
 [Notice receipt](docs/omnivoice-license-notices-2026-10-22.json).
-PR #521 remains subject to its unchanged speech-quality gate.
+PR #521 has merged; the complete corrected cloning gate remains pending.
 
 ## NOW — v0.8.44 publication and wheel compatibility (2026-10-21)
 
@@ -833,13 +841,11 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
 - **Issue518 / PR521 / OmniVoice — MERGED 2026-10-22 (`0cd80cba2`):** audio and
   text utilities match upstream `08be0b4`, behind env gates with
   `CRISPASR_OMNIVOICE_AUDIO_LEGACY=1` restoring the prior pipeline. The2/9 clone
-  WER that blocked integration was the reference clip, not the gate or the port:
-  pinned `fox.wav` says "fex/dig" under both the Nemotron RNNT and the Parakeet
-  CTC judge (0.222 each), every clone arm inherited exactly those two words, and
-  the no-reference control says "fox/dog". The acceptance harness now
-  transcribes every fixture with both architectures before synthesizing, refuses
-  a reference no engine can read back, and scores clones cross-sentence on
-  `window` (0.000 both); seven arms pass the unchanged0.2 gate, maximum0.111.
+  WER campaign reported seven passing `window` arms. Audit subsequently found
+  outcome-based exclusion of eligible `station`; that subset is not complete
+  cloning acceptance. The corrected harness includes all integrity-eligible
+  references, and a fresh full run remains required. ASR agreement on `fox`
+  raises a fixture concern without proving the cause of all cloning errors.
   Merge scope also closed the helper-test conflict, the stale ggml pin, the
   signed128-minimum UBSan overflow and the CLANG64 `<cstdlib>` include. Receipt
   `docs/omnivoice-clone-reference-integrity-2026-10-22.json`, method in

@@ -133,6 +133,14 @@ catch_discover_tests(test-convt-permute
     TEST_SPEC "[unit][core][convt]"
     PROPERTIES LABELS "unit;core")
 
+# Actual tokenizer loader/rebind helpers with tiny synthetic GGUF weights.
+add_executable(test-omnivoice-codec test-omnivoice-codec.cpp)
+target_include_directories(test-omnivoice-codec PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/src)
+target_compile_definitions(test-omnivoice-codec PRIVATE TEST_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+target_link_libraries(test-omnivoice-codec PRIVATE crispasr-core ggml ggml-base crispasr_link_ggml_cpu Threads::Threads)
+add_test(NAME omnivoice-codec-lifecycle COMMAND test-omnivoice-codec)
+set_tests_properties(omnivoice-codec-lifecycle PROPERTIES LABELS "unit;tts;omnivoice")
+
 add_executable(test-step-graph-cache test-step-graph-cache.cpp)
 target_include_directories(test-step-graph-cache PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(test-step-graph-cache PRIVATE Catch2::Catch2WithMain ggml ggml-base)

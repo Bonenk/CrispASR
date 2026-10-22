@@ -778,49 +778,24 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Metal decode is the same f32-no-cast path). GPU codec decode measured slower on M1
   Metal (dispatch-bound) → gated `OMNIVOICE_CODEC_GPU`, default OFF, pending Kaggle CUDA.
   `--tts-steps` now drives omnivoice's stage0 step count (default 32).
-- **omnivoice codec decode: decomposed upsampler (2026-10-22, default ON):** the five
-  ConvTranspose1d stages ran through `ggml_conv_transpose_1d`, which materialises an
-  audio-rate im2col copy. The pre-permuted `[IC, K*OC]` F32 kernel +
-  `mul_mat`/`col2im_1d` form (`core_convt::convt1d_decomp`, already used by
-  voxcpm2/chatterbox) replaces it; `CRISPASR_OMNIVOICE_CODEC_DECOMP=0` restores the
-  crop path. M1 A/B (same text/seed/steps/reference, decode only): 2.8 s audio
-  **685 ms → 472 ms** (−31%); cross-sentence clone, 2.4 s audio, **0.38 s → 0.30 s**
-  (−23%, two pairs each); 18.4 s paragraph 4754 ms → 3.2–4.8 s.
-  Process CPU time (min of 3, load-invariant): 2.8 s clip 7.54 → 6.85 s (−9%),
-  18.4 s paragraph 31.03 → 28.47 s (−8%). Quality: the clone's ASR transcript is
-  **identical on nemotron AND parakeet** (WER 0.111 both arms) and the waveform
-  differs by max 1 int16 LSB on 0.11% of samples (reduction order only).
-  The same rewrite is what makes the Metal codec viable — with the crop path the
-  Metal codec decode was 1759 ms vs 685 ms on CPU (conv_transpose_1d is dispatch-bound
-  on Metal), with the decomposed path Metal decodes 2.8 s of audio in **242 ms**, the
-  fastest of the three. It stays OFF by default anyway: the tokenizer buffer also
-  serves the voice-clone ENCODER and the Metal encoder produces different codes that
-  derail the clone (nemotron WER 1.0 vs 0.333 for the CPU encoder on the same input,
-  same 65 ref frames). `CRISPASR_OMNIVOICE_ENCODE_DIFF` pins it to the DAC
-  acoustic-encoder stage (cos_min 0.9959, max_abs 0.285 on Metal vs 1.000000 on CPU;
-  semantic and fc stages pass) and it is NOT weight precision — baking F32 copies of
-  all 74 encoder conv kernels changes the diff bit-for-bit *not at all*, because
-  F16→F32 widening is lossless. The per-block bisect lands on the first **strided**
-  stage (`ac_block0`, `ggml_conv_1d` stride 8): same archive both backends give
-  1.000000/4.47e-04 on the stride-1 `ac_conv1`, then 0.999092 (CPU) vs 0.997416
-  (Metal) at `ac_block0`, compounding from there. `CRISPASR_OMNIVOICE_CODEC_GPU=1`
-  opts in for reference-free TTS.
-  Two alternative paths were built and measured: the `ac_block0` reading suggested
-  "stride > 1 is the bad Metal path", so every strided conv was rewritten as an
-  exactly-equivalent full-rate stride-1 conv + decimation — and `e_acoustic` came
-  out **bit-identical** on Metal (same 0.995934 / 2.846e-01), which disproves that
-  reading; the variant was dropped (s× the FLOPs for nothing) and the remaining
-  suspects are the d=3/d=9 dilated convs and snake.
-  `CRISPASR_OMNIVOICE_CODEC_SPLIT=1` does work: encode on the CPU (`ENCODE_DIFF`
-  passes), re-host the tokenizer on the GPU on demand for the decode —
-  `decode_compute` **2.25×** faster (2.65 s vs 5.96 s, 18.4 s paragraph), identical
-  transcripts (nemotron WER 0.022 both), PCM within 34/32768. But the rebind
-  re-reads the 403 MB tokenizer (~10 s on this external volume), so a one-shot CLI
-  is a net loss and it breaks even around 3-4 decodes per process. Default OFF; a
-  decoder-only (~50 MB) GPU copy is what would make it a win. See LEARNINGS 41.
-  `CRISPASR_OMNIVOICE_BENCH=1` also splits the codec bucket: `decode_graph_build`
-  0.31 ms, `decode_gallocr` 0.26 ms, `decode_readback` 2.4 ms — graph caching is not
-  worth it; `decode_compute` is the whole cost.
+- **omnivoice codec decode: experimental upsampler and split placement (2026-10-22):**
+  `CRISPASR_OMNIVOICE_CODEC_DECOMP=0/1` selects crop/decomposed ConvTranspose1d.
+  The decomposed path defaults on CPU only; GPU defaults retain crop pending
+  backend-specific validation. The feature-branch report measured M1 CPU decode
+  at 685→472 ms for 2.8 s and 0.38→0.30 s for a short clone, with <=1 int16 LSB
+  PCM differences and matching ASR transcripts. These are reported scoped
+  measurements, not a cross-platform speed guarantee.
+  CUDA retains its pre-existing GPU-codec placement default; Metal stays opt-in
+  via `CRISPASR_OMNIVOICE_CODEC_GPU=1` because its encoder parity is unresolved.
+  `CRISPASR_OMNIVOICE_CODEC_SPLIT=1` requests CPU encode / GPU decode, default off.
+  The branch reported 5.96→2.65 s decode compute on an 18.4 s output, but total
+  decode was 5.98→13.05 s cold and 8.28→4.44 s warm. Each placement change reads
+  the whole 403 MB tokenizer again, so repeated voice changes pay repeatedly;
+  a fixed 3–4-call break-even does not follow from those two observations.
+  Include model load, rebinding, allocation and readback in end-to-end comparisons.
+  Six matching printed digits do not demonstrate bit-identical arrays, and the
+  exploratory encoder bisect has not isolated a faulty kernel. See
+  `docs/omnivoice-audit-2026-10-22.md`.
 - **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
   the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
   (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to

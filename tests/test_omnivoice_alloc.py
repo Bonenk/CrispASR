@@ -50,7 +50,7 @@ struct ov_bench_stage{
     ~ov_bench_stage(){}
 };
 struct ov_hp{ uint32_t n_codebooks=8; };
-struct ov_higgs_tokenizer{ bool loaded=false; };
+struct ov_higgs_tokenizer{ bool loaded=false; std::string path; };
 struct omnivoice_context{
     ov_hp hp;
     ov_higgs_tokenizer tokenizer;
@@ -67,6 +67,9 @@ struct omnivoice_context{
     float pad_duration=0.f;
     float fade_duration=0.f;
 };
+static bool codec_split_enabled(){ return false; }
+static bool codec_decode_on_gpu(const omnivoice_context*){ return false; }
+static bool tok_rebind(omnivoice_context*, bool){ return true; }
 struct ov_gen_result{ std::vector<int32_t> codes; int T=0; int n_codebooks=0; };
 static std::vector<int32_t> STUB_CODES = {1,2,3,4,5,6,7,8,  10,20,30,40,50,60,70,80};
 static std::vector<float>   STUB_PCM   = []{

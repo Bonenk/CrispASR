@@ -19,61 +19,26 @@ Regenerate both with `python tools/gen-learnings-index.py` after adding a sectio
 
 ## The OmniVoice tokenizer buffer serves BOTH the decoder and the voice-clone ENCODER — so moving the codec to another backend changes the clone, not just the decode (2026-10-22)
 
-`load_tokenizer()` puts every HiggsAudioV2 tensor in ONE buffer on ONE backend
-(`tok.backend`), and both `higgs_decode()` and `higgs_encode()` build their ggml
-graphs on it. The Metal codec looked like a free 2× on decode — with the upsampler
-rewritten as `mul_mat` + `col2im_1d` over a pre-permuted `[IC, K*OC]` F32 kernel
-(the form voxcpm2/chatterbox already use) the M1 decode drops from 685 ms (CPU +
-crop) to 242 ms (Metal + decomp) for 2.8 s of audio — but with the codec on Metal a
-fresh voice-clone ENCODE produces DIFFERENT codes than the CPU encode (same 65 ref
-frames, so it is arithmetic, not a layout bug) and the clone derails: nemotron WER
-1.0 ("Solchens, the quick brown of soap dope…") where the CPU encoder gives 0.333
-on the same input. A/B a backend move on the WHOLE pipeline (clone + decode),
-never on the decode alone: the decode is the cheap half, the encoder is where the
-clone lives. `CRISPASR_OMNIVOICE_ENCODE_DIFF=<ref.gguf>` localizes it in one run:
-on Metal `acoustic_enc` is cos_min 0.995934 / max_abs 2.846e-01 (FAIL) while
-`encoder_semantic` (0.999999) and `concat+fc` (1.000000) PASS, so it is the DAC
-acoustic-encoder graph, not the HuBERT branch. **It is NOT weight precision**:
-baking F32 copies of all 74 encoder conv kernels (`FASTCONV`) changes the diff
-numbers bit-for-bit *not at all*, because F16→F32 widening is lossless — the
-cached F32 kernel holds exactly the values the F16 one dequantises to. The bug is
-in a Metal kernel the encoder graph uses, and
-`CRISPASR_OMNIVOICE_ACENC_BISECT=<archive>` localizes it to the first **strided**
-stage. Dumping the per-block tensors from the HF `audio_tokenizer` (hooks on
-`acoustic_encoder.{conv1, block[b].snake1, block[b], snake1}`; the archive must be
-dumped from the ref.gguf's own `input_wav24k`, not from a different WAV — shapes
-else are off by the clip-length ratio and every stage reports SHAPE) gives, with
-only `CODEC_GPU` changing:
+The tokenizer stores encoder and decoder weights in a single backend buffer.
+A decode-only timing does not certify moving the voice-cloning encoder. The
+feature-branch M1 measurements report faster decomposed Metal decode but a
+failing Metal acoustic-encoder comparison (cosine 0.995934, max abs 0.285).
+CPU encode / GPU decode therefore remains an explicit experiment. Rebinding
+reloads the entire 403 MB file on every placement change; include that cost,
+not just graph compute, when deciding whether a split helps a real workload.
 
-  ac_conv1     1.000000 / 4.469e-04  BOTH   (stride-1 conv: fine on Metal)
-  ac_b0_snake  0.999813 CPU  / 0.999361 Metal
-  ac_block0    0.999092 CPU  / 0.997416 Metal   <- first material divergence
-  ... every later stage Metal is worse, ending at e_acoustic 0.995934 FAIL
+The exploratory per-block archive also diverged from CPU intermediates, so it
+cannot identify the first faulty Metal operation. A stride-1-plus-decimation
+variant produced the same printed top-stage metrics; that weakens the stride
+hypothesis, but six printed digits are not byte equality and do not isolate
+snake or dilation. F16→F32 widening preserves weights but may select a different
+compute kernel. Validate captures, norms and arrays before assigning causality.
 
-`ac_block0` is the first `enc_conv1d_strided` (`ggml_conv_1d`, stride 8, kernel
-16), which makes "stride > 1 is the bad Metal path" the obvious reading — and that
-reading is **WRONG**: replacing every strided conv with an exactly-equivalent
-full-rate stride-1 conv followed by decimation (`y[t] = z[t*s]`, same weights, same
-padding) leaves `e_acoustic` **bit-for-bit identical** on Metal — same 0.995934 /
-2.846e-01 to six digits. So the strided form is not the culprit; the divergence is
-elsewhere in that graph, and the remaining suspects are the **dilated** convs
-(d=3, d=9 — `ac_conv1` is d=1 and exact) and the **snake** activation. (The
-intermediate bisect numbers also drift on the CPU against a hand-dumped archive
-while the CPU top stage converges to 1.000000, so treat per-stage intermediate
-cos as advisory and the top-stage CPU/Metal pair as the measurement.)
-Two ways to take the fast DECODE without trusting the Metal encoder:
-`CRISPASR_OMNIVOICE_CODEC_SPLIT=1` encodes on the CPU (diff passes) and re-hosts
-the tokenizer on the GPU for the decode — measured decode_compute 2.25× faster
-(2.65 s vs 5.96 s on an 18.4 s paragraph) with identical transcripts
-(nemotron WER 0.022 both), but the rebind re-reads the 403 MB tokenizer and cost
-~10 s on an external volume, i.e. a net loss for one call and break-even around
-3-4. The fix that makes it a win is copying only the DECODER weights (~50 MB) to
-the GPU instead of re-hosting everything, which needs twin tensor pointers in the
-decode path. The same trap made the decode slow in the first place —
-`ggml_conv_transpose_1d` is dispatch-bound on Metal, so the Metal codec was
-1759 ms vs 685 ms on CPU until the upsampler was decomposed. With the decomposed
-path the Metal DECODE is the fastest of all (242 ms), but it stays opt-in until the
-encoder's F16 conv kernels are re-baked as F32 the way the decoder's were.
+An audit found the experimental split code forcing CPU encode even with its
+switch off. Placement changes must be gated at the call site, and reference
+caches must distinguish encoder backend policy. Failed reloads must clear all
+borrowed tensor pointers; optional pre-permutation must publish pointers only
+after allocation succeeds. See `docs/omnivoice-audit-2026-10-22.md`.
 
 ## An A/B on a shared box needs a load check and a min-of-N — one benchmark number is worth nothing (2026-10-22)
 
@@ -19715,39 +19680,21 @@ noncausal CSGU cases. These isolate graph correctness; full checkpoint stage and
 decoded-output validation remains a separate requirement. The fix preserves
 causal behavior and uses only portable ggml graph operations.
 
-## 2026-10-22 — A voice-clone gate grades the REFERENCE as much as the port: vet the reference audio against its transcript first
+## 2026-10-22 — A voice-clone gate must select references before observing clone outcomes
 
-OmniVoice's cloning acceptance failed 2/9 WER in both the original Python and
-the native runtime, which read as a decode/DSP regression. It was neither: the
-pinned reference clip `fox.wav` does not say "The quick brown fox jumps over the
-lazy dog." Four independent architectures (Nemotron RNNT, Parakeet CTC,
-FastConformer CTC, whisper-base) all return "fex/fixed … dig" — its own
-transcript at WER 0.222 — and a clone reproduces the reference's pronunciation,
-so every arm inherited exactly those two words. The no-reference control on the
-same text said "fox/dog". A clone arm cannot be distinguished from a broken
-port by WER alone when the prompt itself is mispronounced.
+Transcribing reference audio against its transcript is useful input validation.
+For OmniVoice, both pinned ASR architectures scored `fox` at 2/9 errors; `window`
+scored zero, and at least one judge accepted `station`. These measurements raise
+a fixture concern, but ASR consensus alone is not a human pronunciation oracle
+or proof that a native defect is absent.
 
-Two habits follow, and both are cheap:
+The initial revised campaign gated only `window`, excluding `station` because
+its clone said "lazy lady". That contradicts its stated reference-only integrity
+rule. Every reference satisfying the chosen rule must enter the cloning gate;
+keep failures visible, and do not select references by generated-output success.
+Score cross-sentence targets to avoid merely copying reference prose.
 
-- **Validate reference audio against its transcript before it becomes a prompt,
-  with more than one architecture.** One recognizer can share a bad prior with
-  the generation control; `min(WER) <= gate` over an RNNT and a CTC judge caught
-  `fox` (0.222 both) while accepting `window` (0.000 both). Keep the rejected
-  clip as the known-bad control instead of deleting it — it is the only evidence
-  that the gate can go red.
-- **Score a clone on a sentence that is not the reference's own text.** Copying
-  the reference's prose back is a transcript test, not a content test, and it
-  hides dropped onsets. Cross-sentence cloning on a vetted reference put every
-  arm at <= 0.111 against the unchanged 0.2 gate (the residual is Nemotron
-  dropping a leading "The"; a second target scores 0.000).
-
-Do not relax the gate, pick a seed, or drop an arm to make a mispronounced
-reference pass — a rejected reference is a fixture bug, not a threshold
-question. Receipt: `docs/omnivoice-clone-reference-integrity-2026-10-22.json`.
-
-Corollary for pins: a commit SHA belongs to one repository. The gate's first
-run 404'd because the revision was pinned from
-`cstr/nemotron-3.5-asr-streaming-GGUF` but requested from
-`cstr/nemotron-3.5-asr-streaming-0.6b-GGUF`; resolve `repo_info(repo,
-revision=...)` for the pair you actually ship, not just the repo name you
-remember.
+The corrected harness includes all eligible references at the unchanged 0.2
+threshold. The seven-arm historical receipt certifies only its selected subset;
+complete cloning acceptance requires a new run. A commit SHA also belongs to one
+repository: verify the exact repo/revision/file tuple before a costly campaign.

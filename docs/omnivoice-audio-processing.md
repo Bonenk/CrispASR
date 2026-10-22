@@ -2,7 +2,8 @@
 
 The native reference and decode funnels now mirror the audio/text utilities at
 [k2-fsa/OmniVoice 08be0b4](https://github.com/k2-fsa/OmniVoice/tree/08be0b4ccbac3e13e374e86fbfead4b4cac343e2).
-This branch is awaiting real CLI/session speech acceptance before integration.
+PR #521 is merged. Its DSP parity is established; broader cloning acceptance
+remains open after the reference-selection audit below.
 
 Reference order: mono/resample to 24 kHz, measure original RMS, normalize quiet
 references to 0.1 RMS, remove silence (200/100/200 ms), reject empty results,
@@ -43,20 +44,26 @@ The independent oracle executes pinned upstream functions with numpy/pydub;
 boundaries, sub-millisecond/short clips, long pauses, fades and multilingual
 punctuation, including a rejected raw-output negative control.
 `tools/ci-heavy/omnivoice_audio_acceptance.py` adds same-code raw/processed
-waveform parity, actual CLI/session cloning and seven unchanged WER <= 0.2
-roundtrip gates, including default marked session output. Utility parity alone is not speech acceptance. Fades can
-attenuate the upstream transient; they do not guarantee removal of every click.
+waveform parity, actual CLI/session cloning and unchanged WER <= 0.2
+roundtrip gates, including default marked session output. Utility parity alone
+is not speech acceptance. Fades can attenuate a transient; they do not guarantee
+removal of every click.
 
-**A cloning reference must first pass its own transcript.** A clone reproduces
-the reference's pronunciation, so an unvetted reference silently moves the
-acceptance target: the pinned `fox` fixture says "fex/dig", not "fox/dog", and
-every clone arm in the #521 investigation inherited exactly those two words
-while the no-reference control was correct. Before any synthesis the harness
-transcribes each fixture with two independent architectures (Nemotron RNNT and
-Parakeet CTC) and requires at least one to read it back at WER <= 0.2.
-`window` (0.000 on both) is the only gated clone reference, `fox` (0.222 on
-both) is kept as the known-bad control, and `station` (0.111/0.222) is evidence
-rather than a gate. Clones are also scored cross-sentence — `window`'s own
-prose is never a clone target — so a reference cannot be graded by copying its
-text back. Receipt:
-`docs/omnivoice-clone-reference-integrity-2026-10-22.json`.
+References are transcribed before synthesis with pinned Nemotron RNNT and
+Parakeet CTC judges. The declared integrity rule accepts a reference if at least
+one judge scores WER <= 0.2. **Every reference satisfying that rule participates
+in both cross-sentence cloning targets.** Clone outcomes cannot exclude an
+otherwise eligible reference. Outputs currently use the pinned Nemotron judge;
+reference vetting by two judges is not output scoring by two judges.
+
+The October 22 campaign tested only `window` and reported seven passing arms.
+It omitted `station` despite that reference passing the integrity rule, explicitly
+because its clone failed. That was outcome-based selection, so that receipt
+cannot certify the complete gate. The corrected harness includes `station` and
+writes per-arm results before failing; a fresh full campaign is required.
+`fox` fails both reference judges and remains a diagnostic control. Agreement
+between ASR models supports a fixture concern, but does not prove a particular
+pronunciation or establish that every native cloning defect is excluded.
+Historical measurements remain in
+`docs/omnivoice-clone-reference-integrity-2026-10-22.json`; audit scope and next
+gates are in `docs/omnivoice-audit-2026-10-22.md`.

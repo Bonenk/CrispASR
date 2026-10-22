@@ -165,5 +165,10 @@
     "station.wav is readable audio but not a gate reference: parakeet splits \"tomorrow\" (\"to morrow\", 0.222) and the clone reads back as \"lazy lady\" under nemotron, which a 9-word WER judge cannot separate from a port defect",
     "a frozen upstream-vs-native cloning comparison on fox.wav is moot until it uses a vetted reference; none is claimed here"
   ],
-  "rerun_reproducibility": "Two full runs (harness sources 8c9898239 and 123298600) produced byte-identical PCM for all seven arms and identical reference transcripts at seed 42."
+  "rerun_reproducibility": "Two full runs (harness sources 8c9898239 and 123298600) produced byte-identical PCM for all seven arms and identical reference transcripts at seed 42.",
+  "audit_correction": {
+    "status": "superseded_subset_only",
+    "reason": "station satisfies min_wer <= 0.2 but was excluded because its clone failed. The seven measured arms retain their historical results; passed=true is not acceptance of all eligible references.",
+    "required": "Run the corrected harness with every eligible reference; do not infer pronunciation causality or full native/upstream parity from ASR agreement."
+  }
 }
