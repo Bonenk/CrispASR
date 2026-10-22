@@ -13,9 +13,10 @@
 #include "crispasr_stream_punc.h"      // streaming punctuation mode helpers (#112)
 #include "crispasr_cache.h"            // crispasr_cache::ensure_cached_file (for --hf-repo, #128)
 #include "core/asr_sensitivity.h"      // --sensitivity presets (PLAN.md §W7)
-#include "core/ggml_cpu_backend.h"     // CPU-backend probe — fail fast when no module loads (#405)
-#include "core/gpu_backend_pref.h"     // crispasr_set_gpu_backend_pref (#214)
-#include "core/win_compat.h"           // setenv/unsetenv shims for MSVC
+#include "core/parakeet_gguf.h"
+#include "core/ggml_cpu_backend.h" // CPU-backend probe — fail fast when no module loads (#405)
+#include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
+#include "core/win_compat.h"       // setenv/unsetenv shims for MSVC
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_model_registry.h"
 #include "crispasr_output.h"   // crispasr_make_disp_segments — split-on-punct (#29)
@@ -2843,6 +2844,11 @@ int main(int argc, char** argv) {
     {
         const bool explicit_backend = !params.backend.empty();
         const bool model_is_auto = is_auto_model_arg(params.model);
+
+        // #551: do not fall through to legacy Whisper or a forced incompatible
+        // loader when a known unsupported GGUF yields an empty detector result.
+        if (!model_is_auto && core_parakeet_gguf::reject_external_file(params.model.c_str()))
+            return 11;
 
         bool auto_detected_non_whisper = false;
         if (!explicit_backend && !model_is_auto) {

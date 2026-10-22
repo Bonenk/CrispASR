@@ -2800,7 +2800,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     if (!model_path || !backend_name)
         return nullptr;
 
-    if (core_parakeet_gguf::family_backend(backend_name) && core_parakeet_gguf::reject_external_file(model_path))
+    if (core_parakeet_gguf::reject_external_file(model_path))
         return nullptr;
 
     ensure_dynamic_backends_loaded();

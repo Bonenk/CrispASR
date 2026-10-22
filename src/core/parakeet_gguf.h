@@ -56,6 +56,16 @@ inline bool reject_external(const gguf_context* ctx, const char* path) {
 inline bool reject_external_file(const char* path, bool report = true) {
     if (!path || !*path)
         return false;
+    // Legacy Whisper and ONNX inputs must not produce GGUF bad-magic errors.
+    FILE* file = std::fopen(path, "rb");
+    if (!file)
+        return false;
+    char magic[4];
+    const bool gguf =
+        std::fread(magic, 1, sizeof(magic), file) == sizeof(magic) && std::memcmp(magic, "GGUF", sizeof(magic)) == 0;
+    std::fclose(file);
+    if (!gguf)
+        return false;
     gguf_init_params params = {true, nullptr};
     gguf_context* ctx = gguf_init_from_file(path, params);
     if (!ctx)

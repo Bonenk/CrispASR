@@ -39,7 +39,7 @@ def main():
             model = root / name
             fixture(model)
             for backend in (None, "parakeet", "fastconformer-ctc", "canary-ctc",
-                            "fastconformer_ctc", "canary_ctc", "quds-fa"):
+                            "fastconformer_ctc", "canary_ctc", "quds-fa", "whisper"):
                 output = root / "transcript"
                 command = [str(cli), "-m", str(model), "-f", str(audio), "--no-gpu",
                            "-l", "en", "-oj", "-of", str(output)]

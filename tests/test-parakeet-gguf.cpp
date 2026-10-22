@@ -98,7 +98,7 @@ TEST_CASE("external Parakeet schema is unsupported regardless of head kind", "[u
     CHECK(std::string(detected).empty());
     CHECK(crispasr_session_open(f.path.string().c_str(), 1) == nullptr);
     for (const char* backend : {"parakeet", "phonon2", "reazonspeech", "fastconformer-ctc", "canary-ctc",
-                                "fastconformer_ctc", "canary_ctc", "quds", "quds-fa"}) {
+                                "fastconformer_ctc", "canary_ctc", "quds", "quds-fa", "whisper"}) {
         INFO(backend);
         CHECK(crispasr_session_open_explicit(f.path.string().c_str(), backend, 1) == nullptr);
     }
