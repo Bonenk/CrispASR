@@ -719,7 +719,7 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
   See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
   work is runtime/input/precision/quality diagnosis, not another proof search.
 - **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
-  the fixed clone gate fails2/9 WER in both original Python and native output.
+  the2/9 clone WER was the reference clip, not the gate or the port (see below).
   The standalone utilities are integrated with complete original/native array
   replay and hosted checks; see HISTORY.md. The PR is ready-for-review; updated headab6c92cae incorporates main35df8d6d4
   while preserving contributor history. The helper-test conflict is resolved;
