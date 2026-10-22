@@ -6,7 +6,7 @@
   "wer_gate": 0.2,
   "model_revision": "92266739c4496b04a497e164cf8c2801a792551e",
   "fixture_revision": "d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3",
-  "source_commit": "8c989823910c2334e63e621d148b987621681af6",
+  "source_commit": "1232986009644f34a0db99220bc5035d760afbb7",
   "asr_models": {
     "nemotron": {
       "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
@@ -164,5 +164,6 @@
     "fox.wav stays unusable as a cloning gate reference; it is kept as the known-bad control",
     "station.wav is readable audio but not a gate reference: parakeet splits \"tomorrow\" (\"to morrow\", 0.222) and the clone reads back as \"lazy lady\" under nemotron, which a 9-word WER judge cannot separate from a port defect",
     "a frozen upstream-vs-native cloning comparison on fox.wav is moot until it uses a vetted reference; none is claimed here"
-  ]
+  ],
+  "rerun_reproducibility": "Two full runs (harness sources 8c9898239 and 123298600) produced byte-identical PCM for all seven arms and identical reference transcripts at seed 42."
 }
