@@ -146,9 +146,10 @@ for legacy in (True,False):
         np.save(OUT/(label+'.npy'),pcm)
         if not legacy:
             s.set_tts_seed(42)
+            os.environ['CRISPASR_OMNIVOICE_DUMP_CODES'] = str(OUT/'session-marked.codes')
             outputs['session-marked'] = np.asarray(s.synthesize(TEXT),dtype=np.float32)
             np.save(OUT/'session-marked.npy',outputs['session-marked'])
-assert (OUT/'session-raw.codes').read_bytes() == (OUT/'session-full.codes').read_bytes(), 'Generation changed in decode-only A/B'
+assert (OUT/'session-raw.codes').read_bytes() == (OUT/'session-full.codes').read_bytes() == (OUT/'session-marked.codes').read_bytes(), 'Generation changed in decode/marking-only A/B'
 # Load actual upstream utility AST functions through the independent module.
 import runpy
 oracle = runpy.run_path(str(ROOT/'tools/ci-heavy/omnivoice_audio_parity.py'))['namespace']
@@ -173,6 +174,7 @@ for ref_name in CLONE_REFS:
     ref_text = ref['text'].rstrip('.')
     for target_name, target in (('primary', TEXT), ('second', TEXT2)):
         label = f'session-clone-{ref_name}-{target_name}'
+        os.environ['CRISPASR_OMNIVOICE_DUMP_CODES'] = str(OUT/(label+'.codes'))
         with Session(paths['omnivoice-q8_0.gguf'],lib_path=str(lib),backend='omnivoice',n_threads=4) as s:
             s.set_codec_path(paths['omnivoice-tokenizer-f16.gguf'])
             s.set_tts_seed(42)
@@ -183,16 +185,20 @@ for ref_name in CLONE_REFS:
             np.save(OUT/(label+'.npy'),outputs[label])
             if ref_name == CLONE_REFS[0] and target_name == 'primary':
                 s.set_tts_seed(42)
+                os.environ['CRISPASR_OMNIVOICE_DUMP_CODES'] = str(OUT/'session-marked-clone.codes')
                 outputs['session-marked-clone'] = np.asarray(s.synthesize(target),dtype=np.float32)
                 np.save(OUT/'session-marked-clone.npy',outputs['session-marked-clone'])
+                assert (OUT/(label+'.codes')).read_bytes() == (OUT/'session-marked-clone.codes').read_bytes(), 'Marking changed clone generation'
 primary = fixtures[CLONE_REFS[0]]
 cli_wav = OUT/'cli-clone.wav'
+os.environ['CRISPASR_OMNIVOICE_DUMP_CODES'] = str(OUT/'cli-clone.codes')
 run([build/'bin/crispasr','--backend','omnivoice','-m',paths['omnivoice-q8_0.gguf'],
      '--codec-model',paths['omnivoice-tokenizer-f16.gguf'],'--no-gpu','-t','4',
      '--seed','42','--tts-steps','32','--i-have-rights','--voice',primary['path'],
      '--ref-text',primary['text'].rstrip('.'),
      '--tts',TEXT,'--tts-output',cli_wav,'--no-watermark','--no-spoken-disclaimer',
      '--accept-marking-responsibility'], 'cli-clone')
+os.environ.pop('CRISPASR_OMNIVOICE_DUMP_CODES', None)
 with wave.open(str(cli_wav)) as wav:
     assert wav.getframerate() == 24000 and wav.getnchannels() == 1 and wav.getsampwidth() == 2
     outputs['cli-clone'] = np.frombuffer(wav.readframes(wav.getnframes()),dtype='<i2').astype(np.float32)/32768
@@ -201,6 +207,14 @@ expected_outputs = {'session-raw', 'session-full', 'session-marked',
 expected_outputs.update(f'session-clone-{ref}-{target}'
                         for ref in CLONE_REFS for target in ('primary', 'second'))
 assert set(outputs) == expected_outputs, sorted(outputs)
+# Keep generated codes for every surface so platform failures can distinguish
+# generation drift from decoder/DSP or ASR-judge differences.
+code_arrays = {}
+for label in sorted(expected_outputs):
+    payload = (OUT/(label+'.codes')).read_bytes()
+    assert payload and len(payload) % (8 * 4) == 0, label
+    code_arrays[label] = dict(file=label+'.codes', bytes=len(payload),
+                              sha256=hashlib.sha256(payload).hexdigest())
 
 # Every clone arm is scored against its own target; the no-reference arms keep
 # the original control text.
@@ -224,7 +238,7 @@ receipt = dict(passed=passed,model_revision=MODEL_PIN,fixture_revision=FIXTURE_P
     asr_models={engine:dict(repo=repo,name=name,revision=rev)
                 for engine,(repo,name,rev) in ASR_MODELS.items()},
     wer_gate=WER_GATE,clone_references=list(CLONE_REFS),reference_integrity=integrity,
-    roundtrips=results,decode_waveform_max_abs=error,decode_codes_exact=True,
+    roundtrips=results,code_arrays=code_arrays,decode_waveform_max_abs=error,decode_codes_exact=True,
     source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip())
 (OUT/'omnivoice-518-acceptance.json').write_text(json.dumps(receipt,indent=2)+'\n')
 (OUT/'summary.md').write_text('OmniVoice reference-integrity, utility/decode oracle, CLI/session '

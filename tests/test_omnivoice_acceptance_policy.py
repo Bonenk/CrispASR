@@ -36,7 +36,7 @@ class AcceptancePolicy(unittest.TestCase):
                              results={'station': {'wer': wer}},
                              expected_outputs={'station', 'missing'} if missing else {'station'},
                              WER_GATE=0.2, MODEL_PIN='model-pin', FIXTURE_PIN='fixture-pin',
-                             ASR_MODELS={}, CLONE_REFS=('station',), integrity={}, error=0,
+                             ASR_MODELS={}, CLONE_REFS=('station',), integrity={}, error=0, code_arrays={},
                              subprocess=SimpleNamespace(check_output=lambda *a, **k: 'test-source\n'))
             failed = False
             try:

@@ -2,7 +2,7 @@
 
 ## NOW — OmniVoice codec and acceptance audit (2026-10-22)
 
-Owner: Codex, remote branch `fix/omnivoice-codec-audit`. Audit baseline main
+Owner: Codex. Repairs landed on main at runtime source `5acff9f21`. Audit baseline main
 `22e1b6ada` and codec branch `f76d4b190`. Repairs cover split-off placement,
 backend-aware reference caches, complete reload cleanup, transactional
 permutation publication and a 40 MB unused F32 cache. Decomposition and split
@@ -12,8 +12,14 @@ Reference selection now includes every integrity-eligible reference. Historical
 subset acceptance is rejected; failed WER gates persist aggregate receipts.
 Local native/sanitizer tests and four selected CTest registrations pass; fixed-code
 live pairs preserve both ASR transcripts and differ by at most one PCM16 step.
-`station` fails the established Nemotron gate (2/9) while CTC scores it zero;
-keep this disagreement visible. Hosted checks are in progress, not accepted.
+On M1, `station` fails the established Nemotron gate (2/9) while CTC scores it
+zero. Linux CPU campaign39857487336 on first repair `b608bcdd1` instead fails
+three `window` cloning surfaces at2/9; station targets pass. Its utility/DSP
+oracles pass, including exact waveform parity. Runtime campaign39860613583 was queued on5acff9f21 and is superseded by the
+next campaign, which retains generated codes for every surface. CI/lint follow the latest main tip; runtime-source
+runs39860530420/39860530446 were launched, and documentation checkpoints may
+supersede them. Earlier partial green jobs do not certify this source. No full
+hosted or cloning acceptance is claimed.
 See `docs/omnivoice-audit-2026-10-22.md` and its live receipt.
 
 ## NOW — issue551 hosted validation (2026-10-22)

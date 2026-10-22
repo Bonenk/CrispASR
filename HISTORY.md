@@ -10,6 +10,10 @@ quality or the cause of `fox` substitutions. See
 Decomposition and split stay off by default. Counterbalanced CPU timings do not
 establish a consistent latency win, despite lower process CPU work. A duplicate
 40 MB F32 cache is removed; all 32 replay decodes retain their baseline PCM.
+The first repaired Linux CPU campaign39857487336 also rejects speech acceptance:
+three window cloning arms score2/9, station arms pass, and the utility/DSP
+oracles remain green. This differs from M1 and requires matched original/native
+and judge diagnosis; no fixture selection or threshold relaxation.
 
 
 ## 2026-10-22 — PR521 merged: upstream OmniVoice audio utilities, with a vetted cloning reference

@@ -145,3 +145,31 @@ It takes the tokenizer and a proof directory containing both reference WAVs,
 code arrays and expected PCM files from the first driver. It includes the actual
 runtime and needs `crispasr-core` and ggml libraries (do not also link
 `omnivoice`). It checks byte equality on every warmup and measured decode.
+
+## Hosted CPU follow-up
+
+The first repair campaign on Linux CPU completed at source `b608bcdd1`:
+[run 39857487336](https://github.com/CrispStrobe/CrispASR/actions/runs/39857487336).
+Its independently pinned utility oracle passes and the actual raw-session DSP
+comparison has maximum error 0.0. The complete nine-arm speech gate **fails**:
+`window` primary, marked clone and CLI clone score 2/9 ("Quick brown ... lazy
+dot"), while both `station` targets score zero. This differs from the M1 pattern;
+fixture selection cannot establish general acceptance or isolate the cause.
+
+Artifact `12459969252` was downloaded and checked, ZIP SHA256
+`ce4aa4c1461de0304fcb3367d04601c2ced6043cdfc57945d5e5edefe6e0d7fa`.
+The live receipt retains its transcripts and component results. It predates the
+cache/default corrections and does not certify current runtime source `5acff9f21`.
+The current-source full campaign is
+[run 39860613583](https://github.com/CrispStrobe/CrispASR/actions/runs/39860613583),
+queued at this checkpoint. CI/lint for the latest main tip remain pending.
+
+The current harness retains generated code arrays and hashes for every CLI/
+session arm, including separate marked outputs. Marking-only comparisons must
+preserve codes. This lets follow-up work separate generation drift from decoder,
+DSP and judge differences instead of inferring the cause from a transcript.
+
+To reproduce the reported decomposed GPU experiment, explicitly set both
+`CRISPASR_OMNIVOICE_CODEC_SPLIT=1` and
+`CRISPASR_OMNIVOICE_CODEC_DECOMP=1`. Split alone changes placement and retains
+the crop upsampler; it is not a promise of faster decode or total latency.

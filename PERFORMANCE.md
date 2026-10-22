@@ -792,6 +792,8 @@ the §232 campaign. Verified against current code, not carried from this doc.
   CUDA retains its pre-existing GPU-codec placement default; Metal stays opt-in
   via `CRISPASR_OMNIVOICE_CODEC_GPU=1` because its encoder parity is unresolved.
   `CRISPASR_OMNIVOICE_CODEC_SPLIT=1` requests CPU encode / GPU decode, default off.
+  Reproducing the reported decomposed GPU path also needs explicit
+  `CRISPASR_OMNIVOICE_CODEC_DECOMP=1`; split alone retains crop.
   The branch reported 5.96→2.65 s decode compute on an 18.4 s output, but total
   decode was 5.98→13.05 s cold and 8.28→4.44 s warm. Each placement change reads
   the whole 403 MB tokenizer again, so repeated voice changes pay repeatedly;

@@ -581,5 +581,86 @@
     "libggml.dylib": "c4d184876f77314dcc42c2957b1d9bec0575c4a838e2755dabab2d75c94e5409",
     "libggml-base.dylib": "169156bb0025b3831764e90f769687dd612e8e65ac493bc541bc95c847725fee",
     "libggml-cpu.dylib": "9d1fc926685e3b7099c6c91df5b4faf859fa7f94537cd4a0881ca6297b32f684"
+  },
+  "hosted_prior_repair": {
+    "source_commit": "b608bcdd1b62d21db332b3a68a8f11d6f329315a",
+    "run_id": 39857487336,
+    "artifact_id": 12459969252,
+    "artifact_zip_sha256": "ce4aa4c1461de0304fcb3367d04601c2ced6043cdfc57945d5e5edefe6e0d7fa",
+    "platform": "GitHub hosted Linux CPU, CPU main LLM and CPU codec",
+    "workflow_conclusion": "failure",
+    "failure": "unchanged 0.2 WER gate; three window cloning surfaces score 2/9, while both station targets pass",
+    "utility_component_pass": true,
+    "waveform_oracle": {
+      "max_abs": 0.0,
+      "compared_surface": "attested raw C ABI; upstream DSP before automatic watermark",
+      "marked_output_differs": true
+    },
+    "roundtrips": {
+      "session-raw": {
+        "transcript": "The quick brown fox jumps over the lazy dog.",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "samples": 62375,
+        "sha256": "ec1ffc430ba3f8c32fb83f95a3146996c5597381469859ac06ff966d94c9f847"
+      },
+      "session-full": {
+        "transcript": "The quick brown fox jumps over the lazy dog",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "samples": 67176,
+        "sha256": "f58bc97f8892648ef903edb12f7e27f75d7da713c220b032c959b886dc0b8192"
+      },
+      "session-marked": {
+        "transcript": "The quick brown fox jumps over the lazy dog",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "samples": 67176,
+        "sha256": "b6726afaf4eda3eb820b3d793bf9768396e9d0dc885c00bbcd21f696a52e67f2"
+      },
+      "session-clone-window-primary": {
+        "transcript": "Quick brown Fox jumps over the lazy dot.",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.2222222222222222,
+        "samples": 57576,
+        "sha256": "389ea9411628aecae699860b7a4fc924a49463eecfb7a8782c06d5897c6288cf"
+      },
+      "session-marked-clone": {
+        "transcript": "Quick brown Fox jumps over the lazy dot.",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.2222222222222222,
+        "samples": 57576,
+        "sha256": "1564b48b3d4a1dd633372560362c45cbc2133609420298fc0767d4a4a29067b7"
+      },
+      "session-clone-window-second": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "expected": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0,
+        "samples": 78696,
+        "sha256": "9e1c5fc093af32c33434fc1aef6058f59aefec52112a3ed3d79b7e8048fd634a"
+      },
+      "session-clone-station-primary": {
+        "transcript": "The quick brown fox jumps over the lazy dog.",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.0,
+        "samples": 53736,
+        "sha256": "69a5975c9bf05e7a21311fb6509f5a3113fdb207d3a12abf68ef4de38bf68df3"
+      },
+      "session-clone-station-second": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "expected": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0,
+        "samples": 70056,
+        "sha256": "643f227688ca108d78165e7646899a88f5cff1dc88d82646873abf7495539730"
+      },
+      "cli-clone": {
+        "transcript": "Quick brown Fox jumps over the lazy dot.",
+        "expected": "The quick brown fox jumps over the lazy dog.",
+        "wer": 0.2222222222222222,
+        "samples": 57576,
+        "sha256": "ae55da53a237d7c771a30031d8fc19fce0fea2e8e3dfc27a2fe4c806fc1f5d8b"
+      }
+    },
+    "current_runtime_not_certified": "This run precedes the cache reduction and default-off correction. Current runtime source 5acff9f21 has its own pending campaign 39860613583."
   }
 }
