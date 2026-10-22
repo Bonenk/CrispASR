@@ -12,6 +12,7 @@ own text back.
 import hashlib
 import json
 import os
+from contextlib import ExitStack
 from pathlib import Path
 import re
 import subprocess
@@ -34,7 +35,7 @@ WER_GATE = 0.2
 # Two independent architectures judge the reference: an RNNT and a CTC model.
 # A single engine can share a bad prior with the generation control.
 ASR_MODELS = {
-    'nemotron': ('cstr/nemotron-3.5-asr-streaming-0.6b-GGUF',
+    'nemotron': ('cstr/nemotron-3.5-asr-streaming-GGUF',
                  'nemotron-3.5-asr-streaming-0.6b-q4_k.gguf',
                  'bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2'),
     'parakeet': ('cstr/parakeet-ctc-0.6b-GGUF',
@@ -101,18 +102,20 @@ asr_paths = {}
 for engine, (repo, name, rev) in ASR_MODELS.items():
     asr_paths[engine] = hf_hub_download(repo, name, revision=rev, local_dir=TEMP/'asr'/engine)
 integrity = {}
-for name, item in fixtures.items():
-    pcm = read_pcm16(item['path'])
-    row = dict(text=item['text'], seconds=item['seconds'], engines={})
-    for engine, model in asr_paths.items():
-        with Session(model, lib_path=str(lib), n_threads=4) as s:
+with ExitStack() as stack:
+    judges = {engine: stack.enter_context(Session(model, lib_path=str(lib), n_threads=4))
+              for engine, model in asr_paths.items()}
+    for name, item in fixtures.items():
+        pcm = read_pcm16(item['path'])
+        row = dict(text=item['text'], seconds=item['seconds'], engines={})
+        for engine, judge in judges.items():
             actual = ' '.join(segment.text for segment in
-                              s.transcribe(pcm, sample_rate=16000, language='en'))
-        row['engines'][engine] = dict(transcript=actual, wer=word_wer(item['text'], actual))
-    row['min_wer'] = min(v['wer'] for v in row['engines'].values())
-    row['max_wer'] = max(v['wer'] for v in row['engines'].values())
-    integrity[name] = row
-    print('reference', name, row['min_wer'], row['engines'], flush=True)
+                              judge.transcribe(pcm, sample_rate=16000, language='en'))
+            row['engines'][engine] = dict(transcript=actual, wer=word_wer(item['text'], actual))
+        row['min_wer'] = min(v['wer'] for v in row['engines'].values())
+        row['max_wer'] = max(v['wer'] for v in row['engines'].values())
+        integrity[name] = row
+        print('reference', name, row['min_wer'], row['engines'], flush=True)
 (OUT/'reference-integrity.json').write_text(json.dumps(integrity, indent=2) + '\n')
 
 # A valid reference is one that at least one independent recognizer can read
@@ -223,6 +226,8 @@ with Session(asr_paths['nemotron'],lib_path=str(lib),backend='nemotron',n_thread
         (OUT/'roundtrips.json').write_text(json.dumps(results,indent=2)+'\n')
 assert len(results) == 7 and all(case['wer'] <= WER_GATE for case in results.values()), results
 receipt = dict(passed=True,model_revision=MODEL_PIN,fixture_revision=FIXTURE_PIN,
+    asr_models={engine:dict(repo=repo,name=name,revision=rev)
+                for engine,(repo,name,rev) in ASR_MODELS.items()},
     wer_gate=WER_GATE,clone_references=list(CLONE_REFS),reference_integrity=integrity,
     roundtrips=results,decode_waveform_max_abs=error,decode_codes_exact=True,
     source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip())
