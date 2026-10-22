@@ -802,6 +802,19 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Six matching printed digits do not demonstrate bit-identical arrays, and the
   exploratory encoder bisect has not isolated a faulty kernel. See
   `docs/omnivoice-audit-2026-10-22.md`.
+- **omnivoice M1 resident split decoder (2026-10-23, opt-in):**
+  `CRISPASR_OMNIVOICE_CODEC_SPLIT=1` + `CRISPASR_OMNIVOICE_CODEC_RESIDENT=1` +
+  `CRISPASR_OMNIVOICE_CODEC_DECOMP=1` retain CPU encoding and a separate GPU
+  decoder. 124 MB weight/cache buffers avoid repeated full 403 MB rehosting.
+  Final four-case counterbalanced codec medians: CPU 0.335–0.495 s versus
+  resident 0.145–0.223 s; resident PCM is byte-exact to the old Metal split path.
+  Whole six-second-target request: 8.84→8.08 s (8.6%) on a quieter M1, versus
+  matched-value omnivoice.cpp9.57/10.01 s in bracketing campaigns. Both ASR
+  judges score the unconditioned comparison 0.0. Voice-clone transcript parity
+  preserves existing RNNT/CTC disagreement; broader acceptance remains open.
+  Default stays off. See `docs/omnivoice-m1-comparison-2026-10-23.md` for model
+  adaptation, rejected dtype-incompatible controls, actual output durations,
+  initialization/storage caveats and all per-run observations.
 - **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
   the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
   (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to

@@ -1,3 +1,22 @@
+## 2026-10-23 — OmniVoice M1 resident decoder and controlled engine comparison
+
+Added an opt-in decoder-only GPU allocation to the split codec: CPU encoding
+stays resident, GPU decoding reuses 124 MB of weights/caches, and tokenizer
+replacement/failure/destruction releases both allocations. Filters exclude
+encoder projections and training averages. Quiet whole-request A/B 8.84→8.08 s
+(8.6%); four fixed-code codec cases 2.2–2.5x faster than CPU, byte-exact to the
+old Metal split. Both ASR judges preserve decoder-path transcripts. Exact
+uncached reference-code equality,48 final-source decodes, four CTest cases,
+native ASan/UBSan and a failing training-state inclusion mutant validate it.
+
+The controlled unconditioned omnivoice.cpp comparison keeps active model values
+matched, including exact F16→F32 Snake-alpha adaptation for its loader. Both
+judges score the corrected pair0.0. Byte-preserving adapters that violate the
+loader dtype contract fail WER 1.0 and are rejected. Comparator bracketing
+medians 9.57/10.01 s; no broad ranking or cold-start claim. All experiments stay
+off by default; full cloning acceptance remains open. See
+`docs/omnivoice-m1-comparison-2026-10-23.md` and its JSON receipt.
+
 ## 2026-10-22 — OmniVoice audit correction
 
 The PR521 merge remains recorded below, but its broad cloning acceptance claim

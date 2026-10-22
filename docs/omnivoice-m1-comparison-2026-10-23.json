@@ -1,0 +1,1292 @@
+{
+  "date": "2026-10-23",
+  "host": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_gb": 16,
+    "os": "macOS 26",
+    "desktop_contention": "Varied: older contended and later quieter campaigns both retained."
+  },
+  "baseline_runtime": "5acff9f217220cdbecb268e7a453baed8cc29e5a",
+  "source_sha256": {
+    "src/omnivoice.cpp": "b76c4cdac82669d2fdccc8d285cd90a20e06e9d616a1a9d8600e3bb4ef3ace17",
+    "tests/test-omnivoice-codec.cpp": "ea67f91193969ca8969c2fae568fad533eba78230f6074dcb2d5c870ba437f8f",
+    "tools/ci-heavy/omnivoice_engine_bench.cpp": "6a153a1a2f51485587fd57f982e2808c2359149682a9f0582212b8fccbfae445",
+    "tools/ci-heavy/omnivoice_codec_resident_bench.cpp": "51075f72c0d6851b89bf3e5298126f7e3264fd76087a96701d0c92368758cdb6",
+    "tools/ci-heavy/omnivoice_codec_decode_bench.cpp": "f43444b31e704bf58baa82c0ab5bdcd5c95d458d4b01be1c286b4ce2b2f50296",
+    "tools/ci-heavy/omnivoice_bench_adapt.py": "7f766fab97c7dbb0dcd91a41f49c9889657f90f73e0fb5ba8989da9396a65c8a"
+  },
+  "ggml": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "comparator": {
+    "repo": "ServeurpersoCom/omnivoice.cpp",
+    "commit": "1a468d8",
+    "ggml": "cc5df49a",
+    "runtime_unmodified": true
+  },
+  "models": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "main_sha256": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+    "codec_sha256": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63",
+    "adapted_main_sha256": "b9613d128221c36713c0691b9758a32c5cc8567591e098e36759535d4a59ce64",
+    "adapted_codec_sha256": "222072bd6781740db1dc9f1d6cd6d899fac76ac55579bf80035d30babf5ef93f",
+    "active_weight_contract": "LLM bytes/types/shapes preserved under rename; active decoder values preserved,36 F16 alphas widened exactly to F32 for the comparator loader; unused template encoder is not certified for cloning.",
+    "published_adapted_weights": false
+  },
+  "recipe": {
+    "text": "We should bring enough water and food for the long walk home.",
+    "language": "en",
+    "seed": 42,
+    "steps": 32,
+    "target_frames": 150,
+    "target_seconds": 6,
+    "guidance": 2,
+    "class_temperature": 0,
+    "position_temperature": 5,
+    "layer_penalty": 5,
+    "t_shift": 0.1,
+    "flash_attention": true,
+    "cpu_threads": 4,
+    "audio_cleanup": true
+  },
+  "warm_summary": {
+    "cpu_s": 8.837958,
+    "resident_s": 8.076649,
+    "crispasr_reduction_percent": 8.614082574277912,
+    "comparator_before_s": 9.573616,
+    "comparator_after_s": 10.006421,
+    "comparator_combined_s": 9.6343555,
+    "caution": "One English text; three warm samples per arm, comparator bracketed around paired CrispASR. Cold init/storage paths are not comparable."
+  },
+  "quiet_paired": {
+    "load_s": 144.633029,
+    "samples": [
+      {
+        "iteration": 0,
+        "wall_s": 8.649254,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 4.873657,
+        "warmup": true,
+        "resident": false,
+        "generation_s": 7.686994,
+        "decode_s": 0.962259
+      },
+      {
+        "iteration": 1,
+        "wall_s": 9.645583,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 1.230896,
+        "warmup": true,
+        "resident": true,
+        "generation_s": 7.662491,
+        "decode_s": 1.983091
+      },
+      {
+        "iteration": 2,
+        "wall_s": 8.593881,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 4.881807,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 7.652917,
+        "decode_s": 0.940963
+      },
+      {
+        "iteration": 3,
+        "wall_s": 8.076649,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 1.09063,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 7.629591,
+        "decode_s": 0.447055
+      },
+      {
+        "iteration": 4,
+        "wall_s": 7.994403,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 0.58156,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 7.494686,
+        "decode_s": 0.499717
+      },
+      {
+        "iteration": 5,
+        "wall_s": 8.837958,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 5.46569,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 7.509241,
+        "decode_s": 1.328716
+      },
+      {
+        "iteration": 6,
+        "wall_s": 9.229611,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 6.186662,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 7.654874,
+        "decode_s": 1.574735
+      },
+      {
+        "iteration": 7,
+        "wall_s": 8.239657,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 0.806615,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 7.776948,
+        "decode_s": 0.462708
+      }
+    ],
+    "log_sha256": "e522e54faeee03338ab2fb04cdf8442ff160f09f3dac0d8920004d45a68cb10b"
+  },
+  "comparator_before": {
+    "load_s": 13.612289,
+    "samples": [
+      {
+        "iteration": 0,
+        "wall_s": 9.899896,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.847698,
+        "warmup": true
+      },
+      {
+        "iteration": 1,
+        "wall_s": 9.555878,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.567341,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "wall_s": 9.603427,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.589059,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "wall_s": 9.573616,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.575196,
+        "warmup": false
+      }
+    ],
+    "log_sha256": "d392911604f8bdb1719b54d6e91d18af23daa1c85c6095f539e6268511fa7f7c"
+  },
+  "comparator_after": {
+    "load_s": 16.148354,
+    "samples": [
+      {
+        "iteration": 0,
+        "wall_s": 9.885466,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.723585,
+        "warmup": true
+      },
+      {
+        "iteration": 1,
+        "wall_s": 10.006421,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.968078,
+        "warmup": false
+      },
+      {
+        "iteration": 2,
+        "wall_s": 9.665284,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.625862,
+        "warmup": false
+      },
+      {
+        "iteration": 3,
+        "wall_s": 10.280183,
+        "samples": 103680,
+        "rms": 0.0865613,
+        "cpu_s": 0.842304,
+        "warmup": false
+      }
+    ],
+    "log_sha256": "e7582a6111d214df2590a35cd8472c04a8063ee4273a209e59d7eb2da385366e"
+  },
+  "contended_paired": {
+    "load_s": 55.046609,
+    "samples": [
+      {
+        "iteration": 0,
+        "wall_s": 23.440532,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 10.564724,
+        "warmup": true,
+        "resident": false,
+        "generation_s": 20.817109,
+        "decode_s": 2.62342
+      },
+      {
+        "iteration": 1,
+        "wall_s": 23.622907,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 1.032349,
+        "warmup": true,
+        "resident": true,
+        "generation_s": 20.065212,
+        "decode_s": 3.557694
+      },
+      {
+        "iteration": 2,
+        "wall_s": 23.046483,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 11.334745,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 20.041868,
+        "decode_s": 3.004609
+      },
+      {
+        "iteration": 3,
+        "wall_s": 20.973319,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 1.07034,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 20.119946,
+        "decode_s": 0.853371
+      },
+      {
+        "iteration": 4,
+        "wall_s": 19.612227,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 0.973551,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 18.66704,
+        "decode_s": 0.945177
+      },
+      {
+        "iteration": 5,
+        "wall_s": 21.110993,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 10.09863,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 18.659735,
+        "decode_s": 2.451254
+      },
+      {
+        "iteration": 6,
+        "wall_s": 20.23952,
+        "samples": 96240,
+        "rms": 0.09148807,
+        "cpu_s": 9.958672,
+        "warmup": false,
+        "resident": false,
+        "generation_s": 17.951594,
+        "decode_s": 2.287915
+      },
+      {
+        "iteration": 7,
+        "wall_s": 17.066062,
+        "samples": 96240,
+        "rms": 0.09149095,
+        "cpu_s": 1.246389,
+        "warmup": false,
+        "resident": true,
+        "generation_s": 16.281914,
+        "decode_s": 0.784147
+      }
+    ],
+    "log_sha256": "c9d62f71c3304bea72167fe3314ddee5192eabf659585e08e02a417653a5e404"
+  },
+  "rejected_byte_preserving_adapter": {
+    "reason": "F16 Snake alphas interpreted as BF16; empty transcripts under both judges, WER1.0. Not eligible for timing comparison.",
+    "timings": {
+      "load_s": 19.353525,
+      "samples": [
+        {
+          "iteration": 0,
+          "wall_s": 20.838257,
+          "samples": 148800,
+          "rms": 0.10214452,
+          "cpu_s": 1.127412,
+          "warmup": true
+        },
+        {
+          "iteration": 1,
+          "wall_s": 21.032757,
+          "samples": 148800,
+          "rms": 0.10214452,
+          "cpu_s": 1.125232,
+          "warmup": false
+        },
+        {
+          "iteration": 2,
+          "wall_s": 24.39295,
+          "samples": 148800,
+          "rms": 0.10214452,
+          "cpu_s": 1.206819,
+          "warmup": false
+        },
+        {
+          "iteration": 3,
+          "wall_s": 23.67377,
+          "samples": 148800,
+          "rms": 0.10214452,
+          "cpu_s": 1.097455,
+          "warmup": false
+        }
+      ],
+      "log_sha256": "0061c8992390e2c960403d3fb557e9fc2dba078782b652ff4283c58242dbc40a"
+    }
+  },
+  "codec_cases": {
+    "window-0": {
+      "median_ms": {
+        "0": 363.58,
+        "1": 441.223,
+        "2": 156.26
+      },
+      "cpu_vs_resident": {
+        "max_abs": 0.00067138671875,
+        "rms_error": 6.067241907860485e-05,
+        "cosine": 0.9999998492386113,
+        "cpu_norm": 26.512161076599362,
+        "resident_norm": 26.512075125472574
+      },
+      "pcm_sha256": {
+        "0": "d00bc9d19e2a983b09b2e926acd406fe5bfaab77612a1a5b92122b98487a8b89",
+        "1": "982e737d2d6ad6aa2e376ed7caabcbeca3d461d7146d6e74ad2632e8c5b6eaf6",
+        "2": "982e737d2d6ad6aa2e376ed7caabcbeca3d461d7146d6e74ad2632e8c5b6eaf6"
+      },
+      "old_metal_resident_exact": true
+    },
+    "window-1": {
+      "median_ms": {
+        "0": 509.193,
+        "1": 475.597,
+        "2": 223.347
+      },
+      "cpu_vs_resident": {
+        "max_abs": 0.000885009765625,
+        "rms_error": 6.568745396542573e-05,
+        "cosine": 0.9999998934303079,
+        "cpu_norm": 39.91287347959498,
+        "resident_norm": 39.913016767721764
+      },
+      "pcm_sha256": {
+        "0": "0110e412fee0ab51a9902505ed1cf5442448ff7fcfe88e7f65da51ea54ed1adc",
+        "1": "40a6ac77d3211933763115d02281d3aec7527794b40daa24e220bf6360e5bee2",
+        "2": "40a6ac77d3211933763115d02281d3aec7527794b40daa24e220bf6360e5bee2"
+      },
+      "old_metal_resident_exact": true
+    },
+    "station-0": {
+      "median_ms": {
+        "0": 347.986,
+        "1": 418.894,
+        "2": 145.493
+      },
+      "cpu_vs_resident": {
+        "max_abs": 0.000885009765625,
+        "rms_error": 5.166027447502777e-05,
+        "cosine": 0.999999875666816,
+        "cpu_norm": 24.000858440986498,
+        "resident_norm": 24.001264980668353
+      },
+      "pcm_sha256": {
+        "0": "2ab0d92c85c041c1dcbdafa479f892d8d27e9a26ccccecc5ab3722946ef3bebf",
+        "1": "7bfa31b0f3d42c675bbcfbe10a7780f3438f74510bd6d2e14fa57231609147dc",
+        "2": "7bfa31b0f3d42c675bbcfbe10a7780f3438f74510bd6d2e14fa57231609147dc"
+      },
+      "old_metal_resident_exact": true
+    },
+    "station-1": {
+      "median_ms": {
+        "0": 467.28,
+        "1": 476.913,
+        "2": 206.638
+      },
+      "cpu_vs_resident": {
+        "max_abs": 0.000396728515625,
+        "rms_error": 4.174755409946318e-05,
+        "cosine": 0.9999999319391305,
+        "cpu_norm": 29.928854008825635,
+        "resident_norm": 29.929262459760746
+      },
+      "pcm_sha256": {
+        "0": "36fa707b5b76ecdeaf2c6a4905aac0ecc429e063c3891cc406c67cdaa5461e7f",
+        "1": "bd9e731638b9b73fc0bf03b5b5bf3621d24bea4dbc4de9438cee84a3d44bd96b",
+        "2": "bd9e731638b9b73fc0bf03b5b5bf3621d24bea4dbc4de9438cee84a3d44bd96b"
+      },
+      "old_metal_resident_exact": true
+    }
+  },
+  "codec_samples": [
+    {
+      "case": "window-0",
+      "rep": 0,
+      "arm": 0,
+      "warmup": true,
+      "cpu_ms": 1653.32,
+      "wall_ms": 439.061,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 1,
+      "arm": 1,
+      "warmup": true,
+      "cpu_ms": 279.822,
+      "wall_ms": 9913.34,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 2,
+      "arm": 2,
+      "warmup": true,
+      "cpu_ms": 62.066,
+      "wall_ms": 232.068,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 3,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1440.47,
+      "wall_ms": 363.58,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 4,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 266.019,
+      "wall_ms": 495.744,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 5,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 7.108,
+      "wall_ms": 156.26,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 6,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 7.256,
+      "wall_ms": 156.282,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 7,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 269.892,
+      "wall_ms": 441.223,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 8,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1468.75,
+      "wall_ms": 370.28,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 9,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1402.14,
+      "wall_ms": 353.76,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 10,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 248.389,
+      "wall_ms": 404.693,
+      "samples": 57576
+    },
+    {
+      "case": "window-0",
+      "rep": 11,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 6.145,
+      "wall_ms": 155.379,
+      "samples": 57576
+    },
+    {
+      "case": "window-1",
+      "rep": 0,
+      "arm": 0,
+      "warmup": true,
+      "cpu_ms": 2014.12,
+      "wall_ms": 512.623,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 1,
+      "arm": 1,
+      "warmup": true,
+      "cpu_ms": 253.166,
+      "wall_ms": 475.135,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 2,
+      "arm": 2,
+      "warmup": true,
+      "cpu_ms": 9.405,
+      "wall_ms": 222.913,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 3,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 2013.26,
+      "wall_ms": 509.193,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 4,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 251.575,
+      "wall_ms": 474.784,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 5,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 7.579,
+      "wall_ms": 221.432,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 6,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 10.796,
+      "wall_ms": 225.351,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 7,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 264.159,
+      "wall_ms": 486.762,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 8,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 2024.46,
+      "wall_ms": 512.768,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 9,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1919.35,
+      "wall_ms": 485.406,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 10,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 253.304,
+      "wall_ms": 475.597,
+      "samples": 78696
+    },
+    {
+      "case": "window-1",
+      "rep": 11,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 10.023,
+      "wall_ms": 223.347,
+      "samples": 78696
+    },
+    {
+      "case": "station-0",
+      "rep": 0,
+      "arm": 0,
+      "warmup": true,
+      "cpu_ms": 1389.86,
+      "wall_ms": 352.177,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 1,
+      "arm": 1,
+      "warmup": true,
+      "cpu_ms": 246.982,
+      "wall_ms": 394.144,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 2,
+      "arm": 2,
+      "warmup": true,
+      "cpu_ms": 4.669,
+      "wall_ms": 144.546,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 3,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1399.2,
+      "wall_ms": 366.961,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 4,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 260.64,
+      "wall_ms": 434.772,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 5,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 5.074,
+      "wall_ms": 145.493,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 6,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 7.536,
+      "wall_ms": 148.022,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 7,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 266.853,
+      "wall_ms": 418.894,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 8,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1379.84,
+      "wall_ms": 347.986,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 9,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1309.81,
+      "wall_ms": 330.488,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 10,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 246.934,
+      "wall_ms": 394.904,
+      "samples": 53736
+    },
+    {
+      "case": "station-0",
+      "rep": 11,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 5.028,
+      "wall_ms": 144.283,
+      "samples": 53736
+    },
+    {
+      "case": "station-1",
+      "rep": 0,
+      "arm": 0,
+      "warmup": true,
+      "cpu_ms": 1878.34,
+      "wall_ms": 475.368,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 1,
+      "arm": 1,
+      "warmup": true,
+      "cpu_ms": 250.088,
+      "wall_ms": 455.977,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 2,
+      "arm": 2,
+      "warmup": true,
+      "cpu_ms": 9.0,
+      "wall_ms": 203.643,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 3,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1869.86,
+      "wall_ms": 474.646,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 4,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 257.325,
+      "wall_ms": 465.795,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 5,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 8.554,
+      "wall_ms": 213.165,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 6,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 9.073,
+      "wall_ms": 206.638,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 7,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 270.015,
+      "wall_ms": 476.913,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 8,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1852.15,
+      "wall_ms": 467.28,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 9,
+      "arm": 0,
+      "warmup": false,
+      "cpu_ms": 1777.95,
+      "wall_ms": 448.897,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 10,
+      "arm": 1,
+      "warmup": false,
+      "cpu_ms": 256.605,
+      "wall_ms": 481.582,
+      "samples": 70056
+    },
+    {
+      "case": "station-1",
+      "rep": 11,
+      "arm": 2,
+      "warmup": false,
+      "cpu_ms": 9.191,
+      "wall_ms": 205.148,
+      "samples": 70056
+    }
+  ],
+  "resident_weight_buffers_bytes": {
+    "serialized": 43147424,
+    "f32_cache": 40862592,
+    "permutation": 40026112,
+    "total": 124036128,
+    "excluded_training_averages": 1048576
+  },
+  "proof": {
+    "final48_decodes": true,
+    "final12_per_arm_pcm_hashes_match_initial": true,
+    "resident_old_metal_byte_exact_comparisons_per_campaign": 16,
+    "fresh_uncached_reference_encodes": {
+      "window": {
+        "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "cpu_codes_identical": true,
+        "cpu_encoder_buffer_retained": true
+      },
+      "station": {
+        "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "cpu_codes_identical": true,
+        "cpu_encoder_buffer_retained": true
+      }
+    },
+    "paired_all8_codes_identical": true,
+    "quiet_all8_pcm_match_scored_baselines": true,
+    "bracketing_comparator_pcm_exact_to_scored_output": true
+  },
+  "asr_library_sha256": "9f030ae613360002621361c7f0d027482e538b8f0dbb26ddb9f5a824d901da69",
+  "quality": {
+    "judges": {
+      "nemotron": {
+        "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+        "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+        "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+        "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+      },
+      "parakeet": {
+        "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+        "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+        "file": "parakeet-ctc-0.6b-q4_k.gguf",
+        "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+      }
+    },
+    "outputs": {
+      "ovcpp-1.f32": {
+        "samples": 93600,
+        "sha256": "f4ed3d39076e9e345eeede3c2c68d05b1b0a3f52c11955ede92d0b1dfd6a6e03",
+        "rms": 0.09028325994329067,
+        "norm": 27.621366252096603,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "crisp-1.f32": {
+        "samples": 96240,
+        "sha256": "ddbe9b37c472d85d0d66c8424c000d45719cc1ed6a929461c2b842d65fb725dd",
+        "rms": 0.09148806986392247,
+        "norm": 28.381952735769985,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "ovcpp-same-1.f32": {
+        "samples": 148800,
+        "sha256": "107f5fb207f1c5a0b8d4a0b42147f07de68ed1cd91100dacceb861de840facf4",
+        "rms": 0.08732167205626992,
+        "norm": 33.68398836706532,
+        "judges": {
+          "nemotron": {
+            "text": "",
+            "wer": 1.0
+          },
+          "parakeet": {
+            "text": "",
+            "wer": 1.0
+          }
+        }
+      },
+      "crisp-resident-1.f32": {
+        "samples": 96240,
+        "sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "rms": 0.0914909460196898,
+        "norm": 28.382844993276063,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "ovcpp-en-1.f32": {
+        "samples": 148800,
+        "sha256": "03ea70c21b97caedda7778342a14c32d1bed4b4bad1ed38e15587dcabd7af257",
+        "rms": 0.1021445247305163,
+        "norm": 39.401844945948774,
+        "judges": {
+          "nemotron": {
+            "text": "",
+            "wer": 1.0
+          },
+          "parakeet": {
+            "text": "",
+            "wer": 1.0
+          }
+        }
+      },
+      "crisp-paired-2.f32": {
+        "samples": 96240,
+        "sha256": "ddbe9b37c472d85d0d66c8424c000d45719cc1ed6a929461c2b842d65fb725dd",
+        "rms": 0.09148806986392247,
+        "norm": 28.381952735769985,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "crisp-paired-3.f32": {
+        "samples": 96240,
+        "sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "rms": 0.0914909460196898,
+        "norm": 28.382844993276063,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "window-0-resident-arm0.f32": {
+        "samples": 57576,
+        "sha256": "d00bc9d19e2a983b09b2e926acd406fe5bfaab77612a1a5b92122b98487a8b89",
+        "rms": 0.11049035904225836,
+        "norm": 26.512161076599362,
+        "judges": {
+          "nemotron": {
+            "text": "Quick brown Fox jumps over the lazy dog.",
+            "wer": 0.1111111111111111
+          },
+          "parakeet": {
+            "text": "a quick brown fox jumps over the lazy dog",
+            "wer": 0.1111111111111111
+          }
+        }
+      },
+      "window-0-resident-arm1.f32": {
+        "samples": 57576,
+        "sha256": "982e737d2d6ad6aa2e376ed7caabcbeca3d461d7146d6e74ad2632e8c5b6eaf6",
+        "rms": 0.11049000083792973,
+        "norm": 26.512075125472574,
+        "judges": {
+          "nemotron": {
+            "text": "Quick brown Fox jumps over the lazy dog.",
+            "wer": 0.1111111111111111
+          },
+          "parakeet": {
+            "text": "a quick brown fox jumps over the lazy dog",
+            "wer": 0.1111111111111111
+          }
+        }
+      },
+      "window-0-resident-arm2.f32": {
+        "samples": 57576,
+        "sha256": "982e737d2d6ad6aa2e376ed7caabcbeca3d461d7146d6e74ad2632e8c5b6eaf6",
+        "rms": 0.11049000083792973,
+        "norm": 26.512075125472574,
+        "judges": {
+          "nemotron": {
+            "text": "Quick brown Fox jumps over the lazy dog.",
+            "wer": 0.1111111111111111
+          },
+          "parakeet": {
+            "text": "a quick brown fox jumps over the lazy dog",
+            "wer": 0.1111111111111111
+          }
+        }
+      },
+      "window-1-resident-arm0.f32": {
+        "samples": 78696,
+        "sha256": "0110e412fee0ab51a9902505ed1cf5442448ff7fcfe88e7f65da51ea54ed1adc",
+        "rms": 0.1422776443979605,
+        "norm": 39.91287347959498,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "window-1-resident-arm1.f32": {
+        "samples": 78696,
+        "sha256": "40a6ac77d3211933763115d02281d3aec7527794b40daa24e220bf6360e5bee2",
+        "rms": 0.14227815517795134,
+        "norm": 39.913016767721764,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "window-1-resident-arm2.f32": {
+        "samples": 78696,
+        "sha256": "40a6ac77d3211933763115d02281d3aec7527794b40daa24e220bf6360e5bee2",
+        "rms": 0.14227815517795134,
+        "norm": 39.913016767721764,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-0-resident-arm0.f32": {
+        "samples": 53736,
+        "sha256": "2ab0d92c85c041c1dcbdafa479f892d8d27e9a26ccccecc5ab3722946ef3bebf",
+        "rms": 0.10353664971907517,
+        "norm": 24.000858440986498,
+        "judges": {
+          "nemotron": {
+            "text": "The quick brown fox jumps over the lady.",
+            "wer": 0.2222222222222222
+          },
+          "parakeet": {
+            "text": "the quick brown fox jumps over the lazy dog",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-0-resident-arm1.f32": {
+        "samples": 53736,
+        "sha256": "7bfa31b0f3d42c675bbcfbe10a7780f3438f74510bd6d2e14fa57231609147dc",
+        "rms": 0.10353840347953923,
+        "norm": 24.001264980668353,
+        "judges": {
+          "nemotron": {
+            "text": "The quick brown fox jumps over the lady.",
+            "wer": 0.2222222222222222
+          },
+          "parakeet": {
+            "text": "the quick brown fox jumps over the lazy dog",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-0-resident-arm2.f32": {
+        "samples": 53736,
+        "sha256": "7bfa31b0f3d42c675bbcfbe10a7780f3438f74510bd6d2e14fa57231609147dc",
+        "rms": 0.10353840347953923,
+        "norm": 24.001264980668353,
+        "judges": {
+          "nemotron": {
+            "text": "The quick brown fox jumps over the lady.",
+            "wer": 0.2222222222222222
+          },
+          "parakeet": {
+            "text": "the quick brown fox jumps over the lazy dog",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-1-resident-arm0.f32": {
+        "samples": 70056,
+        "sha256": "36fa707b5b76ecdeaf2c6a4905aac0ecc429e063c3891cc406c67cdaa5461e7f",
+        "rms": 0.11307521428884378,
+        "norm": 29.928854008825635,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-1-resident-arm1.f32": {
+        "samples": 70056,
+        "sha256": "bd9e731638b9b73fc0bf03b5b5bf3621d24bea4dbc4de9438cee84a3d44bd96b",
+        "rms": 0.11307675747111867,
+        "norm": 29.929262459760746,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-1-resident-arm2.f32": {
+        "samples": 70056,
+        "sha256": "bd9e731638b9b73fc0bf03b5b5bf3621d24bea4dbc4de9438cee84a3d44bd96b",
+        "rms": 0.11307675747111867,
+        "norm": 29.929262459760746,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "ovcpp-alpha-1.f32": {
+        "samples": 103680,
+        "sha256": "7dbdfb0c4a6cf2ab5ca600dc988fe2004e5edace684d01a74d638b7696caf601",
+        "rms": 0.08656129875430368,
+        "norm": 27.872200545882084,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      }
+    }
+  },
+  "session_c_api": {
+    "library_sha256": "591aa09ac4636d6a6a038b8592a8023299402fc33953af8ffb180b47b950f6e2",
+    "arms": {
+      "0": {
+        "samples": 96240,
+        "pcm_sha256": "ddbe9b37c472d85d0d66c8424c000d45719cc1ed6a929461c2b842d65fb725dd",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "public_native_baseline_exact": true,
+        "wall_s": 8.875090333865955
+      },
+      "1": {
+        "samples": 96240,
+        "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "public_native_baseline_exact": true,
+        "wall_s": 8.225106000201777
+      }
+    },
+    "load_s": 30.489457041956484
+  },
+  "tests": {
+    "full_cli_and_shared_library_release_build": "PASS; linked CLI, exported native/session symbols and live Python Session CPU/resident PCM+code equality.",
+    "selected_ctest": {
+      "passed": 4,
+      "failed": 0
+    },
+    "native_runtime_asan_ubsan": "PASS",
+    "training_average_exclusion_mutant": "Expected abort (-6); assertion catches reintroduced prefix bug.",
+    "standalone_probe_ggml_max_name": 128,
+    "format18": "PASS",
+    "learnings_index": "PASS"
+  },
+  "broader_cloning_acceptance": {
+    "accepted": false,
+    "previous_linux_campaign": 39861560201,
+    "conclusion": "failure",
+    "reason": "Three window cloning surfaces WER2/9; station and unconditioned arms pass. Not waived by this change."
+  },
+  "defaults": {
+    "split": false,
+    "resident": false,
+    "decomp": false,
+    "cuda_placement": "unchanged"
+  }
+}

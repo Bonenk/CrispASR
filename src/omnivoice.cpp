@@ -373,6 +373,7 @@ struct omnivoice_context {
     ov_vocab vocab;
     ov_gen_config gen;
     ov_higgs_tokenizer tokenizer;
+    ov_higgs_tokenizer resident_decoder; // optional split decoder; encoder stays on CPU
 
     int n_threads = 4;
     int verbosity = 1;
@@ -690,14 +691,46 @@ static bool codec_gpu_enabled(const omnivoice_context* ctx);
 static bool codec_split_enabled();
 static bool codec_decode_on_gpu(const omnivoice_context* ctx);
 
-static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want_gpu) {
-    auto& tok = ctx->tokenizer;
+// The GPU copy needs only decoder/RVQ output weights, not HuBERT, the DAC
+// encoder, or RVQ input projections. Keep serialized tensor bytes unchanged.
+static bool tok_is_decode_weight(const char* name) {
+    const std::string n(name);
+    const std::string embed_suffix = ".codebook.embed";
+    const bool embedding = n.size() >= embed_suffix.size() &&
+                           n.compare(n.size() - embed_suffix.size(), embed_suffix.size(), embed_suffix) == 0;
+    return n.rfind("acoustic_decoder.", 0) == 0 || n == "fc2.weight" || n == "fc2.bias" ||
+           (n.rfind("quantizer.quantizers.", 0) == 0 && (embedding || n.find(".project_out.") != std::string::npos));
+}
+
+static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want_gpu,
+                             ov_higgs_tokenizer* destination = nullptr) {
+    auto& tok = destination ? *destination : ctx->tokenizer;
 
     struct gguf_init_params gp = {/*.no_alloc=*/true, /*.ctx=*/&tok.ctx_w};
     struct gguf_context* gf = gguf_init_from_file(path, gp);
     if (!gf) {
         fprintf(stderr, "omnivoice: failed to open tokenizer %s\n", path);
         return false;
+    }
+
+    if (destination) {
+        // Duplicate only selected metadata before allocating any weight buffer.
+        // The data loop below then seeks only these tensors in the original file.
+        auto* source = tok.ctx_w;
+        ggml_init_params ip = {(size_t)(gguf_get_n_tensors(gf) + 1) * 2 * ggml_tensor_overhead(), nullptr, true};
+        tok.ctx_w = ggml_init(ip);
+        if (!tok.ctx_w) {
+            ggml_free(source);
+            gguf_free(gf);
+            return false;
+        }
+        for (auto* t = ggml_get_first_tensor(source); t; t = ggml_get_next_tensor(source, t)) {
+            if (!tok_is_decode_weight(t->name))
+                continue;
+            auto* selected = ggml_dup_tensor(tok.ctx_w, t);
+            ggml_set_name(selected, t->name);
+        }
+        ggml_free(source);
     }
 
     auto find = [&](const char* name) -> ggml_tensor* { return ggml_get_tensor(tok.ctx_w, name); };
@@ -1044,6 +1077,7 @@ static bool tok_rebind(omnivoice_context* ctx, bool want_gpu) {
 static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     // Repeated setters replace the old allocation; a failed load leaves an
     // unloaded tokenizer and can be retried without leaking partial resources.
+    tok_release_backend(ctx->resident_decoder);
     tok_release_backend(ctx->tokenizer);
     ctx->tokenizer.path = path;
     const bool gpu =
@@ -1122,8 +1156,28 @@ static bool codec_decode_on_gpu(const omnivoice_context* ctx) {
 // HiggsAudioV2 decode: codes → PCM
 // ---------------------------------------------------------------------------
 
-static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* codes, int n_codebooks, int T_frames) {
-    auto& tok = ctx->tokenizer;
+// Resident split is independently gated for A/B against the full-file rebind.
+// It trades an additional ~125 MB (F16 tokenizer plus F32 caches) for eliminating
+// placement reloads. It does not change codec math or enable GPU encoding.
+static bool codec_resident_enabled() {
+    return env_bool("CRISPASR_OMNIVOICE_CODEC_RESIDENT");
+}
+
+static bool tok_prepare_resident_decoder(omnivoice_context* ctx) {
+    auto& decoder = ctx->resident_decoder;
+    if (decoder.loaded)
+        return true;
+    if (ctx->tokenizer.path.empty())
+        return false;
+    if (tok_load_backend(ctx, ctx->tokenizer.path.c_str(), true, &decoder))
+        return true;
+    tok_release_backend(decoder);
+    return false;
+}
+
+static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* codes, int n_codebooks, int T_frames,
+                                       ov_higgs_tokenizer* decoder = nullptr) {
+    auto& tok = decoder ? *decoder : ctx->tokenizer;
     if (!tok.loaded)
         return {};
 
@@ -3820,12 +3874,6 @@ float* omnivoice_decode_codes(struct omnivoice_context* ctx, const int32_t* code
         *out_n_samples = 0;
         return nullptr;
     }
-    // SPLIT: the decoder may want a different backend than the encoder left it on.
-    if (codec_split_enabled() && !tok_rebind(ctx, codec_decode_on_gpu(ctx))) {
-        *out_n_samples = 0;
-        return nullptr;
-    }
-
     int n_cb = (int)ctx->hp.n_codebooks;
     int T_frames = n_codes / n_cb;
     if (T_frames <= 0 || n_codes != n_cb * T_frames) {
@@ -3838,8 +3886,21 @@ float* omnivoice_decode_codes(struct omnivoice_context* ctx, const int32_t* code
         fprintf(stderr, "omnivoice: decoding %d codes (%d codebooks × %d frames)\n", n_codes, n_cb, T_frames);
     }
 
+    ov_higgs_tokenizer* decoder = nullptr;
+    if (codec_split_enabled()) {
+        if (codec_decode_on_gpu(ctx) && codec_resident_enabled()) {
+            if (!tok_prepare_resident_decoder(ctx)) {
+                *out_n_samples = 0;
+                return nullptr;
+            }
+            decoder = &ctx->resident_decoder;
+        } else if (!tok_rebind(ctx, codec_decode_on_gpu(ctx))) {
+            *out_n_samples = 0;
+            return nullptr;
+        }
+    }
     ov_bench_stage bench("decode");
-    auto pcm = higgs_decode(ctx, codes, n_cb, T_frames);
+    auto pcm = higgs_decode(ctx, codes, n_cb, T_frames, decoder);
     if (pcm.empty()) {
         *out_n_samples = 0;
         return nullptr;
@@ -3932,6 +3993,7 @@ void omnivoice_free(struct omnivoice_context* ctx) {
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
     // Tokenizer (same cleanup for success, partial load and placement changes).
+    tok_release_backend(ctx->resident_decoder);
     tok_release_backend(ctx->tokenizer);
     delete ctx;
 }
@@ -3952,5 +4014,8 @@ void omnivoice_set_n_threads(struct omnivoice_context* ctx, int n_threads) {
         ctx->n_threads = n_threads;
         if (ctx->backend && core_cpu_backend::is_cpu(ctx->backend))
             core_cpu_backend::set_n_threads(ctx->backend, n_threads);
+        for (auto* codec : {&ctx->tokenizer, &ctx->resident_decoder})
+            if (codec->backend && core_cpu_backend::is_cpu(codec->backend))
+                core_cpu_backend::set_n_threads(codec->backend, n_threads);
     }
 }

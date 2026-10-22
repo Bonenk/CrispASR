@@ -32,6 +32,9 @@ static void fixture(const char* path) {
         gguf_add_tensor(file, t);
     };
     add("fc2.weight");
+    add("acoustic_encoder.conv1.weight");
+    add("quantizer.quantizers.0.project_in.weight");
+    add("quantizer.quantizers.0.codebook.embed_avg");
     add("acoustic_decoder.conv1.weight");
     add("acoustic_decoder.block.0.conv_t1.weight");
     for (int i = 0; i < 8; i++)
@@ -84,6 +87,40 @@ int main(int argc, char** argv) {
     assert(!load_tokenizer(&ctx, truncated.c_str()));
     assert(!ctx.tokenizer.loaded && !ctx.tokenizer.backend && !ctx.tokenizer.ctx_w && ctx.tokenizer.dec_blocks.empty());
     assert(load_tokenizer(&ctx, path.c_str()));
+    // Decoder-only loading must exclude encoder weights while preserving all
+    // selected serialized bytes. Reuse succeeds even without the source file;
+    // replacing the tokenizer invalidates the resident copy.
+    test_env("CRISPASR_OMNIVOICE_CODEC_RESIDENT", nullptr);
+    assert(!codec_resident_enabled());
+    test_env("CRISPASR_OMNIVOICE_CODEC_RESIDENT", "1");
+    assert(codec_resident_enabled());
+    assert(tok_prepare_resident_decoder(&ctx));
+    auto& decoder = ctx.resident_decoder;
+    assert(decoder.loaded && !decoder.enc_conv1_w && !decoder.quantizers[0].proj_in_w);
+    assert(!ggml_get_tensor(decoder.ctx_w, "quantizer.quantizers.0.codebook.embed_avg"));
+    assert(ctx.tokenizer.enc_conv1_w && ctx.tokenizer.quantizers[0].proj_in_w);
+    for (auto* t = ggml_get_first_tensor(decoder.ctx_w); t; t = ggml_get_next_tensor(decoder.ctx_w, t)) {
+        assert(tok_is_decode_weight(t->name));
+        auto* original = ggml_get_tensor(ctx.tokenizer.ctx_w, t->name);
+        assert(original && ggml_nbytes(original) == ggml_nbytes(t));
+        std::vector<uint8_t> a(ggml_nbytes(t)), b(a.size());
+        ggml_backend_tensor_get(original, a.data(), 0, a.size());
+        ggml_backend_tensor_get(t, b.data(), 0, b.size());
+        assert(a == b);
+    }
+    auto* retained = decoder.buf_w;
+    std::filesystem::rename(path, path + ".moved");
+    assert(tok_prepare_resident_decoder(&ctx) && decoder.buf_w == retained);
+    std::filesystem::rename(path + ".moved", path);
+    assert(load_tokenizer(&ctx, path.c_str()));
+    assert(!decoder.loaded && !decoder.ctx_w && !decoder.backend);
+    ctx.tokenizer.path = truncated;
+    assert(!tok_prepare_resident_decoder(&ctx));
+    assert(!decoder.loaded && !decoder.ctx_w && !decoder.backend);
+    assert(load_tokenizer(&ctx, path.c_str()));
+    test_env("CRISPASR_OMNIVOICE_CODEC_RESIDENT", "0");
+    assert(!codec_resident_enabled());
+    std::cout << "PASS filtered decoder bytes, file-independent reuse, invalidation and failed-load cleanup\n";
     // A cache miss with SPLIT disabled must not force a different placement.
     ctx.use_gpu = true;
     crispasr_set_gpu_backend_pref("cpu");

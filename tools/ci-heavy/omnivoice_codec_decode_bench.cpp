@@ -1,4 +1,8 @@
 // POSIX decoder-only probe; two independently prepared contexts, warmup then ABBAAB.
+// Match the repository library ABI when this probe is compiled outside CMake.
+#ifndef GGML_MAX_NAME
+#define GGML_MAX_NAME 128
+#endif
 #include "../../src/omnivoice.cpp"
 #undef NDEBUG
 #include <cassert>

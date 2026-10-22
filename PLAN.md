@@ -1,23 +1,20 @@
 # CrispASR — Pending work
 
-## NOW — M1 OmniVoice engine comparison and latency (2026-10-23)
+## M1 OmniVoice comparison and resident decoder — completed (2026-10-23)
 
-Owner: Codex. Baseline main `c34459b2e`. Compare supplied omnivoice.cpp
-`1a468d8` / ggml `cc5df49a` against a fresh current-source CrispASR build.
-Record model/codec precision differences, matched recipe and per-stage timings;
-keep package comparison separate from fixed-weight optimization A/B. Profile
-before implementing, retain experimental gates and validate generated audio.
-One heavy build/model at a time. Quality acceptance limitations from the prior
-audit remain in force. First supplied-package warm runs are around30–32 s for
-an explicit6 s target; this is not an isolated engine verdict. A benchmark
-adapter preserves all active LLM/decoder tensor bytes for a matched run (unused
-encoder retains its original template schema; no cloning claim for the adapter).
-Resident decoder prototype is off by default and retains CPU encoding. Four
-counterbalanced fixed-code cases measure CPU1.92–2.82 s, split reload1.02–1.48 s,
-resident0.38–0.55 s;16 resident/old-Metal PCM pairs are byte-exact. Serialized
-resident weights44,196,000 B plus80,888,704 B caches. Selected4 CTest cases and
-native ASan/UBSan lifecycle pass. Pending: both-ASR roundtrips, fresh encoder
-reuse, matched active-weight engine timings, and final default disposition.
+Owner: Codex. Gated resident decoder, loader/lifetime regressions and reproducible
+native comparison tools are implemented. Quiet paired request 8.84→8.08 s;
+matched-value omnivoice.cpp bracketing medians 9.57/10.01 s. Both ASR judges pass
+the unconditioned comparison; clone transcripts retain existing disagreements.
+Final 48 fixed-code decodes and fresh uncached CPU encodes preserve baseline
+bytes/codes; four selected CTest cases, ASan/UBSan and negative control pass.
+The full Release CLI/shared library builds; live Python Session C ABI outputs
+match the scored native code/PCM bytes for CPU and resident modes.
+Resident weight/cache buffers 124 MB. Split/resident/decomposition remain off
+by default. [Scope, commands and receipt](docs/omnivoice-m1-comparison-2026-10-23.md).
+Next optimization target is the dominant generation stage and expensive
+initialization; these measurements do not validate a ggml bump or a
+platform-wide default. Broad cloning acceptance is still open.
 
 ## NOW — OmniVoice codec and acceptance audit (2026-10-22)
 
@@ -34,8 +31,10 @@ live pairs preserve both ASR transcripts and differ by at most one PCM16 step.
 On M1, `station` fails the established Nemotron gate (2/9) while CTC scores it
 zero. Linux CPU campaign39857487336 on first repair `b608bcdd1` instead fails
 three `window` cloning surfaces at2/9; station targets pass. Its utility/DSP
-oracles pass, including exact waveform parity. Current complete campaign39861560201 is queued at harness source `f87af58aa`
-(runtime code `5acff9f21`), with generated codes retained for every surface.
+oracles pass, including exact waveform parity. Complete campaign39861560201 at harness source `f87af58aa`
+(runtime code `5acff9f21`) also failed WER 2/9 on the three window-cloning
+surfaces; station and unconditioned arms passed. Generated codes are retained
+for every surface.
 Superseded39860613583 was cancelled before acceptance. CI/lint follow the latest
 main tip; earlier partial green jobs do not certify the tip. No full hosted or
 cloning acceptance is claimed.
