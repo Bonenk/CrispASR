@@ -830,31 +830,26 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
   array-audited and permanently republished with a verified anonymous download.
   See HISTORY.md and docs/omnivoice-clone-diagnostic-2026-10-09.json. Remaining
   work is runtime/input/precision/quality diagnosis, not another proof search.
-- **Issue518 / PR521 / OmniVoice:** audio/text utilities match upstream;
-  the2/9 clone WER was the reference clip, not the gate or the port (see below).
-  The standalone utilities are integrated with complete original/native array
-  replay and hosted checks; see HISTORY.md. The PR is ready-for-review; updated headab6c92cae incorporates main35df8d6d4
-  while preserving contributor history. The helper-test conflict is resolved;
-  main's newer ggml pin preserves two CANN fixes. A literal UBSan regression
-  reproduced and now guards the signed128-minimum formatter overflow.
-  Its body/discussion/review comments were re-read. The Linux failure is the
-  stale vibevoice architecture expectation already fixed on main; CLANG64 lacks
-  `<cstdlib>` in the deprecated executable (now fixed on main);
-  CUDA11.8 setup hit Chocolatey504 before compilation. Fresh head checks are
-  queued; inspect them rather than rerunning stale-source jobs.
-  Cloning quality root-caused 2026-10-22: the pinned `fox.wav` does not say its
-  transcript ("fex/fixed … dig" under both the Nemotron RNNT and the Parakeet
-  CTC judge, 0.222 each), every clone arm inherited exactly those two words,
-  and the no-reference control says "fox/dog". The acceptance harness now
-  transcribes every fixture with both architectures before synthesizing,
-  refuses a reference no engine can read back, and scores clones cross-sentence
-  on `window` (0.000 both). Seven gated arms, max 0.111 against the unchanged
-  0.2 gate. Receipt
+- **Issue518 / PR521 / OmniVoice — MERGED 2026-10-22 (`0cd80cba2`):** audio and
+  text utilities match upstream `08be0b4`, behind env gates with
+  `CRISPASR_OMNIVOICE_AUDIO_LEGACY=1` restoring the prior pipeline. The2/9 clone
+  WER that blocked integration was the reference clip, not the gate or the port:
+  pinned `fox.wav` says "fex/dig" under both the Nemotron RNNT and the Parakeet
+  CTC judge (0.222 each), every clone arm inherited exactly those two words, and
+  the no-reference control says "fox/dog". The acceptance harness now
+  transcribes every fixture with both architectures before synthesizing, refuses
+  a reference no engine can read back, and scores clones cross-sentence on
+  `window` (0.000 both); seven arms pass the unchanged0.2 gate, maximum0.111.
+  Merge scope also closed the helper-test conflict, the stale ggml pin, the
+  signed128-minimum UBSan overflow and the CLANG64 `<cstdlib>` include. Receipt
   `docs/omnivoice-clone-reference-integrity-2026-10-22.json`, method in
-  `docs/omnivoice-audio-processing.md`.
-  Full diff/runtime review, original utility proof and unchanged cloning-quality
-  gates still govern merge scope. Do not call the onset repaired or relax the clone gate. Preserve controls and
-  contributor history.
+  `docs/omnivoice-audio-processing.md`. The pre-merge head passed CI, Lint,
+  Build WASM, Docker Smoke, Binding ABI contracts, Bindings (Ruby) and
+  Regression (nightly) on `ed6c21ecb`; contributor history is preserved in the
+  merge commit.
+  The onset/click is NOT proven repaired — fades attenuate a transient but do
+  not remove every click. Do not reuse `fox.wav` as a cloning reference and do
+  not relax the clone gate.
 - **Breeze:** accepted guided/voice/server fixes are merged. Investigate canonical
   BF16 grid equality (0/8 despite passing scoped speech controls) and unresolved
   model-quality reports from merged contributor PR530 only with a new hypothesis.

@@ -1,3 +1,32 @@
+## 2026-10-22 — PR521 merged: upstream OmniVoice audio utilities, with a vetted cloning reference
+
+Merged `0cd80cba2` (PR #521, contributor history preserved). Reference
+preparation now mirrors upstream `08be0b4` — mono/24 kHz, measure original RMS,
+normalize quiet references to0.1, remove silence (200/100/200 ms), clip to the
+960-sample hop, encode, and add missing terminal punctuation — and output
+cleanup removes silence (500/100/100 ms), restores the reference RMS or
+normalizes an unconditioned voice to0.5 peak, then fades/pads100 ms per side.
+Every stage is env-gated and `CRISPASR_OMNIVOICE_AUDIO_LEGACY=1` restores the
+prior pipeline; `omnivoice_set_audio_processing` configures the same state
+without touching the by-value params ABI.
+
+The cloning gate that had blocked the PR for days failed on its own fixture.
+Pinned `fox.wav` says "fex/dig" under both an RNNT and a CTC judge (0.222 each),
+a clone reproduces the reference's pronunciation, so every arm inherited exactly
+those two words while the no-reference control said "fox/dog". The acceptance
+harness now transcribes each fixture with both architectures before synthesizing,
+refuses a reference no engine can read back, and scores clones cross-sentence on
+`window`; seven CLI/session arms pass the unchanged0.2 gate, maximum0.111
+(the residual is Nemotron dropping a leading "The"; the second target is0.000).
+Two full runs produced byte-identical PCM. Receipt
+`docs/omnivoice-clone-reference-integrity-2026-10-22.json`, method in
+`docs/omnivoice-audio-processing.md`.
+
+Not claimed: the onset/click is not proven repaired, `fox.wav` remains unusable
+as a reference, and no gate, seed or fixture-outcome was changed. The pre-merge
+head passed CI, Lint, Build WASM, Docker Smoke, Binding ABI contracts, Bindings
+(Ruby) and Regression (nightly).
+
 ## 2026-10-22 — issue551 Parakeet schema rejection and license acceptance
 
 The external transcribe.cpp Unified GGUF uses arch `parakeet` but a distinct
