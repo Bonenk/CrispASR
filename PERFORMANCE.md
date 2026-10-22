@@ -800,8 +800,12 @@ the §232 campaign. Verified against current code, not carried from this doc.
   acoustic-encoder stage (cos_min 0.9959, max_abs 0.285 on Metal vs 1.000000 on CPU;
   semantic and fc stages pass) and it is NOT weight precision — baking F32 copies of
   all 74 encoder conv kernels changes the diff bit-for-bit *not at all*, because
-  F16→F32 widening is lossless. A Metal kernel bug in that graph; needs a per-block
-  bisect. See LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
+  F16→F32 widening is lossless. The per-block bisect lands on the first **strided**
+  stage (`ac_block0`, `ggml_conv_1d` stride 8): same archive both backends give
+  1.000000/4.47e-04 on the stride-1 `ac_conv1`, then 0.999092 (CPU) vs 0.997416
+  (Metal) at `ac_block0`, compounding from there. Fix = polyphase the strided conv
+  into stride-1 convs, or keep the ENCODER on the CPU and copy only the decoder
+  weights (~50 MB of the 403 MB) to the GPU. See LEARNINGS 41. `CRISPASR_OMNIVOICE_CODEC_GPU=1` opts in
   for reference-free TTS.
   `CRISPASR_OMNIVOICE_BENCH=1` also splits the codec bucket: `decode_graph_build`
   0.31 ms, `decode_gallocr` 0.26 ms, `decode_readback` 2.4 ms — graph caching is not

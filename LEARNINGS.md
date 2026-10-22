@@ -37,13 +37,26 @@ acoustic-encoder graph, not the HuBERT branch. **It is NOT weight precision**:
 baking F32 copies of all 74 encoder conv kernels (`FASTCONV`) changes the diff
 numbers bit-for-bit *not at all*, because F16→F32 widening is lossless — the
 cached F32 kernel holds exactly the values the F16 one dequantises to. The bug is
-in a Metal kernel the encoder graph uses (strided `ggml_conv_1d` / im2col with
-those shapes), and localizing it needs `CRISPASR_OMNIVOICE_ACENC_BISECT=<archive>`
-against per-block tensors (`ac_conv1`, `ac_b0_snake`, `ac_block0..4`,
-`ac_snake1`) — the archive the current dumper does not emit yet. Next step is to
-dump those stages from the HF `audio_tokenizer` with
-`tools/dump_omnivoice_encode_reference.py` extended, then bisect the first block
-whose cos_min drops. The same trap made the decode slow in the first place —
+in a Metal kernel the encoder graph uses, and
+`CRISPASR_OMNIVOICE_ACENC_BISECT=<archive>` localizes it to the first **strided**
+stage. Dumping the per-block tensors from the HF `audio_tokenizer` (hooks on
+`acoustic_encoder.{conv1, block[b].snake1, block[b], snake1}`; the archive must be
+dumped from the ref.gguf's own `input_wav24k`, not from a different WAV — shapes
+else are off by the clip-length ratio and every stage reports SHAPE) gives, with
+only `CODEC_GPU` changing:
+
+  ac_conv1     1.000000 / 4.469e-04  BOTH   (stride-1 conv: fine on Metal)
+  ac_b0_snake  0.999813 CPU  / 0.999361 Metal
+  ac_block0    0.999092 CPU  / 0.997416 Metal   <- first material divergence
+  ... every later stage Metal is worse, ending at e_acoustic 0.995934 FAIL
+
+`ac_block0` is the first `enc_conv1d_strided` (`ggml_conv_1d`, stride 8, kernel
+16). So `ggml_conv_1d` at stride > 1 is the inaccurate Metal path; stride-1 convs
+are exact. Two ways out: decompose the strided conv into stride-1 convs by phase
+(polyphase, keeps the GPU codec), or run the ENCODER on the CPU and only the
+DECODER on the GPU — the decoder's weights are a small fraction of the 403 MB
+tokenizer (the bulk is HuBERT), so a ~50 MB GPU copy of the decoder tensors
+would do it, at the cost of twin tensor pointers in the decode path. The same trap made the decode slow in the first place —
 `ggml_conv_transpose_1d` is dispatch-bound on Metal, so the Metal codec was
 1759 ms vs 685 ms on CPU until the upsampler was decomposed. With the decomposed
 path the Metal DECODE is the fastest of all (242 ms), but it stays opt-in until the
