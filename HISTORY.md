@@ -7,6 +7,10 @@ eligible reference at the same threshold. Seven passing `window` arms and the
 independent DSP oracle remain scoped evidence; neither proves general cloning
 quality or the cause of `fox` substitutions. See
 `docs/omnivoice-audit-2026-10-22.md` for runtime findings and verification.
+Decomposition and split stay off by default. Counterbalanced CPU timings do not
+establish a consistent latency win, despite lower process CPU work. A duplicate
+40 MB F32 cache is removed; all 32 replay decodes retain their baseline PCM.
+
 
 ## 2026-10-22 — PR521 merged: upstream OmniVoice audio utilities, with a vetted cloning reference
 

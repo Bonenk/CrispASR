@@ -1,0 +1,585 @@
+{
+  "runtime_source": "b608bcdd1b62d21db332b3a68a8f11d6f329315a",
+  "asr_library_sha256": "9f030ae613360002621361c7f0d027482e538b8f0dbb26ddb9f5a824d901da69",
+  "judges": {
+    "nemotron": {
+      "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+      "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+      "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+      "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+    },
+    "parakeet": {
+      "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+      "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+      "file": "parakeet-ctc-0.6b-q4_k.gguf",
+      "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+    }
+  },
+  "pcm": {
+    "window-0": {
+      "samples": 57576,
+      "max_abs": 3.0517578125e-05,
+      "rms_error": 1.01206925301239e-06,
+      "cosine": 0.9999999999580533,
+      "crop_norm": 26.512161076599362,
+      "decomp_norm": 26.512158633342423,
+      "different_samples": 64,
+      "crop_sha256": "d00bc9d19e2a983b09b2e926acd406fe5bfaab77612a1a5b92122b98487a8b89",
+      "decomp_sha256": "0517995760e1dbeb166fd7f5a9b567460632332cda1486d6f87988ffddbc4978",
+      "codes_sha256": "dc510e54a2cbaf38f8be7b72dbed85cbe038d69d2efc0710101de62808c9d3a3"
+    },
+    "window-1": {
+      "samples": 78696,
+      "max_abs": 3.0517578125e-05,
+      "rms_error": 9.264977611229803e-07,
+      "cosine": 0.999999999978798,
+      "crop_norm": 39.91287347959498,
+      "decomp_norm": 39.91287437783763,
+      "different_samples": 73,
+      "crop_sha256": "0110e412fee0ab51a9902505ed1cf5442448ff7fcfe88e7f65da51ea54ed1adc",
+      "decomp_sha256": "ce7efe3a3c50485ccd81736fa5fedb07c77fc634b3000d623fe8908df4a915db",
+      "codes_sha256": "e76fa9e44f261b7c4afecad7946370b8d04389714ebe75e0e76d035657dd537b"
+    },
+    "station-0": {
+      "samples": 53736,
+      "max_abs": 3.0517578125e-05,
+      "rms_error": 8.333081459992742e-07,
+      "cosine": 0.9999999999676122,
+      "crop_norm": 24.000858440986498,
+      "decomp_norm": 24.00085946536513,
+      "different_samples": 43,
+      "crop_sha256": "2ab0d92c85c041c1dcbdafa479f892d8d27e9a26ccccecc5ab3722946ef3bebf",
+      "decomp_sha256": "16db271ade6237f2b66993f894a310be96c12f6c12af4495664c08ad2f83fdf2",
+      "codes_sha256": "f33e01f5a0aaa5551203f7d96abbf879cf1c82ffca2a554807e7d2e1fca9f4bb"
+    },
+    "station-1": {
+      "samples": 70056,
+      "max_abs": 3.0517578125e-05,
+      "rms_error": 7.90453497953743e-07,
+      "cosine": 0.9999999999755668,
+      "crop_norm": 29.928854008825635,
+      "decomp_norm": 29.92885480717047,
+      "different_samples": 47,
+      "crop_sha256": "36fa707b5b76ecdeaf2c6a4905aac0ecc429e063c3891cc406c67cdaa5461e7f",
+      "decomp_sha256": "58df5d6d04b0e4cca2d2fcd5864bce126f45f2aeeb458b967ec9ae7aced443cf",
+      "codes_sha256": "55958ad15530bfe55c57fa8fd822f29033e33f177c1e887578ae1cc28347d58f"
+    }
+  },
+  "roundtrips": {
+    "window-0-0": {
+      "nemotron": {
+        "transcript": "Quick brown Fox jumps over the lazy dog.",
+        "wer": 0.1111111111111111
+      },
+      "parakeet": {
+        "transcript": "a quick brown fox jumps over the lazy dog",
+        "wer": 0.1111111111111111
+      }
+    },
+    "window-0-1": {
+      "nemotron": {
+        "transcript": "Quick brown Fox jumps over the lazy dog.",
+        "wer": 0.1111111111111111
+      },
+      "parakeet": {
+        "transcript": "a quick brown fox jumps over the lazy dog",
+        "wer": 0.1111111111111111
+      }
+    },
+    "window-1-0": {
+      "nemotron": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0
+      },
+      "parakeet": {
+        "transcript": "we should bring enough water and food for the long walk home",
+        "wer": 0.0
+      }
+    },
+    "window-1-1": {
+      "nemotron": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0
+      },
+      "parakeet": {
+        "transcript": "we should bring enough water and food for the long walk home",
+        "wer": 0.0
+      }
+    },
+    "station-0-0": {
+      "nemotron": {
+        "transcript": "The quick brown fox jumps over the lady.",
+        "wer": 0.2222222222222222
+      },
+      "parakeet": {
+        "transcript": "the quick brown fox jumps over the lazy dog",
+        "wer": 0.0
+      }
+    },
+    "station-0-1": {
+      "nemotron": {
+        "transcript": "The quick brown fox jumps over the lady.",
+        "wer": 0.2222222222222222
+      },
+      "parakeet": {
+        "transcript": "the quick brown fox jumps over the lazy dog",
+        "wer": 0.0
+      }
+    },
+    "station-1-0": {
+      "nemotron": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0
+      },
+      "parakeet": {
+        "transcript": "we should bring enough water and food for the long walk home",
+        "wer": 0.0
+      }
+    },
+    "station-1-1": {
+      "nemotron": {
+        "transcript": "We should bring enough water and food for the long walk home.",
+        "wer": 0.0
+      },
+      "parakeet": {
+        "transcript": "we should bring enough water and food for the long walk home",
+        "wer": 0.0
+      }
+    }
+  },
+  "scope": "M1 CPU codec crop/decomposition comparison on fixed codes from two references and two targets; main LLM on Metal. Not full native/upstream cloning parity or a speaker-similarity test.",
+  "ggml_revision": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "model": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "sha256": {
+      "omnivoice-q8_0.gguf": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+      "omnivoice-tokenizer-f16.gguf": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63"
+    }
+  },
+  "fixture": {
+    "repo": "cstr/crispasr-regression-fixtures",
+    "repo_type": "model",
+    "revision": "d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3",
+    "sha256": {
+      "fox": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
+      "window": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
+      "station": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a"
+    }
+  },
+  "hardware": {
+    "platform": "macOS arm64",
+    "gpu": "Apple M1",
+    "ram_gb": 16,
+    "codec_threads": 4,
+    "seed": 42,
+    "steps": 32
+  },
+  "decoder_parity_passed": true,
+  "speech_acceptance_passed": false,
+  "asr_binary_provenance": "Pre-existing native judge library; SHA recorded above. It was not rebuilt at the audit source. Both judge model files were checked against their exact public pinned SHA256 before loading.",
+  "timings": {
+    "window-0": {
+      "crop": {
+        "reload_ms": 10285.3,
+        "decode_with_postprocessing_ms": 1375.76,
+        "samples": 57576
+      },
+      "decomp": {
+        "reload_ms": 371.761,
+        "decode_with_postprocessing_ms": 1108.05,
+        "samples": 57576
+      }
+    },
+    "window-1": {
+      "crop": {
+        "reload_ms": 10309.7,
+        "decode_with_postprocessing_ms": 2197.4,
+        "samples": 78696
+      },
+      "decomp": {
+        "reload_ms": 355.025,
+        "decode_with_postprocessing_ms": 1450.34,
+        "samples": 78696
+      }
+    },
+    "station-0": {
+      "crop": {
+        "reload_ms": 10097.4,
+        "decode_with_postprocessing_ms": 2008.67,
+        "samples": 53736
+      },
+      "decomp": {
+        "reload_ms": 433.428,
+        "decode_with_postprocessing_ms": 1665.49,
+        "samples": 53736
+      }
+    },
+    "station-1": {
+      "crop": {
+        "reload_ms": 10803.9,
+        "decode_with_postprocessing_ms": 3814.36,
+        "samples": 70056
+      },
+      "decomp": {
+        "reload_ms": 446.889,
+        "decode_with_postprocessing_ms": 2179.71,
+        "samples": 70056
+      }
+    }
+  },
+  "timing_limit": "One fixed-order pair per target; illustrative, not a counterbalanced performance estimate. Reload measured separately, not charged to decode bucket.",
+  "validation": {
+    "ctest_selected": 4,
+    "ctest_passed": 4,
+    "permutation_assertions": 17,
+    "permutation_cases": 2,
+    "native_sanitizers": [
+      "AddressSanitizer",
+      "UBSan"
+    ],
+    "negative_controls": {
+      "placement_guard_removed": {
+        "returncode": -6,
+        "expected_failure": true
+      },
+      "historical_permutation_helper": {
+        "returncode": -6,
+        "expected_failure": true
+      }
+    },
+    "allocator_regression": {
+      "positive_cases": 5,
+      "expected_historical_or_mutated_failures": 4
+    },
+    "selection_probe": {
+      "historical": [
+        "window"
+      ],
+      "corrected": [
+        "window",
+        "station"
+      ],
+      "input": "historical pinned reference-integrity measurements",
+      "clone_outputs_used_to_select": false
+    },
+    "acceptance_policy_cases": 4,
+    "native_sanitizer_final_returncode": 0,
+    "native_sanitizer_final_source_hashes": {
+      "src/omnivoice.cpp": "8d4f35c31b2e59d86dcf7f901c0b9aa608b8a80395129cf3e6a6a4bf141462ed",
+      "tests/test-omnivoice-codec.cpp": "9df011be513d21002e80957b8e5ec293966c825b2a318eabc9a376bb7c574ffe"
+    }
+  },
+  "baseline_window_crop_hashes_match_historical_receipt": true,
+  "runtime_source_hashes": {
+    "src/omnivoice.cpp": "2fada3efaf91cfb7f65251694dd9e35649823043797094ebc59d1ec2e726fc54",
+    "src/core/conv.h": "e5aa494ba5f5561d13c37215ced887c34e027cc1e5eee7b848a35035b7700586",
+    "src/core/audio_resample.cpp": "fe93da307c62c67626859988313781a680e0e2f1c9fcc717f4926cc22daafc0f",
+    "src/core/rvq.cpp": "07747bfc1785024dbdcee6873cccaeb0564ddbb16e02282b12a015d5acfa3939"
+  },
+  "cache_reduction": {
+    "source_sha256": "a2038bbd9a9da8570ea456419d2c1e44de11331cf813e0c317f6f1fa3609405e",
+    "eliminated_duplicate_bytes": 40026112,
+    "prepared_buffer_bytes": {
+      "crop": {
+        "baked_f32_bytes": 80888704,
+        "permuted_bytes": 0
+      },
+      "decomp": {
+        "baked_f32_bytes": 40862592,
+        "permuted_bytes": 40026112
+      }
+    },
+    "baseline_byte_equality_checks": 32,
+    "driver": "tools/ci-heavy/omnivoice_codec_decode_bench.cpp",
+    "protocol": "separate prepared CPU contexts, one warmup per arm, then ABBAAB; fixed codes and four clips. No simultaneous graph execution. Graph allocation, compute and output DSP included; model/preparation/rebinding excluded.",
+    "observations": {
+      "window-0": [
+        {
+          "repetition": 0,
+          "arm": "crop",
+          "cpu_ms": 7398.84,
+          "wall_ms": 3827.65,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 1,
+          "arm": "decomp",
+          "cpu_ms": 6742.63,
+          "wall_ms": 3316.2,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 2,
+          "arm": "crop",
+          "cpu_ms": 8409.73,
+          "wall_ms": 3577.81,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 3,
+          "arm": "decomp",
+          "cpu_ms": 6926.59,
+          "wall_ms": 2875.62,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 4,
+          "arm": "decomp",
+          "cpu_ms": 6726.72,
+          "wall_ms": 2740.82,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 5,
+          "arm": "crop",
+          "cpu_ms": 6959.02,
+          "wall_ms": 2821.16,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 6,
+          "arm": "crop",
+          "cpu_ms": 7091.4,
+          "wall_ms": 2789.04,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 7,
+          "arm": "decomp",
+          "cpu_ms": 6479.37,
+          "wall_ms": 3596.09,
+          "bit_exact_to_first_live_run": true
+        }
+      ],
+      "window-1": [
+        {
+          "repetition": 0,
+          "arm": "crop",
+          "cpu_ms": 8584.72,
+          "wall_ms": 3937.49,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 1,
+          "arm": "decomp",
+          "cpu_ms": 7075.34,
+          "wall_ms": 3330.66,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 2,
+          "arm": "crop",
+          "cpu_ms": 8172.81,
+          "wall_ms": 3183.94,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 3,
+          "arm": "decomp",
+          "cpu_ms": 8317.01,
+          "wall_ms": 3443.11,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 4,
+          "arm": "decomp",
+          "cpu_ms": 8055.87,
+          "wall_ms": 3362.91,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 5,
+          "arm": "crop",
+          "cpu_ms": 8921.6,
+          "wall_ms": 5416.5,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 6,
+          "arm": "crop",
+          "cpu_ms": 5190.47,
+          "wall_ms": 2296.87,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 7,
+          "arm": "decomp",
+          "cpu_ms": 5637.54,
+          "wall_ms": 3470.19,
+          "bit_exact_to_first_live_run": true
+        }
+      ],
+      "station-0": [
+        {
+          "repetition": 0,
+          "arm": "crop",
+          "cpu_ms": 4344.85,
+          "wall_ms": 3418.08,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 1,
+          "arm": "decomp",
+          "cpu_ms": 3088.7,
+          "wall_ms": 1616.1,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 2,
+          "arm": "crop",
+          "cpu_ms": 4174.76,
+          "wall_ms": 2526.08,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 3,
+          "arm": "decomp",
+          "cpu_ms": 3536.46,
+          "wall_ms": 1968.33,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 4,
+          "arm": "decomp",
+          "cpu_ms": 2872.75,
+          "wall_ms": 1336.28,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 5,
+          "arm": "crop",
+          "cpu_ms": 3673.48,
+          "wall_ms": 1698.24,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 6,
+          "arm": "crop",
+          "cpu_ms": 3545.22,
+          "wall_ms": 1654.45,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 7,
+          "arm": "decomp",
+          "cpu_ms": 3747.9,
+          "wall_ms": 2017.54,
+          "bit_exact_to_first_live_run": true
+        }
+      ],
+      "station-1": [
+        {
+          "repetition": 0,
+          "arm": "crop",
+          "cpu_ms": 5153.64,
+          "wall_ms": 2784.0,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 1,
+          "arm": "decomp",
+          "cpu_ms": 4274.72,
+          "wall_ms": 2128.77,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 2,
+          "arm": "crop",
+          "cpu_ms": 4280.7,
+          "wall_ms": 2043.56,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 3,
+          "arm": "decomp",
+          "cpu_ms": 4075.45,
+          "wall_ms": 2018.02,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 4,
+          "arm": "decomp",
+          "cpu_ms": 4147.9,
+          "wall_ms": 2096.64,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 5,
+          "arm": "crop",
+          "cpu_ms": 4645.26,
+          "wall_ms": 2269.47,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 6,
+          "arm": "crop",
+          "cpu_ms": 5101.45,
+          "wall_ms": 2658.49,
+          "bit_exact_to_first_live_run": true
+        },
+        {
+          "repetition": 7,
+          "arm": "decomp",
+          "cpu_ms": 3529.94,
+          "wall_ms": 1755.14,
+          "bit_exact_to_first_live_run": true
+        }
+      ]
+    },
+    "summary": {
+      "window-0": {
+        "crop": {
+          "median_cpu_ms": 7091.4,
+          "median_wall_ms": 2821.16
+        },
+        "decomp": {
+          "median_cpu_ms": 6726.72,
+          "median_wall_ms": 2875.62
+        }
+      },
+      "window-1": {
+        "crop": {
+          "median_cpu_ms": 8172.81,
+          "median_wall_ms": 3183.94
+        },
+        "decomp": {
+          "median_cpu_ms": 8055.87,
+          "median_wall_ms": 3443.11
+        }
+      },
+      "station-0": {
+        "crop": {
+          "median_cpu_ms": 3673.48,
+          "median_wall_ms": 1698.24
+        },
+        "decomp": {
+          "median_cpu_ms": 3536.46,
+          "median_wall_ms": 1968.33
+        }
+      },
+      "station-1": {
+        "crop": {
+          "median_cpu_ms": 4645.26,
+          "median_wall_ms": 2269.47
+        },
+        "decomp": {
+          "median_cpu_ms": 4075.45,
+          "median_wall_ms": 2018.02
+        }
+      }
+    },
+    "subsequent_default_change": "The default predicate was subsequently changed to opt-in only. This does not affect the probe, which explicitly prepares arm 0 and arm 1."
+  },
+  "default_disposition": {
+    "decomposition": "off on all backends; explicit opt-in only",
+    "split": "off; explicit opt-in only",
+    "reason": "counterbalanced M1 CPU wall medians regressed in three of four clips; lower CPU work alone is insufficient for promotion",
+    "final_runtime_source_sha256": "8d4f35c31b2e59d86dcf7f901c0b9aa608b8a80395129cf3e6a6a4bf141462ed"
+  },
+  "ggml_library_sha256": {
+    "libggml.dylib": "c4d184876f77314dcc42c2957b1d9bec0575c4a838e2755dabab2d75c94e5409",
+    "libggml-base.dylib": "169156bb0025b3831764e90f769687dd612e8e65ac493bc541bc95c847725fee",
+    "libggml-cpu.dylib": "9d1fc926685e3b7099c6c91df5b4faf859fa7f94537cd4a0881ca6297b32f684"
+  }
+}

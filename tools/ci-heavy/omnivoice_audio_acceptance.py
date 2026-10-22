@@ -219,8 +219,8 @@ with Session(asr_paths['nemotron'],lib_path=str(lib),backend='nemotron',n_thread
                               wer=word_wer(gate_targets[label], actual), samples=len(pcm),
                               sha256=hashlib.sha256(pcm.tobytes()).hexdigest())
         (OUT/'roundtrips.json').write_text(json.dumps(results,indent=2)+'\n')
-assert set(results) == expected_outputs and all(case['wer'] <= WER_GATE for case in results.values()), results
-receipt = dict(passed=True,model_revision=MODEL_PIN,fixture_revision=FIXTURE_PIN,
+passed = set(results) == expected_outputs and all(case['wer'] <= WER_GATE for case in results.values())
+receipt = dict(passed=passed,model_revision=MODEL_PIN,fixture_revision=FIXTURE_PIN,
     asr_models={engine:dict(repo=repo,name=name,revision=rev)
                 for engine,(repo,name,rev) in ASR_MODELS.items()},
     wer_gate=WER_GATE,clone_references=list(CLONE_REFS),reference_integrity=integrity,
@@ -228,4 +228,6 @@ receipt = dict(passed=True,model_revision=MODEL_PIN,fixture_revision=FIXTURE_PIN
     source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip())
 (OUT/'omnivoice-518-acceptance.json').write_text(json.dumps(receipt,indent=2)+'\n')
 (OUT/'summary.md').write_text('OmniVoice reference-integrity, utility/decode oracle, CLI/session '
-    'cross-sentence cloning and ASR roundtrips PASS.\n')
+    'cross-sentence cloning and ASR roundtrips ' + ('PASS' if passed else 'FAIL') + '.\n')
+# Persist a failed aggregate receipt before making the workflow red.
+assert passed, results

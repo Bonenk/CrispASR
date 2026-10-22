@@ -2,11 +2,19 @@
 
 ## NOW — OmniVoice codec and acceptance audit (2026-10-22)
 
-Owner: Codex, branch `fix/codec-audit-internal`. Audit remote main `22e1b6ada`
-and codec branch `f76d4b190`. Check placement gates, failed/repeated tokenizer
-loads, decomposed-kernel allocation failure, and reference selection independent
-of synthesis outcomes. Keep performance claims scoped to their actual hardware
-and measured boundaries; no broad cloning-quality certification from one reference.
+Owner: Codex, remote branch `fix/omnivoice-codec-audit`. Audit baseline main
+`22e1b6ada` and codec branch `f76d4b190`. Repairs cover split-off placement,
+backend-aware reference caches, complete reload cleanup, transactional
+permutation publication and a 40 MB unused F32 cache. Decomposition and split
+both remain off by default on all backends; the counterbalanced CPU test did
+not establish a consistent wall-time gain.
+Reference selection now includes every integrity-eligible reference. Historical
+subset acceptance is rejected; failed WER gates persist aggregate receipts.
+Local native/sanitizer tests and four selected CTest registrations pass; fixed-code
+live pairs preserve both ASR transcripts and differ by at most one PCM16 step.
+`station` fails the established Nemotron gate (2/9) while CTC scores it zero;
+keep this disagreement visible. Hosted checks are in progress, not accepted.
+See `docs/omnivoice-audit-2026-10-22.md` and its live receipt.
 
 ## NOW — issue551 hosted validation (2026-10-22)
 

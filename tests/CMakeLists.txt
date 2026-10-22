@@ -5440,6 +5440,12 @@ set_tests_properties(test-package-lib-bundle PROPERTIES
 # Discover Python before constructing commands or guarding their registration.
 # A later find_package leaves clean builds without the guarded unit tests.
 find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME omnivoice-acceptance-policy
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_omnivoice_acceptance_policy.py -v)
+    set_tests_properties(omnivoice-acceptance-policy PROPERTIES LABELS "unit;tts;omnivoice")
+endif()
+
 
 # ─── test-server-ws-stream — live: --ws-port real-time WebSocket ASR streaming.
 # Raw-socket client (stdlib only) verifies the RFC 6455 handshake + a streaming

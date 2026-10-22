@@ -38,7 +38,11 @@ An audit found the experimental split code forcing CPU encode even with its
 switch off. Placement changes must be gated at the call site, and reference
 caches must distinguish encoder backend policy. Failed reloads must clear all
 borrowed tensor pointers; optional pre-permutation must publish pointers only
-after allocation succeeds. See `docs/omnivoice-audit-2026-10-22.md`.
+after allocation succeeds. Decomposition also made a crop-kernel F32 copy
+unused: prepare permutations first and bake the crop kernel only for blocks
+that need fallback, saving 40 MB on the pinned tokenizer. A decoder-only GPU
+budget must include current F32 caches and graph scratch, not just its roughly
+44 MB of serialized source weights. See `docs/omnivoice-audit-2026-10-22.md`.
 
 ## An A/B on a shared box needs a load check and a min-of-N — one benchmark number is worth nothing (2026-10-22)
 

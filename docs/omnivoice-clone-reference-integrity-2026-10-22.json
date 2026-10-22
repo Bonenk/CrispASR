@@ -1,5 +1,5 @@
 {
-  "passed": true,
+  "passed": false,
   "scope": "OmniVoice #518/#521 cloning quality: the pinned cloning reference was audited against its own transcript, and the unchanged 0.2 WER gate was re-run on a vetted cross-sentence reference",
   "seed": 42,
   "steps": 32,
@@ -168,7 +168,8 @@
   "rerun_reproducibility": "Two full runs (harness sources 8c9898239 and 123298600) produced byte-identical PCM for all seven arms and identical reference transcripts at seed 42.",
   "audit_correction": {
     "status": "superseded_subset_only",
-    "reason": "station satisfies min_wer <= 0.2 but was excluded because its clone failed. The seven measured arms retain their historical results; passed=true is not acceptance of all eligible references.",
+    "reason": "station satisfies min_wer <= 0.2 but was excluded because its clone failed. Measured per-arm results are retained, but overall acceptance is rejected; historical_selected_subset_passed preserves the original subset outcome.",
     "required": "Run the corrected harness with every eligible reference; do not infer pronunciation causality or full native/upstream parity from ASR agreement."
-  }
+  },
+  "historical_selected_subset_passed": true
 }

@@ -780,8 +780,12 @@ the §232 campaign. Verified against current code, not carried from this doc.
   `--tts-steps` now drives omnivoice's stage0 step count (default 32).
 - **omnivoice codec decode: experimental upsampler and split placement (2026-10-22):**
   `CRISPASR_OMNIVOICE_CODEC_DECOMP=0/1` selects crop/decomposed ConvTranspose1d.
-  The decomposed path defaults on CPU only; GPU defaults retain crop pending
-  backend-specific validation. The feature-branch report measured M1 CPU decode
+  The decomposed path is off by default on every backend; crop remains the
+  established default. Counterbalanced M1 CPU measurements reduced process CPU
+  work but median wall time regressed in three of four clips, so a consistent
+  latency win is not established. F32 crop kernels are no longer baked when the
+  permuted kernel is available, eliminating 40 MB of duplicate cached weights.
+  The feature-branch report measured M1 CPU decode
   at 685→472 ms for 2.8 s and 0.38→0.30 s for a short clone, with <=1 int16 LSB
   PCM differences and matching ASR transcripts. These are reported scoped
   measurements, not a cross-platform speed guarantee.

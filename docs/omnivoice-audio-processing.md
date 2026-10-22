@@ -60,7 +60,8 @@ The October 22 campaign tested only `window` and reported seven passing arms.
 It omitted `station` despite that reference passing the integrity rule, explicitly
 because its clone failed. That was outcome-based selection, so that receipt
 cannot certify the complete gate. The corrected harness includes `station` and
-writes per-arm results before failing; a fresh full campaign is required.
+writes per-arm results and a rejected aggregate receipt before failing; a fresh
+full campaign is required.
 `fox` fails both reference judges and remains a diagnostic control. Agreement
 between ASR models supports a fixture concern, but does not prove a particular
 pronunciation or establish that every native cloning defect is excluded.

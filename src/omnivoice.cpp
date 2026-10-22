@@ -685,7 +685,7 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 // ---------------------------------------------------------------------------
 
 static bool codec_fastconv_enabled();
-static bool codec_decomp_enabled(ggml_backend_t backend);
+static bool codec_decomp_enabled();
 static bool codec_gpu_enabled(const omnivoice_context* ctx);
 static bool codec_split_enabled();
 static bool codec_decode_on_gpu(const omnivoice_context* ctx);
@@ -933,26 +933,12 @@ static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want
     gguf_free(gf);
     tok.loaded = true;
 
-    // FASTCONV (#254): pre-bake F32 decode conv kernels (shared core_dac helper) so
-    // the per-graph F16→F32 cast disappears. env OMNIVOICE_CODEC_FASTCONV=0 skips it.
-    {
-        std::vector<ggml_tensor*> convs = {tok.dec_conv1_w, tok.dec_conv2_w};
-        for (auto& blk : tok.dec_blocks) {
-            convs.push_back(blk.conv_t1_w);
-            for (int r = 0; r < 3; r++) {
-                convs.push_back(blk.res[r].conv1_w);
-                convs.push_back(blk.res[r].conv2_w);
-            }
-        }
-        tok.fc.bake(tok.backend, convs, codec_fastconv_enabled());
-    }
-
     // DECOMP (#254): pre-permute the 5 ConvTranspose1d kernels to [IC, K*OC] F32
     // so the decode graph can use mul_mat + col2im_1d instead of
     // ggml_conv_transpose_1d (which materialises a pure-copy im2col at audio
     // rate). Separate ctx+buffer; conv_t1_w_perm stays null when the gate is
     // off, and higgs_decode then keeps the crop path.
-    if (codec_decomp_enabled(tok.backend)) {
+    if (codec_decomp_enabled()) {
         std::vector<ggml_tensor*> srcs;
         std::vector<ggml_tensor**> dsts;
         for (auto& blk : tok.dec_blocks) {
@@ -967,6 +953,23 @@ static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want
                 blk.conv_t1_w_perm = nullptr;
             fprintf(stderr, "omnivoice: ConvTranspose1d pre-permute failed; using the crop path\n");
         }
+    }
+
+    // FASTCONV (#254): pre-bake F32 decode conv kernels (shared core_dac helper) so
+    // the per-graph F16→F32 cast disappears. env OMNIVOICE_CODEC_FASTCONV=0 skips it.
+    {
+        std::vector<ggml_tensor*> convs = {tok.dec_conv1_w, tok.dec_conv2_w};
+        for (auto& blk : tok.dec_blocks) {
+            // Decomposition already owns an F32 permutation. Bake the crop
+            // kernel only when it is actually used (including fallback).
+            if (!blk.conv_t1_w_perm)
+                convs.push_back(blk.conv_t1_w);
+            for (int r = 0; r < 3; r++) {
+                convs.push_back(blk.res[r].conv1_w);
+                convs.push_back(blk.res[r].conv2_w);
+            }
+        }
+        tok.fc.bake(tok.backend, convs, codec_fastconv_enabled());
     }
 
     if (ctx->verbosity >= 1) {
@@ -1077,14 +1080,12 @@ static bool codec_fastconv_enabled() {
     return !(e && e[0] == '0');
 }
 
-// The CPU decomposed upsampler has a scoped M1 A/B. Other backends retain
-// their established crop path until measured on their own hardware; =1 permits
-// an explicit experiment, =0 restores crop everywhere.
-static bool codec_decomp_enabled(ggml_backend_t backend) {
+// Decomposition is an explicit experiment on every backend. Counterbalanced
+// M1 CPU measurements reduced CPU work but did not establish a consistent wall
+// latency win. Preserve the established crop default until that gate passes.
+static bool codec_decomp_enabled() {
     const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_DECOMP");
-    if (e && *e)
-        return e[0] != '0';
-    return backend && core_cpu_backend::is_cpu(backend);
+    return e && *e && e[0] != '0';
 }
 
 // CUDA retains its existing GPU-codec default. Metal remains opt-in because

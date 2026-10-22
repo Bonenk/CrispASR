@@ -25,7 +25,8 @@ static void fixture(const char* path) {
     auto* weights = ggml_init(ip);
     auto* file = gguf_init_empty();
     auto add = [&](const std::string& name) {
-        auto* t = ggml_new_tensor_3d(weights, GGML_TYPE_F32, 2, 2, 2);
+        auto* t = ggml_new_tensor_3d(
+            weights, name.find("conv_t1.weight") != std::string::npos ? GGML_TYPE_F16 : GGML_TYPE_F32, 2, 2, 2);
         ggml_set_name(t, name.c_str());
         ggml_set_f32(t, 0.25f);
         gguf_add_tensor(file, t);
@@ -56,6 +57,14 @@ int main(int argc, char** argv) {
     ctx.n_threads = 1;
     assert(load_tokenizer(&ctx, path.c_str()));
     assert(ctx.tokenizer.loaded && ctx.tokenizer.ctx_perm);
+    auto* upsampler = ctx.tokenizer.dec_blocks[0].conv_t1_w;
+    assert(ctx.tokenizer.fc.get(upsampler) == upsampler);
+    test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", "0");
+    assert(load_tokenizer(&ctx, path.c_str()));
+    upsampler = ctx.tokenizer.dec_blocks[0].conv_t1_w;
+    assert(!ctx.tokenizer.dec_blocks[0].conv_t1_w_perm);
+    assert(ctx.tokenizer.fc.get(upsampler) != upsampler);
+    test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", "1");
     assert(load_tokenizer(&ctx, path.c_str()));
     assert(ctx.tokenizer.loaded && ctx.tokenizer.dec_blocks[0].conv_t1_w_perm);
     tok_release_backend(ctx.tokenizer);
@@ -91,11 +100,11 @@ int main(int argc, char** argv) {
     std::cout << "PASS repeated, missing, truncated and recovered tokenizer loads\n";
     auto* cpu = core_cpu_backend::init();
     test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", nullptr);
-    assert(codec_decomp_enabled(cpu));
+    assert(!codec_decomp_enabled());
     test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", "0");
-    assert(!codec_decomp_enabled(cpu));
+    assert(!codec_decomp_enabled());
     test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", "1");
-    assert(codec_decomp_enabled(cpu));
+    assert(codec_decomp_enabled());
     test_env("CRISPASR_OMNIVOICE_CODEC_DECOMP", nullptr);
     // A CPU device with a failing allocator exercises actual ggml allocation.
     ggml_backend_buffer_type failing = *core_cpu_backend::buffer_type();
