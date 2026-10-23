@@ -25,25 +25,16 @@ evidence; only its fully accepted F16 profile is released. Corrected CUDA
 capsules retain the actual SDK CUB2.3.2 BSD notice and corresponding sources for
 the external runtimes; all old capsule ELF payloads remain byte-identical.
 
-Integration sets the `granite` default to pinned F16, with pinned legal extras.
-Unqualified Q8/Q6/Q4 downloads and silent filename-to-default substitutions are
-rejected. Explicit legacy4.0 filenames and4.1 defaults are preserved. Registry
-checks pass6938 assertions/68 cases. A dedicated hosted nightly regression
-repeats the full accepted F16 gates; generic Granite frontend diff is insufficient.
-Remaining required work: hosted final CI/lint/regression, then rebase and fast
-forward main. No release tag, PR or issue comments are part of this task.
-
-Open precision follow-up: Q8 retaining F16 embeddings passes CPU but fails the
-actual CUDA pipeline-logit norm gate at1.010822821 (maximum1.01). Keeping the
-head at F16 also fails at1.010823834 in the controlled GPU comparison. Both
-retain exact words; that does not waive the magnitude gate. Q6 and every Q4
-head/embedding arm are also unaccepted. Keep these profiles out of the registry
-until a new recipe passes full CPU and actual CUDA acceptance.
-
-Resource policy: check load and available memory immediately before local
-compile/inference. Large CPU work stays on GitHub; actual GPU work stays on
-Kaggle, using a free slot on the single configured account. Up to two Luna/Sol
-agents may do small tasks when local resources permit; no NN math delegation.
+The actual Transformer4.57.3 RoPE oracle and actual shared native attention now
+agree through position16383: relativeL2 0.000405, norm ratio0.999999996.
+Unscaled, wrong-context, double-magnitude and wrong-pairing controls all reject.
+Native YaRN fields are in development on the feature branch; full model stage,
+decoded-output, legacy and real CUDA acceptance remain pending. No registry entry.
+Original5 tokenizer also confirms the CLI's15-token legacy suffix. The C ABI
+still used16 tokens and omitted a space in custom asks; share the proven
+constants/formatting between surfaces. Local native parameter/prompt tests
+pass39 assertions/9 cases; NAR defaults pass5/4. The model-free shared-attention
+probe passes the original YaRN arrays and rejects all four incorrect controls.
 
 
 ## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
