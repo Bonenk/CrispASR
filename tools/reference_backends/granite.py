@@ -45,6 +45,9 @@ DEFAULT_STAGES = [
     "enc_after_layer_last",
     "encoder_out",
     "projector_out",
+    "prompt_ids",
+    "llm_inputs_embeds",
+    "llm_prefill_logits",
     "llm_argmax",
     "generated_text",
 ]
@@ -117,6 +120,8 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     inputs = processor(prompt, wav, device="cpu", return_tensors="pt")
 
     out: Dict[str, np.ndarray] = {}
+    if "prompt_ids" in stages:
+        out["prompt_ids"] = inputs["input_ids"][0].detach().cpu().int().numpy().astype(np.int32)
     if "mel_spectrogram" in stages and "input_features" in inputs:
         feats = inputs["input_features"][0]   # drop batch dim
         out["mel_spectrogram"] = feats.detach().cpu().float().numpy()
@@ -229,12 +234,32 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     # Diff parity only needs mel/encoder_out/projector_out anyway, so skip.
     want_argmax = "llm_argmax" in stages and not is_plus
     want_text   = "generated_text" in stages and not is_plus
-    if want_argmax or want_text:
-        with torch.no_grad():
-            gen = model.generate(
-                **inputs, max_new_tokens=max_new_tokens,
-                do_sample=False, num_beams=1,
-            )
+    want_llm = bool(stages & {"llm_inputs_embeds", "llm_prefill_logits"}) and not is_plus
+    if want_argmax or want_text or want_llm:
+        def capture_embeds(_module, _args, kwargs):
+            if "llm_inputs_embeds" in stages and "llm_inputs_embeds" not in out:
+                out["llm_inputs_embeds"] = kwargs["inputs_embeds"][0].detach().cpu().float().numpy().copy()
+
+        def capture_logits(_module, _args, result):
+            if "llm_prefill_logits" in stages and "llm_prefill_logits" not in out:
+                # The actual GraniteForCausalLM.forward divides this head output
+                # by logits_scaling. Store the same final last-position logits.
+                out["llm_prefill_logits"] = (
+                    result[0, -1].detach().cpu().float().numpy().copy() / model.config.text_config.logits_scaling)
+
+        handles = []
+        if want_llm:
+            handles.append(model.language_model.model.register_forward_pre_hook(capture_embeds, with_kwargs=True))
+            handles.append(model.language_model.lm_head.register_forward_hook(capture_logits))
+        try:
+            with torch.no_grad():
+                gen = model.generate(
+                    **inputs, max_new_tokens=max_new_tokens,
+                    do_sample=False, num_beams=1,
+                )
+        finally:
+            for handle in handles:
+                handle.remove()
         if want_argmax:
             out["llm_argmax"] = gen[0].detach().cpu().int().numpy().astype(np.int32)
         if want_text:

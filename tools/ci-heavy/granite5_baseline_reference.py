@@ -3,7 +3,7 @@
 
 Hosted CPU only. This baseline intentionally predates the YaRN port and cannot
 establish native acceptance. Large outputs are checkpointed individually to a
-private model repo; references go to the regression dataset. No registry edits.
+diagnostic model repo; references go to the regression dataset. No registry edits.
 """
 import argparse
 import hashlib
@@ -18,6 +18,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 MODEL = "ibm-granite/granite-speech-5.0-2b"
 REVISION = "c075cf19e041a2e4d16c5ee24763e5b037d8f479"
+BASELINE_CONVERTER = "49c5d562cffa668c59cf300e61c543bb673345bd"
 
 
 def sha(path):
@@ -65,6 +66,7 @@ def rope_oracle(config_path, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint-repo")
+    parser.add_argument("--public-diagnostics", action="store_true")
     parser.add_argument("--rope-oracle", nargs=2, metavar=("CONFIG", "OUTPUT"))
     args = parser.parse_args()
     if args.rope_oracle:
@@ -87,7 +89,7 @@ def main():
     prefix = f"granite-speech-5.0-2b/{source}"
     receipt = {"source": source, "run": os.environ["GITHUB_RUN_ID"],
                "model": MODEL, "revision": REVISION, "native_acceptance": False,
-               "known_gap": "Unmodified conversion/runtime omit YaRN scaling",
+               "known_gap": "Frozen baseline converter omits YaRN scaling; native acceptance pending",
                "complete": False, "outputs": {}, "checkpoint_repo": args.checkpoint_repo,
                "reference_recipe": {"prompt": prompt, "dtype": "float32", "device": "cpu",
                                     "audio": "samples/jfk.wav", "max_new_tokens": 96,
@@ -109,13 +111,19 @@ def main():
             raise RuntimeError(f"{tag} failed; retained log")
 
     api = HfApi()
-    # Prove writable, private staging before paying for any conversion.
+    # Prove both commit and actual LFS access before paying for conversion.
     info = api.repo_info(args.checkpoint_repo)
-    assert info.private, "Baseline weights must use private staging"
+    assert info.private == (not args.public_diagnostics)
     assert info.card_data["license"] == "apache-2.0", "Staging must preserve the model license"
+    if args.public_diagnostics:
+        assert info.card_data["crispasr_native_acceptance"] is False
     save()
     api.upload_file(path_or_fileobj=out / "receipt.json", path_in_repo=f"{prefix}/receipt.json",
                     repo_id=args.checkpoint_repo, commit_message="Start unaccepted Granite5 baseline")
+    api.upload_file(path_or_fileobj=b"Granite5 LFS storage preflight\n" * 64,
+                    path_in_repo=f"{prefix}/lfs-storage-preflight.bin", repo_id=args.checkpoint_repo,
+                    commit_message="Verify actual diagnostic checkpoint storage")
+    assert api.get_paths_info(args.checkpoint_repo, [f"{prefix}/lfs-storage-preflight.bin"])[0].lfs is not None
     model = Path(snapshot_download(MODEL, revision=REVISION,
                                   ignore_patterns=["*.bin", "*.onnx", "*.h5"]))
     cfg = json.loads((model / "config.json").read_text())
@@ -144,8 +152,16 @@ def main():
         name = f"{prefix}/{path.name}"
         record = {"sha256": sha(path), "bytes": path.stat().st_size, "repo": repo,
                   "repo_type": kind, "path": name}
-        commit = api.upload_file(path_or_fileobj=path, path_in_repo=name, repo_id=repo, repo_type=kind,
-                                 commit_message="Checkpoint unaccepted Granite5 original/baseline")
+        try:
+            commit = api.upload_file(path_or_fileobj=path, path_in_repo=name, repo_id=repo, repo_type=kind,
+                                     commit_message="Checkpoint unaccepted Granite5 original/baseline")
+        except Exception:
+            # Preserve expensive produced bytes in the workflow's always-uploaded
+            # artifact if the transfer bus fails; never silently lose conversion.
+            fallback = out / "failed-transfer"
+            fallback.mkdir(exist_ok=True)
+            shutil.copyfile(path, fallback / path.name)
+            raise
         record["revision"] = commit.oid
         receipt["outputs"][path.name] = record
         save()
@@ -153,7 +169,14 @@ def main():
                         repo_id=args.checkpoint_repo, commit_message="Record Granite5 checkpoint identity")
 
     f16 = scratch / "granite-speech-5.0-2b-baseline-f16.gguf"
-    run([sys.executable, ROOT / "models/convert-granite-speech-to-gguf.py",
+    # Freeze the pre-YaRN producer even while the native port is developed.
+    run(["git", "fetch", "--depth=1", "origin", BASELINE_CONVERTER], "fetch-baseline")
+    converter = out / "baseline-converter.py"
+    converter.write_bytes(subprocess.check_output([
+        "git", "show", f"{BASELINE_CONVERTER}:models/convert-granite-speech-to-gguf.py"], cwd=ROOT))
+    receipt["baseline_converter"] = {"source": BASELINE_CONVERTER, "sha256": sha(converter)}
+    save()
+    run([sys.executable, converter,
          "--input", model, "--output", f16], "convert")
     checkpoint(f16)
     build = scratch / "build"

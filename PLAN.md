@@ -19,6 +19,20 @@ a dedicated checkpoint credential; normal heavy jobs keep the read-only token.
 Voice checkpoint8bc09441a now passes main CI39950301114, Lint39950300946,
 Secret39950301100 and nightly regression39950301071.
 
+Replacement39961385660 passed write access and produced5.58 GB baseline F16,
+then hit the account's private LFS storage quota. That model was not checkpointed
+and no reference/quant/native acceptance followed. Public diagnostic staging
+preserves Apache/MIT notices and IBM attribution, declares acceptance false,
+and passes an actual LFS upload preflight. Freeze the pre-YaRN converter at49c5d562c
+while development continues. The next producer also captures original prompt IDs,
+merged embeddings and first-prefill logits for input and decoder comparison.
+
+The actual Transformer4.57.3 RoPE oracle and actual shared native attention now
+agree through position16383: relativeL2 0.000405, norm ratio0.999999996.
+Unscaled, wrong-context, double-magnitude and wrong-pairing controls all reject.
+Native YaRN fields are in development on the feature branch; full model stage,
+decoded-output, legacy and real CUDA acceptance remain pending. No registry entry.
+
 
 ## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
 
