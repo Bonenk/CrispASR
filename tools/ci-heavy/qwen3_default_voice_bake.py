@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
 """Design fresh references, then bake model-specific Qwen Base prompt candidates.
 
 CPU only, on the heavy GitHub runner. No input audio or preset speaker is used.
@@ -95,6 +96,7 @@ def licensing():
     (OUT / "LICENSE").write_bytes(fetch(
         f"https://raw.githubusercontent.com/QwenLM/Qwen3-TTS/{UPSTREAM_COMMIT}/LICENSE"))
     (OUT / "recipe.py").write_bytes(Path(__file__).read_bytes())
+    (OUT / "LICENSE-RECIPE.txt").write_bytes((Path(__file__).resolve().parents[2] / "LICENSE").read_bytes())
     write_json(evidence / "sources.json", dict(models=declarations, package=dict(
         name="qwen-tts", version="0.1.1", wheel_url=WHEEL_URL, wheel_sha256=WHEEL_SHA),
         upstream_code_commit=UPSTREAM_COMMIT, audit_scope="publisher declarations, not upstream training-data clearance"))
@@ -106,7 +108,9 @@ def licensing():
         "generated reference waveforms; extraction of Base-model speaker embeddings and\n"
         "codec tokens; GGUF packaging with provenance metadata. No upstream weights or\n"
         "third-party recordings are included. No endorsement by Qwen or Alibaba is implied.\n"
-        "The package is offered under Apache-2.0 to the extent the distributor holds\n"
+        "recipe.py is MIT-licensed CrispASR code; see LICENSE-RECIPE.txt, including\n"
+        "the original copyright and permission notices retained verbatim.\n"
+        "The voice assets are offered under Apache-2.0 to the extent the distributor holds\n"
         "licensable rights; no exclusive copyright in machine-generated audio is claimed.\n"
         "No claim is made that generated voices cannot resemble real people, or that\n"
         "upstream training data has been independently cleared. See README.md and licensing/.\n")
@@ -120,8 +124,11 @@ def licensing():
         "the saved, disclosed reference WAVs. Separate 1024/2048-dimensional embeddings\n"
         "are required for 0.6B/1.7B; matching dimensions alone do not prove model compatibility.\n\n"
         "## License and scope\n\n"
-        "Apache-2.0 applies to our licensable contributions, without asserting copyright\n"
-        "where none exists. Keep LICENSE, NOTICE and provenance with redistributions.\n"
+        "Apache-2.0 applies to licensable voice assets, without asserting copyright\n"
+        "where none exists. recipe.py is separately MIT-licensed CrispASR code; see\n"
+        "LICENSE-RECIPE.txt with its retained copyright and permission notices.\n"
+        "Redistribution is governed by those licenses. Preserve required notices.\n"
+        "Keeping the full provenance is recommended, not an extra license condition.\n"
         "Publisher Apache declarations and package license are preserved in licensing/.\n"
         "A model license is not a performer release. No identity or likeness rights,\n"
         "exclusivity, endorsement, universal non-infringement or upstream training-data\n"
@@ -201,6 +208,7 @@ def bake(size):
     # remain part of the downloadable distribution for straightforward reading.
     writer.add_string("crispasr.voice.license_text", (OUT / "LICENSE").read_text())
     writer.add_string("crispasr.voice.notice_text", (OUT / "NOTICE").read_text())
+    writer.add_string("crispasr.voice.recipe_license_text", (OUT / "LICENSE-RECIPE.txt").read_text())
     writer.add_string("crispasr.voice.provenance", (OUT / "provenance.json").read_text())
     writer.add_description("AI-generated designed references; Qwen original F32 Base encoder; see accompanying provenance and NOTICE")
     writer.add_string("voicepack.source_model", SOURCES[size][0])
@@ -208,6 +216,8 @@ def bake(size):
     writer.add_uint32("voicepack.speaker_dimension", dimension)
     writer.add_string("crispasr.voice.reference_kind", "ai_generated_voice_design")
     writer.add_string("crispasr.voice.identity_review", "pending; no real-person target supplied")
+    writer.add_string("crispasr.voice.speaker_identity", "unknown")
+    writer.add_bool("crispasr.voice.cloned_from_recording", False)
     writer.add_bool("crispasr.voice.human_input_recording", False)
     arrays = {}
     records = []
@@ -258,6 +268,8 @@ def main():
         return
     licensing()
     write_json(OUT / "provenance.json", dict(schema=1, recipe_sha256=sha(__file__), source_models=SOURCES,
+               producer_commit=os.environ["GITHUB_SHA"], producer_run=os.environ["GITHUB_RUN_ID"],
+               recipe_license="MIT", recipe_license_sha256=sha(OUT / "LICENSE-RECIPE.txt"),
                text=TEXT, descriptions=VOICES, generation=GENERATION, input_recordings=[], named_person_targets=[],
                package_versions={p: importlib.metadata.version(p) for p in
                                  ["qwen-tts", "torch", "torchaudio", "transformers", "gguf", "numpy"]},

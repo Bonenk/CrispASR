@@ -35,8 +35,13 @@ and any supplied LICENSE/NOTICE/COPYING files. A model-card license declaration
 must be described as such, not misrepresented as a separate license file or a
 performer release. Missing notice files are recorded explicitly.
 
-Distribute the pack and our licensable contributions under Apache-2.0, retaining
-LICENSE, NOTICE and the provenance bundle. Record modifications prominently.
+Voice assets are offered under Apache-2.0 to the extent we hold licensable rights.
+The bundled `recipe.py` remains MIT-licensed CrispASR code. Include the verbatim
+repository MIT license/copyright notices as `LICENSE-RECIPE.txt`, alongside the
+Apache `LICENSE` and attribution `NOTICE`; the GGUF embeds both license texts.
+Our distributions retain the full provenance bundle and record modifications
+prominently. Provenance retention is recommended to recipients, not an additional
+condition on either open-source license.
 Do not assert exclusive copyright in machine-generated material where none
 exists, or imply endorsement by Qwen/Alibaba. The resulting bundle includes no
 model weights or third-party recordings.
@@ -71,19 +76,18 @@ license tag or synthetic-audio label can override those gates.
 
 ## Current execution
 
-The design and native runtime build are frozen at source
-`7411898f8d62add2d8e03ce1f7f26233e17875c3`:
+The [native runtime build and existing CPU controls](https://github.com/CrispStrobe/CrispASR/actions/runs/39935555861)
+passed at source `7411898f8d62add2d8e03ce1f7f26233e17875c3`. That result does
+not validate the fresh designed voices.
 
-- [Fresh reference and prompt bake](https://github.com/CrispStrobe/CrispASR/actions/runs/39935552877).
-- [Native CUDA-capable runtime and existing CPU controls](https://github.com/CrispStrobe/CrispASR/actions/runs/39935555861).
-
-The replacement jobs were queued when this method was written. Neither constitutes
-acceptance until terminal outputs are checked. Earlier queued compatibility and
-pre-embedded-notice bakes were canceled; they are not release inputs.
+The fresh bake uses the updated recipe with both license texts and explicit
+unknown speaker identity. Earlier queued compatibility, pre-embedded-notice and
+pre-MIT-notice bakes were canceled before execution; they are not release inputs.
+In particular, run39935552877 was canceled to complete the recipe licensing scope.
 
 After both inputs succeed, `qwen3_designed_voice_cpu.py` accepts their exact run
-IDs and source, verifies the native archive and every bundled file, compares the
-candidate recipe to the producer git blob, and runs the independent validator.
+IDs and separate producer/runtime source revisions, verifies the native archive and every bundled file, compares the
+candidate recipe and MIT notice to the producer git blobs, and runs the independent validator.
 The wrapper checks through the normal CLI and Python Session/C ABI. References
 must transcribe exactly; “Hello world” must transcribe exactly; other test speech
 allows WER at most 0.1. Both model sizes and both 1.7B F16/Q8 variants are tested.
@@ -100,5 +104,5 @@ requires per-child GPU residency and records native backend logs.
 
 The licensing/array auditor has also been exercised with **schema-only synthetic
 fixtures**. A matching fixture passes; a changed full license, unknown publisher
-license, and mismatched saved embedding are each rejected even when manifest
-checksums are refreshed. This tests the auditor, not the original model or speech.
+license, mismatched saved embedding and missing MIT recipe notice are each
+rejected even when manifest checksums are refreshed. This tests the auditor, not the original model or speech.

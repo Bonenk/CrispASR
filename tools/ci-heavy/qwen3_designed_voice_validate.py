@@ -19,6 +19,7 @@ import numpy as np
 from qwen3_voice_pack_validate import PINS, sha, wer
 
 LICENSE_SHA = "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655"
+RECIPE_LICENSE_SHA = "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e"
 MODELS = {
     "design": ("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", "5ecdb67327fd37bb2e042aab12ff7391903235d3"),
     "1.7b": ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", "fd4b254389122332181a7c3db7f27e918eec64e3"),
@@ -43,6 +44,8 @@ def audit(candidate):
     assert sha(candidate / "licensing/qwen-tts-0.1.1-LICENSE") == LICENSE_SHA
     proof = json.loads((candidate / "provenance.json").read_text())
     assert sha(candidate / "recipe.py") == proof["recipe_sha256"]
+    assert proof["recipe_license"] == "MIT"
+    assert sha(candidate / "LICENSE-RECIPE.txt") == proof["recipe_license_sha256"] == RECIPE_LICENSE_SHA
     assert proof["input_recordings"] == [] and proof["named_person_targets"] == []
     assert proof["upstream_training_rights_independently_verified"] is False
     assert proof["native_speech_accepted"] is False and proof["cuda_speech_accepted"] is False
@@ -51,6 +54,8 @@ def audit(candidate):
         publisher = json.loads((candidate / f"licensing/{label}-publisher.json").read_text())
         assert publisher["id"] == repo and publisher["sha"] == revision
         assert publisher["cardData"]["license"] == "apache-2.0"
+        frontmatter = (candidate / f"licensing/{label}-README.md").read_text().split("---", 2)[1]
+        assert "license: apache-2.0" in [line.strip() for line in frontmatter.splitlines()]
     for size, dimension in (("0.6b", 1024), ("1.7b", 2048)):
         path = candidate / f"qwen3-tts-voice-{size}-designed.gguf"
         reader = GGUFReader(path)
@@ -61,6 +66,10 @@ def audit(candidate):
         assert string("general.license") == "apache-2.0"
         assert string("crispasr.voice.license_text") == (candidate / "LICENSE").read_text()
         assert string("crispasr.voice.notice_text") == (candidate / "NOTICE").read_text()
+        assert string("crispasr.voice.recipe_license_text") == (candidate / "LICENSE-RECIPE.txt").read_text()
+        assert string("crispasr.voice.speaker_identity") == "unknown"
+        clone = reader.fields["crispasr.voice.cloned_from_recording"]
+        assert not bool(clone.parts[clone.data[0]][0])
         assert json.loads(string("crispasr.voice.provenance")) == proof
         assert string("voicepack.source_model") == MODELS[size][0]
         assert string("voicepack.source_revision") == MODELS[size][1]
@@ -105,6 +114,9 @@ def single_voice(candidate, size, name, output):
     writer.add_string("general.license", "apache-2.0")
     writer.add_string("crispasr.voice.license_text", (candidate / "LICENSE").read_text())
     writer.add_string("crispasr.voice.notice_text", (candidate / "NOTICE").read_text())
+    writer.add_string("crispasr.voice.recipe_license_text", (candidate / "LICENSE-RECIPE.txt").read_text())
+    writer.add_string("crispasr.voice.speaker_identity", "unknown")
+    writer.add_bool("crispasr.voice.cloned_from_recording", False)
     writer.add_string("crispasr.voice.provenance", (candidate / "provenance.json").read_text())
     arrays = {}
     for kind, suffix, dtype in (("spk", "speaker", Type.F32), ("code", "codes", Type.I32)):

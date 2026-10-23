@@ -13,10 +13,14 @@ LICENSE/NOTICE, prompts, source/asset hashes and explicit legal-review limits;
 validate GGUF readback, native CPU/F16/Q8 speech and real CUDA before wiring
 the model-specific auto-download/default. Preserve explicit pack/WAV paths.
 Candidates are not promoted by array readback or publisher license tags alone.
-Fresh bake39935552877 and runtime build39935555861 are pinned to7411898f8
-and queued. Licensing preflight verifies four pinned Apache declarations and
-the exact package sources. Three schema-only fault controls reject license or
-embedding mismatches; these are not speech acceptance. Native params74/11 and
+Runtime build39935555861 at7411898f8 passes all existing CPU controls. The
+queued bake39935552877 was canceled before execution to preserve the MIT
+recipe license/copyright separately from Apache voice assets. The updated
+recipe retains and embeds both notices, stamps unknown identity independently
+of the absence of human input recordings, and records its producer commit/run.
+Licensing preflight verifies four pinned Apache declarations, the exact package
+sources and the verbatim repository MIT notice. Four schema-only fault controls
+reject license, notice or embedding mismatches; these are not speech acceptance. Native params74/11 and
 pack lifecycle38 checks pass. Default discovery now reads model metadata; no
 new candidate URL or replacement default has been published.
 See [voice provenance policy](docs/qwen3-designed-voices.md).
