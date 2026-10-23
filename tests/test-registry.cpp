@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
 
 TEST_CASE("registry: lookup known backend returns valid entry", "[unit][registry]") {
     CrispasrRegistryEntry e;
@@ -661,14 +662,27 @@ TEST_CASE("registry: German Moonshine bundles own every companion", "[unit][regi
     }
 }
 
-TEST_CASE("registry: 1.7B Base does not download the incompatible 0.6B voice pack (#555)", "[unit][registry]") {
-    CrispasrRegistryBundle small, large;
-    REQUIRE(crispasr_registry_default_bundle("qwen3-tts", small));
-    REQUIRE(crispasr_registry_default_bundle("qwen3-tts-1.7b-base", large));
-    bool found = false;
-    for (const auto& item : small.artifacts)
-        found |= item.filename == "qwen3-tts-voice-default.gguf";
-    REQUIRE(found);
-    for (const auto& item : large.artifacts)
-        REQUIRE(item.filename != "qwen3-tts-voice-default.gguf");
+TEST_CASE("registry: Base bundles download model-sized voices with notices (#555)", "[unit][registry]") {
+    for (const auto& pair : {std::make_pair("qwen3-tts", "0.6b"), std::make_pair("qwen3-tts-1.7b-base", "1.7b")}) {
+        CrispasrRegistryBundle bundle;
+        REQUIRE(crispasr_registry_default_bundle(pair.first, bundle));
+        CrispasrRegistryEntry entry;
+        REQUIRE(crispasr_registry_lookup(pair.first, entry));
+        REQUIRE(entry.license == "Apache-2.0");
+        const std::string voice = std::string("qwen3-tts-voice-") + pair.second + "-designed.gguf";
+        int companions = 0;
+        for (const auto& item : bundle.artifacts) {
+            REQUIRE(item.filename != "qwen3-tts-voice-default.gguf");
+            if (item.filename.find("qwen3-tts-voice-") == 0) {
+                REQUIRE(item.filename == voice);
+                ++companions;
+            }
+            if (item.url.find("qwen3-tts-voices-GGUF/") != std::string::npos) {
+                REQUIRE(item.url.find("/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/") != std::string::npos);
+                if (item.filename != voice)
+                    ++companions;
+            }
+        }
+        REQUIRE(companions == 5); // Matching pack, Apache/MIT/NOTICE and full provenance.
+    }
 }

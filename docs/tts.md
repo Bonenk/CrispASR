@@ -1247,14 +1247,20 @@ codec by default).
 ```
 
 Notes:
-- **0.6B Base needs no `--voice`**: `-m auto` downloads a baked default voice pack
-  (`qwen3-tts-voice-default.gguf`) alongside the talker and codec so the
-  Base model works out of the box. The default voice is auto-selected when
-  no `--voice` flag is given and the GGUF sits next to the talker.
-  **1.7B Base requires a reference WAV plus `--ref-text`, or a voice pack
-  baked with the 1.7B model.** Its speaker embedding has 2,048 values; the
-  0.6B default pack has 1,024 and cannot be reused. Incompatible packs
-  are rejected at load time.
+- **Both Base sizes have model-matched defaults**: `-m auto` downloads
+  `qwen3-tts-voice-0.6b-designed.gguf` for `--backend qwen3-tts`, or
+  `qwen3-tts-voice-1.7b-designed.gguf` for `--backend qwen3-tts-1.7b-base`,
+  alongside the talker, codec, readable Apache/MIT notices and provenance ZIP.
+  With no `--voice`, the CLI reads the model metadata and chooses the matching
+  sibling pack, including for renamed models. The 1.7B embedding has 2,048
+  values; the 0.6B embedding has 1,024 and cannot be reused or padded.
+  Incompatible packs are rejected at load time. Explicit compatible packs
+  and reference WAVs remain supported.
+  The default uses a freshly AI-generated VoiceDesign reference and separately
+  extracted original Base encoder arrays. [Provenance, license scope and
+  CPU/CUDA acceptance](qwen3-designed-voices.md). Voice assets are Apache-2.0
+  to the extent licensable rights are held; reproduction code is MIT. Identity
+  and upstream training rights are not independently verified.
 - When `--voice` points to a `.wav`, `--ref-text` is required. When it
   points to a `.gguf`, it is treated as a baked voice pack and
   `--ref-text` is ignored.

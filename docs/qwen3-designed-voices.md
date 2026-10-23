@@ -69,9 +69,11 @@ Retain these together with each candidate:
 - Listening and resemblance review status, with any recognized-person concern
   recorded and resolved before that candidate is promoted.
 
-Successful extraction/readback is candidate evidence only. Native speech and
-listening review remain separate recorded gates. Unresolved source rights or
-recognized-person concerns block the affected candidate. No automatic publisher
+Successful extraction/readback is candidate evidence only. Native speech
+acceptance is required before wiring defaults. Human listening feedback is
+recorded separately and cannot establish identity or upstream training rights.
+Missing or contradictory license terms, unlicensed input recordings, or specific
+unresolved likeness concerns block the affected candidate. No automatic publisher
 license tag or synthetic-audio label can override those gates.
 
 ## Current execution
@@ -127,3 +129,20 @@ inside the GGUF and as sidecars; the MIT curation script accompanies the result.
 The hosted matrix must recheck the selected reference at WER0, then test the
 curated defaults through real CLI/C ABI CPU and CUDA paths. Packaging success
 and this lightweight diagnostic do not replace those native acceptance gates.
+
+## Published designed defaults
+
+[Release9ab96c5](https://huggingface.co/cstr/qwen3-tts-voices-GGUF/tree/9ab96c5ba3022bd2ed46306ded0489a24096f8b5)
+contains the tested clear-as-default packs, readable Apache/MIT notices, source
+declarations, reference WAV, original arrays and reproduction recipes. All37
+files passed anonymous full-byte readback; the existing legacy file is unchanged.
+The model card license was independently read back as `apache-2.0`, with the
+separate MIT code scope explicit. Human listening feedback is still pending;
+speaker identity remains unverified and no upstream-training-rights warranty
+is represented. This status is preserved, not counted as an approval.
+
+CPU39942586420 and actual CUDA `issue555-designed-voices-cuda-v1` each score
+all13 reference/speech controls WER0. Both default files are byte-identical across
+CPU/CUDA; native CUDA backend logs and per-child residency are retained.
+The auto-download entries select only their own 1024/2048-d pack and include
+readable license/attribution plus the complete provenance ZIP.

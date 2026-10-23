@@ -1,5 +1,24 @@
 ## 2026-10-23 — Listened OmniVoice Metal encoder defaults
 
+## 2026-10-23 — Qwen Base model-sized designed defaults (#555)
+
+Fresh generic Qwen VoiceDesign output replaces the cross-size default assumption.
+The raw candidate that omitted half its reference text was rejected; clear was
+encoded separately with original 0.6B/1.7B Base F32 encoders and selected without
+changing arrays. CPU and actual Tesla T4 CUDA each pass13 reference/speech
+checks at WER0, including 1.7B F16/Q8, renamed models, explicit paths and C ABI.
+The stale incompatible pack exits15. CPU/CUDA default bytes are identical.
+
+Published designed packs retain Apache asset/source declarations, MIT recipe
+copyright/permission notices, embedded/full readable licenses and source/array
+provenance. All37 files and model-card license passed anonymous readback;
+legacy bytes are unchanged. Auto-download supplies separate model-sized packs
+and notices/provenance. Identity remains unknown; no upstream training-rights
+or universal likeness warranty is represented. Listening feedback is pending.
+[Receipt](docs/qwen3-designed-voices-2026-10-23.json) and
+[method/license scope](docs/qwen3-designed-voices.md).
+
+
 Maintainer approves all provided listening WAVs and minor differences. Eligible
 F16/F32 Higgs on Apple Silicon macOS/Metal now defaults to precise hybrid,
 graph RVQ and fused HuBERT; CPU/CUDA/iOS/other profiles retain prior policy.

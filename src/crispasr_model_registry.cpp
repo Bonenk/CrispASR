@@ -839,7 +839,7 @@ constexpr Entry k_registry[] = {
      "~986 MB",
      "qwen3-tts-tokenizer-12hz.gguf",
      "https://huggingface.co/cstr/qwen3-tts-tokenizer-12hz-GGUF/resolve/main/qwen3-tts-tokenizer-12hz.gguf",
-     "~60 MB"},
+     "~60 MB", "Apache-2.0"},
     // MOSS-TTS-v1.5 (MossTTSDelay): Qwen3-8B backbone + 32 RVQ audio codebooks
     // + a 1.6B transformer codec companion (kept F16 — quantising the codec
     // degrades audio earlier than the backbone). Default download is the Q4_K
@@ -969,7 +969,7 @@ constexpr Entry k_registry[] = {
      "~1.9 GB",
      "qwen3-tts-tokenizer-12hz.gguf",
      "https://huggingface.co/cstr/qwen3-tts-tokenizer-12hz-GGUF/resolve/main/qwen3-tts-tokenizer-12hz.gguf",
-     "~60 MB"},
+     "~60 MB", "Apache-2.0"},
     // Qwen3-TTS-CustomVoice 1.7B: same fixed-speaker pattern as 0.6B-CV
     // (9 baked speakers, `--voice <name>`, no ECAPA / no reference WAV)
     // but on the 1.7B talker. Runtime applies small_to_mtp_projection
@@ -1740,12 +1740,34 @@ constexpr ExtraCompanion k_cosyvoice3_tts_extras[] = {
     {nullptr, nullptr},
 };
 
-// Qwen3 Base voices are model-sized: this legacy pack is 1024-d (0.6B)
-// and must never be attached to the 2048-d 1.7B variants. Designed
-// replacements require their own source/provenance and speech acceptance.
+// Model-sized defaults from a fresh VoiceDesign reference, separately encoded
+// with each original Base model. CPU/CUDA speech and exact array readback pass.
+// Ship readable Apache/MIT notices and the complete provenance companion too.
 constexpr ExtraCompanion k_qwen3_tts_base_extras[] = {
-    {"qwen3-tts-voice-default.gguf",
-     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/main/qwen3-tts-voice-default.gguf"},
+    {"qwen3-tts-voice-0.6b-designed.gguf",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voice-0.6b-designed.gguf"},
+    {"qwen3-tts-voices-LICENSE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-LICENSE.txt"},
+    {"qwen3-tts-voices-LICENSE-RECIPE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-LICENSE-RECIPE.txt"},
+    {"qwen3-tts-voices-NOTICE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-NOTICE.txt"},
+    {"qwen3-tts-designed-voices-provenance.zip",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-designed-voices-provenance.zip"},
+    {nullptr, nullptr},
+};
+
+constexpr ExtraCompanion k_qwen3_tts_17b_base_extras[] = {
+    {"qwen3-tts-voice-1.7b-designed.gguf",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voice-1.7b-designed.gguf"},
+    {"qwen3-tts-voices-LICENSE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-LICENSE.txt"},
+    {"qwen3-tts-voices-LICENSE-RECIPE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-LICENSE-RECIPE.txt"},
+    {"qwen3-tts-voices-NOTICE.txt",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-voices-NOTICE.txt"},
+    {"qwen3-tts-designed-voices-provenance.zip",
+     "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/9ab96c5ba3022bd2ed46306ded0489a24096f8b5/qwen3-tts-designed-voices-provenance.zip"},
     {nullptr, nullptr},
 };
 
@@ -1869,8 +1891,7 @@ constexpr ExtraList k_extras[] = {
     {"cosyvoice3-tts", k_cosyvoice3_tts_extras},
     {"cosyvoice3-tts-rl", k_cosyvoice3_tts_extras},
     {"qwen3-tts", k_qwen3_tts_base_extras},
-    // #555: the shared default pack is 1024-d (0.6B), incompatible with 1.7B.
-    // 1.7B Base requires its own baked pack or a runtime WAV voice prompt.
+    {"qwen3-tts-1.7b-base", k_qwen3_tts_17b_base_extras},
     {"tada", k_tada_3b_extras},
     {"tada-1b", k_tada_1b_extras},
     {"tada-tts-1b", k_tada_1b_extras},

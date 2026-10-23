@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "selected_source_voice": "clear",
+  "output_voice": "default",
+  "reference_sha256": "f379e260c046a384d255adf97ff1382d774349249c05908ff66bbae9524f979c",
+  "source_pool_run": 39938969713,
+  "source_pool_commit": "3ef249810a3036ad1658e64461687c63ce0b6173",
+  "cpu_run": 39942586420,
+  "validator_commit": "a58086216a0a1ff9d58eb2a9773a9a83fc5d702a",
+  "runtime_build_run": 39935555861,
+  "runtime_source": "7411898f8d62add2d8e03ce1f7f26233e17875c3",
+  "worker_commit": "d8a6bf2d61a98fb01840b74355944fea5c8d3dab",
+  "cuda_run": "issue555-designed-voices-cuda-v1",
+  "cuda_hardware": "Tesla T4, 7.5, 580.178.04\nTesla T4, 7.5, 580.178.04",
+  "cuda_per_child_peak_mib": {
+    "small-hello": 2060,
+    "small-sentence": 2062,
+    "small-clear": 2060,
+    "large-hello": 5022,
+    "large-sentence": 4922,
+    "large-clear": 4922,
+    "large-q8-hello": 3092,
+    "large-q8-sentence": 3092,
+    "large-q8-clear": 3092,
+    "renamed-large": 4926,
+    "session-small": 2060,
+    "session-large": 4922,
+    "wrong-pack-rejection": 4740
+  },
+  "cpu_reference_and_speech_checks": 13,
+  "cuda_reference_and_speech_checks": 13,
+  "all_wer_zero": true,
+  "cpu_cuda_pack_bytes_identical": true,
+  "encoder_arrays_changed": false,
+  "speaker_identity": "unknown",
+  "human_input_recordings": [],
+  "named_person_targets": [],
+  "human_listening_review": "not performed; optional feedback pending",
+  "resemblance_review": "No person target or specific concern reported; identity remains unverified",
+  "upstream_training_rights_independently_verified": false,
+  "license": {
+    "voice_assets": "Apache-2.0 to the extent licensable rights are held",
+    "recipes": "MIT; retain LICENSE-RECIPE.txt",
+    "basis": "publisher declarations at pinned revisions, full notices retained; no exclusive copyright claim in machine-generated material"
+  },
+  "rejected_candidate": {
+    "name": "raw default",
+    "reason": "reference failed full transcription",
+    "wer": 0.5333333333333333
+  },
+  "packs": {
+    "0.6b": {
+      "filename": "qwen3-tts-voice-0.6b-designed.gguf",
+      "sha256": "8d907deef0001473459e10f70b41f59b828e99fff76a56a250645c3978e39742"
+    },
+    "1.7b": {
+      "filename": "qwen3-tts-voice-1.7b-designed.gguf",
+      "sha256": "be055fcd5e519b9a60b6b78bc13291d81b50bd751a74a69c699a5b86028ba2c2"
+    }
+  },
+  "asset_repo": "cstr/qwen3-tts-voices-GGUF",
+  "asset_revision": "9ab96c5ba3022bd2ed46306ded0489a24096f8b5",
+  "anonymous_files_verified": 37,
+  "model_card_license_verified": "apache-2.0",
+  "legacy_bytes_unchanged": true,
+  "download_companions": [
+    "matching model-sized pack",
+    "Apache license",
+    "MIT recipe license",
+    "attribution NOTICE",
+    "full provenance ZIP"
+  ],
+  "registry_validation": "6269 assertions / 65 cases pass",
+  "worker_entry_sha256": "bd19d5dc602852783465b878065324ef55653d3b7b03a7869a6c609a8cbfbdc4",
+  "cuda_terminal": "COMPLETE",
+  "actual_gpu_compute_evidence": "CUDA0 code-predictor and codec backend logs plus per-child GPU residency; no idle-GPU denominator"
+}

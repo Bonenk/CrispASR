@@ -1,40 +1,24 @@
 # CrispASR — Pending work
 
-## NOW — issue555 model-sized default, then Granite5 (2026-10-23)
+## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
 
-Owner: Codex, branch `fix/new-issues-20261023`. User requests existing-pack
-compatibility or newly baked defaults, then Granite5 only after555 fully works.
-The published pack is1024-d and cannot serve1.7B. User now explicitly requests
-fresh VoiceDesign references and a defensible licensing/provenance chain. The
-old compatibility-only bake39933983902 was canceled while queued. Design two
-neutral voices without input recordings or named people, then bake separate
-1024/2048-d packs with the pinned original package. Retain publisher declarations,
-LICENSE/NOTICE, prompts, source/asset hashes and explicit legal-review limits;
-validate GGUF readback, native CPU/F16/Q8 speech and real CUDA before wiring
-the model-specific auto-download/default. Preserve explicit pack/WAV paths.
-Candidates are not promoted by array readback or publisher license tags alone.
-Runtime build39935555861 at7411898f8 passes all existing CPU controls. The
-queued bake39935552877 was canceled before execution to preserve the MIT
-recipe license/copyright separately from Apache voice assets. The updated
-recipe retains and embeds both notices, stamps unknown identity independently
-of the absence of human input recordings, and records its producer commit/run.
-Licensing preflight verifies four pinned Apache declarations, the exact package
-sources and the verbatim repository MIT notice. Four schema-only fault controls
-reject license, notice or embedding mismatches; these are not speech acceptance. Native params74/11 and
-pack lifecycle38 checks pass. Default discovery now reads model metadata; no
-new candidate URL or replacement default has been published.
-See [voice provenance policy](docs/qwen3-designed-voices.md).
-Granite5 implementation starts after that acceptance gate.
-Prior frozen e2b77e472 CI39918848127 all13, lint39918851399 all10 and secret
-39918849343 pass job by job; their full unit log has2082 CTest cases and
-189 Python tests/34 subtests. No task code changed while those checks ran.
-Fresh design bake39938969713 at3ef249810 succeeds and its actual license/array
-audit passes. Independent official Whisper base.en weights verify the clear
-reference exactly; raw default scores8/15 WER and is rejected. Select clear
-as the default for each model with unchanged original encoder arrays; retain
-both licenses and the curation recipe. No regeneration or padding is needed.
-The raw-pool CPU dispatch was canceled while pending before consuming a bad
-reference; curated-default native CPU/CUDA checks remain required.
+Owner: Codex, branch `fix/new-issues-20261023`. Fresh original VoiceDesign
+bake39938969713 passes license/array audit. Raw default reference fails full
+transcription and is rejected; clear is exact. Select clear as default with
+unchanged original 1024/2048-d Base encoder arrays. CPU39942586420 and actual
+Tesla T4 CUDA `issue555-designed-voices-cuda-v1` each pass13 reference/speech
+checks at WER0; wrong legacy pack exits15. Model-specific defaults are byte
+identical across CPU/CUDA. No Vulkan-hardware or performance claim.
+
+[Asset revision9ab96c5](https://huggingface.co/cstr/qwen3-tts-voices-GGUF/tree/9ab96c5ba3022bd2ed46306ded0489a24096f8b5)
+passes anonymous readback of all37 files, actual card license and unchanged
+legacy bytes. New defaults include embedded/readable Apache and MIT notices,
+complete source declarations, reference, arrays and exact recipes. Registry
+uses separate immutable URLs and includes notices/provenance. Speaker identity
+stays unknown; human listening feedback is pending, not inferred as approval.
+Publisher grants do not independently clear upstream training or likeness rights.
+[Method](docs/qwen3-designed-voices.md), [receipt](docs/qwen3-designed-voices-2026-10-23.json).
+Granite5 remains the next feature per user priority after the final wiring checks.
 
 ## OmniVoice listened Metal default promotion — completed (2026-10-23)
 
