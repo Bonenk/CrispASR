@@ -1,5 +1,14 @@
 # CrispASR — Pending work
 
+## NOW — OmniVoice listened M1 default promotion (2026-10-23)
+
+Owner: Codex. User listened to all local comparison WAVs and accepts minor
+differences. Promote the measured precise Metal encoder on the validated F16
+profile only, retaining explicit switches and CPU fallback. Verify fresh-process
+cost/memory, default-vs-explicit policy, failed GPU compute, reference-cache
+behavior and Session/CLI speech. Preserve CUDA/CPU policy and existing quality
+limits. Hosted CI remains queued; no blanket green claim.
+
 ## OmniVoice GPU semantic divergence — completed (2026-10-23)
 
 Owner: Codex. Runtime935b31eca adds independent default-off semantic F32
