@@ -7,6 +7,11 @@ Graph FC/RVQ, fused HuBERT and hybrid CPU/GPU encoding remain off by default.
 The [raw receipt](omnivoice-encoder-2026-10-23.json) contains every measured
 sample, hashes, code differences, cloned-audio results and ASR transcripts.
 
+Follow-up: the optional [semantic F32 path](omnivoice-semantic-precision-2026-10-23.md)
+removes the recorded station code difference on the tested M1 and seven-reference
+suite. The unhinted measurements below remain historical controls; GPU defaults
+stay off. The follow-up contains corrected-path synthesis and timing evidence.
+
 ## Measured decision
 
 Apple M1, eight cores, 16 GB, macOS 26; four encoder CPU threads, Release,

@@ -1,3 +1,15 @@
+## 2026-10-23 — OmniVoice optional precise Metal semantic encoder
+
+Added default-off ENCODER_SEMANTIC_F32: existing ggml F32 matrix hints remove
+the station reference-code flip. Seven reference clips/en-de-fr/60–315frames:
+all56 isolated CPU/GPU combinations exact codes. Corrected paired GPU encode
+34–50% faster than shipping CPU on three original clips;48 calls exact.
+Session24renders yield16 exact candidate/CPU code/PCM pairs. Both ASR judges
+score seven distinct cases0; Anna's baseline “home” omission (1/12) is unchanged.
+Full marked CLI target codes exact; both judges0 including disclosure; C2PA retained.
+GPU/precision remain optional; no blanket cloning/CUDA/quant/default promotion.
+[Parameters, norm/margin audit and receipt](docs/omnivoice-semantic-precision-2026-10-23.md).
+
 ## 2026-10-23 — OmniVoice fresh-reference encoder
 
 Five independent A/B paths retain the original encoder. Exact immutable cache

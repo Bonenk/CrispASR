@@ -1,0 +1,1818 @@
+{
+  "date": "2026-10-23",
+  "baseline": "e4a3dfb9811e4af53f72a4b9c67ea402a57c51ea",
+  "implementation": "935b31ecac482fe1ed3542109043b5d888309049",
+  "runtime_source_sha256": "d2c7f78a2093995cefee13c05728fbd7c58a3dda2ee3bba1dcaff8ce3949af04",
+  "diff_probe_sha256": "89e1f5fd38bbe5e5314514e9c69adac94ab03a320c46e5ea91dfd3b4d5a705db",
+  "bench_probe_sha256": "50be97614fc0812a4e9c53647960b41e84ef2d79cd39dd8e57811dd8a55f498d",
+  "host": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_gb": 16,
+    "os": "macOS 26",
+    "desktop_contention": "Interactive desktop; raw per-call times retained. Final CPU default trial reverses arm order."
+  },
+  "ggml": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "models": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "main_sha256": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+    "codec_sha256": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63"
+  },
+  "fixtures": {
+    "window": {
+      "path": "index-echo-9b/roundtrip-piper/window.wav",
+      "sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1"
+    },
+    "station": {
+      "path": "index-echo-9b/roundtrip-piper/station.wav",
+      "sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a"
+    },
+    "fox": {
+      "path": "index-echo-9b/roundtrip-piper/fox.wav",
+      "sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff"
+    }
+  },
+  "fixture_repo": "cstr/crispasr-regression-fixtures",
+  "fixture_revision": "d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3",
+  "local_fixtures": {
+    "samantha-en-short": {
+      "voice": "Samantha",
+      "language": "en",
+      "text": "Please close the window before you leave the room.",
+      "sha256": "de967cd40e175f1edcbb5d91065da420d8aab895b3f6cf14c6bfda405a1c0e54",
+      "producer": "macOS say, installed system voice, rate175; local diagnostics only, not redistributed"
+    },
+    "daniel-en-long": {
+      "voice": "Daniel",
+      "language": "en",
+      "text": "Before we leave for the station tomorrow morning, please close the windows, check the kitchen lights, and bring enough water and food for the long walk. We can meet our friends near the old bridge and decide which path to follow.",
+      "sha256": "e8bd0a924b4474696f4340c6ce05383f1cf2e5df0039259cb3679673cc2efa84",
+      "producer": "macOS say, installed system voice, rate175; local diagnostics only, not redistributed"
+    },
+    "anna-de": {
+      "voice": "Anna",
+      "language": "de",
+      "text": "Bitte schlie\u00dfen Sie das Fenster, bevor Sie das Zimmer verlassen. Wir treffen uns morgen fr\u00fch am Bahnhof.",
+      "sha256": "d4094a42e614ec09d154a2e2e93ba94eebfaa45930d3c9cf40501de3fd7c62fe",
+      "producer": "macOS say, installed system voice, rate175; local diagnostics only, not redistributed"
+    },
+    "thomas-fr": {
+      "voice": "Thomas",
+      "language": "fr",
+      "text": "Nous nous retrouverons demain matin \u00e0 la gare. Fermez la fen\u00eatre avant de quitter la pi\u00e8ce.",
+      "sha256": "36355f16c2080ef6d93dc92c3afb8847a8437c4266e1bd10d65c85f323cd907a",
+      "producer": "macOS say, installed system voice, rate175; local diagnostics only, not redistributed"
+    }
+  },
+  "boundaries": {
+    "boundary-station": {
+      "fe1": {
+        "elements": 93696,
+        "cpu_norm": 309.50552373667176,
+        "candidate_norm": 309.5075909241929,
+        "cosine": 0.9999999125240985,
+        "max_abs": 0.0031039416790008545,
+        "rms_error": 0.0004229839301256489,
+        "cpu_sha256": "62de2c7f3934801a82cd5843074098613ece2f973e34971008a4b6a6783b3777",
+        "candidate_sha256": "143a7222562479cc33741dfc025eed0e94b0d2ab95bd5cef5949774be8a85ed6"
+      },
+      "fe0-hb1": {
+        "elements": 93696,
+        "cpu_norm": 115.04194791583875,
+        "candidate_norm": 115.04135962675322,
+        "cosine": 0.9999999807585078,
+        "max_abs": 0.0017273277044296265,
+        "rms_error": 7.375243437086762e-05,
+        "cpu_sha256": "0f0f244b8557fbeed9cb6a42b68c53257e7f7bc4dab2197e87f57ad20b5e249c",
+        "candidate_sha256": "7369678c01e05fb8387433105725d608e41eaba07950add424514f573f573234"
+      },
+      "fe0-hb0-sem1": {
+        "elements": 46848,
+        "cpu_norm": 74.12026308408831,
+        "candidate_norm": 74.12143973582734,
+        "cosine": 0.9999998468453,
+        "max_abs": 0.002768993377685547,
+        "rms_error": 0.00018960666700889662,
+        "cpu_sha256": "579906f1ac88865f71e827b9cbb2e4f7a86b8a2dc74e446b8b2c81f88e1a696a",
+        "candidate_sha256": "3cebad2fa0e5d3188355eb1b50b56bef9c760792c48a08329adfefb43afdbe81"
+      },
+      "fe1-hb1-sem1": {
+        "elements": 46848,
+        "cpu_norm": 74.12026308408831,
+        "candidate_norm": 74.11955598108177,
+        "cosine": 0.9999997663138449,
+        "max_abs": 0.003507256507873535,
+        "rms_error": 0.00023413326340718054,
+        "cpu_sha256": "579906f1ac88865f71e827b9cbb2e4f7a86b8a2dc74e446b8b2c81f88e1a696a",
+        "candidate_sha256": "50687f757fb655177b8822eb738c78aba0f19cd5cc4478d70c3d0b3acfa1e9a7"
+      },
+      "truncated_frontend": [
+        {
+          "elements": 4029952,
+          "cpu_norm": 152.08838098636312,
+          "candidate_norm": 152.08838099030478,
+          "cosine": 0.9999999999999614,
+          "max_abs": 3.5762786865234375e-07,
+          "rms_error": 5.276635309146032e-09,
+          "cpu_sha256": "ee1db066aae009f968f1bb24a32d01287bcff2be8dcdfc96225ff28712f229a9",
+          "candidate_sha256": "3d2141334edf24ae68e7eeb84bb28aa8e572b707e1e010be30c74d490a45a27c"
+        },
+        {
+          "elements": 4029952,
+          "cpu_norm": 1975.2788000340622,
+          "candidate_norm": 1975.2786623558954,
+          "cosine": 0.9999999999999292,
+          "max_abs": 4.76837158203125e-06,
+          "rms_error": 1.7340707157304167e-07,
+          "cpu_sha256": "5fd3a4225bf1e93b6a9cc0d7acbc01dfba3c74ba6babc7027b143b206c986290",
+          "candidate_sha256": "071c855c02e349cf579fe51015541449d754a4b9f382cd5e056ad4d02926d4c5"
+        },
+        {
+          "elements": 4029952,
+          "cpu_norm": 643.6562593915633,
+          "candidate_norm": 643.6562092230666,
+          "cosine": 0.9999999999999307,
+          "max_abs": 3.814697265625e-06,
+          "rms_error": 7.198511630560068e-08,
+          "cpu_sha256": "f5ba965ae1b69dfca4bd792e6cb7b25779806f9a5d6266ed8213d922a1b4c770",
+          "candidate_sha256": "9a5861230206bad795d8b91665059a2cc08e6fe6faea53538cf179c1c4289117"
+        },
+        {
+          "elements": 2014720,
+          "cpu_norm": 8418.787343993634,
+          "candidate_norm": 8418.794053862512,
+          "cosine": 0.9999999994699615,
+          "max_abs": 0.01215362548828125,
+          "rms_error": 0.00019316650479574499,
+          "cpu_sha256": "7f4b130013d21f6ff90aa35280870eb2f67401a2ca24ca810cac04a8d4d0d8c2",
+          "candidate_sha256": "f944e5b439cd2295c162da74a285da837f987a470b8f41a03c170ae2ae3e21a4"
+        },
+        {
+          "elements": 2014720,
+          "cpu_norm": 914.4657250869395,
+          "candidate_norm": 914.4672891570434,
+          "cosine": 0.9999999971034143,
+          "max_abs": 0.007076263427734375,
+          "rms_error": 4.904869903895752e-05,
+          "cpu_sha256": "978e030678a884920049820eaaaf5ff4a57aa8edca7a41734321265c1bf3a6c0",
+          "candidate_sha256": "d7d673c9008e14ff9b00ef41ffa2d4f2a52092364d5187ab217d45272c6800b6"
+        },
+        {
+          "elements": 1007104,
+          "cpu_norm": 6382.65610519618,
+          "candidate_norm": 6382.67140405658,
+          "cosine": 0.9999999949409997,
+          "max_abs": 0.047393798828125,
+          "rms_error": 0.0006399329788237531,
+          "cpu_sha256": "8d7835582066a81c1f40dde2776f15313e01871bf96ae693de23fb29624d2e10",
+          "candidate_sha256": "98fe1da2aa05957e35cb98b8e9986f79a7b61620e6af40c362d69f9f52fd5861"
+        },
+        {
+          "elements": 1007104,
+          "cpu_norm": 243.7793762214562,
+          "candidate_norm": 243.77934390588717,
+          "cosine": 0.9999999859272923,
+          "max_abs": 0.0031681060791015625,
+          "rms_error": 4.075332414513693e-05,
+          "cpu_sha256": "0b3fa758e55310f2c82e39533cd0bfda2ad14933199442e89ef813430ff9d6f1",
+          "candidate_sha256": "663821bc1d84e03c7a7283f99890ee0e2fa95ca6980a476ddae00a2765e76220"
+        },
+        {
+          "elements": 503296,
+          "cpu_norm": 819.9011837357392,
+          "candidate_norm": 819.8980050188239,
+          "cosine": 0.9999999938705108,
+          "max_abs": 0.00444793701171875,
+          "rms_error": 0.00012803870314037345,
+          "cpu_sha256": "42e9bec8044d3ff41c59d9113b94e2e919180f39ed41b01f1bebb1897a6edcae",
+          "candidate_sha256": "7b23683ef5464f252c4880d3e3fb7488d6d159302b4fd5679a2e7ff67bee1a25"
+        },
+        {
+          "elements": 503296,
+          "cpu_norm": 118.34639055414631,
+          "candidate_norm": 118.34623545046685,
+          "cosine": 0.99999997568059,
+          "max_abs": 0.002064526081085205,
+          "rms_error": 3.679102970794075e-05,
+          "cpu_sha256": "1c9664dd3cb75b5224f7b0cfedae424baa0920a3026a47e774b142f1f5bce841",
+          "candidate_sha256": "a93bfc0478c5bc3dd3c1d41f042f17f5655357d18a462c54cb5abd97c040fcfe"
+        },
+        {
+          "elements": 251392,
+          "cpu_norm": 281.1453765167688,
+          "candidate_norm": 281.14531414218703,
+          "cosine": 0.9999999870961556,
+          "max_abs": 0.0013023614883422852,
+          "rms_error": 9.008028925528111e-05,
+          "cpu_sha256": "d37138fd78150c30eb9ce1bbcb02eb6fb133d225953fafd87b75b54d6f6351b9",
+          "candidate_sha256": "04b858ccb6932e23c0ed18d83fd8f3046f53fc7e6edb36da494f900134fadf8b"
+        }
+      ],
+      "changed_codes": [
+        {
+          "stage": 3,
+          "frame": 55,
+          "cpu_best": 226,
+          "gpu_best": 262,
+          "cpu_top2_scores": [
+            22.13980103,
+            22.13928986
+          ],
+          "gpu_top2_scores": [
+            22.1438446,
+            22.13941956
+          ],
+          "cpu_top2_ids": [
+            226,
+            262
+          ],
+          "gpu_top2_ids": [
+            262,
+            226
+          ]
+        },
+        {
+          "stage": 4,
+          "frame": 55,
+          "cpu_best": 700,
+          "gpu_best": 588,
+          "cpu_top2_scores": [
+            15.31622028,
+            10.63474655
+          ],
+          "gpu_top2_scores": [
+            16.65849686,
+            3.01877594
+          ],
+          "cpu_top2_ids": [
+            700,
+            271
+          ],
+          "gpu_top2_ids": [
+            588,
+            67
+          ]
+        },
+        {
+          "stage": 6,
+          "frame": 55,
+          "cpu_best": 191,
+          "gpu_best": 793,
+          "cpu_top2_scores": [
+            75.961586,
+            64.37886047
+          ],
+          "gpu_top2_scores": [
+            69.5370636,
+            41.66996002
+          ],
+          "cpu_top2_ids": [
+            191,
+            10
+          ],
+          "gpu_top2_ids": [
+            793,
+            758
+          ]
+        },
+        {
+          "stage": 7,
+          "frame": 55,
+          "cpu_best": 339,
+          "gpu_best": 997,
+          "cpu_top2_scores": [
+            31.45498657,
+            28.01978302
+          ],
+          "gpu_top2_scores": [
+            72.97036743,
+            40.72672272
+          ],
+          "cpu_top2_ids": [
+            339,
+            806
+          ],
+          "gpu_top2_ids": [
+            997,
+            439
+          ]
+        }
+      ]
+    },
+    "precise-station": {
+      "fe1": {
+        "elements": 93696,
+        "cpu_norm": 309.50552373667176,
+        "candidate_norm": 309.5055337095711,
+        "cosine": 0.9999999999997707,
+        "max_abs": 5.841255187988281e-06,
+        "rms_error": 6.559850791728278e-07,
+        "cpu_sha256": "62de2c7f3934801a82cd5843074098613ece2f973e34971008a4b6a6783b3777",
+        "candidate_sha256": "1ff0196012bdd76ffde2a67f7fa268dcca86f4d123530cffa301e3d635026073"
+      },
+      "fe0-hb1": {
+        "elements": 93696,
+        "cpu_norm": 115.04194791583875,
+        "candidate_norm": 115.04194349099494,
+        "cosine": 0.9999999999997234,
+        "max_abs": 3.382563591003418e-06,
+        "rms_error": 2.732971214724758e-07,
+        "cpu_sha256": "0f0f244b8557fbeed9cb6a42b68c53257e7f7bc4dab2197e87f57ad20b5e249c",
+        "candidate_sha256": "aa704bc8a746d45ec00ed295e78dde7af5c24fbe67a77040650311b7fbaed56c"
+      },
+      "fe0-hb0-sem1": {
+        "elements": 46848,
+        "cpu_norm": 74.12026308408831,
+        "candidate_norm": 74.1202637328605,
+        "cosine": 0.9999999999997589,
+        "max_abs": 2.0265579223632812e-06,
+        "rms_error": 2.353988176765651e-07,
+        "cpu_sha256": "579906f1ac88865f71e827b9cbb2e4f7a86b8a2dc74e446b8b2c81f88e1a696a",
+        "candidate_sha256": "b6db4d5c1e0934e9ce68bd50467c6453090bff03d9dbb4edd1c4de3b768e6fa4"
+      },
+      "fe1-hb1-sem1": {
+        "elements": 46848,
+        "cpu_norm": 74.12026308408831,
+        "candidate_norm": 74.12025356216839,
+        "cosine": 0.9999999999990272,
+        "max_abs": 7.867813110351562e-06,
+        "rms_error": 4.783299287676227e-07,
+        "cpu_sha256": "579906f1ac88865f71e827b9cbb2e4f7a86b8a2dc74e446b8b2c81f88e1a696a",
+        "candidate_sha256": "681d1a161a2bae19f6189798ac4adcd95b69f60d0c16267d488f947c4e928e0e"
+      },
+      "truncated_frontend": [
+        {
+          "elements": 4029952,
+          "cpu_norm": 152.08838098636312,
+          "candidate_norm": 152.08838099030478,
+          "cosine": 0.9999999999999614,
+          "max_abs": 3.5762786865234375e-07,
+          "rms_error": 5.276635309146032e-09,
+          "cpu_sha256": "ee1db066aae009f968f1bb24a32d01287bcff2be8dcdfc96225ff28712f229a9",
+          "candidate_sha256": "3d2141334edf24ae68e7eeb84bb28aa8e572b707e1e010be30c74d490a45a27c"
+        },
+        {
+          "elements": 4029952,
+          "cpu_norm": 1975.2788000340622,
+          "candidate_norm": 1975.2786623558954,
+          "cosine": 0.9999999999999292,
+          "max_abs": 4.76837158203125e-06,
+          "rms_error": 1.7340707157304167e-07,
+          "cpu_sha256": "5fd3a4225bf1e93b6a9cc0d7acbc01dfba3c74ba6babc7027b143b206c986290",
+          "candidate_sha256": "071c855c02e349cf579fe51015541449d754a4b9f382cd5e056ad4d02926d4c5"
+        },
+        {
+          "elements": 4029952,
+          "cpu_norm": 643.6562593915633,
+          "candidate_norm": 643.6562092230666,
+          "cosine": 0.9999999999999307,
+          "max_abs": 3.814697265625e-06,
+          "rms_error": 7.198511630560068e-08,
+          "cpu_sha256": "f5ba965ae1b69dfca4bd792e6cb7b25779806f9a5d6266ed8213d922a1b4c770",
+          "candidate_sha256": "9a5861230206bad795d8b91665059a2cc08e6fe6faea53538cf179c1c4289117"
+        },
+        {
+          "elements": 2014720,
+          "cpu_norm": 8418.787343993634,
+          "candidate_norm": 8418.7865370306,
+          "cosine": 0.999999999999963,
+          "max_abs": 4.57763671875e-05,
+          "rms_error": 7.812924288194053e-07,
+          "cpu_sha256": "7f4b130013d21f6ff90aa35280870eb2f67401a2ca24ca810cac04a8d4d0d8c2",
+          "candidate_sha256": "f24647d2b892a8cb20d5c6bf5726361a9c3c2e61697199618d3762a3a76132c8"
+        },
+        {
+          "elements": 2014720,
+          "cpu_norm": 914.4657250869395,
+          "candidate_norm": 914.465663486824,
+          "cosine": 0.999999999999972,
+          "max_abs": 1.52587890625e-05,
+          "rms_error": 1.1394129996898618e-07,
+          "cpu_sha256": "978e030678a884920049820eaaaf5ff4a57aa8edca7a41734321265c1bf3a6c0",
+          "candidate_sha256": "7d00370a8e2189bad173199eb1dd691b303ffb6602bdaba91b5a8c2586e796a8"
+        },
+        {
+          "elements": 1007104,
+          "cpu_norm": 6382.65610519618,
+          "candidate_norm": 6382.6557019512275,
+          "cosine": 0.9999999999999762,
+          "max_abs": 7.62939453125e-05,
+          "rms_error": 9.71553126958919e-07,
+          "cpu_sha256": "8d7835582066a81c1f40dde2776f15313e01871bf96ae693de23fb29624d2e10",
+          "candidate_sha256": "9faf9ef15a2fe90f9025d06240e8ca0bd6ae3567c21ad8cb76055ed97d23ae4c"
+        },
+        {
+          "elements": 1007104,
+          "cpu_norm": 243.7793762214562,
+          "candidate_norm": 243.779361761214,
+          "cosine": 0.9999999999999017,
+          "max_abs": 3.814697265625e-06,
+          "rms_error": 9.578848987103591e-08,
+          "cpu_sha256": "0b3fa758e55310f2c82e39533cd0bfda2ad14933199442e89ef813430ff9d6f1",
+          "candidate_sha256": "a9c6e98e5a4614530959330e5b5664ef92aa9d90cabebf8b8d4c83621eb231af"
+        },
+        {
+          "elements": 503296,
+          "cpu_norm": 819.9011837357392,
+          "candidate_norm": 819.9011864915803,
+          "cosine": 0.9999999999999508,
+          "max_abs": 8.58306884765625e-06,
+          "rms_error": 2.827136266006246e-07,
+          "cpu_sha256": "42e9bec8044d3ff41c59d9113b94e2e919180f39ed41b01f1bebb1897a6edcae",
+          "candidate_sha256": "249a75b2200afb5421483049163505c89ddeff6a04d408b289fc3f5051cfc781"
+        },
+        {
+          "elements": 503296,
+          "cpu_norm": 118.34639055414631,
+          "candidate_norm": 118.34638352248635,
+          "cosine": 0.9999999999998592,
+          "max_abs": 1.7881393432617188e-06,
+          "rms_error": 7.841998588367356e-08,
+          "cpu_sha256": "1c9664dd3cb75b5224f7b0cfedae424baa0920a3026a47e774b142f1f5bce841",
+          "candidate_sha256": "12bf550dbaf2e2cda0f1a80b8fde69ca22264032aee83e7ab0d0085101d59625"
+        },
+        {
+          "elements": 251392,
+          "cpu_norm": 281.1453765167688,
+          "candidate_norm": 281.14538154155815,
+          "cosine": 0.9999999999999384,
+          "max_abs": 2.3245811462402344e-06,
+          "rms_error": 1.6055838025917226e-07,
+          "cpu_sha256": "d37138fd78150c30eb9ce1bbcb02eb6fb133d225953fafd87b75b54d6f6351b9",
+          "candidate_sha256": "875ed90d376323072320fd91a6354698aec7a4c64e2b1b8a4d0e0ef8c3340149"
+        }
+      ],
+      "changed_codes": []
+    }
+  },
+  "isolated_pipelines": {
+    "precise-anna-de": {
+      "fe0-hb0-sem0": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "33dc4422a544355f9c37739da0b2c53441392de75eb65814d2d128f319616ea5",
+        "reference_codes": 1248,
+        "differences": 0
+      }
+    },
+    "precise-daniel-en-long": {
+      "fe0-hb0-sem0": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "f412f5a89d49877e0051e1b290558c5e0dde29ec35669c8a29b7b6a8a77a8d8c",
+        "reference_codes": 2520,
+        "differences": 0
+      }
+    },
+    "precise-fox": {
+      "fe0-hb0-sem0": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e",
+        "reference_codes": 528,
+        "differences": 0
+      }
+    },
+    "precise-samantha-en-short": {
+      "fe0-hb0-sem0": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "7abe5e46c5fda066d86af790d880a0a5f08033286651e33164cc3af5af81a372",
+        "reference_codes": 480,
+        "differences": 0
+      }
+    },
+    "precise-station": {
+      "fe0-hb0-sem0": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286",
+        "reference_codes": 488,
+        "differences": 0
+      }
+    },
+    "precise-thomas-fr": {
+      "fe0-hb0-sem0": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "647bd09c66b4784a52ad492aa698bab85736d5c381a6d2f4c44e358793487b54",
+        "reference_codes": 1000,
+        "differences": 0
+      }
+    },
+    "precise-window": {
+      "fe0-hb0-sem0": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe0-hb0-sem1": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe0-hb1-sem0": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe0-hb1-sem1": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe1-hb0-sem0": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe1-hb0-sem1": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe1-hb1-sem0": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      },
+      "fe1-hb1-sem1": {
+        "sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378",
+        "reference_codes": 520,
+        "differences": 0
+      }
+    }
+  },
+  "timings": {
+    "window-precise": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.313393792,
+          "cpu_s": 2.806889,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.582426833,
+          "cpu_s": 5.406669,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.961869583,
+          "cpu_s": 2.308742,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.558690625,
+          "cpu_s": 5.407963,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.569119625,
+          "cpu_s": 5.501966,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.932105583,
+          "cpu_s": 2.244324,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.968594125,
+          "cpu_s": 2.329291,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.658911042,
+          "cpu_s": 5.743479,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.569119625,
+          "cpu_s": 5.501966
+        },
+        "1": {
+          "wall_s": 0.961869583,
+          "cpu_s": 2.308742
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "window-precise-all": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.030474583,
+          "cpu_s": 2.489301,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.536578625,
+          "cpu_s": 5.399268,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.044948666,
+          "cpu_s": 2.674441,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.764747667,
+          "cpu_s": 5.83577,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.44500675,
+          "cpu_s": 5.206728,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.829744958,
+          "cpu_s": 2.215952,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.813617209,
+          "cpu_s": 2.194131,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.482332458,
+          "cpu_s": 5.300617,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.482332458,
+          "cpu_s": 5.300617
+        },
+        "1": {
+          "wall_s": 0.829744958,
+          "cpu_s": 2.215952
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "station-precise": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.022494459,
+          "cpu_s": 2.394488,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.349618375,
+          "cpu_s": 4.889864,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.95826525,
+          "cpu_s": 2.299584,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.418624625,
+          "cpu_s": 5.060657,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.3636765,
+          "cpu_s": 4.96929,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.903957458,
+          "cpu_s": 2.221721,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.9425775,
+          "cpu_s": 2.281202,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.643826625,
+          "cpu_s": 5.726668,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.418624625,
+          "cpu_s": 5.060657
+        },
+        "1": {
+          "wall_s": 0.9425775,
+          "cpu_s": 2.281202
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "station-precise-all": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.1203215,
+          "cpu_s": 2.557192,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.535637583,
+          "cpu_s": 5.298687,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.871562,
+          "cpu_s": 2.296383,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.628427459,
+          "cpu_s": 5.400844,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.72870425,
+          "cpu_s": 5.817608,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.007832458,
+          "cpu_s": 2.62316,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.8517775,
+          "cpu_s": 2.268142,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.83657375,
+          "cpu_s": 5.622154,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.72870425,
+          "cpu_s": 5.622154
+        },
+        "1": {
+          "wall_s": 0.871562,
+          "cpu_s": 2.296383
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "fox-precise": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.096314959,
+          "cpu_s": 2.458891,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.663936083,
+          "cpu_s": 5.59472,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.095684834,
+          "cpu_s": 2.509752,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.803756583,
+          "cpu_s": 5.67382,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.63397025,
+          "cpu_s": 5.520954,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.026838083,
+          "cpu_s": 2.42995,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.035933084,
+          "cpu_s": 2.425998,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.893671125,
+          "cpu_s": 6.093057,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.803756583,
+          "cpu_s": 5.67382
+        },
+        "1": {
+          "wall_s": 1.035933084,
+          "cpu_s": 2.42995
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "fox-precise-all": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.101588709,
+          "cpu_s": 2.523036,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.848453417,
+          "cpu_s": 6.11744,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.885887792,
+          "cpu_s": 2.306514,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.595253125,
+          "cpu_s": 5.613368,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.621011958,
+          "cpu_s": 5.724916,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.846111417,
+          "cpu_s": 2.259191,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.881853917,
+          "cpu_s": 2.361831,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.553695125,
+          "cpu_s": 5.567572,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.595253125,
+          "cpu_s": 5.613368
+        },
+        "1": {
+          "wall_s": 0.881853917,
+          "cpu_s": 2.306514
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    }
+  },
+  "recipe": {
+    "reference_cache": false,
+    "threads": 4,
+    "main": "Q8_0",
+    "tokenizer": "F16",
+    "seed": 42,
+    "steps": 32,
+    "language": "en",
+    "target_duration_seconds": 6,
+    "guidance": 2,
+    "class_temperature": 0,
+    "position_temperature": 5,
+    "codec_gpu": 0,
+    "codec_split": 1,
+    "codec_resident": 1,
+    "codec_decomp": 1,
+    "attention_views": 1,
+    "packed_projection": 0,
+    "unified_cfg": 0,
+    "cfg_interval": 1,
+    "audio_cleanup": true,
+    "session_marking": "Explicit responsibility attestation for local identified diagnostic artifacts; unchanged production marking policy.",
+    "asr_deduplication": "Score every distinct PCM SHA256 with both frozen judges; exact duplicates inherit results.",
+    "precision_gate": "CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32=1; explicit off control retained; default remains off",
+    "bench_arms": "Both CACHE=1/FASTCONV=1; CPU control HYBRID/GRAPH/FUSED/SEMANTIC_F32=0. precise candidate HYBRID/SEMANTIC_F32=1; precise-all all six=1. Reversed8-call order, first2warmups excluded."
+  },
+  "preflight": {
+    "precise-load": "vm.loadavg: { 4.25 3.76 3.33 }\n",
+    "precise-memory": "The system has 17179869184 (1048576 pages with a page size of 16384).\n\nStats: \nPages free: 10052 \nPages purgeable: 64 \nPages purged: 506214827 \n\nSwap I/O:\nSwapins: 49039571 \nSwapouts: 60281549 \n\nPage Q counts:\nPages active: 205206 \nPages inactive: 198634 \nPages speculative: 6293 \nPages throttled: 0 \nPages wired down: 222089 \n\nCompressor Stats:\nPages used by compressor: 370374 \nPages decompressed: 4785771102 \nPages compressed: 5614174608 \n\nFile I/O:\nPageins: 506724609 \nPageouts: 4955877 \n\nSystem-wide memory free percentage: 41%\n"
+  },
+  "quality": {
+    "library_sha256": "e89a696b39f0b6d8799086632238b6ec73168e15505d8a1326e485d52be528b7",
+    "arms": {
+      "clone-window-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "window",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.4797839580569416,
+        "synth_s": 9.281616291031241
+      },
+      "clone-window-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "window",
+        "mode": "precise",
+        "target": 1,
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.3308777089696378,
+        "synth_s": 9.066853834083304
+      },
+      "clone-window-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "window",
+        "mode": "all",
+        "target": 1,
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.204979999922216,
+        "synth_s": 9.031735209049657
+      },
+      "clone-station-0-baseline": {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "reference": "station",
+        "mode": "baseline",
+        "target": 0,
+        "samples": 90456,
+        "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "codes_sha256": "5e53e56beeb7e754057ba37d4082ca5c621f47c7fd8b0b5daf9264845f512860",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.7279756250791252,
+        "synth_s": 9.074218207970262
+      },
+      "clone-station-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.7279756250791252,
+        "synth_s": 9.014674375066534
+      },
+      "clone-station-0-precise": {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "reference": "station",
+        "mode": "precise",
+        "target": 0,
+        "samples": 90456,
+        "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "codes_sha256": "5e53e56beeb7e754057ba37d4082ca5c621f47c7fd8b0b5daf9264845f512860",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2168063330464065,
+        "synth_s": 9.089250291930512
+      },
+      "clone-station-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "precise",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2168063330464065,
+        "synth_s": 9.168088709004223
+      },
+      "clone-station-0-all": {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "reference": "station",
+        "mode": "all",
+        "target": 0,
+        "samples": 90456,
+        "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "codes_sha256": "5e53e56beeb7e754057ba37d4082ca5c621f47c7fd8b0b5daf9264845f512860",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2150168749503791,
+        "synth_s": 9.163833500118926
+      },
+      "clone-station-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "all",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2150168749503791,
+        "synth_s": 9.197577666956931
+      },
+      "clone-fox-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "fox",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 118536,
+        "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "codes_sha256": "c7b14015b6b089835f2a82aae00535fbaf75dbbab8180a6a929cf7d228e85918",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.3243556669913232,
+        "synth_s": 9.364095167024061
+      },
+      "clone-fox-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "fox",
+        "mode": "precise",
+        "target": 1,
+        "samples": 118536,
+        "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "codes_sha256": "c7b14015b6b089835f2a82aae00535fbaf75dbbab8180a6a929cf7d228e85918",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.3295301250182092,
+        "synth_s": 9.351670625153929
+      },
+      "clone-fox-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "fox",
+        "mode": "all",
+        "target": 1,
+        "samples": 118536,
+        "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "codes_sha256": "c7b14015b6b089835f2a82aae00535fbaf75dbbab8180a6a929cf7d228e85918",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2164282500743866,
+        "synth_s": 9.506960208062083
+      },
+      "clone-samantha-en-short-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "samantha-en-short",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 92616,
+        "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "codes_sha256": "48b236e7d6d270ab98b63254fa9f46fba9ac81ac35cf92e3a92f7c0fb5ceb982",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.985670292051509,
+        "synth_s": 9.256164124934003
+      },
+      "clone-samantha-en-short-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "samantha-en-short",
+        "mode": "precise",
+        "target": 1,
+        "samples": 92616,
+        "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "codes_sha256": "48b236e7d6d270ab98b63254fa9f46fba9ac81ac35cf92e3a92f7c0fb5ceb982",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.0809489591047168,
+        "synth_s": 9.646270875120535
+      },
+      "clone-samantha-en-short-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "samantha-en-short",
+        "mode": "all",
+        "target": 1,
+        "samples": 92616,
+        "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "codes_sha256": "48b236e7d6d270ab98b63254fa9f46fba9ac81ac35cf92e3a92f7c0fb5ceb982",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.436493249842897,
+        "synth_s": 10.122200750047341
+      },
+      "clone-daniel-en-long-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "daniel-en-long",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 148776,
+        "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "codes_sha256": "e490272fd294fb3b6f7e05d826cd4fb63875f74185c169ecbf08659b63a0a210",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 11.819779084064066,
+        "synth_s": 15.829083833144978
+      },
+      "clone-daniel-en-long-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "daniel-en-long",
+        "mode": "precise",
+        "target": 1,
+        "samples": 148776,
+        "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "codes_sha256": "e490272fd294fb3b6f7e05d826cd4fb63875f74185c169ecbf08659b63a0a210",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 6.450073541840538,
+        "synth_s": 16.108531541889533
+      },
+      "clone-daniel-en-long-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "daniel-en-long",
+        "mode": "all",
+        "target": 1,
+        "samples": 148776,
+        "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "codes_sha256": "e490272fd294fb3b6f7e05d826cd4fb63875f74185c169ecbf08659b63a0a210",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 6.24213979113847,
+        "synth_s": 16.386550499824807
+      },
+      "clone-anna-de-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "anna-de",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 94536,
+        "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "codes_sha256": "7c9c8d7be996a8425e04ba7da3eaece57b41361354ab4b78709818864d2ab442",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 4.931982708862051,
+        "synth_s": 11.962604792090133
+      },
+      "clone-anna-de-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "anna-de",
+        "mode": "precise",
+        "target": 1,
+        "samples": 94536,
+        "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "codes_sha256": "7c9c8d7be996a8425e04ba7da3eaece57b41361354ab4b78709818864d2ab442",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.5330647910013795,
+        "synth_s": 12.139746375149116
+      },
+      "clone-anna-de-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "anna-de",
+        "mode": "all",
+        "target": 1,
+        "samples": 94536,
+        "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "codes_sha256": "7c9c8d7be996a8425e04ba7da3eaece57b41361354ab4b78709818864d2ab442",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.314250166993588,
+        "synth_s": 12.186121499864385
+      },
+      "clone-thomas-fr-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "thomas-fr",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 93096,
+        "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "codes_sha256": "e66d9553a39302586c96f5186709df1b4d796ece18ffdd645e22b599e90faaf3",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 4.350088791921735,
+        "synth_s": 11.227523291949183
+      },
+      "clone-thomas-fr-1-precise": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "thomas-fr",
+        "mode": "precise",
+        "target": 1,
+        "samples": 93096,
+        "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "codes_sha256": "e66d9553a39302586c96f5186709df1b4d796ece18ffdd645e22b599e90faaf3",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.6778099169023335,
+        "synth_s": 11.273820666130632
+      },
+      "clone-thomas-fr-1-all": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "thomas-fr",
+        "mode": "all",
+        "target": 1,
+        "samples": 93096,
+        "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "codes_sha256": "e66d9553a39302586c96f5186709df1b4d796ece18ffdd645e22b599e90faaf3",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.344419833039865,
+        "synth_s": 11.374594500055537
+      }
+    }
+  },
+  "asr": {
+    "judges": {
+      "nemotron": {
+        "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+        "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+        "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+        "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+      },
+      "parakeet": {
+        "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+        "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+        "file": "parakeet-ctc-0.6b-q4_k.gguf",
+        "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+      }
+    },
+    "outputs": {
+      "clone-window-1-baseline.f32": {
+        "samples": 90936,
+        "sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "rms": 0.13194097970672888,
+        "norm": 39.78758945258356,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-station-0-baseline.f32": {
+        "samples": 90456,
+        "sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "rms": 0.10009115835234066,
+        "norm": 30.103320674955828,
+        "judges": {
+          "nemotron": {
+            "text": "The quick brown Fox jumps over the lazy dog",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "the quick brown fox jumps over the lazy dog",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-station-1-baseline.f32": {
+        "samples": 89496,
+        "sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "rms": 0.11396960935990601,
+        "norm": 34.0950139312511,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-fox-1-baseline.f32": {
+        "samples": 118536,
+        "sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "rms": 0.0682545925767388,
+        "norm": 23.499412921282733,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-samantha-en-short-1-baseline.f32": {
+        "samples": 92616,
+        "sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "rms": 0.16304754301892124,
+        "norm": 49.620058151577176,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-daniel-en-long-1-baseline.f32": {
+        "samples": 148776,
+        "sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "rms": 0.08129276147398362,
+        "norm": 31.35583104008865,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "clone-anna-de-1-baseline.f32": {
+        "samples": 94536,
+        "sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "rms": 0.12344515776703195,
+        "norm": 37.955321138085246,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk.",
+            "wer": 0.08333333333333333
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk",
+            "wer": 0.08333333333333333
+          }
+        }
+      },
+      "clone-thomas-fr-1-baseline.f32": {
+        "samples": 93096,
+        "sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "rms": 0.15163501120762513,
+        "norm": 46.266324372938925,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      }
+    }
+  },
+  "asr_library_sha256": "9f030ae613360002621361c7f0d027482e538b8f0dbb26ddb9f5a824d901da69",
+  "checks": {
+    "ctest": "Test project $WORK/build-audit/cmake\n    Start  11: permute_convt1d_weight == naive permutation (F32)\n1/5 Test  #11: permute_convt1d_weight == naive permutation (F32) ...   Passed    0.01 sec\n    Start  12: permute_convt1d_weight == naive permutation (F16)\n2/5 Test  #12: permute_convt1d_weight == naive permutation (F16) ...   Passed    0.01 sec\n    Start 308: omnivoice-encoder-parity\n3/5 Test #308: omnivoice-encoder-parity ............................   Passed    0.01 sec\n    Start 309: omnivoice-codec-lifecycle\n4/5 Test #309: omnivoice-codec-lifecycle ...........................   Passed    0.05 sec\n    Start 351: omnivoice-acceptance-policy\n5/5 Test #351: omnivoice-acceptance-policy .........................   Passed    0.13 sec\n\n100% tests passed, 0 tests failed out of 5\n\nLabel Time Summary:\nomnivoice    =   0.19 sec*proc (3 tests)\ntts          =   0.19 sec*proc (3 tests)\nunit         =   0.20 sec*proc (5 tests)\n\nTotal Test time (real) =   0.25 sec\n",
+    "asan_ubsan": "ggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 32\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 12576\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 32\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 12576\nPASS encoder F32/F16 scalar/cache/graph parity, ties, transactional allocation, filtered placement and cleanup\n",
+    "negative_control": "Unhinted Metal station changes four codes; adding F32 precision removes these on identical weights and input. Original wrong-tie mutant still fails.",
+    "source_defaults_unchanged": true
+  },
+  "limits": [
+    "One M1, shipped F16 tokenizer and Q8 main. Local synthetic en/de/fr references,60\u2013315frames. Reference languages do not establish multilingual generation quality.",
+    "Codes rather than float tensors become exact; residual F32 reduction-order differences remain. No blanket cross-model/device guarantee.",
+    "New controls do not waive prior fox/Linux cloning failures. GPU placement and semantic precision remain independently opt-in.",
+    "Speaker/prosody preservation is supported by exact generated PCM on these controls, not by a separate embedding model or completed human listening review.",
+    "System say fixtures and all listening audio remain local diagnostics; public receipt publishes only recipe, hashes and metrics."
+  ],
+  "listening_copies": {
+    "AI-generated-station-fox-sentence-CPU-default.wav": {
+      "source_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+      "samples": 90456,
+      "seconds": 3.769,
+      "conversion": "24 kHz mono PCM16, same unity gain, no normalization/trimming"
+    },
+    "AI-generated-station-fox-sentence-GPU-hybrid.wav": {
+      "source_sha256": "3c55b1e1b6fdc7cbdaadb837f182c17c94900959508be333d8ce9530ede9d91d",
+      "samples": 90696,
+      "seconds": 3.779,
+      "conversion": "24 kHz mono PCM16, same unity gain, no normalization/trimming"
+    },
+    "AI-generated-station-walk-sentence-CPU-default.wav": {
+      "source_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+      "samples": 89496,
+      "seconds": 3.729,
+      "conversion": "24 kHz mono PCM16, same unity gain, no normalization/trimming"
+    },
+    "AI-generated-station-walk-sentence-GPU-hybrid.wav": {
+      "source_sha256": "6d5617fca70b6cb6985799dea0b638c5a1d96deead709e75b2cbc4a3e1025f8d",
+      "samples": 89976,
+      "seconds": 3.749,
+      "conversion": "24 kHz mono PCM16, same unity gain, no normalization/trimming"
+    },
+    "AI-generated-station-fox-sentence-GPU-precise.wav": {
+      "source_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+      "samples": 90456,
+      "seconds": 3.769,
+      "conversion": "24 kHz mono PCM16, unity gain, no normalization/trimming; byte-identical to CPU-default WAV"
+    },
+    "AI-generated-station-walk-sentence-GPU-precise.wav": {
+      "source_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+      "samples": 89496,
+      "seconds": 3.729,
+      "conversion": "24 kHz mono PCM16, unity gain, no normalization/trimming; byte-identical to CPU-default WAV"
+    }
+  },
+  "cli": {
+    "target_codes_equal_session_baseline": true,
+    "target_codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+    "marked_wav_sha256": "e698211039ec6e9a73c8732d7bd37bb4f20a1bc6def51791c34ad3ae09d496a0",
+    "c2pa_chunk_present": true,
+    "asr": {
+      "judges": {
+        "nemotron": {
+          "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+          "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+          "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+          "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+        },
+        "parakeet": {
+          "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+          "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+          "file": "parakeet-ctc-0.6b-q4_k.gguf",
+          "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+        }
+      },
+      "outputs": {
+        "cli-marked.f32": {
+          "samples": 184056,
+          "sha256": "aeeade7b59c5e4765551fb0f93de2b8df33fd0a0360ef02233686f266d15fb04",
+          "rms": 0.09435280366912147,
+          "norm": 40.47900226498361,
+          "judges": {
+            "nemotron": {
+              "text": "This audio was generated by artificial intelligence. We should bring enough water and food for the long walk home.",
+              "wer": 0.0
+            },
+            "parakeet": {
+              "text": "this audio was generated by artificial intelligence we should bring enough water and food for the long walk home",
+              "wer": 0.0
+            }
+          }
+        }
+      }
+    }
+  }
+}

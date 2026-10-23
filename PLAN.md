@@ -1,20 +1,22 @@
 # CrispASR — Pending work
 
-## NOW — OmniVoice GPU semantic divergence (2026-10-23)
+## OmniVoice GPU semantic divergence — completed (2026-10-23)
 
-Owner: Codex, isolated audit worktree, baseline e4a3dfb98. User requests local
-CPU/GPU listening pairs and authorizes tracing the station reference's four
-changed codes. Listening WAV pairs prepared at equal gain; raw artifact hashes
-retained locally. Next: actual graph-boundary comparisons with norms, isolated
-stage inputs, codebook margins and a minimal CPU fallback if justified. Retain
-all gates/defaults and broader cloning failures; promote only proven quality
-and performance wins. Found reduced-precision Metal tiled matmul drift: semantic
-F32 hints restore station codes and all56 isolated CPU/GPU combinations across
-seven references (English/German/French,60–315frames). Independent option
-ENCODER_SEMANTIC_F32 stays off; paired precise GPU encoding remains faster than
-shipping CPU on all three original references. Five CTest cases, ASan/UBSan,
-wrong-tie negative control and full library/CLI builds pass. Full Session clone
-comparison is now running; broader decoded-output and final receipts follow.
+Owner: Codex. Runtime935b31eca adds independent default-off semantic F32
+matrix hints and actual truncated-graph/mixed-stage probe. Station's close
+stage3/frame55 codebook choice is flipped by Metal reduced-precision matrix
+arithmetic; hints reduce full semantic maxabs0.003507→0.00000787 and preserve
+CPU codes in all56 stage combinations across seven references (en/de/fr,
+60–315frames). Corrected precise/combined GPU paths remain34–50% faster than
+shipping CPU in48 paired fresh encodes, all exact codes. Full Session24renders
+pass16 candidate/CPU byte-exact code/PCM comparisons; both ASR judges score
+seven distinct cases0 and preserve Anna's CPU omission of “home” (1/12).
+Normally marked CLI matches target codes; both judges0 including disclosure,
+C2PA present. Five CTest cases, ASan/UBSan and negative controls pass.
+Local original and corrected listening WAVs prepared; corrected copies equal
+CPU WAV bytes. GPU/precision defaults stay off; broader fox/Linux acceptance
+and cross-device/quant evidence remain open.
+[Recipes, stage/margin evidence and raw receipt](docs/omnivoice-semantic-precision-2026-10-23.md).
 
 ## OmniVoice encoder A/B — completed (2026-10-23)
 
