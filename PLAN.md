@@ -1,5 +1,15 @@
 # CrispASR — Pending work
 
+## NOW — OmniVoice GPU semantic divergence (2026-10-23)
+
+Owner: Codex, isolated audit worktree, baseline e4a3dfb98. User requests local
+CPU/GPU listening pairs and authorizes tracing the station reference's four
+changed codes. Listening WAV pairs prepared at equal gain; raw artifact hashes
+retained locally. Next: actual graph-boundary comparisons with norms, isolated
+stage inputs, codebook margins and a minimal CPU fallback if justified. Retain
+all gates/defaults and broader cloning failures; promote only proven quality
+and performance wins. Broader reference/length and decoded-output checks follow.
+
 ## OmniVoice encoder A/B — completed (2026-10-23)
 
 Owner: Codex. All five independent encoder paths implemented with old paths
