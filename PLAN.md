@@ -13,6 +13,12 @@ LICENSE/NOTICE, prompts, source/asset hashes and explicit legal-review limits;
 validate GGUF readback, native CPU/F16/Q8 speech and real CUDA before wiring
 the model-specific auto-download/default. Preserve explicit pack/WAV paths.
 Candidates are not promoted by array readback or publisher license tags alone.
+Fresh bake39935552877 and runtime build39935555861 are pinned to7411898f8
+and queued. Licensing preflight verifies four pinned Apache declarations and
+the exact package sources. Three schema-only fault controls reject license or
+embedding mismatches; these are not speech acceptance. Native params74/11 and
+pack lifecycle38 checks pass. Default discovery now reads model metadata; no
+new candidate URL or replacement default has been published.
 See [voice provenance policy](docs/qwen3-designed-voices.md).
 Granite5 implementation starts after that acceptance gate.
 Prior frozen e2b77e472 CI39918848127 all13, lint39918851399 all10 and secret

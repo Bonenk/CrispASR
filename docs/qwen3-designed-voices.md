@@ -68,3 +68,37 @@ Successful extraction/readback is candidate evidence only. Native speech and
 listening review remain separate recorded gates. Unresolved source rights or
 recognized-person concerns block the affected candidate. No automatic publisher
 license tag or synthetic-audio label can override those gates.
+
+## Current execution
+
+The design and native runtime build are frozen at source
+`7411898f8d62add2d8e03ce1f7f26233e17875c3`:
+
+- [Fresh reference and prompt bake](https://github.com/CrispStrobe/CrispASR/actions/runs/39935552877).
+- [Native CUDA-capable runtime and existing CPU controls](https://github.com/CrispStrobe/CrispASR/actions/runs/39935555861).
+
+The replacement jobs were queued when this method was written. Neither constitutes
+acceptance until terminal outputs are checked. Earlier queued compatibility and
+pre-embedded-notice bakes were canceled; they are not release inputs.
+
+After both inputs succeed, `qwen3_designed_voice_cpu.py` accepts their exact run
+IDs and source, verifies the native archive and every bundled file, compares the
+candidate recipe to the producer git blob, and runs the independent validator.
+The wrapper checks through the normal CLI and Python Session/C ABI. References
+must transcribe exactly; “Hello world” must transcribe exactly; other test speech
+allows WER at most 0.1. Both model sizes and both 1.7B F16/Q8 variants are tested.
+Both model-specific defaults must coexist with the old incompatible generic pack;
+renamed-model discovery and explicit incompatible-pack rejection are included.
+
+A one-voice selection fixture lets the existing CLI consume `clear` without a
+new CLI feature: speaker/code arrays are copied unchanged, read back exactly,
+and retain embedded license, attribution and provenance. It is a test fixture,
+not a claim that unrelated model embeddings can be converted by changing shape.
+Session tests use normal marked `synthesize`, and CLI tests retain normal marking
+while omitting the spoken prefix for scoring. Actual CUDA uses the same validator,
+requires per-child GPU residency and records native backend logs.
+
+The licensing/array auditor has also been exercised with **schema-only synthetic
+fixtures**. A matching fixture passes; a changed full license, unknown publisher
+license, and mismatched saved embedding are each rejected even when manifest
+checksums are refreshed. This tests the auditor, not the original model or speech.
