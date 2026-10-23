@@ -52,15 +52,25 @@ completed. Q8 embedding-only F16 retention passes teacher/pipeline norm ratios
 All arms retain the exact source transcript; no numerical threshold was lowered.
 Q4 remains unaccepted. A new quantizer rule preserves token embeddings only for
 Granite YaRN profiles, leaving legacy Granite recipes unchanged. Explicit
-per-tensor overrides retain an A/B route to the old recipe.
+per-tensor overrides retain an A/B route to the old recipe. An actual-quantizer
+regression test fails against the original code and passes all8 cases after
+the fix, checking preserved F16 bytes, legacy/NAR behavior, unrelated metadata
+and the explicit old-policy override.
 
-Full profile validation39984477044 is queued for F16 and corrected Q8;
-separate Q6 candidate39984512161 is queued behind it. Both use exact
+Full profile validation39984477044 succeeded for F16 and corrected Q8;
+separate Q6 candidate39984512161 failed the fixed teacher-logit magnitude
+gate (ratio0.960814) after its frontend stages passed. Q6 remains unaccepted. Both use exact
 source1bad3b2dbe8b5ce55cc5dfafcec25610d442ee95. The shared runner checks all frontend stages, teacher and
 pipeline logits, exact prompt IDs, both decoder paths, repeated renamed-model
 Session autodetection and the real CLI. Fresh Q8 quantization must match all940
-controlled-profile tensor payloads. Precision-factorial success alone does not
-establish full CPU or CUDA acceptance.
+controlled-profile tensor payloads. Independent retained-array review also passes
+all frontend stages, teacher/pipeline magnitude and cosine gates, first-token
+ranks, exact prompt and both27-token decodes, repeated official Session and CLI
+text. Q8 teacher/pipeline norm ratios remain1.005482/1.008909. CPU acceptance is
+established for these two profiles; immutable receipt b99c15b3719518846a90402447cee58331470ed7
+has anonymous byte readback. Later profile jobs cannot invalidate that pinned
+receipt. Future workers publish evidence under per-run paths to separate Q6
+from F16/Q8 approval. CUDA and production acceptance remain false.
 
 CUDA build39980261207 succeeded at exact7287199c3. The build-only capsule has
 complete external runtime notices and verified corresponding sources for
@@ -69,7 +79,37 @@ Kaggle must resolve its own CUDA libraries. Its prepared model-free preflight
 rejects stubs, unresolved dependencies and library interposition, and records
 actual loaded paths/hashes. The Kaggle entry/validator is implemented but
 requires reviewed immutable CPU receipt and runtime checkpoint pins before
-launch. No actual CUDA model acceptance has run.
+launch. Runtime checkpoint99bc8384b has a verified anonymous full-byte readback.
+The shared attention probe now accepts explicit CUDA0 dispatch and retains
+a declared FP32 high-position budget plus four incorrect controls; its CPU path
+still passes. Replacement CUDA build39987283644 at8920fa6c038eedb80997a955b1f6d76133abb0c0
+succeeded; all69 capsule file hashes and700 runtime source hashes match
+the manifest and approved CPU sources, with both source packets verified. GPU
+validation will require this original-module check through position16383 before
+loading trained weights. Kaggle v1 is pinned to reviewed CPU revisionb99c15b3719518846a90402447cee58331470ed7
+and runtime revisiond90703f4029055bdc1cb3e3064ff9e5549422dde; both have
+anonymous byte readback. A read-only slot check found no active kernels among
+the20 most recent; actual prelaunch check also found zero active sessions.
+Kaggle kernel `crispasr-granite5-acceptance` v1 ended ERROR on a T4; terminal
+logs and outputs are preserved. Actual host-library loading passed. Its correct
+YaRN component had norm ratio0.9999999545, relativeL2 0.0007615, peak0.003943 and
+low-position peak0.00001315, exceeding the CPU-derived0.003/0.0005 limits.
+GGML CUDA enables fast math; [NVIDIA documents the lower-accuracy intrinsics](https://docs.nvidia.com/cuda/archive/12.4.1/pdf/CUDA_C_Programming_Guide.pdf).
+The normalized FP32 component budget is now RMS0.1%/peak0.5%, low-position
+peak0.00002, retaining the same1ppm norm invariant. All4 wrong configurations
+still reject on CPU under this same budget. Full model cosine/norm/decoded
+output gates are unchanged. V2 requires a newly compiled, pinned capsule and
+all4 CUDA negative controls before real model acceptance. No CUDA model
+acceptance has passed yet. Build39994202206 at
+999c56805ff903b86b076b03d87da8cd4f90858a is preparing the revised probe.
+V2 will additionally require actual CUDA0-assigned matrix-operation traces per
+native process, beyond residency and decoder backend logs. A concrete CUB notice omission
+was found in the prebuilt capsules: compiled SSM templates require the BSD
+notice despite no NVIDIA shared-library files. The actual official
+cuda-cccl12.4.127-1 package reports CUB2.3.2 (the release-note table says2.3.1),
+and its complete BSD text is now retained in project notices. Licensing-only
+repackaging preserves every compiled ELF byte; v2 stays unlaunchable until its
+corrected capsule is qualified. Future builds also verify the SDK version header.
 
 Resource policy: check load and available memory before local compile/inference;
 keep large model work off this small host. CPU conversion/reference/diff runs on
@@ -1139,9 +1179,14 @@ prevent full-runtime/default acceptance. Do not repeat accepted utility proof.
   Eight-step RTF1.019 and poorer reported quality do not justify changing the
   ten-step quality default. Issue478 Windows/Khmer retest, Q4 batching and
   other-ISA/GPU coverage remain separate; verify current issue state first.
-- **Issue456 / Nyra:** deferred for separate research/output-license review;
-  this is not an approved ordinary-NC integration. No port or conversion is
-  queued; espeak-ng cannot be assumed bundled.
+- **Issue456 / Nyra:** deferred. The [published model/output terms](https://huggingface.co/nyralabs/nyra_forced_aligner_en/blob/9c8e724072261c30641a91ca365ce4f7b4ae7f83/LICENSE.md)
+  restrict production/operational and hosted/API uses, not just paid use, and
+  cover lexicon/configuration assets and generated outputs. MIT code does not
+  remove those restrictions. A production port requires appropriate written
+  rights; no such agreement was found or obtained. Research-only redistribution
+  also requires separate review of recipient/output obligations and unresolved
+  bundled WavLM provenance. No port, conversion or registry entry is queued;
+  espeak-ng/phonemizer bundling requires its own GPL compliance review.
 - **Dolphin:** merged original-reference fix does not prove reporter Kylin/GCC9,
   private clips or GPU behavior. Obtain those inputs if further work is needed.
 
