@@ -1,0 +1,57 @@
+{
+  "issue": 555,
+  "checked_at": "2026-10-23",
+  "baseline_source": "cb31b23db923c61f0fca779919b3ea8c82dab2aa",
+  "runtime_fix": "de83cc6a5e61d3c21de174607d2226809c2c3184",
+  "test_checkpoint": "e7512e776640c6e6a2f3521a2da10a1d91daa152",
+  "bundle_source": "682b54af2a883371541b861b434600bbf9b3a8e5",
+  "root_cause": {
+    "default_pack_repo": "cstr/qwen3-tts-voices-GGUF",
+    "default_pack_revision": "6ee1102f782cab1f17842983044ac51cf57884d8",
+    "default_pack_filename": "qwen3-tts-voice-default.gguf",
+    "default_pack_sha256": "031c1b7f397b5f11db237dd39671042f994f1dd6b55369b64e4e72bc723efb28",
+    "speaker_shape": [
+      1024
+    ],
+    "speaker_type": "F32",
+    "speaker_bytes": 4096,
+    "large_required_shape": [
+      2048
+    ],
+    "large_read_bytes": 8192
+  },
+  "actual_large_header": {
+    "repo": "cstr/qwen3-tts-1.7b-base-GGUF",
+    "revision": "1d9fa40e85c64e699f3f9fea5aa7fc69a7b2d4ff",
+    "filename": "qwen3-tts-12hz-1.7b-base-f16.gguf",
+    "status": 206,
+    "content_range": "bytes 0-1048575/3863009472",
+    "bytes": 1048576,
+    "sha256": "b13f517fec496af3f11f900268615a9dcddfaf08c348178d4f98fa23f9ed23b4",
+    "observed": {
+      "general.architecture": "qwen3tts",
+      "qwen3tts.talker.d_model": 2048,
+      "qwen3tts.speaker.enc_dim": 2048
+    },
+    "scope": "Header only; no model weights or inference loaded locally."
+  },
+  "local": {
+    "params_cases": 10,
+    "params_assertions": 70,
+    "registry_cases": 65,
+    "registry_assertions": 6240,
+    "model_free_lifecycle_checks": 38,
+    "selected_ctest_cases": 11,
+    "selected_ctest_failures": 0,
+    "real_06b_public_loader_cases": 11,
+    "before_public_loader": "Rejected by the new regression: original loader incorrectly accepts wrong dimensions.",
+    "before_prefill": "SIGABRT: tensor read out of bounds, same ggml_backend_tensor_get/build_icl_prefill_embeds stack; reproduced with minimal context and real default pack before neural compute."
+  },
+  "hosted": {
+    "bundle_run": 39910096656,
+    "status": "in_progress",
+    "cpu_speech_accepted": false,
+    "cuda_speech_accepted": false
+  },
+  "scope": "Typed voice-pack loading, rollback, replacement and prefill bounds. 1.7B needs its own compatible voice pack or a WAV/transcript. No speech/CUDA acceptance until actual results are audited."
+}

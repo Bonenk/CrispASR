@@ -8,8 +8,8 @@ Issue551 schema rejection is already on main; hosted CI39722231798 and
 lint39722234064 both completed successfully. Granite5 support (issue552) is deferred.
 Issue555: default voice pack has a 1024-element F32 speaker embedding, while
 1.7B Base expects2048. Prefill reads2048 without validating the tensor.
-Add transactional pack/schema validation, preserve valid packs on failed loads,
-and verify compatible synthesis on CPU and real CUDA per the operational guide.
+Transactional pack/schema validation and failed-load preservation are implemented.
+Compatible synthesis on CPU and real CUDA is being checked per the operational guide.
 Local focused tests pass: Qwen3 params70 assertions/10cases; registry6240/65.
 Model-free public loader/prefill lifecycle passes38 checks; the precise
 pre-fix abort was reproduced with the real default pack without model weights.
@@ -23,7 +23,9 @@ the ggml-cpu MODULE under DL. Keep production DL configuration, disable
 the broad test CMake file in this bundle and inject only the two probes.
 The replacement bundle retains default CUDA FlashAttention kernels for the
 real synthesis check. The queued initial replacement is superseded before
-building; launch CUDA only after the final archive is qualified.
+building. Replacement run39910096656 targets `682b54af2` and is in progress.
+Launch CUDA only after that archive is qualified.
+[Initial shape/regression evidence](docs/issue555-voice-pack-2026-10-23.json).
 Kaggle worker remains guarded/unlaunched until immutable archive pins exist.
 No complete speech acceptance is claimed yet.
 
