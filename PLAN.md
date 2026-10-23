@@ -1,14 +1,25 @@
 # CrispASR — Pending work
 
-## NOW — M1 OmniVoice generation and startup (2026-10-23)
+## M1 OmniVoice generation and startup — completed (2026-10-23)
 
-Owner: Codex. Baseline `aa7d08c82`. First repair the hosted test-harness
-failures (allocator extraction stubs and CPU-header lint); the 2,077 Linux
-CTest cases already pass. Then measure exact existing unified-CFG versus
-two-forward generation and precompiled versus embedded-source Metal startup.
-Use pinned weights, full 32-step recipe, counterbalanced warm samples and
-code/PCM parity. No GPU or platform default promotion without evidence.
-
+Owner: Codex. Hosted harness repairs `1ae585389` address the allocator stub and
+CPU-header lint (hosted CI39897381899 and Lint39897381791 now pass). The
+earlier 2,077 Linux CTest cases already passed. New opt-in
+attention views remove 84 copies per forward: paired generation 8.10→7.45 s,
+request 8.60→7.99 s, exact code/PCM parity. A precompiled repeat confirms
+8.49→7.62 s requests. Packed projections stay opt-in
+(~312 MB extra, no convincing timing win); unified CFG stays off on Metal.
+Same internal-file startup medians 0.503/0.490 s embedded/precompiled, warm OS
+caches; historical external I/O is not a cold-start control. Full precompiled
+Release CLI runs with normal marking; full embedded shared-library Session
+checks unconditioned, both synthetic reference voices and combined gates.
+Both pinned ASR judges score these new walk-sentence controls and marked CLI
+output zero. Actual F32/F16/Q8_0/Q4_K graph parity, allocation checks, four CTest
+cases, ASan/UBSan and a deliberately wrong K-offset negative control pass.
+[Samples and scope](docs/omnivoice-m1-startup-generation-2026-10-23.md).
+All new gates stay off by default; broader fox-cloning acceptance stays open.
+Next target is the dominant matrix kernels/longer inputs and cross-device
+coverage before a default change. No ggml bump or release is implied.
 
 ## M1 OmniVoice comparison and resident decoder — completed (2026-10-23)
 

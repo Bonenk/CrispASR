@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (334 lessons)
+## Index by topic (335 lessons)
 
 **Security & untrusted input** (2)
 
@@ -333,7 +333,7 @@ cross-reference when you already know which model you are touching.
 - L17279 — CrispEmbed #31 WASM OCR e2e
 - L19386 — 313. Index-Echo: audit effective nested dtypes and Silero waveform history
 
-**Per-model port notes** (47)
+**Per-model port notes** (48)
 
 - L967 — A model's capability list cannot be inferred from its vocabulary — and forcing a fake list does not simulate having the capability
 - L3572 — Multi-stream token architecture (Mini-Omni2)
@@ -382,6 +382,7 @@ cross-reference when you already know which model you are touching.
 - L19325 — 2026-10-01 — Parakeet / Phonon-2 CPU decoding: probe the production projection and SOS
 - L19624 — 2026-10-06 — A GGUF's `block_count` can include blocks that are not part of the trunk (Qwen3.5 MTP)
 - L19687 — Dolphin noncausal CSGU needs padding after LayerNorm (2026-10-12, #540)
+- L19724 — M1 OmniVoice attention copies and warm shader-cache controls
 
 **Uncategorised** (12)
 
@@ -442,5 +443,5 @@ lookup, not a partition.
 - **f5-tts** (3) — L14724, L19241, L19278
 - **kokoro** (4) — L1060, L7962, L16019, L16692
 - **zonos** (2) — L12389, L19073
-- **omniasr / omnivoice** (8) — L20, L37, L887, L1790, L5283, L14521, L14549, L14935
+- **omniasr / omnivoice** (9) — L20, L37, L887, L1790, L5283, L14521, L14549, L14935, L19724
 - **glm / mimo / mega** (3) — L11737, L14432, L14489

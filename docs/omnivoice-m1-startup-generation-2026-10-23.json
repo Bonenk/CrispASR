@@ -1,0 +1,1176 @@
+{
+  "date": "2026-10-23",
+  "host": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_gb": 16,
+    "os": "macOS 26",
+    "desktop_contention": "Varied: older contended and later quieter campaigns both retained."
+  },
+  "baseline_runtime": "aa7d08c82691926b1c09a05c185c2c38170db6a7",
+  "ggml": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "source_sha256": {
+    "src/omnivoice.cpp": "d125bebffae7d7ac61f53eee355d4a873db3664323526c3ba5ca3d57f9a8a224",
+    "tests/test-omnivoice-codec.cpp": "98c450acc43948196e551a3c48ff7e4271cd55888a4cb06f2db11e74f47197ce",
+    "tools/ci-heavy/omnivoice_engine_bench.cpp": "aba85198ea4524a1eafd144d44d6f7566c20b3c475fdc2944c416dad57406a5f"
+  },
+  "models": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "main_sha256": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+    "codec_sha256": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63"
+  },
+  "recipe": {
+    "text": "We should bring enough water and food for the long walk home.",
+    "language": "en",
+    "seed": 42,
+    "steps": 32,
+    "target_frames": 150,
+    "target_seconds": 6,
+    "guidance": 2,
+    "class_temperature": 0,
+    "position_temperature": 5,
+    "layer_penalty": 5,
+    "t_shift": 0.1,
+    "flash_attention": true,
+    "cpu_threads": 4,
+    "audio_cleanup": true
+  },
+  "fixed_env": {
+    "CRISPASR_OMNIVOICE_CODEC_GPU": "0",
+    "CRISPASR_OMNIVOICE_CODEC_SPLIT": "1",
+    "CRISPASR_OMNIVOICE_CODEC_RESIDENT": "1",
+    "CRISPASR_OMNIVOICE_CODEC_DECOMP": "1",
+    "CRISPASR_OMNIVOICE_CFG_INTERVAL": "1"
+  },
+  "campaigns": {
+    "embedded-cfg": {
+      "load_s": 1.228094,
+      "samples": [
+        {
+          "iteration": 0,
+          "arm": 0,
+          "warmup": true,
+          "generation_s": 7.99204,
+          "decode_s": 0.567026,
+          "total_s": 8.559067,
+          "cpu_s": 0.865672,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "arm": 1,
+          "warmup": true,
+          "generation_s": 8.799483,
+          "decode_s": 0.45848,
+          "total_s": 9.257965,
+          "cpu_s": 0.692786,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.652599,
+          "decode_s": 0.453804,
+          "total_s": 8.106406,
+          "cpu_s": 0.776375,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 8.844699,
+          "decode_s": 0.506086,
+          "total_s": 9.350786,
+          "cpu_s": 0.790035,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 8.869806,
+          "decode_s": 0.466926,
+          "total_s": 9.336733,
+          "cpu_s": 0.744221,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.678953,
+          "decode_s": 0.515572,
+          "total_s": 8.194527,
+          "cpu_s": 0.881718,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.622649,
+          "decode_s": 0.449061,
+          "total_s": 8.071713,
+          "cpu_s": 0.811443,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 8.799155,
+          "decode_s": 0.48013,
+          "total_s": 9.279287,
+          "cpu_s": 0.757552,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 7.652599,
+          "decode_s": 0.453804,
+          "total_s": 8.106406,
+          "cpu_s": 0.811443
+        },
+        "1": {
+          "generation_s": 8.844699,
+          "decode_s": 0.48013,
+          "total_s": 9.336733,
+          "cpu_s": 0.757552
+        }
+      }
+    },
+    "aot-cfg": {
+      "load_s": 0.823721,
+      "samples": [
+        {
+          "iteration": 0,
+          "arm": 0,
+          "warmup": true,
+          "generation_s": 8.108823,
+          "decode_s": 0.715797,
+          "total_s": 8.824621,
+          "cpu_s": 0.807249,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "arm": 1,
+          "warmup": true,
+          "generation_s": 8.790097,
+          "decode_s": 0.452601,
+          "total_s": 9.242699,
+          "cpu_s": 0.742265,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.71186,
+          "decode_s": 0.494746,
+          "total_s": 8.206608,
+          "cpu_s": 0.809532,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 9.146649,
+          "decode_s": 0.565102,
+          "total_s": 9.711753,
+          "cpu_s": 0.888494,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 9.030306,
+          "decode_s": 0.52127,
+          "total_s": 9.551578,
+          "cpu_s": 0.859451,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.949628,
+          "decode_s": 0.497442,
+          "total_s": 8.447071,
+          "cpu_s": 0.954176,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.83599,
+          "decode_s": 0.451469,
+          "total_s": 8.28746,
+          "cpu_s": 0.965634,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 9.189079,
+          "decode_s": 0.464075,
+          "total_s": 9.653156,
+          "cpu_s": 0.985954,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 7.83599,
+          "decode_s": 0.494746,
+          "total_s": 8.28746,
+          "cpu_s": 0.954176
+        },
+        "1": {
+          "generation_s": 9.146649,
+          "decode_s": 0.52127,
+          "total_s": 9.653156,
+          "cpu_s": 0.888494
+        }
+      }
+    },
+    "packed-paired": {
+      "load_s": 1.227291,
+      "samples": [
+        {
+          "iteration": 0,
+          "arm": 0,
+          "warmup": true,
+          "generation_s": 8.059028,
+          "decode_s": 0.556738,
+          "total_s": 8.615769,
+          "cpu_s": 1.308504,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "arm": 1,
+          "warmup": true,
+          "generation_s": 7.864898,
+          "decode_s": 0.478191,
+          "total_s": 8.34309,
+          "cpu_s": 0.909044,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.68616,
+          "decode_s": 0.459921,
+          "total_s": 8.146082,
+          "cpu_s": 0.823505,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.768821,
+          "decode_s": 0.499651,
+          "total_s": 8.268473,
+          "cpu_s": 0.784916,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.972112,
+          "decode_s": 0.495804,
+          "total_s": 8.467918,
+          "cpu_s": 1.172105,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.847776,
+          "decode_s": 0.45526,
+          "total_s": 8.303037,
+          "cpu_s": 1.039314,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.845251,
+          "decode_s": 0.496036,
+          "total_s": 8.34129,
+          "cpu_s": 1.039299,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.723299,
+          "decode_s": 0.456247,
+          "total_s": 8.17955,
+          "cpu_s": 0.860847,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 7.845251,
+          "decode_s": 0.459921,
+          "total_s": 8.303037,
+          "cpu_s": 1.039299
+        },
+        "1": {
+          "generation_s": 7.768821,
+          "decode_s": 0.495804,
+          "total_s": 8.268473,
+          "cpu_s": 0.860847
+        }
+      }
+    },
+    "attn-paired": {
+      "load_s": 1.189058,
+      "samples": [
+        {
+          "iteration": 0,
+          "arm": 0,
+          "warmup": true,
+          "generation_s": 7.696636,
+          "decode_s": 0.59327,
+          "total_s": 8.289907,
+          "cpu_s": 0.689636,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "arm": 1,
+          "warmup": true,
+          "generation_s": 7.301875,
+          "decode_s": 0.496952,
+          "total_s": 7.798832,
+          "cpu_s": 0.65043,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.692575,
+          "decode_s": 0.474279,
+          "total_s": 8.166856,
+          "cpu_s": 0.611099,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 6.9164,
+          "decode_s": 0.47526,
+          "total_s": 7.391662,
+          "cpu_s": 0.7546,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.454356,
+          "decode_s": 0.5358,
+          "total_s": 7.990161,
+          "cpu_s": 1.021262,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 8.163423,
+          "decode_s": 0.485731,
+          "total_s": 8.649155,
+          "cpu_s": 1.037048,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 8.097599,
+          "decode_s": 0.504912,
+          "total_s": 8.602513,
+          "cpu_s": 0.819198,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.50493,
+          "decode_s": 0.481321,
+          "total_s": 7.986254,
+          "cpu_s": 1.12077,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 8.097599,
+          "decode_s": 0.485731,
+          "total_s": 8.602513,
+          "cpu_s": 0.819198
+        },
+        "1": {
+          "generation_s": 7.454356,
+          "decode_s": 0.481321,
+          "total_s": 7.986254,
+          "cpu_s": 1.021262
+        }
+      }
+    },
+    "aot-attn": {
+      "load_s": 1.1281,
+      "samples": [
+        {
+          "iteration": 0,
+          "arm": 0,
+          "warmup": true,
+          "generation_s": 7.687547,
+          "decode_s": 0.557391,
+          "total_s": 8.244939,
+          "cpu_s": 0.701094,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "arm": 1,
+          "warmup": true,
+          "generation_s": 6.843543,
+          "decode_s": 0.479354,
+          "total_s": 7.322898,
+          "cpu_s": 0.67617,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.656861,
+          "decode_s": 0.48154,
+          "total_s": 8.138403,
+          "cpu_s": 0.752142,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 6.929916,
+          "decode_s": 0.451172,
+          "total_s": 7.38109,
+          "cpu_s": 0.871031,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.129109,
+          "decode_s": 0.492521,
+          "total_s": 7.621632,
+          "cpu_s": 1.032535,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 7.985717,
+          "decode_s": 0.503895,
+          "total_s": 8.489614,
+          "cpu_s": 1.083838,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "arm": 0,
+          "warmup": false,
+          "generation_s": 8.248143,
+          "decode_s": 0.479804,
+          "total_s": 8.72795,
+          "cpu_s": 1.414262,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "arm": 1,
+          "warmup": false,
+          "generation_s": 7.741956,
+          "decode_s": 0.47522,
+          "total_s": 8.217179,
+          "cpu_s": 1.518847,
+          "samples": 96240,
+          "rms": 0.09149095,
+          "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+          "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+          "scored_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 7.985717,
+          "decode_s": 0.48154,
+          "total_s": 8.489614,
+          "cpu_s": 1.083838
+        },
+        "1": {
+          "generation_s": 7.129109,
+          "decode_s": 0.47522,
+          "total_s": 7.621632,
+          "cpu_s": 1.032535
+        }
+      }
+    }
+  },
+  "startup": {
+    "storage": "same internal SSD paths and verified bytes for both builds; OS file/shader caches already warm; separate process per sample; no cache flush",
+    "samples": [
+      {
+        "order": 0,
+        "arm": "embedded",
+        "load_s": 1.173239,
+        "cpu_s": 0.71916
+      },
+      {
+        "order": 1,
+        "arm": "aot",
+        "load_s": 0.543972,
+        "cpu_s": 0.477058
+      },
+      {
+        "order": 2,
+        "arm": "aot",
+        "load_s": 0.474166,
+        "cpu_s": 0.444998
+      },
+      {
+        "order": 3,
+        "arm": "embedded",
+        "load_s": 0.501598,
+        "cpu_s": 0.514315
+      },
+      {
+        "order": 4,
+        "arm": "embedded",
+        "load_s": 0.505029,
+        "cpu_s": 0.522852
+      },
+      {
+        "order": 5,
+        "arm": "aot",
+        "load_s": 0.451189,
+        "cpu_s": 0.432775
+      },
+      {
+        "order": 6,
+        "arm": "aot",
+        "load_s": 0.504844,
+        "cpu_s": 0.475217
+      },
+      {
+        "order": 7,
+        "arm": "embedded",
+        "load_s": 0.495989,
+        "cpu_s": 0.510752
+      }
+    ],
+    "medians": {
+      "embedded": {
+        "load_s": 0.5033135,
+        "cpu_s": 0.5185835
+      },
+      "aot": {
+        "load_s": 0.48950499999999997,
+        "cpu_s": 0.4601075
+      }
+    },
+    "historical_external_144_633029_s_is_not_a_cold_control": true
+  },
+  "profile": {
+    "copy": [
+      {
+        "nodes": 1,
+        "raw_gpu_us": 24,
+        "net_gpu_us": 24,
+        "wall_us": 3282,
+        "operations": {
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 24,
+            "net_gpu_us": 24
+          }
+        }
+      },
+      {
+        "nodes": 919,
+        "raw_gpu_us": 261052,
+        "net_gpu_us": 261023,
+        "wall_us": 400754,
+        "operations": {
+          "ADD": {
+            "count": 63,
+            "raw_gpu_us": 2354,
+            "net_gpu_us": 2351
+          },
+          "MUL": {
+            "count": 141,
+            "raw_gpu_us": 6186,
+            "net_gpu_us": 6180
+          },
+          "CONCAT": {
+            "count": 1,
+            "raw_gpu_us": 73,
+            "net_gpu_us": 73
+          },
+          "RMS_NORM": {
+            "count": 113,
+            "raw_gpu_us": 3125,
+            "net_gpu_us": 3120
+          },
+          "MUL_MAT": {
+            "count": 197,
+            "raw_gpu_us": 188544,
+            "net_gpu_us": 188536
+          },
+          "CONT": {
+            "count": 85,
+            "raw_gpu_us": 38061,
+            "net_gpu_us": 38057
+          },
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 732,
+            "net_gpu_us": 732
+          },
+          "ROPE": {
+            "count": 56,
+            "raw_gpu_us": 3290,
+            "net_gpu_us": 3288
+          },
+          "FLASH_ATTN_EXT": {
+            "count": 28,
+            "raw_gpu_us": 17059,
+            "net_gpu_us": 17057
+          },
+          "UNARY": {
+            "count": 28,
+            "raw_gpu_us": 1629,
+            "net_gpu_us": 1628
+          }
+        }
+      },
+      {
+        "nodes": 916,
+        "raw_gpu_us": 243046,
+        "net_gpu_us": 243016,
+        "wall_us": 370853,
+        "operations": {
+          "ADD": {
+            "count": 63,
+            "raw_gpu_us": 3537,
+            "net_gpu_us": 3534
+          },
+          "MUL": {
+            "count": 141,
+            "raw_gpu_us": 5827,
+            "net_gpu_us": 5821
+          },
+          "RMS_NORM": {
+            "count": 113,
+            "raw_gpu_us": 3011,
+            "net_gpu_us": 3006
+          },
+          "MUL_MAT": {
+            "count": 197,
+            "raw_gpu_us": 174761,
+            "net_gpu_us": 174753
+          },
+          "CONT": {
+            "count": 84,
+            "raw_gpu_us": 32808,
+            "net_gpu_us": 32805
+          },
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 403,
+            "net_gpu_us": 403
+          },
+          "ROPE": {
+            "count": 56,
+            "raw_gpu_us": 3125,
+            "net_gpu_us": 3123
+          },
+          "FLASH_ATTN_EXT": {
+            "count": 28,
+            "raw_gpu_us": 17920,
+            "net_gpu_us": 17919
+          },
+          "UNARY": {
+            "count": 28,
+            "raw_gpu_us": 1654,
+            "net_gpu_us": 1652
+          }
+        }
+      }
+    ],
+    "views": [
+      {
+        "nodes": 1,
+        "raw_gpu_us": 46,
+        "net_gpu_us": 46,
+        "wall_us": 6601,
+        "operations": {
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 46,
+            "net_gpu_us": 46
+          }
+        }
+      },
+      {
+        "nodes": 835,
+        "raw_gpu_us": 228419,
+        "net_gpu_us": 228393,
+        "wall_us": 364233,
+        "operations": {
+          "ADD": {
+            "count": 63,
+            "raw_gpu_us": 2544,
+            "net_gpu_us": 2542
+          },
+          "MUL": {
+            "count": 141,
+            "raw_gpu_us": 6609,
+            "net_gpu_us": 6603
+          },
+          "CONCAT": {
+            "count": 1,
+            "raw_gpu_us": 74,
+            "net_gpu_us": 74
+          },
+          "RMS_NORM": {
+            "count": 113,
+            "raw_gpu_us": 3366,
+            "net_gpu_us": 3361
+          },
+          "MUL_MAT": {
+            "count": 197,
+            "raw_gpu_us": 185534,
+            "net_gpu_us": 185526
+          },
+          "CONT": {
+            "count": 1,
+            "raw_gpu_us": 3087,
+            "net_gpu_us": 3087
+          },
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 733,
+            "net_gpu_us": 733
+          },
+          "ROPE": {
+            "count": 56,
+            "raw_gpu_us": 3165,
+            "net_gpu_us": 3163
+          },
+          "FLASH_ATTN_EXT": {
+            "count": 28,
+            "raw_gpu_us": 21588,
+            "net_gpu_us": 21587
+          },
+          "UNARY": {
+            "count": 28,
+            "raw_gpu_us": 1717,
+            "net_gpu_us": 1716
+          }
+        }
+      },
+      {
+        "nodes": 832,
+        "raw_gpu_us": 229868,
+        "net_gpu_us": 229842,
+        "wall_us": 349894,
+        "operations": {
+          "ADD": {
+            "count": 63,
+            "raw_gpu_us": 2511,
+            "net_gpu_us": 2508
+          },
+          "MUL": {
+            "count": 141,
+            "raw_gpu_us": 6200,
+            "net_gpu_us": 6194
+          },
+          "RMS_NORM": {
+            "count": 113,
+            "raw_gpu_us": 3246,
+            "net_gpu_us": 3241
+          },
+          "MUL_MAT": {
+            "count": 197,
+            "raw_gpu_us": 188462,
+            "net_gpu_us": 188453
+          },
+          "GET_ROWS": {
+            "count": 1,
+            "raw_gpu_us": 550,
+            "net_gpu_us": 550
+          },
+          "ROPE": {
+            "count": 56,
+            "raw_gpu_us": 3552,
+            "net_gpu_us": 3549
+          },
+          "FLASH_ATTN_EXT": {
+            "count": 28,
+            "raw_gpu_us": 23747,
+            "net_gpu_us": 23746
+          },
+          "UNARY": {
+            "count": 28,
+            "raw_gpu_us": 1601,
+            "net_gpu_us": 1600
+          }
+        }
+      }
+    ],
+    "scope": "single MaskGIT step, 150 frames, separate cond/uncond; serialized profiler disables graph fusion and inflates wall time; shares/counts are attribution, not end-to-end timings"
+  },
+  "session_c_api": {
+    "library_sha256": "6428895ccb7a087acff3d00ca3299a7a6359adc70807f50d55caeaa52975b3ca",
+    "arms": {
+      "none-views0-pack0-cfg0": {
+        "samples": 96240,
+        "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "within_reference_exact": true,
+        "wall_s": 8.574797208886594
+      },
+      "none-views1-pack0-cfg0": {
+        "samples": 96240,
+        "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "within_reference_exact": true,
+        "wall_s": 7.496753791114315
+      },
+      "none-views1-pack1-cfg0": {
+        "samples": 96240,
+        "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "within_reference_exact": true,
+        "wall_s": 7.830466957995668
+      },
+      "none-views1-pack0-cfg1": {
+        "samples": 96240,
+        "pcm_sha256": "5efaa52268ffd187f213e2fc71cb40585ab94be8a2b4d256beffcc572725ac37",
+        "codes_sha256": "adacf4b3d39f0c533bd784ae8868f276b24ef32641619b52139a15ad09467437",
+        "within_reference_exact": true,
+        "wall_s": 7.743186583044007
+      },
+      "window-views0-pack0-cfg0": {
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "within_reference_exact": true,
+        "wall_s": 9.895326334051788
+      },
+      "window-views1-pack0-cfg0": {
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "within_reference_exact": true,
+        "wall_s": 8.681642208946869
+      },
+      "station-views0-pack0-cfg0": {
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "within_reference_exact": true,
+        "wall_s": 9.70760158309713
+      },
+      "station-views1-pack0-cfg0": {
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "within_reference_exact": true,
+        "wall_s": 8.984182208077982
+      }
+    }
+  },
+  "quality": {
+    "judges": {
+      "nemotron": {
+        "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+        "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+        "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+        "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+      },
+      "parakeet": {
+        "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+        "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+        "file": "parakeet-ctc-0.6b-q4_k.gguf",
+        "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+      }
+    },
+    "outputs": {
+      "window-views0-pack0-cfg0.f32": {
+        "samples": 90936,
+        "sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "rms": 0.13194097970672888,
+        "norm": 39.78758945258356,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "station-views0-pack0-cfg0.f32": {
+        "samples": 89496,
+        "sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "rms": 0.11396960935990601,
+        "norm": 34.0950139312511,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      },
+      "cli-marked.f32": {
+        "samples": 96240,
+        "sha256": "0fb9418a9bbe352b37f67b78dfab331cf05f4ebbe64e4223960eca78bc84292e",
+        "rms": 0.0914881845632971,
+        "norm": 28.38198831846643,
+        "judges": {
+          "nemotron": {
+            "text": "We should bring enough water and food for the long walk home.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "we should bring enough water and food for the long walk home",
+            "wer": 0.0
+          }
+        }
+      }
+    }
+  },
+  "unconditioned_asr": "all40 native PCM outputs byte-identical to previously scored crisp-paired-3 (both judges WER0); no repeated ASR needed",
+  "preflight": {
+    "load_average": "vm.loadavg: { 2.72 2.97 2.78 }",
+    "system_memory_free_percent": 55,
+    "scope": "before precompiled attention repeat"
+  },
+  "cli": {
+    "watermark_detector_confidence": 0.852,
+    "watermark_detected": true,
+    "c2pa_chunk_present": true,
+    "precompiled_library_loaded": true,
+    "marked_wav_sha256": "3253114d3ca16bed2b6fafe0d34750cf62ca46d693c26cea890e7a238454b2fb",
+    "default_watermark_and_c2pa": true,
+    "explicit_omnivoice_terms_acceptance": true
+  },
+  "tests": {
+    "selected_ctest": 4,
+    "actual_transformer_graphs": "F32,F16,Q8_0,Q4_K; asymmetric GQA; separate/unified CFG; packed/views individually and together; finite nonzero outputs and per-logit absolute error<1e-5",
+    "packed_bytes": "exact F32/F16/Q8_0/Q4_K; reuse, real allocator failure, mixed-type/width fallback",
+    "asan_ubsan": "pass",
+    "negative_control": "K view offset changed to zero; actual transformer logit comparison rejects mutant",
+    "allocation_extraction": "five positives plus two current guard-removal and two historical expected failures pass",
+    "cpu_backend_header_lint": "123 files pass"
+  },
+  "defaults": {
+    "attention_views": false,
+    "packed_projections": false,
+    "unified_cfg_on_metal": false,
+    "split_resident_decomp": false,
+    "precompiled_metal_build": false
+  },
+  "scope": "Q8_0 full-model M1 evidence; CPU hermetic multi-type graph parity; no CUDA full-model/default promotion and no broader fox-cloning acceptance"
+}

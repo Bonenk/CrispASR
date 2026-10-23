@@ -1,3 +1,17 @@
+## 2026-10-23 — OmniVoice M1 attention views and measured startup
+
+Added opt-in strided attention inputs, removing 84 layout copies per forward.
+Paired generation 8.10→7.45 s and whole request 8.60→7.99 s preserve exact
+code/PCM bytes; a precompiled repeat confirms 8.49→7.62 s requests. Full Session C ABI checks both synthetic voices and combined
+projection/CFG gates. Both pinned judges score the new walk-sentence controls
+and normally marked precompiled CLI output WER 0. Actual multi-type transformer
+logit tests, allocation guards, four CTest cases, ASan/UBSan and a wrong-offset
+mutant pass. Packed projection storage stays opt-in with no convincing timing
+win; unified CFG remains slower on Metal. Warm internal-file startup is about
+0.50 s for both embedded/precompiled builds, so no cold-start ranking is claimed.
+[Report and receipt](docs/omnivoice-m1-startup-generation-2026-10-23.md).
+No broader cloning/default promotion or release.
+
 ## 2026-10-23 — OmniVoice M1 resident decoder and controlled engine comparison
 
 Added an opt-in decoder-only GPU allocation to the split codec: CPU encoding

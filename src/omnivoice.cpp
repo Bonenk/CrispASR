@@ -7,13 +7,15 @@
 //   ✓ LLM forward (28L Qwen3 with Q/K-norm, standard RoPE)
 //   ✓ Masked iterative generation loop
 //   ✓ Audio tokenizer decode (HiggsAudioV2 DAC: codes → waveform)
-//   ✗ Audio tokenizer encode (reference audio → codes for voice cloning)
+//   ✓ CPU audio tokenizer encode (Metal encoder parity remains unresolved)
 //
 // Env knobs:
 //   OMNIVOICE_DEBUG=1      — verbose per-step trace
 //   OMNIVOICE_BENCH=1      — per-stage wall-clock timings
 //   OMNIVOICE_DUMP_DIR=/d  — dump intermediate tensors
 //   OMNIVOICE_CODEC_GPU=0/1 — override automatic CUDA codec placement
+//   CRISPASR_OMNIVOICE_PACKED_PROJ=1 — optional packed QKV / gate-up weights
+//   CRISPASR_OMNIVOICE_ATTN_VIEWS=1 — optional strided attention inputs
 
 #include "omnivoice.h"
 
@@ -153,6 +155,8 @@ struct ov_hp {
 // ---------------------------------------------------------------------------
 
 struct ov_layer {
+    ggml_tensor* attn_qkv_w = nullptr; // optional same-value row concatenation
+    ggml_tensor* ffn_gate_up_w = nullptr;
     ggml_tensor* attn_norm_w = nullptr;
     ggml_tensor* attn_q_w = nullptr;
     ggml_tensor* attn_k_w = nullptr;
@@ -384,6 +388,8 @@ struct omnivoice_context {
     ggml_context* ctx_w = nullptr; // weight context
     ggml_backend_t backend = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
+    ggml_context* ctx_packed = nullptr;
+    ggml_backend_buffer_t buf_packed = nullptr;
 
     // Utility defaults match the pinned upstream blueprint. Public setters
     // avoid changing the layout of the by-value context_params ABI.
@@ -1398,6 +1404,68 @@ static std::vector<float> get_time_steps(float t_start, float t_end, int num_ste
     return steps;
 }
 
+// Concatenate output rows without dequantizing/requantizing. Original weights
+// remain available for A/B and unsupported type/shape combinations fall back.
+static bool prepare_packed_projections(omnivoice_context* ctx) {
+    if (ctx->buf_packed)
+        return true;
+    if (!ctx->backend || ctx->model.blocks.empty())
+        return false;
+    ggml_init_params ip = {ctx->model.blocks.size() * 2 * ggml_tensor_overhead(), nullptr, true};
+    auto* weights = ggml_init(ip);
+    if (!weights)
+        return false;
+    struct pack {
+        ggml_tensor* dst;
+        ggml_tensor** slot;
+        std::vector<ggml_tensor*> sources;
+    };
+    std::vector<pack> packs;
+    auto add = [&](ggml_tensor** slot, std::vector<ggml_tensor*> sources) {
+        auto* first = sources.front();
+        if (!first || !ggml_is_matrix(first) || !ggml_is_contiguous(first))
+            return;
+        int64_t rows = 0;
+        for (auto* t : sources) {
+            if (!t || !ggml_is_matrix(t) || !ggml_is_contiguous(t) || t->type != first->type ||
+                t->ne[0] != first->ne[0])
+                return;
+            rows += t->ne[1];
+        }
+        auto* dst = ggml_new_tensor_2d(weights, first->type, first->ne[0], rows);
+        packs.push_back({dst, slot, std::move(sources)});
+    };
+    for (auto& block : ctx->model.blocks) {
+        add(&block.attn_qkv_w, {block.attn_q_w, block.attn_k_w, block.attn_v_w});
+        add(&block.ffn_gate_up_w, {block.ffn_gate_w, block.ffn_up_w});
+    }
+    if (packs.empty()) {
+        ggml_free(weights);
+        return false;
+    }
+    auto* buffer = ggml_backend_alloc_ctx_tensors(weights, ctx->backend);
+    if (!buffer) {
+        ggml_free(weights);
+        return false;
+    }
+    ggml_backend_buffer_set_usage(buffer, GGML_BACKEND_BUFFER_USAGE_WEIGHTS);
+    for (auto& pack : packs) {
+        size_t offset = 0;
+        for (auto* t : pack.sources) {
+            std::vector<uint8_t> bytes(ggml_nbytes(t));
+            ggml_backend_tensor_get(t, bytes.data(), 0, bytes.size());
+            ggml_backend_tensor_set(pack.dst, bytes.data(), offset, bytes.size());
+            offset += bytes.size();
+        }
+    }
+    // Publish only after successful allocation and every copy has completed.
+    ctx->ctx_packed = weights;
+    ctx->buf_packed = buffer;
+    for (auto& pack : packs)
+        *pack.slot = pack.dst;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Build the Qwen3 LLM graph for a forward pass
 // ---------------------------------------------------------------------------
@@ -1433,14 +1501,23 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         attn_in = ggml_mul(ctx0, attn_in, b.attn_norm_w);
 
         // Q, K, V projections
-        ggml_tensor* Q = ggml_mul_mat(ctx0, b.attn_q_w, attn_in);
-        ggml_tensor* K = ggml_mul_mat(ctx0, b.attn_k_w, attn_in);
-        ggml_tensor* V = ggml_mul_mat(ctx0, b.attn_v_w, attn_in);
-
-        // Reshape to (head_dim, n_heads, T) / (head_dim, n_kv_heads, T)
-        Q = ggml_reshape_3d(ctx0, Q, hp.head_dim, hp.n_heads, T);
-        K = ggml_reshape_3d(ctx0, K, hp.head_dim, hp.n_kv_heads, T);
-        V = ggml_reshape_3d(ctx0, V, hp.head_dim, hp.n_kv_heads, T);
+        ggml_tensor *Q, *K, *V;
+        if (env_bool("CRISPASR_OMNIVOICE_PACKED_PROJ") && b.attn_qkv_w) {
+            auto* qkv = ggml_mul_mat(ctx0, b.attn_qkv_w, attn_in);
+            const size_t qbytes = (size_t)hp.head_dim * hp.n_heads * sizeof(float);
+            const size_t kbytes = (size_t)hp.head_dim * hp.n_kv_heads * sizeof(float);
+            Q = ggml_view_3d(ctx0, qkv, hp.head_dim, hp.n_heads, T, hp.head_dim * sizeof(float), qkv->nb[1], 0);
+            K = ggml_view_3d(ctx0, qkv, hp.head_dim, hp.n_kv_heads, T, hp.head_dim * sizeof(float), qkv->nb[1], qbytes);
+            V = ggml_view_3d(ctx0, qkv, hp.head_dim, hp.n_kv_heads, T, hp.head_dim * sizeof(float), qkv->nb[1],
+                             qbytes + kbytes);
+        } else {
+            Q = ggml_mul_mat(ctx0, b.attn_q_w, attn_in);
+            K = ggml_mul_mat(ctx0, b.attn_k_w, attn_in);
+            V = ggml_mul_mat(ctx0, b.attn_v_w, attn_in);
+            Q = ggml_reshape_3d(ctx0, Q, hp.head_dim, hp.n_heads, T);
+            K = ggml_reshape_3d(ctx0, K, hp.head_dim, hp.n_kv_heads, T);
+            V = ggml_reshape_3d(ctx0, V, hp.head_dim, hp.n_kv_heads, T);
+        }
 
         // Q/K norms (Qwen3 style)
         if (b.attn_q_norm_w) {
@@ -1461,9 +1538,14 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         // ggml_flash_attn_ext requires Q/K/V in (head_dim, T, n_heads) layout.
         // Permute from (head_dim, n_heads, T) → (head_dim, T, n_heads).
         // ggml handles GQA natively (Q.ne[2]=n_heads, K.ne[2]=n_kv_heads).
-        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
-        K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
-        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+        const bool attn_views = env_bool("CRISPASR_OMNIVOICE_ATTN_VIEWS");
+        auto layout = [&](ggml_tensor* x) {
+            auto* view = ggml_permute(ctx0, x, 0, 2, 1, 3);
+            return attn_views ? view : ggml_cont(ctx0, view);
+        };
+        Q = layout(Q);
+        K = layout(K);
+        V = layout(V);
 
         // flash_attn_ext: Q/K/V in (hd, T, n_heads/n_kv) → output (hd, n_heads, T).
         ggml_tensor* attn_out;
@@ -1471,8 +1553,8 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
             // Independent flash-attn per block (cond [0:split], uncond [split:T]).
             const int Ta = block_split, Tb = T - block_split;
             auto blk = [&](ggml_tensor* X, int nh, int t0, int tn) {
-                return ggml_cont(ctx0,
-                                 ggml_view_3d(ctx0, X, hp.head_dim, tn, nh, X->nb[1], X->nb[2], (size_t)t0 * X->nb[1]));
+                auto* view = ggml_view_3d(ctx0, X, hp.head_dim, tn, nh, X->nb[1], X->nb[2], (size_t)t0 * X->nb[1]);
+                return attn_views ? view : ggml_cont(ctx0, view);
             };
             ggml_tensor* Ac = ggml_flash_attn_ext(ctx0, blk(Q, hp.n_heads, 0, Ta), blk(K, hp.n_kv_heads, 0, Ta),
                                                   blk(V, hp.n_kv_heads, 0, Ta), nullptr, attn_scale, 0.0f, 0.0f);
@@ -1495,8 +1577,15 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         ggml_tensor* ffn_in = ggml_rms_norm(ctx0, cur, hp.rms_norm_eps);
         ffn_in = ggml_mul(ctx0, ffn_in, b.ffn_norm_w);
 
-        ggml_tensor* gate = ggml_mul_mat(ctx0, b.ffn_gate_w, ffn_in);
-        ggml_tensor* up = ggml_mul_mat(ctx0, b.ffn_up_w, ffn_in);
+        ggml_tensor *gate, *up;
+        if (env_bool("CRISPASR_OMNIVOICE_PACKED_PROJ") && b.ffn_gate_up_w) {
+            auto* both = ggml_mul_mat(ctx0, b.ffn_gate_up_w, ffn_in);
+            gate = ggml_view_2d(ctx0, both, hp.ff_dim, T, both->nb[1], 0);
+            up = ggml_view_2d(ctx0, both, hp.ff_dim, T, both->nb[1], hp.ff_dim * sizeof(float));
+        } else {
+            gate = ggml_mul_mat(ctx0, b.ffn_gate_w, ffn_in);
+            up = ggml_mul_mat(ctx0, b.ffn_up_w, ffn_in);
+        }
         gate = ggml_silu(ctx0, gate);
         ggml_tensor* ffn_out = ggml_mul(ctx0, gate, up);
         ffn_out = ggml_mul_mat(ctx0, b.ffn_down_w, ffn_out);
@@ -1696,6 +1785,8 @@ struct ov_gen_result {
 };
 
 static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::string& text) {
+    if (env_bool("CRISPASR_OMNIVOICE_PACKED_PROJ"))
+        prepare_packed_projections(ctx);
     auto& hp = ctx->hp;
     auto& gen = ctx->gen;
     bool debug = env_bool("CRISPASR_OMNIVOICE_DEBUG");
@@ -3986,6 +4077,10 @@ void omnivoice_free(struct omnivoice_context* ctx) {
     if (!ctx)
         return;
     // Main model
+    if (ctx->buf_packed)
+        ggml_backend_buffer_free(ctx->buf_packed);
+    if (ctx->ctx_packed)
+        ggml_free(ctx->ctx_packed);
     if (ctx->buf_w)
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->backend)

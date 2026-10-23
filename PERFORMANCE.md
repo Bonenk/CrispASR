@@ -815,6 +815,18 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Default stays off. See `docs/omnivoice-m1-comparison-2026-10-23.md` for model
   adaptation, rejected dtype-incompatible controls, actual output durations,
   initialization/storage caveats and all per-run observations.
+- **omnivoice M1 attention views (2026-10-23, opt-in):**
+  `CRISPASR_OMNIVOICE_ATTN_VIEWS=1` passes strided Q/K/V layouts directly to
+  attention, removing 84 copies per forward. Paired with resident codec in both
+  arms: generation 8.098→7.454 s; request 8.603→7.986 s, byte-identical codes/PCM.
+  Full Session/reference-voice and marked precompiled CLI controls preserve
+  output; both ASR judges score the new walk sentence zero. Precompiled repeat
+  8.490→7.622 s confirms the request gain. Packed projections
+  (`CRISPASR_OMNIVOICE_PACKED_PROJ=1`) cost ~312 MB extra Q8 weights and have no
+  convincing timing win (7.845→7.769 s); unified CFG regresses (7.653→8.845 s).
+  All new gates remain off. Same internal-file startup medians are 0.503/0.490 s
+  for embedded/precompiled shaders with warm OS caches; not a cold-start claim.
+  See [full scope and individual samples](docs/omnivoice-m1-startup-generation-2026-10-23.md).
 - **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
   the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
   (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to

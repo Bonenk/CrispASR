@@ -19,14 +19,19 @@ static double now() {
 
 int main(int argc, char** argv) {
     if (argc != 7 && argc != 8) {
-        std::fprintf(stderr, "usage: engine-bench MODEL CODEC TEXT DURATION REPEATS OUTPUT_PREFIX [--paired]\n");
+        std::fprintf(stderr, "usage: engine-bench MODEL CODEC TEXT DURATION REPEATS OUTPUT_PREFIX "
+                             "[--paired|--paired-cfg|--paired-proj|--paired-attn|--load-only]\n");
         return 2;
     }
     const bool paired = argc == 8 && std::string(argv[7]) == "--paired";
-    if (argc == 8 && !paired)
+    const bool paired_cfg = argc == 8 && std::string(argv[7]) == "--paired-cfg";
+    const bool paired_proj = argc == 8 && std::string(argv[7]) == "--paired-proj";
+    const bool paired_attn = argc == 8 && std::string(argv[7]) == "--paired-attn";
+    const bool load_only = argc == 8 && std::string(argv[7]) == "--load-only";
+    if (argc == 8 && !paired && !paired_cfg && !paired_proj && !paired_attn && !load_only)
         return 2;
 #ifdef CRISPASR_BENCH_OVCPP
-    if (paired)
+    if (paired || paired_cfg || paired_proj || paired_attn)
         return 2;
 #else
     if (paired) {
@@ -36,8 +41,9 @@ int main(int argc, char** argv) {
 #endif
     const double duration = std::atof(argv[4]);
     const int repeats = std::atoi(argv[5]);
-    if (!(duration > 0) || repeats < 2 || (paired && repeats != 8))
+    if (!(duration > 0) || repeats < 2 || ((paired || paired_cfg || paired_proj || paired_attn) && repeats != 8))
         return 2;
+    const auto load_cpu = std::clock();
     double start = now();
 #ifdef CRISPASR_BENCH_OVCPP
     ov_init_params p;
@@ -68,7 +74,16 @@ int main(int argc, char** argv) {
         return 3;
 #endif
     std::printf("LOAD %.6f\n", now() - start);
+    std::printf("LOAD_CPU %.6f\n", (double)(std::clock() - load_cpu) / CLOCKS_PER_SEC);
     std::fflush(stdout);
+    if (load_only) {
+#ifdef CRISPASR_BENCH_OVCPP
+        ov_free(ctx);
+#else
+        omnivoice_free(ctx);
+#endif
+        return 0;
+    }
     for (int i = 0; i < repeats; i++) {
 #ifndef CRISPASR_BENCH_OVCPP
         if (paired) {
@@ -78,6 +93,21 @@ int main(int argc, char** argv) {
             setenv("CRISPASR_OMNIVOICE_CODEC_RESIDENT", resident ? "1" : "0", 1);
             setenv("CRISPASR_OMNIVOICE_CODEC_DECOMP", resident ? "1" : "0", 1);
             std::printf("ARM %d resident=%d warmup=%d\n", i, resident, i < 2);
+        }
+        if (paired_cfg) {
+            const int order[] = {0, 1, 0, 1, 1, 0, 0, 1};
+            setenv("CRISPASR_OMNIVOICE_UNIFIED_CFG", order[i] ? "1" : "0", 1);
+            std::printf("ARM %d unified_cfg=%d warmup=%d\n", i, order[i], i < 2);
+        }
+        if (paired_proj) {
+            const int order[] = {0, 1, 0, 1, 1, 0, 0, 1};
+            setenv("CRISPASR_OMNIVOICE_PACKED_PROJ", order[i] ? "1" : "0", 1);
+            std::printf("ARM %d packed_proj=%d warmup=%d\n", i, order[i], i < 2);
+        }
+        if (paired_attn) {
+            const int order[] = {0, 1, 0, 1, 1, 0, 0, 1};
+            setenv("CRISPASR_OMNIVOICE_ATTN_VIEWS", order[i] ? "1" : "0", 1);
+            std::printf("ARM %d attn_views=%d warmup=%d\n", i, order[i], i < 2);
         }
 #endif
         start = now();
