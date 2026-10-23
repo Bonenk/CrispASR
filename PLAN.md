@@ -1,5 +1,16 @@
 # CrispASR — Pending work
 
+## NOW — OmniVoice encoder A/B implementation (2026-10-23)
+
+Owner: Codex, isolated internal audit worktree, baseline `de83cc6a5`. User
+authorizes all five encoder experiments with retained old paths and default
+promotion only after clear performance and quality evidence. Implement independent
+encoder FASTCONV, fixed-data cache, graph FC/RVQ, fused HuBERT and hybrid CPU
+DAC/GPU semantics switches. Profile uncached reference encoding, stage parity,
+full codes and cloned audio on both synthetic references. Preserve known fox
+failures and all license/marking controls; no blanket GPU/default promotion.
+
+
 ## NOW — issue555 Base voice-pack crash (2026-10-23)
 
 Owner: Codex, branch `fix/new-issues-20261023`, baseline `cb31b23db`.
