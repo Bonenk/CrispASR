@@ -106,3 +106,24 @@ The licensing/array auditor has also been exercised with **schema-only synthetic
 fixtures**. A matching fixture passes; a changed full license, unknown publisher
 license, mismatched saved embedding and missing MIT recipe notice are each
 rejected even when manifest checksums are refreshed. This tests the auditor, not the original model or speech.
+
+## Reference qualification and default selection
+
+[Fresh bake39938969713](https://github.com/CrispStrobe/CrispASR/actions/runs/39938969713)
+at `3ef249810a3036ad1658e64461687c63ce0b6173` completed successfully. Its actual
+license/array audit passes. An independent original Whisper base.en diagnostic
+(weights SHA256 `25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead`,
+verified against the official downloader) transcribed only the first sentence
+of the raw masculine `default` reference, WER8/15. It is rejected. The `clear`
+reference transcribed the entire original text exactly, WER0.
+
+The release candidates select only `clear`, named `default` inside each
+model-sized pack. Speaker and codec arrays are unchanged from the original
+Base encoder outputs. The raw two-voice pack is not installed or promoted.
+Metadata records the selected source voice, its description, original producer
+manifest hash and the curation recipe hash. License/attribution texts are kept
+inside the GGUF and as sidecars; the MIT curation script accompanies the result.
+
+The hosted matrix must recheck the selected reference at WER0, then test the
+curated defaults through real CLI/C ABI CPU and CUDA paths. Packaging success
+and this lightweight diagnostic do not replace those native acceptance gates.

@@ -28,6 +28,13 @@ Granite5 implementation starts after that acceptance gate.
 Prior frozen e2b77e472 CI39918848127 all13, lint39918851399 all10 and secret
 39918849343 pass job by job; their full unit log has2082 CTest cases and
 189 Python tests/34 subtests. No task code changed while those checks ran.
+Fresh design bake39938969713 at3ef249810 succeeds and its actual license/array
+audit passes. Independent official Whisper base.en weights verify the clear
+reference exactly; raw default scores8/15 WER and is rejected. Select clear
+as the default for each model with unchanged original encoder arrays; retain
+both licenses and the curation recipe. No regeneration or padding is needed.
+The raw-pool CPU dispatch was canceled while pending before consuming a bad
+reference; curated-default native CPU/CUDA checks remain required.
 
 ## OmniVoice listened Metal default promotion — completed (2026-10-23)
 

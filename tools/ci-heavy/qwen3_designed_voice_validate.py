@@ -27,6 +27,7 @@ MODELS = {
     "tokenizer": ("Qwen/Qwen3-TTS-Tokenizer-12Hz", "7dd38ad4e9bad454aae9cd937d0cd577604fe229"),
 }
 TEXT = "I found the file you asked about and opened it."
+SELECTED_VOICE = "clear"  # The other candidate failed full-reference transcription.
 
 
 def audit(candidate):
@@ -104,12 +105,13 @@ def audit(candidate):
     return proof
 
 
-def single_voice(candidate, size, name, output):
+def single_voice(candidate, size, name, output, output_name=None):
     """Select one original pair, unchanged, for the CLI's single active voice."""
     from gguf import GGUFWriter, GGUFReader, GGMLQuantizationType as Type
     proof = json.loads((candidate / "provenance.json").read_text())
+    output_name = output_name or name
     writer = GGUFWriter(str(output), arch="qwen3tts.voicepack")
-    writer.add_array("voicepack.names", [name])
+    writer.add_array("voicepack.names", [output_name])
     writer.add_array("voicepack.ref_texts", [proof["text"]])
     writer.add_string("general.license", "apache-2.0")
     writer.add_string("crispasr.voice.license_text", (candidate / "LICENSE").read_text())
@@ -118,16 +120,25 @@ def single_voice(candidate, size, name, output):
     writer.add_string("crispasr.voice.speaker_identity", "unknown")
     writer.add_bool("crispasr.voice.cloned_from_recording", False)
     writer.add_string("crispasr.voice.provenance", (candidate / "provenance.json").read_text())
+    writer.add_description(f"Selected original {name} reference as {output_name}; encoder arrays unchanged")
+    writer.add_string("voicepack.source_model", MODELS[size][0])
+    writer.add_string("voicepack.source_revision", MODELS[size][1])
+    writer.add_string("crispasr.voice.selected_source_voice", name)
+    writer.add_string("crispasr.voice.selected_description", proof["descriptions"][name])
+    writer.add_string("crispasr.voice.curation_recipe_sha256", sha(__file__))
+    writer.add_string("crispasr.voice.producer_manifest_sha256", sha(candidate / "SHA256SUMS.json"))
     arrays = {}
     for kind, suffix, dtype in (("spk", "speaker", Type.F32), ("code", "codes", Type.I32)):
-        key = f"voicepack.{kind}.{name}." + ("embd" if kind == "spk" else "codes")
+        key = f"voicepack.{kind}.{output_name}." + ("embd" if kind == "spk" else "codes")
         arrays[key] = np.load(candidate / f"{size}-{name}-{suffix}.npy", allow_pickle=False)
         writer.add_tensor(key, arrays[key], raw_dtype=dtype)
     writer.write_header_to_file()
     writer.write_kv_data_to_file()
     writer.write_tensors_to_file()
     writer.close()
-    for tensor in GGUFReader(output).tensors:
+    reader = GGUFReader(output)
+    assert len(reader.tensors) == 2
+    for tensor in reader.tensors:
         assert np.array_equal(tensor.data.reshape(arrays[tensor.name].shape), arrays[tensor.name])
 
 
@@ -241,7 +252,10 @@ def main():
             models[label] = path
             receipt["models"][label] = dict(repo=repo, revision=revision, filename=name, sha256=sha(path))
             save()
-        for name in ("default", "clear"):
+        receipt["curation"] = dict(selected_source_voice=SELECTED_VOICE, output_voice="default",
+                                   reason="Raw default diagnostic recovered only the first sentence; clear matched the full transcript",
+                                   curation_recipe_sha256=sha(__file__), encoder_arrays_changed=False)
+        for name in (SELECTED_VOICE,):
             label = "reference-" + name
             receipt["cases"][label] = {}
             judge(args.candidate / f"ai-generated-{name}-reference.wav", label, proof["text"], threshold=0)
@@ -249,8 +263,19 @@ def main():
         # Successful no-voice 1.7B renders must therefore prefer metadata-sized defaults.
         for size in ("0.6b", "1.7b"):
             filename = f"qwen3-tts-voice-{size}-designed.gguf"
-            shutil.copy2(args.candidate / filename, directory / filename)
-            single_voice(args.candidate, size, "clear", directory / f"clear-{size}.gguf")
+            # Do not install the raw two-voice candidate. Select only the vetted
+            # reference, retaining the separately extracted model-sized arrays.
+            curated = args.out / "defaults"
+            curated.mkdir(exist_ok=True)
+            single_voice(args.candidate, size, SELECTED_VOICE, curated / filename, output_name="default")
+            shutil.copy2(curated / filename, directory / filename)
+            single_voice(args.candidate, size, SELECTED_VOICE, directory / f"clear-{size}.gguf")
+            receipt["curation"][size] = dict(filename=filename, sha256=sha(curated / filename))
+            save()
+        for filename in ("LICENSE", "LICENSE-RECIPE.txt", "NOTICE"):
+            shutil.copy2(args.candidate / filename, curated / filename)
+        shutil.copy2(__file__, curated / "curation-recipe.py")
+        (curated / "curation.json").write_text(json.dumps(receipt["curation"], indent=2) + "\n")
         renamed = directory / "renamed-model.gguf"
         assert not renamed.exists(), "Use fresh scratch for each run"
         os.link(models["large"], renamed)
