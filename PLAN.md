@@ -47,14 +47,15 @@ Q8 pipeline-prefill ratio1.010201 outside it. Exact words alone do not waive
 these gates. Q4 CLI/Session checks did not run after the numerical failure.
 
 Hosted precision diagnostic39979238513 at7287199c319f0c6534e2d64732cf385f1c58fbdb
-is queued, comparing base/head/embedding/both F16 substitutions within Q8 and Q4.
+has started, comparing base/head/embedding/both F16 substitutions within Q8 and Q4.
 Other tensor payloads must remain unchanged. These are diagnostic candidates,
 not approved models. Choose a recipe only from measured stage and decoded-output
 results, then repeat CLI/Session acceptance. The legacy raw-transcription prompt
 and the publisher's punctuation/capitalization prompt request different styles.
 
-CUDA build-only workflow is being registered separately from the unaccepted
-native feature. It builds exact pinned source on GitHub, includes external
+CUDA build-only workflow is registered separately from the unaccepted
+native feature on main atfc12c52a7. Build39980261207 is queued against exact
+source7287199c319f0c6534e2d64732cf385f1c58fbdb. It builds exact pinned source on GitHub, includes external
 runtime license notices and verified corresponding sources, and omits NVIDIA
 libraries. Kaggle must resolve its own CUDA libraries before real GPU validation.
 No GPU acceptance has run. Resource policy: check load and available memory
