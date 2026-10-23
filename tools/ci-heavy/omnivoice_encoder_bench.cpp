@@ -17,13 +17,14 @@ static void knob(const char* name, const char* value) {
 int main(int argc, char** argv) {
     if (argc != 5) {
         fprintf(stderr, "usage: encoder-bench TOKENIZER REF.wav OUTPUT_PREFIX "
-                        "cache|fastconv|graph|fused|hybrid|all|cpu|defaults|full-bake|baseline\n");
+                        "cache|fastconv|graph|fused|hybrid|all|cpu|defaults|full-bake|precise|precise-all|baseline\n");
         return 2;
     }
     const std::string mode(argv[4]);
-    const char* names[] = {"CACHE", "FASTCONV", "GRAPH", "FUSED", "HYBRID"};
+    const char* names[] = {"CACHE", "FASTCONV", "GRAPH", "FUSED", "HYBRID", "SEMANTIC_F32"};
     if (mode != "cache" && mode != "fastconv" && mode != "graph" && mode != "fused" && mode != "hybrid" &&
-        mode != "all" && mode != "cpu" && mode != "defaults" && mode != "full-bake" && mode != "baseline")
+        mode != "all" && mode != "cpu" && mode != "defaults" && mode != "full-bake" && mode != "precise" &&
+        mode != "precise-all" && mode != "baseline")
         return 2;
     knob("CRISPASR_TTS_REF_CACHE", "0");
     knob("CRISPASR_OMNIVOICE_VOICE_CACHE", "0");
@@ -50,8 +51,12 @@ int main(int argc, char** argv) {
             std::string lower(name);
             std::transform(lower.begin(), lower.end(), lower.begin(),
                            [](unsigned char c) { return (char)std::tolower(c); });
-            bool on = order[i] && (mode == "all" || mode == lower || (mode == "full-bake" && lower == "fastconv") ||
+            bool on = order[i] && ((mode == "all" && lower != "semantic_f32") || mode == lower ||
+                                   (mode == "full-bake" && lower == "fastconv") ||
                                    (mode == "cpu" && (lower == "cache" || lower == "fastconv")));
+            if (mode == "precise" || mode == "precise-all")
+                on = lower == "cache" || lower == "fastconv" ||
+                     (order[i] && (mode == "precise-all" || lower == "hybrid" || lower == "semantic_f32"));
             const auto key = std::string("CRISPASR_OMNIVOICE_ENCODER_") + name;
             if (mode == "defaults" && order[i]) {
 #ifdef _WIN32
@@ -72,7 +77,7 @@ int main(int argc, char** argv) {
         double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t).count(),
                cpus = (double)(std::clock() - cpu) / CLOCKS_PER_SEC;
 #ifndef OV_ENCODER_BASELINE
-        if (order[i] && (mode == "hybrid" || mode == "all")) {
+        if (order[i] && (mode == "hybrid" || mode == "all" || mode == "precise" || mode == "precise-all")) {
             if (!ctx->semantic_encoder.loaded || core_cpu_backend::is_cpu(ctx->semantic_encoder.backend)) {
                 std::fprintf(stderr, "FAIL requested hybrid GPU stage did not run on GPU\n");
                 return 6;

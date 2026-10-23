@@ -2766,6 +2766,18 @@ static const std::vector<float>& encoder_values(ov_higgs_tokenizer& tok, ggml_te
     return found->second;
 }
 
+// Metal's tiled matrix path can reduce operand precision even for F32 tensors.
+// Keep this independent of placement/fusion so the numerical tradeoff is measurable.
+static void encoder_semantic_precision(ggml_cgraph* graph) {
+    if (!env_bool("CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32"))
+        return;
+    for (int i = 0; i < ggml_graph_n_nodes(graph); i++) {
+        auto* node = ggml_graph_node(graph, i);
+        if (node->op == GGML_OP_MUL_MAT)
+            ggml_prec_set_acc(node, GGML_PREC_F32);
+    }
+}
+
 // Transactional, encoder-only F32 convolution bake. Do not mutate the decoder
 // cache or publish any tensors before allocation succeeds.
 static bool prepare_encoder_fastconv(ov_higgs_tokenizer& tok) {
@@ -3242,6 +3254,7 @@ static std::vector<float> higgs_encoder_semantic(omnivoice_context* ctx, const f
     ggml_set_name(h, "e_semantic");
     ggml_set_output(h);
     ggml_build_forward_expand(gf, h);
+    encoder_semantic_precision(gf);
 
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
     ggml_gallocr_alloc_graph(ga, gf);
@@ -3320,6 +3333,7 @@ static std::vector<float> higgs_hubert_frontend(omnivoice_context* ctx, const fl
     ggml_tensor* feat = nullptr;
     auto* p = build_hubert_frontend(ctx0, tok, x, &feat);
     ggml_build_forward_expand(gf, p);
+    encoder_semantic_precision(gf);
 
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
     ggml_gallocr_alloc_graph(ga, gf);
@@ -3494,6 +3508,7 @@ static std::vector<float> higgs_hubert_encoder(omnivoice_context* ctx, const flo
 
     auto* mean = build_hubert_encoder(ctx0, tok, x, pc_w, T, dbg != nullptr);
     ggml_build_forward_expand(gf, mean);
+    encoder_semantic_precision(gf);
 
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
     ggml_gallocr_alloc_graph(ga, gf);
@@ -3541,6 +3556,7 @@ static std::vector<float> higgs_hubert_fused(ov_higgs_tokenizer& tok, const floa
     ggml_set_input(pc);
     auto* mean = build_hubert_encoder(ctx0, tok, frontend, pc, T);
     ggml_build_forward_expand(graph, mean);
+    encoder_semantic_precision(graph);
     auto* alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
     std::vector<float> result;
     if (ggml_gallocr_alloc_graph(alloc, graph)) {
@@ -4153,6 +4169,8 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
             const char* fast_option = env_str(gates[0]);
             if (fast_option && std::strcmp(fast_option, "2") == 0)
                 encoder_policy |= (uint8_t)(1u << 5);
+            if (env_bool("CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32"))
+                encoder_policy |= (uint8_t)(1u << 6);
             if (encoder_policy) {
                 const char version[] = "encoder-ab-v1";
                 mix(version, sizeof(version));

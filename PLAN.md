@@ -8,7 +8,13 @@ changed codes. Listening WAV pairs prepared at equal gain; raw artifact hashes
 retained locally. Next: actual graph-boundary comparisons with norms, isolated
 stage inputs, codebook margins and a minimal CPU fallback if justified. Retain
 all gates/defaults and broader cloning failures; promote only proven quality
-and performance wins. Broader reference/length and decoded-output checks follow.
+and performance wins. Found reduced-precision Metal tiled matmul drift: semantic
+F32 hints restore station codes and all56 isolated CPU/GPU combinations across
+seven references (English/German/French,60–315frames). Independent option
+ENCODER_SEMANTIC_F32 stays off; paired precise GPU encoding remains faster than
+shipping CPU on all three original references. Five CTest cases, ASan/UBSan,
+wrong-tie negative control and full library/CLI builds pass. Full Session clone
+comparison is now running; broader decoded-output and final receipts follow.
 
 ## OmniVoice encoder A/B — completed (2026-10-23)
 
