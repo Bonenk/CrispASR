@@ -55,6 +55,56 @@ int main() {
     assert(prepare_encoder_fastconv(policy));
     assert(policy.enc_fc.enabled && !policy.enc_fc.buf);
     tok_release_backend(policy);
+    // Default policy must follow the actual backend/profile and explicit overrides.
+    {
+        auto* cpu = core_cpu_backend::init();
+        ggml_backend mock = *cpu;
+        mock.iface.get_name = [](ggml_backend_t) { return "MTL0"; };
+        omnivoice_context c;
+        c.use_gpu = true;
+        c.backend = &mock;
+        c.tokenizer.backend = &mock;
+        c.tokenizer.loaded = true;
+        ggml_init_params ip = {4 * ggml_tensor_overhead(), nullptr, true};
+        c.tokenizer.ctx_w = ggml_init(ip);
+        c.tokenizer.fc_w = c.tokenizer.sem_featproj_w = ggml_new_tensor_1d(c.tokenizer.ctx_w, GGML_TYPE_F16, 32);
+        auto* extra = ggml_new_tensor_1d(c.tokenizer.ctx_w, GGML_TYPE_F16, 32);
+        for (auto* name : {"HYBRID", "GRAPH", "FUSED", "SEMANTIC_F32"})
+            unset_gate(name);
+#if defined(__APPLE__) && TARGET_OS_OSX && (defined(__aarch64__) || defined(__arm64__))
+        assert(encoder_hybrid_enabled(&c) && encoder_gpu_defaults(&c));
+        assert(encoder_precision_enabled(c.tokenizer));
+#else
+        assert(!encoder_hybrid_enabled(&c) && !encoder_gpu_defaults(&c));
+        assert(!encoder_precision_enabled(c.tokenizer));
+#endif
+        c.use_gpu = false;
+        assert(!encoder_hybrid_enabled(&c));
+        c.use_gpu = true;
+        gate("HYBRID", false);
+        assert(!encoder_hybrid_enabled(&c) && !encoder_gpu_defaults(&c));
+        gate("SEMANTIC_F32", false);
+        assert(!encoder_precision_enabled(c.tokenizer));
+        gate("HYBRID", true);
+        assert(encoder_hybrid_enabled(&c));
+        c.encoder_gpu_failed = true;
+        assert(!encoder_gpu_defaults(&c));
+        c.encoder_gpu_failed = false;
+        unset_gate("HYBRID");
+        extra->type = GGML_TYPE_Q8_0;
+        assert(!encoder_hybrid_enabled(&c));
+        extra->type = GGML_TYPE_F16;
+        c.tokenizer.hidden_size = 32;
+        assert(!encoder_hybrid_enabled(&c));
+        c.tokenizer.hidden_size = 1024;
+        mock.iface.get_name = [](ggml_backend_t) { return "CUDA0"; };
+        assert(!encoder_hybrid_enabled(&c) && !encoder_precision_enabled(c.tokenizer));
+        for (auto* name : {"HYBRID", "GRAPH", "FUSED", "SEMANTIC_F32"})
+            gate(name, false);
+        ggml_free(c.tokenizer.ctx_w);
+        c.tokenizer.ctx_w = nullptr;
+        ggml_backend_free(cpu);
+    }
     assert(tok_is_semantic_weight("sem.blk.0.attn_q.weight"));
     assert(tok_is_semantic_weight("quantizer.quantizers.0.project_in.weight"));
     assert(tok_is_semantic_weight("quantizer.quantizers.0.codebook.embed"));

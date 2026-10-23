@@ -95,7 +95,7 @@ static void frontend_boundaries(ov_higgs_tokenizer& tok, const std::vector<float
         ggml_set_output(selected);
         auto* graph = ggml_new_graph_custom(c, 4096, false);
         ggml_build_forward_expand(graph, selected);
-        encoder_semantic_precision(graph);
+        encoder_semantic_precision(graph, tok);
         auto* a = ggml_gallocr_new(ggml_backend_get_default_buffer_type(tok.backend));
         if (!ggml_gallocr_alloc_graph(a, graph))
             throw std::runtime_error("boundary allocation");

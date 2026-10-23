@@ -1,5 +1,9 @@
 # OmniVoice Metal semantic precision — 2026-10-23
 
+Historical experiment below: subsequent listening approval and
+[Metal default promotion](omnivoice-metal-defaults-2026-10-23.md) update the
+current eligibility/defaults. The original raw measurements are retained.
+
 The station CPU/GPU code difference in the [encoder report](omnivoice-encoder-2026-10-23.md)
 is reproducible and can be removed on the tested M1 by requesting F32 matrix
 multiplication for semantic encoding. The new independent switch is

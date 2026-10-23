@@ -1,5 +1,9 @@
 # OmniVoice reference-encoder A/B — 2026-10-23
 
+Historical experiment below: subsequent listening approval and
+[Metal default promotion](omnivoice-metal-defaults-2026-10-23.md) update the
+current eligibility/defaults. The original raw measurements are retained.
+
 All five encoder experiments are implemented, with independent switches and
 retained baseline paths. The immutable-data cache now defaults on; the smaller
 pointwise-convolution optimization defaults on only for Apple ARM CPU encoding.

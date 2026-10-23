@@ -1,13 +1,20 @@
 # CrispASR — Pending work
 
-## NOW — OmniVoice listened M1 default promotion (2026-10-23)
+## OmniVoice listened Metal default promotion — completed (2026-10-23)
 
-Owner: Codex. User listened to all local comparison WAVs and accepts minor
-differences. Promote the measured precise Metal encoder on the validated F16
-profile only, retaining explicit switches and CPU fallback. Verify fresh-process
-cost/memory, default-vs-explicit policy, failed GPU compute, reference-cache
-behavior and Session/CLI speech. Preserve CUDA/CPU policy and existing quality
-limits. Hosted CI remains queued; no blanket green claim.
+Owner: Codex. Maintainer listened to all station WAV comparisons and accepts
+minor differences. Eligible F16/F32 Higgs on Apple ARM macOS/Metal now defaults
+to precise hybrid+graph+fused encoding, preserving explicit old paths. No
+CPU/CUDA/iOS/quantized-profile promotion. Fresh encoder39–47% faster; combined
+13–16% faster than precise hybrid; all48code arrays exact. Fresh native-process
+median2.16→1.98s; native tokenizer peakRSS median adds223MB. 16 broad Session
+renders and final linked Session/marked CLI preserve codes/audio. Prior scored
+Anna omission and older fox/Linux limits remain. Five CTest cases, ASan/UBSan,
+wrong-tie control, fresh-context cache hit and no-GPU checks pass. Injected
+failures at all3GPU stages recover exact CPU codes and stay CPU; failed attempts
+skip reference-cache publication. HYBRID=0 restores prior CPU encoding.
+[Eligibility, switches and complete receipt](docs/omnivoice-metal-defaults-2026-10-23.md).
+Hosted checks remain separately pending; no release/tag or model/audio upload.
 
 ## OmniVoice GPU semantic divergence — completed (2026-10-23)
 

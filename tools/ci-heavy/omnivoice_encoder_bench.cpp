@@ -17,14 +17,16 @@ static void knob(const char* name, const char* value) {
 int main(int argc, char** argv) {
     if (argc != 5) {
         fprintf(stderr, "usage: encoder-bench TOKENIZER REF.wav OUTPUT_PREFIX "
-                        "cache|fastconv|graph|fused|hybrid|all|cpu|defaults|full-bake|precise|precise-all|baseline\n");
+                        "cache|fastconv|graph|fused|hybrid|all|cpu|defaults|full-bake|precise|precise-all|promoted|"
+                        "combined|first-cpu|first-default|baseline\n");
         return 2;
     }
     const std::string mode(argv[4]);
     const char* names[] = {"CACHE", "FASTCONV", "GRAPH", "FUSED", "HYBRID", "SEMANTIC_F32"};
     if (mode != "cache" && mode != "fastconv" && mode != "graph" && mode != "fused" && mode != "hybrid" &&
         mode != "all" && mode != "cpu" && mode != "defaults" && mode != "full-bake" && mode != "precise" &&
-        mode != "precise-all" && mode != "baseline")
+        mode != "precise-all" && mode != "promoted" && mode != "combined" && mode != "first-cpu" &&
+        mode != "first-default" && mode != "baseline")
         return 2;
     knob("CRISPASR_TTS_REF_CACHE", "0");
     knob("CRISPASR_OMNIVOICE_VOICE_CACHE", "0");
@@ -46,7 +48,10 @@ int main(int argc, char** argv) {
     if (env_bool("CRISPASR_OMNIVOICE_ENCODER_BENCH_REVERSE"))
         for (auto& arm : order)
             arm = 1 - arm;
-    for (int i = 0; i < (mode == "baseline" ? 2 : 8); i++) {
+    const bool first = mode == "first-cpu" || mode == "first-default";
+    if (first)
+        order[0] = mode == "first-default";
+    for (int i = 0; i < (first ? 1 : mode == "baseline" ? 2 : 8); i++) {
         for (auto* name : names) {
             std::string lower(name);
             std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -57,8 +62,13 @@ int main(int argc, char** argv) {
             if (mode == "precise" || mode == "precise-all")
                 on = lower == "cache" || lower == "fastconv" ||
                      (order[i] && (mode == "precise-all" || lower == "hybrid" || lower == "semantic_f32"));
+            if (mode == "combined")
+                on = lower == "cache" || lower == "fastconv" || lower == "hybrid" || lower == "semantic_f32" ||
+                     (order[i] && (lower == "graph" || lower == "fused"));
+            if ((mode == "promoted" && !order[i]) || mode == "first-cpu")
+                on = lower == "cache" || lower == "fastconv";
             const auto key = std::string("CRISPASR_OMNIVOICE_ENCODER_") + name;
-            if (mode == "defaults" && order[i]) {
+            if ((mode == "defaults" || mode == "promoted" || mode == "first-default") && order[i]) {
 #ifdef _WIN32
                 _putenv_s(key.c_str(), "");
 #else
@@ -77,7 +87,8 @@ int main(int argc, char** argv) {
         double wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - t).count(),
                cpus = (double)(std::clock() - cpu) / CLOCKS_PER_SEC;
 #ifndef OV_ENCODER_BASELINE
-        if (order[i] && (mode == "hybrid" || mode == "all" || mode == "precise" || mode == "precise-all")) {
+        if (order[i] && (mode == "hybrid" || mode == "all" || mode == "precise" || mode == "precise-all" ||
+                         mode == "promoted" || mode == "combined" || mode == "first-default")) {
             if (!ctx->semantic_encoder.loaded || core_cpu_backend::is_cpu(ctx->semantic_encoder.backend)) {
                 std::fprintf(stderr, "FAIL requested hybrid GPU stage did not run on GPU\n");
                 return 6;
@@ -98,6 +109,9 @@ int main(int argc, char** argv) {
         std::printf("ENCODER_BUFFERS host_cache=%zu fastconv=%zu projections=%zu semantic_gpu=%zu\n", host_bytes,
                     bytes(ctx->tokenizer.enc_fc.buf), bytes(ctx->tokenizer.enc_proj.buf),
                     bytes(ctx->semantic_encoder.buf_w));
+        std::printf("SEMANTIC_CACHES fastconv=%zu projections=%zu positional_host=%zu\n",
+                    bytes(ctx->semantic_encoder.enc_fc.buf), bytes(ctx->semantic_encoder.enc_proj.buf),
+                    ctx->semantic_encoder.enc_posconv.size() * sizeof(float));
 #endif
         std::ofstream f(std::string(argv[3]) + "-" + std::to_string(i) + ".codes", std::ios::binary);
         f.write((const char*)ctx->ref_audio_codes.data(), ctx->ref_audio_codes.size() * sizeof(int32_t));

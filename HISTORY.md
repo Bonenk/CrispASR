@@ -1,3 +1,17 @@
+## 2026-10-23 — Listened OmniVoice Metal encoder defaults
+
+Maintainer approves all provided listening WAVs and minor differences. Eligible
+F16/F32 Higgs on Apple Silicon macOS/Metal now defaults to precise hybrid,
+graph RVQ and fused HuBERT; CPU/CUDA/iOS/other profiles retain prior policy.
+48 paired calls preserve frozen CPU codes: fresh encode39–47% faster; combined
+13–16% faster than precise hybrid. Fresh native-process median2.16→1.98s;
+peak RSS median adds223MB (tokenizer probe, warm OS/shader caches, no LLM).
+16 broader Session renders and final Session/marked CLI preserve target codes/
+PCM; scored baseline limitations remain. Five focused CTest cases, ASan/UBSan,
+cache-hit/no-GPU tests and injected failures at all3GPU stages pass. Failures
+recover CPU and skip cache publication. HYBRID=0 restores prior CPU encoding.
+[Defaults, eligibility, memory and raw evidence](docs/omnivoice-metal-defaults-2026-10-23.md).
+
 ## 2026-10-23 — OmniVoice optional precise Metal semantic encoder
 
 Added default-off ENCODER_SEMANTIC_F32: existing ggml F32 matrix hints remove

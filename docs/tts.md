@@ -697,11 +697,11 @@ permissively licensed merely because the runtime code is.
 | `CRISPASR_OMNIVOICE_PERSISTENT_GRAPH` | On | Reuse step graphs rather than rebuilding every iteration. |
 | `CRISPASR_OMNIVOICE_FUSED_STEP` | On with persistent graphs | In-graph embedding lookup/sum and target-logit readback. `0` restores the older host path. |
 | `CRISPASR_OMNIVOICE_ENCODER_CACHE` | On | Exact cached encoder F32 arrays, norms and folded positional weights; about29.4 MB on the tested tokenizer. `0` restores rereading/recomputation. |
-| `CRISPASR_OMNIVOICE_ENCODER_FASTCONV` | `1` on Apple ARM CPU encoding; off elsewhere | `1`: pointwise-only F32 cache/matrix formulation, about26.2 MB; `2`: all encoder convolution weights, about280.9 MB. Independent of decoder FASTCONV. |
-| `CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32` | Off | Request precise F32 matrix multiplication in semantic encoder graphs. With HYBRID=1, removes station code drift on the tested M1; all seven tested references preserve CPU codes/audio. Independent of GRAPH/FUSED and cache identity. See the precision report. |
-| `CRISPASR_OMNIVOICE_ENCODER_GRAPH` | Off | Graph FC and residual quantizers with first-index ties. Extra cached projection weights; GPU numerical parity remains under investigation. |
-| `CRISPASR_OMNIVOICE_ENCODER_FUSED` | Off | Combine HuBERT frontend/transformer without feature readback. No convincing standalone CPU win. |
-| `CRISPASR_OMNIVOICE_ENCODER_HYBRID` | Off | CPU acoustic encoder plus filtered GPU semantics; adds223.8 MB weights before scratch/caches. Station reference codes differ, so experimental despite faster encoding. |
+| `CRISPASR_OMNIVOICE_ENCODER_FASTCONV` | `1` on Apple ARM CPU and eligible macOS Metal encoding; off elsewhere | `1`: pointwise-only F32 cache/matrix formulation, about26.2 MB; `2`: all encoder convolution weights, about280.9 MB. Independent of decoder FASTCONV. |
+| `CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32` | On for eligible Metal semantic encoding; off elsewhere | Request precise F32 matrix multiplication in semantic encoder graphs. With HYBRID=1, removes station code drift on the tested M1; all seven tested references preserve CPU codes/audio. Independent of GRAPH/FUSED and cache identity. See the precision report. |
+| `CRISPASR_OMNIVOICE_ENCODER_GRAPH` | On with eligible default hybrid encoding; off elsewhere | Graph FC and residual quantizers with first-index ties. Extra cached projection weights; Use semantic F32 precision for measured complete-encoder parity; coverage is scoped to the tested profile. |
+| `CRISPASR_OMNIVOICE_ENCODER_FUSED` | On with eligible default hybrid encoding; off elsewhere | Combine HuBERT frontend/transformer without feature readback. No convincing standalone CPU win. |
+| `CRISPASR_OMNIVOICE_ENCODER_HYBRID` | On for the eligible F16/F32 Higgs profile on Apple Silicon macOS/Metal; off elsewhere | CPU acoustic encoder plus filtered GPU semantics; adds223.8 MB weights before scratch/caches. Use precise semantic encoding for tested code parity; reduced-precision control remains available. |
 | `CRISPASR_TTS_REF_CACHE` | On | Shared content-addressed reference-code cache. Use `0` to prove fresh encoding; legacy `CRISPASR_OMNIVOICE_VOICE_CACHE=0` also disables it. |
 | `CRISPASR_OMNIVOICE_TARGET_DURATION` | Estimate | Default duration in seconds; positive explicit setter/CLI duration wins. |
 | `CRISPASR_OMNIVOICE_NUM_STEPS` | Backend/parameter default | Initialization override; later CLI/Session setters can replace it. Explicitly set steps for a benchmark. |
@@ -2480,10 +2480,12 @@ already skip this stage. Explicitly set all five `ENCODER_*` switches to `0`
 for the pre-experiment encoder path. Full baking uses literal `2`; the remaining
 switches use literal `0`/`1`. License acceptance and marking remain required.
 
-For the corrected optional GPU encoder, set both
+For explicit reproducible selection of the corrected GPU encoder, set both
 `CRISPASR_OMNIVOICE_ENCODER_HYBRID=1` and
 `CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32=1`. The
 [semantic precision audit](omnivoice-semantic-precision-2026-10-23.md) records
 boundary isolation, seven reference clips, exact-code/PCM checks and
-paired timings. GPU placement remains off by default; explicit precision `0`
-retains the original numerical A/B control.
+paired timings. Following listening approval, the eligible macOS Metal profile now selects
+this path by default; explicit precision `0` retains the original numerical
+A/B control. See the [default promotion](omnivoice-metal-defaults-2026-10-23.md)
+for eligibility, rollback, startup/memory measurements and CPU recovery.

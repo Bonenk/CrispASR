@@ -1,0 +1,1168 @@
+{
+  "date": "2026-10-23",
+  "baseline": "c9547d17b2eea9840da69e74b741827687c42182",
+  "runtime_source_sha256": "9c248e1912d4c008133dd835d9249200d625df66158f8ebaf5201ee708fe5317",
+  "unit_source_sha256": "cc8d69a3e636b3a1118282b131ea9c0d1b3c81f363b027cbc5cb3d9b49c4fb90",
+  "lifecycle_source_sha256": "34b317ba8690ad84ad46f4a09fd67e0b450f7dd8fefa3706ebd4e7a72a368299",
+  "bench_source_sha256": "a01a7bc1aae705a805af4d6170481376d328cfe6575bf8e95cdd2fba20fc1128",
+  "host": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_gb": 16,
+    "os": "macOS 26",
+    "desktop_contention": "Interactive desktop; raw per-call times retained. Final CPU default trial reverses arm order."
+  },
+  "ggml": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "models": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "main_sha256": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+    "codec_sha256": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63"
+  },
+  "listening_approval": {
+    "scope": "All seven local listening WAVs: station reference and two sentences rendered by CPU/original GPU/corrected GPU.",
+    "result": "Maintainer says all sound acceptable and approves proceeding while accepting minor differences.",
+    "date": "2026-10-23"
+  },
+  "eligibility": "Apple ARM macOS, MTL backend, GPU permission, loaded768x12 semantic/1024hidden/8quantizers/1024codebook/64dim profile, F16 FC/feature projection and exclusively F16/F32 tokenizer tensors. Explicit full-GPU codec overrides are respected.",
+  "defaults": [
+    "CACHE",
+    "FASTCONV=1",
+    "HYBRID",
+    "SEMANTIC_F32",
+    "GRAPH",
+    "FUSED"
+  ],
+  "rollback": "ENCODER_HYBRID=0 restores prior CPU encoding; independent explicit switches retained.",
+  "timings": {
+    "window-promoted": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.029712875,
+          "cpu_s": 2.300538,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.46915675,
+          "cpu_s": 5.191435,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.997311084,
+          "cpu_s": 2.432477,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.648872875,
+          "cpu_s": 5.660675,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.6799885,
+          "cpu_s": 5.603444,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.018296125,
+          "cpu_s": 2.458948,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.887081,
+          "cpu_s": 2.260204,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.497533167,
+          "cpu_s": 5.028781,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.648872875,
+          "cpu_s": 5.603444
+        },
+        "1": {
+          "wall_s": 0.997311084,
+          "cpu_s": 2.432477
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "window-combined": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 0.957419375,
+          "cpu_s": 2.274715,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 0.973123041,
+          "cpu_s": 2.254384,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.874387084,
+          "cpu_s": 2.196313,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.06114475,
+          "cpu_s": 2.464184,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.015663542,
+          "cpu_s": 2.294249,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.910243209,
+          "cpu_s": 2.257361,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.961952208,
+          "cpu_s": 2.372903,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.048218917,
+          "cpu_s": 2.426945,
+          "codes_sha256": "7225a745d9d77d1a3d941414f2d5eb999d024ba85befad7a021a993569240378"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.048218917,
+          "cpu_s": 2.426945
+        },
+        "1": {
+          "wall_s": 0.910243209,
+          "cpu_s": 2.257361
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "station-promoted": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 0.93751175,
+          "cpu_s": 2.212483,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.464895375,
+          "cpu_s": 4.938725,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.839093666,
+          "cpu_s": 2.118189,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.445476791,
+          "cpu_s": 4.956547,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.451839041,
+          "cpu_s": 4.946203,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.876099208,
+          "cpu_s": 2.26804,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.877032042,
+          "cpu_s": 2.233711,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.412681917,
+          "cpu_s": 4.993625,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.445476791,
+          "cpu_s": 4.956547
+        },
+        "1": {
+          "wall_s": 0.876099208,
+          "cpu_s": 2.233711
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "station-combined": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 0.902646083,
+          "cpu_s": 2.260796,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 0.971617375,
+          "cpu_s": 2.311335,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.888359458,
+          "cpu_s": 2.294209,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.150685209,
+          "cpu_s": 2.543652,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.207721042,
+          "cpu_s": 2.541077,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.038237959,
+          "cpu_s": 2.538113,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.024505083,
+          "cpu_s": 2.535259,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.218072042,
+          "cpu_s": 2.812839,
+          "codes_sha256": "a15f53d8fd4cbfeeaf7cbee9b24905a38feb46ec96470fafb6fb8187a274c286"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.207721042,
+          "cpu_s": 2.543652
+        },
+        "1": {
+          "wall_s": 1.024505083,
+          "cpu_s": 2.535259
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "fox-promoted": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 1.108603167,
+          "cpu_s": 2.675951,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.67443475,
+          "cpu_s": 5.773226,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.872972583,
+          "cpu_s": 2.251161,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.633327833,
+          "cpu_s": 5.651687,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.651277667,
+          "cpu_s": 5.686311,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.87583525,
+          "cpu_s": 2.232209,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.880647333,
+          "cpu_s": 2.217575,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.733278125,
+          "cpu_s": 5.904329,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.651277667,
+          "cpu_s": 5.686311
+        },
+        "1": {
+          "wall_s": 0.87583525,
+          "cpu_s": 2.232209
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    },
+    "fox-combined": {
+      "samples": [
+        {
+          "i": 0,
+          "on": 1,
+          "warmup": true,
+          "wall_s": 0.974909417,
+          "cpu_s": 2.442984,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 1,
+          "on": 0,
+          "warmup": true,
+          "wall_s": 1.060920083,
+          "cpu_s": 2.572315,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 2,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.86297075,
+          "cpu_s": 2.221624,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 3,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.096801083,
+          "cpu_s": 2.480419,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 4,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.185155125,
+          "cpu_s": 2.721585,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 5,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 1.07012625,
+          "cpu_s": 2.6451,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 6,
+          "on": 1,
+          "warmup": false,
+          "wall_s": 0.923589209,
+          "cpu_s": 2.296937,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        },
+        {
+          "i": 7,
+          "on": 0,
+          "warmup": false,
+          "wall_s": 1.090031875,
+          "cpu_s": 2.534606,
+          "codes_sha256": "18f54dce76ab5bd57882f2846f8fb4b28ecdee1efec0f7574a9f039096defe4e"
+        }
+      ],
+      "medians": {
+        "0": {
+          "wall_s": 1.096801083,
+          "cpu_s": 2.534606
+        },
+        "1": {
+          "wall_s": 0.923589209,
+          "cpu_s": 2.296937
+        }
+      },
+      "semantic_backends": [
+        "MTL0"
+      ]
+    }
+  },
+  "fresh_process": {
+    "first-cpu": {
+      "samples": [
+        {
+          "encode_wall_s": 1.898233,
+          "encode_cpu_s": 6.068431,
+          "process_wall_s": 2.16,
+          "process_user_s": 5.91,
+          "process_sys_s": 0.43,
+          "peak_rss_bytes": 843857920
+        },
+        {
+          "encode_wall_s": 2.320997417,
+          "encode_cpu_s": 6.414962,
+          "process_wall_s": 2.55,
+          "process_user_s": 6.14,
+          "process_sys_s": 0.53,
+          "peak_rss_bytes": 843235328
+        },
+        {
+          "encode_wall_s": 1.677140959,
+          "encode_cpu_s": 5.973596,
+          "process_wall_s": 1.98,
+          "process_user_s": 5.95,
+          "process_sys_s": 0.34,
+          "peak_rss_bytes": 845627392
+        }
+      ],
+      "medians": {
+        "encode_wall_s": 1.898233,
+        "encode_cpu_s": 6.068431,
+        "process_wall_s": 2.16,
+        "process_user_s": 5.95,
+        "process_sys_s": 0.43,
+        "peak_rss_bytes": 843857920
+      }
+    },
+    "first-default": {
+      "samples": [
+        {
+          "encode_wall_s": 1.38008825,
+          "encode_cpu_s": 2.95704,
+          "process_wall_s": 1.61,
+          "process_user_s": 2.79,
+          "process_sys_s": 0.42,
+          "peak_rss_bytes": 1066876928
+        },
+        {
+          "encode_wall_s": 1.73520925,
+          "encode_cpu_s": 3.460575,
+          "process_wall_s": 2.15,
+          "process_user_s": 3.24,
+          "process_sys_s": 0.61,
+          "peak_rss_bytes": 676315136
+        },
+        {
+          "encode_wall_s": 1.621071084,
+          "encode_cpu_s": 3.344714,
+          "process_wall_s": 1.98,
+          "process_user_s": 3.27,
+          "process_sys_s": 0.43,
+          "peak_rss_bytes": 1068187648
+        }
+      ],
+      "medians": {
+        "encode_wall_s": 1.621071084,
+        "encode_cpu_s": 3.344714,
+        "process_wall_s": 1.98,
+        "process_user_s": 3.24,
+        "process_sys_s": 0.43,
+        "peak_rss_bytes": 1066876928
+      }
+    }
+  },
+  "quality": {
+    "library_sha256": "1a8f130fa6ecf8f3c014b25307c118fc450900e0a34e6300a4a8a046c4768d2c",
+    "arms": {
+      "clone-window-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "window",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.6695645418949425,
+        "synth_s": 8.89492570888251
+      },
+      "clone-window-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "window",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 90936,
+        "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+        "codes_sha256": "cd0401f0be4dbd178c57551f228bda212e61c5c400f73f14615c6206799e17ad",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.1498360829427838,
+        "synth_s": 8.604703332995996
+      },
+      "clone-station-0-baseline": {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "reference": "station",
+        "mode": "baseline",
+        "target": 0,
+        "samples": 90456,
+        "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "codes_sha256": "5e53e56beeb7e754057ba37d4082ca5c621f47c7fd8b0b5daf9264845f512860",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.7053411251399666,
+        "synth_s": 8.616655457997695
+      },
+      "clone-station-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.7053411251399666,
+        "synth_s": 8.900083832908422
+      },
+      "clone-station-0-defaults": {
+        "text": "The quick brown fox jumps over the lazy dog.",
+        "reference": "station",
+        "mode": "defaults",
+        "target": 0,
+        "samples": 90456,
+        "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+        "codes_sha256": "5e53e56beeb7e754057ba37d4082ca5c621f47c7fd8b0b5daf9264845f512860",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2835589160677046,
+        "synth_s": 9.003477500053123
+      },
+      "clone-station-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2835589160677046,
+        "synth_s": 9.26340291602537
+      },
+      "clone-fox-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "fox",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 118536,
+        "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "codes_sha256": "c7b14015b6b089835f2a82aae00535fbaf75dbbab8180a6a929cf7d228e85918",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.2704376250039786,
+        "synth_s": 9.506834666943178
+      },
+      "clone-fox-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "fox",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 118536,
+        "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+        "codes_sha256": "c7b14015b6b089835f2a82aae00535fbaf75dbbab8180a6a929cf7d228e85918",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.3411972078029066,
+        "synth_s": 9.351012750063092
+      },
+      "clone-samantha-en-short-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "samantha-en-short",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 92616,
+        "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "codes_sha256": "48b236e7d6d270ab98b63254fa9f46fba9ac81ac35cf92e3a92f7c0fb5ceb982",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.0684525829274207,
+        "synth_s": 9.727374834008515
+      },
+      "clone-samantha-en-short-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "samantha-en-short",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 92616,
+        "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+        "codes_sha256": "48b236e7d6d270ab98b63254fa9f46fba9ac81ac35cf92e3a92f7c0fb5ceb982",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.1534081250429153,
+        "synth_s": 9.585027166176587
+      },
+      "clone-daniel-en-long-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "daniel-en-long",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 148776,
+        "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "codes_sha256": "e490272fd294fb3b6f7e05d826cd4fb63875f74185c169ecbf08659b63a0a210",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 10.970267833210528,
+        "synth_s": 16.225303082959726
+      },
+      "clone-daniel-en-long-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "daniel-en-long",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 148776,
+        "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+        "codes_sha256": "e490272fd294fb3b6f7e05d826cd4fb63875f74185c169ecbf08659b63a0a210",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 6.399998874869198,
+        "synth_s": 16.532486290903762
+      },
+      "clone-anna-de-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "anna-de",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 94536,
+        "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "codes_sha256": "7c9c8d7be996a8425e04ba7da3eaece57b41361354ab4b78709818864d2ab442",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 4.840262667043135,
+        "synth_s": 12.352166166063398
+      },
+      "clone-anna-de-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "anna-de",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 94536,
+        "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+        "codes_sha256": "7c9c8d7be996a8425e04ba7da3eaece57b41361354ab4b78709818864d2ab442",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.4386679590679705,
+        "synth_s": 12.764906374970451
+      },
+      "clone-thomas-fr-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "thomas-fr",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 93096,
+        "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "codes_sha256": "e66d9553a39302586c96f5186709df1b4d796ece18ffdd645e22b599e90faaf3",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 4.730426541995257,
+        "synth_s": 11.44453045912087
+      },
+      "clone-thomas-fr-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "thomas-fr",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 93096,
+        "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+        "codes_sha256": "e66d9553a39302586c96f5186709df1b4d796ece18ffdd645e22b599e90faaf3",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 2.57331895804964,
+        "synth_s": 12.063766582868993
+      }
+    }
+  },
+  "final_session": {
+    "library_sha256": "33b752b9669e2e0ce4f97a8b14a784a4e84b4b7637e79f6e1625188cd7cf618f",
+    "arms": {
+      "clone-station-1-baseline": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "baseline",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 1.2451182501390576,
+        "synth_s": 8.710008458001539
+      },
+      "clone-station-1-defaults": {
+        "text": "We should bring enough water and food for the long walk home.",
+        "reference": "station",
+        "mode": "defaults",
+        "target": 1,
+        "samples": 89496,
+        "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+        "codes_sha256": "04441f9eb941043281a4aa3afb1d17fbb5fd2568da707dab50e54d2deab50146",
+        "pcm_baseline_exact": true,
+        "codes_baseline_exact": true,
+        "encode_s": 0.8451584170106798,
+        "synth_s": 8.52348699979484
+      }
+    }
+  },
+  "inherited_asr": {
+    "clone-window-1-baseline": {
+      "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-window-1-defaults": {
+      "pcm_sha256": "da10f8982b9043d166a40881b97cee2f42a91165afbb63c572bc6ab14d8e0e19",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-station-0-baseline": {
+      "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+      "judges": {
+        "nemotron": {
+          "text": "The quick brown Fox jumps over the lazy dog",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "the quick brown fox jumps over the lazy dog",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-station-1-baseline": {
+      "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-station-0-defaults": {
+      "pcm_sha256": "1b7944accee5b24341bc13b66836d628e9e72ee8927f5ee9e792724c7da2255e",
+      "judges": {
+        "nemotron": {
+          "text": "The quick brown Fox jumps over the lazy dog",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "the quick brown fox jumps over the lazy dog",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-station-1-defaults": {
+      "pcm_sha256": "92996f42604515731c7b693e3400c909bdc678c8525fbb3d8bc7622aa97c7d44",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-fox-1-baseline": {
+      "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-fox-1-defaults": {
+      "pcm_sha256": "8d4b3c2012574f26e2db2d89139a13d038353110ac6ac1ec8653fc4e80188f1f",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-samantha-en-short-1-baseline": {
+      "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-samantha-en-short-1-defaults": {
+      "pcm_sha256": "4ef78770642e8904a100dcc57e6253855379e495f8f1a371f5522ae584e13761",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-daniel-en-long-1-baseline": {
+      "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-daniel-en-long-1-defaults": {
+      "pcm_sha256": "e64abde4e76aa609a11c262a1d5539f655e707fc25aa0dc0cf8cbbb5a7902531",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-anna-de-1-baseline": {
+      "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk.",
+          "wer": 0.08333333333333333
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk",
+          "wer": 0.08333333333333333
+        }
+      }
+    },
+    "clone-anna-de-1-defaults": {
+      "pcm_sha256": "c4981dee7285a139e964e3d054a6ced05d69ec6955e5c655f77bb44840ac7e52",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk.",
+          "wer": 0.08333333333333333
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk",
+          "wer": 0.08333333333333333
+        }
+      }
+    },
+    "clone-thomas-fr-1-baseline": {
+      "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    },
+    "clone-thomas-fr-1-defaults": {
+      "pcm_sha256": "1d41351e857fa175d7bd3ba638ce373f81d586cf69181da276231b76c418b50b",
+      "judges": {
+        "nemotron": {
+          "text": "We should bring enough water and food for the long walk home.",
+          "wer": 0.0
+        },
+        "parakeet": {
+          "text": "we should bring enough water and food for the long walk home",
+          "wer": 0.0
+        }
+      }
+    }
+  },
+  "asr_judges": {
+    "nemotron": {
+      "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+      "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+      "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+      "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+    },
+    "parakeet": {
+      "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+      "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+      "file": "parakeet-ctc-0.6b-q4_k.gguf",
+      "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+    }
+  },
+  "asr_library_sha256": "9f030ae613360002621361c7f0d027482e538b8f0dbb26ddb9f5a824d901da69",
+  "cli": {
+    "asr": {
+      "judges": {
+        "nemotron": {
+          "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+          "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+          "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+          "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+        },
+        "parakeet": {
+          "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+          "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+          "file": "parakeet-ctc-0.6b-q4_k.gguf",
+          "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+        }
+      },
+      "outputs": {
+        "cli-marked.f32": {
+          "samples": 184056,
+          "sha256": "aeeade7b59c5e4765551fb0f93de2b8df33fd0a0360ef02233686f266d15fb04",
+          "rms": 0.09435280366912147,
+          "norm": 40.47900226498361,
+          "judges": {
+            "nemotron": {
+              "text": "This audio was generated by artificial intelligence. We should bring enough water and food for the long walk home.",
+              "wer": 0.0
+            },
+            "parakeet": {
+              "text": "this audio was generated by artificial intelligence we should bring enough water and food for the long walk home",
+              "wer": 0.0
+            }
+          }
+        }
+      }
+    },
+    "target_codes_equal_baseline": true,
+    "c2pa_chunk_present": true,
+    "marked_wav_sha256": "703d792132cc24c533692eec033354079bc8d23270518920fa7c1481d848fb0f"
+  },
+  "checks": {
+    "ctest": "Test project $WORK/build-audit/cmake\n    Start  11: permute_convt1d_weight == naive permutation (F32)\n1/5 Test  #11: permute_convt1d_weight == naive permutation (F32) ...   Passed    0.01 sec\n    Start  12: permute_convt1d_weight == naive permutation (F16)\n2/5 Test  #12: permute_convt1d_weight == naive permutation (F16) ...   Passed    0.01 sec\n    Start 308: omnivoice-encoder-parity\n3/5 Test #308: omnivoice-encoder-parity ............................   Passed    0.01 sec\n    Start 309: omnivoice-codec-lifecycle\n4/5 Test #309: omnivoice-codec-lifecycle ...........................   Passed    0.05 sec\n    Start 351: omnivoice-acceptance-policy\n5/5 Test #351: omnivoice-acceptance-policy .........................   Passed    0.11 sec\n\n100% tests passed, 0 tests failed out of 5\n\nLabel Time Summary:\nomnivoice    =   0.17 sec*proc (3 tests)\ntts          =   0.17 sec*proc (3 tests)\nunit         =   0.19 sec*proc (5 tests)\n\nTotal Test time (real) =   0.24 sec\n",
+    "asan_ubsan": "ggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 32\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 12576\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 32\nggml_backend_buft_alloc_buffer_n_default: failed to allocate CPU buffer of size 12576\nPASS encoder F32/F16 scalar/cache/graph parity, ties, transactional allocation, filtered placement and cleanup\n",
+    "wrong_tie_mutant_rejected": true,
+    "lifecycle": [
+      "PASS fresh-context cache hit skips GPU allocation",
+      "PASS injected GPU compute failure stage1 recovers exact CPU codes; retry stays CPU",
+      "PASS injected GPU compute failure stage2 recovers exact CPU codes; retry stays CPU",
+      "PASS injected GPU compute failure stage3 recovers exact CPU codes; retry stays CPU",
+      "PASS no-GPU policy preserves CPU encoding"
+    ],
+    "all_final_steps": "START asan-build\nDONE asan-build 0 elapsed 10.124099374981597\nSTART asan\nDONE asan 0 elapsed 0.655401999829337\nSTART tie-mutant-build\nDONE tie-mutant-build 0 elapsed 4.30585779203102\ntie mutation rejected -6\nSTART promotion-final-build\nDONE promotion-final-build 0 elapsed 4.77691858401522\nSTART promotion-final-lifecycle-build\nDONE promotion-final-lifecycle-build 0 elapsed 4.086073374841362\nSTART promotion-final-lifecycle\nDONE promotion-final-lifecycle 0 elapsed 22.302395208040252\nSTART promotion-final-unit-build\nDONE promotion-final-unit-build 0 elapsed 4.784267459064722\nSTART promotion-final-unit\nDONE promotion-final-unit 0 elapsed 0.26084791705943644\nSTART promotion-final-probe-build\nDONE promotion-final-probe-build 0 elapsed 3.7408393339719623\nSTART promotion-final-buffers\nDONE promotion-final-buffers 0 elapsed 1.1745270839892328\nSTART promotion-final-marked-cli\nDONE promotion-final-marked-cli 0 elapsed 25.883838665904477\n",
+    "final_session_and_cli_asr": "START promotion-final-session\nDONE promotion-final-session 0 elapsed 20.467322041047737\nSTART promotion-marked-asr\nDONE promotion-marked-asr 0 elapsed 23.472898500040174\n"
+  },
+  "memory": {
+    "cpu_pointwise_bytes": 26198016,
+    "semantic_gpu_weights_bytes": 223770880,
+    "semantic_gpu_pointwise_bytes": 9437184,
+    "semantic_gpu_projection_bytes": 10557440,
+    "semantic_host_posconv_bytes": 18874368,
+    "scope": "Allocated persistent payloads on the measured F16 tokenizer; graph scratch/allocator overhead additional. RSS is native tokenizer process, excludes LLM, GPU accounting varies."
+  },
+  "preflight": {
+    "promotion-load": "vm.loadavg: { 3.80 3.32 3.18 }\n",
+    "promotion-memory": "The system has 17179869184 (1048576 pages with a page size of 16384).\n\nStats: \nPages free: 19253 \nPages purgeable: 3465 \nPages purged: 506848227 \n\nSwap I/O:\nSwapins: 49055213 \nSwapouts: 60361925 \n\nPage Q counts:\nPages active: 221504 \nPages inactive: 217362 \nPages speculative: 5823 \nPages throttled: 0 \nPages wired down: 225257 \n\nCompressor Stats:\nPages used by compressor: 323517 \nPages decompressed: 4793935755 \nPages compressed: 5623132293 \n\nFile I/O:\nPageins: 507603972 \nPageouts: 4963521 \n\nSystem-wide memory free percentage: 45%\n"
+  },
+  "recipe": {
+    "reference_cache": false,
+    "threads": 4,
+    "main": "Q8_0",
+    "tokenizer": "F16",
+    "seed": 42,
+    "steps": 32,
+    "language": "en",
+    "target_duration_seconds": 6,
+    "guidance": 2,
+    "class_temperature": 0,
+    "position_temperature": 5,
+    "codec_gpu": 0,
+    "codec_split": 1,
+    "codec_resident": 1,
+    "codec_decomp": 1,
+    "attention_views": 1,
+    "packed_projection": 0,
+    "unified_cfg": 0,
+    "cfg_interval": 1,
+    "audio_cleanup": true,
+    "session_marking": "Explicit responsibility attestation for local identified diagnostic artifacts; unchanged production marking policy.",
+    "asr_deduplication": "Score every distinct PCM SHA256 with both frozen judges; exact duplicates inherit results.",
+    "precision_gate": "CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32=1; explicit off control retained; default remains off",
+    "bench_arms": "promoted: explicit prior CPU CACHE/FASTCONV1, others0 versus all encoder knobs unset. combined: precise hybrid versus GRAPH/FUSED1. Eight reversed/interleaved calls, first2warmups. first-* fresh processes, station,3perarm, alternate order, warm OS/shader caches."
+  },
+  "rejected_control": "First cache-hit probe omitted creating its explicit cache directory; no cache entry was written and hit assertion failed. Corrected public probe creates its private subdirectory and passes. No runtime regression is attributed to that harness failure.",
+  "limits": [
+    "One M1 and fixed F16/F32 Higgs profile. No CUDA/iOS or quantized tokenizer default promotion.",
+    "Maintainer listening covers station comparison files, not every broader reference.",
+    "Eight broader target/reference cases preserve CPU output, including Anna home omission1/12. Earlier fox/Linux failures remain open.",
+    "Encoder timings exclude LLM generation; fresh-process probe includes tokenizer load/backend init but files/shaders already warm.",
+    "New hosted CI status must be checked separately; no blanket hosted green claim."
+  ],
+  "timing_source_scope": "Paired timings precede final iOS/type eligibility guards and extra out-of-timer buffer diagnostics; these preserve the tested macOS F16 route. Final source is checked by unit/lifecycle tests, linked Session and CLI."
+}
