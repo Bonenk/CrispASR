@@ -27,7 +27,12 @@ building. Replacement run39910096656 targets `682b54af2` and is in progress.
 Launch CUDA only after that archive is qualified.
 [Initial shape/regression evidence](docs/issue555-voice-pack-2026-10-23.json).
 Kaggle worker remains guarded/unlaunched until immutable archive pins exist.
-No complete speech acceptance is claimed yet.
+Local native0.6B Q8 valid-pack speech yields the exact expected sentence in
+original Whisper base.en (WER0). Hosted linux-unit39911120897 on `8ad6f42c5`
+passes2081 selected CTest cases and189 Python tests/34 subtests; the actual
+pack lifecycle test is selected and passes. The new test now directly includes
+the CPU backend shim, correcting lint's include-reachability finding.
+No1.7B/CUDA speech acceptance is claimed yet.
 
 ## M1 OmniVoice longer inputs and parameter reference — completed (2026-10-23)
 

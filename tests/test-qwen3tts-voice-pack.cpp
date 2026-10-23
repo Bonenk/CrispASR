@@ -1,5 +1,6 @@
 // Exercise the actual public loader and private prefill guard without weights.
 // As in test-omnivoice-codec, include the runtime for a minimal internal context.
+#include "core/ggml_cpu_backend.h"
 #include "../src/qwen3_tts.cpp"
 
 #include <chrono>

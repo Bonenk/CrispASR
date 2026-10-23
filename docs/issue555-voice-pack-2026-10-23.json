@@ -45,13 +45,38 @@
     "selected_ctest_failures": 0,
     "real_06b_public_loader_cases": 11,
     "before_public_loader": "Rejected by the new regression: original loader incorrectly accepts wrong dimensions.",
-    "before_prefill": "SIGABRT: tensor read out of bounds, same ggml_backend_tensor_get/build_icl_prefill_embeds stack; reproduced with minimal context and real default pack before neural compute."
+    "before_prefill": "SIGABRT: tensor read out of bounds, same ggml_backend_tensor_get/build_icl_prefill_embeds stack; reproduced with minimal context and real default pack before neural compute.",
+    "valid_06b_speech": {
+      "expected": "I found the file you asked about and opened it.",
+      "heard": "I found the file you asked about and opened it.",
+      "samples": 76800,
+      "rate": 24000,
+      "rms": 0.06803793658817209,
+      "pcm_sha256": "1090241043085b3dece94ce0fc77b1ee331cf7306be8665d83c66dcc32f75926",
+      "judge": "OpenAI Whisper base.en, original Python package, CPU, fp16=False, temperature=0",
+      "scope": "Native 0.6B Q8 valid-pack control; no 1.7B/CUDA claim.",
+      "wer": 0.0,
+      "judge_package_version": "20250625",
+      "judge_checkpoint_sha256": "25a8566e1d0c1e2231d1c762132cd20e0f96a85d16145c3a00adf5d1ac670ead",
+      "runtime_source": "de83cc6a5e61d3c21de174607d2226809c2c3184",
+      "native_library_sha256": "e7a5a043552c3eb707adc6697e25f41a3e1b04f3bfef4b9957e219b36a03cd48"
+    }
   },
   "hosted": {
     "bundle_run": 39910096656,
     "status": "in_progress",
     "cpu_speech_accepted": false,
-    "cuda_speech_accepted": false
+    "cuda_speech_accepted": false,
+    "linux_unit": {
+      "run_id": 39911120897,
+      "job_id": 120274124897,
+      "source": "8ad6f42c594e1f6d944f3665939078740ef4b44e",
+      "selected_ctest_cases": 2081,
+      "ctest_failures": 0,
+      "python_tests": 189,
+      "python_subtests": 34,
+      "actual_pack_lifecycle_selected_and_passed": true
+    }
   },
-  "scope": "Typed voice-pack loading, rollback, replacement and prefill bounds. 1.7B needs its own compatible voice pack or a WAV/transcript. No speech/CUDA acceptance until actual results are audited."
+  "scope": "Typed voice-pack loading, rollback, replacement and prefill bounds. Valid 0.6B Q8 native speech control passes original Whisper ASR. 1.7B needs its own compatible voice pack or a WAV/transcript. 1.7B/CUDA speech gates remain pending."
 }
