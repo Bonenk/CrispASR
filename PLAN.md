@@ -24,39 +24,30 @@ ASan/UBSan, wrong-tie mutant and full lib/CLI checks pass. Broader fox-cloning,
 hosted acceptance and GPU semantic boundary parity remain open.
 [Parameters, commands, decisions and receipt](docs/omnivoice-encoder-2026-10-23.md).
 
-## NOW — issue555 Base voice-pack crash (2026-10-23)
+## Issue555 Base voice-pack crash — runtime validated (2026-10-23)
 
-Owner: Codex, branch `fix/new-issues-20261023`, baseline `cb31b23db`.
-Read new issues and complete comment threads; errors take priority over features.
-Issue551 schema rejection is already on main; hosted CI39722231798 and
-lint39722234064 both completed successfully. Granite5 support (issue552) is deferred.
-Issue555: default voice pack has a 1024-element F32 speaker embedding, while
-1.7B Base expects2048. Prefill reads2048 without validating the tensor.
-Transactional pack/schema validation and failed-load preservation are implemented.
-Compatible synthesis on CPU and real CUDA is being checked per the operational guide.
-Local focused tests pass: Qwen3 params70 assertions/10cases; registry6240/65.
-Model-free public loader/prefill lifecycle passes38 checks; the precise
-pre-fix abort was reproduced with the real default pack without model weights.
-All11 selected Qwen3 CTest cases pass.
-Actual0.6B Q8 public loader passes11 lifecycle cases (rejected replacements
-preserve the active voice; a smaller successful replacement resets selection).
-Pre-fix runtime fails the identical public loader probe because it accepts the
-wrong-dimension pack. Hosted CUDA-bundle/CPU-speech run39908855336 targets
-source `de83cc6a5` failed at configuration: unrelated existing tests link
-the ggml-cpu MODULE under DL. Keep production DL configuration, disable
-the broad test CMake file in this bundle and inject only the two probes.
-The replacement bundle retains default CUDA FlashAttention kernels for the
-real synthesis check. The queued initial replacement is superseded before
-building. Replacement run39910096656 targets `682b54af2` and is in progress.
-Launch CUDA only after that archive is qualified.
-[Initial shape/regression evidence](docs/issue555-voice-pack-2026-10-23.json).
-Kaggle worker remains guarded/unlaunched until immutable archive pins exist.
-Local native0.6B Q8 valid-pack speech yields the exact expected sentence in
-original Whisper base.en (WER0). Hosted linux-unit39911120897 on `8ad6f42c5`
-passes2081 selected CTest cases and189 Python tests/34 subtests; the actual
-pack lifecycle test is selected and passes. The new test now directly includes
-the CPU backend shim, correcting lint's include-reachability finding.
-No1.7B/CUDA speech acceptance is claimed yet.
+Owner: Codex. Runtime fix `de83cc6a5` rejects incompatible speaker/code tensors
+before prefill, preserves the previous pack on failed replacement, resets stale
+selection after successful replacement, and removes the incompatible0.6B extra
+from1.7B auto-downloads. Exact pre-fix bounds abort is reproduced without weights.
+The actual public loader/prefill test passes38 checks; all11 selected local
+CTest cases pass. Hosted unit39911120897 passes2081 CTest cases and189 Python
+tests/34 subtests, including the actual lifecycle test.
+
+Hosted package/CPU run39910096656 at `682b54af2` passes. One actual Tesla T4
+CUDA kernel, `issue555-cuda-v1` / `crispasr-qwen3-voice-pack-555` version1,
+passes the same10 cases: both wrong-pack CLI calls exit15, both public loader
+probes pass11 checks each, and all three0.6B-Q8/1.7B-F16 speech controls have
+WER0 on CPU and CUDA. Native CUDA graph logs and per-child GPU-residency peaks
+are retained. No idle-GPU denominator or new default/performance claim.
+[Receipt](docs/issue555-voice-pack-2026-10-23.json) and the public60-file proof
+include all logs/WAVs, source/model/binary pins and an independent saved-data
+replay with three rejected negative controls. Anonymous archive/expanded hashes
+and replay pass. Full platform CI/lint on the final documentation tip remain
+to be collected; the direct-header lint finding is fixed and passes locally.
+1.7B requires a matching voice pack or reference WAV/transcript. No release tag
+or Vulkan-hardware acceptance. Issue551's13 CI/10 lint jobs pass; issue552
+Granite5 feature support remains deferred per user priority.
 
 ## M1 OmniVoice longer inputs and parameter reference — completed (2026-10-23)
 

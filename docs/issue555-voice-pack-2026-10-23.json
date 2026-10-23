@@ -64,9 +64,9 @@
   },
   "hosted": {
     "bundle_run": 39910096656,
-    "status": "in_progress",
-    "cpu_speech_accepted": false,
-    "cuda_speech_accepted": false,
+    "status": "accepted_cpu_cuda",
+    "cpu_speech_accepted": true,
+    "cuda_speech_accepted": true,
     "linux_unit": {
       "run_id": 39911120897,
       "job_id": 120274124897,
@@ -76,7 +76,234 @@
       "python_tests": 189,
       "python_subtests": 34,
       "actual_pack_lifecycle_selected_and_passed": true
+    },
+    "cpu": {
+      "device": "cpu",
+      "complete": true,
+      "speech_pass": true,
+      "cases": {
+        "loader-small": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "loader-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "reporter-rejection": {
+          "returncode": 15,
+          "peak_gpu_mib": 0
+        },
+        "explicit-rejection": {
+          "returncode": 15,
+          "peak_gpu_mib": 0
+        },
+        "speech-small": {
+          "returncode": 0,
+          "peak_gpu_mib": 0,
+          "expected": "I found the file you asked about and opened it.",
+          "heard": " I found the file you asked about and opened it.\n",
+          "wer": 0.0,
+          "wav_sha256": "0702466a5c0a219c4483bd36cd04d02f65e002c4bb98b52d3146dc0056e821cd"
+        },
+        "speech-small-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "speech-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 0,
+          "expected": "I found the file you asked about and opened it.",
+          "heard": " I found the file you asked about and opened it.\n",
+          "wer": 0.0,
+          "wav_sha256": "cccedcc6c0ad4b7d5da856ed548e9e6b0e7dd69fffda66fb4fbb05df9b00a5fe"
+        },
+        "speech-large-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "hello-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 0,
+          "expected": "Hello world.",
+          "heard": " Hello World!\n",
+          "wer": 0.0,
+          "wav_sha256": "3bd56e915785b6088d384ce4b83a94690ec5fbfdd0d32e470c82b3a634d981c1"
+        },
+        "hello-large-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        }
+      },
+      "models": {
+        "small": {
+          "repo": "cstr/qwen3-tts-0.6b-base-GGUF",
+          "revision": "94072f5c394b4dc4d98e97cc874800dde6ecacda",
+          "filename": "qwen3-tts-12hz-0.6b-base-q8_0.gguf",
+          "bytes": 985716544,
+          "sha256": "6162637048fff8ca7f7a16bebc8a62ea8181f4aec4f160894955dee5b87c1961"
+        },
+        "large": {
+          "repo": "cstr/qwen3-tts-1.7b-base-GGUF",
+          "revision": "1d9fa40e85c64e699f3f9fea5aa7fc69a7b2d4ff",
+          "filename": "qwen3-tts-12hz-1.7b-base-f16.gguf",
+          "bytes": 3863009472,
+          "sha256": "c7039d04d3c35da80f38b57bce2b97a5e703ee63de64e7cbbcd6181c7e23e00e"
+        },
+        "codec": {
+          "repo": "cstr/qwen3-tts-tokenizer-12hz-GGUF",
+          "revision": "344e279551177654762e5c7d39e217834325f222",
+          "filename": "qwen3-tts-tokenizer-12hz.gguf",
+          "bytes": 358453280,
+          "sha256": "70dc95dbfdd9aa5d9d406236ff771d061bf17b0cda02a72513953355606e719b"
+        },
+        "voice": {
+          "repo": "cstr/qwen3-tts-voices-GGUF",
+          "revision": "6ee1102f782cab1f17842983044ac51cf57884d8",
+          "filename": "qwen3-tts-voice-default.gguf",
+          "bytes": 11104,
+          "sha256": "031c1b7f397b5f11db237dd39671042f994f1dd6b55369b64e4e72bc723efb28"
+        },
+        "judge": {
+          "repo": "ggerganov/whisper.cpp",
+          "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+          "filename": "ggml-base.en.bin",
+          "bytes": 147964211,
+          "sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
+        }
+      }
+    },
+    "bundle": {
+      "source": "682b54af2a883371541b861b434600bbf9b3a8e5",
+      "build_run": 39910096656,
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "65b4a0b8a390e3fcab5211d96adcccde893c7be3",
+      "path": "issue555-voice-pack-20261023/cuda-682b54af2/qwen3-voice-pack-cuda-speech-validation.tar.gz",
+      "sha256": "3487f38ff77e10fedb946b317761d1a911f025eedf2dccd9fba1cc57eb224bfd",
+      "bytes": 499953500,
+      "qualified_members": 29,
+      "no_driver_or_stub": true,
+      "anonymous_readback_passed": true,
+      "cuda_executed": false
+    },
+    "cuda_kernel": {
+      "slug": "crispasr-qwen3-voice-pack-555",
+      "version": 1,
+      "worker_version": "issue555-cuda-v1",
+      "worker_source": "b5116b7d1c0a0a102e3b8ecd6cc434ab2cb00ec4",
+      "entry_sha256": "146695eca90e83dfedd5a9dd50040550cca3c728e18ba527b274f74c2df473a3",
+      "uploaded_bytes_verified": true,
+      "status": "complete"
+    },
+    "cuda": {
+      "device": "cuda",
+      "complete": true,
+      "speech_pass": true,
+      "cases": {
+        "loader-small": {
+          "returncode": 0,
+          "peak_gpu_mib": 1492
+        },
+        "loader-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 3782
+        },
+        "reporter-rejection": {
+          "returncode": 15,
+          "peak_gpu_mib": 4852
+        },
+        "explicit-rejection": {
+          "returncode": 15,
+          "peak_gpu_mib": 4740
+        },
+        "speech-small": {
+          "returncode": 0,
+          "peak_gpu_mib": 2062,
+          "expected": "I found the file you asked about and opened it.",
+          "heard": " I found the file you asked about and opened it.\n",
+          "wer": 0.0,
+          "wav_sha256": "bd71b0f274de4a8eed4eb7ea53e9261db2265d7da07c5a4ffe263d3a7de72ce5"
+        },
+        "speech-small-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "speech-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 5246,
+          "expected": "I found the file you asked about and opened it.",
+          "heard": " I found the file you asked about and opened it.\n",
+          "wer": 0.0,
+          "wav_sha256": "ea04e288ac5fedfcf59407d96dac8b17beca556b3f8b34282141cfe10781e66b"
+        },
+        "speech-large-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        },
+        "hello-large": {
+          "returncode": 0,
+          "peak_gpu_mib": 5020,
+          "expected": "Hello world.",
+          "heard": " Hello World!\n",
+          "wer": 0.0,
+          "wav_sha256": "2f3ac94c1cfbc1398dfc19faa002c09c6c247003b079ac0f37e008aa68aaa130"
+        },
+        "hello-large-judge": {
+          "returncode": 0,
+          "peak_gpu_mib": 0
+        }
+      },
+      "models": {
+        "small": {
+          "repo": "cstr/qwen3-tts-0.6b-base-GGUF",
+          "revision": "94072f5c394b4dc4d98e97cc874800dde6ecacda",
+          "filename": "qwen3-tts-12hz-0.6b-base-q8_0.gguf",
+          "bytes": 985716544,
+          "sha256": "6162637048fff8ca7f7a16bebc8a62ea8181f4aec4f160894955dee5b87c1961"
+        },
+        "large": {
+          "repo": "cstr/qwen3-tts-1.7b-base-GGUF",
+          "revision": "1d9fa40e85c64e699f3f9fea5aa7fc69a7b2d4ff",
+          "filename": "qwen3-tts-12hz-1.7b-base-f16.gguf",
+          "bytes": 3863009472,
+          "sha256": "c7039d04d3c35da80f38b57bce2b97a5e703ee63de64e7cbbcd6181c7e23e00e"
+        },
+        "codec": {
+          "repo": "cstr/qwen3-tts-tokenizer-12hz-GGUF",
+          "revision": "344e279551177654762e5c7d39e217834325f222",
+          "filename": "qwen3-tts-tokenizer-12hz.gguf",
+          "bytes": 358453280,
+          "sha256": "70dc95dbfdd9aa5d9d406236ff771d061bf17b0cda02a72513953355606e719b"
+        },
+        "voice": {
+          "repo": "cstr/qwen3-tts-voices-GGUF",
+          "revision": "6ee1102f782cab1f17842983044ac51cf57884d8",
+          "filename": "qwen3-tts-voice-default.gguf",
+          "bytes": 11104,
+          "sha256": "031c1b7f397b5f11db237dd39671042f994f1dd6b55369b64e4e72bc723efb28"
+        },
+        "judge": {
+          "repo": "ggerganov/whisper.cpp",
+          "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+          "filename": "ggml-base.en.bin",
+          "bytes": 147964211,
+          "sha256": "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
+        }
+      },
+      "hardware": "Tesla T4, 7.5, 580.178.04\nTesla T4, 7.5, 580.178.04"
+    },
+    "proof": {
+      "repo": "cstr/crispasr-regression-fixtures",
+      "revision": "eefe7afa71e4920f4a6e9a3f48d70e21d04f292e",
+      "path": "issue555-voice-pack-20261023/issue555-cpu-cuda-proof-v1.zip",
+      "sha256": "e2de3b75b4efd5f18005128c1be80e30769347427f7be21ef31e16676d766edb",
+      "bytes": 524072,
+      "files": 60,
+      "anonymous_readback_passed": true,
+      "expanded_hashes_passed": true,
+      "replayed_cpu_cuda_cases": 20,
+      "rejected_negative_controls": 3
     }
   },
-  "scope": "Typed voice-pack loading, rollback, replacement and prefill bounds. Valid 0.6B Q8 native speech control passes original Whisper ASR. 1.7B needs its own compatible voice pack or a WAV/transcript. 1.7B/CUDA speech gates remain pending."
+  "scope": "Typed voice-pack loading, rollback, replacement and prefill bounds. Actual 0.6B Q8 and 1.7B F16 compatible-voice speech passes all three ASR controls on CPU and Tesla T4 CUDA. Wrong default/explicit packs exit15 without abort. 1.7B requires its own compatible voice pack or WAV/transcript. No all-voice/quantization, Vulkan hardware, or published-release acceptance is claimed."
 }

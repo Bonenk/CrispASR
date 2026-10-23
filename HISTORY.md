@@ -1,3 +1,30 @@
+## 2026-10-23 — Qwen3 Base voice-pack bounds and replacement fix (#555)
+
+The shared default pack has1024 F32 speaker values, while1.7B Base requires2048.
+The unchecked8192-byte read of4096 bytes is reproduced with the original runtime
+and default pack before any neural compute. Runtime `de83cc6a5` validates complete
+unique voice records, speaker/code types and shapes before publishing a pack;
+failed replacements preserve the old pack and successful replacements preserve
+selection by name or choose the first voice. Prefill also guards tensor bounds.
+The1.7B registry no longer downloads the incompatible0.6B default. TTS docs and
+public API contract describe the required matching pack or WAV/transcript.
+
+Local params70 assertions, registry6240 assertions and actual model-free loader/
+prefill38 checks pass; all11 selected CTest cases pass. The same live public
+loader probe rejects the original runtime and passes11 checks per model/device.
+Hosted CPU/package run39910096656 at `682b54af2` passes, and one actual Tesla T4
+CUDA kernel passes the same10 cases. All three0.6B-Q8/1.7B-F16 speech controls
+score WER0 on each device; wrong default and explicit packs exit15 without abort.
+CUDA graph logs and sampled native-child GPU memory prove actual GPU execution.
+The new test's CPU-shim include audit finding is corrected without runtime changes.
+
+[Machine receipt](docs/issue555-voice-pack-2026-10-23.json) links the public60-file,
+524072-byte proof at fixture revision `eefe7afa71e4920f4a6e9a3f48d70e21d04f292e`.
+Its anonymous download, expanded hashes and independent20-case replay pass;
+three deliberately misleading result controls are rejected. The compiled archive's
+29 file hashes and anonymous readback are separately qualified. This is bounded
+pack/speech validation, not every voice/quant, Vulkan hardware or a new release.
+
 ## 2026-10-23 — OmniVoice fresh-reference encoder
 
 Five independent A/B paths retain the original encoder. Exact immutable cache
