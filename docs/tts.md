@@ -696,6 +696,11 @@ permissively licensed merely because the runtime code is.
 | `CRISPASR_OMNIVOICE_CFG_INTERVAL` | `1` | `K>1` reuses stale unconditional logits and forces separate forwards. Approximate: changes output, even with the same seed. |
 | `CRISPASR_OMNIVOICE_PERSISTENT_GRAPH` | On | Reuse step graphs rather than rebuilding every iteration. |
 | `CRISPASR_OMNIVOICE_FUSED_STEP` | On with persistent graphs | In-graph embedding lookup/sum and target-logit readback. `0` restores the older host path. |
+| `CRISPASR_OMNIVOICE_ENCODER_CACHE` | On | Exact cached encoder F32 arrays, norms and folded positional weights; about29.4 MB on the tested tokenizer. `0` restores rereading/recomputation. |
+| `CRISPASR_OMNIVOICE_ENCODER_FASTCONV` | `1` on Apple ARM CPU encoding; off elsewhere | `1`: pointwise-only F32 cache/matrix formulation, about26.2 MB; `2`: all encoder convolution weights, about280.9 MB. Independent of decoder FASTCONV. |
+| `CRISPASR_OMNIVOICE_ENCODER_GRAPH` | Off | Graph FC and residual quantizers with first-index ties. Extra cached projection weights; GPU numerical parity remains under investigation. |
+| `CRISPASR_OMNIVOICE_ENCODER_FUSED` | Off | Combine HuBERT frontend/transformer without feature readback. No convincing standalone CPU win. |
+| `CRISPASR_OMNIVOICE_ENCODER_HYBRID` | Off | CPU acoustic encoder plus filtered GPU semantics; adds223.8 MB weights before scratch/caches. Station reference codes differ, so experimental despite faster encoding. |
 | `CRISPASR_TTS_REF_CACHE` | On | Shared content-addressed reference-code cache. Use `0` to prove fresh encoding; legacy `CRISPASR_OMNIVOICE_VOICE_CACHE=0` also disables it. |
 | `CRISPASR_OMNIVOICE_TARGET_DURATION` | Estimate | Default duration in seconds; positive explicit setter/CLI duration wins. |
 | `CRISPASR_OMNIVOICE_NUM_STEPS` | Backend/parameter default | Initialization override; later CLI/Session setters can replace it. Explicitly set steps for a benchmark. |
@@ -2465,3 +2470,11 @@ isolated controls do not accept native speech, Q4 or speed.
 OpenVoice2 cloning reference/quality scope and reproducible per-stage validation
 are documented in [OpenVoice2 baking](openvoice2-baking.md). Native conversion
 uses a raw reference clip; automatic upstream VAD/clip averaging is not implied.
+
+Fresh-reference encoder measurements, all five A/B modes, raw timings, memory
+costs and exact default code/PCM evidence are in the
+[encoder report](omnivoice-encoder-2026-10-23.md). On the measured M1, the
+low-memory CPU default cuts uncached encoding5–8%; cached reference requests
+already skip this stage. Explicitly set all five `ENCODER_*` switches to `0`
+for the pre-experiment encoder path. Full baking uses literal `2`; the remaining
+switches use literal `0`/`1`. License acceptance and marking remain required.

@@ -1,3 +1,15 @@
+## 2026-10-23 — OmniVoice fresh-reference encoder
+
+Five independent A/B paths retain the original encoder. Exact immutable cache
+and Apple ARM CPU pointwise convolution now default on: window1.355→1.246 s,
+station1.253→1.172 s, fox1.338→1.268 s, exact reference codes on all calls and
+byte-identical Session cloned codes/PCM. About55.6 MB extra cached payload.
+Full convolution baking remains mode2; GPU semantics/graph/fused remain off:
+roughly39–54% faster fresh encoding but station changes4/488 codes and cloned
+PCM. Both frozen ASR judges score all new controls0; broader cloning acceptance
+remains open. These are encoding-stage savings, not generation/cache-hit gains.
+[Parameters, tests and raw receipt](docs/omnivoice-encoder-2026-10-23.md).
+
 ## 2026-10-23 — OmniVoice longer-input evidence and parameter reference
 
 Extended the M1 A/B to a new 450-frame paragraph, preserving all 16 generation

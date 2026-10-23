@@ -17,13 +17,13 @@ static void knob(const char* name, const char* value) {
 int main(int argc, char** argv) {
     if (argc != 5) {
         fprintf(stderr, "usage: encoder-bench TOKENIZER REF.wav OUTPUT_PREFIX "
-                        "cache|fastconv|graph|fused|hybrid|all|cpu|baseline\n");
+                        "cache|fastconv|graph|fused|hybrid|all|cpu|defaults|full-bake|baseline\n");
         return 2;
     }
     const std::string mode(argv[4]);
     const char* names[] = {"CACHE", "FASTCONV", "GRAPH", "FUSED", "HYBRID"};
     if (mode != "cache" && mode != "fastconv" && mode != "graph" && mode != "fused" && mode != "hybrid" &&
-        mode != "all" && mode != "cpu" && mode != "baseline")
+        mode != "all" && mode != "cpu" && mode != "defaults" && mode != "full-bake" && mode != "baseline")
         return 2;
     knob("CRISPASR_TTS_REF_CACHE", "0");
     knob("CRISPASR_OMNIVOICE_VOICE_CACHE", "0");
@@ -41,15 +41,26 @@ int main(int argc, char** argv) {
         ctx->backend = core_cpu_backend::init();
     if (!load_tokenizer(ctx, argv[1]))
         return 3;
-    const int order[] = {0, 1, 0, 1, 1, 0, 0, 1};
+    int order[] = {0, 1, 0, 1, 1, 0, 0, 1};
+    if (env_bool("CRISPASR_OMNIVOICE_ENCODER_BENCH_REVERSE"))
+        for (auto& arm : order)
+            arm = 1 - arm;
     for (int i = 0; i < (mode == "baseline" ? 2 : 8); i++) {
         for (auto* name : names) {
             std::string lower(name);
             std::transform(lower.begin(), lower.end(), lower.begin(),
                            [](unsigned char c) { return (char)std::tolower(c); });
-            bool on = order[i] &&
-                      (mode == "all" || mode == lower || (mode == "cpu" && (lower == "cache" || lower == "fastconv")));
-            knob((std::string("CRISPASR_OMNIVOICE_ENCODER_") + name).c_str(), on ? "1" : "0");
+            bool on = order[i] && (mode == "all" || mode == lower || (mode == "full-bake" && lower == "fastconv") ||
+                                   (mode == "cpu" && (lower == "cache" || lower == "fastconv")));
+            const auto key = std::string("CRISPASR_OMNIVOICE_ENCODER_") + name;
+            if (mode == "defaults" && order[i]) {
+#ifdef _WIN32
+                _putenv_s(key.c_str(), "");
+#else
+                unsetenv(key.c_str());
+#endif
+            } else
+                knob(key.c_str(), on ? (mode == "full-bake" ? "2" : "1") : "0");
         }
         std::printf("ARM i=%d variant=%s on=%d warmup=%d\n", i, mode.c_str(), order[i], i < 2);
         std::fflush(stdout);

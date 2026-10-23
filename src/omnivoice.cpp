@@ -339,6 +339,7 @@ struct ov_higgs_tokenizer {
     ggml_context* ctx_perm = nullptr;
     ggml_backend_buffer_t buf_perm = nullptr;
     core_dac::fastconv_cache enc_fc, enc_proj;
+    bool enc_fc_all = false;
     std::vector<ggml_tensor*> enc_graph_norms;
     std::unordered_map<const ggml_tensor*, std::vector<float>> enc_values, enc_norms;
     std::vector<float> enc_posconv;
@@ -1042,6 +1043,7 @@ static bool tok_load_backend(omnivoice_context* ctx, const char* path, bool want
 static void tok_release_backend(ov_higgs_tokenizer& tok) {
     tok.fc.free();
     tok.enc_fc.free();
+    tok.enc_fc_all = false;
     tok.enc_proj.free();
     tok.enc_graph_norms.clear();
     tok.enc_values.clear();
@@ -2731,6 +2733,22 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
     return out;
 }
 
+// Default promotion is deliberately scoped: the data cache changes no math;
+// encoder convolution has exact-code and repeat timing evidence on Apple CPU.
+static bool encoder_cache_enabled() {
+    return env_bool_default("CRISPASR_OMNIVOICE_ENCODER_CACHE", true);
+}
+static bool encoder_fastconv_enabled(const ov_higgs_tokenizer& tok, bool force_cpu_policy = false) {
+    bool default_on = false;
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+    default_on = force_cpu_policy || (tok.backend && core_cpu_backend::is_cpu(tok.backend));
+#else
+    (void)tok;
+    (void)force_cpu_policy;
+#endif
+    return env_bool_default("CRISPASR_OMNIVOICE_ENCODER_FASTCONV", default_on);
+}
+
 // The scalar path and cache use exactly the same F16-to-F32 conversion and
 // accumulation order. Cache ownership follows tokenizer replacement/placement.
 static const std::vector<float>& encoder_values(ov_higgs_tokenizer& tok, ggml_tensor* t, std::vector<float>& scratch) {
@@ -2738,7 +2756,7 @@ static const std::vector<float>& encoder_values(ov_higgs_tokenizer& tok, ggml_te
         scratch.clear();
         return scratch;
     }
-    if (!env_bool("CRISPASR_OMNIVOICE_ENCODER_CACHE")) {
+    if (!encoder_cache_enabled()) {
         scratch = read_tensor_f32(t);
         return scratch;
     }
@@ -2751,8 +2769,12 @@ static const std::vector<float>& encoder_values(ov_higgs_tokenizer& tok, ggml_te
 // Transactional, encoder-only F32 convolution bake. Do not mutate the decoder
 // cache or publish any tensors before allocation succeeds.
 static bool prepare_encoder_fastconv(ov_higgs_tokenizer& tok) {
-    if (tok.enc_fc.buf)
+    const char* option = env_str("CRISPASR_OMNIVOICE_ENCODER_FASTCONV");
+    const bool all_kernels = option && std::strcmp(option, "2") == 0;
+    if (tok.enc_fc.enabled && tok.enc_fc_all == all_kernels)
         return true;
+    tok.enc_fc.free();
+    tok.enc_fc_all = all_kernels;
     std::vector<ggml_tensor*> weights = {tok.enc_conv1_w, tok.enc_conv2_w, tok.encsem_conv_w};
     for (auto& b : tok.enc_blocks) {
         weights.push_back(b.conv1_w);
@@ -2772,10 +2794,13 @@ static bool prepare_encoder_fastconv(ov_higgs_tokenizer& tok) {
         weights.push_back(b.conv_w);
     std::vector<ggml_tensor*> selected;
     for (auto* w : weights)
-        if (w && w->type == GGML_TYPE_F16 && std::find(selected.begin(), selected.end(), w) == selected.end())
+        if (w && w->type == GGML_TYPE_F16 && (all_kernels || w->ne[0] == 1) &&
+            std::find(selected.begin(), selected.end(), w) == selected.end())
             selected.push_back(w);
-    if (selected.empty())
-        return false;
+    if (selected.empty()) {
+        tok.enc_fc.enabled = true;
+        return true;
+    }
     core_dac::fastconv_cache candidate;
     ggml_init_params ip = {(selected.size() + 1) * ggml_tensor_overhead(), nullptr, true};
     candidate.ctx = ggml_init(ip);
@@ -2801,7 +2826,7 @@ static bool prepare_encoder_fastconv(ov_higgs_tokenizer& tok) {
 }
 
 static const core_dac::fastconv_cache* encoder_fastconv(ov_higgs_tokenizer& tok) {
-    return env_bool("CRISPASR_OMNIVOICE_ENCODER_FASTCONV") && prepare_encoder_fastconv(tok) ? &tok.enc_fc : nullptr;
+    return encoder_fastconv_enabled(tok) && prepare_encoder_fastconv(tok) ? &tok.enc_fc : nullptr;
 }
 
 // Factorized residual VQ encode: emb (T, hidden=1024 row-major) → codes (n_q, T).
@@ -2895,7 +2920,7 @@ static bool higgs_rvq_encode(ov_higgs_tokenizer& tok, const std::vector<float>& 
 
         // Euclidean nearest-neighbor over the codebook (reuse core_rvq).
         std::vector<float> norm_scratch;
-        auto& norm_sq = env_bool("CRISPASR_OMNIVOICE_ENCODER_CACHE") ? tok.enc_norms[q.codebook] : norm_scratch;
+        auto& norm_sq = encoder_cache_enabled() ? tok.enc_norms[q.codebook] : norm_scratch;
         if (norm_sq.empty()) {
             norm_sq.resize(S);
             for (int s = 0; s < S; s++) {
@@ -3351,7 +3376,7 @@ static std::vector<float> fold_posconv_weight(ov_higgs_tokenizer& tok) {
 }
 
 static const std::vector<float>& encoder_posconv(ov_higgs_tokenizer& tok, std::vector<float>& scratch) {
-    if (!env_bool("CRISPASR_OMNIVOICE_ENCODER_CACHE")) {
+    if (!encoder_cache_enabled()) {
         scratch = fold_posconv_weight(tok);
         return scratch;
     }
@@ -4117,14 +4142,22 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
                                    "CRISPASR_OMNIVOICE_ENCODER_GRAPH", "CRISPASR_OMNIVOICE_ENCODER_FUSED",
                                    "CRISPASR_OMNIVOICE_ENCODER_HYBRID"};
             uint8_t encoder_policy = 0;
-            for (int i = 0; i < 5; i++)
-                if (env_bool(gates[i]))
+            for (int i = 0; i < 5; i++) {
+                const bool on =
+                    i == 0   ? encoder_fastconv_enabled(ctx->tokenizer, codec_split_enabled() || env_bool(gates[4]))
+                    : i == 1 ? encoder_cache_enabled()
+                             : env_bool(gates[i]);
+                if (on)
                     encoder_policy |= (uint8_t)(1u << i);
+            }
+            const char* fast_option = env_str(gates[0]);
+            if (fast_option && std::strcmp(fast_option, "2") == 0)
+                encoder_policy |= (uint8_t)(1u << 5);
             if (encoder_policy) {
                 const char version[] = "encoder-ab-v1";
                 mix(version, sizeof(version));
                 mix(&encoder_policy, sizeof(encoder_policy));
-                const char* model_backend = ggml_backend_name(ctx->backend);
+                const char* model_backend = ctx->backend ? ggml_backend_name(ctx->backend) : "CPU";
                 mix(model_backend, std::strlen(model_backend));
             }
             const char cache_version[] = "omnivoice-encoder-placement-v2";

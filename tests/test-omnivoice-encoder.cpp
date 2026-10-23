@@ -26,7 +26,35 @@ static void fill(ggml_tensor* t, int seed) {
         ggml_backend_tensor_set(t, h.data(), 0, h.size() * sizeof(ggml_fp16_t));
     }
 }
+static void unset_gate(const char* suffix) {
+    const auto key = std::string("CRISPASR_OMNIVOICE_ENCODER_") + suffix;
+#ifdef _WIN32
+    _putenv_s(key.c_str(), "");
+#else
+    unsetenv(key.c_str());
+#endif
+}
 int main() {
+    unset_gate("CACHE");
+    assert(encoder_cache_enabled());
+    gate("CACHE", false);
+    assert(!encoder_cache_enabled());
+    ov_higgs_tokenizer policy;
+    policy.backend = core_cpu_backend::init();
+    unset_gate("FASTCONV");
+#if defined(__APPLE__) && (defined(__aarch64__) || defined(__arm64__))
+    assert(encoder_fastconv_enabled(policy));
+#else
+    assert(!encoder_fastconv_enabled(policy));
+#endif
+    gate("FASTCONV", false);
+    assert(!encoder_fastconv_enabled(policy, true));
+    gate("FASTCONV", true);
+    assert(encoder_fastconv_enabled(policy));
+    // An all-F32/no-conversion model still activates the K=1 graph rewrite.
+    assert(prepare_encoder_fastconv(policy));
+    assert(policy.enc_fc.enabled && !policy.enc_fc.buf);
+    tok_release_backend(policy);
     assert(tok_is_semantic_weight("sem.blk.0.attn_q.weight"));
     assert(tok_is_semantic_weight("quantizer.quantizers.0.project_in.weight"));
     assert(tok_is_semantic_weight("quantizer.quantizers.0.codebook.embed"));
@@ -56,6 +84,8 @@ int main() {
             q.proj_out_w = mat(8, 32);
             q.proj_out_b = bias(32);
         }
+        t.enc_blocks.resize(1);
+        auto* pointwise = t.enc_blocks[0].res[0].conv2_w = ggml_new_tensor_3d(t.ctx_w, GGML_TYPE_F16, 1, 2, 2);
         t.buf_w = ggml_backend_alloc_ctx_tensors(t.ctx_w, t.backend);
         int seed = 1;
         for (auto* w = ggml_get_first_tensor(t.ctx_w); w; w = ggml_get_next_tensor(t.ctx_w, w))
@@ -88,9 +118,21 @@ int main() {
         assert(prepare_encoder_fastconv(t));
         auto* retained = t.enc_fc.buf;
         assert(prepare_encoder_fastconv(t) && t.enc_fc.buf == retained);
-        std::vector<float> baked(ggml_nelements(t.enc_conv1_w));
-        ggml_backend_tensor_get(t.enc_fc.get(t.enc_conv1_w), baked.data(), 0, baked.size() * sizeof(float));
-        assert(baked == read_tensor_f32(t.enc_conv1_w));
+        std::vector<float> baked(ggml_nelements(pointwise));
+        ggml_backend_tensor_get(t.enc_fc.get(pointwise), baked.data(), 0, baked.size() * sizeof(float));
+        assert(baked == read_tensor_f32(pointwise));
+        assert(t.enc_fc.get(t.enc_conv1_w) == t.enc_conv1_w);
+        // Explicit full baking and return to pointwise must rebuild the cache.
+#ifdef _WIN32
+        _putenv_s("CRISPASR_OMNIVOICE_ENCODER_FASTCONV", "2");
+#else
+        setenv("CRISPASR_OMNIVOICE_ENCODER_FASTCONV", "2", 1);
+#endif
+        assert(prepare_encoder_fastconv(t) && t.enc_fc_all);
+        assert(t.enc_fc.get(t.enc_conv1_w) != t.enc_conv1_w);
+        gate("FASTCONV", true);
+        assert(prepare_encoder_fastconv(t) && !t.enc_fc_all);
+        assert(t.enc_fc.get(t.enc_conv1_w) == t.enc_conv1_w);
         for (int T : {1, 7, 11}) {
             std::vector<float> x((size_t)32 * T);
             for (size_t i = 0; i < x.size(); i++)

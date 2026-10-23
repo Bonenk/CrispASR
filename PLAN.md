@@ -1,15 +1,18 @@
 # CrispASR — Pending work
 
-## NOW — OmniVoice encoder A/B implementation (2026-10-23)
+## OmniVoice encoder A/B — completed (2026-10-23)
 
-Owner: Codex, isolated internal audit worktree, baseline `de83cc6a5`. User
-authorizes all five encoder experiments with retained old paths and default
-promotion only after clear performance and quality evidence. Implement independent
-encoder FASTCONV, fixed-data cache, graph FC/RVQ, fused HuBERT and hybrid CPU
-DAC/GPU semantics switches. Profile uncached reference encoding, stage parity,
-full codes and cloned audio on both synthetic references. Preserve known fox
-failures and all license/marking controls; no blanket GPU/default promotion.
-
+Owner: Codex. All five independent encoder paths implemented with old paths
+retained (checkpoint48aa6d20a). Promote exact immutable cache and Apple ARM CPU
+pointwise fastconv only: three uncached synthetic references improve5–8% with
+exact frozen-baseline codes and five exact cloned-code/PCM pairs through Session.
+Extra default cached payload55.6 MB; full281 MB bake remains explicit mode2.
+Hybrid/all GPU encode is about39–54% faster but station changes4/488 reference
+codes, so hybrid/graph/fused stay off despite WER0 in both frozen judges on all
+new controls. Unit/default/mode-switch/allocation/tie tests, five CTest cases,
+ASan/UBSan, wrong-tie mutant and full lib/CLI checks pass. Broader fox-cloning,
+hosted acceptance and GPU semantic boundary parity remain open.
+[Parameters, commands, decisions and receipt](docs/omnivoice-encoder-2026-10-23.md).
 
 ## NOW — issue555 Base voice-pack crash (2026-10-23)
 
