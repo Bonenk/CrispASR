@@ -827,6 +827,14 @@ the §232 campaign. Verified against current code, not carried from this doc.
   All new gates remain off. Same internal-file startup medians are 0.503/0.490 s
   for embedded/precompiled shaders with warm OS caches; not a cold-start claim.
   See [full scope and individual samples](docs/omnivoice-m1-startup-generation-2026-10-23.md).
+- **omnivoice M1 longer-input control (2026-10-23):** 18-second / 450-frame,
+  32-step new paragraph confirms attention-view parity and paired request
+  reduction 28.298→26.105 s (emitted 16.929 s). Packing 26.233→25.965 s is still
+  inconclusive. Matched-active-value omnivoice.cpp median 35.284 s, emitted
+  17.770 s, sequential shared-host comparison; both pinned ASR judges WER 0.
+  All 16 CrispASR code/PCM outputs exact. No default change. See the
+  [complete recipe/report](docs/omnivoice-m1-long-input-2026-10-23.md) and
+  [switch reference](docs/tts.md#omnivoice-reproducible-parameters-and-m1-performance-switches).
 - **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
   the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
   (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to

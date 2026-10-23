@@ -1,0 +1,615 @@
+{
+  "date": "2026-10-23",
+  "runtime": "50196b2cd6dec7576343a1cb01e2e021f0df358e",
+  "host": {
+    "cpu": "Apple M1",
+    "cores": 8,
+    "ram_gb": 16,
+    "os": "macOS 26",
+    "desktop_contention": "Varied: older contended and later quieter campaigns both retained."
+  },
+  "ggml": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+  "comparator": {
+    "repo": "ServeurpersoCom/omnivoice.cpp",
+    "commit": "1a468d8",
+    "ggml": "cc5df49a",
+    "runtime_unmodified": true
+  },
+  "models": {
+    "repo": "cstr/omnivoice-GGUF",
+    "revision": "92266739c4496b04a497e164cf8c2801a792551e",
+    "main_sha256": "9d8835c80d50cce6ba66bed60c31e94836a7f990c40d2e22496c0b6710c98bb5",
+    "codec_sha256": "710ef610e1f2845c6b7333d5432376b24f2d20d2c54a8cec9bc118d183ecea63",
+    "adapted_main_sha256": "b9613d128221c36713c0691b9758a32c5cc8567591e098e36759535d4a59ce64",
+    "adapted_codec_sha256": "222072bd6781740db1dc9f1d6cd6d899fac76ac55579bf80035d30babf5ef93f",
+    "active_weight_contract": "LLM bytes/types/shapes preserved under rename; active decoder values preserved,36 F16 alphas widened exactly to F32 for the comparator loader; unused template encoder is not certified for cloning.",
+    "published_adapted_weights": false
+  },
+  "recipe": {
+    "text": "Before we leave for the station tomorrow morning, please close the windows, check the kitchen lights, and bring enough water and food for the long walk. We can meet our friends near the old bridge and decide which path to follow.",
+    "language": "en",
+    "seed": 42,
+    "steps": 32,
+    "target_seconds": 18,
+    "target_frames": 450,
+    "cpu_threads": 4,
+    "audio_cleanup": true,
+    "ggml_revision": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+    "runtime_source_sha256": "d125bebffae7d7ac61f53eee355d4a873db3664323526c3ba5ca3d57f9a8a224"
+  },
+  "environment": {
+    "CRISPASR_OMNIVOICE_CODEC_GPU": "0",
+    "CRISPASR_OMNIVOICE_CODEC_SPLIT": "1",
+    "CRISPASR_OMNIVOICE_CODEC_RESIDENT": "1",
+    "CRISPASR_OMNIVOICE_CODEC_DECOMP": "1",
+    "CRISPASR_OMNIVOICE_CFG_INTERVAL": "1",
+    "CRISPASR_OMNIVOICE_UNIFIED_CFG": "0",
+    "CRISPASR_OMNIVOICE_PACKED_PROJ": "0",
+    "CRISPASR_OMNIVOICE_ATTN_VIEWS": "1",
+    "CRISPASR_TTS_REF_CACHE": "0"
+  },
+  "campaigns": {
+    "long-views": {
+      "load_s": 1.093988,
+      "samples": [
+        {
+          "iteration": 0,
+          "warmup": true,
+          "total_s": 25.407837,
+          "cpu_s": 1.704932,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 23.912919,
+          "decode_s": 1.494917,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "warmup": true,
+          "total_s": 22.425761,
+          "cpu_s": 1.705309,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 20.931174,
+          "decode_s": 1.494581,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "warmup": false,
+          "total_s": 25.872138,
+          "cpu_s": 2.266512,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 24.314634,
+          "decode_s": 1.557501,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "warmup": false,
+          "total_s": 26.105297,
+          "cpu_s": 3.567338,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 24.446109,
+          "decode_s": 1.658977,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "warmup": false,
+          "total_s": 26.50984,
+          "cpu_s": 4.14364,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 25.023634,
+          "decode_s": 1.486197,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "warmup": false,
+          "total_s": 28.297909,
+          "cpu_s": 2.641041,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 26.711197,
+          "decode_s": 1.586705,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "warmup": false,
+          "total_s": 28.630849,
+          "cpu_s": 3.843241,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 27.100502,
+          "decode_s": 1.530345,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "warmup": false,
+          "total_s": 25.403591,
+          "cpu_s": 3.759233,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 23.859508,
+          "decode_s": 1.544077,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 26.711197,
+          "decode_s": 1.557501,
+          "total_s": 28.297909,
+          "cpu_s": 2.641041
+        },
+        "1": {
+          "generation_s": 24.446109,
+          "decode_s": 1.544077,
+          "total_s": 26.105297,
+          "cpu_s": 3.759233
+        }
+      }
+    },
+    "long-packing": {
+      "load_s": 0.917984,
+      "samples": [
+        {
+          "iteration": 0,
+          "warmup": true,
+          "total_s": 25.670407,
+          "cpu_s": 4.050217,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 24.051122,
+          "decode_s": 1.619284,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 1,
+          "warmup": true,
+          "total_s": 26.466998,
+          "cpu_s": 4.34436,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 24.885065,
+          "decode_s": 1.581921,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 2,
+          "warmup": false,
+          "total_s": 25.450096,
+          "cpu_s": 4.14849,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 23.872061,
+          "decode_s": 1.578034,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 3,
+          "warmup": false,
+          "total_s": 25.881036,
+          "cpu_s": 4.001027,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 24.333256,
+          "decode_s": 1.547766,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 4,
+          "warmup": false,
+          "total_s": 25.965176,
+          "cpu_s": 4.113954,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 24.452728,
+          "decode_s": 1.512444,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 5,
+          "warmup": false,
+          "total_s": 26.233428,
+          "cpu_s": 4.084187,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 24.61388,
+          "decode_s": 1.61954,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 6,
+          "warmup": false,
+          "total_s": 27.373687,
+          "cpu_s": 4.323575,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 0,
+          "generation_s": 25.783731,
+          "decode_s": 1.589946,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        },
+        {
+          "iteration": 7,
+          "warmup": false,
+          "total_s": 26.672668,
+          "cpu_s": 3.916884,
+          "samples": 406296,
+          "emitted_seconds": 16.929,
+          "rms": 0.10735043,
+          "pcm_sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+          "arm": 1,
+          "generation_s": 25.164924,
+          "decode_s": 1.507732,
+          "codes_sha256": "78145f37844be8a556c941a302136e767567843594271ab61e5163f886ff8de5",
+          "pcm_baseline_exact": true,
+          "codes_baseline_exact": true
+        }
+      ],
+      "warm_medians": {
+        "0": {
+          "generation_s": 24.61388,
+          "decode_s": 1.589946,
+          "total_s": 26.233428,
+          "cpu_s": 4.14849
+        },
+        "1": {
+          "generation_s": 24.452728,
+          "decode_s": 1.512444,
+          "total_s": 25.965176,
+          "cpu_s": 4.001027
+        }
+      }
+    },
+    "long-ovcpp": {
+      "load_s": 18.593519,
+      "samples": [
+        {
+          "iteration": 0,
+          "warmup": true,
+          "total_s": 36.552611,
+          "cpu_s": 3.031517,
+          "samples": 426480,
+          "emitted_seconds": 17.77,
+          "rms": 0.07970217,
+          "pcm_sha256": "38fbb02ca099844df5cf3df40d15900d903c099ae53a463779236c65b7f4ec3d"
+        },
+        {
+          "iteration": 1,
+          "warmup": false,
+          "total_s": 33.246969,
+          "cpu_s": 3.384328,
+          "samples": 426480,
+          "emitted_seconds": 17.77,
+          "rms": 0.07970217,
+          "pcm_sha256": "38fbb02ca099844df5cf3df40d15900d903c099ae53a463779236c65b7f4ec3d"
+        },
+        {
+          "iteration": 2,
+          "warmup": false,
+          "total_s": 35.284363,
+          "cpu_s": 3.865625,
+          "samples": 426480,
+          "emitted_seconds": 17.77,
+          "rms": 0.07970217,
+          "pcm_sha256": "38fbb02ca099844df5cf3df40d15900d903c099ae53a463779236c65b7f4ec3d"
+        },
+        {
+          "iteration": 3,
+          "warmup": false,
+          "total_s": 35.698734,
+          "cpu_s": 3.592762,
+          "samples": 426480,
+          "emitted_seconds": 17.77,
+          "rms": 0.07970217,
+          "pcm_sha256": "38fbb02ca099844df5cf3df40d15900d903c099ae53a463779236c65b7f4ec3d"
+        }
+      ],
+      "warm_medians": {
+        "all": {
+          "total_s": 35.284363,
+          "cpu_s": 3.592762
+        }
+      }
+    }
+  },
+  "preflight": {
+    "views": {
+      "load": "vm.loadavg: { 2.38 2.81 3.43 }",
+      "memory_free_percent": 48
+    },
+    "packing": {
+      "load": "vm.loadavg: { 5.91 4.94 4.22 }",
+      "memory_free_percent": 48
+    },
+    "comparator": {
+      "load": "vm.loadavg: { 3.75 4.37 4.14 }",
+      "memory_free_percent": 41
+    }
+  },
+  "quality": {
+    "judges": {
+      "nemotron": {
+        "repo": "cstr/nemotron-3.5-asr-streaming-GGUF",
+        "revision": "bbd95a9ca5fa0dfca3312a122dfc45a2b578b9c2",
+        "file": "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+        "sha256": "60a2b074cdf46e81d72bc15d3eb79505dafbb697135f558659d9068f651854a2"
+      },
+      "parakeet": {
+        "repo": "cstr/parakeet-ctc-0.6b-GGUF",
+        "revision": "159612ab8741e595e95e992298acfc400dc502b7",
+        "file": "parakeet-ctc-0.6b-q4_k.gguf",
+        "sha256": "8f8f00676e7b16e08e7f922e224af99bf1c02d6c58cd207b9613ef4c78d0d543"
+      }
+    },
+    "outputs": {
+      "long-views-2.f32": {
+        "samples": 406296,
+        "sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+        "rms": 0.10735042536968509,
+        "norm": 68.42661288910952,
+        "judges": {
+          "nemotron": {
+            "text": "Before we leave for the station tomorrow morning, please close the windows. Check the kitchen lights and bring enough water and food for the long walk. We can meet our friends near the old bridge and decide which path to follow.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "before we leave for the station tomorrow morning please close the windows check the kitchen lights and bring enough water and food for the long walk we can meet our friends near the old bridge and decide which path to follow",
+            "wer": 0.0
+          }
+        }
+      },
+      "long-packing-3.f32": {
+        "samples": 406296,
+        "sha256": "ce891c7d0c7f248eff3a2d5682722f53bd1a62ee93d2dd74053f7d5de2bfb257",
+        "rms": 0.10735042536968509,
+        "norm": 68.42661288910952,
+        "judges": {
+          "nemotron": {
+            "text": "Before we leave for the station tomorrow morning, please close the windows. Check the kitchen lights and bring enough water and food for the long walk. We can meet our friends near the old bridge and decide which path to follow.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "before we leave for the station tomorrow morning please close the windows check the kitchen lights and bring enough water and food for the long walk we can meet our friends near the old bridge and decide which path to follow",
+            "wer": 0.0
+          }
+        }
+      },
+      "long-ovcpp-1.f32": {
+        "samples": 426480,
+        "sha256": "38fbb02ca099844df5cf3df40d15900d903c099ae53a463779236c65b7f4ec3d",
+        "rms": 0.07970217270155185,
+        "norm": 52.04985156027109,
+        "judges": {
+          "nemotron": {
+            "text": "Before we leave for the station tomorrow morning, please close the windows, check the kitchen lights and bring enough water and food for the long walk. We can meet our friends near the old bridge and decide which path to follow.",
+            "wer": 0.0
+          },
+          "parakeet": {
+            "text": "before we leave for the station tomorrow morning please close the windows check the kitchen lights and bring enough water and food for the long walk we can meet our friends near the old bridge and decide which path to follow",
+            "wer": 0.0
+          }
+        }
+      }
+    }
+  },
+  "matrix_micro": [
+    "SAMPLE T=150 i=0 arm=0 warm=1 ms=4.358625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=2.171000",
+    "SAMPLE T=150 i=1 arm=1 warm=1 ms=2.540333 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.304000",
+    "SAMPLE T=150 i=2 arm=1 warm=1 ms=1.777708 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.100000",
+    "SAMPLE T=150 i=3 arm=0 warm=1 ms=2.097375 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.120000",
+    "SAMPLE T=150 i=4 arm=0 warm=1 ms=1.911000 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.080000",
+    "SAMPLE T=150 i=5 arm=1 warm=1 ms=1.922833 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.096000",
+    "SAMPLE T=150 i=6 arm=1 warm=1 ms=1.777250 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.087000",
+    "SAMPLE T=150 i=7 arm=0 warm=1 ms=1.948833 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.080000",
+    "SAMPLE T=150 i=8 arm=0 warm=0 ms=1.949208 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.081000",
+    "SAMPLE T=150 i=9 arm=1 warm=0 ms=1.961417 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.129000",
+    "SAMPLE T=150 i=10 arm=1 warm=0 ms=1.800500 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.094000",
+    "SAMPLE T=150 i=11 arm=0 warm=0 ms=1.975458 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.091000",
+    "SAMPLE T=150 i=12 arm=0 warm=0 ms=1.937250 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.143000",
+    "SAMPLE T=150 i=13 arm=1 warm=0 ms=1.838000 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.150000",
+    "SAMPLE T=150 i=14 arm=1 warm=0 ms=1.792958 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.103000",
+    "SAMPLE T=150 i=15 arm=0 warm=0 ms=1.967834 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.071000",
+    "SAMPLE T=150 i=16 arm=0 warm=0 ms=1.922792 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.068000",
+    "SAMPLE T=150 i=17 arm=1 warm=0 ms=1.769667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.103000",
+    "SAMPLE T=150 i=18 arm=1 warm=0 ms=1.829375 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.135000",
+    "SAMPLE T=150 i=19 arm=0 warm=0 ms=1.973625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.097000",
+    "SAMPLE T=150 i=20 arm=0 warm=0 ms=1.949417 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.115000",
+    "SAMPLE T=150 i=21 arm=1 warm=0 ms=1.820042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.128000",
+    "SAMPLE T=150 i=22 arm=1 warm=0 ms=1.784583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.084000",
+    "SAMPLE T=150 i=23 arm=0 warm=0 ms=1.991500 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.100000",
+    "SAMPLE T=150 i=24 arm=0 warm=0 ms=1.941625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.085000",
+    "SAMPLE T=150 i=25 arm=1 warm=0 ms=1.776500 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.117000",
+    "SAMPLE T=150 i=26 arm=1 warm=0 ms=1.819583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.104000",
+    "SAMPLE T=150 i=27 arm=0 warm=0 ms=2.012625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345 cpu_ms=0.090000",
+    "SUMMARY T=150 arm=0 median_ms=1.958626 samples=10 cpu_ms=0.090500",
+    "SUMMARY T=150 arm=1 median_ms=1.810042 samples=10 cpu_ms=0.110500",
+    "SAMPLE T=450 i=0 arm=0 warm=1 ms=5.486042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.218000",
+    "SAMPLE T=450 i=1 arm=1 warm=1 ms=4.740250 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.168000",
+    "SAMPLE T=450 i=2 arm=1 warm=1 ms=4.700625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.163000",
+    "SAMPLE T=450 i=3 arm=0 warm=1 ms=5.185125 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.166000",
+    "SAMPLE T=450 i=4 arm=0 warm=1 ms=5.144291 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.142000",
+    "SAMPLE T=450 i=5 arm=1 warm=1 ms=4.736625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.193000",
+    "SAMPLE T=450 i=6 arm=1 warm=1 ms=4.691000 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.174000",
+    "SAMPLE T=450 i=7 arm=0 warm=1 ms=5.175708 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.206000",
+    "SAMPLE T=450 i=8 arm=0 warm=0 ms=5.156667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.193000",
+    "SAMPLE T=450 i=9 arm=1 warm=0 ms=4.683667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.150000",
+    "SAMPLE T=450 i=10 arm=1 warm=0 ms=4.364584 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.169000",
+    "SAMPLE T=450 i=11 arm=0 warm=0 ms=5.144041 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.144000",
+    "SAMPLE T=450 i=12 arm=0 warm=0 ms=5.051542 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.097000",
+    "SAMPLE T=450 i=13 arm=1 warm=0 ms=4.571334 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.220000",
+    "SAMPLE T=450 i=14 arm=1 warm=0 ms=4.689250 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.190000",
+    "SAMPLE T=450 i=15 arm=0 warm=0 ms=5.111292 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.262000",
+    "SAMPLE T=450 i=16 arm=0 warm=0 ms=5.138458 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.167000",
+    "SAMPLE T=450 i=17 arm=1 warm=0 ms=4.681291 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.142000",
+    "SAMPLE T=450 i=18 arm=1 warm=0 ms=4.671583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.120000",
+    "SAMPLE T=450 i=19 arm=0 warm=0 ms=5.173666 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.160000",
+    "SAMPLE T=450 i=20 arm=0 warm=0 ms=5.620708 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.163000",
+    "SAMPLE T=450 i=21 arm=1 warm=0 ms=4.697583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.185000",
+    "SAMPLE T=450 i=22 arm=1 warm=0 ms=4.690166 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.174000",
+    "SAMPLE T=450 i=23 arm=0 warm=0 ms=5.147750 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.161000",
+    "SAMPLE T=450 i=24 arm=0 warm=0 ms=5.054042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.119000",
+    "SAMPLE T=450 i=25 arm=1 warm=0 ms=3.591791 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.138000",
+    "SAMPLE T=450 i=26 arm=1 warm=0 ms=4.728333 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.155000",
+    "SAMPLE T=450 i=27 arm=0 warm=0 ms=4.561709 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178 cpu_ms=0.161000",
+    "SUMMARY T=450 arm=0 median_ms=5.141250 samples=10 cpu_ms=0.161000",
+    "SUMMARY T=450 arm=1 median_ms=4.682479 samples=10 cpu_ms=0.162000"
+  ],
+  "matrix_exploratory": [
+    "SAMPLE T=150 i=0 arm=0 warm=1 ms=4.762833 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=1 arm=1 warm=1 ms=2.216667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=2 arm=1 warm=1 ms=1.975875 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=3 arm=0 warm=1 ms=1.926958 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=4 arm=0 warm=1 ms=1.912583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=5 arm=1 warm=1 ms=1.760042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=6 arm=1 warm=1 ms=1.784625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=7 arm=0 warm=1 ms=1.931750 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=8 arm=0 warm=0 ms=1.948791 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=9 arm=1 warm=0 ms=1.901042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=10 arm=1 warm=0 ms=1.763750 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=11 arm=0 warm=0 ms=2.076166 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=12 arm=0 warm=0 ms=1.939584 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=13 arm=1 warm=0 ms=2.845833 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=14 arm=1 warm=0 ms=1.776334 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=15 arm=0 warm=0 ms=1.823375 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=16 arm=0 warm=0 ms=1.495667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=17 arm=1 warm=0 ms=1.372000 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=18 arm=1 warm=0 ms=1.472292 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=19 arm=0 warm=0 ms=1.639667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=20 arm=0 warm=0 ms=1.938792 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=21 arm=1 warm=0 ms=1.587666 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=22 arm=1 warm=0 ms=1.525417 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=23 arm=0 warm=0 ms=1.551292 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=24 arm=0 warm=0 ms=1.924459 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=25 arm=1 warm=0 ms=1.832958 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=26 arm=1 warm=0 ms=1.387833 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SAMPLE T=150 i=27 arm=0 warm=0 ms=1.557042 exact=1 maxabs=0 cosine=1.000000000000 refnorm=812.489345 norm=812.489345",
+    "SUMMARY T=150 arm=0 median_ms=1.873917 samples=10",
+    "SUMMARY T=150 arm=1 median_ms=1.675708 samples=10",
+    "SAMPLE T=450 i=0 arm=0 warm=1 ms=4.839292 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=1 arm=1 warm=1 ms=4.656625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=2 arm=1 warm=1 ms=5.536375 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=3 arm=0 warm=1 ms=5.132750 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=4 arm=0 warm=1 ms=5.379625 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=5 arm=1 warm=1 ms=4.702709 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=6 arm=1 warm=1 ms=4.658166 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=7 arm=0 warm=1 ms=5.259166 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=8 arm=0 warm=0 ms=5.110583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=9 arm=1 warm=0 ms=4.652334 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=10 arm=1 warm=0 ms=4.954083 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=11 arm=0 warm=0 ms=5.108333 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=12 arm=0 warm=0 ms=4.771958 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=13 arm=1 warm=0 ms=4.389791 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=14 arm=1 warm=0 ms=4.655333 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=15 arm=0 warm=0 ms=4.887500 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=16 arm=0 warm=0 ms=5.054250 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=17 arm=1 warm=0 ms=4.227416 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=18 arm=1 warm=0 ms=4.492125 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=19 arm=0 warm=0 ms=5.527542 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=20 arm=0 warm=0 ms=4.173458 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=21 arm=1 warm=0 ms=4.061291 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=22 arm=1 warm=0 ms=3.835500 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=23 arm=0 warm=0 ms=4.296792 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=24 arm=0 warm=0 ms=4.932583 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=25 arm=1 warm=0 ms=3.674125 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=26 arm=1 warm=0 ms=2.695667 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SAMPLE T=450 i=27 arm=0 warm=0 ms=3.007375 exact=1 maxabs=0 cosine=1.000000000000 refnorm=1407.20178 norm=1407.20178",
+    "SUMMARY T=450 arm=0 median_ms=4.910042 samples=10",
+    "SUMMARY T=450 arm=1 median_ms=4.308604 samples=10"
+  ],
+  "matrix_source_sha256": "21aea8dc6372eeb1b7bca11909dfaea31369681a1d729f30d651eb195ca4d578",
+  "cli": {
+    "codes_baseline_exact": true,
+    "watermark_detected": true,
+    "watermark_confidence": 0.8113,
+    "c2pa_chunk_present": true,
+    "wav_sha256": "4797c1c143a4a7c17621b388862f171bee9205dea57d5c76df2d88bfe5876e49"
+  },
+  "matrix_scope": "actual layer0 ffn_down Q8_0 versus CPU-dequantized F16 weight copy, same inputs; hot single-operation timing only, no full-model quality/speed claim",
+  "full_model_transformer_artifact_types": "Q8_0 main with F16 embeddings/audio head, F16 tokenizer; comparator adaptation described by prior receipt",
+  "defaults_changed": false,
+  "comparison_limit": "sequential engines on shared interactive M1, no general ranking or multiplication of gains; equal seeds are different RNGs across engines",
+  "prior_cloning_failures": "fox controls remain open; this unconditioned longer-input check does not clear them"
+}

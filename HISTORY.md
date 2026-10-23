@@ -1,3 +1,14 @@
+## 2026-10-23 — OmniVoice longer-input evidence and parameter reference
+
+Extended the M1 A/B to a new 450-frame paragraph, preserving all 16 generation
+code/PCM arrays. Paired attention-view request 28.30→26.11 s; packing remains
+inconclusive at 26.23→25.97 s. Same-active-value omnivoice.cpp median 35.28 s;
+both independent ASR judges score every longer control zero. Full marked CLI
+preserves codes. Documented actual defaults/interactions, precise model/judge
+pins, sampling/build/run recipes, memory costs and full timing/quality receipt.
+Added a Metal-only real-weight Q8/derived-F16 matmul probe; no runtime, model,
+default or ggml change. [Evidence](docs/omnivoice-m1-long-input-2026-10-23.md).
+
 ## 2026-10-23 — OmniVoice M1 attention views and measured startup
 
 Added opt-in strided attention inputs, removing 84 layout copies per forward.

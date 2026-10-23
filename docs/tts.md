@@ -665,6 +665,12 @@ CRISPASR_OMNIVOICE_ATTN_VIEWS=1 \
 CRISPASR_OMNIVOICE_PACKED_PROJ=0 \
 CRISPASR_OMNIVOICE_UNIFIED_CFG=0 \
 CRISPASR_OMNIVOICE_CFG_INTERVAL=1 \
+CRISPASR_OMNIVOICE_GUIDANCE=2 \
+CRISPASR_OMNIVOICE_CLASS_TEMP=0 \
+CRISPASR_OMNIVOICE_POS_TEMP=5 \
+CRISPASR_OMNIVOICE_PERSISTENT_GRAPH=1 \
+CRISPASR_OMNIVOICE_FUSED_STEP=1 \
+CRISPASR_OMNIVOICE_CODEC_FASTCONV=1 \
 "$BUILD/bin/crispasr" -m "$OV_MAIN" --codec-model "$OV_CODEC" \
   --gpu-backend metal -fa -t 4 -l en --seed 42 --tts-steps 32 \
   --tts-duration 6 --tts "$TEXT" --tts-output output.wav \
@@ -679,7 +685,7 @@ permissively licensed merely because the runtime code is.
 
 | Environment variable | Unset behavior | Effect / interaction |
 |---|---|---|
-| `CRISPASR_OMNIVOICE_CODEC_GPU` | CUDA GPU codec; CPU on Metal/CPU | Explicit `1` moves the full codec to GPU; Metal encoder parity remains unresolved. `0` preserves CPU encoding. |
+| `CRISPASR_OMNIVOICE_CODEC_GPU` | CUDA GPU codec; CPU on Metal/CPU | With split off, `1` requests the full GPU codec; Metal encoder parity remains unresolved. Split mode retains CPU encoding even if this is `1`. |
 | `CRISPASR_OMNIVOICE_CODEC_SPLIT` | Off | CPU encode / GPU decode when GPU use is enabled. Without resident mode, placement changes reload the complete tokenizer. |
 | `CRISPASR_OMNIVOICE_CODEC_RESIDENT` | Off | With split mode, retain a decoder-only GPU copy alongside the CPU tokenizer. About **124 MB** extra weight/cache buffers on the tested F16 codec; graph scratch is additional. |
 | `CRISPASR_OMNIVOICE_CODEC_DECOMP` | Off | Decomposed transposed-convolution decoder; enable explicitly for the measured fast Metal path. Split/resident do not enable it implicitly. |
@@ -694,10 +700,14 @@ permissively licensed merely because the runtime code is.
 | `CRISPASR_OMNIVOICE_TARGET_DURATION` | Estimate | Default duration in seconds; positive explicit setter/CLI duration wins. |
 | `CRISPASR_OMNIVOICE_NUM_STEPS` | Backend/parameter default | Initialization override; later CLI/Session setters can replace it. Explicitly set steps for a benchmark. |
 | `CRISPASR_OMNIVOICE_GUIDANCE`, `CRISPASR_OMNIVOICE_CLASS_TEMP`, `CRISPASR_OMNIVOICE_POS_TEMP` | `2`, `0`, `5` | Diagnostic sampling overrides at initialization, including exact zero. Changing them changes the recipe. |
+| `CRISPASR_OMNIVOICE_AUDIO_LEGACY` | Off | Restore the older raw audio utility path for bisection; changes waveform processing. |
+| `CRISPASR_OMNIVOICE_PREPROCESS_PROMPT`, `CRISPASR_OMNIVOICE_POSTPROCESS_OUTPUT` | On unless legacy mode | Independently override reference preprocessing / output cleanup. Keep identical for a codec A/B. |
+| `CRISPASR_OMNIVOICE_PAD_DURATION`, `CRISPASR_OMNIVOICE_FADE_DURATION` | `0.1` seconds; `0` in legacy mode | Accepted range `0..10` seconds. These affect PCM and emitted duration, not the codebook count. |
 | `CRISPASR_OMNIVOICE_BENCH` | Off | Per-stage diagnostics. Keep profiler overhead separate from request timings. |
 | `CRISPASR_OMNIVOICE_DUMP_CODES` | Unset | Diagnostic output file for raw codebook-major int32 codes; compare these before blaming codec placement. |
 
-These are independent experiments. The M1 recipe above enables split, resident,
+Use literal `0` and `1` for boolean switches; a nonempty string such as `false`
+is not a reliable way to disable them. These are independent experiments. The M1 recipe above enables split, resident,
 decomposition and views, while leaving packing/unified CFG off and CFG exact.
 `--no-gpu` prevents GPU execution regardless of these placement switches. Raw
 native callers must explicitly set `use_gpu`; zero-initialized native parameters
