@@ -1,5 +1,15 @@
 # CrispASR — Pending work
 
+## NOW — M1 OmniVoice generation and startup (2026-10-23)
+
+Owner: Codex. Baseline `aa7d08c82`. First repair the hosted test-harness
+failures (allocator extraction stubs and CPU-header lint); the 2,077 Linux
+CTest cases already pass. Then measure exact existing unified-CFG versus
+two-forward generation and precompiled versus embedded-source Metal startup.
+Use pinned weights, full 32-step recipe, counterbalanced warm samples and
+code/PCM parity. No GPU or platform default promotion without evidence.
+
+
 ## M1 OmniVoice comparison and resident decoder — completed (2026-10-23)
 
 Owner: Codex. Gated resident decoder, loader/lifetime regressions and reproducible

@@ -53,7 +53,7 @@ struct ov_hp{ uint32_t n_codebooks=8; };
 struct ov_higgs_tokenizer{ bool loaded=false; std::string path; };
 struct omnivoice_context{
     ov_hp hp;
-    ov_higgs_tokenizer tokenizer;
+    ov_higgs_tokenizer tokenizer, resident_decoder;
     int verbosity=0;
     float ref_rms=0.0f;
     // #518 audio post-processing controls. Default to the legacy/raw
@@ -68,6 +68,8 @@ struct omnivoice_context{
     float fade_duration=0.f;
 };
 static bool codec_split_enabled(){ return false; }
+static bool codec_resident_enabled(){ return false; }
+static bool tok_prepare_resident_decoder(omnivoice_context*){ return true; }
 static bool codec_decode_on_gpu(const omnivoice_context*){ return false; }
 static bool tok_rebind(omnivoice_context*, bool){ return true; }
 struct ov_gen_result{ std::vector<int32_t> codes; int T=0; int n_codebooks=0; };
@@ -79,7 +81,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     (void)ctx; (void)text;
     ov_gen_result r; r.codes = STUB_CODES; r.T = 2; r.n_codebooks=8; return r;
 }
-static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* codes, int n_cb, int T_frames){
+static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* codes, int n_cb, int T_frames, ov_higgs_tokenizer* = nullptr){
     (void)ctx; (void)codes; (void)n_cb; (void)T_frames;
     std::vector<float> pcm = STUB_PCM;
     if(pcm.empty()) pcm.push_back(0.0f);

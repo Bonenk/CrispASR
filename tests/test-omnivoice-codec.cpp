@@ -1,5 +1,6 @@
 // Hermetic tokenizer lifetime, placement-policy and allocation-failure regression.
 // Include the runtime so these checks exercise its actual private load helpers.
+#include "core/ggml_cpu_backend.h"
 #include "../src/omnivoice.cpp"
 #ifdef NDEBUG
 #undef NDEBUG
