@@ -134,6 +134,12 @@ catch_discover_tests(test-convt-permute
     PROPERTIES LABELS "unit;core")
 
 # Actual tokenizer loader/rebind helpers with tiny synthetic GGUF weights.
+add_executable(test-omnivoice-encoder test-omnivoice-encoder.cpp)
+target_include_directories(test-omnivoice-encoder PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/src)
+target_link_libraries(test-omnivoice-encoder PRIVATE crispasr-core ggml ggml-base crispasr_link_ggml_cpu Threads::Threads)
+add_test(NAME omnivoice-encoder-parity COMMAND test-omnivoice-encoder)
+set_tests_properties(omnivoice-encoder-parity PROPERTIES LABELS "unit;tts;omnivoice")
+
 add_executable(test-omnivoice-codec test-omnivoice-codec.cpp)
 target_include_directories(test-omnivoice-codec PRIVATE ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/src)
 target_compile_definitions(test-omnivoice-codec PRIVATE TEST_SOURCE_DIR="${PROJECT_SOURCE_DIR}")

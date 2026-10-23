@@ -1,0 +1,143 @@
+#include "core/ggml_cpu_backend.h"
+#include "../src/omnivoice.cpp"
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include "ggml-backend-impl.h"
+#include <cassert>
+#include <iostream>
+static void gate(const char* suffix, bool on) {
+    auto key = std::string("CRISPASR_OMNIVOICE_ENCODER_") + suffix;
+#ifdef _WIN32
+    _putenv_s(key.c_str(), on ? "1" : "0");
+#else
+    setenv(key.c_str(), on ? "1" : "0", 1);
+#endif
+}
+static void fill(ggml_tensor* t, int seed) {
+    std::vector<float> v(ggml_nelements(t));
+    for (size_t i = 0; i < v.size(); i++)
+        v[i] = .17f * std::sin((float)(i + seed) * .37f);
+    if (t->type == GGML_TYPE_F32)
+        ggml_backend_tensor_set(t, v.data(), 0, v.size() * sizeof(float));
+    else {
+        std::vector<ggml_fp16_t> h(v.size());
+        ggml_fp32_to_fp16_row(v.data(), h.data(), h.size());
+        ggml_backend_tensor_set(t, h.data(), 0, h.size() * sizeof(ggml_fp16_t));
+    }
+}
+int main() {
+    assert(tok_is_semantic_weight("sem.blk.0.attn_q.weight"));
+    assert(tok_is_semantic_weight("quantizer.quantizers.0.project_in.weight"));
+    assert(tok_is_semantic_weight("quantizer.quantizers.0.codebook.embed"));
+    assert(!tok_is_semantic_weight("quantizer.quantizers.0.codebook.embed_avg"));
+    assert(!tok_is_semantic_weight("acoustic_encoder.conv1.weight"));
+    assert(!tok_is_semantic_weight("fc2.weight"));
+    for (auto type : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+        ov_higgs_tokenizer t;
+        t.backend = core_cpu_backend::init();
+        core_cpu_backend::set_n_threads(t.backend, 1);
+        t.hidden_size = 32;
+        t.codebook_dim = 8;
+        t.codebook_size = 16;
+        t.n_quantizers = 3;
+        t.quantizers.resize(3);
+        ggml_init_params ip = {64 * ggml_tensor_overhead(), nullptr, true};
+        t.ctx_w = ggml_init(ip);
+        auto mat = [&](int a, int b) { return ggml_new_tensor_2d(t.ctx_w, type, a, b); };
+        auto bias = [&](int n) { return ggml_new_tensor_1d(t.ctx_w, type, n); };
+        t.fc_w = mat(32, 32);
+        t.fc_b = bias(32);
+        t.enc_conv1_w = ggml_new_tensor_3d(t.ctx_w, GGML_TYPE_F16, 3, 2, 2);
+        for (auto& q : t.quantizers) {
+            q.codebook = mat(8, 16);
+            q.proj_in_w = mat(32, 8);
+            q.proj_in_b = bias(8);
+            q.proj_out_w = mat(8, 32);
+            q.proj_out_b = bias(32);
+        }
+        t.buf_w = ggml_backend_alloc_ctx_tensors(t.ctx_w, t.backend);
+        int seed = 1;
+        for (auto* w = ggml_get_first_tensor(t.ctx_w); w; w = ggml_get_next_tensor(t.ctx_w, w))
+            fill(w, seed += 19);
+        // Exercise the actual failed allocator before either cache publishes slots.
+        auto* cpu = t.backend;
+        ggml_backend_buffer_type failing = *core_cpu_backend::buffer_type();
+        failing.iface.alloc_buffer = [](ggml_backend_buffer_type_t, size_t) -> ggml_backend_buffer_t {
+            return nullptr;
+        };
+        ggml_backend_device dev = *ggml_backend_get_device(cpu);
+        dev.context = &failing;
+        dev.iface.get_buffer_type = [](ggml_backend_dev_t d) {
+            return static_cast<ggml_backend_buffer_type_t>(d->context);
+        };
+        ggml_backend backend = *cpu;
+        backend.device = &dev;
+        t.backend = &backend;
+        assert(!prepare_encoder_fastconv(t));
+        assert(!t.enc_fc.buf && !t.enc_fc.ctx && t.enc_fc.f32.empty());
+        assert(!prepare_encoder_projection(t));
+        assert(!t.enc_proj.buf && !t.enc_proj.ctx && t.enc_graph_norms.empty());
+        t.backend = cpu;
+        gate("CACHE", false);
+        std::vector<float> scratch;
+        auto original = encoder_values(t, t.fc_w, scratch);
+        gate("CACHE", true);
+        auto cached = encoder_values(t, t.fc_w, scratch);
+        assert(cached == original);
+        assert(prepare_encoder_fastconv(t));
+        auto* retained = t.enc_fc.buf;
+        assert(prepare_encoder_fastconv(t) && t.enc_fc.buf == retained);
+        std::vector<float> baked(ggml_nelements(t.enc_conv1_w));
+        ggml_backend_tensor_get(t.enc_fc.get(t.enc_conv1_w), baked.data(), 0, baked.size() * sizeof(float));
+        assert(baked == read_tensor_f32(t.enc_conv1_w));
+        for (int T : {1, 7, 11}) {
+            std::vector<float> x((size_t)32 * T);
+            for (size_t i = 0; i < x.size(); i++)
+                x[i] = std::sin((float)i * .23f);
+            std::vector<float> emb;
+            higgs_linear(read_tensor_f32(t.fc_w), read_tensor_f32(t.fc_b), x.data(), T, 32, 32, emb);
+            std::vector<int32_t> old;
+            gate("CACHE", false);
+            assert(higgs_rvq_encode(t, emb, T, old));
+            std::vector<int32_t> cache;
+            gate("CACHE", true);
+            assert(higgs_rvq_encode(t, emb, T, cache));
+            assert(old == cache);
+            auto graph = higgs_projection_graph(t, x.data(), T);
+            assert(graph == old);
+            assert(graph.size() == (size_t)3 * T);
+            for (auto c : graph)
+                assert(c >= 0 && c < 16);
+        }
+        // A missing optional FC bias matches the original bias-free projection.
+        auto* saved_bias = t.fc_b;
+        t.fc_b = nullptr;
+        std::vector<float> optional_scratch;
+        assert(encoder_values(t, nullptr, optional_scratch).empty());
+        std::vector<float> bias_free(32 * 3, .3f), embedding;
+        higgs_linear(read_tensor_f32(t.fc_w), {}, bias_free.data(), 3, 32, 32, embedding);
+        std::vector<int32_t> expected;
+        assert(higgs_rvq_encode(t, embedding, 3, expected));
+        assert(higgs_projection_graph(t, bias_free.data(), 3) == expected);
+        t.fc_b = saved_bias;
+        // Equal centroids must retain the first index, including later residual stages.
+        for (auto& q : t.quantizers) {
+            std::vector<uint8_t> zero(ggml_nbytes(q.codebook), 0);
+            ggml_backend_tensor_set(q.codebook, zero.data(), 0, zero.size());
+        }
+        t.enc_proj.free();
+        t.enc_graph_norms.clear();
+        t.enc_values.clear();
+        t.enc_norms.clear();
+        std::vector<float> x(32 * 3, .2f);
+        auto ties = higgs_projection_graph(t, x.data(), 3);
+        assert(ties.size() == 9);
+        for (auto c : ties)
+            assert(c == 0);
+        tok_release_backend(t);
+        assert(!t.enc_fc.buf && !t.enc_proj.buf && t.enc_values.empty() && t.enc_graph_norms.empty());
+    }
+    std::cout << "PASS encoder F32/F16 scalar/cache/graph parity, ties, transactional allocation, filtered placement "
+                 "and cleanup\n";
+}
