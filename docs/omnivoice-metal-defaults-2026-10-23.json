@@ -1153,7 +1153,7 @@
     "audio_cleanup": true,
     "session_marking": "Explicit responsibility attestation for local identified diagnostic artifacts; unchanged production marking policy.",
     "asr_deduplication": "Score every distinct PCM SHA256 with both frozen judges; exact duplicates inherit results.",
-    "precision_gate": "CRISPASR_OMNIVOICE_ENCODER_SEMANTIC_F32=1; explicit off control retained; default remains off",
+    "precision_gate": "Eligible macOS Metal encoding defaults to SEMANTIC_F32=1; explicit 0 retains the numerical control.",
     "bench_arms": "promoted: explicit prior CPU CACHE/FASTCONV1, others0 versus all encoder knobs unset. combined: precise hybrid versus GRAPH/FUSED1. Eight reversed/interleaved calls, first2warmups. first-* fresh processes, station,3perarm, alternate order, warm OS/shader caches."
   },
   "rejected_control": "First cache-hit probe omitted creating its explicit cache directory; no cache entry was written and hit assertion failed. Corrected public probe creates its private subdirectory and passes. No runtime regression is attributed to that harness failure.",
@@ -1164,5 +1164,6 @@
     "Encoder timings exclude LLM generation; fresh-process probe includes tokenizer load/backend init but files/shaders already warm.",
     "New hosted CI status must be checked separately; no blanket hosted green claim."
   ],
-  "timing_source_scope": "Paired timings precede final iOS/type eligibility guards and extra out-of-timer buffer diagnostics; these preserve the tested macOS F16 route. Final source is checked by unit/lifecycle tests, linked Session and CLI."
+  "timing_source_scope": "Paired timings precede final iOS/type eligibility guards and extra out-of-timer buffer diagnostics; these preserve the tested macOS F16 route. Final source is checked by unit/lifecycle tests, linked Session and CLI.",
+  "implementation_commit": "b6922ccbcb77ce65bd870132b2eb3b897fe9f985"
 }
