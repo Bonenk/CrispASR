@@ -7,6 +7,14 @@
 #include "qwen3_tts_hip_policy.h"
 #include "qwen3_tts_voice_pack.h"
 
+TEST_CASE("Qwen3 default pack names follow the speaker dimension", "[unit][qwen3_tts]") {
+    using qwen3_tts_voice_pack::default_filename;
+    REQUIRE(std::string(default_filename(1024)) == "qwen3-tts-voice-0.6b-designed.gguf");
+    REQUIRE(std::string(default_filename(2048)) == "qwen3-tts-voice-1.7b-designed.gguf");
+    REQUIRE(default_filename(0) == nullptr);
+    REQUIRE(default_filename(4096) == nullptr);
+}
+
 TEST_CASE("qwen3_tts_params: default values are sensible", "[unit][qwen3_tts]") {
     struct qwen3_tts_context_params p = qwen3_tts_context_default_params();
 

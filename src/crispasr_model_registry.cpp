@@ -1740,9 +1740,9 @@ constexpr ExtraCompanion k_cosyvoice3_tts_extras[] = {
     {nullptr, nullptr},
 };
 
-// qwen3-tts Base variants need a default voice pack so synthesis works
-// without --voice. One pack covers both 0.6B and 1.7B Base since the
-// voice embedding format is model-size-agnostic (spk_embedding + ref_code).
+// Qwen3 Base voices are model-sized: this legacy pack is 1024-d (0.6B)
+// and must never be attached to the 2048-d 1.7B variants. Designed
+// replacements require their own source/provenance and speech acceptance.
 constexpr ExtraCompanion k_qwen3_tts_base_extras[] = {
     {"qwen3-tts-voice-default.gguf",
      "https://huggingface.co/cstr/qwen3-tts-voices-GGUF/resolve/main/qwen3-tts-voice-default.gguf"},

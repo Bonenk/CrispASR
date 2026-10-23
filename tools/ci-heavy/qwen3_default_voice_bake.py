@@ -197,6 +197,11 @@ def bake(size):
     writer.add_array("voicepack.ref_texts", [TEXT] * len(VOICES))
     writer.add_string("general.license", "apache-2.0")
     writer.add_string("general.license.link", "https://www.apache.org/licenses/LICENSE-2.0")
+    # Preserve notices even when a user copies only the GGUF. Sidecar copies
+    # remain part of the downloadable distribution for straightforward reading.
+    writer.add_string("crispasr.voice.license_text", (OUT / "LICENSE").read_text())
+    writer.add_string("crispasr.voice.notice_text", (OUT / "NOTICE").read_text())
+    writer.add_string("crispasr.voice.provenance", (OUT / "provenance.json").read_text())
     writer.add_description("AI-generated designed references; Qwen original F32 Base encoder; see accompanying provenance and NOTICE")
     writer.add_string("voicepack.source_model", SOURCES[size][0])
     writer.add_string("voicepack.source_revision", SOURCES[size][1])

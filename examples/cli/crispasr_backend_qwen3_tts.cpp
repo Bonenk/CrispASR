@@ -13,7 +13,9 @@
 #include "whisper_params.h"
 
 #include "core/tts_voice_policy.h"
+#include "core/gguf_loader.h"
 #include "qwen3_tts.h"
+#include "qwen3_tts_voice_pack.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -70,6 +72,20 @@ static std::string discover_codec(const std::string& model_path) {
 // as an extra companion when the user runs --model auto --backend qwen3-tts).
 static std::string discover_default_voice(const std::string& model_path) {
     const std::string dir = dir_of(model_path);
+    // Read the model contract, including for renamed files. The native loader
+    // uses 1024 when this key is absent; a present unknown width has no default.
+    auto* metadata = core_gguf::open_metadata(model_path.c_str());
+    if (!metadata)
+        return "";
+    const auto dimension = core_gguf::kv_u32(metadata, "qwen3tts.talker.d_model", 1024);
+    core_gguf::free_metadata(metadata);
+    if (const char* filename = qwen3_tts_voice_pack::default_filename(dimension)) {
+        const std::string path = dir + "/" + filename;
+        if (file_exists(path))
+            return path;
+    }
+    // Preserve existing locally installed packs; the runtime validates their
+    // actual speaker width before any tensor read.
     static const char* candidates[] = {
         "qwen3-tts-voice-default.gguf",
         "qwen3-tts-voice-default-q8_0.gguf",

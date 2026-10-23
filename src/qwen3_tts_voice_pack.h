@@ -9,6 +9,17 @@
 // Validate before backend reads; a pack is not interchangeable across sizes.
 namespace qwen3_tts_voice_pack {
 
+inline const char* default_filename(int dimension) {
+    switch (dimension) {
+    case 1024:
+        return "qwen3-tts-voice-0.6b-designed.gguf";
+    case 2048:
+        return "qwen3-tts-voice-1.7b-designed.gguf";
+    default:
+        return nullptr;
+    }
+}
+
 inline bool valid_tensors(const ggml_tensor* speaker, const ggml_tensor* codes, int d, int groups) {
     return speaker && codes && speaker->type == GGML_TYPE_F32 && speaker->ne[0] == d && speaker->ne[1] == 1 &&
            speaker->ne[2] == 1 && speaker->ne[3] == 1 && ggml_is_contiguous(speaker) && codes->type == GGML_TYPE_I32 &&
