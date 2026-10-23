@@ -11,9 +11,9 @@ import tarfile
 VERSION = "issue555-cuda-v1"
 SOURCE = "682b54af2a883371541b861b434600bbf9b3a8e5"
 # Fill only after auditing the completed CI archive and its anonymous readback.
-BUNDLE_REVISION = "PENDING"
-BUNDLE_SHA256 = "PENDING"
-BUNDLE_PATH = "PENDING"
+BUNDLE_REVISION = '65b4a0b8a390e3fcab5211d96adcccde893c7be3'
+BUNDLE_SHA256 = '3487f38ff77e10fedb946b317761d1a911f025eedf2dccd9fba1cc57eb224bfd'
+BUNDLE_PATH = 'issue555-voice-pack-20261023/cuda-682b54af2/qwen3-voice-pack-cuda-speech-validation.tar.gz'
 assert len(BUNDLE_REVISION) == 40 and len(BUNDLE_SHA256) == 64, "CI archive not yet qualified; do not launch"
 OUT = Path("/kaggle/working")
 SCRATCH = Path("/kaggle/temp/issue555")
