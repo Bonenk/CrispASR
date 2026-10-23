@@ -1,4 +1,4 @@
-"""Granite Speech 4.0-1B reference dump backend.
+"""Granite Speech reference dump backend.
 
 Port of `models/granite-speech-kaggle-groundtruth.py` into the modular
 tools/dump_reference.py interface. That legacy script was a one-off
@@ -52,7 +52,7 @@ DEFAULT_STAGES = [
 
 def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
          max_new_tokens: int) -> Dict[str, np.ndarray]:
-    """Run Granite Speech 1B reference forward and return stage captures."""
+    """Run the original Granite Speech F32 forward and return stage captures."""
     import torch
     try:
         from transformers import GraniteSpeechForConditionalGeneration, AutoProcessor
@@ -62,7 +62,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
             "Install: pip install 'transformers>=4.52.1'\n"
             f"(import error: {e})")
 
-    print(f"  loading Granite Speech 1B from {model_dir}")
+    print(f"  loading original Granite Speech F32 from {model_dir}")
     processor = AutoProcessor.from_pretrained(str(model_dir))
     # PLUS detection: granite-speech-4.1-2b-plus's config.json declares
     # `model_type: granite_speech_plus` (not in transformers <=5.7), so
@@ -96,13 +96,22 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
             str(model_dir), torch_dtype=torch.float32, device_map="cpu",
         ).eval()
 
+    wrong_dtype = [(name, str(p.dtype), str(p.device))
+                   for name, p in model.named_parameters()
+                   if p.is_floating_point() and (p.dtype != torch.float32 or p.device.type != "cpu")]
+    if wrong_dtype:
+        raise RuntimeError(f"Original reference requires CPU F32 parameters: {wrong_dtype[:8]}")
+    print("  verified every floating model parameter is CPU F32")
+
     # Granite expects the audio as a torch tensor shape (1, N) via torchaudio,
     # but a float32 numpy array of shape (N,) works with .unsqueeze(0) too.
     wav = torch.from_numpy(audio.astype(np.float32)).unsqueeze(0)
 
+    import os
     tokenizer = processor.tokenizer
     chat = [{"role": "user",
-             "content": "<|audio|>can you transcribe the speech into a written format?"}]
+             "content": os.environ.get("GRANITE_REFERENCE_PROMPT",
+                                       "<|audio|>can you transcribe the speech into a written format?")}]
     prompt = tokenizer.apply_chat_template(chat, tokenize=False,
                                             add_generation_prompt=True)
     inputs = processor(prompt, wav, device="cpu", return_tensors="pt")

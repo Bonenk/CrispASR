@@ -1,5 +1,19 @@
 # CrispASR — Pending work
 
+## NOW — Granite Speech5.0 (#552), original baseline/reference (2026-10-23)
+
+Owner: Codex, branch `feat/granite5-20261023`. Issue description and all
+comments reread (none). Original source pinned to
+`c075cf19e041a2e4d16c5ee24763e5b037d8f479`, Apache-2.0. Existing native
+converter/runtime omit YaRN factor4/originalctx4096/maxctx16384. Read the
+original Transformer4.57 implementation and first capture the existing
+convert baseline and actual original F32 references; then quantize/diff and
+port the missing fields with old-default A/B controls. Do not present a
+registry alias or foreign llama.cpp GGUF as model support. Heavy work stays
+on GitHub; actual CUDA only after CPU parity. Voice checkpoint8bc09441a
+remains frozen on main while this isolated feature is developed.
+
+
 ## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
 
 Owner: Codex, branch `fix/new-issues-20261023`. Fresh original VoiceDesign
