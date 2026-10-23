@@ -634,6 +634,86 @@ Han / Cyrillic, so **every Latin-script pair** — en↔de, en↔fr, es↔it, th
 subtitle-dubbing workflow actually asks for — landed in that unknown case, with
 no message and no way to override it.
 
+### OmniVoice: reproducible parameters and M1 performance switches
+
+For repeatable comparisons, pass the model and tokenizer paths explicitly and
+set language, seed, steps and duration. The tested recipe is Q8_0 main + F16
+Higgs tokenizer, English, seed **42**, **32** MaskGIT steps, guidance **2.0**,
+class temperature **0**, position temperature **5.0**, layer penalty **5.0**,
+time shift **0.1**, eight codebooks and four CPU threads. Cleanup stays enabled,
+with 0.1-second pad/fade defaults. Six seconds requests 150 codec frames at
+25 Hz; eighteen requests 450. Silence cleanup means emitted audio can be shorter.
+Duration is an allocation/length target, not a quality or runtime guarantee.
+
+The OmniVoice backend defaults to 32 steps when no override is supplied; the
+CLI's generic `--tts-steps` help line is shared with other engines. Explicit
+`--tts-steps 32` removes that ambiguity. Lowering steps changes refinement and
+needs its own quality test. `--tts-speed` affects estimated lengths when no
+explicit duration is set. `--tts-duration 0` restores the environment's
+`CRISPASR_OMNIVOICE_TARGET_DURATION`, or estimation if that variable is unset.
+Positive duration is capped at 600 seconds; this is not an M1 capacity claim.
+
+Use portable aliases for local files, with the normal license/marking policy:
+
+```sh
+# Set OV_MAIN, OV_CODEC, BUILD and TEXT to your local model files/build/text.
+CRISPASR_OMNIVOICE_CODEC_GPU=0 \
+CRISPASR_OMNIVOICE_CODEC_SPLIT=1 \
+CRISPASR_OMNIVOICE_CODEC_RESIDENT=1 \
+CRISPASR_OMNIVOICE_CODEC_DECOMP=1 \
+CRISPASR_OMNIVOICE_ATTN_VIEWS=1 \
+CRISPASR_OMNIVOICE_PACKED_PROJ=0 \
+CRISPASR_OMNIVOICE_UNIFIED_CFG=0 \
+CRISPASR_OMNIVOICE_CFG_INTERVAL=1 \
+"$BUILD/bin/crispasr" -m "$OV_MAIN" --codec-model "$OV_CODEC" \
+  --gpu-backend metal -fa -t 4 -l en --seed 42 --tts-steps 32 \
+  --tts-duration 6 --tts "$TEXT" --tts-output output.wav \
+  --accept-license omnivoice-terms
+```
+
+`omnivoice-terms` affirms eligibility/compliance with the main weights' NC terms
+and the companion's custom terms; it grants no additional rights. Voice cloning
+also requires a permitted reference and, on the CLI, `--i-have-rights`. Normal
+watermark/C2PA marking remains enabled in this example. The weights are not
+permissively licensed merely because the runtime code is.
+
+| Environment variable | Unset behavior | Effect / interaction |
+|---|---|---|
+| `CRISPASR_OMNIVOICE_CODEC_GPU` | CUDA GPU codec; CPU on Metal/CPU | Explicit `1` moves the full codec to GPU; Metal encoder parity remains unresolved. `0` preserves CPU encoding. |
+| `CRISPASR_OMNIVOICE_CODEC_SPLIT` | Off | CPU encode / GPU decode when GPU use is enabled. Without resident mode, placement changes reload the complete tokenizer. |
+| `CRISPASR_OMNIVOICE_CODEC_RESIDENT` | Off | With split mode, retain a decoder-only GPU copy alongside the CPU tokenizer. About **124 MB** extra weight/cache buffers on the tested F16 codec; graph scratch is additional. |
+| `CRISPASR_OMNIVOICE_CODEC_DECOMP` | Off | Decomposed transposed-convolution decoder; enable explicitly for the measured fast Metal path. Split/resident do not enable it implicitly. |
+| `CRISPASR_OMNIVOICE_CODEC_FASTCONV` | On | Existing baked F32 convolution/k=1 matmul path. `0` restores the legacy path for bisection. |
+| `CRISPASR_OMNIVOICE_ATTN_VIEWS` | Off | Pass strided Q/K/V views to attention, removing 84 copies per forward. No extra model-weight allocation. |
+| `CRISPASR_OMNIVOICE_PACKED_PROJ` | Off | Cache concatenated Q/K/V and gate/up matrices, preserving quantized bytes. About **312 MB** extra Q8 weights, lazy first-request cost; incompatible pairs retain separate projections. Short-case gain was inconclusive. |
+| `CRISPASR_OMNIVOICE_UNIFIED_CFG` | On for CUDA; off for Metal/CPU | Combine conditional/unconditional forwards with independent attention blocks. Slower on the tested M1 short request. |
+| `CRISPASR_OMNIVOICE_CFG_INTERVAL` | `1` | `K>1` reuses stale unconditional logits and forces separate forwards. Approximate: changes output, even with the same seed. |
+| `CRISPASR_OMNIVOICE_PERSISTENT_GRAPH` | On | Reuse step graphs rather than rebuilding every iteration. |
+| `CRISPASR_OMNIVOICE_FUSED_STEP` | On with persistent graphs | In-graph embedding lookup/sum and target-logit readback. `0` restores the older host path. |
+| `CRISPASR_TTS_REF_CACHE` | On | Shared content-addressed reference-code cache. Use `0` to prove fresh encoding; legacy `CRISPASR_OMNIVOICE_VOICE_CACHE=0` also disables it. |
+| `CRISPASR_OMNIVOICE_TARGET_DURATION` | Estimate | Default duration in seconds; positive explicit setter/CLI duration wins. |
+| `CRISPASR_OMNIVOICE_NUM_STEPS` | Backend/parameter default | Initialization override; later CLI/Session setters can replace it. Explicitly set steps for a benchmark. |
+| `CRISPASR_OMNIVOICE_GUIDANCE`, `CRISPASR_OMNIVOICE_CLASS_TEMP`, `CRISPASR_OMNIVOICE_POS_TEMP` | `2`, `0`, `5` | Diagnostic sampling overrides at initialization, including exact zero. Changing them changes the recipe. |
+| `CRISPASR_OMNIVOICE_BENCH` | Off | Per-stage diagnostics. Keep profiler overhead separate from request timings. |
+| `CRISPASR_OMNIVOICE_DUMP_CODES` | Unset | Diagnostic output file for raw codebook-major int32 codes; compare these before blaming codec placement. |
+
+These are independent experiments. The M1 recipe above enables split, resident,
+decomposition and views, while leaving packing/unified CFG off and CFG exact.
+`--no-gpu` prevents GPU execution regardless of these placement switches. Raw
+native callers must explicitly set `use_gpu`; zero-initialized native parameters
+select CPU. The transformer currently builds flash-attention nodes directly;
+the generic flash flag is not a validated alternate-kernel benchmark control.
+
+The controlled model pins, complete build flags, per-run times and ASR receipts
+are in [the engine comparison](omnivoice-m1-comparison-2026-10-23.md) and
+[the generation/startup report](omnivoice-m1-startup-generation-2026-10-23.md).
+Warm model loads on the internal SSD settle near 0.5 seconds. Retain a Session
+for repeated calls. Precompiled Metal libraries use
+`-DGGML_METAL_EMBED_LIBRARY=OFF` with `ggml-metal-lib` built and the metallib
+resources beside the CLI; this does not establish SDK resource discovery or a
+large warm-start win. Full-model F16/Q4 and CUDA acceptance remain separate from
+the M1 Q8 measurements; the new performance switches remain off by default.
+
 ### OmniVoice: ISO 639-3 ids, and what the tag can and cannot do
 
 OmniVoice carries the language as a literal string in its prompt, so the value

@@ -1,5 +1,17 @@
 # CrispASR — Pending work
 
+## NOW — M1 OmniVoice longer inputs and parameter reference (2026-10-23)
+
+Owner: Codex. Runtime baseline `50196b2cd`: hosted CI39899280705 and
+Lint39899280570 pass; Ruby/WASM/Docker/regression/secret scan pass, Lint Deep
+still running at this checkpoint. Validate attention views and packed projections
+on a new 18-second / 450-frame text with unchanged 32-step sampling and matched
+weights, plus a same-recipe omnivoice.cpp control. Preserve all individual times,
+code/PCM hashes, memory/load preflight and both ASR judgments. Expand the main
+TTS Markdown with actual defaults, interactions, complete commands and costs.
+No new matrix kernel or default promotion is justified before this evidence.
+
+
 ## M1 OmniVoice generation and startup — completed (2026-10-23)
 
 Owner: Codex. Hosted harness repairs `1ae585389` address the allocator stub and
