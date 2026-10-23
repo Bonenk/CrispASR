@@ -120,7 +120,7 @@ def main():
              "--tts-output", args.out / "explicit-must-not-exist.wav", *common],
             "explicit-rejection", reject=True, gpu=True)
         assert not (args.out / "explicit-must-not-exist.wav").exists()
-        # Keep watermark and C2PA; synthetic test speech omits the spoken prefix.
+        # Keep normal file marking; synthetic test speech omits the spoken prefix.
         marking = ["--no-spoken-disclaimer", "--accept-marking-responsibility"]
         reference = args.out / "synthetic-reference.wav"
         run([cli, "--backend", "qwen3-tts", "-m", models["small"], "--tts", TEXT,

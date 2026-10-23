@@ -11,9 +11,18 @@ Issue555: default voice pack has a 1024-element F32 speaker embedding, while
 Add transactional pack/schema validation, preserve valid packs on failed loads,
 and verify compatible synthesis on CPU and real CUDA per the operational guide.
 Local focused tests pass: Qwen3 params70 assertions/10cases; registry6240/65.
+Model-free public loader/prefill lifecycle passes38 checks; the precise
+pre-fix abort was reproduced with the real default pack without model weights.
+All11 selected Qwen3 CTest cases pass.
 Actual0.6B Q8 public loader passes11 lifecycle cases (rejected replacements
 preserve the active voice; a smaller successful replacement resets selection).
-CPU1.7B and real CUDA checks are prepared in the dedicated hosted workflow.
+Pre-fix runtime fails the identical public loader probe because it accepts the
+wrong-dimension pack. Hosted CUDA-bundle/CPU-speech run39908855336 targets
+source `de83cc6a5` failed at configuration: unrelated existing tests link
+the ggml-cpu MODULE under DL. Keep production DL configuration, disable
+the broad test CMake file in this bundle and inject only the two probes.
+Real CUDA runs only after the replacement archive is qualified.
+Kaggle worker remains guarded/unlaunched until immutable archive pins exist.
 No complete speech acceptance is claimed yet.
 
 ## M1 OmniVoice longer inputs and parameter reference — completed (2026-10-23)

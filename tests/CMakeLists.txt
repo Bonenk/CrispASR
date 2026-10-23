@@ -2500,6 +2500,13 @@ catch_discover_tests(test-qwen3tts-params
     PROPERTIES LABELS "unit;qwen3_tts"
 )
 
+# Model-free #555 regression: actual public loader, prefill bounds, rollback.
+add_executable(test-qwen3tts-voice-pack test-qwen3tts-voice-pack.cpp)
+target_include_directories(test-qwen3tts-voice-pack PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-qwen3tts-voice-pack PRIVATE crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
+add_test(NAME qwen3tts-voice-pack-lifecycle COMMAND test-qwen3tts-voice-pack)
+set_tests_properties(qwen3tts-voice-pack-lifecycle PROPERTIES LABELS "unit;qwen3_tts")
+
 # Public loader lifecycle probe; needs a real model, run by the #555 worker.
 add_executable(qwen3-voice-pack-probe ../tools/ci-heavy/qwen3_voice_pack_probe.cpp)
 target_include_directories(qwen3-voice-pack-probe PRIVATE ${PROJECT_SOURCE_DIR}/src)

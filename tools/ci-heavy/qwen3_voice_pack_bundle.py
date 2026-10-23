@@ -42,26 +42,38 @@ def main():
     links = BUILD / 'link-stubs'
     links.mkdir(parents=True, exist_ok=True)
     (links / 'libcuda.so.1').symlink_to(stubs[0])
+    # Keep the production DL package configuration. The full test CMake file
+    # contains unrelated direct ggml-cpu MODULE links; inject only these probes.
+    proof = BUILD / 'proof-targets.cmake'
+    proof.write_text(f"""add_executable(qwen3-voice-pack-probe "{ROOT}/tools/ci-heavy/qwen3_voice_pack_probe.cpp")
+    target_include_directories(qwen3-voice-pack-probe PRIVATE "{ROOT}/src")
+    target_link_libraries(qwen3-voice-pack-probe PRIVATE qwen3_tts)
+    target_compile_features(qwen3-voice-pack-probe PRIVATE cxx_std_17)
+    add_executable(test-qwen3tts-voice-pack "{ROOT}/tests/test-qwen3tts-voice-pack.cpp")
+    target_include_directories(test-qwen3tts-voice-pack PRIVATE "{ROOT}/src")
+    target_link_libraries(test-qwen3tts-voice-pack PRIVATE crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
+    target_compile_features(test-qwen3tts-voice-pack PRIVATE cxx_std_17)
+    set_target_properties(qwen3-voice-pack-probe test-qwen3tts-voice-pack PROPERTIES RUNTIME_OUTPUT_DIRECTORY "{BUILD}/bin")
+    """)
     run(['cmake', '-G', 'Ninja', '-S', ROOT, '-B', BUILD,
+         f'-DCMAKE_PROJECT_crispasr_INCLUDE={proof}',
          '-DCMAKE_BUILD_TYPE=Release', '-DBUILD_SHARED_LIBS=ON',
          '-DGGML_BACKEND_DL=ON', '-DGGML_CUDA_FA=OFF', '-DGGML_CUDA=ON', '-DCMAKE_CUDA_ARCHITECTURES=60;75',
          '-DGGML_NATIVE=OFF', '-DGGML_BLAS=OFF', '-DGGML_OPENBLAS=OFF',
          '-DGGML_VULKAN=OFF', '-DGGML_METAL=OFF',
-         '-DCRISPASR_BUILD_TESTS=ON', '-DCRISPASR_BUILD_SERVER=OFF',
+         '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF',
          '-DCRISPASR_BUILD_EXAMPLES=ON',
          f'-DCMAKE_EXE_LINKER_FLAGS=-Wl,-rpath-link,{links}',
          '-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
          '-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache'], 'configure')
     run(['cmake', '--build', BUILD, '--target', 'crispasr-cli', 'crispasr-lib',
-         'test-qwen3tts-params', 'test-registry', 'qwen3-voice-pack-probe', '-j2'], 'build')
+         'test-qwen3tts-voice-pack', 'qwen3-voice-pack-probe', '-j2'], 'build')
     bundle = OUT / 'bundle'
     bundle.mkdir()
     for name in ['crispasr']:
         shutil.copy2(BUILD / 'bin' / name, bundle / name)
-    for name in ['test-qwen3tts-params', 'test-registry', 'qwen3-voice-pack-probe']:
+    for name in ['test-qwen3tts-voice-pack', 'qwen3-voice-pack-probe']:
         shutil.copy2(BUILD / 'bin' / name, bundle / name)
-    run([BUILD / 'bin/test-qwen3tts-params'], 'unit-params')
-    run([BUILD / 'bin/test-registry'], 'unit-registry')
     for path in BUILD.rglob('*.so*'):
         if path.is_file() and not path.name.startswith('libcuda.so'):
             soname = subprocess.check_output(['patchelf', '--print-soname', str(path)], text=True).strip()
@@ -87,6 +99,7 @@ def main():
          '--allow', 'libcuda.so.*'], 'dependency-check')
     assert (bundle / 'libggml-cuda.so').is_file()
     assert (bundle / 'libcrispasr.so').is_file()
+    run([bundle / 'test-qwen3tts-voice-pack'], 'unit-lifecycle')
     # The binding must be the same composition as the compiled C ABI.
     shutil.copytree(ROOT / 'python/crispasr', bundle / 'python/crispasr',
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '*.so*'))
