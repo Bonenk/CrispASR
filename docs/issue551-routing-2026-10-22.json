@@ -87,5 +87,20 @@
     "lint_run": 39722234064,
     "status": "in_progress; inspect individual jobs before claiming full hosted acceptance"
   },
-  "license_notice_receipt": "omnivoice-license-notices-2026-10-22.json"
+  "license_notice_receipt": "omnivoice-license-notices-2026-10-22.json",
+  "hosted_validation": {
+    "checked_at": "2026-10-23",
+    "source": "17de1a726ded2f7d60aab1ef4179a9cb6addbd75",
+    "ci": {
+      "run_id": 39722231798,
+      "jobs": 13,
+      "all_passed": true
+    },
+    "lint": {
+      "run_id": 39722234064,
+      "jobs": 10,
+      "all_passed": true
+    },
+    "scope": "Explicit foreign-layout rejection; no Unified model inference/streaming acceptance."
+  }
 }

@@ -21,7 +21,9 @@ wrong-dimension pack. Hosted CUDA-bundle/CPU-speech run39908855336 targets
 source `de83cc6a5` failed at configuration: unrelated existing tests link
 the ggml-cpu MODULE under DL. Keep production DL configuration, disable
 the broad test CMake file in this bundle and inject only the two probes.
-Real CUDA runs only after the replacement archive is qualified.
+The replacement bundle retains default CUDA FlashAttention kernels for the
+real synthesis check. The queued initial replacement is superseded before
+building; launch CUDA only after the final archive is qualified.
 Kaggle worker remains guarded/unlaunched until immutable archive pins exist.
 No complete speech acceptance is claimed yet.
 
@@ -102,7 +104,7 @@ main tip; earlier partial green jobs do not certify the tip. No full hosted or
 cloning acceptance is claimed.
 See `docs/omnivoice-audit-2026-10-22.md` and its live receipt.
 
-## NOW — issue551 hosted validation (2026-10-22)
+## Issue551 schema rejection — validation complete (2026-10-23)
 
 Owner: Codex, branch `fix/issue551-routing`, base `95e454b49`.
 Implemented and locally validated through source `17de1a7`: shared schema
@@ -113,9 +115,9 @@ assertions,64 registry cases and existing architecture/parameter guards pass.
 CTest selects and executes all 5 routing tests; CI now requires that registration.
 [Scoped evidence](docs/issue551-routing-2026-10-22.json).
 
-Hosted CI 39722231798 and lint 39722234064 are running/queued; inspect individual
-jobs before claiming complete hosted acceptance. Older heads are superseded and
-do not certify this source. NVIDIA and OmniVoice acceptance now explicitly
+Hosted CI39722231798 passes all13 jobs and lint39722234064 passes all10
+jobs, checked individually on2026-10-23. Both target immutable source `17de1a7`;
+this validates the explicit unsupported-layout handling, not Unified inference. NVIDIA and OmniVoice acceptance now explicitly
 affirm the user's eligibility/compliance obligations; project redistribution
 obligations remain ours. Five corrected model-card/notice documents are published
 and anonymously verified, with no weight changes.
