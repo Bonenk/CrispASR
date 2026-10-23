@@ -1,5 +1,18 @@
 # CrispASR — Pending work
 
+## NOW — issue555 model-sized default, then Granite5 (2026-10-23)
+
+Owner: Codex, branch `fix/new-issues-20261023`. User requests existing-pack
+compatibility or newly baked defaults, then Granite5 only after555 fully works.
+The published pack is1024-d and cannot serve1.7B. Bake a2048-d default with
+the pinned original Qwen package from an already verified AI-generated reference;
+validate GGUF readback, native CPU/F16/Q8 speech and real CUDA before wiring
+the model-specific auto-download/default. Preserve explicit pack/WAV paths.
+Granite5 implementation starts after that acceptance gate.
+Prior frozen e2b77e472 CI39918848127 all13, lint39918851399 all10 and secret
+39918849343 pass job by job; their full unit log has2082 CTest cases and
+189 Python tests/34 subtests. No task code changed while those checks ran.
+
 ## OmniVoice listened Metal default promotion — completed (2026-10-23)
 
 Owner: Codex. Maintainer listened to all station WAV comparisons and accepts
