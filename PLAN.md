@@ -1,6 +1,6 @@
 # CrispASR — Pending work
 
-## NOW — Granite Speech5.0 F16 (#552), final integration checks (2026-10-23)
+## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 
 Owner: Codex, isolated feature worktree. Native YaRN conversion/runtime support
 and shared CLI/C ABI prompts are implemented. Only F16 qualifies for publication:
@@ -25,8 +25,16 @@ Unqualified Q8/Q6/Q4 downloads and silent filename-to-default substitutions are
 rejected. Explicit legacy4.0 filenames and4.1 defaults are preserved. Registry
 checks pass6938 assertions/68 cases. A dedicated hosted nightly regression
 repeats the full accepted F16 gates; generic Granite frontend diff is insufficient.
-Remaining required work: hosted final CI/lint/regression, then rebase and fast
-forward main. No release tag, PR or issue comments are part of this task.
+Final source `5b5278a0f` passes all13 CI jobs (40012494853), all10 lint jobs
+(40012494794), regression40012494531 and secret scan40012334127. The dedicated
+F16 regression repeats the full original stage/magnitude, prompt, both decodes,
+renamed-model C ABI and CLI acceptance on that final source. Its21 output files
+and manifest are permanently checkpointed in the public validation dataset at
+`0fa4dbaf1041069dbf5fecacbb41ac1149af8767`; the portable
+[receipt](docs/granite5-2026-10-23.json) pins the exact prefix and hash.
+Rebasing onto current main preserves the validated tree; subsequent changes only
+record these results. Integration is complete. No release tag, PR or issue
+comments are part of this task.
 
 Open precision follow-up: Q8 retaining F16 embeddings passes CPU but fails the
 actual CUDA pipeline-logit norm gate at1.010822821 (maximum1.01). Keeping the
@@ -41,7 +49,7 @@ Kaggle, using a free slot on the single configured account. Up to two Luna/Sol
 agents may do small tasks when local resources permit; no NN math delegation.
 
 
-## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
+## Issue555 model-sized designed defaults — completed (2026-10-23)
 
 Owner: Codex, branch `fix/new-issues-20261023`. Fresh original VoiceDesign
 bake39938969713 passes license/array audit. Raw default reference fails full
@@ -59,7 +67,7 @@ uses separate immutable URLs and includes notices/provenance. Speaker identity
 stays unknown; human listening feedback is pending, not inferred as approval.
 Publisher grants do not independently clear upstream training or likeness rights.
 [Method](docs/qwen3-designed-voices.md), [receipt](docs/qwen3-designed-voices-2026-10-23.json).
-Granite5 F16 is now qualified; final integration checks are tracked above.
+Granite5 F16 integration and final accepted checks are recorded above.
 
 ## OmniVoice listened Metal default promotion — completed (2026-10-23)
 

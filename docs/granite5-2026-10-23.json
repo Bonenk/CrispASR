@@ -180,5 +180,38 @@
     "repo_type": "dataset",
     "path": "granite-speech-5.0-2b/a02a0dd9299e0b759704f520fe3959f50a764f71/jfk-ref.gguf",
     "revision": "0426caae5f4f536d87058f5cb36d77525dd5bcde"
+  },
+  "final_source_cpu_regression": {
+    "repo": "cstr/crispasr-granite5-validation-public",
+    "revision": "0fa4dbaf1041069dbf5fecacbb41ac1149af8767",
+    "prefix": "regression/5b5278a0f030a8b57e93a38a41bdb8fb1a4f7cca/40012494531/cpu",
+    "receipt_sha256": "98bc4fdee1283f9ed1df358583deb78e02b5dd10b6a54de05e7b14fa92df3ccb",
+    "source": "5b5278a0f030a8b57e93a38a41bdb8fb1a4f7cca",
+    "run": 40012494531,
+    "cpu_acceptance": true,
+    "cuda_acceptance": false,
+    "files": 21
+  },
+  "final_integration_checks": {
+    "source": "5b5278a0f030a8b57e93a38a41bdb8fb1a4f7cca",
+    "ci": {
+      "run": 40012494853,
+      "conclusion": "success",
+      "jobs": 13
+    },
+    "lint": {
+      "run": 40012494794,
+      "conclusion": "success",
+      "jobs": 10
+    },
+    "regression": {
+      "run": 40012494531,
+      "conclusion": "success"
+    },
+    "secret_scan": {
+      "run": 40012334127,
+      "conclusion": "success"
+    },
+    "integration_note": "Rebase preserves the validated source tree; subsequent changes record results only."
   }
 }
