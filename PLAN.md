@@ -4,10 +4,16 @@
 
 Owner: Codex, branch `fix/new-issues-20261023`. User requests existing-pack
 compatibility or newly baked defaults, then Granite5 only after555 fully works.
-The published pack is1024-d and cannot serve1.7B. Bake a2048-d default with
-the pinned original Qwen package from an already verified AI-generated reference;
+The published pack is1024-d and cannot serve1.7B. User now explicitly requests
+fresh VoiceDesign references and a defensible licensing/provenance chain. The
+old compatibility-only bake39933983902 was canceled while queued. Design two
+neutral voices without input recordings or named people, then bake separate
+1024/2048-d packs with the pinned original package. Retain publisher declarations,
+LICENSE/NOTICE, prompts, source/asset hashes and explicit legal-review limits;
 validate GGUF readback, native CPU/F16/Q8 speech and real CUDA before wiring
 the model-specific auto-download/default. Preserve explicit pack/WAV paths.
+Candidates are not promoted by array readback or publisher license tags alone.
+See [voice provenance policy](docs/qwen3-designed-voices.md).
 Granite5 implementation starts after that acceptance gate.
 Prior frozen e2b77e472 CI39918848127 all13, lint39918851399 all10 and secret
 39918849343 pass job by job; their full unit log has2082 CTest cases and
