@@ -102,8 +102,9 @@ int qwen3_tts_encode_pcm_to_codes(struct qwen3_tts_context* ctx, const float* pc
 // Load a voice pack GGUF (produced by `models/bake-qwen3-tts-voice-pack.py`)
 // containing one or more `(spk_embedding, ref_code)` pairs extracted via
 // the official qwen-tts package. Required for voice-clone synthesis
-// until the runtime ECAPA speaker_encoder + codec encoder forwards
-// land.  Returns 0 on success.
+// or supply a runtime WAV prompt instead. Packs must match the model
+// dimension (0.6B: 1024, 1.7B: 2048). Returns 0 on success, -1 on
+// invalid/incompatible packs; failed loads preserve the current pack.
 int qwen3_tts_load_voice_pack(struct qwen3_tts_context* ctx, const char* path);
 
 // Select an active voice from the loaded voice pack by name.

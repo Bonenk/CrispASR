@@ -1,5 +1,21 @@
 # CrispASR — Pending work
 
+## NOW — issue555 Base voice-pack crash (2026-10-23)
+
+Owner: Codex, branch `fix/new-issues-20261023`, baseline `cb31b23db`.
+Read new issues and complete comment threads; errors take priority over features.
+Issue551 schema rejection is already on main; hosted CI39722231798 and
+lint39722234064 both completed successfully. Granite5 support (issue552) is deferred.
+Issue555: default voice pack has a 1024-element F32 speaker embedding, while
+1.7B Base expects2048. Prefill reads2048 without validating the tensor.
+Add transactional pack/schema validation, preserve valid packs on failed loads,
+and verify compatible synthesis on CPU and real CUDA per the operational guide.
+Local focused tests pass: Qwen3 params70 assertions/10cases; registry6240/65.
+Actual0.6B Q8 public loader passes11 lifecycle cases (rejected replacements
+preserve the active voice; a smaller successful replacement resets selection).
+CPU1.7B and real CUDA checks are prepared in the dedicated hosted workflow.
+No complete speech acceptance is claimed yet.
+
 ## M1 OmniVoice longer inputs and parameter reference — completed (2026-10-23)
 
 Owner: Codex. Runtime `50196b2cd` hosted CI39899280705 and Lint39899280570

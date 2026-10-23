@@ -2500,6 +2500,11 @@ catch_discover_tests(test-qwen3tts-params
     PROPERTIES LABELS "unit;qwen3_tts"
 )
 
+# Public loader lifecycle probe; needs a real model, run by the #555 worker.
+add_executable(qwen3-voice-pack-probe ../tools/ci-heavy/qwen3_voice_pack_probe.cpp)
+target_include_directories(qwen3-voice-pack-probe PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(qwen3-voice-pack-probe PRIVATE qwen3_tts)
+
 # ─── test-moss-tts-params — Catch2 unit tests for moss_tts_context_params /
 # moss_tts_synth_params defaults + null-guards. No GGUF required. ───────────────
 add_executable(test-moss-tts-params

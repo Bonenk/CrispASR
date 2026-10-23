@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include "qwen3_tts.h"
 #include "qwen3_tts_hip_policy.h"
+#include "qwen3_tts_voice_pack.h"
 
 TEST_CASE("qwen3_tts_params: default values are sensible", "[unit][qwen3_tts]") {
     struct qwen3_tts_context_params p = qwen3_tts_context_default_params();
@@ -85,4 +86,44 @@ TEST_CASE("qwen3_tts Vulkan talker runs natively unless asked (#337)", "[unit][q
     REQUIRE(vulkan_talker_on_cpu("1", nullptr));       // escape hatch
     REQUIRE(vulkan_talker_on_cpu(nullptr, "0"));       // legacy explicit opt-out
     REQUIRE(vulkan_talker_on_cpu("1", "1"));           // the CPU request wins
+}
+
+TEST_CASE("Qwen3 Base packs require model-sized F32 speakers and I32 codec frames (#555)", "[unit][qwen3_tts]") {
+    ggml_init_params params = {8 * ggml_tensor_overhead(), nullptr, true};
+    ggml_context* ctx = ggml_init(params);
+    REQUIRE(ctx);
+    auto* speaker = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 1024);
+    auto* codes = ggml_new_tensor_2d(ctx, GGML_TYPE_I32, 16, 101);
+    using qwen3_tts_voice_pack::valid_tensors;
+    REQUIRE(valid_tensors(speaker, codes, 1024, 16));
+    // The shipped 0.6B default pack triggered an 8192-byte read of 4096 bytes.
+    REQUIRE_FALSE(valid_tensors(speaker, codes, 2048, 16));
+    auto* large = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, 2048);
+    REQUIRE(valid_tensors(large, codes, 2048, 16));
+    REQUIRE_FALSE(valid_tensors(large, codes, 1024, 16));
+    auto* half = ggml_new_tensor_1d(ctx, GGML_TYPE_F16, 1024);
+    REQUIRE_FALSE(valid_tensors(half, codes, 1024, 16));
+    REQUIRE_FALSE(valid_tensors(nullptr, codes, 1024, 16));
+    REQUIRE_FALSE(valid_tensors(speaker, nullptr, 1024, 16));
+    REQUIRE_FALSE(valid_tensors(speaker, codes, 1024, 8));
+    codes->type = GGML_TYPE_F32;
+    REQUIRE_FALSE(valid_tensors(speaker, codes, 1024, 16));
+    codes->type = GGML_TYPE_I32;
+    codes->ne[2] = 2;
+    REQUIRE_FALSE(valid_tensors(speaker, codes, 1024, 16));
+    codes->ne[2] = 1;
+    codes->ne[1] = 0;
+    REQUIRE_FALSE(valid_tensors(speaker, codes, 1024, 16));
+    ggml_free(ctx);
+}
+
+TEST_CASE("Qwen3 Base pack names must index complete unique voice records (#555)", "[unit][qwen3_tts]") {
+    using qwen3_tts_voice_pack::valid_names;
+    REQUIRE(valid_names({"first", "second"}, {"hello", "world"}));
+    REQUIRE_FALSE(valid_names({}, {}));
+    REQUIRE_FALSE(valid_names({"first"}, {}));
+    REQUIRE_FALSE(valid_names({"first"}, {"hello", "world"}));
+    REQUIRE_FALSE(valid_names({"first", "first"}, {"hello", "world"}));
+    REQUIRE_FALSE(valid_names({""}, {"hello"}));
+    REQUIRE_FALSE(valid_names({"first"}, {""}));
 }

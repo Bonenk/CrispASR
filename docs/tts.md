@@ -1241,10 +1241,14 @@ codec by default).
 ```
 
 Notes:
-- **No `--voice` needed**: `-m auto` downloads a baked default voice pack
+- **0.6B Base needs no `--voice`**: `-m auto` downloads a baked default voice pack
   (`qwen3-tts-voice-default.gguf`) alongside the talker and codec so the
   Base model works out of the box. The default voice is auto-selected when
   no `--voice` flag is given and the GGUF sits next to the talker.
+  **1.7B Base requires a reference WAV plus `--ref-text`, or a voice pack
+  baked with the 1.7B model.** Its speaker embedding has 2,048 values; the
+  0.6B default pack has 1,024 and cannot be reused. Incompatible packs
+  are rejected at load time.
 - When `--voice` points to a `.wav`, `--ref-text` is required. When it
   points to a `.gguf`, it is treated as a baked voice pack and
   `--ref-text` is ignored.

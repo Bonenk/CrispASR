@@ -61,6 +61,7 @@
 
 #include "qwen3_tts.h"
 #include "qwen3_tts_hip_policy.h"
+#include "qwen3_tts_voice_pack.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -3288,7 +3289,7 @@ bool build_icl_prefill_embeds(qwen3_tts_context* c, const std::string& syn_text,
         ref_code_TC.clear();
     } else {
         // Voice pack path (original behavior).
-        if (c->vp_active < 0) {
+        if (c->vp_active < 0 || (size_t)c->vp_active >= c->vp_names.size()) {
             fprintf(stderr, "qwen3_tts: no voice — call qwen3_tts_load_voice_pack or qwen3_tts_set_voice_prompt\n");
             return false;
         }
@@ -3304,8 +3305,8 @@ bool build_icl_prefill_embeds(qwen3_tts_context* c, const std::string& syn_text,
             return false;
         }
         T_codec = (int)code_t->ne[1];
-        if ((int)code_t->ne[0] != n_groups) {
-            fprintf(stderr, "qwen3_tts: ref_code groups mismatch: %d vs %d\n", (int)code_t->ne[0], n_groups);
+        if (!qwen3_tts_voice_pack::valid_tensors(spk_t, code_t, d, n_groups)) {
+            fprintf(stderr, "qwen3_tts: incompatible voice pack tensors for '%s'\n", voice_name.c_str());
             return false;
         }
         if ((int)c->runtime_spk_emb.size() == d) {
@@ -6659,17 +6660,21 @@ extern "C" int qwen3_tts_load_voice_pack(struct qwen3_tts_context* ctx, const ch
     // every tensor onto the same backend the talker weights live on
     // (so ggml_get_rows / ggml_view_2d access them without crossing
     // backend boundaries during graph build).
+    std::vector<std::string> names, ref_texts;
     {
-        ggml_context* dummy = nullptr;
-        gguf_init_params gp = {true, &dummy};
+        gguf_init_params gp = {true, nullptr};
         gguf_context* g = gguf_init_from_file(path, gp);
         if (!g) {
             fprintf(stderr, "qwen3_tts: failed to read voice pack '%s'\n", path);
             return -1;
         }
-        ctx->vp_names = core_gguf::kv_str_array(g, "voicepack.names");
-        ctx->vp_ref_texts = core_gguf::kv_str_array(g, "voicepack.ref_texts");
+        names = core_gguf::kv_str_array(g, "voicepack.names");
+        ref_texts = core_gguf::kv_str_array(g, "voicepack.ref_texts");
         gguf_free(g);
+    }
+    if (!qwen3_tts_voice_pack::valid_names(names, ref_texts)) {
+        fprintf(stderr, "qwen3_tts: invalid voice pack names/ref_texts in '%s'\n", path);
+        return -1;
     }
 
     // load_weights returns a fresh ggml_context — we keep the existing
@@ -6680,14 +6685,40 @@ extern "C" int qwen3_tts_load_voice_pack(struct qwen3_tts_context* ctx, const ch
         return -1;
     }
 
+    for (const auto& name : names) {
+        const auto spk = wl.tensors.find("voicepack.spk." + name + ".embd");
+        const auto code = wl.tensors.find("voicepack.code." + name + ".codes");
+        if (!qwen3_tts_voice_pack::valid_tensors(spk == wl.tensors.end() ? nullptr : spk->second,
+                                                 code == wl.tensors.end() ? nullptr : code->second,
+                                                 (int)ctx->hp.d_model, (int)ctx->hp.n_code_groups)) {
+            fprintf(stderr,
+                    "qwen3_tts: incompatible voice pack '%s', voice '%s': expected an F32 speaker "
+                    "embedding of %u values and I32 reference codes with %u groups. "
+                    "0.6B and 1.7B Base voice packs are not interchangeable. "
+                    "Use a pack baked with this model, or --voice ref.wav --ref-text \"...\".\n",
+                    path, name.c_str(), ctx->hp.d_model, ctx->hp.n_code_groups);
+            core_gguf::free_weights(wl);
+            return -1;
+        }
+    }
+
+    // Publish only a complete compatible pack; failed loads preserve the old voice.
+    std::string selected;
+    if (ctx->vp_active >= 0 && (size_t)ctx->vp_active < ctx->vp_names.size())
+        selected = ctx->vp_names[ctx->vp_active];
     if (ctx->vp_buf_w) {
         core_gguf::release_weight_buffer(ctx->vp_buf_w);
     }
     if (ctx->vp_ctx_w) {
         ggml_free(ctx->vp_ctx_w);
     }
-    ctx->vp_tensors.clear();
-
+    ctx->vp_names = std::move(names);
+    ctx->vp_ref_texts = std::move(ref_texts);
+    ctx->vp_active = 0;
+    for (size_t i = 0; i < ctx->vp_names.size(); ++i) {
+        if (ctx->vp_names[i] == selected)
+            ctx->vp_active = (int)i;
+    }
     ctx->vp_tensors = std::move(wl.tensors);
     ctx->vp_ctx_w = wl.ctx;
     ctx->vp_buf_w = wl.buf;
@@ -6697,9 +6728,6 @@ extern "C" int qwen3_tts_load_voice_pack(struct qwen3_tts_context* ctx, const ch
         for (size_t i = 0; i < ctx->vp_names.size(); i++) {
             fprintf(stderr, "  [%zu] %s\n", i, ctx->vp_names[i].c_str());
         }
-    }
-    if (ctx->vp_active < 0 && !ctx->vp_names.empty()) {
-        ctx->vp_active = 0; // auto-select first voice
     }
     return 0;
 }

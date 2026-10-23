@@ -1869,7 +1869,8 @@ constexpr ExtraList k_extras[] = {
     {"cosyvoice3-tts", k_cosyvoice3_tts_extras},
     {"cosyvoice3-tts-rl", k_cosyvoice3_tts_extras},
     {"qwen3-tts", k_qwen3_tts_base_extras},
-    {"qwen3-tts-1.7b-base", k_qwen3_tts_base_extras},
+    // #555: the shared default pack is 1024-d (0.6B), incompatible with 1.7B.
+    // 1.7B Base requires its own baked pack or a runtime WAV voice prompt.
     {"tada", k_tada_3b_extras},
     {"tada-1b", k_tada_1b_extras},
     {"tada-tts-1b", k_tada_1b_extras},

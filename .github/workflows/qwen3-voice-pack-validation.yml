@@ -1,0 +1,59 @@
+name: Qwen3 Base voice pack validation bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qwen3-voice-pack-cuda-speech-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y ninja-build ccache patchelf
+      - uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: '12.4.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cudart-dev", "nvrtc", "nvrtc-dev"]'
+          non-cuda-sub-packages: '["libcublas", "libcublas-dev"]'
+      - uses: actions/cache/restore@v4
+        id: ccache
+        with:
+          path: ~/.cache/ccache
+          key: qwen3-voice-pack-cuda124-${{ runner.os }}-${{ github.sha }}
+          restore-keys: qwen3-voice-pack-cuda124-${{ runner.os }}-
+      - name: Build targeted CUDA proof and package runtime
+        run: python3 tools/ci-heavy/qwen3_voice_pack_bundle.py
+      - name: CPU public loader and compatible voice speech checks
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python3 -m pip install 'numpy<3' huggingface_hub gguf
+          mkdir -p "$RUNNER_TEMP/qwen3-voice-pack-runtime"
+          tar -xzf qwen3-voice-pack-cuda-out/qwen3-voice-pack-cuda-speech-validation.tar.gz -C "$RUNNER_TEMP/qwen3-voice-pack-runtime"
+          python3 tools/ci-heavy/qwen3_voice_pack_validate.py --device cpu \
+            --bundle "$RUNNER_TEMP/qwen3-voice-pack-runtime/bundle" \
+            --scratch "$RUNNER_TEMP/qwen3-voice-pack-models" \
+            --out qwen3-voice-pack-cuda-out/cpu
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.cache/ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qwen3-voice-pack-cuda-speech-validation-${{ github.sha }}
+          path: qwen3-voice-pack-cuda-out/
+          if-no-files-found: error
+          retention-days: 14

@@ -660,3 +660,15 @@ TEST_CASE("registry: German Moonshine bundles own every companion", "[unit][regi
         REQUIRE(bundle.artifacts.front().filename == std::string(key) + (f32 ? "/encoder.onnx" : "/encoder_int8.onnx"));
     }
 }
+
+TEST_CASE("registry: 1.7B Base does not download the incompatible 0.6B voice pack (#555)", "[unit][registry]") {
+    CrispasrRegistryBundle small, large;
+    REQUIRE(crispasr_registry_default_bundle("qwen3-tts", small));
+    REQUIRE(crispasr_registry_default_bundle("qwen3-tts-1.7b-base", large));
+    bool found = false;
+    for (const auto& item : small.artifacts)
+        found |= item.filename == "qwen3-tts-voice-default.gguf";
+    REQUIRE(found);
+    for (const auto& item : large.artifacts)
+        REQUIRE(item.filename != "qwen3-tts-voice-default.gguf");
+}
