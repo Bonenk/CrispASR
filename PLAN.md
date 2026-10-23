@@ -13,6 +13,12 @@ registry alias or foreign llama.cpp GGUF as model support. Heavy work stays
 on GitHub; actual CUDA only after CPU parity. Voice checkpoint8bc09441a
 remains frozen on main while this isolated feature is developed.
 
+Baseline producer39956092100 stopped at its deliberate write-access preflight
+with HTTP403, before any weight download or conversion. Give only this worker
+a dedicated checkpoint credential; normal heavy jobs keep the read-only token.
+Voice checkpoint8bc09441a now passes main CI39950301114, Lint39950300946,
+Secret39950301100 and nightly regression39950301071.
+
 
 ## Issue555 model-sized designed defaults — shipped; Granite5 next (2026-10-23)
 
