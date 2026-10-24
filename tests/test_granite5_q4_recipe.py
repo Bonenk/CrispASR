@@ -14,10 +14,11 @@ cuda = importlib.import_module('granite5_q4_cuda')
 
 
 class GraniteQ4Inventory(unittest.TestCase):
-    def write(self, path, *, quantized=False, damaged_frontend=False):
+    def write(self, path, *, quantized=False, damaged_frontend=False, singleton=False, rearranged=False):
         from gguf import GGMLQuantizationType as Q, GGUFWriter
         writer = GGUFWriter(path, 'granite_speech')
-        writer.add_tensor('enc.input.weight', np.full((32, 32),
+        shape = (1, 32, 32) if singleton else ((16, 64) if rearranged else (32, 32))
+        writer.add_tensor('enc.input.weight', np.full(shape,
                           2 if damaged_frontend else 1, dtype=np.float32))
         writer.add_tensor('token_embd.weight', np.ones((32, 256), dtype=np.float16))
         writer.add_tensor('blk.0.attn_norm.weight', np.ones(256, dtype=np.float32))
@@ -53,6 +54,16 @@ class GraniteQ4Inventory(unittest.TestCase):
             self.write(candidate, quantized=True)
             with self.assertRaisesRegex(ValueError, 'override not applied'):
                 recipe.tensor_inventory(original, candidate, [r'^blk\.0\.ffn_gate\.weight$=f16'])
+
+    def test_quantizer_singleton_canonicalization_preserves_logical_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original, candidate = (Path(directory) / name for name in ('original.gguf', 'candidate.gguf'))
+            self.write(original, singleton=True)
+            self.write(candidate, quantized=True)
+            recipe.tensor_inventory(original, candidate, [recipe.HEAD])
+            self.write(candidate, quantized=True, rearranged=True)
+            with self.assertRaisesRegex(ValueError, 'tensor shape differs'):
+                recipe.tensor_inventory(original, candidate, [recipe.HEAD])
 
     def test_cuda_requires_full_selected_cpu_case_and_real_q4(self):
         cpu = dict(complete=True, diagnostic_only=True, production_release=False, cuda_acceptance=False,

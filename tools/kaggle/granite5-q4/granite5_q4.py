@@ -16,9 +16,9 @@ CPU_RUN = 40066357138
 CPU_REVISION = ''
 CPU_SHA256 = ''
 SELECTED_CASE = ''
-RUNTIME_SOURCE = CPU_SOURCE
-RUNTIME_REVISION = ''
-RUNTIME_SHA256 = ''
+RUNTIME_SOURCE = 'e2368b9e6ba94368a31798d003dca3b61e0bda10'
+RUNTIME_REVISION = 'd597fd6b5cde7126f181fdce08b5d85499c54cb9'
+RUNTIME_SHA256 = '132ba8f3e82abe6dcc6b66de808883d5f634997f65210a435ef88689ef7473d9'
 STAGING = 'cstr/crispasr-granite5-validation-public'
 RUNTIME_PATH = f'runtime/{RUNTIME_SOURCE}/granite5-cuda-validation.tar.gz'
 # Deliberately unlaunchable until reviewed immutable CPU/runtime pins exist.

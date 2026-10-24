@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tarfile
 import wave
 import zipfile
 
@@ -35,6 +36,10 @@ RECIPES = {
     'value-down-f16': [HEAD, r'^blk\.[0-9]+\.(attn_v|ffn_down)\.weight$=f16'],
     'edges-f16': [HEAD, r'^blk\.(0|1|2|3|36|37|38|39)\..*\.weight$=f16'],
 }
+RUNTIME = dict(repo=STAGING, repo_type='model',
+    path='runtime/e2368b9e6ba94368a31798d003dca3b61e0bda10/granite5-cuda-validation.tar.gz',
+    revision='d597fd6b5cde7126f181fdce08b5d85499c54cb9', bytes=230938776,
+    sha256='132ba8f3e82abe6dcc6b66de808883d5f634997f65210a435ef88689ef7473d9')
 CALIBRATION = dict(repo='cstr/crispasr-imatrix-calib', repo_type='dataset',
     revision='06258ecef2dfed2be52ced573ec0dffc2443fabc',
     path='index-echo-en-zh-20261009/index-echo-en-zh-calibration.zip', bytes=6446200,
@@ -59,10 +64,19 @@ def tensor_inventory(original, candidate, rules):
     if set(expected) != {t.name for t in after.tensors}:
         raise ValueError('Candidate tensor names differ from the qualified F16')
     inventory, counts = {}, {}
+    def logical_shape(shape):
+        # ggml_n_dims() canonicalizes trailing unit axes when the C++
+        # quantizer creates its output descriptors. They carry no stride or
+        # element-count change; actual non-unit dimension changes still fail.
+        result = list(shape)
+        while len(result) > 1 and result[-1] == 1:
+            result.pop()
+        return result
     for tensor in after.tensors:
         source = expected[tensor.name]
-        if not np.array_equal(tensor.shape, source.shape):
-            raise ValueError('Candidate tensor shape differs')
+        if logical_shape(tensor.shape) != logical_shape(source.shape):
+            raise ValueError(f'Candidate tensor shape differs: {tensor.name}: '
+                             f'{source.shape.tolist()} -> {tensor.shape.tolist()}')
         kind = tensor.tensor_type.name
         counts[kind] = counts.get(kind, 0) + tensor.n_elements
         matched = next((rule.rsplit('=', 1)[1] for rule in rules
@@ -86,6 +100,8 @@ def main():
     from huggingface_hub import HfApi, hf_hub_download
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', nargs='+', choices=RECIPES, default=list(RECIPES))
+    parser.add_argument('--reuse-calibration-run', type=int)
+    parser.add_argument('--reuse-calibration-source')
     args = parser.parse_args()
     out = Path(os.environ['HEAVY_OUT'])
     scratch = Path(os.environ['HEAVY_SCRATCH']) / 'granite5-q4-recipe'
@@ -130,23 +146,80 @@ def main():
     if not shutil.which('ccache') or not shutil.which('ninja'):
         execute(['sudo', 'apt-get', 'update'], 'apt-update')
         execute(['sudo', 'apt-get', 'install', '-y', 'ccache', 'ninja-build'], 'apt-tools')
+    # The already qualified capsule contains the same CPU backend and native
+    # sources. Reuse it on this CPU runner; no GPU execution is requested.
+    # Only the quantizer needs a fresh build, avoiding another full runtime build.
+    runtime = fetch(RUNTIME, 'runtime-input')
+    with tarfile.open(runtime) as archive:
+        archive.extractall(scratch / 'runtime', filter='data')
+    bundle = scratch / 'runtime/bundle'
+    from granite5_cuda_acceptance import qualify_runtime
+    provenance = qualify_runtime(bundle, receipt)
+    ggml_source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT / 'ggml', text=True).strip()
+    if ggml_source != provenance['ggml']:
+        raise ValueError('Quantizer headers and qualified GGML library source differ')
+    receipt['runtime'] = dict(file=RUNTIME, source=provenance['source'],
+                              native_sources_verified=len(provenance['runtime_sources']), device='cpu')
+    environment['LD_LIBRARY_PATH'] = str(bundle)
+    # GGML_BACKEND_PATH names one module file, not a directory. This also
+    # bootstraps the CPU module when a Python process embeds the C ABI.
+    environment['GGML_BACKEND_PATH'] = str(bundle / 'libggml-cpu.so')
+    save()
     build = scratch / 'build'
-    execute(['cmake', '-S', ROOT, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
-             '-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
-             '-DGGML_NATIVE=OFF', '-DGGML_BLAS=OFF', '-DCRISPASR_BUILD_SERVER=OFF',
-             '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_OPUS_FETCH=ON',
-             f'-DCMAKE_PROJECT_crispasr_INCLUDE={ROOT}/tools/ci-heavy/granite5_regression_targets.cmake'],
-            'configure')
-    execute(['cmake', '--build', build, '--target', 'crispasr-cli', 'crispasr-lib',
-             'crispasr-quantize', 'granite5-stage-probe', '-j2'], 'build')
-    bundle = scratch / 'runtime'
-    bundle.mkdir()
-    for name in ('crispasr', 'granite5-stage-probe'):
-        (bundle / name).symlink_to(build / 'bin' / name)
-    (bundle / 'libcrispasr.so').symlink_to(next(build.rglob('libcrispasr.so')))
-    environment['LD_LIBRARY_PATH'] = ':'.join(sorted({str(p.parent) for p in build.rglob('*.so*') if p.is_file()}))
+    project = scratch / 'quantizer-project'
+    project.mkdir()
+    # Compile the actual quantizer and its actual format-parser helper. The
+    # top-level "common" dependency also builds the full C ABI unnecessarily
+    # for this standalone tool; the qualified GGML base exports every symbol
+    # these two sources use. Match the repository's tensor-name ABI explicitly.
+    (project / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.20)
+project(granite_q4_quantizer LANGUAGES CXX)
+find_package(Threads REQUIRED)
+add_executable(crispasr-quantize "{ROOT}/examples/crispasr-quantize/main.cpp" "{ROOT}/examples/common-ggml.cpp")
+target_include_directories(crispasr-quantize PRIVATE "{ROOT}/examples" "{ROOT}/ggml/include")
+target_compile_features(crispasr-quantize PRIVATE cxx_std_17)
+target_compile_definitions(crispasr-quantize PRIVATE GGML_MAX_NAME=128)
+target_link_libraries(crispasr-quantize PRIVATE "{bundle}/libggml-base.so" Threads::Threads)
+set_target_properties(crispasr-quantize PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/bin")
+''')
+    execute(['cmake', '-S', project, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
+             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache'], 'configure-quantizer')
+    execute(['cmake', '--build', build, '--target', 'crispasr-quantize', '-j2'], 'build-quantizer')
+    receipt['quantizer_build'] = dict(main_source_sha256=receipt['quantizer_source_sha256'],
+        helper_source_sha256=sha(ROOT / 'examples/common-ggml.cpp'), tensor_name_abi=128,
+        ggml_source=ggml_source, ggml_base_sha256=sha(bundle / 'libggml-base.so'),
+        runtime_source=provenance['source'])
+    save()
     imatrix = scratch / 'calibration.imatrix.gguf'
-    if 'body-imatrix' in args.cases:
+    if bool(args.reuse_calibration_run) != bool(args.reuse_calibration_source):
+        raise ValueError('Both immutable calibration run and source are required')
+    if 'body-imatrix' in args.cases and args.reuse_calibration_run:
+        if not re.fullmatch('[0-9a-f]{40}', args.reuse_calibration_source):
+            raise ValueError('Immutable calibration source required')
+        previous_run = json.loads(subprocess.check_output(['gh', 'api',
+            f'repos/CrispStrobe/CrispASR/actions/runs/{args.reuse_calibration_run}']))
+        if not (previous_run['head_sha'] == args.reuse_calibration_source and previous_run['status'] == 'completed' and
+                previous_run['event'] == 'workflow_dispatch'):
+            raise ValueError('Unexpected calibration input run')
+        old = scratch / 'prior-calibration'
+        execute(['gh', 'run', 'download', args.reuse_calibration_run, '--repo', 'CrispStrobe/CrispASR',
+                 '--name', f'heavy-{args.reuse_calibration_run}', '--dir', old], 'calibration-input')
+        previous = json.loads((old / 'receipt.json').read_text())
+        calibration = previous['calibration']
+        if not (previous['source'] == args.reuse_calibration_source and previous['f16'] == f16_record and
+                previous['instruction'] == pins['instruction'] and
+                previous['runtime_sources'] == receipt['runtime_sources'] and
+                calibration['manifest'] == MANIFEST and calibration['archive'] == CALIBRATION and
+                len(calibration['clips']) == 8 and sha(old / imatrix.name) == calibration['imatrix_sha256']):
+            raise ValueError('Retained calibration source, corpus or statistics differ')
+        shutil.copyfile(old / imatrix.name, imatrix)
+        shutil.copyfile(imatrix, out / imatrix.name)
+        for name in ('calibration-source-card.md', 'commonvoice-source-card.md'):
+            shutil.copyfile(old / name, out / name)
+        receipt['calibration'] = dict(calibration, reused_from=dict(run=args.reuse_calibration_run,
+                                                                   source=args.reuse_calibration_source))
+        save()
+    elif 'body-imatrix' in args.cases:
         archive = fetch(CALIBRATION, 'calibration')
         manifest = json.loads(fetch(MANIFEST, 'calibration').read_text())
         selected = sorted((c for c in manifest['clips'] if c['language'] == 'en'), key=lambda c: c['path'])[:8]
@@ -193,9 +266,6 @@ def main():
             command += ['--imatrix', imatrix]
         execute(command, f'quantize-{case}')
         row = dict(rules=RECIPES[case], cpu_acceptance=False)
-        inventory = tensor_inventory(f16, model, RECIPES[case])
-        (out / f'{case}-tensors.json').write_text(json.dumps(inventory, indent=2) + '\n')
-        row['elements_by_type'] = inventory['elements_by_type']
         record = dict(repo=STAGING, repo_type='model', path=f'q4-recipes/{source}/{model.name}',
                       sha256=sha(model), bytes=model.stat().st_size)
         try:
@@ -211,9 +281,13 @@ def main():
         row['file'] = record
         receipt['cases'][case] = row
         save()
+        inventory = tensor_inventory(f16, model, RECIPES[case])
+        (out / f'{case}-tensors.json').write_text(json.dumps(inventory, indent=2) + '\n')
+        row['elements_by_type'] = inventory['elements_by_type']
+        save()
         case_out = out / case
         try:
-            row['validation'] = validate_case(model, reference, pins['instruction'], bundle, ROOT / 'python',
+            row['validation'] = validate_case(model, reference, pins['instruction'], bundle, bundle / 'python',
                                                ROOT / 'samples/jfk.wav', case_out, 'cpu', environment, 'q4_k')
             row['cpu_acceptance'] = True
         except ValueError as error:

@@ -13,9 +13,17 @@ quantizer output with verified real Q4_K tensors and unchanged frontend, norms
 and embeddings. Checkpoint each candidate before inference, then qualify a
 selected recipe through full CPU and actual CUDA gates. Two small GGUF controls
 pass, rejecting changed protected tensors, ignored precision overrides and F16
-files relabelled as Q4. Hosted CPU40066357138 is queued at source `e2368b9e6`; matching CUDA build
+files relabelled as Q4. Hosted CPU40066357138 at source `e2368b9e6` completed calibration but stopped
+before model inference: the tensor audit rejected ggml trailing-singleton shape
+canonicalization. Its280-matrix calibration is retained; logical-shape controls
+now cover canonicalization and reject real dimension changes. Generated weights
+will checkpoint before the audit as well as inference. Retry reuses that
+calibration and the source-matched native capsule while freshly compiling the
+actual quantizer/parser sources against its verified GGML base; matching CUDA build
 40066374390 passed with that exact source input; capsule/license/source audit
-and public checkpoint are next. Cancelled build40066358829
+passes70 file hashes,700 native source hashes and both corresponding-source
+packets. Capsule `d597fd6b5cde7126f181fdce08b5d85499c54cb9` passes full
+anonymous byte readback; this is build qualification, not GPU model acceptance. Cancelled build40066358829
 had a source-pin typo and is excluded from evidence. The prepared Q4 GPU worker
 requires a complete selected CPU result, verified Q4 payloads, identical runtime
 sources, original rotary controls and full actual GPU stage/Session/CLI gates.
