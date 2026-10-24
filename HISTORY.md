@@ -19,6 +19,12 @@ Frozen source96aeb4269 passes13 CI jobs,10 lint checks, cppcheck and the secret
 scan;2093 native cases include the actual C ABI/default and CLI resolver checks.
 The lint build now propagates failures through `tee`; positive and injected
 failure controls verify the shell behavior while retaining logs.
+Full published-model CPU regression40078090078 passes F16 and Q4; independent
+raw-array replay and all44-file anonymous readback are permanently pinned at
+validation revision3df6d8a66f94036d4773ee2424e42ab2ece9b046. The native resolver
+also refreshes cached F16-era provenance to the new release. Granite-only replay
+skips unrelated legacy preflight; its manual runs cannot hide untested changes
+from the core-model regression baseline.
 [Recipe, actual CUDA and bare-command proof](docs/granite5-q4k-2026-10-24.json).
 
 ## 2026-10-24 — C# managed roster validation checks

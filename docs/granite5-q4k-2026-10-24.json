@@ -1,6 +1,6 @@
 {
   "date": "2026-10-24",
-  "complete": false,
+  "complete": true,
   "production_release": true,
   "scope": "English JFK original F32 stages/magnitudes, exact prompt and both 27-token decodes, repeated renamed C ABI Session and CLI; native context4096, no full16k inference or performance claim",
   "selected_recipe": "value-down-f16",
@@ -572,7 +572,7 @@
     "assets": "Retain full original Apache license, IBM NOTICE, original publisher card, MIT recipe license and F16 provenance unchanged. Selected recipe uses no importance matrix or calibration audio. Publisher declarations do not independently clear training data or guarantee noninfringement."
   },
   "integration": {
-    "complete": false,
+    "complete": true,
     "registry_default": "q4_k",
     "explicit_profiles": [
       "f16",
@@ -632,8 +632,8 @@
       },
       "Regression (nightly)": {
         "run": 40078090078,
-        "status": "queued",
-        "conclusion": ""
+        "status": "completed",
+        "conclusion": "success"
       },
       "Secret scan": {
         "run": 40076296974,
@@ -690,6 +690,54 @@
       "successful_post_link_symlinks": "545/546",
       "log_sha256": "80c3e343f8935ba99acd526b70e50b7dafee862008fc1ede1634cfecea567b45"
     },
-    "runtime_changes_after_source": []
+    "runtime_changes_after_source": [],
+    "final_cpu_regression": {
+      "repo": "cstr/crispasr-granite5-validation-public",
+      "repo_type": "model",
+      "revision": "3df6d8a66f94036d4773ee2424e42ab2ece9b046",
+      "prefix": "regression/96aeb4269a68a7d1e2208cf04d692419198f554f/40078090078/cpu",
+      "receipt_sha256": "c986a1f3d8328276f14ea6216165962aa79dbe51da0ff13dac14a0bdaff0dbe1",
+      "manifest_sha256": "736a7219a4a437f5e80e96771d7d35564a6b20602eef3f6f6410934091e6f660",
+      "source": "96aeb4269a68a7d1e2208cf04d692419198f554f",
+      "run": 40078090078,
+      "job": 120834891619,
+      "full_model_cpu_acceptance": true,
+      "independent_raw_array_replay": true,
+      "profiles": [
+        "f16",
+        "q4_k"
+      ],
+      "files": 44,
+      "bytes": 12851382,
+      "anonymous_all_file_readback": true
+    },
+    "independent_final_cpu_audit_sha256": "1c898f4fd5eede6e6aafe2c667ba59a58cd4be9fb42ccd24a9eaf364c3498c6f",
+    "cached_provenance_upgrade": {
+      "native_cached_provenance_upgrade": true,
+      "from_revision": "701f5529d8459412cc1b6053b5880c630125b138",
+      "to_revision": "e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d",
+      "new_validation_evidence_sha256": "130bfdcb2ca7eff50ec73000ba7c16027a2f7183d786bf84ad2a49eb7f167a0e",
+      "model_free": true
+    },
+    "granite_only_workflow_scope": {
+      "legacy_preflight_skipped": true,
+      "manual_runs_excluded_from_core_baseline": true,
+      "query_control": {
+        "controlled_run_metadata_only": true,
+        "baseline_event": "push",
+        "old_baseline_candidates": [
+          "manual-head",
+          "full-push",
+          "full-schedule"
+        ],
+        "new_baseline_candidates": [
+          "full-push"
+        ],
+        "manual_scope_excluded": true,
+        "other_events_conservatively_excluded": true,
+        "push_baseline_retained": true
+      },
+      "validation": "actionlint and controlled query metadata; full actual Granite-only model job passed independently of legacy preflight"
+    }
   }
 }

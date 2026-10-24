@@ -207,15 +207,17 @@ jobs:
             echo 'granite5=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Push: diff against the head of the newest SUCCESSFUL Regression run
+          # Push: diff against the head of the newest SUCCESSFUL push Regression run
           # on main that is an ancestor of this commit, not just the previous
           # push. Consecutive pushes cancel each other (concurrency), and a
           # cancelled run's changes were otherwise never selected again: on
           # 2026-09-28 the parakeet + wav2vec2 fixes landed in cancelled runs and
           # the surviving run selected only the diff-tool change.
+          # Only automatic push runs advance this baseline. Manual
+          # Granite-only runs do not qualify the core-model matrix.
           if [ "$EVENT" = push ]; then
             for sha in $(gh run list -R "$GITHUB_REPOSITORY" --workflow regression.yml --branch main \
-                           --status success --limit 30 --json headSha --jq '.[].headSha' 2>/dev/null); do
+                           --event push --status success --limit 30 --json headSha --jq '.[].headSha' 2>/dev/null); do
               if git merge-base --is-ancestor "$sha" HEAD 2>/dev/null; then BASE="$sha"; break; fi
             done
           fi
@@ -233,6 +235,8 @@ jobs:
   # without the 1+ GB pull. ~1 s for the seed manifest; O(N+1) HF
   # API calls for N backends.
   preflight:
+    # Granite-only replay checks its own immutable model/reference inputs.
+    if: inputs.granite5_only != true
     needs: [smoke, unit-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5

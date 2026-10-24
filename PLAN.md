@@ -1,37 +1,26 @@
 # CrispASR — Pending work
 
-## NOW — Granite5 Q4_K final source checks (#552), 2026-10-24
+## Granite Speech5 Q4_K (#552) — completed (2026-10-24)
 
-Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. Full CPU40068653973
-and actual Tesla T4 CUDA acceptance pass for `value-down-f16`. Bare quantizer
-proof40074132958 reproduces the entire4074560192-byte model and SHA256
-`63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d`.
-The qualified policy is now the tool default; the previous recipe is available
-through `CRISPASR_GRANITE_Q4_LEGACY=1`. Gates and inference math are unchanged.
+The `granite` default is the qualified4.07 GB mixed Q4_K model. Bare
+`crispasr-quantize input-f16.gguf output.gguf q4_k` reproduces the CPU/T4-tested
+file byte-for-byte. F16 remains explicit; Q8/Q6 and earlier failed recipes remain
+excluded. Apache model/MIT recipe licenses, notices, original publisher card
+and prior F16 provenance are preserved. All model/metadata readbacks pass.
 
-Hosted publication40075304660 succeeded on ARM after one dependency-only failure
-and one cancelled, never-started x64 retry. Public immutable model release
-`e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d` passes full anonymous model readback,
-independent metadata readback and original F16/license preservation checks.
-The registry defaults to Q4_K and retains explicit F16; Q8/Q6 remain rejected.
-Regression pins now select both published models. Original6-stage numerical,
-magnitude, exact prompt/both27-token decodes, repeated renamed C ABI Session
-and CLI acceptance remain required. Native context4096; no full16k or speed claim.
+Frozen source96aeb4269 passes13 CI jobs,10 lint jobs, cppcheck, secret scan and
+full CPU regression40078090078 for BOTH published F16/Q4 models. Independent
+raw-array replay and all44-file anonymous proof readback pass at immutable
+validation revision3df6d8a66f94036d4773ee2424e42ab2ece9b046. Native2093 tests
+include actual C ABI/default-bundle and CLI resolver checks. Cached F16-era
+provenance upgrades to the new pinned Q4 release through the native resolver.
+[Complete source/model/legal/CPU/CUDA proof](docs/granite5-q4k-2026-10-24.json).
 
-A validation audit found that the lint build pipeline could hide a failed
-`cmake --build` behind `tee`. The workflow correction enables explicit pipefail. Controlled runs prove
-that the old step returned0 after a build exited42; the corrected step returns42
-and retains the log. Both successful controls return0. Frozen source96aeb4269 remains the model/native test input.
-
-Actual registry checks pass6997 assertions/68 cases; eight offline CLI cases
-and all five native-downloaded legal companions pass. Frozen source96aeb4269 passes all13 CI jobs (40076296954), all10 lint jobs
-(40076703735), cppcheck40076296939 and secret40076296974. Actual Linux native
-testing passes2093 cases, including the new registry C ABI and CLI resolver
-checks. The Granite-only published-model replay40078090078 is queued; its
-completed smoke/select/model-free steps pass. Both F16 and Q4 remain selected. Only the registry table differs from the
-GPU-qualified native runtime. [Full pins/receipt](docs/granite5-q4k-2026-10-24.json).
-Heavy CPU work remains hosted; actual GPU work uses a free configured Kaggle slot.
-Local tiny compiles require fresh load/memory checks. No large weights run locally.
+The lint pipeline now propagates build failures through `tee`, proven with
+successful and failing command controls. Granite-only replay skips unrelated
+legacy preflight and cannot advance the core-model regression baseline.
+Inference/quantizer/test bytes remain identical to the qualified source.
+Native context4096; English JFK qualification only, with no full16k or speed claim.
 
 ## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 
