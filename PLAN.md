@@ -6,9 +6,14 @@ Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. User explicitly
 requires a Granite5 Q4_K model produced with `crispasr-quantize`. F16 remains the
 qualified default while this work proceeds. Earlier Q4 head/embedding precision
 arms failed the unchanged original-reference numerical gates despite exact JFK
-words. Next: isolate attention/FFN and boundary-layer sensitivity using fresh
-quantizer output, checkpoint each candidate before inference, then qualify a
-selected recipe through full CPU and actual CUDA gates. Do not relax thresholds
+words. Prepared `granite5_q4_recipe.py`: fixed body, attention, FFN, value/down and
+boundary-layer precision arms, plus a body importance-matrix arm calibrated on
+eight fixed CC0 English clips disjoint from JFK. Every candidate uses fresh
+quantizer output with verified real Q4_K tensors and unchanged frontend, norms
+and embeddings. Checkpoint each candidate before inference, then qualify a
+selected recipe through full CPU and actual CUDA gates. Two small GGUF controls
+pass, rejecting changed protected tensors, ignored precision overrides and F16
+files relabelled as Q4. Hosted execution is next. Do not relax thresholds
 or promote an unaccepted diagnostic. Heavy CPU work stays on hosted runners;
 actual GPU validation stays on a free Kaggle slot. Check local load/memory before
 any compile or inference.
