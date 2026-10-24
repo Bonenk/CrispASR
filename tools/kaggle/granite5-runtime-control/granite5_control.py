@@ -10,7 +10,7 @@ import sys
 import tarfile
 
 VERSION = 'granite5-runtime-control-v1'
-SOURCE = ''
+SOURCE = '4b433e1bbe54cf3bcbf0dfee731cdbdfdbb27ad7'
 RUNTIME_SOURCE = 'e2368b9e6ba94368a31798d003dca3b61e0bda10'
 RUNTIME_REVISION = 'd597fd6b5cde7126f181fdce08b5d85499c54cb9'
 RUNTIME_SHA256 = '132ba8f3e82abe6dcc6b66de808883d5f634997f65210a435ef88689ef7473d9'
