@@ -60,6 +60,25 @@ class Granite5RegressionInputs(unittest.TestCase):
         pins['models'].pop('q8_0')
         regression.check_pins(pins)
 
+    def test_q4_requires_explicit_profile_pins_and_published_card_qualification(self):
+        pins = copy.deepcopy(self.pins)
+        pins['profiles'] = ['f16', 'q4_k']
+        pins['models']['q4_k'] = pins['models'].pop('q8_0')
+        pins['models']['q4_k']['filename'] = 'granite-speech-5.0-2b-q4_k.gguf'
+        regression.check_pins(pins)
+        card = dict(license='apache-2.0', crispasr_native_acceptance=True)
+        regression.check_published_profiles(card, ['f16'])
+        for declared in (None, ['f16'], ['q4_k']):
+            if declared is not None:
+                card['crispasr_validated_profiles'] = declared
+            with self.assertRaises(ValueError):
+                regression.check_published_profiles(card, pins['profiles'])
+        card['crispasr_validated_profiles'] = ['f16', 'q4_k']
+        regression.check_published_profiles(card, pins['profiles'])
+        card['crispasr_native_acceptance'] = False
+        with self.assertRaises(ValueError):
+            regression.check_published_profiles(card, pins['profiles'])
+
 
 if __name__ == '__main__':
     unittest.main()

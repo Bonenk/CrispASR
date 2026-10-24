@@ -20,7 +20,8 @@ INSTRUCTION = 'transcribe the speech with proper punctuation and capitalization.
 def check_pins(pins):
     if not (pins['repo'] == 'cstr/granite-speech-5.0-2b-GGUF' and
             re.fullmatch('[0-9a-f]{40}', pins['revision']) and
-            pins['instruction'] == INSTRUCTION and tuple(pins['profiles']) in (('f16',), ('f16', 'q8_0')) and
+            pins['instruction'] == INSTRUCTION and tuple(pins['profiles']) in
+            (('f16',), ('f16', 'q8_0'), ('f16', 'q4_k')) and
             set(pins['models']) == set(pins['profiles'])):
         raise ValueError('Explicit immutable qualified profiles and the original instruction are required')
     for quant, record in pins['models'].items():
@@ -42,6 +43,15 @@ def check_content(path, record):
         raise ValueError('Pinned regression input content differs')
 
 
+def check_published_profiles(card, profiles):
+    if not (card['license'] == 'apache-2.0' and card['crispasr_native_acceptance'] is True):
+        raise ValueError('Published model license/qualification card differs')
+    # The first F16 release predates per-profile card metadata. Its global
+    # acceptance flag cannot qualify a newly uploaded but still unlisted Q4.
+    if 'q4_k' in profiles and not set(profiles) <= set(card.get('crispasr_validated_profiles', [])):
+        raise ValueError('The published card must explicitly qualify every requested Q4 release profile')
+
+
 def main():
     from huggingface_hub import HfApi, hf_hub_download
     parser = argparse.ArgumentParser(description=__doc__)
@@ -58,8 +68,7 @@ def main():
         (args.out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     save()
     card = HfApi().model_info(pins['repo'], revision=pins['revision']).card_data
-    if not (card['license'] == 'apache-2.0' and card['crispasr_native_acceptance'] is True):
-        raise ValueError('Published model license/qualification card differs')
+    check_published_profiles(card, pins['profiles'])
     bundle = args.scratch / 'runtime'
     bundle.mkdir()
     for name in ('crispasr', 'granite5-stage-probe'):

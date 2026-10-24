@@ -14,13 +14,20 @@ and embeddings. Checkpoint each candidate before inference, then qualify a
 selected recipe through full CPU and actual CUDA gates. Two small GGUF controls
 pass, rejecting changed protected tensors, ignored precision overrides and F16
 files relabelled as Q4. Hosted CPU40066357138 is queued at source `e2368b9e6`; matching CUDA build
-40066374390 is queued with that exact source input. Cancelled build40066358829
+40066374390 passed with that exact source input; capsule/license/source audit
+and public checkpoint are next. Cancelled build40066358829
 had a source-pin typo and is excluded from evidence. The prepared Q4 GPU worker
 requires a complete selected CPU result, verified Q4 payloads, identical runtime
 sources, original rotary controls and full actual GPU stage/Session/CLI gates.
 It has not run. Model-free controls reject incomplete/failed CPU cases, wrong
-devices, changed recipes and F16 relabelling. C# correction run40065985585 is
-queued on Linux/Windows. Do not relax thresholds
+devices, changed recipes and F16 relabelling. C# correction run40065985585
+passes on both Linux and Windows. A Q4 publisher is prepared with seven small
+rejection-control tests: exact CPU/GPU linkage, actual decoder work, immutable
+source/license provenance, independent raw-array audit and full anonymous byte
+readback. Existing F16 bytes and historical failed evidence stay preserved.
+Regression input validation now requires an explicit published Q4 profile
+declaration; the current F16 card cannot qualify an unlisted new file. Registry
+integration is drafted privately, with no active Q4 download until acceptance. Do not relax thresholds
 or promote an unaccepted diagnostic. Heavy CPU work stays on hosted runners;
 actual GPU validation stays on a free Kaggle slot. Check local load/memory before
 any compile or inference.
@@ -30,7 +37,7 @@ regression40021856680 now pass. C#40021856648 fails one stale empty-roster
 exception expectation on each OS: managed validation now throws ArgumentException
 before native access. Correct the test contract and exercise empty/whitespace/null
 rosters without requiring a native library; preserve the consent gate. Hosted
-Linux/Windows rerun remains pending after the correction.
+Linux/Windows correction run40065985585 now passes.
 
 ## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 
