@@ -18,9 +18,17 @@ Regression pins now select both published models. Original6-stage numerical,
 magnitude, exact prompt/both27-token decodes, repeated renamed C ABI Session
 and CLI acceptance remain required. Native context4096; no full16k or speed claim.
 
+A validation audit found that the lint build pipeline could hide a failed
+`cmake --build` behind `tee`. The workflow correction enables explicit pipefail. Controlled runs prove
+that the old step returned0 after a build exited42; the corrected step returns42
+and retains the log. Both successful controls return0. Frozen source96aeb4269 remains the model/native test input.
+
 Actual registry checks pass6997 assertions/68 cases; eight offline CLI cases
-and all five native-downloaded legal companions pass. Frozen-source hosted
-CI, lint, regression and secret checks are next. Only the registry table differs from the
+and all five native-downloaded legal companions pass. Frozen source96aeb4269 passes all13 CI jobs (40076296954), all10 lint jobs
+(40076703735), cppcheck40076296939 and secret40076296974. Actual Linux native
+testing passes2093 cases, including the new registry C ABI and CLI resolver
+checks. The Granite-only published-model replay40078090078 is queued; its
+completed smoke/select/model-free steps pass. Both F16 and Q4 remain selected. Only the registry table differs from the
 GPU-qualified native runtime. [Full pins/receipt](docs/granite5-q4k-2026-10-24.json).
 Heavy CPU work remains hosted; actual GPU work uses a free configured Kaggle slot.
 Local tiny compiles require fresh load/memory checks. No large weights run locally.

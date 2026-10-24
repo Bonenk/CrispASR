@@ -15,6 +15,10 @@ The registry defaults to pinned Q4_K with explicit F16 still available;
 Q8/Q6 remain excluded. Dedicated regression now checks both published profiles.
 Native context remains4096, with English JFK qualification and no speed claim.
 Only the registry table changes relative to the GPU-qualified native runtime.
+Frozen source96aeb4269 passes13 CI jobs,10 lint checks, cppcheck and the secret
+scan;2093 native cases include the actual C ABI/default and CLI resolver checks.
+The lint build now propagates failures through `tee`; positive and injected
+failure controls verify the shell behavior while retaining logs.
 [Recipe, actual CUDA and bare-command proof](docs/granite5-q4k-2026-10-24.json).
 
 ## 2026-10-24 — C# managed roster validation checks

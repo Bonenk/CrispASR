@@ -612,6 +612,84 @@
       "native_changes_from_gpu_runtime": [
         "src/crispasr_model_registry.cpp"
       ]
-    }
+    },
+    "source": "96aeb4269a68a7d1e2208cf04d692419198f554f",
+    "hosted_checks": {
+      "CI": {
+        "run": 40076296954,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "Lint": {
+        "run": 40076703735,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "Lint Deep": {
+        "run": 40076296939,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "Regression (nightly)": {
+        "run": 40078090078,
+        "status": "queued",
+        "conclusion": ""
+      },
+      "Secret scan": {
+        "run": 40076296974,
+        "status": "completed",
+        "conclusion": "success"
+      }
+    },
+    "hosted_no_model_tests": {
+      "workflow_run": 40076296955,
+      "job": 120820254948,
+      "accepted": true,
+      "granite_controls": 18,
+      "log_sha256": "56618398e1ff2e30df813ec6b695f2ac298cd265af8fa6c68fb7e5177896138f"
+    },
+    "hosted_native_unit_tests": {
+      "workflow_run": 40076296954,
+      "job": 120820255324,
+      "accepted": true,
+      "ctest_cases": 2093,
+      "new_registry_c_abi_checks": true,
+      "cli_dry_run_check": true,
+      "log_sha256": "ead80e10901ab5226e0fb158741a314b6a0cec2b59fa3fe9a3eb6e07a9543dca"
+    },
+    "lint_failure_propagation_control": {
+      "controlled_shell_only": true,
+      "actual_native_build": false,
+      "records": {
+        "before_success": {
+          "exit": 0,
+          "log_retained": true
+        },
+        "after_success": {
+          "exit": 0,
+          "log_retained": true
+        },
+        "before_failure": {
+          "exit": 0,
+          "log_retained": true
+        },
+        "after_failure": {
+          "exit": 42,
+          "log_retained": true
+        }
+      },
+      "old_step_sha256": "9cbff576648782d76ad1bf0d1d0f1f56ec60d58a6d62b8a61098180c2ecdf04a",
+      "new_step_sha256": "3d096fe243c476e3c91d69a1bb51a523bf8c3af63639000527b3dd2e1b1b342b"
+    },
+    "hosted_lint": {
+      "workflow_run": 40076703735,
+      "accepted": true,
+      "jobs": 10,
+      "actual_build_verified": true,
+      "link_step": "544/546",
+      "successful_post_link_symlinks": "545/546",
+      "log_sha256": "80c3e343f8935ba99acd526b70e50b7dafee862008fc1ede1634cfecea567b45"
+    },
+    "runtime_changes_after_source": []
   }
 }
