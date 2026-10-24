@@ -95,6 +95,30 @@ def tensor_inventory(original, candidate, rules):
     return dict(tensors=inventory, elements_by_type=counts)
 
 
+def build_quantizer(bundle, scratch, execute):
+    build = scratch / 'build'
+    project = scratch / 'quantizer-project'
+    project.mkdir()
+    # Compile the actual quantizer and its actual format-parser helper. The
+    # top-level "common" dependency also builds the full C ABI unnecessarily
+    # for this standalone tool; the qualified GGML base exports every symbol
+    # these two sources use. Match the repository's tensor-name ABI explicitly.
+    (project / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.20)
+project(granite_q4_quantizer LANGUAGES CXX)
+find_package(Threads REQUIRED)
+add_executable(crispasr-quantize "{ROOT}/examples/crispasr-quantize/main.cpp" "{ROOT}/examples/common-ggml.cpp")
+target_include_directories(crispasr-quantize PRIVATE "{ROOT}/examples" "{ROOT}/ggml/include")
+target_compile_features(crispasr-quantize PRIVATE cxx_std_17)
+target_compile_definitions(crispasr-quantize PRIVATE GGML_MAX_NAME=128)
+target_link_libraries(crispasr-quantize PRIVATE "{bundle}/libggml-base.so" Threads::Threads)
+set_target_properties(crispasr-quantize PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/bin")
+''')
+    execute(['cmake', '-S', project, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
+             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache'], 'configure-quantizer')
+    execute(['cmake', '--build', build, '--target', 'crispasr-quantize', '-j2'], 'build-quantizer')
+    return build / 'bin/crispasr-quantize'
+
+
 def main():
     from gguf import GGUFReader
     from huggingface_hub import HfApi, hf_hub_download
@@ -165,26 +189,7 @@ def main():
     # bootstraps the CPU module when a Python process embeds the C ABI.
     environment['GGML_BACKEND_PATH'] = str(bundle / 'libggml-cpu.so')
     save()
-    build = scratch / 'build'
-    project = scratch / 'quantizer-project'
-    project.mkdir()
-    # Compile the actual quantizer and its actual format-parser helper. The
-    # top-level "common" dependency also builds the full C ABI unnecessarily
-    # for this standalone tool; the qualified GGML base exports every symbol
-    # these two sources use. Match the repository's tensor-name ABI explicitly.
-    (project / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.20)
-project(granite_q4_quantizer LANGUAGES CXX)
-find_package(Threads REQUIRED)
-add_executable(crispasr-quantize "{ROOT}/examples/crispasr-quantize/main.cpp" "{ROOT}/examples/common-ggml.cpp")
-target_include_directories(crispasr-quantize PRIVATE "{ROOT}/examples" "{ROOT}/ggml/include")
-target_compile_features(crispasr-quantize PRIVATE cxx_std_17)
-target_compile_definitions(crispasr-quantize PRIVATE GGML_MAX_NAME=128)
-target_link_libraries(crispasr-quantize PRIVATE "{bundle}/libggml-base.so" Threads::Threads)
-set_target_properties(crispasr-quantize PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/bin")
-''')
-    execute(['cmake', '-S', project, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
-             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache'], 'configure-quantizer')
-    execute(['cmake', '--build', build, '--target', 'crispasr-quantize', '-j2'], 'build-quantizer')
+    quantizer = build_quantizer(bundle, scratch, execute)
     receipt['quantizer_build'] = dict(main_source_sha256=receipt['quantizer_source_sha256'],
         helper_source_sha256=sha(ROOT / 'examples/common-ggml.cpp'), tensor_name_abi=128,
         ggml_source=ggml_source, ggml_base_sha256=sha(bundle / 'libggml-base.so'),
@@ -259,12 +264,12 @@ set_target_properties(crispasr-quantize PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${{
     arrays = {t.name: t.data.reshape(-1).copy() for t in ref.tensors}
     for case in args.cases:
         model = scratch / f'granite-speech-5.0-2b-q4_k-{case}.gguf'
-        command = [build / 'bin/crispasr-quantize', f16, model, 'q4_k']
+        command = [quantizer, f16, model, 'q4_k']
         for rule in RECIPES[case]:
             command += ['--tensor-type', rule]
         if case == 'body-imatrix':
             command += ['--imatrix', imatrix]
-        execute(command, f'quantize-{case}')
+        execute(command, f'quantize-{case}', dict(environment, CRISPASR_GRANITE_Q4_LEGACY='1'))
         row = dict(rules=RECIPES[case], cpu_acceptance=False)
         record = dict(repo=STAGING, repo_type='model', path=f'q4-recipes/{source}/{model.name}',
                       sha256=sha(model), bytes=model.stat().st_size)

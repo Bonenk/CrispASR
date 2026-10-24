@@ -323,6 +323,19 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     const char* env_quant_all = std::getenv("CRISPASR_GRANITE_QUANT_ALL");
     const bool granite_quant_all = is_granite_family && env_quant_all && *env_quant_all && *env_quant_all != '0';
 
+    // Granite5 Q4_K needs higher precision in the value/readout projections.
+    // Controlled original-reference tests retain the head, attention values and
+    // FFN down projections; the bulk query/key/output and FFN gate/up weights
+    // remain Q4_K. Existing non-YaRN Granite models keep their original recipe.
+    const char* granite_q4_legacy_env = std::getenv("CRISPASR_GRANITE_Q4_LEGACY");
+    const bool granite_q4_legacy = granite_q4_legacy_env && *granite_q4_legacy_env && *granite_q4_legacy_env != '0';
+    const bool granite_yarn_q4 = granite_yarn && qtype == GGML_TYPE_Q4_K && !granite_quant_all && !granite_q4_legacy;
+    if (granite_yarn_q4) {
+        printf("%s: Granite5 Q4_K keeps value/down projections at source precision "
+               "(CRISPASR_GRANITE_Q4_LEGACY=1 restores the previous recipe)\n",
+               __func__);
+    }
+
     // OmniASR-CTC: 48-layer wav2vec2-style encoder + CTC head. Per-layer
     // activation cosine analysis on JFK (Q4_K vs Q8_0 dumps via
     // OMNIASR_DUMP_DIR) shows drift accumulates: layers 0–35 stay at
@@ -915,6 +928,9 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             !(is_supertonic && !(sname.rfind("vf.", 0) == 0 || sname.rfind("voc.", 0) == 0)) &&
             !(is_granite_family && !granite_quant_all && sname.find("enc.") == 0) &&
             !(granite_yarn && !granite_quant_all && sname == "token_embd.weight") &&
+            !(granite_yarn_q4 &&
+              ((!allow_lmhead && sname == "output.weight") ||
+               (sname.rfind("blk.", 0) == 0 && (ends_with(".attn_v.weight") || ends_with(".ffn_down.weight"))))) &&
             // MOSS-Audio: keep encoder + adapter + deepstack at F16
             !(arch == "moss_audio" &&
               (sname.find("enc.") == 0 || sname.find("adapter.") == 0 || sname.find("deepstack.") == 0)) &&

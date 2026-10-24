@@ -18,23 +18,31 @@ First CPU40066357138 (`e2368b9e6`) calibrated all280 decoder matrices but stoppe
 before inference: its audit rejected lossless trailing-singleton dimension
 canonicalization. That audit is corrected and tested against both harmless
 canonicalization and real dimension changes. Generated weights checkpoint before
-the audit as well as inference. Retry40068653973 at `8fbb1794d` is running,
-reusing the retained calibration and rebuilding the actual quantizer/parser
-against the verified GGML base. Native sources and GGML headers must match the
-prebuilt runtime. The tensor-name ABI remains128.
+the audit as well as inference. Retry40068653973 at `8fbb1794d` completed:
+`value-down-f16` and `ffn-f16` pass every CPU gate. The smaller selected
+value/down recipe is4074560192 bytes, SHA256
+`63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d`.
+The other five recipes remain rejected. CPU evidence revision
+`e425e802e3a029edcf15d51cb31e863d59b5b0d2` is immutable.
+
+Actual Kaggle Q4 acceptance v1 has completed on Tesla T4: all six stages,
+fixed magnitudes, exact prompt and27 token IDs in both decode paths, repeated
+renamed C ABI Session and CLI pass. Stage/Session/CLI GPU peaks are4114/4420/4406MiB;
+actual decoder matmuls are verified. Full terminal logs and uploaded-script
+identity are retained. Independent raw-array replay and publication are next.
+The new default quantizer policy preserves head, value and FFN down weights;
+eight model-free before/after controls pass including byte equality to the
+explicit recipe, legacy/Q8/older-Granite stability and user-override precedence.
+Hosted full-model byte equivalence is required before final integration.
 
 CUDA build40066374390 passed at `e2368b9e6`. The capsule passes70 file hashes,
 700 native source hashes, compiled CUB notices and both corresponding-source
 packets. Public revision `d597fd6b5cde7126f181fdce08b5d85499c54cb9` passes full
-anonymous byte readback. This is build qualification, not GPU model acceptance.
-Cancelled build40066358829 had a source-pin typo and is excluded from evidence.
-The prepared GPU worker requires a fully accepted selected CPU case, actual GPU
-loader/decoder work, original rotary controls and full stage/Session/CLI gates.
-It has not run. The Kaggle entry remains unlaunchable until CPU/recipe pins exist.
-A separate F16 GPU positive control is prepared for the new runtime while the
-Q4 CPU recipes run. Its immutable successful CPU proof is40012494531 at
-`5b5278a0f`; complete native/client/input Git trees must match. It cannot
-establish Q4 acceptance. Fresh slot availability is required before launch.
+anonymous byte readback. This capsule also passed the separate F16 actual-T4 positive control,
+including full stages, Session and CLI. That control establishes no Q4 claim;
+the separate selected Q4 run supplies that evidence. Both kernels are terminal
+and their logs are retained. Cancelled build40066358829 had a source-pin typo
+and is excluded from evidence.
 
 The Q4 publisher and seven small rejection-control tests are prepared. They
 require exact CPU/GPU linkage, immutable source/license provenance, independent
