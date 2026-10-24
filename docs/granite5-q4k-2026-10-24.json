@@ -469,13 +469,16 @@
     }
   },
   "publication": {
-    "run": 40074770638,
+    "run": 40075304660,
     "complete": false,
     "prior_run": {
       "run": 40074162368,
       "accepted": false,
       "reason": "Missing requests at import; no model download or production mutation"
-    }
+    },
+    "source": "0774cf2cceae254a7b1e767241ccf6dc8d238be4",
+    "runner": "ubuntu-24.04-arm",
+    "cancelled_queued_run": 40074770638
   },
   "license": {
     "model": "Apache-2.0",

@@ -36,8 +36,9 @@ explicit recipe, legacy/Q8/older-Granite stability and user-override precedence.
 Hosted full-model byte equivalence40074132958 passes: the bare command
 reproduces every qualified byte. Its immutable proof is
 `26e9d02c322c4b2f2f3a5a3bd567a414ece97dda`. Publication40074162368 stopped before model transfer because the hosted
-environment lacked `requests`. Retry40074770638 adds that explicit dependency
-and is running at `83706a7099a6bfcd6c25b62c00945592d64b922f`. Independent CPU/CUDA
+environment lacked `requests`. Retry40074770638 added that dependency but never acquired a runner; it was
+cancelled before executing any steps. Pure transfer/audit publication40075304660
+uses the hosted ARM pool at `0774cf2cceae254a7b1e767241ccf6dc8d238be4`. Independent CPU/CUDA
 raw-array replay passes; GPU evidence is public at immutable revision
 `fadfb5c880443d34ad31c11ac44cd635b65c4c1d`. See
 `docs/granite5-q4k-2026-10-24.json` for exact pins. Final integration awaits
