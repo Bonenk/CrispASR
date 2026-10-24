@@ -1,5 +1,25 @@
 # CrispASR — Pending work
 
+## NOW — Granite5 Q4_K quantizer recipe (#552), renewed work (2026-10-24)
+
+Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. User explicitly
+requires a Granite5 Q4_K model produced with `crispasr-quantize`. F16 remains the
+qualified default while this work proceeds. Earlier Q4 head/embedding precision
+arms failed the unchanged original-reference numerical gates despite exact JFK
+words. Next: isolate attention/FFN and boundary-layer sensitivity using fresh
+quantizer output, checkpoint each candidate before inference, then qualify a
+selected recipe through full CPU and actual CUDA gates. Do not relax thresholds
+or promote an unaccepted diagnostic. Heavy CPU work stays on hosted runners;
+actual GPU validation stays on a free Kaggle slot. Check local load/memory before
+any compile or inference.
+
+Main `b2e1de53a` CI40021856682, lint40021856813, deep lint40021856695 and
+regression40021856680 now pass. C#40021856648 fails one stale empty-roster
+exception expectation on each OS: managed validation now throws ArgumentException
+before native access. Correct the test contract and exercise empty/whitespace/null
+rosters without requiring a native library; preserve the consent gate. Hosted
+Linux/Windows rerun remains pending after the correction.
+
 ## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 
 Owner: Codex, isolated feature worktree. Native YaRN conversion/runtime support
