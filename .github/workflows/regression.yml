@@ -136,7 +136,8 @@ jobs:
       # this far before (the step above was red), so the gap was invisible. The
       # perf job below already does exactly this on line ~275.
       - name: Install no-model test deps
-        run: pip install -q numpy || true
+        # Granite Q4 inventory controls write tiny synthetic GGUF fixtures.
+        run: pip install -q numpy 'gguf==0.17.1'
       - name: Run no-model Python unit tests
         run: |
           python -m pytest tests/test_backend_config.py -v || \

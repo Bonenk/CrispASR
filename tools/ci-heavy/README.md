@@ -32,6 +32,16 @@ metadata and phase logs survive failure. This is metadata integration evidence,
 not original-model, WER, speed, VAD-detector or GPU parity. Run with
 `-f script=tools/ci-heavy/whisper_wrapper_validate.py -f pip=numpy -f timeout_minutes=60`.
 
+`granite5_q4_default.py` proves that the bare `crispasr-quantize` command
+reproduces the complete SHA-256 and tensor inventory of the accepted mixed Q4_K
+file, using the original F16 input and source-matched GGML library. It performs
+no inference or publication. `granite5_q4_publish.py` separately requires immutable
+complete CPU/actual-CUDA evidence and original-reference replay, preserves the
+F16 release and license bundle, and checks anonymous full-model readback before
+qualifying the new profile. Its hosted dependencies are
+`-f pip="numpy requests gguf==0.17.1 huggingface_hub>=0.36,<2"`; publication
+additionally requires explicit evidence arguments and `--publish`.
+
 ## Running a job
 
 ```bash

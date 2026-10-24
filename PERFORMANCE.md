@@ -1,3 +1,19 @@
+## 2026-10-24 — Granite Speech5 Q4_K precision qualification
+
+The selected mixed Q4_K file is4,074,560,192 bytes versus5,581,888,128 for F16
+(27% smaller). It retains head/value/down projections and the protected acoustic
+frontend/embedding precision. Actual `crispasr-quantize` output passes original
+F32 stages and fixed magnitude gates, exact prompt and both27-token decodes,
+repeated renamed C ABI Session and CLI on hosted CPU and Tesla T4 CUDA.
+Teacher/pipeline cosine is0.996882/0.997173 on CPU and0.997049/0.997517 on T4;
+norm ratios are1.002303/0.999412 and1.003401/0.992966 respectively.
+Actual T4 stage/Session/CLI peaks are4114/4420/4406MiB, with CUDA decoder
+matmuls verified in every process. These are acceptance-run observations;
+no inference speedup or isolated MMQ A/B is claimed. English JFK and native
+context4096 only; full16k inference remains unqualified. Other rejected
+Q4 recipes, Q8 and Q6 retain their failed gates.
+[Immutable inputs and receipts](docs/granite5-q4k-2026-10-24.json).
+
 ## 2026-10-23 — Listened OmniVoice Metal encoder defaults
 
 Maintainer approves all provided listening WAVs and minor differences. Eligible

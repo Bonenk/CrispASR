@@ -62,7 +62,9 @@ frontend stages, teacher/pipeline logit cosine and magnitude, exact prompt and
 both decoder token sequences, repeated renamed-file C ABI Sessions and CLI text
 for the original punctuation/capitalization instruction. It also checks the
 legacy raw-task words. Only the explicitly qualified published profiles run;
-the initial release includes F16. Q8_0 failed the CUDA magnitude gate.
+the initial release included F16, with a separately qualified mixed Q4_K recipe
+added after full CPU and actual CUDA acceptance. Q8_0 remains excluded after
+failing the CUDA magnitude gate.
 The retained original F32 reference is verified by SHA-256; it is not rebaked.
 The generic Granite frontend diff does not exercise these decoder gates.
 Changes to the runtime, binding, quantizer, converter or Granite5 validators

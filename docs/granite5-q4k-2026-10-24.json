@@ -1,0 +1,488 @@
+{
+  "date": "2026-10-24",
+  "complete": false,
+  "production_release": false,
+  "scope": "English JFK original F32 stages/magnitudes, exact prompt and both 27-token decodes, repeated renamed C ABI Session and CLI; native context4096, no full16k inference or performance claim",
+  "selected_recipe": "value-down-f16",
+  "rules": [
+    "^output\\.weight$=f16",
+    "^blk\\.[0-9]+\\.(attn_v|ffn_down)\\.weight$=f16"
+  ],
+  "file": {
+    "repo": "cstr/crispasr-granite5-validation-public",
+    "repo_type": "model",
+    "path": "q4-recipes/8fbb1794da4eea3851d8384934695d39b3518b72/granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+    "sha256": "63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d",
+    "bytes": 4074560192,
+    "revision": "d0e6349c7d0601fdd8ea38d1aad90e6b92ac47e2"
+  },
+  "elements_by_type": {
+    "F32": 476118956,
+    "F16": 788533248,
+    "Q4_K": 1048576000
+  },
+  "cpu": {
+    "source": "8fbb1794da4eea3851d8384934695d39b3518b72",
+    "run": 40068653973,
+    "revision": "e425e802e3a029edcf15d51cb31e863d59b5b0d2",
+    "receipt_sha256": "de60017c1e5d443539021124927a6c30d99bfa399d24ea018e274574ae9f53d7",
+    "cases": {
+      "body": {
+        "accepted": false,
+        "bytes": 3531922112
+      },
+      "body-imatrix": {
+        "accepted": false,
+        "bytes": 3531922112
+      },
+      "attention-f16": {
+        "accepted": false,
+        "bytes": 4134853312
+      },
+      "ffn-f16": {
+        "accepted": true,
+        "bytes": 4978956992
+      },
+      "value-down-q6": {
+        "accepted": false,
+        "bytes": 3629243072
+      },
+      "value-down-f16": {
+        "accepted": true,
+        "bytes": 4074560192
+      },
+      "edges-f16": {
+        "accepted": false,
+        "bytes": 3941915328
+      }
+    },
+    "validation": {
+      "complete": true,
+      "accepted": true,
+      "device": "cpu",
+      "stages": {
+        "mel_spectrogram": {
+          "cosine": 0.9999999781546937,
+          "norm_ratio": 1.0000001324384455,
+          "relative_l2": 0.00020902307078891409,
+          "maxabs": 0.02021205425262451,
+          "pass": true
+        },
+        "encoder_out": {
+          "cosine": 0.9999999611213714,
+          "norm_ratio": 0.9999992444903599,
+          "relative_l2": 0.0002788507664116465,
+          "maxabs": 0.01636052131652832,
+          "pass": true
+        },
+        "projector_out": {
+          "cosine": 0.9999999524444321,
+          "norm_ratio": 1.000007456407223,
+          "relative_l2": 0.00030849220360374357,
+          "maxabs": 0.0005241632461547852,
+          "pass": true
+        },
+        "llm_inputs_embeds": {
+          "cosine": 0.9999999571686274,
+          "norm_ratio": 1.000006715291024,
+          "relative_l2": 0.00029275998915116106,
+          "maxabs": 0.0005241632461547852,
+          "pass": true
+        },
+        "llm_prefill_logits": {
+          "cosine": 0.9968818358777051,
+          "norm_ratio": 1.00230337953983,
+          "relative_l2": 0.07909486982590985,
+          "maxabs": 1.384211540222168,
+          "pass": true
+        },
+        "pipeline_prefill_logits": {
+          "cosine": 0.9971727272573342,
+          "norm_ratio": 0.9994122901807801,
+          "relative_l2": 0.07517690906295404,
+          "maxabs": 1.382535696029663,
+          "pass": true
+        }
+      },
+      "executions": {
+        "stages": {
+          "command": [
+            "granite5-stage-probe",
+            "granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+            "jfk-ref.gguf",
+            "value-down-f16",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "cpu"
+          ],
+          "resources": {
+            "load_average": [
+              1.21728515625,
+              1.72509765625,
+              1.27197265625
+            ],
+            "cpus": 4,
+            "memory_available_kib": 14242540
+          },
+          "peak_gpu_mib": 0,
+          "returncode": 0
+        },
+        "session": {
+          "command": [
+            "python",
+            "granite5_execution.py",
+            "--session-child",
+            "--model",
+            "renamed-model.gguf",
+            "--library",
+            "libcrispasr.so",
+            "--python-root",
+            "python",
+            "--pcm",
+            "original-audio.npy",
+            "--instruction",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "--output",
+            "session.json",
+            "--device",
+            "cpu"
+          ],
+          "resources": {
+            "load_average": [
+              2.1552734375,
+              1.90625,
+              1.341796875
+            ],
+            "cpus": 4,
+            "memory_available_kib": 14332820
+          },
+          "peak_gpu_mib": 0,
+          "returncode": 0
+        },
+        "cli": {
+          "command": [
+            "crispasr",
+            "-m",
+            "granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+            "-f",
+            "jfk.wav",
+            "-l",
+            "en",
+            "--ask",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "--max-new-tokens",
+            "96",
+            "-otxt",
+            "-of",
+            "cli-official",
+            "-t",
+            "4",
+            "--no-gpu"
+          ],
+          "resources": {
+            "load_average": [
+              3.13134765625,
+              2.201171875,
+              1.4697265625
+            ],
+            "cpus": 4,
+            "memory_available_kib": 14220984
+          },
+          "peak_gpu_mib": 0,
+          "returncode": 0
+        }
+      },
+      "prompt_ids_exact": true,
+      "bucketed": {
+        "exact": true,
+        "expected_count": 27,
+        "actual_count": 27,
+        "matching_prefix_count": 27,
+        "first_difference": null,
+        "expected_token": null,
+        "actual_token": null
+      },
+      "dynamic": {
+        "exact": true,
+        "expected_count": 27,
+        "actual_count": 27,
+        "matching_prefix_count": 27,
+        "first_difference": null,
+        "expected_token": null,
+        "actual_token": null
+      },
+      "native_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "session": {
+        "official": [
+          "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+          "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+        ],
+        "legacy_default": "and so, my fellow americans, ask not what your country can do for you, ask what you can do for your country."
+      },
+      "cli_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.\n"
+    }
+  },
+  "cuda": {
+    "repo": "cstr/crispasr-granite5-validation-public",
+    "prefix": "q4-cuda/8fbb1794da4eea3851d8384934695d39b3518b72/v1",
+    "revision": "fadfb5c880443d34ad31c11ac44cd635b65c4c1d",
+    "receipt_sha256": "74dd5b9d1a0e118bd4fd21904e5a8524400075a3a060113f2ed3eaf6e8ed6329",
+    "files": 30,
+    "bytes": 36401678,
+    "cuda_acceptance": true,
+    "production_release": false,
+    "anonymous_receipt_readback": true,
+    "hardware": {
+      "index": "0",
+      "uuid": "GPU-8574de0b-d511-6aa4-de26-6bca9868aebf",
+      "name": "Tesla T4",
+      "compute_capability": "7.5",
+      "driver_version": "580.178.04",
+      "memory_total_mib": "15360",
+      "memory_free_mib": "14912",
+      "utilization_gpu_percent": "0"
+    },
+    "runtime_source": "e2368b9e6ba94368a31798d003dca3b61e0bda10",
+    "validation": {
+      "complete": true,
+      "accepted": true,
+      "device": "cuda",
+      "stages": {
+        "mel_spectrogram": {
+          "cosine": 0.9999999781546894,
+          "norm_ratio": 1.0000001324384455,
+          "relative_l2": 0.00020902307078891384,
+          "maxabs": 0.02021205425262451,
+          "pass": true
+        },
+        "encoder_out": {
+          "cosine": 0.9999999610954918,
+          "norm_ratio": 0.9999992392624993,
+          "relative_l2": 0.00027894352476746036,
+          "maxabs": 0.016364097595214844,
+          "pass": true
+        },
+        "projector_out": {
+          "cosine": 0.9999999360370057,
+          "norm_ratio": 1.0000157050312433,
+          "relative_l2": 0.0003580148454135577,
+          "maxabs": 0.0005548000335693359,
+          "pass": true
+        },
+        "llm_inputs_embeds": {
+          "cosine": 0.9999999423833847,
+          "norm_ratio": 1.000014144063678,
+          "relative_l2": 0.0003397571187686514,
+          "maxabs": 0.0005548000335693359,
+          "pass": true
+        },
+        "llm_prefill_logits": {
+          "cosine": 0.9970491273758301,
+          "norm_ratio": 1.0034013756298552,
+          "relative_l2": 0.07702849250099651,
+          "maxabs": 1.476274013519287,
+          "pass": true
+        },
+        "pipeline_prefill_logits": {
+          "cosine": 0.9975169477037594,
+          "norm_ratio": 0.9929661172568018,
+          "relative_l2": 0.0705737139559227,
+          "maxabs": 1.4299259185791016,
+          "pass": true
+        }
+      },
+      "executions": {
+        "stages": {
+          "command": [
+            "granite5-stage-probe",
+            "granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+            "jfk-ref.gguf",
+            "q4_k",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "cuda"
+          ],
+          "resources": {
+            "load_average": [
+              1.9853515625,
+              0.56494140625,
+              0.236328125
+            ],
+            "cpus": 4,
+            "memory_available_kib": 31004800,
+            "gpu0": "GPU-8574de0b-d511-6aa4-de26-6bca9868aebf, 14912, 0"
+          },
+          "peak_gpu_mib": 4114,
+          "returncode": 0,
+          "gpu_matmul_nodes": 16523,
+          "gpu_decoder_matmul_nodes": 55
+        },
+        "session": {
+          "command": [
+            "python3",
+            "granite5_execution.py",
+            "--session-child",
+            "--model",
+            "renamed-model.gguf",
+            "--library",
+            "libcrispasr.so",
+            "--python-root",
+            "python",
+            "--pcm",
+            "original-audio.npy",
+            "--instruction",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "--output",
+            "session.json",
+            "--device",
+            "cuda"
+          ],
+          "resources": {
+            "load_average": [
+              1.90625,
+              0.572265625,
+              0.24072265625
+            ],
+            "cpus": 4,
+            "memory_available_kib": 30421880,
+            "gpu0": "GPU-8574de0b-d511-6aa4-de26-6bca9868aebf, 14912, 0"
+          },
+          "peak_gpu_mib": 4420,
+          "returncode": 0,
+          "gpu_matmul_nodes": 26246,
+          "gpu_decoder_matmul_nodes": 82
+        },
+        "cli": {
+          "command": [
+            "crispasr",
+            "-m",
+            "granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+            "-f",
+            "jfk.wav",
+            "-l",
+            "en",
+            "--ask",
+            "transcribe the speech with proper punctuation and capitalization.",
+            "--max-new-tokens",
+            "96",
+            "-otxt",
+            "-of",
+            "cli-official",
+            "-t",
+            "4"
+          ],
+          "resources": {
+            "load_average": [
+              1.6865234375,
+              0.56982421875,
+              0.24365234375
+            ],
+            "cpus": 4,
+            "memory_available_kib": 30233108,
+            "gpu0": "GPU-8574de0b-d511-6aa4-de26-6bca9868aebf, 14912, 0"
+          },
+          "peak_gpu_mib": 4406,
+          "returncode": 0,
+          "gpu_matmul_nodes": 8655,
+          "gpu_decoder_matmul_nodes": 27
+        }
+      },
+      "prompt_ids_exact": true,
+      "bucketed": {
+        "exact": true,
+        "expected_count": 27,
+        "actual_count": 27,
+        "matching_prefix_count": 27,
+        "first_difference": null,
+        "expected_token": null,
+        "actual_token": null
+      },
+      "dynamic": {
+        "exact": true,
+        "expected_count": 27,
+        "actual_count": 27,
+        "matching_prefix_count": 27,
+        "first_difference": null,
+        "expected_token": null,
+        "actual_token": null
+      },
+      "native_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "session": {
+        "official": [
+          "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+          "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+        ],
+        "legacy_default": "and so, my fellow americans, ask not what your country can do for you, ask what you can do for your country."
+      },
+      "cli_text": "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.\n"
+    }
+  },
+  "independent_replay": {
+    "complete": true,
+    "sha256": "451d07eaa5c02ebf8f1a81e4bb2dda529771773ff7c6cef5aff9301bbbb0eb1b"
+  },
+  "quantizer_default": {
+    "source": "83706a7099a6bfcd6c25b62c00945592d64b922f",
+    "hosted_run": 40074132958,
+    "full_model_byte_equivalence": true,
+    "synthetic_controls": 8,
+    "legacy_gate": "CRISPASR_GRANITE_Q4_LEGACY=1",
+    "receipt": {
+      "complete": true,
+      "exact_qualified_file": true,
+      "production_release": false,
+      "source": "83706a7099a6bfcd6c25b62c00945592d64b922f",
+      "run": 40074132958,
+      "cpu_source": "8fbb1794da4eea3851d8384934695d39b3518b72",
+      "cpu_run": 40068653973,
+      "cpu_revision": "e425e802e3a029edcf15d51cb31e863d59b5b0d2",
+      "cpu_receipt_sha256": "de60017c1e5d443539021124927a6c30d99bfa399d24ea018e274574ae9f53d7",
+      "build": {
+        "main_source_sha256": "e5f247ad6149521426c25838b1d24e032cc3b6d8dd83e4d185ca9d36d57a1b5f",
+        "helper_source_sha256": "c08b0e4eb8c89146c24192460a9f283194191dd48aec582ee65bc4ec02ae685f",
+        "ggml_source": "e2ae679a563014f46c546ce6c6448e8601e4dea6",
+        "ggml_base_sha256": "81e209bb4e8d265ea2e335d54b1b9ed6537c3f60d83356228605cc61e54b3245",
+        "tensor_name_abi": 128
+      },
+      "file": {
+        "bytes": 4074560192,
+        "sha256": "63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d"
+      },
+      "expected_file": {
+        "repo": "cstr/crispasr-granite5-validation-public",
+        "repo_type": "model",
+        "path": "q4-recipes/8fbb1794da4eea3851d8384934695d39b3518b72/granite-speech-5.0-2b-q4_k-value-down-f16.gguf",
+        "sha256": "63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d",
+        "bytes": 4074560192,
+        "revision": "d0e6349c7d0601fdd8ea38d1aad90e6b92ac47e2"
+      },
+      "elements_by_type": {
+        "F32": 476118956,
+        "F16": 788533248,
+        "Q4_K": 1048576000
+      }
+    },
+    "evidence": {
+      "repo": "cstr/crispasr-granite5-validation-public",
+      "revision": "26e9d02c322c4b2f2f3a5a3bd567a414ece97dda",
+      "prefix": "q4-default/83706a7099a6bfcd6c25b62c00945592d64b922f/40074132958",
+      "receipt_sha256": "365530c9039ecbe85737a4f5694491a4992d7c25f7e8ac688c6c827efe18e2c5",
+      "anonymous_receipt_readback": true
+    }
+  },
+  "publication": {
+    "run": 40074770638,
+    "complete": false,
+    "prior_run": {
+      "run": 40074162368,
+      "accepted": false,
+      "reason": "Missing requests at import; no model download or production mutation"
+    }
+  },
+  "license": {
+    "model": "Apache-2.0",
+    "recipe": "MIT",
+    "original_source": "ibm-granite/granite-speech-5.0-2b",
+    "original_revision": "c075cf19e041a2e4d16c5ee24763e5b037d8f479",
+    "baseline_release": "701f5529d8459412cc1b6053b5880c630125b138",
+    "assets": "Retain full original Apache license, IBM NOTICE, original publisher card, MIT recipe license and F16 provenance unchanged. Selected recipe uses no importance matrix or calibration audio. Publisher declarations do not independently clear training data or guarantee noninfringement."
+  }
+}

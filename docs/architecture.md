@@ -490,11 +490,25 @@ metadata retain their original parameters. The native context limit remains
 4096. Component agreement through position 16383 does not qualify full 16k
 inference.
 
-F16 passes the independent original F32 stage, magnitude, prompt-token,
-decoded-token, C ABI and CLI checks on CPU and actual CUDA. Q8_0 with F16 token
-embeddings passes CPU but fails the CUDA pipeline-logit magnitude gate;
-retaining its output head at F16 does not fix that failure. Q4_K and Q6_K also
-fail fixed magnitude gates. Only F16 is qualified for publication. Use
+F16 and the selected mixed Q4_K recipe pass the independent original F32
+stage, magnitude, prompt-token, decoded-token, C ABI and CLI checks on CPU and
+actual Tesla T4 CUDA. The Q4_K file is4.07 GB: encoder/projector, token embeddings,
+output head, attention value and FFN down projections retain their source
+precision; query/key/output and FFN gate/up matrices use Q4_K. Earlier Q4
+recipes and Q6_K failed fixed magnitude gates. Q8_0 with F16 token embeddings
+passes CPU but fails the CUDA pipeline-logit magnitude gate; retaining its
+output head at F16 does not fix that failure.
+
+The default Granite5 quantizer command reproduces the selected recipe:
+
+```sh
+crispasr-quantize granite-speech-5.0-2b-f16.gguf granite-speech-5.0-2b-q4_k.gguf q4_k
+```
+
+`CRISPASR_GRANITE_Q4_LEGACY=1` restores the previous Q4 recipe for diagnosis.
+Explicit `--tensor-type` rules still override the precision policy. Older
+Granite models without YaRN retain their existing quantizer behavior.
+The original F16 qualification remains available. Use
 `--ask "transcribe the speech with proper punctuation and capitalization."`
 for the publisher's punctuated/capitalized task; the legacy default request
 uses its raw transcription task. Both CLI and C ABI format the same prompt.

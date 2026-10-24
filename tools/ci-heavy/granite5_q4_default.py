@@ -84,6 +84,17 @@ def main():
     receipt['expected_file'] = row['file']
     save()
     if receipt['file'] != {k: row['file'][k] for k in ('bytes', 'sha256')}:
+        # Preserve unexpected expensive output for diagnosis, with the complete
+        # existing license/attribution bundle. The already checkpointed accepted
+        # file needs no duplicate transfer when whole-file identity matches.
+        fallback = out / 'failed-byte-equivalence'
+        fallback.mkdir()
+        shutil.copyfile(candidate, fallback / candidate.name)
+        legal = json.loads((ROOT / 'docs/granite5-2026-10-23.json').read_text())['license']['assets']
+        for name, identity in legal.items():
+            companion = fetch(dict(repo=cpu['f16']['repo'], revision=cpu['f16']['revision'],
+                                   path=name, **identity))
+            shutil.copyfile(companion, fallback / name)
         raise ValueError('Bare quantizer output differs from the CPU/CUDA-qualified file')
     inventory = tensor_inventory(f16, candidate, row['rules'])
     (out / 'tensors.json').write_text(json.dumps(inventory, indent=2) + '\n')

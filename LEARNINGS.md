@@ -19772,3 +19772,13 @@ immediately after quantization, before an audit can throw: a harness failure
 must not discard a valid, expensive artifact. Preserve successful calibration
 statistics and their exact corpus/model/source pins independently of later
 candidate failures.
+
+
+Granite5 Q4_K needed both attention value and FFN down projections retained at
+source precision, in addition to head and token embeddings. The selected file
+passed the unchanged original F32 CPU and T4 magnitude gates; protecting only
+the head or using Q6 value/down did not. Exact words alone had hidden these
+failures. Before making the recipe the tool default, compare the complete
+bare-command output hash with the already qualified explicit-override file.
+Keep the previous recipe behind a diagnostic environment gate and isolate
+that gate to quantizer subprocesses when replaying the old fixed recipe arms.

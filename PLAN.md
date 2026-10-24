@@ -33,7 +33,15 @@ identity are retained. Independent raw-array replay and publication are next.
 The new default quantizer policy preserves head, value and FFN down weights;
 eight model-free before/after controls pass including byte equality to the
 explicit recipe, legacy/Q8/older-Granite stability and user-override precedence.
-Hosted full-model byte equivalence is required before final integration.
+Hosted full-model byte equivalence40074132958 passes: the bare command
+reproduces every qualified byte. Its immutable proof is
+`26e9d02c322c4b2f2f3a5a3bd567a414ece97dda`. Publication40074162368 stopped before model transfer because the hosted
+environment lacked `requests`. Retry40074770638 adds that explicit dependency
+and is running at `83706a7099a6bfcd6c25b62c00945592d64b922f`. Independent CPU/CUDA
+raw-array replay passes; GPU evidence is public at immutable revision
+`fadfb5c880443d34ad31c11ac44cd635b65c4c1d`. See
+`docs/granite5-q4k-2026-10-24.json` for exact pins. Final integration awaits
+anonymous licensed release readback.
 
 CUDA build40066374390 passed at `e2368b9e6`. The capsule passes70 file hashes,
 700 native source hashes, compiled CUB notices and both corresponding-source

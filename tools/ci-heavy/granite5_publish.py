@@ -14,7 +14,6 @@ import shutil
 import subprocess
 import sys
 
-import requests
 
 from granite5_native_acceptance import sha
 from granite5_execution import gpu_matmul_nodes, gpu_decoder_matmul_nodes
@@ -31,6 +30,7 @@ LEGAL_REVISION = '7601437936c5b406af3e00c3a549d913329605ac'
 
 
 def readback(repo, revision, name, expected_sha, expected_bytes=None):
+    import requests
     from huggingface_hub import hf_hub_url
     # This deliberately sends no HF credentials; public availability is a gate.
     session = requests.Session()
