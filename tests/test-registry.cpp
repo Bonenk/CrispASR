@@ -252,22 +252,27 @@ TEST_CASE("registry: granite-4.1 has entry", "[unit][registry]") {
     REQUIRE(std::string(e.filename).find("granite") != std::string::npos);
 }
 
-TEST_CASE("registry: Granite5 offers only the CPU/CUDA-qualified F16 profile", "[unit][registry][granite5]") {
+TEST_CASE("registry: Granite5 defaults to qualified Q4 and preserves explicit F16", "[unit][registry][granite5]") {
     CrispasrRegistryEntry entry;
     REQUIRE(crispasr_registry_lookup("granite", entry));
-    REQUIRE(entry.filename == "granite-speech-5.0-2b-f16.gguf");
+    REQUIRE(entry.filename == "granite-speech-5.0-2b-q4_k.gguf");
     REQUIRE(entry.license == "Apache-2.0");
     REQUIRE(entry.url.find("/granite-speech-5.0-2b-GGUF/resolve/") != std::string::npos);
     REQUIRE(entry.url.find("/resolve/main/") == std::string::npos);
     REQUIRE_FALSE(entry.approx_size.empty());
-    for (const char* quant : {"f16"}) {
+    const std::string default_url = entry.url;
+    for (const char* quant : {"q4_k", "f16"}) {
         REQUIRE(crispasr_registry_lookup("granite", entry, quant));
         REQUIRE(entry.filename == std::string("granite-speech-5.0-2b-") + quant + ".gguf");
         REQUIRE_FALSE(entry.approx_size.empty());
         REQUIRE(crispasr_registry_lookup_by_filename(entry.filename, entry));
         REQUIRE(entry.backend == "granite");
+        if (std::string(quant) == "f16")
+            REQUIRE(entry.url.find("/resolve/701f5529d8459412cc1b6053b5880c630125b138/") != std::string::npos);
+        else
+            REQUIRE(entry.url == default_url);
     }
-    for (const char* quant : {"q8_0", "q4_k", "q6_k", "q5_k", "q2_k", "bf16", "f32"}) {
+    for (const char* quant : {"q8_0", "q6_k", "q5_k", "q2_k", "bf16", "f32"}) {
         REQUIRE_FALSE(crispasr_registry_lookup("granite", entry, quant));
         REQUIRE_FALSE(crispasr_registry_lookup_by_filename("granite-speech-5.0-2b-f16.gguf", entry, quant));
         REQUIRE_FALSE(
@@ -275,16 +280,22 @@ TEST_CASE("registry: Granite5 offers only the CPU/CUDA-qualified F16 profile", "
     }
     REQUIRE(crispasr_registry_lookup("granite-4.1", entry, "q4_k"));
     REQUIRE(entry.filename == "granite-speech-4.1-2b-q4_k.gguf");
+    REQUIRE(crispasr_registry_lookup_by_filename("granite-speech-4.0-1b-q4_k.gguf", entry));
+    REQUIRE(entry.url.find("/granite-speech-4.0-1b-GGUF/") != std::string::npos);
     int profiles = 0;
     for (int i = 0; i < crispasr_registry_count(); ++i) {
         REQUIRE(crispasr_registry_get_at(i, entry));
         if (entry.filename.find("granite-speech-5.0-2b-") != 0)
             continue;
         ++profiles;
-        REQUIRE_FALSE(crispasr_registry_get_at(i, entry, "q4_k"));
+        REQUIRE(crispasr_registry_get_at(i, entry, "q4_k"));
+        REQUIRE(entry.filename == "granite-speech-5.0-2b-q4_k.gguf");
+        REQUIRE(crispasr_registry_get_at(i, entry, "f16"));
+        REQUIRE(entry.filename == "granite-speech-5.0-2b-f16.gguf");
+        REQUIRE_FALSE(crispasr_registry_get_at(i, entry, "q8_0"));
         REQUIRE_FALSE(crispasr_registry_get_at(i, entry, "q6_k"));
     }
-    REQUIRE(profiles == 1);
+    REQUIRE(profiles == 2);
 }
 
 TEST_CASE("registry: Granite5 downloads the complete pinned legal bundle", "[unit][registry][granite5]") {
@@ -293,6 +304,10 @@ TEST_CASE("registry: Granite5 downloads the complete pinned legal bundle", "[uni
     REQUIRE(bundle.license == "Apache-2.0");
     REQUIRE_FALSE(bundle.requires_license_acceptance);
     REQUIRE(bundle.artifacts.size() == 6);
+    REQUIRE(bundle.artifacts.front().filename == "granite-speech-5.0-2b-q4_k.gguf");
+    REQUIRE(bundle.artifacts.front().kind == CrispasrRegistryArtifactKind::Primary);
+    const std::string primary_url = bundle.artifacts.front().url;
+    const std::string release_prefix = primary_url.substr(0, primary_url.rfind('/') + 1);
     const char* names[] = {"LICENSE", "LICENSE-RECIPE.txt", "NOTICE", "original-publisher-README.md",
                            "validation-evidence.json"};
     for (size_t i = 1; i < bundle.artifacts.size(); ++i) {
@@ -301,10 +316,11 @@ TEST_CASE("registry: Granite5 downloads the complete pinned legal bundle", "[uni
         REQUIRE(artifact.filename == std::string("granite-speech-5.0-2b/") + names[i - 1]);
         REQUIRE(artifact.url.find("/granite-speech-5.0-2b-GGUF/resolve/") != std::string::npos);
         REQUIRE(artifact.url.find("/resolve/main/") == std::string::npos);
+        REQUIRE(artifact.url == release_prefix + names[i - 1]);
     }
 }
 
-TEST_CASE("resolver: rejected Granite5 profiles cannot fall back to cached F16", "[unit][registry][granite5]") {
+TEST_CASE("resolver: cached F16 cannot satisfy the Granite5 Q4 default", "[unit][registry][granite5]") {
     const std::filesystem::path cache = "test-registry-granite5-cache";
     const std::string f16 = "granite-speech-5.0-2b-f16.gguf";
     const std::string q4 = "granite-speech-5.0-2b-q4_k.gguf";
@@ -314,11 +330,29 @@ TEST_CASE("resolver: rejected Granite5 profiles cannot fall back to cached F16",
         fixture << "fixture";
     }
     CHECK(crispasr_resolve_model(q4, "granite", true, cache.string(), false) == q4);
-    CHECK(crispasr_resolve_model("auto", "granite", true, cache.string(), false, "q4_k").empty());
     CrispasrRegistryEntry entry;
+    REQUIRE(crispasr_registry_lookup("granite", entry));
+    CHECK(entry.filename == q4);
+    CHECK_FALSE(std::filesystem::exists(cache / entry.filename));
+    // Inspect the cache with the default's exact quant; auto-resolution can
+    // fetch model/notice files and does not belong in a model-free unit test.
     CHECK_FALSE(crispasr_find_cached_model(entry, cache.string(), "q4_k"));
     CHECK(crispasr_find_cached_model(entry, cache.string(), "f16"));
     CHECK(entry.filename == f16);
+    CHECK(crispasr_resolve_model(f16, "granite", true, cache.string(), false) == (cache / f16).string());
+    for (const char* rejected : {"q8_0", "q6_k"}) {
+        CHECK_FALSE(crispasr_find_cached_model(entry, cache.string(), rejected));
+        CHECK(crispasr_resolve_model("auto", "granite", true, cache.string(), false, rejected).empty());
+    }
+    {
+        std::ofstream fixture(cache / q4, std::ios::binary);
+        fixture << "qualified Q4 cache fixture";
+    }
+    CHECK(crispasr_find_cached_model(entry, cache.string(), "q4_k"));
+    CHECK(entry.filename == q4);
+    CHECK(crispasr_find_cached_model(entry, cache.string(), "f16"));
+    CHECK(entry.filename == f16);
+    std::filesystem::remove(cache / q4);
     std::filesystem::remove(cache / f16);
     std::filesystem::remove(cache);
 }
@@ -529,10 +563,6 @@ TEST_CASE("registry: fill with preferred quant does not crash on any entry (#152
         crispasr_registry_get_at(i, e);
         CrispasrRegistryEntry eq;
         const bool found = crispasr_registry_lookup(e.backend, eq, "q4_k");
-        if (e.backend == "granite") {
-            REQUIRE_FALSE(found);
-            continue;
-        }
         REQUIRE(found);
         REQUIRE(!eq.backend.empty());
         REQUIRE(!eq.filename.empty());

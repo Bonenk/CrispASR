@@ -1,3 +1,22 @@
+## 2026-10-24 — Granite Speech5 Q4_K quantizer/default (#552)
+
+The bare `crispasr-quantize input-f16.gguf output.gguf q4_k` command now keeps
+Granite5 head/value/down projections at source precision. Its complete output
+is byte-identical to the independently CPU/T4-qualified4074560192-byte model.
+The previous recipe remains behind `CRISPASR_GRANITE_Q4_LEGACY=1`; explicit
+user tensor overrides, Q8 and older non-YaRN recipes retain their behavior.
+All original F32 stages/magnitudes, exact prompt and both27-token paths,
+repeated renamed C ABI Session and CLI pass. No gate was widened.
+
+Public release `e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d` adds canonical Q4_K
+with full anonymous model/metadata readback. Apache model/MIT recipe licenses,
+IBM notice, original publisher card and prior F16 bytes/provenance are retained.
+The registry defaults to pinned Q4_K with explicit F16 still available;
+Q8/Q6 remain excluded. Dedicated regression now checks both published profiles.
+Native context remains4096, with English JFK qualification and no speed claim.
+Only the registry table changes relative to the GPU-qualified native runtime.
+[Recipe, actual CUDA and bare-command proof](docs/granite5-q4k-2026-10-24.json).
+
 ## 2026-10-24 — C# managed roster validation checks
 
 Empty/whitespace and null speaker rosters now exercise the managed argument

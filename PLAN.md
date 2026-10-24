@@ -1,79 +1,34 @@
 # CrispASR — Pending work
 
-## NOW — Granite5 Q4_K quantizer recipe (#552), renewed work (2026-10-24)
+## NOW — Granite5 Q4_K final source checks (#552), 2026-10-24
 
-Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. User requires a
-Granite5 Q4_K model produced with `crispasr-quantize`. The qualified registry
-still serves F16 only. Earlier head/embedding substitutions failed the fixed
-numerical gates despite exact JFK words; no thresholds are being relaxed.
-
-Prepared seven fixed decoder recipes: body, body with importance matrix,
-attention F16, FFN F16, value/down Q6 or F16, and boundary layers F16. Eight
-fixed CC0 English calibration clips are disjoint from JFK. Every candidate uses
-actual quantizer output, verifies Q4_K payloads and preserves frontend, norm and
-embedding bytes. Full CPU acceptance includes original F32 stages/magnitudes,
-exact prompt and both decodes, repeated renamed C ABI Session and CLI.
-
-First CPU40066357138 (`e2368b9e6`) calibrated all280 decoder matrices but stopped
-before inference: its audit rejected lossless trailing-singleton dimension
-canonicalization. That audit is corrected and tested against both harmless
-canonicalization and real dimension changes. Generated weights checkpoint before
-the audit as well as inference. Retry40068653973 at `8fbb1794d` completed:
-`value-down-f16` and `ffn-f16` pass every CPU gate. The smaller selected
-value/down recipe is4074560192 bytes, SHA256
+Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. Full CPU40068653973
+and actual Tesla T4 CUDA acceptance pass for `value-down-f16`. Bare quantizer
+proof40074132958 reproduces the entire4074560192-byte model and SHA256
 `63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d`.
-The other five recipes remain rejected. CPU evidence revision
-`e425e802e3a029edcf15d51cb31e863d59b5b0d2` is immutable.
+The qualified policy is now the tool default; the previous recipe is available
+through `CRISPASR_GRANITE_Q4_LEGACY=1`. Gates and inference math are unchanged.
 
-Actual Kaggle Q4 acceptance v1 has completed on Tesla T4: all six stages,
-fixed magnitudes, exact prompt and27 token IDs in both decode paths, repeated
-renamed C ABI Session and CLI pass. Stage/Session/CLI GPU peaks are4114/4420/4406MiB;
-actual decoder matmuls are verified. Full terminal logs and uploaded-script
-identity are retained. Independent raw-array replay and publication are next.
-The new default quantizer policy preserves head, value and FFN down weights;
-eight model-free before/after controls pass including byte equality to the
-explicit recipe, legacy/Q8/older-Granite stability and user-override precedence.
-Hosted full-model byte equivalence40074132958 passes: the bare command
-reproduces every qualified byte. Its immutable proof is
-`26e9d02c322c4b2f2f3a5a3bd567a414ece97dda`. Publication40074162368 stopped before model transfer because the hosted
-environment lacked `requests`. Retry40074770638 added that dependency but never acquired a runner; it was
-cancelled before executing any steps. Pure transfer/audit publication40075304660
-uses the hosted ARM pool at `0774cf2cceae254a7b1e767241ccf6dc8d238be4`. Independent CPU/CUDA
-raw-array replay passes; GPU evidence is public at immutable revision
-`fadfb5c880443d34ad31c11ac44cd635b65c4c1d`. See
-`docs/granite5-q4k-2026-10-24.json` for exact pins. Final integration awaits
-anonymous licensed release readback.
+Hosted publication40075304660 succeeded on ARM after one dependency-only failure
+and one cancelled, never-started x64 retry. Public immutable model release
+`e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d` passes full anonymous model readback,
+independent metadata readback and original F16/license preservation checks.
+The registry defaults to Q4_K and retains explicit F16; Q8/Q6 remain rejected.
+Regression pins now select both published models. Original6-stage numerical,
+magnitude, exact prompt/both27-token decodes, repeated renamed C ABI Session
+and CLI acceptance remain required. Native context4096; no full16k or speed claim.
 
-CUDA build40066374390 passed at `e2368b9e6`. The capsule passes70 file hashes,
-700 native source hashes, compiled CUB notices and both corresponding-source
-packets. Public revision `d597fd6b5cde7126f181fdce08b5d85499c54cb9` passes full
-anonymous byte readback. This capsule also passed the separate F16 actual-T4 positive control,
-including full stages, Session and CLI. That control establishes no Q4 claim;
-the separate selected Q4 run supplies that evidence. Both kernels are terminal
-and their logs are retained. Cancelled build40066358829 had a source-pin typo
-and is excluded from evidence.
-
-The Q4 publisher and seven small rejection-control tests are prepared. They
-require exact CPU/GPU linkage, immutable source/license provenance, independent
-raw-array audit and full anonymous model readback. Existing F16 bytes and failed
-historical evidence stay preserved. Regression inputs require an explicit Q4
-profile declaration in the published card. Registry integration is drafted
-privately; no unaccepted model is offered for download.
-
-Main `b2e1de53a` CI40021856682, lint40021856813, deep lint40021856695 and
-regression40021856680 pass. The C# empty-roster expectation was stale after
-managed argument validation was added. Corrected empty/whitespace/null and
-consent-precedence tests require no native library; hosted C#40065985585 passes
-all207 tests on each of Linux and Windows.
-
-Check local load/memory before any compile or inference. Heavy CPU work stays on
-hosted runners; actual GPU validation uses a free slot on the configured Kaggle
-account. No runtime NN math is delegated.
+Actual registry checks pass6997 assertions/68 cases; eight offline CLI cases
+and all five native-downloaded legal companions pass. Frozen-source hosted
+CI, lint, regression and secret checks are next. Only the registry table differs from the
+GPU-qualified native runtime. [Full pins/receipt](docs/granite5-q4k-2026-10-24.json).
+Heavy CPU work remains hosted; actual GPU work uses a free configured Kaggle slot.
+Local tiny compiles require fresh load/memory checks. No large weights run locally.
 
 ## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 
 Owner: Codex, isolated feature worktree. Native YaRN conversion/runtime support
-and shared CLI/C ABI prompts are implemented. Only F16 qualifies for publication:
+and shared CLI/C ABI prompts are implemented. The initial release qualified F16:
 full original F32 stage/magnitude, prompt IDs, both27-token decodes, repeated
 renamed-model C ABI Sessions and CLI checks pass on hosted CPU39984477044 and
 actual T4 CUDA v4. Native context remains4096; rotary testing through16383 does
@@ -90,8 +45,9 @@ evidence; only its fully accepted F16 profile is released. Corrected CUDA
 capsules retain the actual SDK CUB2.3.2 BSD notice and corresponding sources for
 the external runtimes; all old capsule ELF payloads remain byte-identical.
 
-Integration sets the `granite` default to pinned F16, with pinned legal extras.
-Unqualified Q8/Q6/Q4 downloads and silent filename-to-default substitutions are
+The initial integration set the `granite` default to pinned F16, with legal extras.
+The2026-10-24 Q4_K recipe above supersedes that default and its Q4 rejection.
+Initially unqualified Q8/Q6/Q4 downloads and silent filename-to-default substitutions are
 rejected. Explicit legacy4.0 filenames and4.1 defaults are preserved. Registry
 checks pass6938 assertions/68 cases. A dedicated hosted nightly regression
 repeats the full accepted F16 gates; generic Granite frontend diff is insufficient.
@@ -110,8 +66,8 @@ Open precision follow-up: Q8 retaining F16 embeddings passes CPU but fails the
 actual CUDA pipeline-logit norm gate at1.010822821 (maximum1.01). Keeping the
 head at F16 also fails at1.010823834 in the controlled GPU comparison. Both
 retain exact words; that does not waive the magnitude gate. Q6 and every Q4
-head/embedding arm are also unaccepted. Keep these profiles out of the registry
-until a new recipe passes full CPU and actual CUDA acceptance.
+head/embedding arm are also unaccepted. The2026-10-24 value/down F16 recipe
+separately passes full CPU/CUDA acceptance; the earlier failed recipes stay rejected.
 
 Resource policy: check load and available memory immediately before local
 compile/inference. Large CPU work stays on GitHub; actual GPU work stays on

@@ -1,14 +1,20 @@
 {
   "repo": "cstr/granite-speech-5.0-2b-GGUF",
-  "revision": "701f5529d8459412cc1b6053b5880c630125b138",
+  "revision": "e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d",
   "profiles": [
-    "f16"
+    "f16",
+    "q4_k"
   ],
   "models": {
     "f16": {
       "filename": "granite-speech-5.0-2b-f16.gguf",
       "sha256": "2b9095b27d6a22f63a2b9dd6d8014611a71565c28fd71e19d7381eb55cc68351",
       "bytes": 5581888128
+    },
+    "q4_k": {
+      "filename": "granite-speech-5.0-2b-q4_k.gguf",
+      "sha256": "63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d",
+      "bytes": 4074560192
     }
   },
   "reference": {
@@ -31,7 +37,17 @@
   },
   "unaccepted_profiles": [
     "q8_0",
-    "q6_k",
-    "q4_k"
-  ]
+    "q6_k"
+  ],
+  "q4_cuda_evidence": {
+    "repo": "cstr/crispasr-granite5-validation-public",
+    "prefix": "q4-cuda/8fbb1794da4eea3851d8384934695d39b3518b72/v1",
+    "revision": "fadfb5c880443d34ad31c11ac44cd635b65c4c1d",
+    "receipt_sha256": "74dd5b9d1a0e118bd4fd21904e5a8524400075a3a060113f2ed3eaf6e8ed6329",
+    "files": 30,
+    "bytes": 36401678,
+    "cuda_acceptance": true,
+    "production_release": false,
+    "anonymous_receipt_readback": true
+  }
 }

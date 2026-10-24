@@ -16,6 +16,9 @@ TEST_CASE("registry C ABI: Granite5 default includes pinned Apache notices", "[u
     REQUIRE(std::string(backend) == "granite");
     REQUIRE(std::string(license) == "Apache-2.0");
     REQUIRE(requires_acceptance == 0);
+    const char* legal_names[] = {"LICENSE", "LICENSE-RECIPE.txt", "NOTICE", "original-publisher-README.md",
+                                 "validation-evidence.json"};
+    std::string release_prefix;
     for (int index = 0; index < 6; ++index) {
         int32_t kind = -1;
         char filename[128] = {}, url[512] = {}, size[64] = {};
@@ -24,10 +27,40 @@ TEST_CASE("registry C ABI: Granite5 default includes pinned Apache notices", "[u
         REQUIRE(kind == (index == 0 ? CRISPASR_REGISTRY_ARTIFACT_PRIMARY : CRISPASR_REGISTRY_ARTIFACT_EXTRA));
         REQUIRE(std::string(url).find("/granite-speech-5.0-2b-GGUF/resolve/") != std::string::npos);
         REQUIRE(std::string(url).find("/resolve/main/") == std::string::npos);
-        if (index == 0)
-            REQUIRE(std::string(filename) == "granite-speech-5.0-2b-f16.gguf");
+        if (index == 0) {
+            REQUIRE(std::string(filename) == "granite-speech-5.0-2b-q4_k.gguf");
+            REQUIRE_FALSE(std::string(size).empty());
+            const std::string primary_url = url;
+            release_prefix = primary_url.substr(0, primary_url.rfind('/') + 1);
+        } else {
+            REQUIRE(std::string(filename) == std::string("granite-speech-5.0-2b/") + legal_names[index - 1]);
+            REQUIRE(std::string(url) == release_prefix + legal_names[index - 1]);
+        }
+    }
+}
+
+TEST_CASE("registry C ABI: Granite5 Q4 default and explicit F16 preserve profile identity",
+          "[unit][registry][c-abi][granite5]") {
+    char filename[128] = {}, url[512] = {}, size[64] = {};
+    REQUIRE(crispasr_registry_lookup_abi("granite", filename, sizeof(filename), url, sizeof(url), size, sizeof(size)) ==
+            0);
+    REQUIRE(std::string(filename) == "granite-speech-5.0-2b-q4_k.gguf");
+    const std::string default_url = url;
+    for (const char* quant : {"q4_k", "f16"}) {
+        const std::string requested = std::string("granite-speech-5.0-2b-") + quant + ".gguf";
+        REQUIRE(crispasr_registry_lookup_by_filename_abi(requested.c_str(), filename, sizeof(filename), url,
+                                                         sizeof(url), size, sizeof(size)) == 0);
+        REQUIRE(std::string(filename) == requested);
+        REQUIRE_FALSE(std::string(size).empty());
+        if (std::string(quant) == "f16")
+            REQUIRE(std::string(url).find("/resolve/701f5529d8459412cc1b6053b5880c630125b138/") != std::string::npos);
         else
-            REQUIRE(std::string(filename).find("granite-speech-5.0-2b/") == 0);
+            REQUIRE(std::string(url) == default_url);
+    }
+    for (const char* quant : {"q8_0", "q6_k"}) {
+        const std::string rejected = std::string("granite-speech-5.0-2b-") + quant + ".gguf";
+        REQUIRE(crispasr_registry_lookup_by_filename_abi(rejected.c_str(), filename, sizeof(filename), url, sizeof(url),
+                                                         size, sizeof(size)) == 1);
     }
 }
 

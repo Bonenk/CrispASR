@@ -169,10 +169,13 @@ constexpr Entry k_registry[] = {
     {"voxtral4b", "voxtral-mini-4b-realtime-f16.gguf",
      "https://huggingface.co/cstr/voxtral-mini-4b-realtime-GGUF/resolve/main/voxtral-mini-4b-realtime-f16.gguf",
      "~8.3 GB", nullptr, nullptr},
-    // Only F16 passes all CPU/CUDA stage, magnitude, token and API gates.
+    // Qualified Granite5 profiles have explicit immutable rows and measured sizes.
+    {"granite", "granite-speech-5.0-2b-q4_k.gguf",
+     "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/granite-speech-5.0-2b-q4_k.gguf",
+     "~4.07 GB", nullptr, nullptr, nullptr, "Apache-2.0", ",f16,q4_k,"},
     {"granite", "granite-speech-5.0-2b-f16.gguf",
      "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/granite-speech-5.0-2b-f16.gguf",
-     "~5.58 GB", nullptr, nullptr, nullptr, "Apache-2.0", ",f16,"},
+     "~5.58 GB", nullptr, nullptr, nullptr, "Apache-2.0", ",f16,q4_k,"},
     {"granite", "granite-speech-4.0-1b-q4_k.gguf",
      "https://huggingface.co/cstr/granite-speech-4.0-1b-GGUF/resolve/main/granite-speech-4.0-1b-q4_k.gguf", "~2.94 GB", nullptr, nullptr},
     {"granite-4.1", "granite-speech-4.1-2b-q4_k.gguf",
@@ -1880,11 +1883,11 @@ constexpr ExtraCompanion k_moonshine_streaming_small_de_onnx_f32_extras[] = {
 };
 
 constexpr ExtraCompanion k_granite5_extras[] = {
-    {"granite-speech-5.0-2b/LICENSE", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/LICENSE"},
-    {"granite-speech-5.0-2b/LICENSE-RECIPE.txt", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/LICENSE-RECIPE.txt"},
-    {"granite-speech-5.0-2b/NOTICE", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/NOTICE"},
-    {"granite-speech-5.0-2b/original-publisher-README.md", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/original-publisher-README.md"},
-    {"granite-speech-5.0-2b/validation-evidence.json", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/701f5529d8459412cc1b6053b5880c630125b138/validation-evidence.json"},
+    {"granite-speech-5.0-2b/LICENSE", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/LICENSE"},
+    {"granite-speech-5.0-2b/LICENSE-RECIPE.txt", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/LICENSE-RECIPE.txt"},
+    {"granite-speech-5.0-2b/NOTICE", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/NOTICE"},
+    {"granite-speech-5.0-2b/original-publisher-README.md", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/original-publisher-README.md"},
+    {"granite-speech-5.0-2b/validation-evidence.json", "https://huggingface.co/cstr/granite-speech-5.0-2b-GGUF/resolve/e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d/validation-evidence.json"},
     {nullptr, nullptr},
 };
 

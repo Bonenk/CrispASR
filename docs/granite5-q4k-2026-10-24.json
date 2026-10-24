@@ -1,7 +1,7 @@
 {
   "date": "2026-10-24",
   "complete": false,
-  "production_release": false,
+  "production_release": true,
   "scope": "English JFK original F32 stages/magnitudes, exact prompt and both 27-token decodes, repeated renamed C ABI Session and CLI; native context4096, no full16k inference or performance claim",
   "selected_recipe": "value-down-f16",
   "rules": [
@@ -470,7 +470,7 @@
   },
   "publication": {
     "run": 40075304660,
-    "complete": false,
+    "complete": true,
     "prior_run": {
       "run": 40074162368,
       "accepted": false,
@@ -478,7 +478,90 @@
     },
     "source": "0774cf2cceae254a7b1e767241ccf6dc8d238be4",
     "runner": "ubuntu-24.04-arm",
-    "cancelled_queued_run": 40074770638
+    "cancelled_queued_run": 40074770638,
+    "release": {
+      "repo": "cstr/granite-speech-5.0-2b-GGUF",
+      "revision": "e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d",
+      "complete": true,
+      "base_f16_revision": "701f5529d8459412cc1b6053b5880c630125b138",
+      "models": {
+        "f16": {
+          "filename": "granite-speech-5.0-2b-f16.gguf",
+          "revision": "68bfc1859eaca70fb0d83122120e81867dd9a114",
+          "sha256": "2b9095b27d6a22f63a2b9dd6d8014611a71565c28fd71e19d7381eb55cc68351",
+          "bytes": 5581888128,
+          "anonymous_full_byte_readback": true
+        },
+        "q4_k": {
+          "filename": "granite-speech-5.0-2b-q4_k.gguf",
+          "revision": "da7ce0b2838eb83d65f6546e3b42d2abea1cecf0",
+          "sha256": "63324167e3a85a67539a44712aef1a4624882561a939597cc20e1a31e864674d",
+          "bytes": 4074560192,
+          "anonymous_full_byte_readback": true
+        }
+      }
+    },
+    "independent_metadata_readback": {
+      "revision": "e1df7d2cabb0ddba9863d7fc90cb6e78e8f19a6d",
+      "assets": {
+        "q4-cpu-receipt.json": {
+          "bytes": 117717,
+          "sha256": "de60017c1e5d443539021124927a6c30d99bfa399d24ea018e274574ae9f53d7",
+          "anonymous_readback": true
+        },
+        "NOTICE": {
+          "bytes": 399,
+          "sha256": "ebfa1eb6afd8d479af5f54b1231840acd5a789daf61b743fcbd383a50da36609",
+          "anonymous_readback": true
+        },
+        "README.md": {
+          "bytes": 2427,
+          "sha256": "3dfe1ef4584dfa1509bddd71e877649703fbc2c8666216808a7d2eca401693ca",
+          "anonymous_readback": true
+        },
+        "F16-validation-evidence.json": {
+          "bytes": 2710,
+          "sha256": "22b4e3cdbe16cc2d8a8f819686379591918a22da2b17569c9fa67163b98a0e51",
+          "anonymous_readback": true
+        },
+        "LICENSE": {
+          "bytes": 11343,
+          "sha256": "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655",
+          "anonymous_readback": true
+        },
+        "LICENSE-RECIPE.txt": {
+          "bytes": 1184,
+          "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e",
+          "anonymous_readback": true
+        },
+        "independent-q4-audit.json": {
+          "bytes": 5417,
+          "sha256": "00eb6b10cd259aa0c9ed7ad6ae44a7b60d4f57bd0f7e7ad4cce6e5bf9160a3ba",
+          "anonymous_readback": true
+        },
+        "F16-release-README.md": {
+          "bytes": 1493,
+          "sha256": "d99ea1aa60a57f324d89c7e018f51361d770b0449a2c360ca6bdbd878177255d",
+          "anonymous_readback": true
+        },
+        "validation-evidence.json": {
+          "bytes": 5598,
+          "sha256": "130bfdcb2ca7eff50ec73000ba7c16027a2f7183d786bf84ad2a49eb7f167a0e",
+          "anonymous_readback": true
+        },
+        "original-publisher-README.md": {
+          "bytes": 24532,
+          "sha256": "7de30987be095cfc7e417b82710a607d7e838cc64fdeaeaa11b06ee939fdf8aa",
+          "anonymous_readback": true
+        },
+        "q4-cuda-receipt.json": {
+          "bytes": 10163,
+          "sha256": "74dd5b9d1a0e118bd4fd21904e5a8524400075a3a060113f2ed3eaf6e8ed6329",
+          "anonymous_readback": true
+        }
+      },
+      "models_lfs_identity_verified": true
+    }
   },
   "license": {
     "model": "Apache-2.0",
@@ -487,5 +570,48 @@
     "original_revision": "c075cf19e041a2e4d16c5ee24763e5b037d8f479",
     "baseline_release": "701f5529d8459412cc1b6053b5880c630125b138",
     "assets": "Retain full original Apache license, IBM NOTICE, original publisher card, MIT recipe license and F16 provenance unchanged. Selected recipe uses no importance matrix or calibration audio. Publisher declarations do not independently clear training data or guarantee noninfringement."
+  },
+  "integration": {
+    "complete": false,
+    "registry_default": "q4_k",
+    "explicit_profiles": [
+      "f16",
+      "q4_k"
+    ],
+    "native_runtime_changes": [
+      "src/crispasr_model_registry.cpp"
+    ],
+    "local_checks": {
+      "registry_assertions": 6997,
+      "registry_cases": 68,
+      "cli_offline_cases": 8,
+      "legal_companions": {
+        "LICENSE": {
+          "bytes": 11343,
+          "sha256": "a44a6081c73ad75f0255bb2bb5cab74ef1829565a895a24e53a4f11290ab7655"
+        },
+        "LICENSE-RECIPE.txt": {
+          "bytes": 1184,
+          "sha256": "aa918fb53ff1948e12cdae8136e045210fb6db222a1f6f0c14bad48e6de2100e"
+        },
+        "NOTICE": {
+          "bytes": 399,
+          "sha256": "ebfa1eb6afd8d479af5f54b1231840acd5a789daf61b743fcbd383a50da36609"
+        },
+        "original-publisher-README.md": {
+          "bytes": 24532,
+          "sha256": "7de30987be095cfc7e417b82710a607d7e838cc64fdeaeaa11b06ee939fdf8aa"
+        },
+        "validation-evidence.json": {
+          "bytes": 5598,
+          "sha256": "130bfdcb2ca7eff50ec73000ba7c16027a2f7183d786bf84ad2a49eb7f167a0e"
+        }
+      },
+      "primary_test_fixture_bytes": 7,
+      "assertions_enabled": true,
+      "native_changes_from_gpu_runtime": [
+        "src/crispasr_model_registry.cpp"
+      ]
+    }
   }
 }
