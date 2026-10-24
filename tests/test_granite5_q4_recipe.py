@@ -1,5 +1,6 @@
 """Small GGUF controls for quantizer recipe evidence; no model execution."""
 import importlib
+import copy
 from pathlib import Path
 import sys
 import tempfile
@@ -9,6 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools/ci-heavy'))
 recipe = importlib.import_module('granite5_q4_recipe')
+cuda = importlib.import_module('granite5_q4_cuda')
 
 
 class GraniteQ4Inventory(unittest.TestCase):
@@ -51,6 +53,24 @@ class GraniteQ4Inventory(unittest.TestCase):
             self.write(candidate, quantized=True)
             with self.assertRaisesRegex(ValueError, 'override not applied'):
                 recipe.tensor_inventory(original, candidate, [r'^blk\.0\.ffn_gate\.weight$=f16'])
+
+    def test_cuda_requires_full_selected_cpu_case_and_real_q4(self):
+        cpu = dict(complete=True, diagnostic_only=True, production_release=False, cuda_acceptance=False,
+            cases={'body': dict(cpu_acceptance=True, rules=recipe.RECIPES['body'],
+                elements_by_type={'Q4_K': 8192}, validation=dict(accepted=True, complete=True, device='cpu')),
+                'attention-f16': dict(cpu_acceptance=False)})
+        cuda.approved_case(cpu, 'body')  # Other rejected diagnostic arms stay rejected.
+        mutations = [lambda p: p.update(complete=False),
+                     lambda p: p['cases']['body'].update(cpu_acceptance=False),
+                     lambda p: p['cases']['body']['validation'].update(complete=False),
+                     lambda p: p['cases']['body']['validation'].update(device='cuda'),
+                     lambda p: p['cases']['body'].update(elements_by_type={'F16': 8192}),
+                     lambda p: p['cases']['body'].update(rules=[])]
+        for mutate in mutations:
+            bad = copy.deepcopy(cpu)
+            mutate(bad)
+            with self.assertRaises(ValueError):
+                cuda.approved_case(bad, 'body')
 
 
 if __name__ == '__main__':

@@ -13,7 +13,14 @@ quantizer output with verified real Q4_K tensors and unchanged frontend, norms
 and embeddings. Checkpoint each candidate before inference, then qualify a
 selected recipe through full CPU and actual CUDA gates. Two small GGUF controls
 pass, rejecting changed protected tensors, ignored precision overrides and F16
-files relabelled as Q4. Hosted execution is next. Do not relax thresholds
+files relabelled as Q4. Hosted CPU40066357138 is queued at source `e2368b9e6`; matching CUDA build
+40066374390 is queued with that exact source input. Cancelled build40066358829
+had a source-pin typo and is excluded from evidence. The prepared Q4 GPU worker
+requires a complete selected CPU result, verified Q4 payloads, identical runtime
+sources, original rotary controls and full actual GPU stage/Session/CLI gates.
+It has not run. Model-free controls reject incomplete/failed CPU cases, wrong
+devices, changed recipes and F16 relabelling. C# correction run40065985585 is
+queued on Linux/Windows. Do not relax thresholds
 or promote an unaccepted diagnostic. Heavy CPU work stays on hosted runners;
 actual GPU validation stays on a free Kaggle slot. Check local load/memory before
 any compile or inference.
