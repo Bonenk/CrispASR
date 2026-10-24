@@ -19762,3 +19762,13 @@ Inspect the actual SDK package/version header: CUDA12.4.1's installed CUB was
 2.3.2 while its release-note table named2.3.1. License-only archive completion
 can preserve every ELF byte while adding notices; retain that parent-child
 provenance and do not imply it establishes model acceptance.
+
+Quantizer tensor audits must compare logical dimensions, not the original rank.
+`ggml_n_dims()` removes trailing unit axes when GGUF descriptors are written.
+Accept only that lossless canonicalization; keep rejecting all other dimension
+changes, even when element counts and payload bytes match. Protected tensor
+bytes and types still have to match the source. Checkpoint the produced model
+immediately after quantization, before an audit can throw: a harness failure
+must not discard a valid, expensive artifact. Preserve successful calibration
+statistics and their exact corpus/model/source pins independently of later
+candidate failures.

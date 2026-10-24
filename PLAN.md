@@ -2,50 +2,56 @@
 
 ## NOW — Granite5 Q4_K quantizer recipe (#552), renewed work (2026-10-24)
 
-Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. User explicitly
-requires a Granite5 Q4_K model produced with `crispasr-quantize`. F16 remains the
-qualified default while this work proceeds. Earlier Q4 head/embedding precision
-arms failed the unchanged original-reference numerical gates despite exact JFK
-words. Prepared `granite5_q4_recipe.py`: fixed body, attention, FFN, value/down and
-boundary-layer precision arms, plus a body importance-matrix arm calibrated on
-eight fixed CC0 English clips disjoint from JFK. Every candidate uses fresh
-quantizer output with verified real Q4_K tensors and unchanged frontend, norms
-and embeddings. Checkpoint each candidate before inference, then qualify a
-selected recipe through full CPU and actual CUDA gates. Two small GGUF controls
-pass, rejecting changed protected tensors, ignored precision overrides and F16
-files relabelled as Q4. Hosted CPU40066357138 at source `e2368b9e6` completed calibration but stopped
-before model inference: the tensor audit rejected ggml trailing-singleton shape
-canonicalization. Its280-matrix calibration is retained; logical-shape controls
-now cover canonicalization and reject real dimension changes. Generated weights
-will checkpoint before the audit as well as inference. Retry reuses that
-calibration and the source-matched native capsule while freshly compiling the
-actual quantizer/parser sources against its verified GGML base; matching CUDA build
-40066374390 passed with that exact source input; capsule/license/source audit
-passes70 file hashes,700 native source hashes and both corresponding-source
-packets. Capsule `d597fd6b5cde7126f181fdce08b5d85499c54cb9` passes full
-anonymous byte readback; this is build qualification, not GPU model acceptance. Cancelled build40066358829
-had a source-pin typo and is excluded from evidence. The prepared Q4 GPU worker
-requires a complete selected CPU result, verified Q4 payloads, identical runtime
-sources, original rotary controls and full actual GPU stage/Session/CLI gates.
-It has not run. Model-free controls reject incomplete/failed CPU cases, wrong
-devices, changed recipes and F16 relabelling. C# correction run40065985585
-passes on both Linux and Windows. A Q4 publisher is prepared with seven small
-rejection-control tests: exact CPU/GPU linkage, actual decoder work, immutable
-source/license provenance, independent raw-array audit and full anonymous byte
-readback. Existing F16 bytes and historical failed evidence stay preserved.
-Regression input validation now requires an explicit published Q4 profile
-declaration; the current F16 card cannot qualify an unlisted new file. Registry
-integration is drafted privately, with no active Q4 download until acceptance. Do not relax thresholds
-or promote an unaccepted diagnostic. Heavy CPU work stays on hosted runners;
-actual GPU validation stays on a free Kaggle slot. Check local load/memory before
-any compile or inference.
+Owner: Codex, isolated `feat/granite5-q4k-20261024` worktree. User requires a
+Granite5 Q4_K model produced with `crispasr-quantize`. The qualified registry
+still serves F16 only. Earlier head/embedding substitutions failed the fixed
+numerical gates despite exact JFK words; no thresholds are being relaxed.
+
+Prepared seven fixed decoder recipes: body, body with importance matrix,
+attention F16, FFN F16, value/down Q6 or F16, and boundary layers F16. Eight
+fixed CC0 English calibration clips are disjoint from JFK. Every candidate uses
+actual quantizer output, verifies Q4_K payloads and preserves frontend, norm and
+embedding bytes. Full CPU acceptance includes original F32 stages/magnitudes,
+exact prompt and both decodes, repeated renamed C ABI Session and CLI.
+
+First CPU40066357138 (`e2368b9e6`) calibrated all280 decoder matrices but stopped
+before inference: its audit rejected lossless trailing-singleton dimension
+canonicalization. That audit is corrected and tested against both harmless
+canonicalization and real dimension changes. Generated weights checkpoint before
+the audit as well as inference. Retry40068653973 at `8fbb1794d` is running,
+reusing the retained calibration and rebuilding the actual quantizer/parser
+against the verified GGML base. Native sources and GGML headers must match the
+prebuilt runtime. The tensor-name ABI remains128.
+
+CUDA build40066374390 passed at `e2368b9e6`. The capsule passes70 file hashes,
+700 native source hashes, compiled CUB notices and both corresponding-source
+packets. Public revision `d597fd6b5cde7126f181fdce08b5d85499c54cb9` passes full
+anonymous byte readback. This is build qualification, not GPU model acceptance.
+Cancelled build40066358829 had a source-pin typo and is excluded from evidence.
+The prepared GPU worker requires a fully accepted selected CPU case, actual GPU
+loader/decoder work, original rotary controls and full stage/Session/CLI gates.
+It has not run. The Kaggle entry remains unlaunchable until CPU/recipe pins exist.
+A separate F16 GPU positive control is prepared for the new runtime while the
+Q4 CPU recipes run. Its immutable successful CPU proof is40012494531 at
+`5b5278a0f`; complete native/client/input Git trees must match. It cannot
+establish Q4 acceptance. Fresh slot availability is required before launch.
+
+The Q4 publisher and seven small rejection-control tests are prepared. They
+require exact CPU/GPU linkage, immutable source/license provenance, independent
+raw-array audit and full anonymous model readback. Existing F16 bytes and failed
+historical evidence stay preserved. Regression inputs require an explicit Q4
+profile declaration in the published card. Registry integration is drafted
+privately; no unaccepted model is offered for download.
 
 Main `b2e1de53a` CI40021856682, lint40021856813, deep lint40021856695 and
-regression40021856680 now pass. C#40021856648 fails one stale empty-roster
-exception expectation on each OS: managed validation now throws ArgumentException
-before native access. Correct the test contract and exercise empty/whitespace/null
-rosters without requiring a native library; preserve the consent gate. Hosted
-Linux/Windows correction run40065985585 now passes.
+regression40021856680 pass. The C# empty-roster expectation was stale after
+managed argument validation was added. Corrected empty/whitespace/null and
+consent-precedence tests require no native library; hosted C#40065985585 passes
+all207 tests on each of Linux and Windows.
+
+Check local load/memory before any compile or inference. Heavy CPU work stays on
+hosted runners; actual GPU validation uses a free slot on the configured Kaggle
+account. No runtime NN math is delegated.
 
 ## Granite Speech5.0 F16 (#552) — completed (2026-10-23)
 

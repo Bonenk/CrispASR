@@ -1,3 +1,10 @@
+## 2026-10-24 — C# managed roster validation checks
+
+Empty/whitespace and null speaker rosters now exercise the managed argument
+contract directly, including parameter names and consent-gate precedence. These
+checks no longer skip when a native library is absent. Production guards remain
+unchanged. Hosted C#40065985585 passes207 tests on each of Linux and Windows.
+
 ## 2026-10-23 — Granite Speech5.0 F16 (#552)
 
 YaRN factor4/original-context4096 metadata now reaches every Granite prefill,
