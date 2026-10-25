@@ -707,8 +707,9 @@ crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
   -f hindi.wav -l hi --canary-mode romanized
 ```
 
-`-l` / `-sl` is mandatory. The current adapter rejects `auto` because the
-one-step encoder-state LID path is not wired into the C++ runtime yet; a target
+`-l` / `-sl` should be explicit. The C++ runtime has no built-in LID, so a
+literal `auto` that reaches the backend is rejected; the CLI may still run its
+external LID first, which can return a language outside the model's 27. A target
 language is ignored (this checkpoint is ASR-only). Supported `-l` values are
 `as bgc bhb bho bn brx doi en gu hi hne kn kok ks mai ml mni mr ne or pa sa sat
 sd ta te ur`. Long audio is decoded in 30 s windows with 1 s overlap (the
