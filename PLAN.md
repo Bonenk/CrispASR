@@ -3,58 +3,55 @@
 ## NOW — release recovery and error backlog (2026-10-25)
 
 Owner: Codex, branch `fix/release-and-binding-errors-20261025`, base `c08d243de`.
-User authorized the complete reviewed agenda, errors before features, with closure
-only after the last item and a fresh GitHub sweep. No issue is closed early.
+The user authorized the reviewed agenda, errors before features, with closure
+only after reaching the last item, followed by a fresh GitHub sweep.
 
-1. Repair #556 artifact selection and recover the existing v0.8.44 CPU wheels
-   and sdist from run39599409648; verify exact distributions before publication.
-2. Integrate contributor #553/#554, retaining attribution, and validate malformed
-   UTF-8 and actual/null synthesis-error handling through binding probes.
-3. Diagnose full nightly40078771993: CSM WER0.6667 and data2vec upstream
-   transcript WER0.0435. Do not relax gates or replace reference expectations.
-4. Reconcile completed #555/#552/#549/#551 against release/downstream evidence;
-   complete corrected #518 clone acceptance, scope #532's missing reproducer,
-   retain hardware-specific #483/#461 checks and #456's license-review hold.
-5. Reach the last item, then close only evidence-supported resolutions and loop
-   over fresh issues/PRs. Unreproduced, hardware-blocked or license-blocked work
-   remains explicitly open. Heavy CPU work runs on Actions; actual CUDA on an
-   available Kaggle slot. Check local load/memory before compiles/inference.
+Completed implementation and evidence:
 
-Checkpoint: contributor fixes are integrated with original authorship in
-`1a9ff6889` (#553) and `2fdc45923` (#554). Publication recovery, six rejecting
-distribution controls and Rust error-path probes are on main `85a620366`.
-Recovery40171262926 and corrected complete OmniVoice CPU campaign40171264744
-are queued at that source. CI40171253946, Lint40171253899,
-Rust40171253931, Dart40171253902 and ABI contracts40171253885 remain pending.
-No successful publication or passing hosted binding suite is claimed yet.
+- **#556:** original 0.8.44 CPU wheels and sdist published by recovery
+  [40171262926](https://github.com/CrispStrobe/CrispASR/actions/runs/40171262926).
+  All five distributions were anonymously read back in full and match the
+  original producer sizes and SHA256 hashes. No rebuilding or retagging.
+  Artifact selection excludes ABI receipts; seven publication checks reject
+  contamination, wrong metadata and incomplete sets. Follow-up `008b421e7`
+  removes a Python 3.11-only hashing API exposed by the Python 3.10 unit runner.
+- **#553 / #554:** contributor patches are integrated with original authorship
+  in `1a9ff6889` and `2fdc45923`. Actual hosted Dart and Rust native builds pass.
+  All six ABI contracts in run40171253885 pass, including the new malformed
+  UTF-8 case and Rust native-error/null-fallback probe (36 probes, five doctests).
+- **#518:** corrected CPU campaign40171264744 passes all nine roundtrips, both
+  eligible references and both cross-sentence targets, at unchanged WER <= 0.2
+  (maximum 1/9). Same-code DSP matches upstream exactly. Independent PCM/code
+  hashes and coverage pass. Historical M1 judge disagreement remains recorded;
+  this does not establish every GPU, speaker similarity or universal click
+  removal. The full proof bundle remains private: exact upstream notices are
+  retained without inventing a CC-BY-NC version or a wider fixture rights grant.
+- **Nightly investigation:** same-host campaign40171767752 passes both pinned
+  sources `8bc09441a` and `96aeb4269`. Their data2vec Q4 CTC arrays are identical
+  (F16 stage cosine0.999141); all four CSM audio PCM streams are identical with
+  WER0. The older nightly failures remain unreproduced on this AMD EPYC7763
+  host. No NN fix, gate relaxation or cross-host cause is claimed. Retain the
+  old failures and new CPU/compiler/raw-array evidence; do not repeat the same
+  passing pair without a new hypothesis or failing input.
+- **Fresh unit verification:** run40173179590 at `008b421e7` passes all2,094
+  selected CTest tests, including the corrected publication check, plus189
+  Python tests and34 subtests. Secret40173179676 passes. Native source under
+  src/include/CLI/quantizer/ggml remains unchanged from qualified `96aeb4269`.
 
-Superseding result: recovery40171262926 is SUCCESS. PyPI now serves0.8.44;
-all four original CPU wheels and the original sdist were anonymously read back
-in full and match producer sizes/SHA256 exactly. Dart40171253902 passes its
-actual truncated-UTF8 fixture, formatter and analyzer after linking the native
-library. Rust40171253931 passes its native build and ordinary suite; the new
-error/null ABI probe still awaits contract40171253885. Complete model gates
-remain pending. Sourcec0266a0e8 additionally records CPU ISA and compiler commands
-in targeted campaign40171767752; its predecessor40171536821 was cancelled
-while queued before doing work. [Current receipt](docs/release-errors-2026-10-25.json).
+Remaining checks: the other jobs in CI40173179590, Lint40171253899 and optional
+background DeepLint40171253900 are finishing. Required checks precede closure.
+[Current receipt](docs/release-errors-2026-10-25.json).
 
-ABI contracts40171253885 now pass all six languages, including the actual new
-Rust native-error/null-fallback test (36 probe cases). Main unit job121104038437
-atc026 failed only the new publication validator: Ubuntu22's Python3.10 lacks
-`hashlib.file_digest`. The other2093 selected tests passed (four dictionary
-skips). Replace that3.11-only API with streamedSHA256 and add a regression for
-the older hashlib surface; fresh unit CI is required. This does not alter the
-already verified recovery inputs or published bytes (recovery usedPython3.12).
-
-The targeted same-host CPU diagnostic builds prior accepted8bc09441a and
-nightly96aeb4269 sequentially with unchanged model pins/gates, retaining CSM
-WAVs and data2vec CTC logits. Source comparison has not isolated a runtime bug;
-do not patch NN math speculatively. #483's existing paired MMQ artifacts are
-still available until2026-11-07; GTX1660/MX150 performance remains reporter-only.
-#461 still needs actual B390 Vulkan evidence at ten steps; Kaggle CUDA cannot
-certify it. #532 still lacks the reported assertion/device/model/clip details.
-Nyra upstream terms were rechecked2026-10-25 and still restrict generated
-alignments: retain #456's separate-license-review hold without a conversion.
+The review has reached the final license item. Explicit external dependencies
+remain open: #532 needs the reported assertion/device/model/clip reproducer;
+#483 needs actual GTX1660/MX150 MMQ results (paired artifacts remain available
+until2026-11-07); #461 needs B390 Vulkan profiling with ten-step quality; #456
+retains its separate license-review hold after rechecking upstream terms.
+#555, #552 and #551 already have scoped main implementations and evidence;
+#549's missing CPU publication is now resolved. No issue or PR has been closed
+yet. Close supported resolutions after the remaining checks, then inspect new
+issues/PRs. Heavy CPU work stays on Actions; actual CUDA requires a free Kaggle
+slot. Local compilation was stopped when unrelated load exceeded capacity.
 
 ## Granite Speech5 Q4_K (#552) — completed (2026-10-24)
 

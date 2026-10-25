@@ -48,14 +48,23 @@
     "passed": true
   },
   "packaging_controls": {
-    "tests": 6,
+    "tests": 7,
     "passed": true,
     "receipt_contamination_rejected": true,
     "wrong_version_rejected": true,
     "wrong_project_rejected": true,
     "missing_platform_rejected": true,
     "gpu_local_version_rejected": true,
-    "distribution_set": "four CPU wheels plus sdist, no rebuilt release artifacts"
+    "distribution_set": "four CPU wheels plus sdist, no rebuilt release artifacts",
+    "python310_compatibility_fix": "008b421e7",
+    "older_hashlib_surface_regression_passed": true,
+    "initial_unit_failure": {
+      "run": 40171756881,
+      "job": 121104038437,
+      "cause": "New validator used Python3.11 hashlib.file_digest on the Python3.10 unit runner; fixed with streamed SHA256."
+    },
+    "fresh_ci_run": 40173179590,
+    "fresh_unit_tier_step": "success; full linux-unit job success"
   },
   "bindings": {
     "dart": {
@@ -76,26 +85,179 @@
       "run": 40171253931,
       "conclusion": "success",
       "actual_native_library_linked": true,
-      "native_error_and_null_fallback_probe": "pending ABI contract run40171253885"
+      "native_error_and_null_fallback_probe": "executed and passed",
+      "probe_cases": 36,
+      "doctests": 5
     },
     "contract_run": 40171253885,
-    "contract_conclusion": "pending",
+    "contract_conclusion": "success",
     "local_probe_attempt": "stopped before Rust execution when load exceeded local resource allowance; no passing claim"
   },
   "model_campaigns": {
     "omnivoice": {
       "run": 40171264744,
-      "conclusion": "pending",
-      "gate": "all integrity-eligible references, unchanged WER <= 0.2; no outcome-based exclusions"
+      "conclusion": "success",
+      "gate": "all integrity-eligible references, unchanged WER <= 0.2; no outcome-based exclusions",
+      "independent_audit": {
+        "passed": true,
+        "scope": "Independent raw array/code inventory and original unchanged acceptance receipt replay; no new inference.",
+        "run": 40171264744,
+        "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
+        "references": [
+          "station",
+          "window"
+        ],
+        "checks": [
+          {
+            "label": "session-raw",
+            "samples": 62375,
+            "wer": 0.0,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-full",
+            "samples": 67176,
+            "wer": 0.0,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-marked",
+            "samples": 67176,
+            "wer": 0.0,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-clone-window-primary",
+            "samples": 57576,
+            "wer": 0.1111111111111111,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-marked-clone",
+            "samples": 57576,
+            "wer": 0.1111111111111111,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-clone-window-second",
+            "samples": 78696,
+            "wer": 0.0,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-clone-station-primary",
+            "samples": 53736,
+            "wer": 0.1111111111111111,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "session-clone-station-second",
+            "samples": 70056,
+            "wer": 0.0,
+            "pcm_and_codes_verified": true
+          },
+          {
+            "label": "cli-clone",
+            "samples": 57576,
+            "wer": 0.1111111111111111,
+            "pcm_and_codes_verified": true
+          }
+        ],
+        "receipt_sha256": "a4820df6b7e152ed4c68a53c8c2b580b6c3df1a08ab97eff12f9753eaf7fa382",
+        "max_wer": 0.1111111111111111,
+        "waveform_oracle_max_abs": 0.0
+      },
+      "historical_m1_counterexample_retained": true,
+      "scope_limits": [
+        "CPU campaign only",
+        "No original-TTS generated-code parity claim",
+        "No speaker-similarity or universal audible-click-removal claim",
+        "No blanket cross-GPU acceptance claim"
+      ],
+      "private_archive": {
+        "sha256": "4367a17c27bbd00ff61b36960a11adc8f02797e8d702009045089fa4c5b27098",
+        "bytes": 38737766,
+        "members": 1657,
+        "all_members_read_back_and_hashed": true,
+        "additional_raw_archive_publication": false,
+        "rights_limit": "Exact upstream card specifies CC-BY-NC without a version; fixture README is generic. Preserve notices without inferring a version or additional redistribution grant."
+      }
     },
     "nightly_ab": {
       "run": 40171767752,
-      "conclusion": "pending",
+      "conclusion": "success",
       "prior_source": "8bc09441a1f47d0e3aeac44e98bf90cf79819d81",
       "nightly_source": "96aeb4269a68a7d1e2208cf04d692419198f554f",
       "original_failed_run": 40078771993,
       "gates_unchanged": true,
-      "retained": "CTC logits, generated WAVs, raw stdout/stderr, CPU info, compiler commands and resource readings"
+      "retained": "CTC logits, generated WAVs, raw stdout/stderr, CPU info, compiler commands and resource readings",
+      "independent_audit": {
+        "passed": true,
+        "run": 40171767752,
+        "scope": "Independent retained-byte/gate audit of same-host pinned-source CPU A/B; original nightly failures remain unreproduced on this host. No NN fix or cross-host parity claim.",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "records": {
+          "prior": {
+            "source": "8bc09441a1f47d0e3aeac44e98bf90cf79819d81",
+            "ctc_shape": [
+              549,
+              32
+            ],
+            "ctc_bytes_sha256": "266f9b9d9483f88dcfd144e14d8268028b9303653c08692dc036835fab5b8bec",
+            "ctc_json_sha256": "bff111ee97a30e47b770e722f0528a9ce11ed75738df630f707de49fe3a3868b",
+            "ctc_frame47_top2_gap": 0.0651702880859375,
+            "f16_cosine": 0.999141,
+            "csm": {
+              "csm": {
+                "wav_sha256": "c577dd9a07adb52b0155597defa2f6d151f755d5e36bc8ca06ec49db6f859a65",
+                "pcm_sha256": "fff79f9c32a62304fb2348866f4a497436c67b359ea482909eaf56b58b6ded96",
+                "samples": 113280,
+                "wer": 0.0,
+                "transcript": "The quick brown fox jumps over the lazy dog."
+              },
+              "csm-repeat": {
+                "wav_sha256": "ec75ed5b8aea51482bae966f647d33a5b749745d0d796ab17c92e648929cc169",
+                "pcm_sha256": "fff79f9c32a62304fb2348866f4a497436c67b359ea482909eaf56b58b6ded96",
+                "samples": 113280,
+                "wer": 0.0,
+                "transcript": "The quick brown fox jumps over the lazy dog."
+              }
+            }
+          },
+          "nightly": {
+            "source": "96aeb4269a68a7d1e2208cf04d692419198f554f",
+            "ctc_shape": [
+              549,
+              32
+            ],
+            "ctc_bytes_sha256": "266f9b9d9483f88dcfd144e14d8268028b9303653c08692dc036835fab5b8bec",
+            "ctc_json_sha256": "bff111ee97a30e47b770e722f0528a9ce11ed75738df630f707de49fe3a3868b",
+            "ctc_frame47_top2_gap": 0.0651702880859375,
+            "f16_cosine": 0.999141,
+            "csm": {
+              "csm": {
+                "wav_sha256": "c1abf851d639f6d893354248b84dc52d14030544791f9de0cba3cdab0faa359b",
+                "pcm_sha256": "fff79f9c32a62304fb2348866f4a497436c67b359ea482909eaf56b58b6ded96",
+                "samples": 113280,
+                "wer": 0.0,
+                "transcript": "The quick brown fox jumps over the lazy dog."
+              },
+              "csm-repeat": {
+                "wav_sha256": "22029ef2f1650a8e078f3b1d841a7b806519df02b0e9ed3cdd0bf31fe27b4735",
+                "pcm_sha256": "fff79f9c32a62304fb2348866f4a497436c67b359ea482909eaf56b58b6ded96",
+                "samples": 113280,
+                "wer": 0.0,
+                "transcript": "The quick brown fox jumps over the lazy dog."
+              }
+            }
+          }
+        },
+        "csm_all_four_pcm_equal": true
+      },
+      "neural_runtime_fix_applied": false,
+      "cross_host_failure_cause_identified": false,
+      "original_failure_preserved": true,
+      "followup": "Use retained CPU/ISA/compiler commands and raw arrays on a future failure; do not repeat the same passing pair or relax gates without new evidence."
     }
   },
   "unresolved": {
@@ -107,5 +269,35 @@
   "closure": {
     "performed": false,
     "fresh_sweep_after_closure": "pending"
+  },
+  "validation_source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
+  "checks": {
+    "ci": {
+      "run": 40173179590,
+      "source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
+      "conclusion": "pending",
+      "linux_unit_job": 121108457091,
+      "linux_unit_conclusion": "success",
+      "native_ctest_selected": 2094,
+      "native_ctest_failed": 0,
+      "dictionary_data_skips": 4,
+      "python_tests": 189,
+      "python_subtests": 34
+    },
+    "lint": {
+      "run": 40171253899,
+      "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
+      "conclusion": "pending"
+    },
+    "secret": {
+      "run": 40173179676,
+      "source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
+      "conclusion": "success"
+    },
+    "deep_lint": {
+      "run": 40171253900,
+      "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
+      "conclusion": "pending"
+    }
   }
 }
