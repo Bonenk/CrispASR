@@ -20,6 +20,24 @@ only after the last item and a fresh GitHub sweep. No issue is closed early.
    remains explicitly open. Heavy CPU work runs on Actions; actual CUDA on an
    available Kaggle slot. Check local load/memory before compiles/inference.
 
+Checkpoint: contributor fixes are integrated with original authorship in
+`1a9ff6889` (#553) and `2fdc45923` (#554). Publication recovery, six rejecting
+distribution controls and Rust error-path probes are on main `85a620366`.
+Recovery40171262926 and corrected complete OmniVoice CPU campaign40171264744
+are queued at that source. CI40171253946, Lint40171253899,
+Rust40171253931, Dart40171253902 and ABI contracts40171253885 remain pending.
+No successful publication or passing hosted binding suite is claimed yet.
+
+The targeted same-host CPU diagnostic builds prior accepted8bc09441a and
+nightly96aeb4269 sequentially with unchanged model pins/gates, retaining CSM
+WAVs and data2vec CTC logits. Source comparison has not isolated a runtime bug;
+do not patch NN math speculatively. #483's existing paired MMQ artifacts are
+still available until2026-11-07; GTX1660/MX150 performance remains reporter-only.
+#461 still needs actual B390 Vulkan evidence at ten steps; Kaggle CUDA cannot
+certify it. #532 still lacks the reported assertion/device/model/clip details.
+Nyra upstream terms were rechecked2026-10-25 and still restrict generated
+alignments: retain #456's separate-license-review hold without a conversion.
+
 ## Granite Speech5 Q4_K (#552) — completed (2026-10-24)
 
 The `granite` default is the qualified4.07 GB mixed Q4_K model. Bare
