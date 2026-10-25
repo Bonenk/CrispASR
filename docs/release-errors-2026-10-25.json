@@ -1,6 +1,6 @@
 {
   "date": "2026-10-25",
-  "complete": false,
+  "complete": true,
   "scope": "Release recovery, contributor binding fixes and full-nightly error investigation; closure deferred until the agenda reaches its final item and required results are reviewed.",
   "integration_source": "85a6203669094b2477a1f58333bb2c1be6da7575",
   "diagnostic_source": "c0266a0e85ec5e3d357c34d673bd09c5fe7340c5",
@@ -267,27 +267,109 @@
     "456": "Retain separate license-review hold; upstream terms rechecked2026-10-25 still cover generated alignments."
   },
   "closure": {
-    "performed": false,
-    "fresh_sweep_after_closure": "pending"
+    "performed": true,
+    "rows": [
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:25:56Z",
+        "number": 556,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/556"
+      },
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:25:58Z",
+        "number": 555,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/555"
+      },
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:26:01Z",
+        "number": 552,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/552"
+      },
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:26:02Z",
+        "number": 551,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/551"
+      },
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:26:04Z",
+        "number": 549,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/549"
+      },
+      {
+        "kind": "issue",
+        "closedAt": "2026-10-25T08:26:06Z",
+        "number": 518,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/issues/518"
+      },
+      {
+        "kind": "pr",
+        "integration": "author-preserving patch already on main",
+        "closedAt": "2026-10-25T08:26:08Z",
+        "number": 553,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/pull/553"
+      },
+      {
+        "kind": "pr",
+        "integration": "author-preserving patch already on main",
+        "closedAt": "2026-10-25T08:26:10Z",
+        "number": 554,
+        "state": "CLOSED",
+        "url": "https://github.com/CrispStrobe/CrispASR/pull/554"
+      }
+    ],
+    "fresh_sweep_after_closure": {
+      "time_utc": "2026-10-25 08:26:36 UTC",
+      "open_issues": [
+        532,
+        483,
+        461,
+        456
+      ],
+      "open_prs": [],
+      "new_issues_or_prs_created_today": [],
+      "new_actionable_followups": false
+    }
   },
   "validation_source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
   "checks": {
     "ci": {
       "run": 40173179590,
       "source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
-      "conclusion": "pending",
+      "conclusion": "success",
       "linux_unit_job": 121108457091,
       "linux_unit_conclusion": "success",
       "native_ctest_selected": 2094,
       "native_ctest_failed": 0,
       "dictionary_data_skips": 4,
       "python_tests": 189,
-      "python_subtests": 34
+      "python_subtests": 34,
+      "jobs": 13
     },
     "lint": {
       "run": 40171253899,
       "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
-      "conclusion": "pending"
+      "conclusion": "success",
+      "jobs": 10,
+      "actual_native_build_proof": {
+        "passed": true,
+        "run": 40171253899,
+        "job": 121102354815,
+        "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
+        "actual_native_link": "2026-10-25T07:18:33.2208134Z [544/546] Linking CXX shared library src/libcrispasr.so.0.8.44",
+        "failed_build_markers": 0,
+        "log_sha256": "02aec97537a06df212ba4a7406a2f651ab209e75dce4db1312349288e40b417f"
+      }
     },
     "secret": {
       "run": 40173179676,
@@ -297,7 +379,29 @@
     "deep_lint": {
       "run": 40171253900,
       "source": "85a6203669094b2477a1f58333bb2c1be6da7575",
-      "conclusion": "pending"
+      "conclusion": "success",
+      "actual_native_build_verified": true
+    },
+    "additional_scheduled_deep_lint": {
+      "run": 40173354661,
+      "source": "008b421e7b9c4253c1e320c5c25b04c5b2b739ac",
+      "conclusion": null,
+      "required": false,
+      "scope": "Later scheduled duplicate; C/C++ sources are unchanged from the completed successful deep-analysis run.",
+      "status": "in_progress",
+      "cpp_source_changes_from_completed_run": []
     }
+  },
+  "native_source_equivalence": {
+    "baseline": "96aeb4269a68a7d1e2208cf04d692419198f554f",
+    "paths": [
+      "src",
+      "include",
+      "examples/cli",
+      "examples/crispasr-quantize",
+      "ggml",
+      "CMakeLists.txt"
+    ],
+    "git_diff_exit_code": 0
   }
 }
