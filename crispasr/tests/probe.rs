@@ -429,6 +429,30 @@ fn probe_disclaimer_and_last_error() {
 }
 
 #[test]
+fn probe_synthesize_raw_reports_native_error_and_null_fallback() {
+    unsafe {
+        probe_reset();
+        probe_mode_set(35);
+    }
+    let sess = new_probe_session();
+    let err = sess.synthesize_raw("hello").unwrap_err();
+    assert!(err.contains("probe synthesis failure"), "{err}");
+    assert!(
+        !err.contains("call accept_marking_responsibility first?"),
+        "{err}"
+    );
+
+    unsafe { probe_mode_set(36) };
+    let err = sess.synthesize_raw("hello").unwrap_err();
+    assert!(
+        err.contains("call accept_marking_responsibility first?"),
+        "{err}"
+    );
+    assert_eq!(unsafe { probe_live_get() }, 0);
+    unsafe { probe_mode_set(0) };
+}
+
+#[test]
 fn probe_overflow_checks() {
     unsafe {
         probe_reset();

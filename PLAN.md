@@ -1,5 +1,25 @@
 # CrispASR — Pending work
 
+## NOW — release recovery and error backlog (2026-10-25)
+
+Owner: Codex, branch `fix/release-and-binding-errors-20261025`, base `c08d243de`.
+User authorized the complete reviewed agenda, errors before features, with closure
+only after the last item and a fresh GitHub sweep. No issue is closed early.
+
+1. Repair #556 artifact selection and recover the existing v0.8.44 CPU wheels
+   and sdist from run39599409648; verify exact distributions before publication.
+2. Integrate contributor #553/#554, retaining attribution, and validate malformed
+   UTF-8 and actual/null synthesis-error handling through binding probes.
+3. Diagnose full nightly40078771993: CSM WER0.6667 and data2vec upstream
+   transcript WER0.0435. Do not relax gates or replace reference expectations.
+4. Reconcile completed #555/#552/#549/#551 against release/downstream evidence;
+   complete corrected #518 clone acceptance, scope #532's missing reproducer,
+   retain hardware-specific #483/#461 checks and #456's license-review hold.
+5. Reach the last item, then close only evidence-supported resolutions and loop
+   over fresh issues/PRs. Unreproduced, hardware-blocked or license-blocked work
+   remains explicitly open. Heavy CPU work runs on Actions; actual CUDA on an
+   available Kaggle slot. Check local load/memory before compiles/inference.
+
 ## Granite Speech5 Q4_K (#552) — completed (2026-10-24)
 
 The `granite` default is the qualified4.07 GB mixed Q4_K model. Bare

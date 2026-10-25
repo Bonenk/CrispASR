@@ -1,0 +1,73 @@
+name: Recover v0.8.44 CPU publication
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: recover-pypi-0844
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Verify retained producer identity and successful distribution jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/CrispStrobe/CrispASR/actions/runs/39599409648 > producer.json
+          gh api --paginate repos/CrispStrobe/CrispASR/actions/runs/39599409648/jobs > producer-jobs.json
+          python - <<'PY'
+          import json
+          run = json.load(open('producer.json'))
+          assert run['head_sha'] == '68c42813c2714cda946a6b45717be58804967930'
+          assert run['path'] == '.github/workflows/release-python-wheels.yml'
+          assert run['event'] == 'workflow_run' and run['status'] == 'completed'
+          jobs = json.load(open('producer-jobs.json'))['jobs']
+          wanted = {'CPU wheel (linux-x86_64)', 'CPU wheel (linux-arm64)',
+                    'CPU wheel (macos-arm64)', 'CPU wheel (windows-x86_64)', 'sdist'}
+          found = {j['name'] for j in jobs if j['conclusion'] == 'success'}
+          assert wanted <= found, wanted - found
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 39599409648
+          pattern: cpu-wheel-{linux-x86_64,linux-arm64,macos-arm64,windows-x86_64}
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 39599409648
+          name: sdist
+          path: dist
+      - name: Validate all five original distributions
+        run: |
+          set -euo pipefail
+          python python/tools/check_pypi_distributions.py dist --version 0.8.44 > distributions.json
+          python -m pip install twine
+          python -m twine check dist/*.whl dist/*.tar.gz
+      - name: Retain exact publication inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-0844-recovery-receipt
+          path: |
+            producer.json
+            producer-jobs.json
+            distributions.json
+      - name: Publish original CPU wheels and sdist
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz

@@ -5685,6 +5685,9 @@ if(UNIX AND Python3_EXECUTABLE)
     set_tests_properties(ja-metadata-validator PROPERTIES LABELS "unit;bindings" TIMEOUT 30)
     add_test(NAME wheel-platform-floor
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_wheel_platform_floor.py -v)
+    add_test(NAME pypi-distributions
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_pypi_distributions.py -v)
+    set_tests_properties(pypi-distributions PROPERTIES LABELS "unit;python")
     set_tests_properties(wheel-platform-floor PROPERTIES LABELS "unit;packaging" TIMEOUT 30)
     # Model-free language ABI probes skip on developer machines without SDKs.
     # binding-contracts.yml uses the strict runner and rejects every skip.

@@ -268,16 +268,17 @@ jobs:
           path: python/dist/*.tar.gz
 
   publish-pypi:
-    needs: [cpu-wheels, sdist]
+    needs: [setup, cpu-wheels, sdist]
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/crispasr
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: cpu-wheel-*
+          pattern: cpu-wheel-{linux-x86_64,linux-arm64,macos-arm64,windows-x86_64}
           merge-multiple: true
       - uses: actions/download-artifact@v4
         with:
@@ -287,12 +288,15 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+          RELEASE_TAG: ${{ needs.setup.outputs.tag }}
         run: |
+          set -euo pipefail
           python -m pip install --upgrade twine
-          ls -la dist
+          python python/tools/check_pypi_distributions.py dist --version "${RELEASE_TAG#v}"
+          python -m twine check dist/*.whl dist/*.tar.gz
           # --skip-existing so a re-run (or the sdist already uploaded by the
           # wrapper workflow) doesn't fail the job.
-          python -m twine upload --skip-existing dist/*
+          python -m twine upload --skip-existing dist/*.whl dist/*.tar.gz
 
   gpu-wheels:
     needs: setup
