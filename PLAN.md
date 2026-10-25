@@ -28,6 +28,16 @@ are queued at that source. CI40171253946, Lint40171253899,
 Rust40171253931, Dart40171253902 and ABI contracts40171253885 remain pending.
 No successful publication or passing hosted binding suite is claimed yet.
 
+Superseding result: recovery40171262926 is SUCCESS. PyPI now serves0.8.44;
+all four original CPU wheels and the original sdist were anonymously read back
+in full and match producer sizes/SHA256 exactly. Dart40171253902 passes its
+actual truncated-UTF8 fixture, formatter and analyzer after linking the native
+library. Rust40171253931 passes its native build and ordinary suite; the new
+error/null ABI probe still awaits contract40171253885. Complete model gates
+remain pending. Sourcec0266a0e8 additionally records CPU ISA and compiler commands
+in targeted campaign40171767752; its predecessor40171536821 was cancelled
+while queued before doing work. [Current receipt](docs/release-errors-2026-10-25.json).
+
 The targeted same-host CPU diagnostic builds prior accepted8bc09441a and
 nightly96aeb4269 sequentially with unchanged model pins/gates, retaining CSM
 WAVs and data2vec CTC logits. Source comparison has not isolated a runtime bug;

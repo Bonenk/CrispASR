@@ -1,0 +1,111 @@
+{
+  "date": "2026-10-25",
+  "complete": false,
+  "scope": "Release recovery, contributor binding fixes and full-nightly error investigation; closure deferred until the agenda reaches its final item and required results are reviewed.",
+  "integration_source": "85a6203669094b2477a1f58333bb2c1be6da7575",
+  "diagnostic_source": "c0266a0e85ec5e3d357c34d673bd09c5fe7340c5",
+  "pypi": {
+    "version": "0.8.44",
+    "source_run": 39599409648,
+    "recovery_run": 40171262926,
+    "anonymous_readbacks": [
+      {
+        "filename": "crispasr-0.8.44-py3-none-macosx_11_0_arm64.whl",
+        "bytes": 34782512,
+        "sha256": "e25d7d7e27097eab4c03f1133cd6a7b11114bc8887965dae20e000e22b7d3e9b",
+        "url": "https://files.pythonhosted.org/packages/fb/df/b8fc821e59745b73016a8d4774c4a3226f3ad2e480d2e39115f16c625e84/crispasr-0.8.44-py3-none-macosx_11_0_arm64.whl",
+        "passed": true
+      },
+      {
+        "filename": "crispasr-0.8.44-py3-none-manylinux_2_35_aarch64.whl",
+        "bytes": 45734910,
+        "sha256": "cf094118d300cc17802578fcce90d8656416ce90f0222daf81f28dfc1d73c268",
+        "url": "https://files.pythonhosted.org/packages/4e/1b/8d5ba94b0f7e642b8f549d3943d20d9349815148c1070edc32b61fa71b59/crispasr-0.8.44-py3-none-manylinux_2_35_aarch64.whl",
+        "passed": true
+      },
+      {
+        "filename": "crispasr-0.8.44-py3-none-manylinux_2_35_x86_64.whl",
+        "bytes": 53533227,
+        "sha256": "c202726b313c45edb3d5852a904a11c55a42baf21131965fddd0baa8e745bd15",
+        "url": "https://files.pythonhosted.org/packages/6e/01/b63d8f1b99793decfa34c8b35d3f448de0d20e15b9629fd411d68ad6b10b/crispasr-0.8.44-py3-none-manylinux_2_35_x86_64.whl",
+        "passed": true
+      },
+      {
+        "filename": "crispasr-0.8.44-py3-none-win_amd64.whl",
+        "bytes": 14703773,
+        "sha256": "e6ba54db65b987c2cbc1cccbe886ede532f50981ee21baf0812a6e418bbdfc4b",
+        "url": "https://files.pythonhosted.org/packages/0b/fb/22758d26b2a0f83f186628a0371a8e616eee2eece3a6ed3f1c801e62f6df/crispasr-0.8.44-py3-none-win_amd64.whl",
+        "passed": true
+      },
+      {
+        "filename": "crispasr-0.8.44.tar.gz",
+        "bytes": 70898,
+        "sha256": "cac12e864d8760c8d3018e94ac7a2e5380b02b3c3162fd685e10da8b630fa849",
+        "url": "https://files.pythonhosted.org/packages/5c/d2/1d5c75bdc6288c6aab1108e78a055211b99ec4c070f1604e10a2e56658d7/crispasr-0.8.44.tar.gz",
+        "passed": true
+      }
+    ],
+    "passed": true
+  },
+  "packaging_controls": {
+    "tests": 6,
+    "passed": true,
+    "receipt_contamination_rejected": true,
+    "wrong_version_rejected": true,
+    "wrong_project_rejected": true,
+    "missing_platform_rejected": true,
+    "gpu_local_version_rejected": true,
+    "distribution_set": "four CPU wheels plus sdist, no rebuilt release artifacts"
+  },
+  "bindings": {
+    "dart": {
+      "pr": 553,
+      "contributor_commit": "7293151b2629aea48a167a115901561cc5a3b108",
+      "integration_commit": "1a9ff6889",
+      "run": 40171253902,
+      "conclusion": "success",
+      "actual_native_library_linked": true,
+      "new_truncated_utf8_probe_executed": true,
+      "formatter_changed_files": 0,
+      "analyzer_issues": 0
+    },
+    "rust": {
+      "pr": 554,
+      "contributor_commit": "d50f43b36e5b7ed7228dbb99b53338234baa9543",
+      "integration_commit": "2fdc45923",
+      "run": 40171253931,
+      "conclusion": "success",
+      "actual_native_library_linked": true,
+      "native_error_and_null_fallback_probe": "pending ABI contract run40171253885"
+    },
+    "contract_run": 40171253885,
+    "contract_conclusion": "pending",
+    "local_probe_attempt": "stopped before Rust execution when load exceeded local resource allowance; no passing claim"
+  },
+  "model_campaigns": {
+    "omnivoice": {
+      "run": 40171264744,
+      "conclusion": "pending",
+      "gate": "all integrity-eligible references, unchanged WER <= 0.2; no outcome-based exclusions"
+    },
+    "nightly_ab": {
+      "run": 40171767752,
+      "conclusion": "pending",
+      "prior_source": "8bc09441a1f47d0e3aeac44e98bf90cf79819d81",
+      "nightly_source": "96aeb4269a68a7d1e2208cf04d692419198f554f",
+      "original_failed_run": 40078771993,
+      "gates_unchanged": true,
+      "retained": "CTC logits, generated WAVs, raw stdout/stderr, CPU info, compiler commands and resource readings"
+    }
+  },
+  "unresolved": {
+    "532": "Reported allocation crash remains unreproduced; assertion/device/model/commit/failing clip still missing.",
+    "483": "Matched CUDA12.6 packages confirmed by reporter; MMQ performance needs GTX1660/MX150 evidence. Existing A/B artifacts11532751916 and11532004516 expire2026-11-07.",
+    "461": "VoxCPM2 performance needs actual B390 Vulkan profiling with ten-step quality preserved.",
+    "456": "Retain separate license-review hold; upstream terms rechecked2026-10-25 still cover generated alignments."
+  },
+  "closure": {
+    "performed": false,
+    "fresh_sweep_after_closure": "pending"
+  }
+}
