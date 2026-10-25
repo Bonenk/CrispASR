@@ -408,6 +408,8 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.source_lang = whisper_param_turn_lowercase(ARGV_NEXT);
     } else if (arg == "-tl" || arg == "--target-lang") {
         params.target_lang = whisper_param_turn_lowercase(ARGV_NEXT);
+    } else if (arg == "--canary-mode") {
+        params.canary_mode = whisper_param_turn_lowercase(ARGV_NEXT);
     } else if (arg == "--no-punctuation") {
         params.punctuation = false;
     } else if (arg == "--punc-model") {
@@ -1236,6 +1238,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(out, "  -tl LANG,  --target-lang LANG     [%-7s] target language (canary AST; TTS: the\n",
             params.target_lang.c_str());
     fprintf(out, "                                              language to speak, overrides -l)\n");
+    fprintf(out, "             --canary-mode MODE     [%-7s] Indic-Transcribe-Flex output: native|mixed|romanized\n",
+            params.canary_mode.empty() ? "native" : params.canary_mode.c_str());
     fprintf(out, "             --no-punctuation       [%-7s] disable punctuation (canary, cohere)\n",
             params.punctuation ? "false" : "true");
     fprintf(out, "             --punc-model FNAME     [%-7s] punctuation GGUF: auto|firered|fullstop|punctuate-all\n",

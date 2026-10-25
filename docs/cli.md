@@ -660,6 +660,62 @@ Canary 1B v2 remains supported and remains the registry default for
 `--backend canary -m auto`; adding direct 180M Flash compatibility does not
 change that default.
 
+## Indic-Transcribe-Flex
+
+[`bodhan-ai/indic-transcribe-flex`](https://huggingface.co/bodhan-ai/indic-transcribe-flex)
+is a 1.2B Canary-2 AED model: a 32-layer FastConformer encoder (`d=1024`) and a
+24-layer Transformer decoder with tied embeddings and a 7,152-token aggregate
+SentencePiece vocabulary. It covers 27 languages (26 Indic languages plus
+Indian-accented English) and selects one of three output scripts through two
+prompt slots. Access is gated by the Indic Open Model License v1.0; accept it on
+the model page before downloading. The upstream model also inherits the base
+[`nvidia/canary-1b-v2`](https://huggingface.co/nvidia/canary-1b-v2) terms
+(CC-BY-4.0), so both licenses apply.
+
+Convert the HF safetensors tree (config, feature extractor, both `.model`
+tokenizers, and `model.safetensors`) with:
+
+```bash
+python models/convert-indic-transcribe-to-gguf.py \
+  --hf-dir /path/to/indic-transcribe-flex \
+  --output indic-transcribe-flex-f16.gguf
+```
+
+The converter writes the legacy `canary.*` tensor layout plus
+`canary.prompt_format="indic"`, `canary.languages`, and the
+`canary.special.*` token ids. The runtime builds the fixed 10-token prompt:
+
+```text
+<|startofcontext|><|startoftranscript|><|emo:undefined|>
+<|LANG|><|LANG|><|pnc|><noitn|itn|><|noromanized|romanized|>
+<|notimestamp|><|nodiarize|>
+```
+
+Pick the output mode with `--canary-mode` (or `CRISPASR_CANARY_MODE`):
+
+```bash
+# native script (default)
+crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+  -f hindi.wav -l hi --canary-mode native
+
+# mixed script: native words + Latin loanwords/digits
+crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+  -f hindi.wav -l hi --canary-mode mixed
+
+# fully romanized
+crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+  -f hindi.wav -l hi --canary-mode romanized
+```
+
+`-l` / `-sl` is mandatory. The current adapter rejects `auto` because the
+one-step encoder-state LID path is not wired into the C++ runtime yet; a target
+language is ignored (this checkpoint is ASR-only). Supported `-l` values are
+`as bgc bhb bho bn brx doi en gu hi hne kn kok ks mai ml mni mr ne or pa sa sat
+sd ta te ur`. Long audio is decoded in 30 s windows with 1 s overlap (the
+checkpoint trains at 30 s). Native and romanized outputs were checked against a
+FLEURS Hindi reference; Q5_K preserved it exactly, while Q4_K dropped one short
+word on that clip. Use Q5_K or higher for the compact build.
+
 ## Word-level timestamps via CTC alignment
 
 The LLM-based backends (`qwen3`, `voxtral`, `voxtral4b`, `granite`)

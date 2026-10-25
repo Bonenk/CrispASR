@@ -128,6 +128,7 @@ struct canary_hparams {
     std::string variant;
     std::string decoder_activation = "relu";
     std::string prompt_format;
+    bool indic_prompt = false;
     std::vector<std::string> languages;
     std::vector<int> language_ids;
     std::vector<std::string> translation_pairs;
@@ -138,6 +139,10 @@ struct canary_hparams {
     int pnc_id = -1;
     int nopnc_id = -1;
     int noitn_id = -1;
+    int itn_id = -1;
+    int romanized_id = -1;
+    int noromanized_id = -1;
+    int emo_id = -1;
     int notimestamp_id = -1;
     int nodiarize_id = -1;
 };
@@ -288,6 +293,8 @@ struct canary_context {
     // #292: decode cap; forwarded from --max-new-tokens when the user set it,
     // else this default. Clamped to the model's decoder context at use.
     int max_new_tokens = 256;
+    // Indic-Transcribe-Flex output script: 0 native, 1 mixed/ITN, 2 romanized.
+    int output_mode = CANARY_OUTPUT_NATIVE;
 };
 
 // ===========================================================================
@@ -601,6 +608,25 @@ static bool canary_load_model(canary_model& model, canary_vocab& vocab, const ch
             hp.vocab_size = core_gguf::kv_u32(gctx, "canary.vocab_size", hp.vocab_size);
             hp.max_dec_ctx = core_gguf::kv_u32(gctx, "canary.max_dec_ctx", hp.max_dec_ctx);
             hp.frame_dur_cs = core_gguf::kv_u32(gctx, "canary.frame_dur_cs", hp.frame_dur_cs);
+
+            hp.prompt_format = core_gguf::kv_str(gctx, "canary.prompt_format", "");
+            hp.indic_prompt = hp.prompt_format == "indic";
+            if (hp.indic_prompt) {
+                hp.languages = core_gguf::kv_str_array(gctx, "canary.languages");
+                hp.startofcontext_id = core_gguf::kv_i32(gctx, "canary.special.startofcontext_id", -1);
+                hp.startoftranscript_id = core_gguf::kv_i32(gctx, "canary.special.bos_id", -1);
+                hp.endoftext_id = core_gguf::kv_i32(gctx, "canary.special.eos_id", -1);
+                hp.pad_id = core_gguf::kv_i32(gctx, "canary.special.pad_id", -1);
+                hp.pnc_id = core_gguf::kv_i32(gctx, "canary.special.pnc_id", -1);
+                hp.nopnc_id = core_gguf::kv_i32(gctx, "canary.special.nopnc_id", -1);
+                hp.noitn_id = core_gguf::kv_i32(gctx, "canary.special.noitn_id", -1);
+                hp.itn_id = core_gguf::kv_i32(gctx, "canary.special.itn_id", -1);
+                hp.romanized_id = core_gguf::kv_i32(gctx, "canary.special.romanized_id", -1);
+                hp.noromanized_id = core_gguf::kv_i32(gctx, "canary.special.noromanized_id", -1);
+                hp.emo_id = core_gguf::kv_i32(gctx, "canary.special.emo_id", -1);
+                hp.notimestamp_id = core_gguf::kv_i32(gctx, "canary.special.notimestamp_id", -1);
+                hp.nodiarize_id = core_gguf::kv_i32(gctx, "canary.special.nodiarize_id", -1);
+            }
         }
 
         auto tokens = core_gguf::kv_str_array(gctx, "tokenizer.ggml.tokens");
@@ -1614,6 +1640,41 @@ static std::vector<int> canary_build_prompt(canary_context* ctx, const std::stri
     }
 
     auto tok = [&](const char* s) { return canary_str_to_token(ctx, s); };
+
+    // Indic-Transcribe-Flex: 10-token Canary-2 prompt with TWO output-mode
+    // slots. Native = noitn + noromanized, mixed/ITN = itn + noromanized,
+    // romanized = noitn + romanized.
+    if (hp.indic_prompt) {
+        const int mode = ctx->output_mode;
+        const bool mixed = mode == CANARY_OUTPUT_MIXED;
+        const bool romanized = mode == CANARY_OUTPUT_ROMANIZED;
+        auto pick = [&](int id, const char* fallback) { return id >= 0 ? id : tok(fallback); };
+
+        std::vector<int> p;
+        p.reserve(10);
+        p.push_back(pick(hp.startofcontext_id, "<|startofcontext|>"));
+        p.push_back(pick(hp.startoftranscript_id, "<|startoftranscript|>"));
+        p.push_back(pick(hp.emo_id, "<|emo:undefined|>"));
+        p.push_back(canary_str_to_token(ctx, ("<|" + src + "|>").c_str()));
+        p.push_back(canary_str_to_token(ctx, ("<|" + tgt + "|>").c_str()));
+        p.push_back(pick(punctuation ? hp.pnc_id : hp.nopnc_id, punctuation ? "<|pnc|>" : "<|nopnc|>"));
+        p.push_back(mixed ? pick(hp.itn_id, "<|itn|>") : pick(hp.noitn_id, "<|noitn|>"));
+        p.push_back(romanized ? pick(hp.romanized_id, "<|romanized|>") : pick(hp.noromanized_id, "<|noromanized|>"));
+        p.push_back(pick(hp.notimestamp_id, "<|notimestamp|>"));
+        p.push_back(pick(hp.nodiarize_id, "<|nodiarize|>"));
+
+        for (size_t i = 0; i < p.size(); i++) {
+            if (p[i] < 0 || p[i] >= (int)ctx->vocab.id_to_token.size()) {
+                fprintf(stderr,
+                        "canary: failed to build Indic prompt at slot %zu "
+                        "(src='%s', tgt='%s', mode=%d, pnc=%d)\n",
+                        i, src.c_str(), tgt.c_str(), mode, (int)punctuation);
+                return {};
+            }
+        }
+        return p;
+    }
+
     std::string src_tok = "<|" + src + "|>";
     std::string tgt_tok = "<|" + tgt + "|>";
 
@@ -1954,6 +2015,25 @@ extern "C" void canary_set_beam_size(struct canary_context* ctx, int n) {
 extern "C" void canary_set_max_new_tokens(struct canary_context* ctx, int n) {
     if (ctx && n > 0)
         ctx->max_new_tokens = n;
+}
+
+extern "C" void canary_set_output_mode(struct canary_context* ctx, int mode) {
+    if (!ctx)
+        return;
+    ctx->output_mode = (mode >= CANARY_OUTPUT_NATIVE && mode <= CANARY_OUTPUT_ROMANIZED) ? mode : CANARY_OUTPUT_NATIVE;
+}
+
+extern "C" bool canary_is_indic(struct canary_context* ctx) {
+    return ctx && ctx->model.hparams.indic_prompt;
+}
+
+extern "C" bool canary_supports_language(struct canary_context* ctx, const char* lang) {
+    if (!ctx || !lang)
+        return false;
+    const auto& langs = ctx->model.hparams.languages;
+    if (langs.empty())
+        return true;
+    return std::find(langs.begin(), langs.end(), lang) != langs.end();
 }
 
 extern "C" int canary_n_vocab(struct canary_context* ctx) {

@@ -184,6 +184,7 @@ from the GGUF metadata. Jump to the [TTS table](#text-to-speech-models) for the 
 | **fastconformer-ctc** | [`grider-transwithai/parakeet-ctc-1.1b-ja`](https://huggingface.co/cstr/parakeet-ctc-1.1b-ja-GGUF) | 42L FastConformer + CTC, 80 mels, Japanese fine-tune | Japanese | Apache-2.0 |
 | **canary** | [`nvidia/canary-1b-v2`](https://huggingface.co/nvidia/canary-1b-v2) | FastConformer + Transformer decoder | 25 EU (explicit `-sl/-tl`) | CC-BY-4.0 |
 | **canary** | [`handy-computer/canary-180m-flash-gguf`](https://huggingface.co/handy-computer/canary-180m-flash-gguf) (base [`nvidia/canary-180m-flash`](https://huggingface.co/nvidia/canary-180m-flash)) | 17L FastConformer (d=512) + trained 512→1024 projection + 4L Transformer decoder; existing transcribe.cpp GGUFs load directly ([more](docs/architecture.md#canary)) | en, de, es, fr (explicit); EN↔DE/ES/FR translation | CC-BY-4.0 |
+| **canary** | [`bodhan-ai/indic-transcribe-flex`](https://huggingface.co/bodhan-ai/indic-transcribe-flex) | 32L FastConformer (d=1024) + 24L decoder, 7,152-token aggregate SP; native / mixed-ITN / romanized prompt modes ([more](docs/cli.md#indic-transcribe-flex)) | 27 languages, 26 Indic + Indian English (explicit `-l`) | Indic Open Model License v1.0 + base CC-BY-4.0 (gated) |
 | **canary-qwen** | [`nvidia/canary-qwen-2.5b`](https://huggingface.co/nvidia/canary-qwen-2.5b) | FastConformer + Qwen3-1.7B SALM | en | CC-BY-4.0 |
 | **index-echo** | [`2B`](https://huggingface.co/IndexTeam/Index-Echo-S2TT-2B), [`9B`](https://huggingface.co/IndexTeam/Index-Echo-S2TT-9B) | AuT + Qwen3.5; bilingual timestamped subtitles ([details](docs/architecture.md#index-echo)); 2B F16/Q8 and 9B F16 CPU/CUDA validated; pairs 2.589 GiB (2B Q8), 17.914 GiB (9B F16) | upstream recipe: zh → en/ja/es | Apache-2.0 |
 | **lfm2-audio** | [`LiquidAI/LFM2.5-Audio-1.5B`](https://huggingface.co/cstr/lfm2-audio-1.5b-GGUF) | FastConformer + LFM2 hybrid conv+attention backbone (ASR+TTS) | en | LFM Open v1.0 |
@@ -800,6 +801,25 @@ huggingface-cli download handy-computer/canary-180m-flash-gguf \
 
 # ...or use the familiar crispasr flag:
 ./build/bin/crispasr --backend canary -m canary-1b-v2-q5_0.gguf -f audio.de.wav -l de --translate
+```
+
+Indic-Transcribe-Flex uses the same `canary` backend. Convert the gated HF
+checkpoint once with `models/convert-indic-transcribe-to-gguf.py`, then select
+the output script with `--canary-mode` (the language is required; there is no
+runtime LID step yet):
+
+```bash
+# Native script (default)
+./build/bin/crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+    -f hindi.wav -l hi --canary-mode native
+
+# Mixed script: native words plus Latin loanwords and digits
+./build/bin/crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+    -f hindi.wav -l hi --canary-mode mixed
+
+# Fully romanized Latin output
+./build/bin/crispasr --backend canary -m indic-transcribe-flex-q5_k.gguf \
+    -f hindi.wav -l hi --canary-mode romanized
 ```
 
 Canary 180M Flash supports ASR in `en`, `de`, `es`, and `fr`, plus only the

@@ -91,7 +91,13 @@ public:
         // resolved this — but we keep it so canary degrades gracefully
         // even if a future code path skips LID resolution.
         std::string src = params.source_lang.empty() ? params.language : params.source_lang;
-        if (src == "auto" || src.empty()) {
+        const bool src_was_auto = src.empty() || src == "auto";
+        if (src_was_auto) {
+            if (canary_is_indic(ctx_)) {
+                fprintf(stderr, "canary: indic-transcribe-flex needs an explicit language, e.g. `-l hi`; "
+                                "runtime-side automatic language ID is not wired yet.\n");
+                return out;
+            }
             if (!params.no_prints) {
                 fprintf(stderr,
                         "canary: no source language set (got '%s'); "
@@ -106,32 +112,76 @@ public:
             tgt = params.translate ? std::string("en") : src;
         }
 
-        // Issue #89 / #140: canary-1b-v2 is trained on 25 European
-        // languages (per the NVIDIA model card). The BPE vocab includes
-        // every ISO-639 `<|xx|>` token, but only the 25 below have
-        // training signal — anything else produces hallucinated output.
-        // clang-format off
-        static const char* kSupportedLangs[] = {
-            "en", "bg", "hr", "cs", "da", "nl", "et", "fi", "fr",
-            "de", "el", "hu", "it", "lv", "lt", "mt", "pl", "pt",
-            "ro", "sk", "sl", "es", "sv", "ru", "uk",
-        };
-        // clang-format on
-        auto is_supported = [&](const std::string& lang) {
-            for (const char* s : kSupportedLangs)
-                if (lang == s)
-                    return true;
-            return false;
-        };
-        if (!is_supported(src) || !is_supported(tgt)) {
-            fprintf(stderr,
-                    "canary: src='%s' tgt='%s' — not in canary-1b-v2's "
-                    "trained language set (25 European languages). "
-                    "For Japanese/Mandarin use --backend parakeet; for "
-                    "the broader multilingual set use --backend qwen3 "
-                    "or --backend voxtral.\n",
-                    src.c_str(), tgt.c_str());
-            return out;
+        const bool indic = canary_is_indic(ctx_);
+
+        // Indic-Transcribe-Flex output mode. The model card exposes exactly
+        // three mutually-exclusive choices: native script, mixed/ITN, and
+        // romanized. Accept the spelling variants the upstream Python wrapper
+        // accepts, plus an env fallback for frontends that cannot pass flags.
+        int output_mode = CANARY_OUTPUT_NATIVE;
+        std::string mode_name = params.canary_mode;
+        if (mode_name.empty()) {
+            if (const char* e = crispasr_env::get("CRISPASR_CANARY_MODE"))
+                mode_name = e;
+        }
+        if (!mode_name.empty()) {
+            if (mode_name == "native" || mode_name == "default") {
+                output_mode = CANARY_OUTPUT_NATIVE;
+            } else if (mode_name == "mixed" || mode_name == "itn") {
+                output_mode = CANARY_OUTPUT_MIXED;
+            } else if (mode_name == "romanized" || mode_name == "romanised") {
+                output_mode = CANARY_OUTPUT_ROMANIZED;
+            } else {
+                fprintf(stderr, "canary: unknown --canary-mode '%s' (expected native, mixed, or romanized)\n",
+                        mode_name.c_str());
+                return out;
+            }
+        }
+        canary_set_output_mode(ctx_, output_mode);
+
+        if (indic) {
+            if (!canary_supports_language(ctx_, src.c_str())) {
+                fprintf(stderr,
+                        "canary: language '%s' is not advertised by indic-transcribe-flex "
+                        "(27 languages: 26 Indic + Indian-accented English).\n",
+                        src.c_str());
+                return out;
+            }
+            if (tgt != src) {
+                fprintf(stderr,
+                        "canary: indic-transcribe-flex is ASR-only; ignoring target language '%s' "
+                        "and transcribing in '%s'. Use --canary-mode for script selection.\n",
+                        tgt.c_str(), src.c_str());
+                tgt = src;
+            }
+        } else {
+            // Issue #89 / #140: canary-1b-v2 is trained on 25 European
+            // languages (per the NVIDIA model card). The BPE vocab includes
+            // every ISO-639 `<|xx|>` token, but only the 25 below have
+            // training signal - anything else produces hallucinated output.
+            // clang-format off
+            static const char* kSupportedLangs[] = {
+                "en", "bg", "hr", "cs", "da", "nl", "et", "fi", "fr",
+                "de", "el", "hu", "it", "lv", "lt", "mt", "pl", "pt",
+                "ro", "sk", "sl", "es", "sv", "ru", "uk",
+            };
+            // clang-format on
+            auto is_supported = [&](const std::string& lang) {
+                for (const char* s : kSupportedLangs)
+                    if (lang == s)
+                        return true;
+                return false;
+            };
+            if (!is_supported(src) || !is_supported(tgt)) {
+                fprintf(stderr,
+                        "canary: src='%s' tgt='%s' - not in canary-1b-v2's "
+                        "trained language set (25 European languages). "
+                        "For Japanese/Mandarin use --backend parakeet; for "
+                        "the broader multilingual set use --backend qwen3 "
+                        "or --backend voxtral.\n",
+                        src.c_str(), tgt.c_str());
+                return out;
+            }
         }
 
         // Issue #419: print the EFFECTIVE language conditioning once. Canary
@@ -143,7 +193,11 @@ public:
         static bool s_lang_logged = false;
         if (!params.no_prints && !s_lang_logged) {
             s_lang_logged = true;
-            fprintf(stderr, "canary: languages src='%s' tgt='%s'\n", src.c_str(), tgt.c_str());
+            if (indic)
+                fprintf(stderr, "canary: indic languages src='%s' tgt='%s' mode='%s'\n", src.c_str(), tgt.c_str(),
+                        mode_name.empty() ? "native" : mode_name.c_str());
+            else
+                fprintf(stderr, "canary: languages src='%s' tgt='%s'\n", src.c_str(), tgt.c_str());
         }
 
         // Long-form handling follows canary-1b-v2's own `.transcribe()`
@@ -161,10 +215,16 @@ public:
         }
         const bool force_single = stream_threshold_s > 0 && n_samples <= stream_threshold_s * 16000;
 
-        canary_result* r = force_single ? canary_transcribe_ex(ctx_, samples, n_samples, src.c_str(), tgt.c_str(),
-                                                               params.punctuation, t_offset_cs)
-                                        : canary_transcribe_streamed(ctx_, samples, n_samples, src.c_str(), tgt.c_str(),
-                                                                     params.punctuation, t_offset_cs, 0, -1);
+        // Indic-Transcribe trains at <=30 s and degrades past that; use fixed
+        // 30 s windows with the same 1 s overlap as the Canary chunker instead
+        // of canary-1b-v2's dynamic 30..40 s window.
+        const int chunk_s = indic ? 30 : 0;
+        const int overlap_s = indic ? 1 : -1;
+        canary_result* r = force_single
+                               ? canary_transcribe_ex(ctx_, samples, n_samples, src.c_str(), tgt.c_str(),
+                                                      params.punctuation, t_offset_cs)
+                               : canary_transcribe_streamed(ctx_, samples, n_samples, src.c_str(), tgt.c_str(),
+                                                            params.punctuation, t_offset_cs, chunk_s, overlap_s);
         if (!r)
             return out;
 

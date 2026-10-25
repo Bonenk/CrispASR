@@ -174,6 +174,8 @@ struct whisper_params {
     std::string backend;
     std::string source_lang;
     std::string target_lang;
+    // Indic-Transcribe-Flex output mode: native | mixed | romanized.
+    std::string canary_mode;
     bool punctuation = true;
     std::string punc_model;
     std::string truecase_model;

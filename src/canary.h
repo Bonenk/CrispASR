@@ -108,6 +108,25 @@ int canary_frame_dur_cs(struct canary_context* ctx);
 int canary_n_mels(struct canary_context* ctx);
 int canary_sample_rate(struct canary_context* ctx);
 
+// Indic-Transcribe-Flex output mode. The model selects its output script
+// through two independent prompt slots; these three modes are the public,
+// mutually-exclusive choices exposed by the model card:
+//   0 = native script (default), 1 = mixed/ITN, 2 = romanized/romanised.
+// Out-of-range values are clamped to 0. Ignores/stores on non-Indic models.
+enum {
+    CANARY_OUTPUT_NATIVE = 0,
+    CANARY_OUTPUT_MIXED = 1,
+    CANARY_OUTPUT_ROMANIZED = 2,
+};
+void canary_set_output_mode(struct canary_context* ctx, int mode);
+
+// True when the loaded model uses the Indic-Transcribe prompt/layout.
+bool canary_is_indic(struct canary_context* ctx);
+
+// Language advertised by the loaded GGUF (legacy Canary models advertise no
+// list and return true for every code so existing validation stays unchanged).
+bool canary_supports_language(struct canary_context* ctx, const char* lang);
+
 // ---- Stage-level entry points (for crispasr-diff testing) ----
 // Returns malloc'd F32 buffers the caller must free(). nullptr on failure.
 
