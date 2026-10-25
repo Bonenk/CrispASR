@@ -190,6 +190,9 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     scratch.mkdir(parents=True, exist_ok=True)
     os.environ["TMPDIR"] = str(scratch)
+    # Matrix builds use -march=native; the runner image alone does not identify
+    # the CPU instruction path. Retain the actual host and compiler commands.
+    shutil.copy2("/proc/cpuinfo", out / "cpuinfo.txt")
     manifest = json.loads((ROOT / "tests/regression/manifest.json").read_text())
     d, c, a = selected(manifest)
     packages = {name: importlib.metadata.version(name) for name in ("numpy", "gguf", "huggingface_hub")}
@@ -247,6 +250,7 @@ def main():
                 raise RuntimeError(f"{tag} regression pins differ from diagnostic manifest")
             case_result = {"source": actual_source, "resources_before_build": snapshot(),
                            "build_flags": ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release",
+                                           "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                                            "-DCRISPASR_BUILD_TESTS=OFF", "-DCRISPASR_BUILD_EXAMPLES=ON",
                                            "-DCRISPASR_BUILD_SERVER=OFF"]}
             receipt["cases"][tag] = case_result
@@ -258,10 +262,12 @@ def main():
             required(["cmake", "--build", build, "--target", "crispasr-cli", "crispasr-diff", "-j4"],
                      worktree, case, "build", 1800)
             shutil.copy2(build / "CMakeCache.txt", case / "CMakeCache.txt")
+            shutil.copy2(build / "compile_commands.json", case / "compile_commands.json")
             cli, diff = build / "bin/crispasr", build / "bin/crispasr-diff"
             if not cli.is_file() or not diff.is_file():
                 raise RuntimeError(f"{tag}: built executables missing")
             case_result["binary_sha256"] = {"cli": sha256(cli), "diff": sha256(diff)}
+            required(["ldd", cli], worktree, case, "cli-libraries", 60)
             data2vec(case, cli, diff, d, q4, f16, ref, vocab, sample, case_result)
             csm(case, cli, c, tts, asr, case_result)
             case_result["resources_after"] = snapshot()
