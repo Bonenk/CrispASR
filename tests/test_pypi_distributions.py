@@ -6,6 +6,7 @@ from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +38,11 @@ class PublicationTest(unittest.TestCase):
         result = CHECK.validate(self.folder, "0.8.44")
         self.assertEqual(len(result), 5)
         self.assertTrue(all(len(item["sha256"]) == 64 and item["bytes"] > 0 for item in result))
+
+    def test_hashing_does_not_require_python311_file_digest(self):
+        # The CTest unit runner uses Python3.10, which lacks this API.
+        with patch.object(CHECK.hashlib, "file_digest", None, create=True):
+            self.assertEqual(len(CHECK.validate(self.folder, "0.8.44")), 5)
 
     def test_original_receipt_contamination_is_rejected(self):
         (self.folder / "wheel-abi.json").write_text("{}")

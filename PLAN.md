@@ -38,6 +38,14 @@ remain pending. Sourcec0266a0e8 additionally records CPU ISA and compiler comman
 in targeted campaign40171767752; its predecessor40171536821 was cancelled
 while queued before doing work. [Current receipt](docs/release-errors-2026-10-25.json).
 
+ABI contracts40171253885 now pass all six languages, including the actual new
+Rust native-error/null-fallback test (36 probe cases). Main unit job121104038437
+atc026 failed only the new publication validator: Ubuntu22's Python3.10 lacks
+`hashlib.file_digest`. The other2093 selected tests passed (four dictionary
+skips). Replace that3.11-only API with streamedSHA256 and add a regression for
+the older hashlib surface; fresh unit CI is required. This does not alter the
+already verified recovery inputs or published bytes (recovery usedPython3.12).
+
 The targeted same-host CPU diagnostic builds prior accepted8bc09441a and
 nightly96aeb4269 sequentially with unchanged model pins/gates, retaining CSM
 WAVs and data2vec CTC logits. Source comparison has not isolated a runtime bug;

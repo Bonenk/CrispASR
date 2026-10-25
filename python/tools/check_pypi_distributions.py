@@ -49,8 +49,10 @@ def validate(folder, version):
         if fields.get_all("Name") != ["crispasr"] or fields.get_all("Version") != [version]:
             raise ValueError(f"Distribution metadata does not match requested release: {name}")
         with path.open("rb") as stream:
-            digest = hashlib.file_digest(stream, "sha256").hexdigest()
-        receipt.append({"filename": name, "bytes": path.stat().st_size, "sha256": digest})
+            digest = hashlib.sha256()
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        receipt.append({"filename": name, "bytes": path.stat().st_size, "sha256": digest.hexdigest()})
     return receipt
 
 
