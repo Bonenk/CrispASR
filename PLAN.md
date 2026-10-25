@@ -1,57 +1,54 @@
 # CrispASR — Pending work
 
-## NOW — release recovery and error backlog (2026-10-25)
+## Release and error follow-up — completed (2026-10-25)
 
-Owner: Codex, branch `fix/release-and-binding-errors-20261025`, base `c08d243de`.
-The user authorized the reviewed agenda, errors before features, with closure
-only after reaching the last item, followed by a fresh GitHub sweep.
+The reviewed agenda was processed through the final license item before any
+closure. Six resolved issues (#556, #555, #552, #551, #549, #518) and two
+integrated PRs (#553, #554) are closed. The subsequent 08:26 UTC sweep found
+no new issues, PRs or actionable follow-ups; only the four dependencies below
+remain open. [Complete receipt](docs/release-errors-2026-10-25.json).
 
-Completed implementation and evidence:
+- Original 0.8.44 CPU wheels and sdist are on PyPI, with all five full anonymous
+  readbacks matching original producer hashes. Recovery 40171262926 reused the
+  successful artifacts. Artifact selection excludes ABI receipts; seven checks
+  guard metadata, completeness and Python 3.10 compatibility. No new tag or
+  rebuilt release artifacts were introduced.
+- Contributor Dart/Rust patches retain original authorship in `1a9ff6889` and
+  `2fdc45923`. Actual hosted builds and all six ABI contracts pass, including
+  malformed UTF-8 and native synthesis-error/null-fallback coverage.
+- Corrected OmniVoice CPU campaign 40171264744 passes all nine arms and both
+  eligible references/targets at unchanged WER <= 0.2 (maximum 1/9). Same-code
+  DSP matches upstream exactly; independent PCM/code/hash/coverage audit passes.
+  Historical M1 judge disagreement remains recorded. This establishes the
+  upstream-processing port's CPU scope, not every GPU, speaker similarity or
+  universal click removal. Full raw proof remains private with exact notices;
+  no CC-BY-NC version or wider fixture-rights grant is invented.
+- Nightly investigation 40171767752 passes pinned sources `8bc09441a` and
+  `96aeb4269` on one AMD EPYC 7763 host. Their data2vec CTC arrays and all four
+  CSM audio PCM streams are byte-identical, with CSM WER 0. Original nightly
+  failures remain unreproduced; no NN fix or gate relaxation is claimed. Keep
+  the old failures and new CPU/compiler/raw evidence for a future failing host,
+  and do not repeat the same passing pair without a new hypothesis/input.
+- Source `008b421e7` passes all 13 CI jobs, 2,094 selected CTest tests (zero
+  failures; four dictionary skips), 189 Python tests and 34 subtests. All10 lint
+  checks, deep analysis, secret scan, six ABI jobs, Dart and Rust pass. Native
+  sources remain unchanged from qualified `96aeb4269`. A later scheduled
+  DeepLint 40173354661 is optional background verification of unchanged C/C++.
 
-- **#556:** original 0.8.44 CPU wheels and sdist published by recovery
-  [40171262926](https://github.com/CrispStrobe/CrispASR/actions/runs/40171262926).
-  All five distributions were anonymously read back in full and match the
-  original producer sizes and SHA256 hashes. No rebuilding or retagging.
-  Artifact selection excludes ABI receipts; seven publication checks reject
-  contamination, wrong metadata and incomplete sets. Follow-up `008b421e7`
-  removes a Python 3.11-only hashing API exposed by the Python 3.10 unit runner.
-- **#553 / #554:** contributor patches are integrated with original authorship
-  in `1a9ff6889` and `2fdc45923`. Actual hosted Dart and Rust native builds pass.
-  All six ABI contracts in run40171253885 pass, including the new malformed
-  UTF-8 case and Rust native-error/null-fallback probe (36 probes, five doctests).
-- **#518:** corrected CPU campaign40171264744 passes all nine roundtrips, both
-  eligible references and both cross-sentence targets, at unchanged WER <= 0.2
-  (maximum 1/9). Same-code DSP matches upstream exactly. Independent PCM/code
-  hashes and coverage pass. Historical M1 judge disagreement remains recorded;
-  this does not establish every GPU, speaker similarity or universal click
-  removal. The full proof bundle remains private: exact upstream notices are
-  retained without inventing a CC-BY-NC version or a wider fixture rights grant.
-- **Nightly investigation:** same-host campaign40171767752 passes both pinned
-  sources `8bc09441a` and `96aeb4269`. Their data2vec Q4 CTC arrays are identical
-  (F16 stage cosine0.999141); all four CSM audio PCM streams are identical with
-  WER0. The older nightly failures remain unreproduced on this AMD EPYC7763
-  host. No NN fix, gate relaxation or cross-host cause is claimed. Retain the
-  old failures and new CPU/compiler/raw-array evidence; do not repeat the same
-  passing pair without a new hypothesis or failing input.
-- **Fresh unit verification:** run40173179590 at `008b421e7` passes all2,094
-  selected CTest tests, including the corrected publication check, plus189
-  Python tests and34 subtests. Secret40173179676 passes. Native source under
-  src/include/CLI/quantizer/ggml remains unchanged from qualified `96aeb4269`.
+External dependencies remain open:
 
-Remaining checks: the other jobs in CI40173179590, Lint40171253899 and optional
-background DeepLint40171253900 are finishing. Required checks precede closure.
-[Current receipt](docs/release-errors-2026-10-25.json).
+- #532: the reported assertion/device/model/clip reproducer is still missing;
+  CPU/T4 allocation controls did not reproduce the crash.
+- #483: actual GTX1660/MX150 MMQ results remain external; paired packages are
+  available through 2026-11-07. Matching CUDA 12.6 packages already resolve the
+  reporter's runtime-version warning.
+- #461: B390 Vulkan profiling must preserve the reported ten-step quality.
+- #456: retain the separate license-review hold; upstream terms still cover
+  generated alignments. No conversion or registry support was added.
 
-The review has reached the final license item. Explicit external dependencies
-remain open: #532 needs the reported assertion/device/model/clip reproducer;
-#483 needs actual GTX1660/MX150 MMQ results (paired artifacts remain available
-until2026-11-07); #461 needs B390 Vulkan profiling with ten-step quality; #456
-retains its separate license-review hold after rechecking upstream terms.
-#555, #552 and #551 already have scoped main implementations and evidence;
-#549's missing CPU publication is now resolved. No issue or PR has been closed
-yet. Close supported resolutions after the remaining checks, then inspect new
-issues/PRs. Heavy CPU work stays on Actions; actual CUDA requires a free Kaggle
-slot. Local compilation was stopped when unrelated load exceeded capacity.
+Heavy CPU work ran on Actions. Local model-free compilation was stopped when
+unrelated load exceeded capacity; no large local inference was run. Any future
+CUDA work requires a free Kaggle slot under the existing usage guide.
 
 ## Granite Speech5 Q4_K (#552) — completed (2026-10-24)
 

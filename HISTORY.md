@@ -1,3 +1,30 @@
+## 2026-10-25 — CPU publication restored and binding errors fixed
+
+Published the original 0.8.44 CPU wheels and sdist after excluding ABI receipts
+from distribution selection. All five anonymous full readbacks match producer
+hashes. Strict metadata/set validation and a Python 3.10 hashing regression now
+run before publication and in CTest. Contributor #553/#554 patches retain their
+authorship; actual Dart/Rust builds and six language ABI contracts pass.
+
+The corrected OmniVoice campaign covers both eligible references and targets:
+all nine CPU roundtrips pass unchanged WER <= 0.2, with exact upstream DSP.
+Raw PCM/code hashes and coverage were independently replayed. Historical M1
+judge disagreement and license/provenance limits remain; no universal click,
+speaker or GPU claim follows. The raw archive remains private.
+
+A matched hosted CPU comparison passes both prior and nightly sources:
+data2vec CTC arrays and four seeded CSM audio streams are byte-identical, CSM
+WER is zero, and the original nightly failures remain unreproduced. No NN fix,
+reference replacement or threshold change was applied. Compiler/CPU/raw-output
+evidence survives for the next investigation.
+
+All 13 CI jobs, ten lint checks, deep analysis and secret scan pass; the unit
+job runs 2,094 selected CTest tests plus 189 Python tests and 34 subtests.
+After the entire agenda and these checks, six resolved issues and two already
+integrated PRs were closed. The fresh sweep found only the four documented
+reproducer/hardware/license dependencies. No new tag or release was created.
+[Publication, checks, model evidence and closure receipt](docs/release-errors-2026-10-25.json).
+
 ## 2026-10-24 — Granite Speech5 Q4_K quantizer/default (#552)
 
 The bare `crispasr-quantize input-f16.gguf output.gguf q4_k` command now keeps
